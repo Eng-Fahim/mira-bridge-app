@@ -43,7 +43,7 @@ public class MiraDashboardFragment extends Fragment {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Handler timeHandler = new Handler(Looper.getMainLooper());
 
-    private static final String BASE_URL = "https://ams.ibreg.org/wp-json/mira-gate/v1/";
+    private static final String BASE_URL = "https://ams.ibreg.org/wp-json/mira-gate/v1/dashboard/summary";
     private static final String API_KEY = "mira_gate_test071234567890abcdefghijklmnop"; 
 
     @Nullable
