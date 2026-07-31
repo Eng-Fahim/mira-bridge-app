@@ -1,9 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your light theme here. -->
         <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+
+        <!-- 🔤 تعيين خط Cairo الأساسي لجميع عناصر Material3 -->
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
     </style>
 
-    <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo" />
+    <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo">
+        <!-- تأكيد توحيد الخط على الثيم المستدعى -->
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+    </style>
 </resources>
