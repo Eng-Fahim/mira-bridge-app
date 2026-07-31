@@ -132,50 +132,56 @@ public class MiraDashboardFragment extends Fragment {
      * جلب البيانات من REST API
      */
     private void fetchDashboardDataFromApi() {
-        executor.execute(() -> {
-            try {
-                URL url = new URL(BASE_URL + "gates/stats");
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
-                conn.setRequestProperty("Accept", "application/json");
-                conn.setConnectTimeout(5000);
+    executor.execute(() -> {
+        try {
+            // 🟢 استخدم الرابط الكامل مباشرة
+            URL url = new URL("https://ams.ibreg.org/wp-json/mira-gate/v1/dashboard/summary");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
+            conn.setRequestProperty("Accept", "application/json");
+            conn.setConnectTimeout(5000);
 
-                int responseCode = conn.getResponseCode();
-                if (responseCode == 200) {
-                    BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                    StringBuilder response = new StringBuilder();
-                    String inputLine;
-                    while ((inputLine = in.readLine()) != null) {
-                        response.append(inputLine);
-                    }
-                    in.close();
+            int responseCode = conn.getResponseCode();
+            if (responseCode == 200) {
+                BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = in.readLine()) != null) {
+                    response.append(line);
+                }
+                in.close();
 
-                    JSONObject jsonResponse = new JSONObject(response.toString());
-                    if (jsonResponse.optBoolean("success")) {
-                        JSONObject data = jsonResponse.getJSONObject("data");
-                        int onlineGates = data.optInt("online", 0);
+                JSONObject jsonResponse = new JSONObject(response.toString());
+                if (jsonResponse.optBoolean("success")) {
+                    JSONObject summary = jsonResponse.getJSONObject("summary");
+                    int totalItems = summary.optInt("total_items", 0);
+                    int soldToday = summary.optInt("sold_today", 0);
+                    int activeGates = summary.optInt("active_gates", 0);
 
-                        mainHandler.post(() -> {
-                            if (tvActiveGates != null) tvActiveGates.setText(String.valueOf(onlineGates));
-                            if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFF16A34A);
-                            if (indicatorDb != null) indicatorDb.setBackgroundColor(0xFF16A34A);
-                            if (tvLastSync != null) tvLastSync.setText("تم التحديث: " + new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date()));
-                        });
-                    }
-                } else {
                     mainHandler.post(() -> {
-                        if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFFDC2626);
-                        if (tvLastSync != null) tvLastSync.setText("خطأ في الاتصال");
+                        if (tvTotalItems != null) tvTotalItems.setText(String.valueOf(totalItems));
+                        if (tvSoldToday != null) tvSoldToday.setText(String.valueOf(soldToday));
+                        if (tvActiveGates != null) tvActiveGates.setText(String.valueOf(activeGates));
+                        if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFF16A34A);
+                        if (indicatorDb != null) indicatorDb.setBackgroundColor(0xFF16A34A);
+                        if (tvLastSync != null) tvLastSync.setText("تم التحديث: " + 
+                            new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date()));
                     });
                 }
-            } catch (Exception e) {
+            } else {
                 mainHandler.post(() -> {
                     if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFFDC2626);
-                    if (tvLastSync != null) tvLastSync.setText("غير متصل");
+                    if (tvLastSync != null) tvLastSync.setText("خطأ: " + responseCode);
                 });
             }
-        });
+        } catch (Exception e) {
+            mainHandler.post(() -> {
+                if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFFDC2626);
+                if (tvLastSync != null) tvLastSync.setText("غير متصل: " + e.getMessage());
+            });
+        }
+    });
     }
 
     @Override
