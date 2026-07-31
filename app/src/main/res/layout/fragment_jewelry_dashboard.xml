@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFFFFF"
+    android:background="#020617"
     android:layoutDirection="rtl">
 
     <LinearLayout
@@ -12,33 +12,51 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- ✅ الصف الأول: الإحصائيات العامة (Grid 2x2) -->
-        <GridLayout
+        <!-- Header -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="💎 لوحة تحكم المجوهرات"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- الإحصائيات العلوية -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:columnCount="2"
-            android:alignmentMode="alignMargins"
-            android:rowOrderPreserved="false">
+            android:orientation="horizontal">
 
             <!-- إجمالي القطع -->
             <androidx.cardview.widget.CardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_columnWeight="1"
-                android:layout_margin="4dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
                 app:cardBackgroundColor="#0F172A"
-                app:cardCornerRadius="12dp">
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:padding="12dp"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="💎" android:textSize="24sp"/>
-                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginStart="8dp">
-                        <TextView android:id="@+id/tvTotalItems" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textColor="#F8FAFC" android:textStyle="bold" android:textSize="18sp"/>
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="إجمالي القطع" android:textColor="#FFFFFF" android:textSize="10sp"/>
-                    </LinearLayout>
+                    android:padding="16dp"
+                    android:orientation="vertical">
+                    <TextView
+                        android:id="@+id/tvTotalItems"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="--"
+                        android:textColor="#38BDF8"
+                        android:textStyle="bold"
+                        android:textSize="22sp"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="إجمالي القطع"
+                        android:textColor="#CBD5E1"
+                        android:textSize="12sp"
+                        android:layout_marginTop="4dp"/>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
@@ -46,79 +64,97 @@
             <androidx.cardview.widget.CardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_columnWeight="1"
-                android:layout_margin="4dp"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
                 app:cardBackgroundColor="#0F172A"
-                app:cardCornerRadius="12dp">
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:padding="12dp"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚖️" android:textSize="24sp"/>
-                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginStart="8dp">
-                        <TextView android:id="@+id/tvTotalWeight" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textColor="#F8FAFC" android:textStyle="bold" android:textSize="18sp"/>
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الوزن الإجمالي (g)" android:textColor="#94A3B8" android:textSize="10sp"/>
-                    </LinearLayout>
+                    android:padding="16dp"
+                    android:orientation="vertical">
+                    <TextView
+                        android:id="@+id/tvTotalWeight"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="-- g"
+                        android:textColor="#10B981"
+                        android:textStyle="bold"
+                        android:textSize="22sp"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="الوزن الإجمالي"
+                        android:textColor="#CBD5E1"
+                        android:textSize="12sp"
+                        android:layout_marginTop="4dp"/>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
-        </GridLayout>
+        </LinearLayout>
 
-        <!-- ✅ الصف الثاني: شريط سعر الذهب الحي -->
+        <!-- سعر الذهب -->
         <androidx.cardview.widget.CardView
-            android:id="@+id/cardGoldTicker"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             app:cardBackgroundColor="#1E1B4B"
-            app:cardCornerRadius="12dp">
-            <RelativeLayout
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp">
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:padding="16dp">
-                <TextView android:id="@+id/tvTrendIcon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🥇" android:textSize="28sp"/>
-                <LinearLayout
+                android:padding="16dp"
+                android:orientation="vertical">
+                <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_toEndOf="@id/tvTrendIcon"
-                    android:layout_marginStart="12dp"
-                    android:orientation="vertical">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="سعر الذهب الحالي (21K)" android:textColor="#94A3B8" android:textSize="11sp"/>
-                    <TextView android:id="@+id/tvGoldPrice" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="- $" android:textColor="#F59E0B" android:textStyle="bold" android:textSize="20sp"/>
-                </LinearLayout>
-            </RelativeLayout>
+                    android:text="سعر الذهب الحالي (21K)"
+                    android:textColor="#A5B4FC"
+                    android:textSize="12sp"/>
+                <TextView
+                    android:id="@+id/tvGoldPrice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="جاري التحميل..."
+                    android:textColor="#F59E0B"
+                    android:textStyle="bold"
+                    android:textSize="24sp"
+                    android:layout_marginTop="4dp"/>
+            </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- ✅ الصف الثالث: الرسوم البيانية (MPAndroidChart) -->
+        <!-- رسم توزيع الأوزان -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="📊 توزيع الأوزان بالمخزن"
-            android:textColor="#F8FAFC"
-            android:layout_marginTop="16dp"
+            android:text="📊 توزيع الأوزان حسب العيار (جرام)"
+            android:textColor="#FFFFFF"
+            android:layout_marginTop="20dp"
+            android:textSize="14sp"
             android:textStyle="bold"/>
 
         <com.github.mikephil.charting.charts.BarChart
             android:id="@+id/barChartWeights"
             android:layout_width="match_parent"
-            android:layout_height="200dp"
+            android:layout_height="220dp"
             android:layout_marginTop="8dp"/>
 
+        <!-- رسم كفاءة التكويد -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="🎯 كفاءة التكويد ومستهدف اليوم"
-            android:textColor="#F8FAFC"
-            android:layout_marginTop="16dp"
+            android:textColor="#FFFFFF"
+            android:layout_marginTop="20dp"
+            android:textSize="14sp"
             android:textStyle="bold"/>
 
         <com.github.mikephil.charting.charts.PieChart
             android:id="@+id/pieChartTarget"
             android:layout_width="match_parent"
-            android:layout_height="200dp"
+            android:layout_height="220dp"
             android:layout_marginTop="8dp"/>
 
     </LinearLayout>
 </ScrollView>
-
