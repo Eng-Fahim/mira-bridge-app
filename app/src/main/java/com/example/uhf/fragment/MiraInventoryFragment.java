@@ -1,4 +1,4 @@
-package com.mira.bridge.ui.inventory;
+package com.example.uhf.fragment;
 
 import android.graphics.Color;
 import android.os.Bundle;
@@ -17,13 +17,12 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.mira.bridge.R;
-import com.mira.bridge.api.MiraApiClient;
-import com.mira.bridge.data.PreferencesManager;
+import com.example.uhf.R;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -34,6 +33,7 @@ import java.util.List;
 import java.util.Locale;
 
 public class MiraInventoryFragment extends Fragment {
+    
 
     // UI
     private TextView tvInventoryStatus, tvExpectedCount, tvScannedCount, tvMissingCount;
