@@ -59,8 +59,9 @@ public class MiraInventoryFragment extends Fragment {
     private Runnable timerRunnable;
 
     // API
-    private MiraApiClient apiClient;
-    private PreferencesManager prefs;
+   /* private MiraApiClient apiClient;
+    private PreferencesManager prefs;*/
+    
 
     @Nullable
     @Override
