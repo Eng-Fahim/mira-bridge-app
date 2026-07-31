@@ -12,6 +12,8 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
@@ -32,9 +34,9 @@ import java.net.URL;
  * MIRA Secure Gate™ Fragment
  * 
  * وضع البوابة الأمنية:
- * - مسح RFID مستمر
- * - استعلام MIRA ID لكل تاق
- * - فتح/قفل البوابة حسب القرار
+ * - مسح RFID مستمر مع تصفية القراءات المكررة (Debounce Filter)
+ * - استعلام MIRA ID لكل تاق مع التعامل الكامل مع استجابات الشبكة
+ * - فتح/قفل البوابة وتنبيهات الواجهة
  */
 public class MiraSecureGateFragment extends Fragment {
 
@@ -42,7 +44,7 @@ public class MiraSecureGateFragment extends Fragment {
 
     private UHFMainActivity mContext;
     private MiraSettingsManager settingsManager;
-    private Handler handler = new Handler(Looper.getMainLooper());
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     // 🟢 عناصر الواجهة
     private TextView tvGateIcon, tvGateStatus, tvLastEvent;
@@ -50,14 +52,19 @@ public class MiraSecureGateFragment extends Fragment {
     private View statusIndicator;
     private Button btnArmGate, btnDisarmGate;
 
-    // 🟢 حالة البوابة
+    // 🟢 حالة البوابة والعدادات
     private boolean gateActive = false;
     private int passCount = 0;
     private int denyCount = 0;
     private int totalCount = 0;
 
+    // 🟢 فحص التكرار (Debounce Mechanism)
+    private String lastScannedEpc = "";
+    private long lastScanTime = 0;
+    private static final long SCAN_COOL_DOWN = 2000; // منع استعلام نفس التاق خلال ثانيتين
+
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_mira_secure_gate, container, false);
         
         tvGateIcon = view.findViewById(R.id.tvGateIcon);
@@ -74,10 +81,12 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
         mContext = (UHFMainActivity) getActivity();
-        settingsManager = MiraSettingsManager.getInstance(mContext);
+        if (mContext != null) {
+            settingsManager = MiraSettingsManager.getInstance(mContext);
+        }
 
         btnArmGate.setOnClickListener(v -> armGate());
         btnDisarmGate.setOnClickListener(v -> disarmGate());
@@ -92,10 +101,7 @@ public class MiraSecureGateFragment extends Fragment {
         gateActive = true;
         updateUI();
         
-        // بدء المسح المستمر
         startContinuousScan();
-        
-        // تحديث حالة البوابة في MIRA ID
         updateGateStatusOnServer("armed");
         
         Toast.makeText(mContext, "🛡️ MIRA Secure Gate™ مفعلة", Toast.LENGTH_SHORT).show();
@@ -108,23 +114,20 @@ public class MiraSecureGateFragment extends Fragment {
         gateActive = false;
         updateUI();
         
-        // إيقاف المسح
         stopContinuousScan();
         
-        // إعادة تعيين الإحصائيات
         passCount = 0;
         denyCount = 0;
         totalCount = 0;
         updateCounters();
         
-        // تحديث حالة البوابة في MIRA ID
         updateGateStatusOnServer("offline");
         
         Toast.makeText(mContext, "🔒 تم إيقاف البوابة", Toast.LENGTH_SHORT).show();
     }
 
     // ============================================
-    // 🟢 المسح المستمر
+    // 🟢 التحكم بمسح الهاردوير (UHF Reader)
     // ============================================
     private void startContinuousScan() {
         if (mContext != null && mContext.mReader != null) {
@@ -146,23 +149,38 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     // ============================================
-    // 🟢 معالجة التاق عند البوابة
+    // 🟢 معالجة التاق مع فلترة التكرار
     // ============================================
     private void processGateTag(UHFTAGInfo tagInfo) {
         if (!gateActive) return;
         
         String epc = tagInfo.getEPC();
-        if (epc == null || epc.isEmpty()) return;
+        if (epc == null || epc.trim().isEmpty()) return;
 
-        totalCount++;
-        updateCounters();
+        long currentTime = System.currentTimeMillis();
+        // منع معالجة التاق نفسه فوراً إذا كان ثابتاً أمام المستشعر
+        if (epc.equals(lastScannedEpc) && (currentTime - lastScanTime < SCAN_COOL_DOWN)) {
+            return;
+        }
 
-        // استعلام MIRA ID
+        lastScannedEpc = epc;
+        lastScanTime = currentTime;
+
+        handler.post(() -> {
+            totalCount++;
+            updateCounters();
+            
+            String shortEpc = epc.length() > 8 ? epc.substring(epc.length() - 8) : epc;
+            tvLastEvent.setText("🔍 جاري التحقق من التاق: ..." + shortEpc);
+            tvLastEvent.setTextColor(Color.parseColor("#FFC107"));
+        });
+
+        // استعلام السيرفر
         queryMiraGate(epc);
     }
 
     // ============================================
-    // 🟢 استعلام MIRA ID
+    // 🟢 استعلام سيرفر MIRA ID
     // ============================================
     private void queryMiraGate(String epc) {
         new Thread(() -> {
@@ -178,8 +196,8 @@ public class MiraSecureGateFragment extends Fragment {
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
                 conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-                conn.setConnectTimeout(3000);
-                conn.setReadTimeout(3000);
+                conn.setConnectTimeout(4000);
+                conn.setReadTimeout(4000);
                 conn.setDoOutput(true);
 
                 JSONObject json = new JSONObject();
@@ -203,37 +221,43 @@ public class MiraSecureGateFragment extends Fragment {
                     JSONObject item = responseJson.optJSONObject("item");
 
                     boolean allowed = decision != null && decision.optBoolean("allowed", false);
-                    String itemTitle = item != null ? item.optString("title", "Unknown") : "Unknown";
+                    String itemTitle = item != null ? item.optString("title", "عنصر غير معروف") : "عنصر غير معروف";
                     String serial = item != null ? item.optString("serial", epc) : epc;
 
                     handler.post(() -> handleGateDecision(allowed, itemTitle, serial));
+                } else {
+                    handler.post(() -> {
+                        tvLastEvent.setText("⚠️ خطأ سيرفر (HTTP " + responseCode + ")");
+                        tvLastEvent.setTextColor(Color.parseColor("#FF9800"));
+                    });
                 }
 
             } catch (Exception e) {
                 Log.e(TAG, "MIRA query error: " + e.getMessage());
+                handler.post(() -> {
+                    tvLastEvent.setText("❌ فشل الاتصال بالشبكة!");
+                    tvLastEvent.setTextColor(Color.RED);
+                });
             }
         }).start();
     }
 
     // ============================================
-    // 🟢 تنفيذ قرار البوابة
+    // 🟢 تنفيذ قرار البوابة في الواجهة
     // ============================================
     private void handleGateDecision(boolean allowed, String itemTitle, String serial) {
         if (allowed) {
-            // ✅ مصرح - فتح البوابة
             passCount++;
             updateCounters();
             
             tvGateStatus.setText("✅ فتح - " + itemTitle);
             tvGateStatus.setTextColor(Color.parseColor("#4CAF50"));
-            statusIndicator.setBackgroundColor(Color.parseColor("#4CAF50"));
+            statusIndicator.setBackgroundResource(R.drawable.circle_indicator_green);
             tvLastEvent.setText("✅ " + serial + " - " + itemTitle);
             tvLastEvent.setTextColor(Color.parseColor("#4CAF50"));
             
-            // محاكاة فتح البوابة
             simulateGateOpen();
             
-            // إعادة التفعيل بعد 3 ثواني
             handler.postDelayed(() -> {
                 if (gateActive) {
                     resetGateUI();
@@ -241,20 +265,17 @@ public class MiraSecureGateFragment extends Fragment {
             }, 3000);
 
         } else {
-            // ❌ غير مصرح - إنذار
             denyCount++;
             updateCounters();
             
             tvGateStatus.setText("🚨 إنذار - " + itemTitle);
             tvGateStatus.setTextColor(Color.parseColor("#F44336"));
-            statusIndicator.setBackgroundColor(Color.parseColor("#F44336"));
+            statusIndicator.setBackgroundResource(R.drawable.circle_indicator_red);
             tvLastEvent.setText("🚨 " + serial + " - غير مصرح!");
             tvLastEvent.setTextColor(Color.RED);
             
-            // محاكاة إنذار
             simulateAlert();
             
-            // إعادة التفعيل بعد 2 ثانية
             handler.postDelayed(() -> {
                 if (gateActive) {
                     resetGateUI();
@@ -264,49 +285,40 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     // ============================================
-    // 🟢 محاكاة فتح البوابة
+    // 🟢 محاكاة الإشارات والأصوات
     // ============================================
     private void simulateGateOpen() {
         tvGateIcon.setText("✅");
-        // هنا يتم استدعاء UsbRelayController لفتح البوابة فعلياً
-        // UsbRelayController.open(1);
-        
         if (mContext != null) {
             mContext.playSound(1);
         }
     }
 
-    // ============================================
-    // 🟢 محاكاة الإنذار
-    // ============================================
     private void simulateAlert() {
         tvGateIcon.setText("🚨");
-        // هنا يتم استدعاء UsbRelayController للإنذار
-        // UsbRelayController.buzzerOn();
-        
         if (mContext != null) {
             mContext.playSound(2);
         }
     }
 
     // ============================================
-    // 🟢 إعادة تعيين واجهة البوابة
+    // 🟢 إعادة تعيين الواجهة للوضع الجاهز
     // ============================================
     private void resetGateUI() {
         tvGateIcon.setText("🚪");
         tvGateStatus.setText("🛡️ البوابة مفعلة - جاري المسح");
         tvGateStatus.setTextColor(Color.parseColor("#FFFFFF"));
-        statusIndicator.setBackgroundColor(Color.parseColor("#4CAF50"));
+        statusIndicator.setBackgroundResource(R.drawable.circle_indicator_green);
     }
 
     // ============================================
-    // 🟢 تحديث الواجهة
+    // 🟢 تحديث الواجهة والعدادات
     // ============================================
     private void updateUI() {
         if (gateActive) {
             tvGateStatus.setText("🛡️ البوابة مفعلة - جاري المسح");
             tvGateStatus.setTextColor(Color.parseColor("#FFFFFF"));
-            statusIndicator.setBackgroundColor(Color.parseColor("#4CAF50"));
+            statusIndicator.setBackgroundResource(R.drawable.circle_indicator_green);
             btnArmGate.setEnabled(false);
             btnArmGate.setAlpha(0.5f);
             btnDisarmGate.setEnabled(true);
@@ -314,7 +326,7 @@ public class MiraSecureGateFragment extends Fragment {
         } else {
             tvGateStatus.setText("🔒 البوابة غير مفعلة");
             tvGateStatus.setTextColor(Color.parseColor("#FFFFFF"));
-            statusIndicator.setBackgroundColor(Color.parseColor("#F44336"));
+            statusIndicator.setBackgroundResource(R.drawable.circle_indicator_red);
             btnArmGate.setEnabled(true);
             btnArmGate.setAlpha(1.0f);
             btnDisarmGate.setEnabled(false);
@@ -329,7 +341,7 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     // ============================================
-    // 🟢 تحديث حالة البوابة في MIRA ID
+    // 🟢 تحديث حالة البوابة على السيرفر
     // ============================================
     private void updateGateStatusOnServer(String status) {
         new Thread(() -> {
@@ -343,6 +355,7 @@ public class MiraSecureGateFragment extends Fragment {
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setRequestProperty("X-MIRA-API-Key", apiKey);
+                conn.setConnectTimeout(3000);
                 conn.setDoOutput(true);
 
                 JSONObject json = new JSONObject();
