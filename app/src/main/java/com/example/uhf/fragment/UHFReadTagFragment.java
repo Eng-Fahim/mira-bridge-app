@@ -1,10 +1,7 @@
-package com.rfid.uhf;
+package com.example.uhf.fragment;
 
 import android.graphics.Color;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.os.Message;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -17,6 +14,10 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+
+import com.example.uhf.R; // استيراد ملف الـ R الخاص بالـ Package
+// إذا كان MiraSettingsManager في كلاس محدد أو نفس الباكيج، يرجى التثبت من استيراده إذا لزم:
+// import com.example.uhf.MiraSettingsManager; 
 
 import org.json.JSONObject;
 
@@ -235,10 +236,10 @@ public class UHFReadTagFragment extends Fragment {
             if (tvHeaderStatus != null) {
                 if (allowed) {
                     tvHeaderStatus.setText("✓ PASSED — AUTHORIZED DISPATCH");
-                    tvHeaderStatus.setTextColor(Color.parseColor("#4ADE80")); // الأخضر المضيء
+                    tvHeaderStatus.setTextColor(Color.parseColor("#4ADE80"));
                 } else {
                     tvHeaderStatus.setText("☒ BLOCKED — UNAUTHORIZED");
-                    tvHeaderStatus.setTextColor(Color.parseColor("#EF4444")); // الأحمر
+                    tvHeaderStatus.setTextColor(Color.parseColor("#EF4444"));
                 }
             }
 
@@ -246,7 +247,7 @@ public class UHFReadTagFragment extends Fragment {
             Log.e(TAG, "JSON parse error: " + e.getMessage());
             if (tvHeaderStatus != null) {
                 tvHeaderStatus.setText("INVALID RESPONSE FORMAT");
-                tvHeaderStatus.setTextColor(Color.parseColor("#F59E0B")); // البرتقالي
+                tvHeaderStatus.setTextColor(Color.parseColor("#F59E0B"));
             }
         }
     }
