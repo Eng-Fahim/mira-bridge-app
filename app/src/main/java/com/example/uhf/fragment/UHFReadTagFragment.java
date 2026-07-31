@@ -1,5 +1,7 @@
 package com.example.uhf.fragment;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
@@ -15,9 +17,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
-import com.example.uhf.R; // استيراد ملف الـ R الخاص بالـ Package
-// إذا كان MiraSettingsManager في كلاس محدد أو نفس الباكيج، يرجى التثبت من استيراده إذا لزم:
-// import com.example.uhf.MiraSettingsManager; 
+import com.example.uhf.R;
 
 import org.json.JSONObject;
 
@@ -32,6 +32,7 @@ import java.util.Locale;
 public class UHFReadTagFragment extends Fragment {
 
     private static final String TAG = "UHFReadTagFragment";
+    private static final String PREFS_NAME = "mira_settings";
 
     // MIRA UI Elements
     private View cardMiraResult;
@@ -46,8 +47,6 @@ public class UHFReadTagFragment extends Fragment {
     private EditText etGtinInput;
     private Button btnScan;
 
-    private MiraSettingsManager settingsManager;
-
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -58,12 +57,7 @@ public class UHFReadTagFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // تهيئة مدير الإعدادات
-        if (getContext() != null) {
-            settingsManager = MiraSettingsManager.getInstance(getContext());
-        }
-
-        // ربط عناصر واجهة المستخدم للتصميم الداكن الجديد (Dark UI)
+        // ربط عناصر واجهة المستخدم للتصميم الداكن (Dark UI)
         cardMiraResult = view.findViewById(R.id.cardMiraResult);
         tvMiraProductName = view.findViewById(R.id.tvProductName);
         tvHeaderStatus = view.findViewById(R.id.tvHeaderStatus);
@@ -91,17 +85,15 @@ public class UHFReadTagFragment extends Fragment {
     }
 
     /**
-     * إرسال رمز EPC/Tag إلى خادم MIRA المعتمد وتحديث بطاقة العرض الداكنة.
-     *
-     * @param epc  قيمة RFID EPC أو الباروكود
-     * @param rssi قوة الإشارة (اختياري)
+     * إرسال رمز EPC/Tag إلى خادم MIRA المعتمد وتحديث بطاقة العرض.
      */
     public void sendTagToMiraServer(final String epc, final String rssi) {
-        if (settingsManager == null && getContext() != null) {
-            settingsManager = MiraSettingsManager.getInstance(getContext());
+        SharedPreferences prefs = null;
+        if (getContext() != null) {
+            prefs = getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         }
 
-        final boolean showCard = settingsManager == null || settingsManager.getBoolean("show_mira_card", true);
+        final boolean showCard = prefs == null || prefs.getBoolean("show_mira_card", true);
 
         // إظهار البطاقة في حالة الإعدادات المفعلة
         if (getActivity() != null) {
@@ -112,7 +104,9 @@ public class UHFReadTagFragment extends Fragment {
             });
         }
 
-        // تنفيذ الطلب الشبكي في Thread منفصل لعدم تجميد الـ UI
+        final SharedPreferences finalPrefs = prefs;
+
+        // تنفيذ الطلب الشبكي في Thread منفصل
         new Thread(() -> {
             InputStream inputStream = null;
             try {
@@ -121,10 +115,10 @@ public class UHFReadTagFragment extends Fragment {
                 String apiKey = "mira_gate_test071234567890abcdefghijklmnop";
                 String gateId = "handheld_c72";
 
-                if (settingsManager != null) {
-                    apiUrl = settingsManager.getString("mira_api_url", apiUrl);
-                    apiKey = settingsManager.getString("mira_api_key", apiKey);
-                    gateId = settingsManager.getString("mira_gate_id", gateId);
+                if (finalPrefs != null) {
+                    apiUrl = finalPrefs.getString("mira_api_url", apiUrl);
+                    apiKey = finalPrefs.getString("mira_api_key", apiKey);
+                    gateId = finalPrefs.getString("mira_gate_id", gateId);
                 }
 
                 URL url = new URL(apiUrl);
