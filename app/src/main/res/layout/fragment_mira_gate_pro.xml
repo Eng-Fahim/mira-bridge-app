@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0A0E27"
+    android:gravity="center"
+    android:padding="20dp">
+
+    <!-- Gate Icon -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🚪"
+        android:textSize="80sp"
+        android:layout_marginBottom="8dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="MIRA SECURE GATE™"
+        android:textColor="#FFFFFF"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.2"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Intelligent Jewelry Security Gate"
+        android:textColor="#90A4AE"
+        android:textSize="12sp"
+        android:layout_marginBottom="24dp" />
+
+    <!-- Gate Status -->
+    <View
+        android:id="@+id/statusIndicator"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:background="@drawable/circle_indicator_green"
+        android:layout_marginBottom="12dp" />
+
+    <TextView
+        android:id="@+id/tvGateStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🛡️ GATE ARMED"
+        android:textColor="#4CAF50"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="20dp" />
+
+    <!-- Statistics -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="20dp"
+        android:background="#1A1E3A"
+        android:padding="16dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+            <TextView android:id="@+id/tvPassCount" android:text="127" android:textColor="#4CAF50" android:textSize="32sp" android:textStyle="bold"/>
+            <TextView android:text="AUTHORIZED" android:textColor="#81C784" android:textSize="9sp" android:textStyle="bold"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+            <TextView android:id="@+id/tvDenyCount" android:text="3" android:textColor="#F44336" android:textSize="32sp" android:textStyle="bold"/>
+            <TextView android:text="DENIED" android:textColor="#EF9A9A" android:textSize="9sp" android:textStyle="bold"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+            <TextView android:id="@+id/tvUnknownCount" android:text="0" android:textColor="#FF9800" android:textSize="32sp" android:textStyle="bold"/>
+            <TextView android:text="UNKNOWN" android:textColor="#FFCC80" android:textSize="9sp" android:textStyle="bold"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Control Buttons -->
+    <Button
+        android:id="@+id/btnArm"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="🛡️ ARM GATE"
+        android:background="#4CAF50"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:textSize="16sp"
+        android:layout_marginBottom="8dp" />
+
+    <Button
+        android:id="@+id/btnDisarm"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="🔒 DISARM GATE"
+        android:background="#F44336"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:textSize="16sp"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Footer -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Powered by Chainway C72 UHF"
+            android:textColor="#455A64"
+            android:textSize="10sp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="MIRA Technology © 2026 | mira-id.com"
+            android:textColor="#546E7A"
+            android:textSize="9sp"
+            android:layout_marginTop="2dp" />
+    </LinearLayout>
+
+</LinearLayout>
