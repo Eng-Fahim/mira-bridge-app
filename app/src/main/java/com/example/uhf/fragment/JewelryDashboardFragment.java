@@ -112,8 +112,8 @@ public class JewelryDashboardFragment extends Fragment {
     }
 
     private void fetchFullEnterpriseData() {
-        String apiUrl = "https://your-domain.com/wp-json/mira/v1/enterprise-dashboard";
-
+        conn.setRequestProperty("X-MIRA-API-Key", "mira_gate_test071234567890abcdefghijklmnop");
+        String apiUrl = "https://ams.ibreg.org/wp-json/mira-gate/v1/dashboard/full";
         new Thread(() -> {
             try {
                 URL url = new URL(apiUrl);
