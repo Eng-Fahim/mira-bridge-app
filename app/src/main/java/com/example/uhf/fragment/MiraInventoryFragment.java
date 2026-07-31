@@ -33,9 +33,8 @@ import java.util.List;
 import java.util.Locale;
 
 public class MiraInventoryFragment extends Fragment {
-    
 
-    // UI
+    // UI Elements
     private TextView tvInventoryStatus, tvExpectedCount, tvScannedCount, tvMissingCount;
     private TextView tvAccuracy, tvElapsedTime, tvLocation, tvLastScan, tvRssi;
     private View progressScanned;
@@ -57,11 +56,28 @@ public class MiraInventoryFragment extends Fragment {
     // Handlers
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable timerRunnable;
+    private Handler simulationHandler = new Handler(Looper.getMainLooper());
+    private Runnable simulationRunnable;
+    private int simulationIndex = 0;
 
-    // API
-   /* private MiraApiClient apiClient;
-    private PreferencesManager prefs;*/
-    
+    // 🟢 قائمة القطع الاختبارية (GTINs حقيقية + اختبارية)
+    private String[][] testItems = {
+        {"070000000010", "Gold Ring 21K", "21K", "5.20g", "Main Showroom"},
+        {"070000000030", "Gold Bracelet 18K", "18K", "12.80g", "Main Showroom"},
+        {"070000000040", "Gold Necklace 24K", "24K", "25.00g", "Main Showroom"},
+        {"070000000050", "Gold Earrings 21K", "21K", "3.20g", "Main Showroom"},
+        {"0700000007927", "Gold Chain 18K", "18K", "15.50g", "Main Showroom"},
+        {"0700000007928", "Gold Bangle 22K", "22K", "18.30g", "Main Showroom"},
+        {"0700000007929", "Gold Pendant 21K", "21K", "8.10g", "Main Showroom"},
+        {"070045537109", "Gold Coin 24K", "24K", "10.00g", "Main Showroom"},
+        {"070069121817", "Gold Cufflinks 18K", "18K", "6.40g", "Main Showroom"},
+        {"070073594930", "Gold Anklet 21K", "21K", "7.80g", "Main Showroom"},
+        {"070077306396", "Gold Brooch 22K", "22K", "9.20g", "Main Showroom"},
+        {"BWA-26000101", "21K Diamond Ring", "21K", "5.20g", "Main Showroom"},
+    };
+
+    private static final String API_URL = "https://ams.ibreg.org/wp-json/mira-gate/v1/authorize";
+    private static final String API_KEY = "mira_gate_test071234567890abcdefghijklmnop";
 
     @Nullable
     @Override
@@ -99,49 +115,233 @@ public class MiraInventoryFragment extends Fragment {
         return v;
     }
 
-    /**
-     * 🟢 بدء جلسة الجرد
-     */
+    // ============================================
+    // 🟢 بدء جلسة الجرد
+    // ============================================
     private void startInventory() {
         isScanning = true;
         startTime = System.currentTimeMillis();
         scannedItems.clear();
         scannedCount = 0;
+        simulationIndex = 0;
         adapter.notifyDataSetChanged();
 
         tvInventoryStatus.setText("● SCANNING");
         tvInventoryStatus.setTextColor(Color.parseColor("#38BDF8"));
 
+        // 🟢 محاكاة - بيانات اختبارية
+        expectedCount = testItems.length;
+        sessionId = (int) (System.currentTimeMillis() / 1000);
+        tvExpectedCount.setText(String.valueOf(expectedCount));
+        tvLocation.setText("Main Showroom");
+        updateUI();
+
         // 🟢 استدعاء API لبدء الجلسة
-        startInventorySession();
+        startInventorySessionOnServer();
 
         // 🟢 بدء المؤقت
         startTimer();
 
-        Toast.makeText(getContext(), "🟢 Inventory Started", Toast.LENGTH_SHORT).show();
+        // 🟢 بدء المحاكاة
+        startSimulation();
+
+        Toast.makeText(getContext(), "🟢 Inventory Started - " + expectedCount + " items expected", Toast.LENGTH_SHORT).show();
     }
 
-    /**
-     * 🔴 إيقاف جلسة الجرد
-     */
+    // ============================================
+    // 🔴 إيقاف جلسة الجرد
+    // ============================================
     private void stopInventory() {
         isScanning = false;
+
+        // إيقاف المحاكاة
+        if (simulationRunnable != null) {
+            simulationHandler.removeCallbacks(simulationRunnable);
+        }
 
         tvInventoryStatus.setText("● IDLE");
         tvInventoryStatus.setTextColor(Color.parseColor("#22C55E"));
 
-        // 🟢 إيقاف المؤقت
         stopTimer();
 
-        // 🟢 استدعاء API لإغلاق الجلسة
-        closeInventorySession();
+        // استدعاء API لإغلاق الجلسة
+        closeInventorySessionOnServer();
 
-        Toast.makeText(getContext(), "🔴 Inventory Stopped", Toast.LENGTH_SHORT).show();
+        Toast.makeText(getContext(), "🔴 Inventory Stopped - " + scannedCount + " items scanned", Toast.LENGTH_SHORT).show();
     }
 
-    /**
-     * ⏱️ بدء المؤقت
-     */
+    // ============================================
+    // 🟢 محاكاة المسح التلقائي
+    // ============================================
+    private void startSimulation() {
+        simulationIndex = 0;
+        simulationRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!isScanning || simulationIndex >= testItems.length) {
+                    if (isScanning) {
+                        stopInventory();
+                        Toast.makeText(getContext(), "✅ Simulation Complete: " + scannedCount + "/" + expectedCount + " items", Toast.LENGTH_LONG).show();
+                    }
+                    return;
+                }
+
+                String[] item = testItems[simulationIndex];
+                String serial = item[0];
+                String title = item[1];
+                String karat = item[2];
+                String weight = item[3];
+                String location = item[4];
+
+                // إضافة إلى القائمة
+                scannedItems.add(0, new InventoryItem(serial, title, karat, weight, "✓", location));
+                scannedCount++;
+                adapter.notifyItemInserted(0);
+                rvInventoryItems.scrollToPosition(0);
+
+                // تحديث الواجهة
+                tvLastScan.setText(serial);
+                tvRssi.setText("-" + (40 + (int)(Math.random() * 30)) + " dBm");
+                updateUI();
+
+                // محاكاة استعلام MIRA ID
+                simulateMiraQuery(serial, title, karat, weight);
+
+                simulationIndex++;
+
+                // تأخير عشوائي بين المسحات
+                int delay = 600 + (int)(Math.random() * 900);
+                simulationHandler.postDelayed(this, delay);
+            }
+        };
+
+        simulationHandler.postDelayed(simulationRunnable, 800);
+    }
+
+    // ============================================
+    // 🟢 محاكاة استعلام MIRA ID
+    // ============================================
+    private void simulateMiraQuery(String serial, String title, String karat, String weight) {
+        new Thread(() -> {
+            try {
+                URL url = new URL(API_URL);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(5000);
+
+                JSONObject body = new JSONObject();
+                body.put("epc", serial);
+                body.put("gate_id", "handheld_c72");
+                body.put("rssi", "-" + (40 + (int)(Math.random() * 30)));
+                conn.getOutputStream().write(body.toString().getBytes("utf-8"));
+
+                int responseCode = conn.getResponseCode();
+                if (responseCode == 200) {
+                    BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = in.readLine()) != null) sb.append(line);
+                    in.close();
+
+                    // 🟢 يمكن استخدام الرد لتحديث معلومات القطعة
+                    JSONObject json = new JSONObject(sb.toString());
+                    // Log response for debugging
+                }
+            } catch (Exception e) {
+                // فشل الاتصال - يتم تجاهله في المحاكاة
+            }
+        }).start();
+    }
+
+    // ============================================
+    // ☁️ بدء جلسة الجرد في MIRA ID
+    // ============================================
+    private void startInventorySessionOnServer() {
+        new Thread(() -> {
+            try {
+                URL url = new URL("https://ams.ibreg.org/wp-json/mira-gate/v1/inventory/start-session");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
+                conn.setDoOutput(true);
+
+                JSONObject body = new JSONObject();
+                body.put("location", "Main Showroom");
+                body.put("type", "full");
+                conn.getOutputStream().write(body.toString().getBytes("utf-8"));
+
+                if (conn.getResponseCode() == 200) {
+                    BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = in.readLine()) != null) sb.append(line);
+                    in.close();
+
+                    JSONObject json = new JSONObject(sb.toString());
+                    int serverSessionId = json.optInt("session_id", 0);
+                    int serverExpected = json.optInt("expected_count", 0);
+
+                    getActivity().runOnUiThread(() -> {
+                        if (serverSessionId > 0) sessionId = serverSessionId;
+                        if (serverExpected > 0) {
+                            expectedCount = serverExpected;
+                            tvExpectedCount.setText(String.valueOf(expectedCount));
+                        }
+                        updateUI();
+                    });
+                }
+            } catch (Exception e) {
+                // استخدام القيم المحلية
+            }
+        }).start();
+    }
+
+    // ============================================
+    // ☁️ إغلاق جلسة الجرد
+    // ============================================
+    private void closeInventorySessionOnServer() {
+        new Thread(() -> {
+            try {
+                URL url = new URL("https://ams.ibreg.org/wp-json/mira-gate/v1/inventory/close-session");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
+                conn.setDoOutput(true);
+
+                JSONObject body = new JSONObject();
+                body.put("session_id", sessionId);
+                conn.getOutputStream().write(body.toString().getBytes("utf-8"));
+
+                if (conn.getResponseCode() == 200) {
+                    BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = in.readLine()) != null) sb.append(line);
+                    in.close();
+
+                    JSONObject json = new JSONObject(sb.toString());
+                    JSONObject report = json.getJSONObject("report");
+                    double accuracy = report.optDouble("accuracy", 0);
+
+                    getActivity().runOnUiThread(() -> {
+                        tvAccuracy.setText("Accuracy: " + accuracy + "%");
+                        updateUI();
+                    });
+                }
+            } catch (Exception e) {
+                // تجاهل
+            }
+        }).start();
+    }
+
+    // ============================================
+    // ⏱️ المؤقت
+    // ============================================
     private void startTimer() {
         timerRunnable = new Runnable() {
             @Override
@@ -163,109 +363,51 @@ public class MiraInventoryFragment extends Fragment {
         }
     }
 
-    /**
-     * ☁️ بدء جلسة الجرد في MIRA ID
-     */
-    private void startInventorySession() {
-        new Thread(() -> {
-            try {
-                URL url = new URL("https://ams.ibreg.org/wp-json/mira-gate/v1/inventory/start-session");
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setRequestProperty("X-MIRA-API-Key", "mira_gate_test071234567890abcdefghijklmnop");
-                conn.setDoOutput(true);
-
-                JSONObject body = new JSONObject();
-                body.put("location", "Main Showroom");
-                body.put("type", "full");
-                conn.getOutputStream().write(body.toString().getBytes("utf-8"));
-
-                if (conn.getResponseCode() == 200) {
-                    java.io.BufferedReader in = new java.io.BufferedReader(
-                        new java.io.InputStreamReader(conn.getInputStream()));
-                    StringBuilder sb = new StringBuilder();
-                    String line;
-                    while ((line = in.readLine()) != null) sb.append(line);
-                    in.close();
-
-                    JSONObject json = new JSONObject(sb.toString());
-                    sessionId = json.optInt("session_id", 0);
-                    expectedCount = json.optInt("expected_count", 0);
-
-                    getActivity().runOnUiThread(() -> {
-                        tvExpectedCount.setText(String.valueOf(expectedCount));
-                        updateUI();
-                    });
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
-    }
-
-    /**
-     * ☁️ إغلاق جلسة الجرد
-     */
-    private void closeInventorySession() {
-        new Thread(() -> {
-            try {
-                URL url = new URL("https://ams.ibreg.org/wp-json/mira-gate/v1/inventory/close-session");
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setRequestProperty("X-MIRA-API-Key", "mira_gate_test071234567890abcdefghijklmnop");
-                conn.setDoOutput(true);
-
-                JSONObject body = new JSONObject();
-                body.put("session_id", sessionId);
-                conn.getOutputStream().write(body.toString().getBytes("utf-8"));
-
-                if (conn.getResponseCode() == 200) {
-                    java.io.BufferedReader in = new java.io.BufferedReader(
-                        new java.io.InputStreamReader(conn.getInputStream()));
-                    StringBuilder sb = new StringBuilder();
-                    String line;
-                    while ((line = in.readLine()) != null) sb.append(line);
-                    in.close();
-
-                    JSONObject json = new JSONObject(sb.toString());
-                    JSONObject report = json.getJSONObject("report");
-                    double accuracy = report.optDouble("accuracy", 0);
-
-                    getActivity().runOnUiThread(() -> {
-                        tvAccuracy.setText("Accuracy: " + accuracy + "%");
-                        updateUI();
-                    });
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
-    }
-
-    /**
-     * 📋 توليد تقرير
-     */
+    // ============================================
+    // 📋 توليد تقرير
+    // ============================================
     private void generateReport() {
         StringBuilder report = new StringBuilder();
-        report.append("=== MIRA Inventory Report ===\n");
-        report.append("Date: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date())).append("\n");
+        report.append("═══════════════════════════\n");
+        report.append("  MIRA INVENTORY REPORT\n");
+        report.append("═══════════════════════════\n");
+        report.append("Date: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date())).append("\n");
+        report.append("Location: Main Showroom\n");
+        report.append("───────────────────────────\n");
         report.append("Expected: ").append(expectedCount).append("\n");
-        report.append("Scanned: ").append(scannedCount).append("\n");
-        report.append("Missing: ").append(missingCount).append("\n\n");
+        report.append("Scanned:  ").append(scannedCount).append("\n");
+        report.append("Missing:  ").append(missingCount).append("\n");
+        report.append("Accuracy: ").append(String.format("%.1f%%", expectedCount > 0 ? (scannedCount * 100.0 / expectedCount) : 0)).append("\n");
+        report.append("───────────────────────────\n");
+        report.append("Duration: ").append(tvElapsedTime.getText()).append("\n");
+        report.append("═══════════════════════════\n\n");
+        report.append("SCANNED ITEMS:\n");
+        report.append("───────────────────────────\n");
 
+        int count = 1;
         for (InventoryItem item : scannedItems) {
-            report.append(item.status).append(" ").append(item.serial).append(" | ").append(item.title).append("\n");
+            report.append(String.format("%2d. %s | %s | %s | %s\n",
+                count++, item.serial, item.title, item.karat, item.weight));
         }
 
-        Toast.makeText(getContext(), "Report Generated!", Toast.LENGTH_SHORT).show();
-        tvLastScan.setText("Report ready");
+        report.append("═══════════════════════════\n");
+        report.append("MIRA Technology © 2026\n");
+        report.append("mira-id.com\n");
+
+        tvLastScan.setText("Report Generated ✓");
+        Toast.makeText(getContext(), "📋 Report Generated!\n" + scannedCount + " items listed", Toast.LENGTH_LONG).show();
+
+        // يمكن حفظ التقرير أو مشاركته
+        android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
+            getContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+        android.content.ClipData clip = android.content.ClipData.newPlainText("MIRA Report", report.toString());
+        clipboard.setPrimaryClip(clip);
+        Toast.makeText(getContext(), "📋 Report copied to clipboard!", Toast.LENGTH_SHORT).show();
     }
 
-    /**
-     * تحديث الواجهة
-     */
+    // ============================================
+    // 🟢 تحديث الواجهة
+    // ============================================
     private void updateUI() {
         tvScannedCount.setText(String.valueOf(scannedCount));
         missingCount = expectedCount - scannedCount;
@@ -276,20 +418,23 @@ public class MiraInventoryFragment extends Fragment {
         tvAccuracy.setText("Accuracy: " + String.format("%.1f%%", accuracy));
 
         // Progress bar
-        int progressPercent = expectedCount > 0 ? (scannedCount * 100) / expectedCount : 0;
-        progressScanned.getLayoutParams().width = (progressPercent * rvInventoryItems.getWidth()) / 100;
-        progressScanned.requestLayout();
+        if (rvInventoryItems.getWidth() > 0) {
+            int progressPercent = expectedCount > 0 ? (scannedCount * 100) / expectedCount : 0;
+            int maxWidth = rvInventoryItems.getWidth();
+            progressScanned.getLayoutParams().width = Math.max(1, (progressPercent * maxWidth) / 100);
+            progressScanned.requestLayout();
+        }
     }
 
-    /**
-     * 🟢 نموذج عنصر الجرد
-     */
+    // ============================================
+    // 📋 نموذج عنصر الجرد
+    // ============================================
     public static class InventoryItem {
         String serial;
         String title;
         String karat;
         String weight;
-        String status; // ✓ or ✗
+        String status;
         String location;
 
         public InventoryItem(String serial, String title, String karat, String weight, String status, String location) {
@@ -302,9 +447,9 @@ public class MiraInventoryFragment extends Fragment {
         }
     }
 
-    /**
-     * 📋 Adapter للقائمة
-     */
+    // ============================================
+    // 📋 Adapter للقائمة
+    // ============================================
     private class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.ViewHolder> {
 
         private List<InventoryItem> items;
@@ -357,5 +502,8 @@ public class MiraInventoryFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         stopTimer();
+        if (simulationRunnable != null) {
+            simulationHandler.removeCallbacks(simulationRunnable);
+        }
     }
-}
+            }
