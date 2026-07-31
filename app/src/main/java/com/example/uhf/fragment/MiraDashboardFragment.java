@@ -1,154 +1,194 @@
-package com.example.uhf.fragment;
+package com.mira.hardware.ui;
 
-import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.EditText;
-import android.widget.ListView;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
 import android.widget.TextView;
-import com.example.uhf.R;
-import com.example.uhf.activity.UHFMainActivity;
+import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+
+import com.mira.hardware.R;
+
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-public class MiraDashboardFragment extends KeyDwonFragment {
+public class MiraDashboardFragment extends Fragment {
 
-    private UHFMainActivity mContext;
-    private final Handler handler = new Handler(Looper.getMainLooper());
-    private Runnable updateRunnable;
+    // عناصر الواجهة
+    private TextView tvGreeting, tvDate, tvTime;
+    private TextView tvTotalItems, tvSoldToday, tvActiveGates;
+    private TextView tvSystemStatus, tvLastSync;
+    private View indicatorApi, indicatorDb, indicatorGate;
+    private TextView tvRecent1, tvRecent2, tvRecent3;
+    private View cardScan, cardGate, cardRadar, cardSettings;
 
-    // 1. ربط العناصر الفعالة من ملف XML
-    private TextView tvTime, tvBatchTotal, tvBatchAllowed, tvBatchAllowedPct;
-    private TextView tvBatchBlocked, tvBatchBlockedPct, tvBatchUnknown, tvBatchUnknownPct;
-    private TextView tvCount, tvTotal;
-    private EditText etGtinInput, etTime;
-    private Button btnCheckGtin, btInventory, btClear;
-    private ListView lvTags;
-    private RadioGroup rgInventory;
-    private RadioButton rbInventorySingle, rbInventoryLoop;
-    private CheckBox cbFilter;
-    private View layoutFilter;
+    // الخيوط الموازية وإدارة الوقت
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Handler timeHandler = new Handler(Looper.getMainLooper());
 
+    // إعدادات الـ API (يمكن جلبها من SharedPreferences)
+    private static final String BASE_URL = "https://your-domain.com/wp-json/mira-gate/v1/";
+    private static final String API_KEY = "YOUR_MIRA_API_KEY_HERE"; 
+
+    @Nullable
     @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        if (context instanceof UHFMainActivity) {
-            mContext = (UHFMainActivity) context;
-        }
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View v = inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
+
+        initViews(v);
+        setupNavigationListeners();
+        startTimeClock();
+        fetchDashboardDataFromApi();
+
+        return v;
     }
 
-    @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
-    }
-
-    @Override
-    public void onViewCreated(View v, Bundle savedInstanceState) {
-        super.onViewCreated(v, savedInstanceState);
-
-        // 2. التعريف بالعناصر المعتمدة داخل fragment_mira_dashboard.xml
+    private void initViews(View v) {
+        tvGreeting = v.findViewById(R.id.tvGreeting);
+        tvDate = v.findViewById(R.id.tvDate);
         tvTime = v.findViewById(R.id.tvTime);
-        tvBatchTotal = v.findViewById(R.id.tvBatchTotal);
-        tvBatchAllowed = v.findViewById(R.id.tvBatchAllowed);
-        tvBatchAllowedPct = v.findViewById(R.id.tvBatchAllowedPct);
-        tvBatchBlocked = v.findViewById(R.id.tvBatchBlocked);
-        tvBatchBlockedPct = v.findViewById(R.id.tvBatchBlockedPct);
-        tvBatchUnknown = v.findViewById(R.id.tvBatchUnknown);
-        tvBatchUnknownPct = v.findViewById(R.id.tvBatchUnknownPct);
-        
-        tvCount = v.findViewById(R.id.tv_count);
-        tvTotal = v.findViewById(R.id.tv_total);
-        lvTags = v.findViewById(R.id.LvTags);
 
-        etGtinInput = v.findViewById(R.id.etGtinInput);
-        btnCheckGtin = v.findViewById(R.id.btnCheckGtin);
-        btInventory = v.findViewById(R.id.BtInventory);
-        btClear = v.findViewById(R.id.BtClear);
-        
-        cbFilter = v.findViewById(R.id.cbFilter);
-        layoutFilter = v.findViewById(R.id.layout_filter);
+        tvTotalItems = v.findViewById(R.id.tvTotalItems);
+        tvSoldToday = v.findViewById(R.id.tvSoldToday);
+        tvActiveGates = v.findViewById(R.id.tvActiveGates);
 
-        // إظهار وإخفاء قسم الفلترة
-        if (cbFilter != null && layoutFilter != null) {
-            cbFilter.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                layoutFilter.setVisibility(isChecked ? View.VISIBLE : View.GONE);
-            });
+        tvSystemStatus = v.findViewById(R.id.tvSystemStatus);
+        tvLastSync = v.findViewById(R.id.tvLastSync);
+
+        indicatorApi = v.findViewById(R.id.indicatorApi);
+        indicatorDb = v.findViewById(R.id.indicatorDb);
+        indicatorGate = v.findViewById(R.id.indicatorGate);
+
+        tvRecent1 = v.findViewById(R.id.tvRecent1);
+        tvRecent2 = v.findViewById(R.id.tvRecent2);
+        tvRecent3 = v.findViewById(R.id.tvRecent3);
+
+        cardScan = v.findViewById(R.id.cardScan);
+        cardGate = v.findViewById(R.id.cardGate);
+        cardRadar = v.findViewById(R.id.cardRadar);
+        cardSettings = v.findViewById(R.id.cardSettings);
+    }
+
+    /**
+     * تفعيل التنقل المباشر عند النقر على بطاقات الوصول السريع
+     */
+    private void setupNavigationListeners() {
+        if (cardScan != null) {
+            cardScan.setOnClickListener(v -> navigateToFragment(new MiraScanFragment()));
         }
-
-        // أزرار الأحداث
-        if (btnCheckGtin != null) {
-            btnCheckGtin.setOnClickListener(v2 -> {
-                // إضافة وظيفة فحص GTIN هنا
-            });
+        if (cardGate != null) {
+            cardGate.setOnClickListener(v -> navigateToFragment(new MiraGateFragment()));
         }
+        if (cardRadar != null) {
+            cardRadar.setOnClickListener(v -> navigateToFragment(new MiraRadarFragment()));
+        }
+        if (cardSettings != null) {
+            cardSettings.setOnClickListener(v -> navigateToFragment(new MiraSettingsFragment()));
+        }
+    }
 
-        updateAll();
+    private void navigateToFragment(Fragment targetFragment) {
+        if (getActivity() != null) {
+            getActivity().getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.fragment_container, targetFragment) // احرص على مطابقة المسمى مع Activity الرئيسي
+                    .addToBackStack(null)
+                    .commit();
+        }
+    }
 
-        // تحديث الوقت والقراءات دورياً
-        updateRunnable = new Runnable() {
+    /**
+     * تحديث الساعة والتاريخ بشكل حي
+     */
+    private void startTimeClock() {
+        timeHandler.post(new Runnable() {
             @Override
             public void run() {
-                if (isAdded() && getActivity() != null) {
-                    updateAll();
-                    handler.postDelayed(this, 1000); // تحديث الوقت كل ثانية
-                }
+                SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+                SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE, d MMMM yyyy", new Locale("ar"));
+                Date now = new Date();
+
+                if (tvTime != null) tvTime.setText(timeFormat.format(now));
+                if (tvDate != null) tvDate.setText(dateFormat.format(now));
+
+                timeHandler.postDelayed(this, 1000);
             }
-        };
-        handler.postDelayed(updateRunnable, 1000);
+        });
     }
 
-    private void updateAll() {
-        if (!isAdded()) return;
+    /**
+     * جلب البيانات من الـ REST API في الخلفية
+     */
+    private void fetchDashboardDataFromApi() {
+        executor.execute(() -> {
+            try {
+                // طلب الإحصائيات من الـ API
+                URL url = new URL(BASE_URL + "gates/stats");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
+                conn.setRequestProperty("Accept", "application/json");
+                conn.setConnectTimeout(5000);
 
-        // تحديث شريط الوقت
-        if (tvTime != null) {
-            SimpleDateFormat tf = new SimpleDateFormat("hh:mm:ss a", new Locale("ar"));
-            tvTime.setText(tf.format(new Date()));
-        }
+                int responseCode = conn.getResponseCode();
+                if (responseCode == 200) {
+                    BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                    StringBuilder response = new StringBuilder();
+                    String inputLine;
+                    while ((inputLine = in.readLine()) != null) {
+                        response.append(inputLine);
+                    }
+                    in.close();
+
+                    JSONObject jsonResponse = new JSONObject(response.toString());
+                    if (jsonResponse.optBoolean("success")) {
+                        JSONObject data = jsonResponse.getJSONObject("data");
+                        int totalGates = data.optInt("total", 0);
+                        int onlineGates = data.optInt("online", 0);
+
+                        // تحديث الواجهة على الخيط الرئيسي
+                        mainHandler.post(() -> {
+                            tvActiveGates.setText(String.valueOf(onlineGates));
+                            indicatorApi.setBackgroundColor(0xFF16A34A); // أخضر
+                            indicatorDb.setBackgroundColor(0xFF16A34A);  // أخضر
+                            tvLastSync.setText("تم التحديث: " + new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date()));
+                        });
+                    }
+                } else {
+                    mainHandler.post(() -> {
+                        indicatorApi.setBackgroundColor(0xFFDC2626); // أحمر
+                        tvLastSync.setText("خطأ في الاتصال");
+                    });
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                mainHandler.post(() -> {
+                    if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFFDC2626);
+                    if (tvLastSync != null) tvLastSync.setText("غير متصل");
+                });
+            }
+        });
     }
-
-    public void updateMetrics(int total, int allowed, int blocked, int unknown) {
-        if (!isAdded()) return;
-
-        if (tvBatchTotal != null) tvBatchTotal.setText(String.valueOf(total));
-        if (tvBatchAllowed != null) tvBatchAllowed.setText(String.valueOf(allowed));
-        if (tvBatchBlocked != null) tvBatchBlocked.setText(String.valueOf(blocked));
-        if (tvBatchUnknown != null) tvBatchUnknown.setText(String.valueOf(unknown));
-
-        if (total > 0) {
-            int allowedPct = (allowed * 100) / total;
-            int blockedPct = (blocked * 100) / total;
-            int unknownPct = (unknown * 100) / total;
-
-            if (tvBatchAllowedPct != null) tvBatchAllowedPct.setText(allowedPct + "%");
-            if (tvBatchBlockedPct != null) tvBatchBlockedPct.setText(blockedPct + "%");
-            if (tvBatchUnknownPct != null) tvBatchUnknownPct.setText(unknownPct + "%");
-        }
-    }
-
-    @Override
-    public void myOnKeyDwon() {}
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        if (updateRunnable != null) {
-            handler.removeCallbacks(updateRunnable);
-        }
-    }
-
-    @Override
-    public void onDetach() {
-        super.onDetach();
-        mContext = null;
+        timeHandler.removeCallbacksAndMessages(null);
+        executor.shutdown();
     }
 }
