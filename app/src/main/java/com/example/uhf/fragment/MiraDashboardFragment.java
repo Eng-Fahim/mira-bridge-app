@@ -1,4 +1,4 @@
-package com.mira.hardware.ui;
+package com.example.uhf.fragment;
 
 import android.os.Bundle;
 import android.os.Handler;
@@ -13,7 +13,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
-import com.mira.hardware.R;
+// استيراد الـ R الصحيح الخاص بالمشروع
+import com.example.uhf.R;
 
 import org.json.JSONObject;
 
@@ -42,9 +43,8 @@ public class MiraDashboardFragment extends Fragment {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Handler timeHandler = new Handler(Looper.getMainLooper());
 
-    // إعدادات الـ API (يمكن جلبها من SharedPreferences)
-    private static final String BASE_URL = "https://your-domain.com/wp-json/mira-gate/v1/";
-    private static final String API_KEY = "YOUR_MIRA_API_KEY_HERE"; 
+    private static final String BASE_URL = "https://ams.ibreg.org/wp-json/mira-gate/v1/";
+    private static final String API_KEY = "mira_gate_test071234567890abcdefghijklmnop"; 
 
     @Nullable
     @Override
@@ -86,34 +86,31 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     /**
-     * تفعيل التنقل المباشر عند النقر على بطاقات الوصول السريع
+     * إعداد التنقل المباشر
      */
     private void setupNavigationListeners() {
         if (cardScan != null) {
-            cardScan.setOnClickListener(v -> navigateToFragment(new MiraScanFragment()));
+            cardScan.setOnClickListener(v -> showToast("فتح شاشة الفحص"));
         }
         if (cardGate != null) {
-            cardGate.setOnClickListener(v -> navigateToFragment(new MiraGateFragment()));
+            cardGate.setOnClickListener(v -> showToast("فتح شاشة البوابة"));
         }
         if (cardRadar != null) {
-            cardRadar.setOnClickListener(v -> navigateToFragment(new MiraRadarFragment()));
+            cardRadar.setOnClickListener(v -> showToast("فتح شاشة الرادار"));
         }
         if (cardSettings != null) {
-            cardSettings.setOnClickListener(v -> navigateToFragment(new MiraSettingsFragment()));
+            cardSettings.setOnClickListener(v -> showToast("فتح شاشة الإعدادات"));
         }
     }
 
-    private void navigateToFragment(Fragment targetFragment) {
-        if (getActivity() != null) {
-            getActivity().getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.fragment_container, targetFragment) // احرص على مطابقة المسمى مع Activity الرئيسي
-                    .addToBackStack(null)
-                    .commit();
+    private void showToast(String message) {
+        if (getContext() != null) {
+            Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
         }
     }
 
     /**
-     * تحديث الساعة والتاريخ بشكل حي
+     * تحديث الساعة والتاريخ حيّاً
      */
     private void startTimeClock() {
         timeHandler.post(new Runnable() {
@@ -132,12 +129,11 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     /**
-     * جلب البيانات من الـ REST API في الخلفية
+     * جلب البيانات من REST API
      */
     private void fetchDashboardDataFromApi() {
         executor.execute(() -> {
             try {
-                // طلب الإحصائيات من الـ API
                 URL url = new URL(BASE_URL + "gates/stats");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
@@ -158,25 +154,22 @@ public class MiraDashboardFragment extends Fragment {
                     JSONObject jsonResponse = new JSONObject(response.toString());
                     if (jsonResponse.optBoolean("success")) {
                         JSONObject data = jsonResponse.getJSONObject("data");
-                        int totalGates = data.optInt("total", 0);
                         int onlineGates = data.optInt("online", 0);
 
-                        // تحديث الواجهة على الخيط الرئيسي
                         mainHandler.post(() -> {
-                            tvActiveGates.setText(String.valueOf(onlineGates));
-                            indicatorApi.setBackgroundColor(0xFF16A34A); // أخضر
-                            indicatorDb.setBackgroundColor(0xFF16A34A);  // أخضر
-                            tvLastSync.setText("تم التحديث: " + new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date()));
+                            if (tvActiveGates != null) tvActiveGates.setText(String.valueOf(onlineGates));
+                            if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFF16A34A);
+                            if (indicatorDb != null) indicatorDb.setBackgroundColor(0xFF16A34A);
+                            if (tvLastSync != null) tvLastSync.setText("تم التحديث: " + new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date()));
                         });
                     }
                 } else {
                     mainHandler.post(() -> {
-                        indicatorApi.setBackgroundColor(0xFFDC2626); // أحمر
-                        tvLastSync.setText("خطأ في الاتصال");
+                        if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFFDC2626);
+                        if (tvLastSync != null) tvLastSync.setText("خطأ في الاتصال");
                     });
                 }
             } catch (Exception e) {
-                e.printStackTrace();
                 mainHandler.post(() -> {
                     if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFFDC2626);
                     if (tvLastSync != null) tvLastSync.setText("غير متصل");
