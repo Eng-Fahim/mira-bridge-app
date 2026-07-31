@@ -1,18 +1,22 @@
 package com.example.uhf.fragment;
 
 import android.content.Context;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.ListView;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 
@@ -21,18 +25,22 @@ public class MiraDashboardFragment extends KeyDwonFragment {
     private UHFMainActivity mContext;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable updateRunnable;
-    
-    private TextView tvGreeting, tvDate, tvTime;
-    private TextView tvTotalItems, tvSoldToday, tvActiveGates;
-    private TextView tvSystemStatus, tvLastSync;
-    private View indicatorApi, indicatorDb, indicatorGate;
-    private TextView tvRecent1, tvRecent2, tvRecent3;
-    private View cardScan, cardGate, cardRadar, cardSettings;
+
+    // 1. ربط العناصر الفعالة من ملف XML
+    private TextView tvTime, tvBatchTotal, tvBatchAllowed, tvBatchAllowedPct;
+    private TextView tvBatchBlocked, tvBatchBlockedPct, tvBatchUnknown, tvBatchUnknownPct;
+    private TextView tvCount, tvTotal;
+    private EditText etGtinInput, etTime;
+    private Button btnCheckGtin, btInventory, btClear;
+    private ListView lvTags;
+    private RadioGroup rgInventory;
+    private RadioButton rbInventorySingle, rbInventoryLoop;
+    private CheckBox cbFilter;
+    private View layoutFilter;
 
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
-        // التحقق من نوع الـ Activity بأمان لتجنب الـ ClassCastException
         if (context instanceof UHFMainActivity) {
             mContext = (UHFMainActivity) context;
         }
@@ -47,93 +55,92 @@ public class MiraDashboardFragment extends KeyDwonFragment {
     public void onViewCreated(View v, Bundle savedInstanceState) {
         super.onViewCreated(v, savedInstanceState);
 
-        tvGreeting = v.findViewById(R.id.tvGreeting);
-        tvDate = v.findViewById(R.id.tvDate);
+        // 2. التعريف بالعناصر المعتمدة داخل fragment_mira_dashboard.xml
         tvTime = v.findViewById(R.id.tvTime);
-        tvTotalItems = v.findViewById(R.id.tvTotalItems);
-        tvSoldToday = v.findViewById(R.id.tvSoldToday);
-        tvActiveGates = v.findViewById(R.id.tvActiveGates);
-        tvSystemStatus = v.findViewById(R.id.tvSystemStatus);
-        tvLastSync = v.findViewById(R.id.tvLastSync);
-        indicatorApi = v.findViewById(R.id.indicatorApi);
-        indicatorDb = v.findViewById(R.id.indicatorDb);
-        indicatorGate = v.findViewById(R.id.indicatorGate);
-        tvRecent1 = v.findViewById(R.id.tvRecent1);
-        tvRecent2 = v.findViewById(R.id.tvRecent2);
-        tvRecent3 = v.findViewById(R.id.tvRecent3);
-        cardScan = v.findViewById(R.id.cardScan);
-        cardGate = v.findViewById(R.id.cardGate);
-        cardRadar = v.findViewById(R.id.cardRadar);
-        cardSettings = v.findViewById(R.id.cardSettings);
+        tvBatchTotal = v.findViewById(R.id.tvBatchTotal);
+        tvBatchAllowed = v.findViewById(R.id.tvBatchAllowed);
+        tvBatchAllowedPct = v.findViewById(R.id.tvBatchAllowedPct);
+        tvBatchBlocked = v.findViewById(R.id.tvBatchBlocked);
+        tvBatchBlockedPct = v.findViewById(R.id.tvBatchBlockedPct);
+        tvBatchUnknown = v.findViewById(R.id.tvBatchUnknown);
+        tvBatchUnknownPct = v.findViewById(R.id.tvBatchUnknownPct);
+        
+        tvCount = v.findViewById(R.id.tv_count);
+        tvTotal = v.findViewById(R.id.tv_total);
+        lvTags = v.findViewById(R.id.LvTags);
 
-        if (cardScan != null) cardScan.setOnClickListener(v2 -> switchTab(1));
-        if (cardGate != null) cardGate.setOnClickListener(v2 -> switchTab(9));
-        if (cardRadar != null) cardRadar.setOnClickListener(v2 -> switchTab(3));
-        if (cardSettings != null) cardSettings.setOnClickListener(v2 -> switchTab(2));
+        etGtinInput = v.findViewById(R.id.etGtinInput);
+        btnCheckGtin = v.findViewById(R.id.btnCheckGtin);
+        btInventory = v.findViewById(R.id.BtInventory);
+        btClear = v.findViewById(R.id.BtClear);
+        
+        cbFilter = v.findViewById(R.id.cbFilter);
+        layoutFilter = v.findViewById(R.id.layout_filter);
+
+        // إظهار وإخفاء قسم الفلترة
+        if (cbFilter != null && layoutFilter != null) {
+            cbFilter.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                layoutFilter.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+            });
+        }
+
+        // أزرار الأحداث
+        if (btnCheckGtin != null) {
+            btnCheckGtin.setOnClickListener(v2 -> {
+                // إضافة وظيفة فحص GTIN هنا
+            });
+        }
 
         updateAll();
-        
-        // إعداد الـ Runnable بأمان مع التحقق من وجود الـ Fragment في الواجهة
+
+        // تحديث الوقت والقراءات دورياً
         updateRunnable = new Runnable() {
             @Override
             public void run() {
                 if (isAdded() && getActivity() != null) {
                     updateAll();
-                    handler.postDelayed(this, 30000);
+                    handler.postDelayed(this, 1000); // تحديث الوقت كل ثانية
                 }
             }
         };
-        handler.postDelayed(updateRunnable, 30000);
+        handler.postDelayed(updateRunnable, 1000);
     }
 
     private void updateAll() {
         if (!isAdded()) return;
 
-        Date now = new Date();
-        SimpleDateFormat df = new SimpleDateFormat("EEEE، dd MMMM yyyy", new Locale("ar"));
-        SimpleDateFormat tf = new SimpleDateFormat("hh:mm:ss a", new Locale("ar"));
-
-        if (tvDate != null) tvDate.setText(df.format(now));
-        if (tvTime != null) tvTime.setText(tf.format(now));
-        
-        if (tvGreeting != null) {
-            Calendar calendar = Calendar.getInstance();
-            int h = calendar.get(Calendar.HOUR_OF_DAY);
-            tvGreeting.setText(h < 12 ? "صباح الخير ☀️" : h < 17 ? "مساء الخير 🌤️" : "مساء الخير 🌙");
-        }
-
-        if (tvTotalItems != null) tvTotalItems.setText("5,234");
-        if (tvSoldToday != null) tvSoldToday.setText("12");
-        if (tvActiveGates != null) tvActiveGates.setText("3");
-
-        if (indicatorApi != null) indicatorApi.setBackgroundColor(Color.parseColor("#4CAF50"));
-        if (indicatorDb != null) indicatorDb.setBackgroundColor(Color.parseColor("#4CAF50"));
-        if (indicatorGate != null) indicatorGate.setBackgroundColor(Color.parseColor("#4CAF50"));
-        if (tvSystemStatus != null) tvSystemStatus.setText("🟢 جميع الأنظمة تعمل");
-        if (tvLastSync != null) tvLastSync.setText("آخر مزامنة: " + tf.format(now));
-
-        if (tvRecent1 != null) tvRecent1.setText("✅ 12:30 - خروج مصرح: خاتم ذهب 21K");
-        if (tvRecent2 != null) tvRecent2.setText("🚨 12:28 - محاولة خروج غير مصرح: سوارة");
-        if (tvRecent3 != null) tvRecent3.setText("📋 12:15 - تقرير جرد يومي مكتمل");
-    }
-
-    private void switchTab(int index) {
-        if (mContext == null && getActivity() instanceof UHFMainActivity) {
-            mContext = (UHFMainActivity) getActivity();
-        }
-        
-        if (mContext != null && mContext.mTabHost != null) {
-            mContext.mTabHost.setCurrentTab(index);
+        // تحديث شريط الوقت
+        if (tvTime != null) {
+            SimpleDateFormat tf = new SimpleDateFormat("hh:mm:ss a", new Locale("ar"));
+            tvTime.setText(tf.format(new Date()));
         }
     }
 
-    @Override 
+    public void updateMetrics(int total, int allowed, int blocked, int unknown) {
+        if (!isAdded()) return;
+
+        if (tvBatchTotal != null) tvBatchTotal.setText(String.valueOf(total));
+        if (tvBatchAllowed != null) tvBatchAllowed.setText(String.valueOf(allowed));
+        if (tvBatchBlocked != null) tvBatchBlocked.setText(String.valueOf(blocked));
+        if (tvBatchUnknown != null) tvBatchUnknown.setText(String.valueOf(unknown));
+
+        if (total > 0) {
+            int allowedPct = (allowed * 100) / total;
+            int blockedPct = (blocked * 100) / total;
+            int unknownPct = (unknown * 100) / total;
+
+            if (tvBatchAllowedPct != null) tvBatchAllowedPct.setText(allowedPct + "%");
+            if (tvBatchBlockedPct != null) tvBatchBlockedPct.setText(blockedPct + "%");
+            if (tvBatchUnknownPct != null) tvBatchUnknownPct.setText(unknownPct + "%");
+        }
+    }
+
+    @Override
     public void myOnKeyDwon() {}
-    
-    @Override 
+
+    @Override
     public void onDestroyView() {
         super.onDestroyView();
-        // إيقاف الـ Handler عند تدمير الواجهة للحد من التسريب والانهيارات
         if (updateRunnable != null) {
             handler.removeCallbacks(updateRunnable);
         }
