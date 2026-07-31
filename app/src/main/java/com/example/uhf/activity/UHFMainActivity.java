@@ -133,6 +133,12 @@ mTabHost.addTab(
             .setIndicator(getString(R.string.uhf_msg_tab_set)),
             UHFSetFragment.class, null);
 
+
+        // 📊 Inventory
+mTabHost.addTab(
+    mTabHost.newTabSpec("Inventory").setIndicator("📊"),
+    MiraInventoryFragment.class, null
+);
         // 📡 Radar
         mTabHost.addTab(mTabHost.newTabSpec(getResources().getString(R.string.uhf_radar_loaction))
             .setIndicator(getResources().getString(R.string.uhf_radar_loaction)),
