@@ -23,6 +23,11 @@
         android:title="@string/uhf_msg_tab_write"/>
     -->
     <item
+    android:id="@+id/nav_jewelry_dashboard"
+    android:icon="@drawable/ic_dashboard"
+    android:title="لوحة تحكم المجوهرات" />
+
+    <item
         android:id="@+id/action_kill"
         android:showAsAction="never"
         android:visible="false"
