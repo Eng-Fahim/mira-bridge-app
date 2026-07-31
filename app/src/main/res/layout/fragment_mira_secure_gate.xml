@@ -35,7 +35,7 @@
         android:textSize="13sp"
         android:layout_marginBottom="20dp" />
 
-    <!-- مؤشر الحالة -->
+    <!-- مؤشر الحالة الدائري -->
     <View
         android:id="@+id/statusIndicator"
         android:layout_width="80dp"
