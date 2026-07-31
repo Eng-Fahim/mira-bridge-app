@@ -12,6 +12,7 @@ import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 import android.widget.Toast;
+import com.example.uhf.fragment.JewelryDashboardFragment;
 
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -102,7 +103,14 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         fm = getSupportFragmentManager();
         mTabHost = (FragmentTabHost) findViewById(android.R.id.tabhost);
         mTabHost.setup(this, fm, R.id.realtabcontent);
-// 📷 Scan
+
+        // 💎 Jewelry Dashboard - لوحة المجوهرات
+mTabHost.addTab(
+    mTabHost.newTabSpec("JewelryDashboard").setIndicator("💎"),
+    JewelryDashboardFragment.class, null
+);
+
+        // 📷 Scan
         mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_scan))
             .setIndicator(getString(R.string.uhf_msg_tab_scan)),
             UHFReadTagFragment.class, null);
