@@ -151,6 +151,15 @@
         <item>4</item>
     </integer-array>
 
+    <!-- أضف داخل resources في res/values/arrays.xml -->
+<string-array name="payment_methods">
+    <item>💵 نقدي</item>
+    <item>💳 بطاقة ائتمان</item>
+    <item>🏦 تحويل بنكي</item>
+    <item>📱 محفظة رقمية</item>
+    <item>🔐 شيك</item>
+</string-array>
+
     <!-- 🟢 MIRA Bridge API URLs -->
     <string-array name="mira_api_urls">
         <item>https://ams.ibreg.org/wp-json/mira-gate/v1/authorize</item>
