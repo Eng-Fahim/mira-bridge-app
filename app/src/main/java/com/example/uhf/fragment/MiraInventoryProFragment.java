@@ -1,5 +1,6 @@
 package com.example.uhf.fragment;
 
+import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
@@ -29,7 +30,6 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
@@ -40,7 +40,7 @@ import java.util.Locale;
 
 public class MiraInventoryProFragment extends KeyDwonFragment {
 
-    // UI
+    // UI Elements
     private TextView tvInventoryStatus, tvExpectedCount, tvScannedCount, tvVariance;
     private TextView tvAccuracy, tvElapsedTime, tvLocation, tvLastScan, tvRssi;
     private TextView tvLastAuditDate, tvLastAccuracy, tvHighValueCount;
@@ -50,7 +50,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private Button btnStartInventory, btnBlindInventory, btnStopInventory, btnGenerateReport;
     private RecyclerView rvInventoryItems;
 
-    // State
+    // State Variables
     private boolean isScanning = false;
     private boolean isBlindMode = false;
     private int expectedCount = 0;
@@ -61,8 +61,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private int sessionId = 0;
     private long startTime = 0;
 
-    // Lists
-    private List<InventoryItem> scannedItems = new ArrayList<>();
+    // Data Lists
+    private final List<InventoryItem> scannedItems = new ArrayList<>();
     private InventoryAdapter adapter;
 
     // Handlers
@@ -76,7 +76,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private boolean soundEnabled = true;
     private boolean vibrateEnabled = true;
 
-    // API
+    // API Config
     private static final String BASE_URL = "https://ams.ibreg.org/wp-json/mira-gate/v1";
     private static final String API_KEY = "mira_gate_test071234567890abcdefghijklmnop";
 
@@ -170,13 +170,14 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     JSONObject json = new JSONObject(sb.toString());
                     JSONObject snapshot = json.optJSONObject("snapshot");
 
-                    if (snapshot != null && getActivity() != null) {
+                    if (snapshot != null && isAdded() && getActivity() != null) {
                         prevTotalItems = snapshot.optInt("total_items", 0);
                         String date = snapshot.optString("date", "-");
 
                         getActivity().runOnUiThread(() -> {
+                            if (!isAdded()) return;
                             tvLastAuditDate.setText(date.length() > 10 ? date.substring(0, 10) : date);
-                            tvLastAccuracy.setText(String.format("%.1f%%", 98.1));
+                            tvLastAccuracy.setText(String.format(Locale.US, "%.1f%%", 98.1));
                             tvPrevItems.setText(String.valueOf(prevTotalItems));
                         });
                     }
@@ -203,8 +204,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     int count = json.optInt("count", 0);
                     JSONArray items = json.optJSONArray("items");
 
-                    if (getActivity() != null) {
+                    if (isAdded() && getActivity() != null) {
                         getActivity().runOnUiThread(() -> {
+                            if (!isAdded()) return;
                             tvHighValueCount.setText(String.valueOf(count));
                             if (count > 0 && items != null) {
                                 StringBuilder list = new StringBuilder();
@@ -316,8 +318,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     sessionId = json.optInt("session_id", 0);
                     expectedCount = json.optInt("expected_count", realGtins.length);
 
-                    if (getActivity() != null) {
+                    if (isAdded() && getActivity() != null) {
                         getActivity().runOnUiThread(() -> {
+                            if (!isAdded()) return;
                             if (!blind) tvExpectedCount.setText(String.valueOf(expectedCount));
                             else tvExpectedCount.setText("???");
                             tvLocation.setText("Main Showroom");
@@ -328,8 +331,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             } catch (Exception e) {
                 sessionId = (int) (System.currentTimeMillis() / 1000);
                 expectedCount = realGtins.length;
-                if (getActivity() != null) {
+                if (isAdded() && getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
+                        if (!isAdded()) return;
                         tvExpectedCount.setText(isBlindMode ? "???" : String.valueOf(expectedCount));
                     });
                 }
@@ -439,21 +443,24 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             String fTitle = title, fKarat = karat, fWeight = weight, fLocation = location, fStatus = status;
             boolean fFound = found;
 
-            if (getActivity() != null) {
+            if (isAdded() && getActivity() != null) {
                 getActivity().runOnUiThread(() -> {
+                    if (!isAdded()) return;
                     scannedItems.add(0, new InventoryItem(gtin, fTitle, fKarat, fWeight, fStatus, fLocation));
                     playInventorySound("✓".equals(fStatus) ? "scan" : "alert");
                     scannedCount++;
                     if (fFound) foundCount++;
                     adapter.notifyItemInserted(0);
-                    rvInventoryItems.scrollToPosition(0);
+                    if (rvInventoryItems != null) {
+                        rvInventoryItems.scrollToPosition(0);
+                    }
                     tvLastScan.setText(gtin);
                     tvRssi.setText("-" + (40 + (int)(Math.random() * 30)) + " dBm");
                     tvScannedCount.setText(String.valueOf(scannedCount));
                     tvVariance.setText(String.valueOf(expectedCount - foundCount));
                     double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 0;
                     tvAccuracy.setText("Accuracy: " + String.format(Locale.US, "%.1f%%", acc));
-                    if (rvInventoryItems.getWidth() > 0) {
+                    if (rvInventoryItems != null && rvInventoryItems.getWidth() > 0) {
                         int pct = expectedCount > 0 ? (scannedCount * 100) / expectedCount : 0;
                         progressScanned.getLayoutParams().width = Math.max(1, (pct * rvInventoryItems.getWidth()) / 100);
                         progressScanned.requestLayout();
@@ -510,15 +517,18 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             "<div class='footer'><strong>MIRA Technology © 2026</strong><br>mira-id.com | تم الإنشاء بواسطة MIRA Bridge™ Pro<br>المدة: " + tvElapsedTime.getText() + "</div>" +
             "</body></html>";
 
-        WebView webView = new WebView(getContext());
+        WebView webView = new WebView(requireContext());
         webView.getSettings().setJavaScriptEnabled(true);
         webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
-                PrintManager pm = (PrintManager) getContext().getSystemService(getContext().PRINT_SERVICE);
-                PrintDocumentAdapter pda = view.createPrintDocumentAdapter("MIRA_Inventory_Pro_Report");
-                pm.print("MIRA Inventory Pro Report", pda, new PrintAttributes.Builder().build());
+                if (getContext() == null) return;
+                PrintManager pm = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
+                if (pm != null) {
+                    PrintDocumentAdapter pda = view.createPrintDocumentAdapter("MIRA_Inventory_Pro_Report");
+                    pm.print("MIRA Inventory Pro Report", pda, new PrintAttributes.Builder().build());
+                }
             }
         });
         Toast.makeText(getContext(), "🖨️ Opening print dialog...", Toast.LENGTH_SHORT).show();
@@ -526,14 +536,19 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
     private void startTimer() {
         timerRunnable = () -> {
+            if (!isAdded()) return;
             long e = System.currentTimeMillis() - startTime;
-            tvElapsedTime.setText(String.format("%02d:%02d:%02d", e/3600000, (e/60000)%60, (e/1000)%60));
+            tvElapsedTime.setText(String.format(Locale.US, "%02d:%02d:%02d", e/3600000, (e/60000)%60, (e/1000)%60));
             handler.postDelayed(timerRunnable, 1000);
         };
         handler.post(timerRunnable);
     }
 
-    private void stopTimer() { if (timerRunnable != null) handler.removeCallbacks(timerRunnable); }
+    private void stopTimer() { 
+        if (timerRunnable != null) {
+            handler.removeCallbacks(timerRunnable); 
+        }
+    }
 
     private void updateUI() {
         tvScannedCount.setText(String.valueOf(scannedCount));
@@ -556,7 +571,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         } catch (Exception ignored) {}
         if (vibrateEnabled && getContext() != null) {
             try {
-                android.os.Vibrator vib = (android.os.Vibrator) getContext().getSystemService(android.content.Context.VIBRATOR_SERVICE);
+                android.os.Vibrator vib = (android.os.Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
                 if (vib != null && vib.hasVibrator()) {
                     switch (type) {
                         case "start": vib.vibrate(200); break;
@@ -568,11 +583,13 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }
     }
 
-    private void safePlay(com.example.uhf.activity.UHFMainActivity a, int id) { try { a.playSound(id); } catch (Exception ignored) {} }
+    private void safePlay(com.example.uhf.activity.UHFMainActivity a, int id) { 
+        try { a.playSound(id); } catch (Exception ignored) {} 
+    }
 
     private void loadInventorySettings() {
         if (getContext() == null) return;
-        android.content.SharedPreferences p = getContext().getSharedPreferences("MIRA_BRIDGE_SETTINGS", android.content.Context.MODE_PRIVATE);
+        android.content.SharedPreferences p = getContext().getSharedPreferences("MIRA_BRIDGE_SETTINGS", Context.MODE_PRIVATE);
         soundEnabled = "true".equals(p.getString("inventory_sound", "true"));
         vibrateEnabled = "true".equals(p.getString("inventory_vibrate", "true"));
     }
@@ -592,36 +609,51 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.VH> {
         private final List<InventoryItem> items;
         public InventoryAdapter(List<InventoryItem> i) { this.items = i; }
-        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int t) {
+        
+        @NonNull 
+        @Override 
+        public VH onCreateViewHolder(@NonNull ViewGroup p, int t) {
             return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_inventory, p, false));
         }
-        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
+
+        @Override 
+        public void onBindViewHolder(@NonNull VH h, int pos) {
             InventoryItem item = items.get(pos);
-            h.s.setText(item.status); h.serial.setText(item.serial); h.title.setText(item.title);
+            h.s.setText(item.status); 
+            h.serial.setText(item.serial); 
+            h.title.setText(item.title);
             h.details.setText(item.karat + " | " + item.weight);
             h.s.setTextColor("✓".equals(item.status) ? Color.parseColor("#22C55E") : Color.parseColor("#EF4444"));
         }
-        @Override public int getItemCount() { return items.size(); }
+
+        @Override 
+        public int getItemCount() { return items.size(); }
+
         class VH extends RecyclerView.ViewHolder {
             TextView s, serial, title, details;
-            VH(View v) { super(v); s=v.findViewById(R.id.tvItemStatus); serial=v.findViewById(R.id.tvItemSerial); title=v.findViewById(R.id.tvItemTitle); details=v.findViewById(R.id.tvItemDetails); }
+            VH(View v) { 
+                super(v); 
+                s=v.findViewById(R.id.tvItemStatus); 
+                serial=v.findViewById(R.id.tvItemSerial); 
+                title=v.findViewById(R.id.tvItemTitle); 
+                details=v.findViewById(R.id.tvItemDetails); 
+            }
         }
     }
 
     @Override 
-public void onDestroyView() {
-    isScanning = false;
-    stopTimer();
-    if (simulationRunnable != null) {
-        simulationHandler.removeCallbacks(simulationRunnable);
+    public void onDestroyView() {
+        isScanning = false;
+        stopTimer();
+        if (simulationRunnable != null) {
+            simulationHandler.removeCallbacks(simulationRunnable);
+        }
+        handler.removeCallbacksAndMessages(null);
+        simulationHandler.removeCallbacksAndMessages(null);
+        
+        if (rvInventoryItems != null) {
+            rvInventoryItems.setAdapter(null);
+        }
+        super.onDestroyView();
     }
-    handler.removeCallbacksAndMessages(null);
-    simulationHandler.removeCallbacksAndMessages(null);
-    
-    // تفريغ الـ Adapter والـ RecyclerView لمنع الـ Memory Leak
-    if (rvInventoryItems != null) {
-        rvInventoryItems.setAdapter(null);
-    }
-    super.onDestroyView();
 }
-
