@@ -37,7 +37,39 @@
             android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
+<!-- أضف هذا داخل LinearLayout header بعد tvPosScaleStatus -->
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="8dp"
+    android:gravity="center">
 
+    <Button
+        android:id="@+id/btnOpenScanner"
+        android:layout_width="0dp"
+        android:layout_height="44dp"
+        android:layout_weight="1"
+        android:layout_marginEnd="6dp"
+        android:background="@drawable/bg_scanner_btn"
+        android:text="📷 مسح GS1"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/btnPosRFIDMode"
+        android:layout_width="0dp"
+        android:layout_height="44dp"
+        android:layout_weight="1"
+        android:layout_marginStart="6dp"
+        android:background="@drawable/bg_rfid_btn"
+        android:text="📡 مسح RFID"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+</LinearLayout>
     <!-- Status Banner -->
     <LinearLayout
         android:layout_width="match_parent"
