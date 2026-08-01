@@ -9,6 +9,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -36,9 +37,7 @@ public class POSCheckoutDialog extends DialogFragment {
     private double totalAmount;
     private int itemCount;
 
-    public POSCheckoutDialog() {
-        // Required empty public constructor
-    }
+    public POSCheckoutDialog() {}
 
     public static POSCheckoutDialog newInstance(double totalAmount, int itemCount) {
         POSCheckoutDialog dialog = new POSCheckoutDialog();
@@ -65,7 +64,6 @@ public class POSCheckoutDialog extends DialogFragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        // جعل خلفية النافذة شفافة ليتناسب مع تصميم MIRA الداكن
         if (getDialog() != null && getDialog().getWindow() != null) {
             getDialog().getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             getDialog().getWindow().requestFeature(Window.FEATURE_NO_TITLE);
@@ -74,33 +72,52 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     @Override
+    public void onStart() {
+        super.onStart();
+        // ⚡ تجديد العرض ليكون 88% من عرض الشاشة لمنع انكماش الموديل
+        if (getDialog() != null && getDialog().getWindow() != null) {
+            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.88);
+            getDialog().getWindow().setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT);
+        }
+    }
+
+    @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // عناصر النموذج
+        TextView tvItemCount = view.findViewById(R.id.tvItemCount);
+        TextView tvFinalTotal = view.findViewById(R.id.tvFinalTotal);
         EditText etCustomerName = view.findViewById(R.id.etCustomerName);
         EditText etCustomerPhone = view.findViewById(R.id.etCustomerPhone);
         Spinner spPaymentMethod = view.findViewById(R.id.spPaymentMethod);
         EditText etDiscount = view.findViewById(R.id.etDiscount);
-        TextView tvFinalTotal = view.findViewById(R.id.tvFinalTotal);
 
         Button btnConfirmCheckout = view.findViewById(R.id.btnConfirmCheckout);
         Button btnCancelCheckout = view.findViewById(R.id.btnCancelCheckout);
 
-        // تهيئة Spinner
-        String[] paymentMethods = {"💵 نقدي", "💳 بطاقة ائتمان", "🏦 تحويل بنكي", "📱 محفظة رقمية"};
+        // تعيين البيانات الديناميكية المستلمة من السلة
+        if (tvItemCount != null) tvItemCount.setText(itemCount + " قطعة");
+        if (tvFinalTotal != null) tvFinalTotal.setText(String.format(Locale.US, "$%,.2f", totalAmount));
+
+        // 🇾🇪 قائمة المحافظ الإلكترونية وطرق الدفع المحلية
+        String[] paymentMethods = {
+                "💵 نقدي (Cash)",
+                "📱 جاوو بي (JAWWAPAY)",
+                "📲 كاش (Kuraimi Express)",
+                "💳 فلوسك (Floosak)",
+                "📲 ون كاش (OneCash)",
+                "📱 محفظتي (Mahfadati)",
+                "🏦 تحويل بنكي مباشر",
+                "💳 بطاقة دفع إلكتروني"
+        };
+
         if (getContext() != null && spPaymentMethod != null) {
             ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
                     android.R.layout.simple_spinner_dropdown_item, paymentMethods);
             spPaymentMethod.setAdapter(adapter);
         }
 
-        // عرض المبلغ النهائي الأولي
-        if (tvFinalTotal != null) {
-            tvFinalTotal.setText(String.format(Locale.US, "$%,.2f", totalAmount));
-        }
-
-        // حساب الخصم التفاعلي
+        // ⚡ حساب الخصم الحظي
         if (etDiscount != null && tvFinalTotal != null) {
             etDiscount.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -109,7 +126,7 @@ public class POSCheckoutDialog extends DialogFragment {
                 public void afterTextChanged(Editable s) {
                     try {
                         double discount = s.length() > 0 ? Double.parseDouble(s.toString()) : 0;
-                        double finalTotal = totalAmount * (1 - discount / 100);
+                        double finalTotal = totalAmount * (1 - (discount / 100));
                         tvFinalTotal.setText(String.format(Locale.US, "$%,.2f", finalTotal));
                     } catch (NumberFormatException e) {
                         tvFinalTotal.setText(String.format(Locale.US, "$%,.2f", totalAmount));
@@ -118,12 +135,10 @@ public class POSCheckoutDialog extends DialogFragment {
             });
         }
 
-        // ⚡ زر الإلغاء
         if (btnCancelCheckout != null) {
             btnCancelCheckout.setOnClickListener(v -> dismiss());
         }
 
-        // ⚡ زر تأكيد البيع
         if (btnConfirmCheckout != null) {
             btnConfirmCheckout.setOnClickListener(v -> {
                 POSCheckoutData data = new POSCheckoutData();
@@ -132,8 +147,6 @@ public class POSCheckoutDialog extends DialogFragment {
                 
                 if (spPaymentMethod != null && spPaymentMethod.getSelectedItem() != null) {
                     data.paymentMethod = spPaymentMethod.getSelectedItem().toString();
-                } else {
-                    data.paymentMethod = "💵 نقدي";
                 }
 
                 String discountStr = (etDiscount != null) ? etDiscount.getText().toString().trim() : "0";
@@ -142,7 +155,7 @@ public class POSCheckoutDialog extends DialogFragment {
                 } catch (Exception e) {
                     data.discount = 0;
                 }
-                data.finalAmount = totalAmount * (1 - data.discount / 100);
+                data.finalAmount = totalAmount * (1 - (data.discount / 100));
 
                 if (listener != null) {
                     listener.onCheckout(data);
@@ -155,9 +168,7 @@ public class POSCheckoutDialog extends DialogFragment {
     public static class POSCheckoutData {
         public String customerName = "";
         public String customerPhone = "";
-        public String customerEmail = "";
-        public String paymentMethod = "💵 نقدي";
-        public String notes = "";
+        public String paymentMethod = "";
         public double discount = 0;
         public double finalAmount = 0;
     }
