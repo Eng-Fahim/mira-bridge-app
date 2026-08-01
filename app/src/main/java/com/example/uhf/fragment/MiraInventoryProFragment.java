@@ -608,9 +608,20 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }
     }
 
-    @Override public void onDestroyView() {
-        super.onDestroyView();
-        stopTimer();
-        if (simulationRunnable != null) simulationHandler.removeCallbacks(simulationRunnable);
+    @Override 
+public void onDestroyView() {
+    isScanning = false;
+    stopTimer();
+    if (simulationRunnable != null) {
+        simulationHandler.removeCallbacks(simulationRunnable);
     }
+    handler.removeCallbacksAndMessages(null);
+    simulationHandler.removeCallbacksAndMessages(null);
+    
+    // تفريغ الـ Adapter والـ RecyclerView لمنع الـ Memory Leak
+    if (rvInventoryItems != null) {
+        rvInventoryItems.setAdapter(null);
+    }
+    super.onDestroyView();
 }
+
