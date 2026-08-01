@@ -513,18 +513,22 @@ public class MiraPosFragment extends Fragment {
 
     // ===================== Checkout Process =====================
 
-    private void processCheckoutAndStockUpdate() {
+        private void processCheckoutAndStockUpdate() {
         if (cartList.isEmpty()) return;
+
+        // ⚡ إخفاء لوحة المفاتيح
+        if (getActivity() != null) {
+            com.example.uhf.tools.UIHelper.hideKeyboard(getActivity());
+        }
 
         double totalAmount = getCartTotal();
 
-        POSCheckoutDialog dialog = new POSCheckoutDialog(
-                totalAmount,
-                cartList.size(),
-                checkoutData -> executeCheckout(checkoutData)
-        );
+        // ⚡ الاستدعاء المحدث الآمن
+        POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(totalAmount, cartList.size());
+        dialog.setCheckoutListener(checkoutData -> executeCheckout(checkoutData));
         dialog.show(getParentFragmentManager(), "POSCheckoutDialog");
     }
+
 
     private void executeCheckout(POSCheckoutDialog.POSCheckoutData checkoutData) {
         btnCheckout.setEnabled(false);
@@ -807,4 +811,4 @@ public class MiraPosFragment extends Fragment {
             }
         }
     }
-                            }
+                    }
