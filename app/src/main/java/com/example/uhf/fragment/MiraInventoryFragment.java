@@ -46,6 +46,12 @@ public class MiraInventoryFragment extends Fragment {
     private Button btnStartInventory, btnStopInventory, btnGenerateReport;
     private RecyclerView rvInventoryItems;
 
+    // 🟢 إعدادات الجرد
+    private boolean soundEnabled = true;
+    private boolean vibrateEnabled = true;
+    private boolean autoStopEnabled = false;
+    private String inventoryMode = "Full";
+
     // State
     private boolean isScanning = false;
     private int expectedCount = 0;
@@ -81,6 +87,9 @@ public class MiraInventoryFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.fragment_mira_inventory, container, false);
+
+        // 🟢 تحميل إعدادات الجرد
+        loadInventorySettings();
 
         // Bind Views
         tvInventoryStatus = v.findViewById(R.id.tvInventoryStatus);
@@ -138,6 +147,9 @@ public class MiraInventoryFragment extends Fragment {
         tvInventoryStatus.setText("● SCANNING");
         tvInventoryStatus.setTextColor(Color.parseColor("#38BDF8"));
 
+        // 🟢 صوت + اهتزاز البدء
+        playInventorySound("start");
+
         startSessionOnServer();
         startTimer();
         startSimulation();
@@ -150,6 +162,9 @@ public class MiraInventoryFragment extends Fragment {
     // ============================================
     private void stopInventory() {
         isScanning = false;
+
+        // 🟢 صوت + اهتزاز الاكتمال
+        playInventorySound("complete");
 
         if (simulationRunnable != null) {
             simulationHandler.removeCallbacks(simulationRunnable);
@@ -352,6 +367,14 @@ public class MiraInventoryFragment extends Fragment {
 
                 getActivity().runOnUiThread(() -> {
                     scannedItems.add(0, new InventoryItem(gtin, finalTitle, finalKarat, finalWeight, finalStatus, finalLocation));
+
+                    // 🟢 صوت المسح أو التنبيه
+                    if ("✓".equals(finalStatus)) {
+                        playInventorySound("scan");
+                    } else if ("⚠️".equals(finalStatus)) {
+                        playInventorySound("alert");
+                    }
+
                     scannedCount++;
                     if (finalFound) foundCount++;
                     adapter.notifyItemInserted(0);
@@ -572,4 +595,65 @@ public class MiraInventoryFragment extends Fragment {
         stopTimer();
         if (simulationRunnable != null) simulationHandler.removeCallbacks(simulationRunnable);
     }
-                        }
+
+    // ============================================
+    // 🟢 تحميل إعدادات الجرد
+    // ============================================
+    private void loadInventorySettings() {
+        android.content.SharedPreferences prefs = getContext().getSharedPreferences("MIRA_BRIDGE_SETTINGS", android.content.Context.MODE_PRIVATE);
+        soundEnabled = "true".equals(prefs.getString("inventory_sound", "true"));
+        vibrateEnabled = "true".equals(prefs.getString("inventory_vibrate", "true"));
+        autoStopEnabled = "true".equals(prefs.getString("inventory_auto_stop", "false"));
+        inventoryMode = prefs.getString("inventory_mode", "Full");
+    }
+
+    // ============================================
+    // 🔊 تشغيل صوت
+    // ============================================
+    private void playInventorySound(String type) {
+        if (!soundEnabled) return;
+
+        try {
+            if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
+                com.example.uhf.activity.UHFMainActivity activity =
+                    (com.example.uhf.activity.UHFMainActivity) getActivity();
+
+                switch (type) {
+                    case "start":
+                        activity.playSound(1);
+                        break;
+                    case "scan":
+                        activity.playSound(1);
+                        break;
+                    case "complete":
+                        activity.playSound(1);
+                        activity.playSound(1);
+                        break;
+                    case "alert":
+                        activity.playSound(2);
+                        break;
+                }
+            }
+        } catch (Exception e) {
+            // تجاهل
+        }
+
+        // 🟢 اهتزاز
+        if (vibrateEnabled && getContext() != null) {
+            android.os.Vibrator vibrator = (android.os.Vibrator) getContext().getSystemService(android.content.Context.VIBRATOR_SERVICE);
+            if (vibrator != null && vibrator.hasVibrator()) {
+                switch (type) {
+                    case "start":
+                        vibrator.vibrate(200);
+                        break;
+                    case "complete":
+                        vibrator.vibrate(new long[]{0, 100, 100, 100, 100, 300}, -1);
+                        break;
+                    case "scan":
+                        vibrator.vibrate(50);
+                        break;
+                }
+            }
+        }
+    }
+        }
