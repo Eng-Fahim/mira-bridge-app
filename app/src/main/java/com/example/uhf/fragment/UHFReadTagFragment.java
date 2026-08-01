@@ -18,6 +18,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
+import com.example.uhf.engine.SmartScaleConnector;
 
 import org.json.JSONObject;
 
@@ -47,6 +48,10 @@ public class UHFReadTagFragment extends Fragment {
     private EditText etGtinInput;
     private Button btnScan;
 
+    // 📡 المحور الأول: موصل الميزان الذكي ومتغير الوزن اللحظي
+    private SmartScaleConnector scaleConnector;
+    private double liveScaleWeight = 0.0; // الوزن الفعلي الملتقط من الميزان البلوتوث
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -71,6 +76,9 @@ public class UHFReadTagFragment extends Fragment {
         etGtinInput = view.findViewById(R.id.etGtinInput);
         btnScan = view.findViewById(R.id.btnScan);
 
+        // 1️⃣ بدء تشغيل الميزان الذكي تلقائياً عند فتح الشاشة
+        initSmartScale();
+
         // ربط زر المسح اليدوي/التحقق
         if (btnScan != null) {
             btnScan.setOnClickListener(v -> {
@@ -82,6 +90,39 @@ public class UHFReadTagFragment extends Fragment {
                 }
             });
         }
+    }
+
+    /**
+     * ⚖️ تهيئة والاتصال بالميزان الذكي (Bluetooth Scale)
+     */
+    private void initSmartScale() {
+        scaleConnector = new SmartScaleConnector();
+        scaleConnector.setListener(new SmartScaleConnector.ScaleListener() {
+            @Override
+            public void onWeightReceived(double weightGrams) {
+                liveScaleWeight = weightGrams;
+                Log.d(TAG, "Scale Live Weight: " + weightGrams + "g");
+            }
+
+            @Override
+            public void onScaleConnected(String deviceName) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> 
+                        Toast.makeText(getContext(), "⚖️ Scale Connected: " + deviceName, Toast.LENGTH_SHORT).show()
+                    );
+                }
+            }
+
+            @Override
+            public void onScaleDisconnected() {
+                liveScaleWeight = 0.0;
+            }
+
+            @Override
+            public void onScaleError(String error) {
+                Log.e(TAG, "Scale Error: " + error);
+            }
+        });
     }
 
     /**
@@ -110,7 +151,6 @@ public class UHFReadTagFragment extends Fragment {
         new Thread(() -> {
             InputStream inputStream = null;
             try {
-                // القيم الافتراضية للاتصال
                 String apiUrl = "https://ams.ibreg.org/wp-json/mira-gate/v1/authorize";
                 String apiKey = "mira_gate_test071234567890abcdefghijklmnop";
                 String gateId = "handheld_c72";
@@ -137,6 +177,11 @@ public class UHFReadTagFragment extends Fragment {
                 if (rssi != null && !rssi.isEmpty()) {
                     jsonParam.put("rssi", rssi);
                 }
+                
+                // 📡 إرسال وزن الميزان الفعلي المباشر للسيرفر للتأكيد إن وجد
+                if (liveScaleWeight > 0) {
+                    jsonParam.put("scale_weight", liveScaleWeight);
+                }
 
                 try (OutputStream os = conn.getOutputStream()) {
                     byte[] input = jsonParam.toString().getBytes("utf-8");
@@ -155,7 +200,7 @@ public class UHFReadTagFragment extends Fragment {
 
                 final String jsonResponseStr = response.toString();
 
-                // معالجة النتيجة وتحديث عناصر الواجهة
+                // معالجة النتيجة وتحديث عناصر الواجهة بالمحرك الثلاثي
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> updateUIWithMiraResponse(jsonResponseStr, epc));
                 }
@@ -179,7 +224,7 @@ public class UHFReadTagFragment extends Fragment {
     }
 
     /**
-     * دالة مساعدة لتجميع استجابة JSON وتوزيع البيانات على عناصر البطاقة
+     * 💎 دالة تجميع الاستجابة وتطبيق التحقق الثلاثي الـ Hybrid Tri-Verification على الواجهة
      */
     private void updateUIWithMiraResponse(String jsonResponseStr, String fallbackEpc) {
         try {
@@ -193,7 +238,7 @@ public class UHFReadTagFragment extends Fragment {
             // استخراج بيانات المنتج
             String title = (item != null) ? item.optString("title", "Item Verified") : "Unknown Item";
             String karat = (item != null) ? item.optString("karat", "N/A") : "N/A";
-            double weight = (item != null) ? item.optDouble("weight", 0.0) : 0.0;
+            double expectedWeight = (item != null) ? item.optDouble("weight", 0.0) : 0.0;
             double value = (item != null) ? item.optDouble("price", 0.0) : 0.0;
             String statusStr = (item != null) ? item.optString("status", "VALID").toUpperCase() : "N/A";
 
@@ -212,28 +257,58 @@ public class UHFReadTagFragment extends Fragment {
                 tvPurityVal.setText(karat.isEmpty() ? "N/A" : karat);
             }
             if (tvWeightVal != null) {
-                tvWeightVal.setText(weight > 0 ? String.format(Locale.US, "%.2fg", weight) : "0.00g");
+                // إظهار الوزن الفعلي الموزون مقابل الوزن المتوقع إن وجد الميزان
+                if (liveScaleWeight > 0 && expectedWeight > 0) {
+                    tvWeightVal.setText(String.format(Locale.US, "%.2fg (Scale: %.2fg)", expectedWeight, liveScaleWeight));
+                } else {
+                    tvWeightVal.setText(expectedWeight > 0 ? String.format(Locale.US, "%.2fg", expectedWeight) : "0.00g");
+                }
             }
             if (tvValueVal != null) {
                 tvValueVal.setText(value > 0 ? String.format(Locale.US, "$%,.0f", value) : "$0");
             }
 
-            // 3. تحديث السيريال والشارة
+            // 3. تحديث السيريال
             if (tvSerialVal != null) {
                 tvSerialVal.setText("SN: " + serialNo);
             }
-            if (tvStatusBadge != null) {
-                tvStatusBadge.setText(statusStr);
+
+            // 4. 🌟 خوارزمية التحقق الثلاثي اللحظي (Tri-Verification Logic)
+            boolean isGs1Valid = barcode != null && barcode.optBoolean("valid", true);
+            boolean isWeightMatch = true;
+
+            // هامش السماحية بالوزن ±0.05g
+            if (liveScaleWeight > 0 && expectedWeight > 0) {
+                isWeightMatch = Math.abs(liveScaleWeight - expectedWeight) <= 0.05;
             }
 
-            // 4. تحديث شريط القرار العلوي (Passed / Blocked)
-            if (tvHeaderStatus != null) {
-                if (allowed) {
-                    tvHeaderStatus.setText("✓ PASSED — AUTHORIZED DISPATCH");
-                    tvHeaderStatus.setTextColor(Color.parseColor("#4ADE80"));
+            if (tvHeaderStatus != null && tvStatusBadge != null) {
+                if (allowed && isGs1Valid && isWeightMatch) {
+                    if (liveScaleWeight > 0) {
+                        // ✅✅✅ مطابقة ثلاثية كاملة (100%)
+                        tvHeaderStatus.setText("✅✅✅ TRI-VERIFIED (100%) — MATCHED");
+                        tvHeaderStatus.setTextColor(Color.parseColor("#4ADE80"));
+                        tvStatusBadge.setText("3X VERIFIED");
+                        tvStatusBadge.setTextColor(Color.parseColor("#4ADE80"));
+                    } else {
+                        // ✅✅ مطابقة ثنائية (RFID + GS1 فقط بدون ميزان)
+                        tvHeaderStatus.setText("✅✅ DOUBLE-VERIFIED (RFID + GS1)");
+                        tvHeaderStatus.setTextColor(Color.parseColor("#38BDF8"));
+                        tvStatusBadge.setText("2X VERIFIED");
+                        tvStatusBadge.setTextColor(Color.parseColor("#38BDF8"));
+                    }
+                } else if (!isWeightMatch) {
+                    // 🚨 تحذير عدم تطابق الوزن!
+                    tvHeaderStatus.setText(String.format(Locale.US, "🚨 WEIGHT MISMATCH! (Exp: %.2fg vs Act: %.2fg)", expectedWeight, liveScaleWeight));
+                    tvHeaderStatus.setTextColor(Color.parseColor("#EF4444"));
+                    tvStatusBadge.setText("WEIGHT ALERT");
+                    tvStatusBadge.setTextColor(Color.parseColor("#EF4444"));
                 } else {
+                    // ☒ محظور / غير مصرح
                     tvHeaderStatus.setText("☒ BLOCKED — UNAUTHORIZED");
                     tvHeaderStatus.setTextColor(Color.parseColor("#EF4444"));
+                    tvStatusBadge.setText(statusStr);
+                    tvStatusBadge.setTextColor(Color.parseColor("#EF4444"));
                 }
             }
 
@@ -243,6 +318,14 @@ public class UHFReadTagFragment extends Fragment {
                 tvHeaderStatus.setText("INVALID RESPONSE FORMAT");
                 tvHeaderStatus.setTextColor(Color.parseColor("#F59E0B"));
             }
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (scaleConnector != null) {
+            scaleConnector.disconnect();
         }
     }
 }
