@@ -324,4 +324,20 @@ mTabHost.addTab(mTabHost.newTabSpec("Inventory Pro").setIndicator("📊"),
             synchronized (objectLock) { objectLock.notifyAll(); }
         }
     }
+
+        // ============================================
+    // 🛒 التوصيل المباشر لشاشة MIRA POS
+    // ============================================
+    public void onTagRead(String epc) {
+        if (mTabHost != null) {
+            String currentTabTag = mTabHost.getCurrentTabTag();
+            Fragment fragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
+            
+            // إذا كانت الشاشة الحالية هي شاشة البيع، أرسل لها الـ EPC فوراً
+            if (fragment instanceof MiraPosFragment) {
+                ((MiraPosFragment) fragment).onRingScanned(epc);
+            }
+        }
+    }
+
 }
