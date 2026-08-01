@@ -39,6 +39,13 @@
     <item>📡 RFID Only</item>
     <item>🛠️ Development Mode</item>
 </string-array>
+  
+    <string-array name="inventory_modes">
+    <item>جرد كامل (Full)</item>
+    <item>جرد جزئي (Partial)</item>
+    <item>جرد سريع (Quick)</item>
+    <item>جرد بالموقع (Location)</item>
+</string-array>
     <!-- GB label Lock -->
     <string-array name="storageArea">
         <item>Label information area</item>
