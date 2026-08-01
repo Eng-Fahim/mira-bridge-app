@@ -528,21 +528,22 @@ public class MiraPosFragment extends Fragment {
 
     // ===================== Checkout Process =====================
 
-        private void processCheckoutAndStockUpdate() {
+            private void processCheckoutAndStockUpdate() {
         if (cartList.isEmpty()) return;
 
         // ⚡ إخفاء لوحة المفاتيح
         if (getActivity() != null) {
-            com.example.uhf.tools.UIHelper.hideKeyboard(getActivity());
+            UIHelper.hideKeyboard(getActivity());
         }
 
         double totalAmount = getCartTotal();
 
-        // ⚡ الاستدعاء المحدث الآمن
+        // ⚡ استخدام getChildFragmentManager() آمن جداً للدايلوج
         POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(totalAmount, cartList.size());
         dialog.setCheckoutListener(checkoutData -> executeCheckout(checkoutData));
-        dialog.show(getParentFragmentManager(), "POSCheckoutDialog");
+        dialog.show(getChildFragmentManager(), "POSCheckoutDialog");
     }
+
 
 
     private void executeCheckout(POSCheckoutDialog.POSCheckoutData checkoutData) {
@@ -826,4 +827,4 @@ public class MiraPosFragment extends Fragment {
             }
         }
     }
-                            }
+    }
