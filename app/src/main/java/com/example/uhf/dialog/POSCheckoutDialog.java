@@ -26,14 +26,39 @@ public class POSCheckoutDialog extends DialogFragment {
         void onCheckout(POSCheckoutData data);
     }
 
-    private final CheckoutListener listener;
-    private final double totalAmount;
-    private final int itemCount;
+    private static final String ARG_TOTAL_AMOUNT = "total_amount";
+    private static final String ARG_ITEM_COUNT = "item_count";
 
-    public POSCheckoutDialog(double totalAmount, int itemCount, CheckoutListener listener) {
-        this.totalAmount = totalAmount;
-        this.itemCount = itemCount;
+    private CheckoutListener listener;
+    private double totalAmount;
+    private int itemCount;
+
+    // ⚡ 1. الكونستركتور الفارغ إجباري لمنع انهيار أندرويد
+    public POSCheckoutDialog() {
+        // Required empty public constructor
+    }
+
+    // ⚡ 2. النمط القياسي لإنشاء الـ Dialog مع Arguments
+    public static POSCheckoutDialog newInstance(double totalAmount, int itemCount) {
+        POSCheckoutDialog dialog = new POSCheckoutDialog();
+        Bundle args = new Bundle();
+        args.putDouble(ARG_TOTAL_AMOUNT, totalAmount);
+        args.putInt(ARG_ITEM_COUNT, itemCount);
+        dialog.setArguments(args);
+        return dialog;
+    }
+
+    public void setCheckoutListener(CheckoutListener listener) {
         this.listener = listener;
+    }
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        if (getArguments() != null) {
+            totalAmount = getArguments().getDouble(ARG_TOTAL_AMOUNT, 0.0);
+            itemCount = getArguments().getInt(ARG_ITEM_COUNT, 0);
+        }
     }
 
     @NonNull
@@ -56,7 +81,7 @@ public class POSCheckoutDialog extends DialogFragment {
                 android.R.layout.simple_spinner_dropdown_item, paymentMethods);
         spPaymentMethod.setAdapter(adapter);
 
-        // عرض المبلغ النهائي
+        // عرض المبلغ النهائي Initial
         tvFinalTotal.setText(String.format(Locale.US, "$%,.2f", totalAmount));
 
         // حساب الخصم مباشرة
@@ -81,10 +106,15 @@ public class POSCheckoutDialog extends DialogFragment {
                     POSCheckoutData data = new POSCheckoutData();
                     data.customerName = etCustomerName.getText().toString().trim();
                     data.customerPhone = etCustomerPhone.getText().toString().trim();
-                    data.paymentMethod = spPaymentMethod.getSelectedItem().toString();
+                    data.paymentMethod = spPaymentMethod.getSelectedItem() != null ? 
+                            spPaymentMethod.getSelectedItem().toString() : "💵 نقدي";
                     
                     String discountStr = etDiscount.getText().toString().trim();
-                    data.discount = discountStr.isEmpty() ? 0 : Double.parseDouble(discountStr);
+                    try {
+                        data.discount = discountStr.isEmpty() ? 0 : Double.parseDouble(discountStr);
+                    } catch (Exception e) {
+                        data.discount = 0;
+                    }
                     data.finalAmount = totalAmount * (1 - data.discount / 100);
 
                     if (listener != null) {
