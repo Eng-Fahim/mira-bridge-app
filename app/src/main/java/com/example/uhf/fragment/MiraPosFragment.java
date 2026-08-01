@@ -42,13 +42,13 @@ import java.util.Set;
 /**
  * 🛒 MIRA POS Mode Fragment
  * وضع البيع الخاص بـ MIRA Bridge:
- * - قراءة Ring EPC عبر RFID ومطابقتها.
- * - مسح GS1 DATAMATRIX للباركود.
- * - الإدخال اليدوي للكود.
- * - الاستعلام الفوري والتحقق من التوفر عبر MIRA ID.
- * - الربط مع قراءات الميزان اللحظية.
- * - نموذج تفاصيل العميل قبل إتمام البيع.
- * - تحديث حالة المخزون والهوية الرقمية فوراً عند الشراء.
+ * - 📷 مسح GS1 DATAMATRIX بالكاميرا
+ * - 📡 قراءة Ring EPC عبر RFID مباشر
+ * - ⌨️ الإدخال اليدوي للكود
+ * - ⚖️ الربط مع قراءات الميزان اللحظية
+ * - 📋 نموذج تفاصيل العميل قبل إتمام البيع
+ * - 🔄 تحديث حالة المخزون والهوية الرقمية
+ * - 💾 حفظ محلي عند فشل الاتصال
  */
 public class MiraPosFragment extends Fragment {
 
@@ -60,7 +60,11 @@ public class MiraPosFragment extends Fragment {
     private TextView tvScaleStatus, tvItemCount, tvTotalAmount, tvCartStatus;
     private EditText etManualEpc;
     private Button btnAddManual, btnCheckout, btnClearCart;
+    private Button btnOpenScanner, btnPosRFIDMode;
     private RecyclerView rvCartItems;
+
+    // ===================== RFID Mode =====================
+    private boolean isRFIDModeActive = false;
 
     // ===================== Cart Data =====================
     public static class CartItem {
@@ -99,6 +103,7 @@ public class MiraPosFragment extends Fragment {
     private double liveScaleWeight = 0.0;
 
     // ===================== Lifecycle =====================
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -129,6 +134,24 @@ public class MiraPosFragment extends Fragment {
         updateCartSummary();
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        // تسجيل هذا الفragment كمستقبل نشط للـ RFID
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        // إلغاء التسجيل عند الخروج من التبويب
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
+        }
+    }
+
     // ===================== Initialization =====================
 
     private void bindViews(View view) {
@@ -142,6 +165,10 @@ public class MiraPosFragment extends Fragment {
         btnCheckout = view.findViewById(R.id.btnPosCheckout);
         btnClearCart = view.findViewById(R.id.btnPosClearCart);
 
+        // ⭐ أزرار المسح الجديدة
+        btnOpenScanner = view.findViewById(R.id.btnOpenScanner);
+        btnPosRFIDMode = view.findViewById(R.id.btnPosRFIDMode);
+
         rvCartItems = view.findViewById(R.id.rvPosCartItems);
     }
 
@@ -152,7 +179,7 @@ public class MiraPosFragment extends Fragment {
     }
 
     private void setupListeners() {
-        // زر الإضافة اليدوية
+        // ⌨️ زر الإضافة اليدوية
         btnAddManual.setOnClickListener(v -> {
             String epc = etManualEpc.getText().toString().trim();
             if (!epc.isEmpty()) {
@@ -163,11 +190,21 @@ public class MiraPosFragment extends Fragment {
             }
         });
 
-        // زر مسح السلة
+        // 🗑️ زر مسح السلة
         btnClearCart.setOnClickListener(v -> clearCart());
 
-        // زر إتمام البيع
+        // 💳 زر إتمام البيع
         btnCheckout.setOnClickListener(v -> processCheckoutAndStockUpdate());
+
+        // 📷 زر فتح ماسح GS1 DATAMATRIX
+        if (btnOpenScanner != null) {
+            btnOpenScanner.setOnClickListener(v -> openBarcodeScanner());
+        }
+
+        // 📡 زر تفعيل/تعطيل RFID المباشر
+        if (btnPosRFIDMode != null) {
+            btnPosRFIDMode.setOnClickListener(v -> toggleRFIDMode());
+        }
     }
 
     // ===================== Smart Scale =====================
@@ -220,6 +257,64 @@ public class MiraPosFragment extends Fragment {
         });
     }
 
+    // ===================== 📷 Barcode Scanner =====================
+
+    /**
+     * 📷 فتح ماسح GS1 DATAMATRIX بالكاميرا
+     */
+    private void openBarcodeScanner() {
+        MiraBarcodeScannerFragment scannerFragment = new MiraBarcodeScannerFragment();
+        scannerFragment.setOnBarcodeScannedListener((data, format) -> {
+            // عند مسح باركود، أرسل إلى POS
+            onBarcodeScanned(data);
+            // العودة إلى شاشة POS
+            if (getParentFragmentManager().getBackStackEntryCount() > 0) {
+                getParentFragmentManager().popBackStack();
+            }
+        });
+
+        getParentFragmentManager()
+                .beginTransaction()
+                .replace(android.R.id.tabhost, scannerFragment)  // استخدام container المناسب
+                .addToBackStack("barcode_scanner")
+                .commit();
+    }
+
+    // ===================== 📡 RFID Direct Mode =====================
+
+    /**
+     * 📡 تفعيل/تعطيل استقبال RFID المباشر
+     */
+    private void toggleRFIDMode() {
+        isRFIDModeActive = !isRFIDModeActive;
+
+        if (isRFIDModeActive) {
+            // تفعيل وضع RFID
+            btnPosRFIDMode.setText("📡 RFID نشط");
+            btnPosRFIDMode.setTextColor(Color.parseColor("#FFFFFF"));
+            btnPosRFIDMode.setBackgroundResource(R.drawable.bg_rfid_btn_active);
+            tvCartStatus.setText("📡 جاهز لاستقبال مسح RFID المباشر...");
+            tvCartStatus.setTextColor(Color.parseColor("#4ADE80"));
+
+            // تسجيل كمستقبل نشط
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
+            }
+        } else {
+            // تعطيل وضع RFID
+            btnPosRFIDMode.setText("📡 مسح RFID");
+            btnPosRFIDMode.setTextColor(Color.parseColor("#FFFFFF"));
+            btnPosRFIDMode.setBackgroundResource(R.drawable.bg_rfid_btn);
+            tvCartStatus.setText("جاهز لمسح القطع والخواتم...");
+            tvCartStatus.setTextColor(Color.parseColor("#94A3B8"));
+
+            // إلغاء التسجيل
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
+            }
+        }
+    }
+
     // ===================== Tag Processing =====================
 
     /**
@@ -227,7 +322,7 @@ public class MiraPosFragment extends Fragment {
      */
     public void onRingScanned(String epc) {
         if (scannedEpcs.contains(epc)) {
-            playAlertSound(2); // صوت التكرار/الخطأ
+            playAlertSound(2);
             showToast("القطعة مضافة مسبقاً للسلة: " + epc);
             return;
         }
@@ -251,7 +346,7 @@ public class MiraPosFragment extends Fragment {
      * يدعم: RFID EPC, GS1 DATAMATRIX, Serial Number, GTIN
      */
     private void processRingEpc(final String code, final String source) {
-        playAlertSound(1); // صوت النغمة العادية
+        playAlertSound(1);
 
         new Thread(() -> {
             try {
@@ -296,7 +391,7 @@ public class MiraPosFragment extends Fragment {
                 while ((line = reader.readLine()) != null) response.append(line);
 
                 final String responseStr = response.toString();
-                Log.d(TAG, "API Response: " + responseStr);
+                Log.d(TAG, "API Response [" + source + "]: " + responseStr);
 
                 JSONObject resObj = new JSONObject(responseStr);
                 JSONObject item = resObj.optJSONObject("item");
@@ -336,7 +431,6 @@ public class MiraPosFragment extends Fragment {
                 Log.e(TAG, "Error fetching item: " + e.getMessage());
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
-                        // إنشاء قطعة افتراضية عند فشل الاتصال
                         CartItem fallbackItem = new CartItem(code,
                                 "قطعة (غير متصلة)", "21K", 5.2,
                                 liveScaleWeight, 420.0, true, "OFFLINE");
@@ -350,29 +444,7 @@ public class MiraPosFragment extends Fragment {
             }
         }).start();
     }
-// ===================== أضف هذه الدالة =====================
 
-/**
- * 🔄 تفعيل استقبال مسح RFID مباشرة في POS
- * يتم استدعاؤها عند فتح التبويب
- */
-@Override
-public void onResume() {
-    super.onResume();
-    // تسجيل هذا الفragment كمستقبل نشط للـ RFID
-    if (getActivity() instanceof UHFMainActivity) {
-        ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
-    }
-}
-
-@Override
-public void onPause() {
-    super.onPause();
-    // إلغاء التسجيل
-    if (getActivity() instanceof UHFMainActivity) {
-        ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
-    }
-}
     // ===================== Cart Management =====================
 
     private void updateCartSummary() {
@@ -441,29 +513,19 @@ public void onPause() {
 
     // ===================== Checkout Process =====================
 
-    /**
-     * 📤 الخطوة 1: إظهار نموذج تفاصيل العميل قبل البيع
-     */
     private void processCheckoutAndStockUpdate() {
         if (cartList.isEmpty()) return;
 
         double totalAmount = getCartTotal();
 
-        // ⭐ إظهار نموذج تفاصيل البيع
         POSCheckoutDialog dialog = new POSCheckoutDialog(
                 totalAmount,
                 cartList.size(),
-                checkoutData -> {
-                    // بعد ملء النموذج، تنفيذ البيع
-                    executeCheckout(checkoutData);
-                }
+                checkoutData -> executeCheckout(checkoutData)
         );
         dialog.show(getParentFragmentManager(), "POSCheckoutDialog");
     }
 
-    /**
-     * 📤 الخطوة 2: تنفيذ عملية البيع وإرسال البيانات للخادم
-     */
     private void executeCheckout(POSCheckoutDialog.POSCheckoutData checkoutData) {
         btnCheckout.setEnabled(false);
         btnCheckout.setAlpha(0.5f);
@@ -492,13 +554,11 @@ public void onPause() {
                 conn.setReadTimeout(10000);
                 conn.setDoOutput(true);
 
-                // 🟢 تجهيز حمولة الطلب كاملة
                 JSONObject payload = new JSONObject();
                 payload.put("action", "COMPLETE_POS_SALE");
                 payload.put("gate_id", prefs != null ? prefs.getString("mira_gate_id", "handheld_c72") : "handheld_c72");
                 payload.put("timestamp", System.currentTimeMillis() / 1000);
 
-                // 👤 بيانات العميل
                 JSONObject customer = new JSONObject();
                 customer.put("name", checkoutData.customerName);
                 customer.put("phone", checkoutData.customerPhone);
@@ -507,7 +567,6 @@ public void onPause() {
                 customer.put("notes", checkoutData.notes);
                 payload.put("customer", customer);
 
-                // 🏷️ القطع المباعة
                 JSONArray itemsArr = new JSONArray();
                 for (CartItem item : cartList) {
                     JSONObject obj = new JSONObject();
@@ -526,7 +585,6 @@ public void onPause() {
                 }
                 payload.put("items", itemsArr);
 
-                // 💰 ملخص مالي
                 JSONObject payment = new JSONObject();
                 payment.put("subtotal", getCartTotal());
                 payment.put("discount_percent", checkoutData.discount);
@@ -535,7 +593,6 @@ public void onPause() {
                 payment.put("currency", "USD");
                 payload.put("payment", payment);
 
-                // 📡 إرسال الطلب
                 try (OutputStream os = conn.getOutputStream()) {
                     byte[] input = payload.toString().getBytes("utf-8");
                     os.write(input, 0, input.length);
@@ -557,7 +614,6 @@ public void onPause() {
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
                         if (finalCode >= 200 && finalCode < 300) {
-                            // ✅ نجاح البيع
                             playAlertSound(1);
                             String successMsg = "✅ تم إتمام البيع بنجاح!\n" +
                                     "العميل: " + checkoutData.customerName + "\n" +
@@ -566,7 +622,6 @@ public void onPause() {
                             Toast.makeText(getContext(), successMsg, Toast.LENGTH_LONG).show();
                             clearCart();
                         } else {
-                            // ❌ فشل من الخادم
                             tvCartStatus.setText("❌ فشل إتمام البيع (" + finalCode + ")");
                             tvCartStatus.setTextColor(Color.parseColor("#EF4444"));
                             btnCheckout.setEnabled(true);
@@ -581,7 +636,6 @@ public void onPause() {
                 Log.e(TAG, "Checkout exception: " + e.getMessage());
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
-                        // ⚠️ حفظ محلي عند فشل الاتصال
                         saveSaleLocally(checkoutData);
                         tvCartStatus.setText("💾 تم حفظ البيع محلياً (بانتظار المزامنة)");
                         tvCartStatus.setTextColor(Color.parseColor("#F59E0B"));
@@ -597,9 +651,6 @@ public void onPause() {
         }).start();
     }
 
-    /**
-     * 💾 حفظ البيع محلياً عند فشل الاتصال بالخادم
-     */
     private void saveSaleLocally(POSCheckoutDialog.POSCheckoutData checkoutData) {
         if (getContext() != null) {
             try {
@@ -620,7 +671,6 @@ public void onPause() {
                 sale.put("final_amount", checkoutData.finalAmount);
                 sale.put("item_count", cartList.size());
 
-                // حفظ القطع
                 JSONArray itemsArr = new JSONArray();
                 for (CartItem item : cartList) {
                     JSONObject obj = new JSONObject();
@@ -644,9 +694,6 @@ public void onPause() {
         }
     }
 
-    /**
-     * 🔄 التحقق من وجود مبيعات معلقة عند الفتح
-     */
     private void checkPendingSales() {
         if (getContext() != null) {
             SharedPreferences prefs = getContext().getSharedPreferences(PENDING_SALES_PREFS, Context.MODE_PRIVATE);
@@ -760,4 +807,4 @@ public void onPause() {
             }
         }
     }
-        }
+                            }
