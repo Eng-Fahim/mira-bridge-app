@@ -360,6 +360,95 @@
     </LinearLayout>
 </LinearLayout>
         <!-- ============================================ -->
+<!-- 📊 إعدادات الجرد -->
+<!-- ============================================ -->
+<LinearLayout
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="2dp"
+    android:background="@drawable/rectangle_bg"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:background="#4A148C"
+        android:padding="10dp"
+        android:text="📊 إعدادات الجرد (Inventory)"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="10dp"
+        android:background="#FFFFFF">
+
+        <!-- نمط الجرد -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="نمط الجرد:"
+            android:textColor="#333333"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <Spinner
+            android:id="@+id/spInventoryMode"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:entries="@array/inventory_modes"
+            android:layout_marginBottom="8dp" />
+
+        <CheckBox
+            android:id="@+id/cbInventorySound"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🔊 صوت عند كل مسح"
+            android:textSize="14sp"
+            android:checked="true"
+            android:paddingVertical="6dp" />
+
+        <CheckBox
+            android:id="@+id/cbInventoryVibrate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📳 اهتزاز عند كل مسح"
+            android:textSize="14sp"
+            android:checked="true"
+            android:paddingVertical="6dp" />
+
+        <CheckBox
+            android:id="@+id/cbInventoryAutoStop"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⏹️ إيقاف تلقائي عند الاكتمال"
+            android:textSize="14sp"
+            android:checked="false"
+            android:paddingVertical="6dp" />
+
+        <CheckBox
+            android:id="@+id/cbInventoryShowImages"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🖼️ عرض صور القطع أثناء الجرد"
+            android:textSize="14sp"
+            android:checked="false"
+            android:paddingVertical="6dp" />
+
+        <CheckBox
+            android:id="@+id/cbInventorySortByLocation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📍 ترتيب حسب الموقع"
+            android:textSize="14sp"
+            android:checked="true"
+            android:paddingVertical="6dp" />
+    </LinearLayout>
+</LinearLayout>
+        <!-- ============================================ -->
         <!-- 📡 قسم إعدادات القارئ RFID (الأصلي) -->
         <!-- ============================================ -->
         <LinearLayout
