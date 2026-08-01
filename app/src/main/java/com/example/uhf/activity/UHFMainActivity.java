@@ -1,4 +1,5 @@
 package com.example.uhf.activity;
+
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -12,9 +13,6 @@ import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 import android.widget.Toast;
-import com.example.uhf.fragment.JewelryDashboardFragment;
-import com.example.uhf.fragment.MiraInventoryProFragment;
-import com.example.uhf.fragment.MiraPosFragment;
 
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -25,8 +23,12 @@ import com.example.uhf.R;
 import com.example.uhf.fragment.AuthenticateNxpUcodeDnaFragment;
 import com.example.uhf.fragment.BlockPermalockFragment;
 import com.example.uhf.fragment.BlockWriteFragment;
+import com.example.uhf.fragment.JewelryDashboardFragment;
 import com.example.uhf.fragment.MarginReadFragment;
 import com.example.uhf.fragment.MiraDashboardFragment;
+import com.example.uhf.fragment.MiraInventoryProFragment;
+import com.example.uhf.fragment.MiraPosFragment;
+import com.example.uhf.fragment.MiraPWAWebFragment;
 import com.example.uhf.fragment.MiraSecureGateFragment;
 import com.example.uhf.fragment.ProtectedModeAndShortRangeModeFragment;
 import com.example.uhf.fragment.UHFKillFragment;
@@ -39,20 +41,15 @@ import com.example.uhf.fragment.UHFSetFragment;
 import com.example.uhf.fragment.UHFTagFlashFragment;
 import com.example.uhf.fragment.UHFTagLitFragment;
 import com.example.uhf.fragment.UHFUpgradeFragment;
-import com.example.uhf.fragment.MiraPWAWebFragment;
 import com.example.uhf.tools.ExportExcelAsyncTask;
 import com.example.uhf.tools.UIHelper;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 import com.rscja.deviceapi.interfaces.ConnectionStatus;
 
-
 import java.util.ArrayList;
 import java.util.HashMap;
 
 public class UHFMainActivity extends BaseTabFragmentActivity {
-
-    
-   private MiraPosFragment activePOSFragment = null;
 
     private final static String TAG = "MainActivity";
     public FragmentTabHost mTabHost;
@@ -62,6 +59,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public boolean loopFlag = false;
     private PlaySoundThread playSoundThread = null;
     public Fragment currentFragment;
+
+    // ⭐ POS Mode - مستقبل RFID النشط
+    private MiraPosFragment activePOSFragment = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,8 +73,15 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         initUHF();
         initViewPageData();
     }
-public void setActivePOSFragment(MiraPosFragment fragment) {
-    this.activePOSFragment = fragment;
+
+    // ============================================
+    // 🟢 POS Mode - تسجيل وإلغاء المستقبل النشط
+    // ============================================
+    public void setActivePOSFragment(MiraPosFragment fragment) {
+        this.activePOSFragment = fragment;
+        Log.d(TAG, "Active POS Fragment: " + (fragment != null ? "SET" : "CLEARED"));
+    }
+
     // ============================================
     // 🟢 التحقق من حالة القارئ
     // ============================================
@@ -87,12 +94,38 @@ public void setActivePOSFragment(MiraPosFragment fragment) {
     }
 
     // ============================================
+    // 🟢 استقبال مسح RFID - توجيه ذكي
+    // ============================================
+    public void onTagRead(String epc) {
+        // 🟢 الأولوية لـ POS Mode إذا كان نشطاً
+        if (activePOSFragment != null && activePOSFragment.isVisible()) {
+            activePOSFragment.onRingScanned(epc);
+            Log.d(TAG, "RFID → Active POS: " + epc);
+            return;
+        }
+
+        // التحقق من التبويب الحالي
+        if (mTabHost != null) {
+            String currentTabTag = mTabHost.getCurrentTabTag();
+            Fragment fragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
+
+            if (fragment instanceof MiraPosFragment && fragment.isVisible()) {
+                ((MiraPosFragment) fragment).onRingScanned(epc);
+                Log.d(TAG, "RFID → POS Tab: " + epc);
+                return;
+            }
+        }
+
+        Log.d(TAG, "RFID scanned but POS not active: " + epc);
+    }
+
+    // ============================================
     // 🟢 تفويض onActivityResult للـ Fragment الحالي
     // ============================================
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        
+
         if (mTabHost != null) {
             String currentTabTag = mTabHost.getCurrentTabTag();
             Fragment fragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
@@ -100,7 +133,7 @@ public void setActivePOSFragment(MiraPosFragment fragment) {
                 fragment.onActivityResult(requestCode, resultCode, data);
             }
         }
-        
+
         if (currentFragment != null && currentFragment instanceof UHFReadTagFragment) {
             currentFragment.onActivityResult(requestCode, resultCode, data);
         }
@@ -112,49 +145,43 @@ public void setActivePOSFragment(MiraPosFragment fragment) {
         mTabHost.setup(this, fm, R.id.realtabcontent);
 
         // 💎 Jewelry Dashboard - لوحة المجوهرات
-mTabHost.addTab(
-    mTabHost.newTabSpec("JewelryDashboard").setIndicator("💎"),
-    JewelryDashboardFragment.class, null
-);
-// 🛒 MIRA POS Mode - وضع البيع
-mTabHost.addTab(
-    mTabHost.newTabSpec("POS Mode").setIndicator("🛒"),
-    MiraPosFragment.class, null
-);
+        mTabHost.addTab(
+            mTabHost.newTabSpec("JewelryDashboard").setIndicator("💎"),
+            JewelryDashboardFragment.class, null
+        );
 
-        
+        // 🛒 MIRA POS Mode - وضع البيع
+        mTabHost.addTab(
+            mTabHost.newTabSpec("POS Mode").setIndicator("🛒"),
+            MiraPosFragment.class, null
+        );
+
         // 📷 Scan
         mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_scan))
             .setIndicator(getString(R.string.uhf_msg_tab_scan)),
             UHFReadTagFragment.class, null);
 
         // 🌐 MIRA Web (PWA)
-mTabHost.addTab(
-    mTabHost.newTabSpec("MIRA Web").setIndicator("🌐"),
-    MiraPWAWebFragment.class, null
-);
+        mTabHost.addTab(
+            mTabHost.newTabSpec("MIRA Web").setIndicator("🌐"),
+            MiraPWAWebFragment.class, null
+        );
+
         // 🏠 Dashboard - التبويب الرئيسي
         mTabHost.addTab(
             mTabHost.newTabSpec("Dashboard").setIndicator("🏠"),
             MiraDashboardFragment.class, null
         );
 
-        
-
         // ⚙️ Config
         mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_set))
             .setIndicator(getString(R.string.uhf_msg_tab_set)),
             UHFSetFragment.class, null);
 
+        // 📊 Inventory Pro
+        mTabHost.addTab(mTabHost.newTabSpec("Inventory Pro").setIndicator("📊"),
+            MiraInventoryProFragment.class, null);
 
-        // 📊 Inventory
-// ❌ القديم
-// mTabHost.addTab(mTabHost.newTabSpec("Inventory").setIndicator("📊"),
-//     MiraInventoryFragment.class, null);
-
-// ✅ الجديد
-mTabHost.addTab(mTabHost.newTabSpec("Inventory Pro").setIndicator("📊"),
-    MiraInventoryProFragment.class, null);
         // 📡 Radar
         mTabHost.addTab(mTabHost.newTabSpec(getResources().getString(R.string.uhf_radar_loaction))
             .setIndicator(getResources().getString(R.string.uhf_radar_loaction)),
@@ -330,30 +357,4 @@ mTabHost.addTab(mTabHost.newTabSpec("Inventory Pro").setIndicator("📊"),
             synchronized (objectLock) { objectLock.notifyAll(); }
         }
     }
-
-        // ============================================
-    // 🛒 التوصيل المباشر لشاشة MIRA POS
-    // ============================================
-    public void onTagRead(String epc) {
-    // 🟢 الأولوية لـ POS Mode إذا كان نشطاً
-    if (activePOSFragment != null && activePOSFragment.isVisible()) {
-        activePOSFragment.onRingScanned(epc);
-        return;
     }
-    
-    // التحقق من التبويب الحالي
-    if (mTabHost != null) {
-        String currentTabTag = mTabHost.getCurrentTabTag();
-        Fragment fragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
-        
-        if (fragment instanceof MiraPosFragment && fragment.isVisible()) {
-            ((MiraPosFragment) fragment).onRingScanned(epc);
-            return;
-        }
-    }
-    
-    // إذا لم يكن POS نشطاً، لا تفعل شيء أو أرسل للتبويب الحالي
-    Log.d(TAG, "Tag read but POS not active: " + epc);
-    }
-
-}
