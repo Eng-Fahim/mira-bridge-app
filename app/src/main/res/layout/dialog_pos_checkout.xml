@@ -17,7 +17,7 @@
             android:textColor="#FFFFFF"
             android:textSize="14sp"
             android:textStyle="bold"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginBottom="8dp" />
 
         <EditText
             android:id="@+id/etCustomerName"
@@ -28,7 +28,7 @@
             android:textColor="#FFFFFF"
             android:background="@drawable/bg_dark_input"
             android:paddingHorizontal="12dp"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginBottom="8dp" />
 
         <EditText
             android:id="@+id/etCustomerPhone"
@@ -40,52 +40,40 @@
             android:background="@drawable/bg_dark_input"
             android:paddingHorizontal="12dp"
             android:inputType="phone"
-            android:layout_marginBottom="8dp"/>
-
-        <EditText
-            android:id="@+id/etCustomerEmail"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:hint="البريد الإلكتروني"
-            android:textColorHint="#64748B"
-            android:textColor="#FFFFFF"
-            android:background="@drawable/bg_dark_input"
-            android:paddingHorizontal="12dp"
-            android:inputType="textEmailAddress"
-            android:layout_marginBottom="16dp"/>
+            android:layout_marginBottom="16dp" />
 
         <!-- الدفع -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="💳 تفاصيل الدفع"
+            android:text="💳 طريقة الدفع"
             android:textColor="#FFFFFF"
             android:textSize="14sp"
             android:textStyle="bold"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginBottom="8dp" />
 
         <Spinner
             android:id="@+id/spPaymentMethod"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:background="@drawable/bg_dark_input"
-            android:entries="@array/payment_methods"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginBottom="16dp" />
 
+        <!-- الخصم والمبلغ النهائي -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
+            android:gravity="center_vertical"
             android:layout_marginBottom="16dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="نسبة الخصم:"
+                android:text="الخصم:"
                 android:textColor="#94A3B8"
                 android:textSize="13sp"
-                android:layout_gravity="center_vertical"
-                android:layout_marginEnd="8dp"/>
+                android:layout_marginEnd="8dp" />
 
             <EditText
                 android:id="@+id/etDiscount"
@@ -97,7 +85,7 @@
                 android:background="@drawable/bg_dark_input"
                 android:gravity="center"
                 android:inputType="numberDecimal"
-                android:text="0"/>
+                android:text="0" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -105,33 +93,22 @@
                 android:text="%"
                 android:textColor="#94A3B8"
                 android:textSize="13sp"
-                android:layout_gravity="center_vertical"
-                android:layout_marginStart="4dp"/>
+                android:layout_marginStart="4dp" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
             <TextView
                 android:id="@+id/tvFinalTotal"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:text="$0.00"
                 android:textColor="#FACE15"
                 android:textSize="18sp"
-                android:textStyle="bold"
-                android:gravity="end"/>
+                android:textStyle="bold" />
         </LinearLayout>
-
-        <!-- ملاحظات -->
-        <EditText
-            android:id="@+id/etNotes"
-            android:layout_width="match_parent"
-            android:layout_height="80dp"
-            android:hint="ملاحظات إضافية..."
-            android:textColorHint="#64748B"
-            android:textColor="#FFFFFF"
-            android:background="@drawable/bg_dark_input"
-            android:paddingHorizontal="12dp"
-            android:gravity="top"
-            android:layout_marginBottom="8dp"/>
 
     </LinearLayout>
 </ScrollView>
