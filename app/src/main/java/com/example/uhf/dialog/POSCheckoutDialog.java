@@ -1,19 +1,22 @@
 package com.example.uhf.dialog;
 
-import android.app.Dialog;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
 
 import com.example.uhf.R;
@@ -33,12 +36,10 @@ public class POSCheckoutDialog extends DialogFragment {
     private double totalAmount;
     private int itemCount;
 
-    // ⚡ 1. الكونستركتور الفارغ إجباري لمنع انهيار أندرويد
     public POSCheckoutDialog() {
         // Required empty public constructor
     }
 
-    // ⚡ 2. النمط القياسي لإنشاء الـ Dialog مع Arguments
     public static POSCheckoutDialog newInstance(double totalAmount, int itemCount) {
         POSCheckoutDialog dialog = new POSCheckoutDialog();
         Bundle args = new Bundle();
@@ -61,12 +62,20 @@ public class POSCheckoutDialog extends DialogFragment {
         }
     }
 
-    @NonNull
+    @Nullable
     @Override
-    public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireActivity());
-        LayoutInflater inflater = requireActivity().getLayoutInflater();
-        View view = inflater.inflate(R.layout.dialog_pos_checkout, null);
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        // جعل خلفية النافذة شفافة ليتناسب مع تصميم MIRA الداكن
+        if (getDialog() != null && getDialog().getWindow() != null) {
+            getDialog().getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            getDialog().getWindow().requestFeature(Window.FEATURE_NO_TITLE);
+        }
+        return inflater.inflate(R.layout.dialog_pos_checkout, container, false);
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
         // عناصر النموذج
         EditText etCustomerName = view.findViewById(R.id.etCustomerName);
@@ -75,55 +84,72 @@ public class POSCheckoutDialog extends DialogFragment {
         EditText etDiscount = view.findViewById(R.id.etDiscount);
         TextView tvFinalTotal = view.findViewById(R.id.tvFinalTotal);
 
+        Button btnConfirmCheckout = view.findViewById(R.id.btnConfirmCheckout);
+        Button btnCancelCheckout = view.findViewById(R.id.btnCancelCheckout);
+
         // تهيئة Spinner
         String[] paymentMethods = {"💵 نقدي", "💳 بطاقة ائتمان", "🏦 تحويل بنكي", "📱 محفظة رقمية"};
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_spinner_dropdown_item, paymentMethods);
-        spPaymentMethod.setAdapter(adapter);
+        if (getContext() != null && spPaymentMethod != null) {
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+                    android.R.layout.simple_spinner_dropdown_item, paymentMethods);
+            spPaymentMethod.setAdapter(adapter);
+        }
 
-        // عرض المبلغ النهائي Initial
-        tvFinalTotal.setText(String.format(Locale.US, "$%,.2f", totalAmount));
+        // عرض المبلغ النهائي الأولي
+        if (tvFinalTotal != null) {
+            tvFinalTotal.setText(String.format(Locale.US, "$%,.2f", totalAmount));
+        }
 
-        // حساب الخصم مباشرة
-        etDiscount.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override
-            public void afterTextChanged(Editable s) {
-                try {
-                    double discount = s.length() > 0 ? Double.parseDouble(s.toString()) : 0;
-                    double finalTotal = totalAmount * (1 - discount / 100);
-                    tvFinalTotal.setText(String.format(Locale.US, "$%,.2f", finalTotal));
-                } catch (NumberFormatException e) {
-                    tvFinalTotal.setText(String.format(Locale.US, "$%,.2f", totalAmount));
-                }
-            }
-        });
-
-        builder.setView(view)
-                .setTitle("📋 تفاصيل البيع - " + itemCount + " قطعة")
-                .setPositiveButton("✅ تأكيد البيع", (dialog, which) -> {
-                    POSCheckoutData data = new POSCheckoutData();
-                    data.customerName = etCustomerName.getText().toString().trim();
-                    data.customerPhone = etCustomerPhone.getText().toString().trim();
-                    data.paymentMethod = spPaymentMethod.getSelectedItem() != null ? 
-                            spPaymentMethod.getSelectedItem().toString() : "💵 نقدي";
-                    
-                    String discountStr = etDiscount.getText().toString().trim();
+        // حساب الخصم التفاعلي
+        if (etDiscount != null && tvFinalTotal != null) {
+            etDiscount.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override
+                public void afterTextChanged(Editable s) {
                     try {
-                        data.discount = discountStr.isEmpty() ? 0 : Double.parseDouble(discountStr);
-                    } catch (Exception e) {
-                        data.discount = 0;
+                        double discount = s.length() > 0 ? Double.parseDouble(s.toString()) : 0;
+                        double finalTotal = totalAmount * (1 - discount / 100);
+                        tvFinalTotal.setText(String.format(Locale.US, "$%,.2f", finalTotal));
+                    } catch (NumberFormatException e) {
+                        tvFinalTotal.setText(String.format(Locale.US, "$%,.2f", totalAmount));
                     }
-                    data.finalAmount = totalAmount * (1 - data.discount / 100);
+                }
+            });
+        }
 
-                    if (listener != null) {
-                        listener.onCheckout(data);
-                    }
-                })
-                .setNegativeButton("❌ إلغاء", null);
+        // ⚡ زر الإلغاء
+        if (btnCancelCheckout != null) {
+            btnCancelCheckout.setOnClickListener(v -> dismiss());
+        }
 
-        return builder.create();
+        // ⚡ زر تأكيد البيع
+        if (btnConfirmCheckout != null) {
+            btnConfirmCheckout.setOnClickListener(v -> {
+                POSCheckoutData data = new POSCheckoutData();
+                if (etCustomerName != null) data.customerName = etCustomerName.getText().toString().trim();
+                if (etCustomerPhone != null) data.customerPhone = etCustomerPhone.getText().toString().trim();
+                
+                if (spPaymentMethod != null && spPaymentMethod.getSelectedItem() != null) {
+                    data.paymentMethod = spPaymentMethod.getSelectedItem().toString();
+                } else {
+                    data.paymentMethod = "💵 نقدي";
+                }
+
+                String discountStr = (etDiscount != null) ? etDiscount.getText().toString().trim() : "0";
+                try {
+                    data.discount = discountStr.isEmpty() ? 0 : Double.parseDouble(discountStr);
+                } catch (Exception e) {
+                    data.discount = 0;
+                }
+                data.finalAmount = totalAmount * (1 - data.discount / 100);
+
+                if (listener != null) {
+                    listener.onCheckout(data);
+                }
+                dismiss();
+            });
+        }
     }
 
     public static class POSCheckoutData {
