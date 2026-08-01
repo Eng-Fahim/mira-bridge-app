@@ -18,13 +18,13 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager; // 👈 إضافة جديدة
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-
 
 
 public class UIHelper {
@@ -99,6 +99,22 @@ public class UIHelper {
             builder.create().show();
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * ⌨️ إخفاء لوحة المفاتيح برمجياً فور الضغط على أي زر
+     */
+    public static void hideKeyboard(Activity activity) {
+        if (activity != null && activity.getCurrentFocus() != null) {
+            try {
+                InputMethodManager imm = (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.hideSoftInputFromWindow(activity.getCurrentFocus().getWindowToken(), 0);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 
