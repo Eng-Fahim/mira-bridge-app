@@ -153,27 +153,60 @@ public class UHFReadTagFragment extends Fragment {
         // 2. إرسال إلى خادم MIRA للتحقق والعرض
         sendTagToMiraServer(epc, "-50");
     }
-
-    /**
-     * ⚡ توجيه الوسم إلى MiraPosFragment إذا كان في وضع البيع
-     */
-    private void forwardToPOSMode(String epc) {
-        if (getActivity() instanceof UHFMainActivity) {
-            UHFMainActivity activity = (UHFMainActivity) getActivity();
-
-            // ⭐ البحث عن MiraPosFragment النشط
-            MiraPosFragment posFragment = findPosFragment();
-            if (posFragment != null && posFragment.isVisible()) {
-                // إذا كان POS Mode نشطاً، أرسل الوسم مباشرة إليه
-                posFragment.onRingScanned(epc);
-                Log.d(TAG, "✅ EPC forwarded to POS Mode: " + epc);
-            } else {
-                // الوضع العادي - إرسال إلى Activity
-                activity.onTagRead(epc);
-                Log.d(TAG, "📡 EPC sent to MainActivity: " + epc);
-            }
+/**
+ * ⚡ توجيه الوسم إلى MiraPosFragment إذا كان في وضع البيع
+ */
+private void forwardToPOSMode(String epc) {
+    if (getActivity() instanceof UHFMainActivity) {
+        UHFMainActivity activity = (UHFMainActivity) getActivity();
+        
+        // ⭐ البحث عن MiraPosFragment النشط عبر FragmentTabHost
+        MiraPosFragment posFragment = findPosFragment(activity);
+        
+        if (posFragment != null && posFragment.isVisible()) {
+            // POS Mode نشط - إرسال الوسم مباشرة
+            posFragment.onRingScanned(epc);
+            Log.d(TAG, "✅ EPC forwarded to POS Mode: " + epc);
+        } else {
+            // الوضع العادي - استخدام التوصيل الموجود في Activity
+            activity.onTagRead(epc);
+            Log.d(TAG, "📡 EPC sent via MainActivity: " + epc);
         }
     }
+}
+
+/**
+ * 🔍 البحث عن MiraPosFragment عبر FragmentTabHost
+ */
+private MiraPosFragment findPosFragment(UHFMainActivity activity) {
+    try {
+        // المحاولة عبر FragmentManager مباشرة
+        Fragment fragment = activity.getSupportFragmentManager()
+                .findFragmentByTag("POS Mode");
+        
+        if (fragment instanceof MiraPosFragment) {
+            return (MiraPosFragment) fragment;
+        }
+    } catch (Exception e) {
+        Log.d(TAG, "findPosFragment via tag: " + e.getMessage());
+    }
+    
+    // المحاولة عبر mTabHost
+    try {
+        if (activity.mTabHost != null) {
+            Fragment fragment = activity.getSupportFragmentManager()
+                    .findFragmentByTag(activity.mTabHost.getCurrentTabTag());
+            
+            if (fragment instanceof MiraPosFragment) {
+                return (MiraPosFragment) fragment;
+            }
+        }
+    } catch (Exception e) {
+        Log.d(TAG, "findPosFragment via tabHost: " + e.getMessage());
+    }
+    
+    return null;
+}
 
     /**
      * 🔍 البحث عن MiraPosFragment النشط
