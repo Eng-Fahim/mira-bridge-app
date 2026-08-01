@@ -334,30 +334,30 @@ public class MiraInventoryFragment extends Fragment {
                     JSONObject decision = json.optJSONObject("decision");
                     JSONObject barcode = json.optJSONObject("barcode");
 
-                    if (item != null) {
-                        title = item.optString("title", gtin);
-                        karat = item.optString("karat", "-");
-                        double w = item.optDouble("weight", 0);
-                        weight = w > 0 ? String.format(Locale.US, "%.1fg", w) : "-";
-                        location = item.optString("location", "Main Showroom");
+                    // 🟢 منطق الجرد الصحيح:
+if (item != null) {
+    title = item.optString("title", gtin);
+    karat = item.optString("karat", "-");
+    double w = item.optDouble("weight", 0);
+    weight = w > 0 ? String.format(Locale.US, "%.1fg", w) : "-";
+    location = item.optString("location", "Main Showroom");
 
-                        String vaultStatus = item.optString("status", "");
-                        if (vaultStatus.equals("sold")) {
-                            status = "✓";
-                            found = true;
-                        } else if (vaultStatus.equals("in_stock") || vaultStatus.equals("available")) {
-                            status = "⚠️";
-                            found = true;
-                        } else {
-                            status = "✓";
-                            found = true;
-                        }
-                    } else if (barcode != null) {
-                        title = "Barcode: " + barcode.optString("serial_no", gtin);
-                        status = "⚠️";
-                    }
-                }
-
+    String vaultStatus = item.optString("status", "");
+    
+    // 🟢 للجرد: أي قطعة موجودة في النظام = "موجودة"
+    if (vaultStatus.equals("in_stock") || vaultStatus.equals("available") || 
+        vaultStatus.equals("sold") || vaultStatus.equals("display") ||
+        vaultStatus.equals("reserved")) {
+        status = "✓";   // ✅ موجودة في النظام
+        found = true;
+    } else if (vaultStatus.equals("deleted")) {
+        status = "✗";   // ❌ محذوفة
+        found = false;
+    } else {
+        status = "✓";   // ✅ افتراضياً موجودة
+        found = true;
+    }
+}
                 String finalTitle = title;
                 String finalKarat = karat;
                 String finalWeight = weight;
@@ -611,35 +611,38 @@ public class MiraInventoryFragment extends Fragment {
     // 🔊 تشغيل صوت
     // ============================================
     private void playInventorySound(String type) {
-        if (!soundEnabled) return;
+    if (!soundEnabled) return;
 
-        try {
-            if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
-                com.example.uhf.activity.UHFMainActivity activity =
-                    (com.example.uhf.activity.UHFMainActivity) getActivity();
+    try {
+        if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
+            com.example.uhf.activity.UHFMainActivity activity =
+                (com.example.uhf.activity.UHFMainActivity) getActivity();
+            
+            if (activity == null) return;  // 🟢 حماية
 
-                switch (type) {
-                    case "start":
-                        activity.playSound(1);
-                        break;
-                    case "scan":
-                        activity.playSound(1);
-                        break;
-                    case "complete":
-                        activity.playSound(1);
-                        activity.playSound(1);
-                        break;
-                    case "alert":
-                        activity.playSound(2);
-                        break;
-                }
+            switch (type) {
+                case "start":
+                    safePlaySound(activity, 1);
+                    break;
+                case "scan":
+                    safePlaySound(activity, 1);
+                    break;
+                case "complete":
+                    safePlaySound(activity, 1);
+                    safePlaySound(activity, 1);
+                    break;
+                case "alert":
+                    safePlaySound(activity, 2);
+                    break;
             }
-        } catch (Exception e) {
-            // تجاهل
         }
+    } catch (Exception e) {
+        // تجاهل أي خطأ
+    }
 
-        // 🟢 اهتزاز
-        if (vibrateEnabled && getContext() != null) {
+    // 🟢 اهتزاز
+    if (vibrateEnabled && getContext() != null) {
+        try {
             android.os.Vibrator vibrator = (android.os.Vibrator) getContext().getSystemService(android.content.Context.VIBRATOR_SERVICE);
             if (vibrator != null && vibrator.hasVibrator()) {
                 switch (type) {
@@ -654,6 +657,17 @@ public class MiraInventoryFragment extends Fragment {
                         break;
                 }
             }
+        } catch (Exception e) {
+            // تجاهل
         }
+    }
+}
+
+// 🟢 دالة آمنة لتشغيل الصوت
+private void safePlaySound(com.example.uhf.activity.UHFMainActivity activity, int soundId) {
+    try {
+        activity.playSound(soundId);
+    } catch (Exception e) {
+        // الصوت غير متوفر - تجاهل
     }
         }
