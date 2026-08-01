@@ -42,6 +42,7 @@ import com.example.uhf.tools.ExportExcelAsyncTask;
 import com.example.uhf.tools.UIHelper;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 import com.rscja.deviceapi.interfaces.ConnectionStatus;
+import com.example.uhf.fragment.MiraInventoryProFragment;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -135,10 +136,13 @@ mTabHost.addTab(
 
 
         // 📊 Inventory
-mTabHost.addTab(
-    mTabHost.newTabSpec("Inventory").setIndicator("📊"),
-    MiraInventoryFragment.class, null
-);
+// ❌ القديم
+// mTabHost.addTab(mTabHost.newTabSpec("Inventory").setIndicator("📊"),
+//     MiraInventoryFragment.class, null);
+
+// ✅ الجديد
+mTabHost.addTab(mTabHost.newTabSpec("Inventory Pro").setIndicator("📊"),
+    MiraInventoryProFragment.class, null);
         // 📡 Radar
         mTabHost.addTab(mTabHost.newTabSpec(getResources().getString(R.string.uhf_radar_loaction))
             .setIndicator(getResources().getString(R.string.uhf_radar_loaction)),
