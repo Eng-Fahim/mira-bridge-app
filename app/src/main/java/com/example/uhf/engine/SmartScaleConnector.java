@@ -11,9 +11,7 @@ import java.io.OutputStream;
 import java.util.UUID;
 
 /**
- * 🟢 موصل الميزان الذكي عبر Bluetooth
- * 
- * يدعم الموازين الإلكترونية الذكية لقراءة الوزن الفعلي للقطع
+ * 🟢 موصل الميزان الذكي عبر Bluetooth SPP
  */
 public class SmartScaleConnector {
 
@@ -23,9 +21,9 @@ public class SmartScaleConnector {
     private BluetoothSocket socket;
     private InputStream inputStream;
     private OutputStream outputStream;
-    private Handler handler = new Handler(Looper.getMainLooper());
+    private final Handler handler = new Handler(Looper.getMainLooper());
     private ScaleListener listener;
-    private boolean connected = false;
+    private volatile boolean connected = false;
 
     public interface ScaleListener {
         void onWeightReceived(double weightGrams);
@@ -42,49 +40,52 @@ public class SmartScaleConnector {
         return connected;
     }
 
-    /**
-     * 🟢 الاتصال بميزان Bluetooth
-     */
     public void connect(BluetoothDevice device) {
+        if (device == null) {
+            if (listener != null) listener.onScaleError("Device is null");
+            return;
+        }
+
         new Thread(() -> {
             try {
+                disconnect(); // إغلاق أي اتصال قديم أولاً
+                
                 socket = device.createRfcommSocketToServiceRecord(SPP_UUID);
                 socket.connect();
                 inputStream = socket.getInputStream();
                 outputStream = socket.getOutputStream();
                 connected = true;
 
+                final String deviceName = device.getName() != null ? device.getName() : "Smart Scale";
                 handler.post(() -> {
                     if (listener != null) {
-                        listener.onScaleConnected(device.getName());
+                        listener.onScaleConnected(deviceName);
                     }
                 });
 
-                // 🟢 بدء قراءة الوزن
                 startReading();
 
             } catch (Exception e) {
                 Log.e(TAG, "Connect error: " + e.getMessage());
+                connected = false;
                 handler.post(() -> {
                     if (listener != null) {
-                        listener.onScaleError(e.getMessage());
+                        listener.onScaleError("فشل الاتصال بالميزان: " + e.getMessage());
                     }
                 });
             }
         }).start();
     }
 
-    /**
-     * 🟢 قراءة مستمرة للوزن
-     */
     private void startReading() {
         byte[] buffer = new byte[256];
         while (connected) {
             try {
+                if (inputStream == null) break;
                 int bytes = inputStream.read(buffer);
                 if (bytes > 0) {
-                    String data = new String(buffer, 0, bytes).trim();
-                    double weight = parseWeight(data);
+                    String rawData = new String(buffer, 0, bytes);
+                    double weight = parseWeight(rawData);
                     if (weight > 0) {
                         handler.post(() -> {
                             if (listener != null) {
@@ -98,24 +99,24 @@ public class SmartScaleConnector {
                     Log.e(TAG, "Read error: " + e.getMessage());
                     disconnect();
                 }
+                break;
             }
         }
     }
 
-    /**
-     * 🟢 استخراج الوزن من بيانات الميزان
-     */
     private double parseWeight(String rawData) {
         try {
-            // صيغ شائعة للموازين:
-            // "ST,GS, 5.200,g" ← وزن بالجرام
-            // "+ 12.800 g"
-            // "5.200g"
+            if (rawData == null || rawData.trim().isEmpty()) return 0;
+            
+            // تنقية وتجميع الأرقام والنقاط العشرية
+            // أمثلة: "ST,GS, +0005.20g" أو "12.8g"
             String cleaned = rawData.replaceAll("[^0-9.]", " ").trim();
             String[] parts = cleaned.split("\\s+");
+            
             for (String part : parts) {
                 if (!part.isEmpty() && part.matches("\\d+\\.?\\d*")) {
-                    return Double.parseDouble(part);
+                    double val = Double.parseDouble(part);
+                    if (val > 0) return val;
                 }
             }
         } catch (Exception e) {
@@ -124,35 +125,29 @@ public class SmartScaleConnector {
         return 0;
     }
 
-    /**
-     * 🟢 إرسال أمر للميزان
-     */
     public void sendCommand(String command) {
-        try {
-            if (outputStream != null) {
-                outputStream.write((command + "\r\n").getBytes());
+        new Thread(() -> {
+            try {
+                if (outputStream != null && connected) {
+                    outputStream.write((command + "\r\n").getBytes());
+                    outputStream.flush();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Send error: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Send error: " + e.getMessage());
-        }
+        }).start();
     }
 
-    /**
-     * 🟢 تصفير الميزان (Tare)
-     */
     public void tare() {
         sendCommand("T");
     }
 
-    /**
-     * 🟢 فصل الاتصال
-     */
     public void disconnect() {
         connected = false;
         try {
-            if (inputStream != null) inputStream.close();
-            if (outputStream != null) outputStream.close();
-            if (socket != null) socket.close();
+            if (inputStream != null) { inputStream.close(); inputStream = null; }
+            if (outputStream != null) { outputStream.close(); outputStream = null; }
+            if (socket != null) { socket.close(); socket = null; }
         } catch (Exception e) {
             Log.e(TAG, "Disconnect error: " + e.getMessage());
         }
