@@ -13,7 +13,7 @@ import android.provider.Settings;
 import android.util.Log;
 import android.widget.Toast;
 import com.example.uhf.fragment.JewelryDashboardFragment;
-import com.example.uhf.fragment.MiraInventoryFragment;
+import com.example.uhf.fragment.MiraInventoryProFragment;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
@@ -42,7 +42,7 @@ import com.example.uhf.tools.ExportExcelAsyncTask;
 import com.example.uhf.tools.UIHelper;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 import com.rscja.deviceapi.interfaces.ConnectionStatus;
-import com.example.uhf.fragment.MiraInventoryProFragment;
+
 
 import java.util.ArrayList;
 import java.util.HashMap;
