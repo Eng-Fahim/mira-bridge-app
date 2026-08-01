@@ -596,7 +596,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
     @Override
     public void myOnKeyDwon() {
-        // مطلوب من KeyDwonFragment
+        // Handle trigger key down
     }
 
     public static class InventoryItem {
