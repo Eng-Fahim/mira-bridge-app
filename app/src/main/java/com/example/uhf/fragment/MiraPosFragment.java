@@ -350,7 +350,29 @@ public class MiraPosFragment extends Fragment {
             }
         }).start();
     }
+// ===================== أضف هذه الدالة =====================
 
+/**
+ * 🔄 تفعيل استقبال مسح RFID مباشرة في POS
+ * يتم استدعاؤها عند فتح التبويب
+ */
+@Override
+public void onResume() {
+    super.onResume();
+    // تسجيل هذا الفragment كمستقبل نشط للـ RFID
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
+    }
+}
+
+@Override
+public void onPause() {
+    super.onPause();
+    // إلغاء التسجيل
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
+    }
+}
     // ===================== Cart Management =====================
 
     private void updateCartSummary() {
