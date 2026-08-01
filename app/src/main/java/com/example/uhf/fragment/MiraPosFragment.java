@@ -529,21 +529,38 @@ public class MiraPosFragment extends Fragment {
     // ===================== Checkout Process =====================
 
                 private void processCheckoutAndStockUpdate() {
-        if (cartList.isEmpty()) return;
-
-        try {
-            double totalAmount = getCartTotal();
-            POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(totalAmount, cartList.size());
-            dialog.setCheckoutListener(checkoutData -> executeCheckout(checkoutData));
-            
-            // استخدام الدايلوج العادي عبر Activity للتاكد
-            dialog.show(requireActivity().getSupportFragmentManager(), "POSCheckoutDialog");
-            
-        } catch (Exception e) {
-            Log.e("POS_CRASH_DEBUG", "Error showing dialog: " + e.getMessage(), e);
-            Toast.makeText(getContext(), "خطأ: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
+    // التأكد من أن السلة ليست فارغة وأن الـ Fragment متصل بالنشاط
+    if (cartList == null || cartList.isEmpty()) {
+        Toast.makeText(getContext(), "السلة فارغة!", Toast.LENGTH_SHORT).show();
+        return;
     }
+
+    if (!isAdded() || getActivity() == null) return;
+
+    // إخفاء لوحة المفاتيح
+    UIHelper.hideKeyboard(getActivity());
+
+    try {
+        double totalAmount = getCartTotal();
+
+        // إنشاء كائن الدايلوج
+        POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(totalAmount, cartList.size());
+        
+        // ربط الـ Listener
+        dialog.setCheckoutListener(checkoutData -> executeCheckout(checkoutData));
+
+        // ⚡ استخدام FragmentManager الخاص بالنشاط الرئيسي بأمان
+        FragmentManager fm = getActivity().getSupportFragmentManager();
+        
+        // منع الانهيار في حال كان النظام في حالة SaveInstanceState
+        if (!fm.isStateSaved()) {
+            dialog.show(fm, "POSCheckoutDialog");
+        }
+    } catch (Exception e) {
+        Log.e("POS_CHECKOUT_ERROR", "حدث خطأ أثناء فتح نافذة البيع: " + e.getMessage(), e);
+        Toast.makeText(getContext(), "خطأ في فتح النافذة: " + e.getMessage(), Toast.LENGTH_LONG).show();
+    }
+}
 
 
 
@@ -829,4 +846,4 @@ public class MiraPosFragment extends Fragment {
             }
         }
     }
-    }
+                    }
