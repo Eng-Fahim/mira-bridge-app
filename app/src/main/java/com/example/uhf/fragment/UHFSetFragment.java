@@ -80,6 +80,13 @@ public class UHFSetFragment extends KeyDwonFragment implements OnClickListener {
     private CheckBox cbAutoScan, cbAutoOpenCamera, cbShowScanFrame, cbParseGS1, cbVibrateOnScan;
 
     // =============================================
+// 🟢 إعدادات الجرد
+// =============================================
+private CheckBox cbInventorySound, cbInventoryVibrate, cbInventoryAutoStop;
+private CheckBox cbInventoryShowImages, cbInventorySortByLocation;
+private Spinner spInventoryMode;
+
+    // =============================================
     // 🟢 عناصر RFID المُحقونة بـ ViewInject
     // =============================================
     @ViewInject(R.id.ll_freHop)
@@ -215,6 +222,14 @@ public class UHFSetFragment extends KeyDwonFragment implements OnClickListener {
         cbShowScanFrame = root.findViewById(R.id.cbShowScanFrame);
         cbParseGS1 = root.findViewById(R.id.cbParseGS1);
         cbVibrateOnScan = root.findViewById(R.id.cbVibrateOnScan);
+
+        // 🟢 ربط عناصر إعدادات الجرد
+cbInventorySound = root.findViewById(R.id.cbInventorySound);
+cbInventoryVibrate = root.findViewById(R.id.cbInventoryVibrate);
+cbInventoryAutoStop = root.findViewById(R.id.cbInventoryAutoStop);
+cbInventoryShowImages = root.findViewById(R.id.cbInventoryShowImages);
+cbInventorySortByLocation = root.findViewById(R.id.cbInventorySortByLocation);
+spInventoryMode = root.findViewById(R.id.spInventoryMode);
 
         llMemoryBankParams.setVisibility(View.GONE);
         spMemoryBank.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -530,6 +545,14 @@ if (mContext == null || mContext.mReader == null) return;
         editor.putBoolean("show_scan_frame", cbShowScanFrame != null && cbShowScanFrame.isChecked());
         editor.putBoolean("parse_gs1", cbParseGS1 != null && cbParseGS1.isChecked());
         editor.putBoolean("vibrate_on_scan", cbVibrateOnScan != null && cbVibrateOnScan.isChecked());
+
+        // 🟢 حفظ إعدادات الجرد
+editor.putString("inventory_mode", spInventoryMode.getSelectedItem().toString());
+editor.putString("inventory_sound", cbInventorySound.isChecked() ? "true" : "false");
+editor.putString("inventory_vibrate", cbInventoryVibrate.isChecked() ? "true" : "false");
+editor.putString("inventory_auto_stop", cbInventoryAutoStop.isChecked() ? "true" : "false");
+editor.putString("inventory_show_images", cbInventoryShowImages.isChecked() ? "true" : "false");
+editor.putString("inventory_sort_location", cbInventorySortByLocation.isChecked() ? "true" : "false");
         editor.apply();
 
         // إشعار مدير الإعدادات
@@ -643,6 +666,20 @@ if (mContext == null || mContext.mReader == null) return;
         if (cbParseGS1 != null) cbParseGS1.setChecked(prefs.getBoolean("parse_gs1", true));
         if (cbVibrateOnScan != null) cbVibrateOnScan.setChecked(prefs.getBoolean("vibrate_on_scan", true));
 
+        // 🟢 تحميل إعدادات الجرد
+if (spInventoryMode != null) {
+    String invMode = prefs.getString("inventory_mode", "Full");
+    for (int i = 0; i < spInventoryMode.getCount(); i++) {
+        if (spInventoryMode.getItemAtPosition(i).toString().equals(invMode)) {
+            spInventoryMode.setSelection(i); break;
+        }
+    }
+}
+if (cbInventorySound != null) cbInventorySound.setChecked("true".equals(prefs.getString("inventory_sound", "true")));
+if (cbInventoryVibrate != null) cbInventoryVibrate.setChecked("true".equals(prefs.getString("inventory_vibrate", "true")));
+if (cbInventoryAutoStop != null) cbInventoryAutoStop.setChecked("true".equals(prefs.getString("inventory_auto_stop", "false")));
+if (cbInventoryShowImages != null) cbInventoryShowImages.setChecked("true".equals(prefs.getString("inventory_show_images", "false")));
+if (cbInventorySortByLocation != null) cbInventorySortByLocation.setChecked("true".equals(prefs.getString("inventory_sort_location", "true")));
         // 🟢 استعادة نمط العمل
         String workingMode = prefs.getString("working_mode", "mira_yemen");
         if (spWorkingMode != null) {
