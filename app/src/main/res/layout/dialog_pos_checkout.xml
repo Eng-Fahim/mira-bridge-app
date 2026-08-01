@@ -2,31 +2,94 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="#0B0F17"
-    android:padding="16dp">
+    android:background="#0F172A"
+    android:padding="20dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- العنوان -->
+        <!-- Header -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="💳 تأكيد عملية البيع"
+            android:text="💳 إتمام عملية البيع والدفع"
             android:textColor="#FFFFFF"
             android:textSize="18sp"
             android:textStyle="bold"
             android:gravity="center"
             android:layout_marginBottom="16dp" />
 
-        <!-- العميل -->
+        <!-- Total Summary Box -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#1E293B"
+            android:orientation="vertical"
+            android:padding="14dp"
+            android:layout_marginBottom="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="عدد القطع:"
+                    android:textColor="#94A3B8"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tvItemCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0 قطعة"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#334155"
+                android:layout_marginVertical="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="المبلغ الإجمالي:"
+                    android:textColor="#94A3B8"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/tvFinalTotal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="$0.00"
+                    android:textColor="#EAB308"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Customer Section -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="👤 معلومات العميل"
-            android:textColor="#FFFFFF"
+            android:text="👤 بيانات العميل"
+            android:textColor="#38BDF8"
             android:textSize="13sp"
             android:textStyle="bold"
             android:layout_marginBottom="6dp" />
@@ -34,34 +97,34 @@
         <EditText
             android:id="@+id/etCustomerName"
             android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:hint="اسم العميل"
+            android:layout_height="48dp"
+            android:hint="اسم العميل (اختياري)"
             android:textColorHint="#64748B"
             android:textColor="#FFFFFF"
             android:background="@drawable/bg_dark_input"
             android:paddingHorizontal="12dp"
-            android:textSize="13sp"
+            android:textSize="14sp"
             android:layout_marginBottom="8dp" />
 
         <EditText
             android:id="@+id/etCustomerPhone"
             android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:hint="رقم الهاتف"
+            android:layout_height="48dp"
+            android:hint="رقم الهاتف (مثل: 77XXXXXXX)"
             android:textColorHint="#64748B"
             android:textColor="#FFFFFF"
             android:background="@drawable/bg_dark_input"
             android:paddingHorizontal="12dp"
             android:inputType="phone"
-            android:textSize="13sp"
+            android:textSize="14sp"
             android:layout_marginBottom="16dp" />
 
-        <!-- الدفع -->
+        <!-- Payment Method Section -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="💳 طريقة الدفع"
-            android:textColor="#FFFFFF"
+            android:text="🏦 طريقة الدفع / المحفظة"
+            android:textColor="#38BDF8"
             android:textSize="13sp"
             android:textStyle="bold"
             android:layout_marginBottom="6dp" />
@@ -69,39 +132,37 @@
         <Spinner
             android:id="@+id/spPaymentMethod"
             android:layout_width="match_parent"
-            android:layout_height="44dp"
+            android:layout_height="48dp"
             android:background="@drawable/bg_dark_input"
             android:layout_marginBottom="16dp" />
 
-        <!-- الخصم والمبلغ النهائي -->
+        <!-- Discount Section -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:background="#1E293B"
-            android:padding="12dp"
             android:layout_marginBottom="20dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="الخصم:"
+                android:text="نسبة الخصم:"
                 android:textColor="#94A3B8"
                 android:textSize="13sp"
-                android:layout_marginEnd="6dp" />
+                android:layout_marginEnd="8dp" />
 
             <EditText
                 android:id="@+id/etDiscount"
-                android:layout_width="65dp"
-                android:layout_height="38dp"
+                android:layout_width="80dp"
+                android:layout_height="42dp"
                 android:hint="0"
                 android:textColorHint="#64748B"
-                android:textColor="#FACE15"
+                android:textColor="#EAB308"
                 android:background="@drawable/bg_dark_input"
                 android:gravity="center"
                 android:inputType="numberDecimal"
-                android:textSize="13sp"
+                android:textSize="14sp"
                 android:text="0" />
 
             <TextView
@@ -109,25 +170,11 @@
                 android:layout_height="wrap_content"
                 android:text="%"
                 android:textColor="#94A3B8"
-                android:textSize="13sp"
+                android:textSize="14sp"
                 android:layout_marginStart="4dp" />
-
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
-
-            <TextView
-                android:id="@+id/tvFinalTotal"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="$0.00"
-                android:textColor="#FACE15"
-                android:textSize="18sp"
-                android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- أزرار الإجراءات (تأكيد / إلغاء) -->
+        <!-- Action Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -136,24 +183,24 @@
             <Button
                 android:id="@+id/btnCancelCheckout"
                 android:layout_width="0dp"
-                android:layout_height="46dp"
+                android:layout_height="50dp"
                 android:layout_weight="1"
                 android:layout_marginEnd="8dp"
                 android:background="@drawable/bg_dark_input"
                 android:text="إلغاء"
                 android:textColor="#EF4444"
-                android:textSize="13sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <Button
                 android:id="@+id/btnConfirmCheckout"
                 android:layout_width="0dp"
-                android:layout_height="46dp"
-                android:layout_weight="1.5"
+                android:layout_height="50dp"
+                android:layout_weight="1.8"
                 android:background="@drawable/bg_blue_btn"
-                android:text="تأكيد البيع والحسم"
+                android:text="تأكيد وحسم المخزون"
                 android:textColor="#FFFFFF"
-                android:textSize="13sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
