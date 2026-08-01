@@ -51,6 +51,9 @@ import java.util.HashMap;
 
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
+    
+   private MiraPosFragment activePOSFragment = null;
+
     private final static String TAG = "MainActivity";
     public FragmentTabHost mTabHost;
     private FragmentManager fm;
@@ -70,7 +73,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         initUHF();
         initViewPageData();
     }
-
+public void setActivePOSFragment(MiraPosFragment fragment) {
+    this.activePOSFragment = fragment;
     // ============================================
     // 🟢 التحقق من حالة القارئ
     // ============================================
@@ -331,15 +335,25 @@ mTabHost.addTab(mTabHost.newTabSpec("Inventory Pro").setIndicator("📊"),
     // 🛒 التوصيل المباشر لشاشة MIRA POS
     // ============================================
     public void onTagRead(String epc) {
-        if (mTabHost != null) {
-            String currentTabTag = mTabHost.getCurrentTabTag();
-            Fragment fragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
-            
-            // إذا كانت الشاشة الحالية هي شاشة البيع، أرسل لها الـ EPC فوراً
-            if (fragment instanceof MiraPosFragment) {
-                ((MiraPosFragment) fragment).onRingScanned(epc);
-            }
+    // 🟢 الأولوية لـ POS Mode إذا كان نشطاً
+    if (activePOSFragment != null && activePOSFragment.isVisible()) {
+        activePOSFragment.onRingScanned(epc);
+        return;
+    }
+    
+    // التحقق من التبويب الحالي
+    if (mTabHost != null) {
+        String currentTabTag = mTabHost.getCurrentTabTag();
+        Fragment fragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
+        
+        if (fragment instanceof MiraPosFragment && fragment.isVisible()) {
+            ((MiraPosFragment) fragment).onRingScanned(epc);
+            return;
         }
+    }
+    
+    // إذا لم يكن POS نشطاً، لا تفعل شيء أو أرسل للتبويب الحالي
+    Log.d(TAG, "Tag read but POS not active: " + epc);
     }
 
 }
