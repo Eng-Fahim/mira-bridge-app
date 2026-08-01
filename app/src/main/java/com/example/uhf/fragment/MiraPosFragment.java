@@ -261,7 +261,8 @@ public class MiraPosFragment extends Fragment {
 
     // ===================== 📷 Barcode Scanner =====================
 
-    /**
+   
+        /**
      * 📷 فتح ماسح GS1 DATAMATRIX بالكاميرا
      */
     private void openBarcodeScanner() {
@@ -275,12 +276,24 @@ public class MiraPosFragment extends Fragment {
             }
         });
 
-        getParentFragmentManager()
-                .beginTransaction()
-                .replace(android.R.id.tabhost, scannerFragment)  // استخدام container المناسب
-                .addToBackStack("barcode_scanner")
-                .commit();
+        // ⚡ تم تصحيح الـ Container ID لاستخدام الحاوية الجذرية لـ Fragment الحالي بأمان
+        if (getView() != null && getView().getParent() != null) {
+            int containerId = ((View) getView().getParent()).getId();
+            getParentFragmentManager()
+                    .beginTransaction()
+                    .replace(containerId, scannerFragment)
+                    .addToBackStack("barcode_scanner")
+                    .commit();
+        } else {
+            // حل احتياطي استخدام android.R.id.content
+            getParentFragmentManager()
+                    .beginTransaction()
+                    .replace(android.R.id.content, scannerFragment)
+                    .addToBackStack("barcode_scanner")
+                    .commit();
+        }
     }
+
 
     // ===================== 📡 RFID Direct Mode =====================
 
@@ -813,4 +826,4 @@ public class MiraPosFragment extends Fragment {
             }
         }
     }
-                    }
+                            }
