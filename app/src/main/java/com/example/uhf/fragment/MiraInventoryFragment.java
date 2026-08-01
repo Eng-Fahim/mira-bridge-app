@@ -299,114 +299,105 @@ public class MiraInventoryFragment extends Fragment {
     }
 
     private void queryMiraForInventory(String gtin) {
-        new Thread(() -> {
-            try {
-                URL url = new URL(BASE_URL + "/authorize");
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
-                conn.setDoOutput(true);
-                conn.setConnectTimeout(5000);
+    new Thread(() -> {
+        String title = gtin;
+        String karat = "-";
+        String weight = "-";
+        String location = "Main Showroom";
+        String status = "✗";
+        boolean found = false;
 
-                JSONObject body = new JSONObject();
-                body.put("epc", gtin);
-                body.put("gate_id", "handheld_c72");
-                body.put("rssi", "-" + (40 + (int)(Math.random() * 30)));
-                conn.getOutputStream().write(body.toString().getBytes("utf-8"));
+        try {
+            URL url = new URL(BASE_URL + "/authorize");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
+            conn.setDoOutput(true);
+            conn.setConnectTimeout(5000);
 
-                String title = gtin;
-                String karat = "-";
-                String weight = "-";
-                String location = "Main Showroom";
-                String status = "✗";
-                boolean found = false;
+            JSONObject body = new JSONObject();
+            body.put("epc", gtin);
+            body.put("gate_id", "handheld_c72");
+            body.put("rssi", "-" + (40 + (int)(Math.random() * 30)));
+            conn.getOutputStream().write(body.toString().getBytes("utf-8"));
 
-                if (conn.getResponseCode() == 200) {
-                    BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                    StringBuilder sb = new StringBuilder();
-                    String l;
-                    while ((l = in.readLine()) != null) sb.append(l);
-                    in.close();
+            if (conn.getResponseCode() == 200) {
+                BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                StringBuilder sb = new StringBuilder();
+                String l;
+                while ((l = in.readLine()) != null) sb.append(l);
+                in.close();
 
-                    JSONObject json = new JSONObject(sb.toString());
-                    JSONObject item = json.optJSONObject("item");
-                    JSONObject decision = json.optJSONObject("decision");
-                    JSONObject barcode = json.optJSONObject("barcode");
+                JSONObject json = new JSONObject(sb.toString());
+                JSONObject item = json.optJSONObject("item");
 
-                    // 🟢 منطق الجرد الصحيح:
-if (item != null) {
-    title = item.optString("title", gtin);
-    karat = item.optString("karat", "-");
-    double w = item.optDouble("weight", 0);
-    weight = w > 0 ? String.format(Locale.US, "%.1fg", w) : "-";
-    location = item.optString("location", "Main Showroom");
+                if (item != null) {
+                    title = item.optString("title", gtin);
+                    karat = item.optString("karat", "-");
+                    double w = item.optDouble("weight", 0);
+                    weight = w > 0 ? String.format(Locale.US, "%.1fg", w) : "-";
+                    location = item.optString("location", "Main Showroom");
 
-    String vaultStatus = item.optString("status", "");
-    
-    // 🟢 للجرد: أي قطعة موجودة في النظام = "موجودة"
-    if (vaultStatus.equals("in_stock") || vaultStatus.equals("available") || 
-        vaultStatus.equals("sold") || vaultStatus.equals("display") ||
-        vaultStatus.equals("reserved")) {
-        status = "✓";   // ✅ موجودة في النظام
-        found = true;
-    } else if (vaultStatus.equals("deleted")) {
-        status = "✗";   // ❌ محذوفة
-        found = false;
-    } else {
-        status = "✓";   // ✅ افتراضياً موجودة
-        found = true;
-    }
-}
-                String finalTitle = title;
-                String finalKarat = karat;
-                String finalWeight = weight;
-                String finalLocation = location;
-                String finalStatus = status;
-                boolean finalFound = found;
-
-                getActivity().runOnUiThread(() -> {
-                    scannedItems.add(0, new InventoryItem(gtin, finalTitle, finalKarat, finalWeight, finalStatus, finalLocation));
-
-                    // 🟢 صوت المسح أو التنبيه
-                    if ("✓".equals(finalStatus)) {
-                        playInventorySound("scan");
-                    } else if ("⚠️".equals(finalStatus)) {
-                        playInventorySound("alert");
+                    String vaultStatus = item.optString("status", "");
+                    if (vaultStatus.equals("in_stock") || vaultStatus.equals("available") ||
+                        vaultStatus.equals("sold") || vaultStatus.equals("display") ||
+                        vaultStatus.equals("reserved")) {
+                        status = "✓";
+                        found = true;
+                    } else if (vaultStatus.equals("deleted")) {
+                        status = "✗";
+                        found = false;
+                    } else {
+                        status = "✓";
+                        found = true;
                     }
-
-                    scannedCount++;
-                    if (finalFound) foundCount++;
-                    adapter.notifyItemInserted(0);
-                    rvInventoryItems.scrollToPosition(0);
-
-                    tvLastScan.setText(gtin);
-                    tvRssi.setText("-" + (40 + (int)(Math.random() * 30)) + " dBm");
-                    tvScannedCount.setText(String.valueOf(scannedCount));
-
-                    double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 0;
-                    tvAccuracy.setText("Accuracy: " + String.format(Locale.US, "%.1f%%", acc));
-
-                    if (rvInventoryItems.getWidth() > 0) {
-                        int pct = expectedCount > 0 ? (scannedCount * 100) / expectedCount : 0;
-                        progressScanned.getLayoutParams().width = Math.max(1, (pct * rvInventoryItems.getWidth()) / 100);
-                        progressScanned.requestLayout();
-                    }
-                });
-
-                recordScanOnServer(gtin, finalStatus);
-
-            } catch (Exception e) {
-                getActivity().runOnUiThread(() -> {
-                    scannedItems.add(0, new InventoryItem(gtin, "Error", "-", "-", "✗", "Unknown"));
-                    scannedCount++;
-                    adapter.notifyItemInserted(0);
-                    tvLastScan.setText(gtin + " (offline)");
-                });
+                }
             }
-        }).start();
-    }
+        } catch (Exception e) {
+            title = "Error";
+            status = "✗";
+            found = false;
+        }
 
+        String finalTitle = title;
+        String finalKarat = karat;
+        String finalWeight = weight;
+        String finalLocation = location;
+        String finalStatus = status;
+        boolean finalFound = found;
+
+        getActivity().runOnUiThread(() -> {
+            scannedItems.add(0, new InventoryItem(gtin, finalTitle, finalKarat, finalWeight, finalStatus, finalLocation));
+
+            if ("✓".equals(finalStatus)) {
+                playInventorySound("scan");
+            } else {
+                playInventorySound("alert");
+            }
+
+            scannedCount++;
+            if (finalFound) foundCount++;
+            adapter.notifyItemInserted(0);
+            rvInventoryItems.scrollToPosition(0);
+
+            tvLastScan.setText(gtin);
+            tvRssi.setText("-" + (40 + (int)(Math.random() * 30)) + " dBm");
+            tvScannedCount.setText(String.valueOf(scannedCount));
+
+            double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 0;
+            tvAccuracy.setText("Accuracy: " + String.format(Locale.US, "%.1f%%", acc));
+
+            if (rvInventoryItems.getWidth() > 0) {
+                int pct = expectedCount > 0 ? (scannedCount * 100) / expectedCount : 0;
+                progressScanned.getLayoutParams().width = Math.max(1, (pct * rvInventoryItems.getWidth()) / 100);
+                progressScanned.requestLayout();
+            }
+        });
+
+        recordScanOnServer(gtin, finalStatus);
+    }).start();
+}
     private void recordScanOnServer(String code, String status) {
         new Thread(() -> {
             try {
@@ -670,4 +661,5 @@ private void safePlaySound(com.example.uhf.activity.UHFMainActivity activity, in
     } catch (Exception e) {
         // الصوت غير متوفر - تجاهل
     }
-        }
+}
+}
