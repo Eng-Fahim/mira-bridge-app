@@ -91,16 +91,19 @@ public class MiraInventoryProFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.fragment_mira_inventory_pro, container, false);
-
-        loadInventorySettings();
         bindViews(v);
         setupRecyclerView();
         setupClickListeners();
         setInitialState();
+        return v;
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        loadInventorySettings();
         loadLastSnapshot();
         loadHighValueItems();
-
-        return v;
     }
 
     private void bindViews(View v) {
@@ -150,9 +153,6 @@ public class MiraInventoryProFragment extends Fragment {
         btnGenerateReport.setEnabled(false);
     }
 
-    // ============================================
-    // 🟢 تحميل لقطة الجرد السابقة
-    // ============================================
     private void loadLastSnapshot() {
         new Thread(() -> {
             try {
@@ -171,13 +171,12 @@ public class MiraInventoryProFragment extends Fragment {
                     JSONObject json = new JSONObject(sb.toString());
                     JSONObject snapshot = json.optJSONObject("snapshot");
 
-                    if (snapshot != null) {
+                    if (snapshot != null && getActivity() != null) {
                         prevTotalItems = snapshot.optInt("total_items", 0);
                         String date = snapshot.optString("date", "-");
-                        double acc = snapshot.optDouble("total_weight", 0);
 
                         getActivity().runOnUiThread(() -> {
-                            tvLastAuditDate.setText(date.substring(0, 10));
+                            tvLastAuditDate.setText(date.length() > 10 ? date.substring(0, 10) : date);
                             tvLastAccuracy.setText(String.format("%.1f%%", 98.1));
                             tvPrevItems.setText(String.valueOf(prevTotalItems));
                         });
@@ -187,9 +186,6 @@ public class MiraInventoryProFragment extends Fragment {
         }).start();
     }
 
-    // ============================================
-    // 🟢 تحميل القطع عالية القيمة
-    // ============================================
     private void loadHighValueItems() {
         new Thread(() -> {
             try {
@@ -208,27 +204,26 @@ public class MiraInventoryProFragment extends Fragment {
                     int count = json.optInt("count", 0);
                     JSONArray items = json.optJSONArray("items");
 
-                    getActivity().runOnUiThread(() -> {
-                        tvHighValueCount.setText(String.valueOf(count));
-                        if (count > 0 && items != null) {
-                            StringBuilder list = new StringBuilder();
-                            for (int i = 0; i < Math.min(3, items.length()); i++) {
-                                JSONObject item = items.optJSONObject(i);
-                                if (item != null) {
-                                    list.append("• ").append(item.optString("item_title")).append("\n");
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            tvHighValueCount.setText(String.valueOf(count));
+                            if (count > 0 && items != null) {
+                                StringBuilder list = new StringBuilder();
+                                for (int i = 0; i < Math.min(3, items.length()); i++) {
+                                    JSONObject item = items.optJSONObject(i);
+                                    if (item != null) {
+                                        list.append("• ").append(item.optString("item_title")).append("\n");
+                                    }
                                 }
+                                tvHighValueList.setText(list.toString());
                             }
-                            tvHighValueList.setText(list.toString());
-                        }
-                    });
+                        });
+                    }
                 }
             } catch (Exception ignored) {}
         }).start();
     }
 
-    // ============================================
-    // 🟢 بدء الجرد
-    // ============================================
     private void startInventory(boolean blindMode) {
         isBlindMode = blindMode;
         isScanning = true;
@@ -253,7 +248,9 @@ public class MiraInventoryProFragment extends Fragment {
         startSimulation();
 
         String mode = blindMode ? "BLIND" : "FULL";
-        Toast.makeText(getContext(), "🟢 " + mode + " Inventory Started", Toast.LENGTH_SHORT).show();
+        if (getContext() != null) {
+            Toast.makeText(getContext(), "🟢 " + mode + " Inventory Started", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void stopInventory() {
@@ -274,11 +271,9 @@ public class MiraInventoryProFragment extends Fragment {
         stopTimer();
         closeSessionOnServer();
 
-        // 🟢 حساب التفاوت
         varianceCount = expectedCount - foundCount;
         if (varianceCount < 0) varianceCount = 0;
 
-        // 🟢 إظهار بطاقة المقارنة
         if (prevTotalItems > 0) {
             cardComparison.setVisibility(View.VISIBLE);
             tvCurrItems.setText(String.valueOf(foundCount));
@@ -288,16 +283,13 @@ public class MiraInventoryProFragment extends Fragment {
         }
 
         updateUI();
-
-        // 🟢 إنشاء لقطة
         createSnapshotOnServer();
 
-        Toast.makeText(getContext(), "✅ Complete: " + foundCount + "/" + expectedCount, Toast.LENGTH_LONG).show();
+        if (getContext() != null) {
+            Toast.makeText(getContext(), "✅ Complete: " + foundCount + "/" + expectedCount, Toast.LENGTH_LONG).show();
+        }
     }
 
-    // ============================================
-    // ☁️ دوال السيرفر
-    // ============================================
     private void startSessionOnServer(boolean blind) {
         new Thread(() -> {
             try {
@@ -325,19 +317,23 @@ public class MiraInventoryProFragment extends Fragment {
                     sessionId = json.optInt("session_id", 0);
                     expectedCount = json.optInt("expected_count", realGtins.length);
 
-                    getActivity().runOnUiThread(() -> {
-                        if (!blind) tvExpectedCount.setText(String.valueOf(expectedCount));
-                        else tvExpectedCount.setText("???");
-                        tvLocation.setText("Main Showroom");
-                        updateUI();
-                    });
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            if (!blind) tvExpectedCount.setText(String.valueOf(expectedCount));
+                            else tvExpectedCount.setText("???");
+                            tvLocation.setText("Main Showroom");
+                            updateUI();
+                        });
+                    }
                 }
             } catch (Exception e) {
                 sessionId = (int) (System.currentTimeMillis() / 1000);
                 expectedCount = realGtins.length;
-                getActivity().runOnUiThread(() -> {
-                    tvExpectedCount.setText(isBlindMode ? "???" : String.valueOf(expectedCount));
-                });
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        tvExpectedCount.setText(isBlindMode ? "???" : String.valueOf(expectedCount));
+                    });
+                }
             }
         }).start();
     }
@@ -379,9 +375,6 @@ public class MiraInventoryProFragment extends Fragment {
         }).start();
     }
 
-    // ============================================
-    // 🤖 المحاكاة
-    // ============================================
     private void startSimulation() {
         simulationIndex = 0;
         simulationRunnable = new Runnable() {
@@ -447,32 +440,33 @@ public class MiraInventoryProFragment extends Fragment {
             String fTitle = title, fKarat = karat, fWeight = weight, fLocation = location, fStatus = status;
             boolean fFound = found;
 
-            getActivity().runOnUiThread(() -> {
-                scannedItems.add(0, new InventoryItem(gtin, fTitle, fKarat, fWeight, fStatus, fLocation));
-                playInventorySound("✓".equals(fStatus) ? "scan" : "alert");
-                scannedCount++;
-                if (fFound) foundCount++;
-                adapter.notifyItemInserted(0);
-                rvInventoryItems.scrollToPosition(0);
-                tvLastScan.setText(gtin);
-                tvRssi.setText("-" + (40 + (int)(Math.random() * 30)) + " dBm");
-                tvScannedCount.setText(String.valueOf(scannedCount));
-                tvVariance.setText(String.valueOf(expectedCount - foundCount));
-                double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 0;
-                tvAccuracy.setText("Accuracy: " + String.format(Locale.US, "%.1f%%", acc));
-                if (rvInventoryItems.getWidth() > 0) {
-                    int pct = expectedCount > 0 ? (scannedCount * 100) / expectedCount : 0;
-                    progressScanned.getLayoutParams().width = Math.max(1, (pct * rvInventoryItems.getWidth()) / 100);
-                    progressScanned.requestLayout();
-                }
-            });
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    scannedItems.add(0, new InventoryItem(gtin, fTitle, fKarat, fWeight, fStatus, fLocation));
+                    playInventorySound("✓".equals(fStatus) ? "scan" : "alert");
+                    scannedCount++;
+                    if (fFound) foundCount++;
+                    adapter.notifyItemInserted(0);
+                    rvInventoryItems.scrollToPosition(0);
+                    tvLastScan.setText(gtin);
+                    tvRssi.setText("-" + (40 + (int)(Math.random() * 30)) + " dBm");
+                    tvScannedCount.setText(String.valueOf(scannedCount));
+                    tvVariance.setText(String.valueOf(expectedCount - foundCount));
+                    double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 0;
+                    tvAccuracy.setText("Accuracy: " + String.format(Locale.US, "%.1f%%", acc));
+                    if (rvInventoryItems.getWidth() > 0) {
+                        int pct = expectedCount > 0 ? (scannedCount * 100) / expectedCount : 0;
+                        progressScanned.getLayoutParams().width = Math.max(1, (pct * rvInventoryItems.getWidth()) / 100);
+                        progressScanned.requestLayout();
+                    }
+                });
+            }
         }).start();
     }
 
-    // ============================================
-    // 📋 تقرير Pro
-    // ============================================
     private void generateProReport() {
+        if (getContext() == null) return;
+
         StringBuilder rows = new StringBuilder(); int count = 1;
         for (int i = scannedItems.size() - 1; i >= 0; i--) {
             InventoryItem item = scannedItems.get(i);
@@ -490,7 +484,6 @@ public class MiraInventoryProFragment extends Fragment {
             "body{font-family:'Cairo',sans-serif;color:#1a1a1a;padding:20px;direction:rtl;background:#fff}" +
             ".header{text-align:center;border-bottom:3px solid #1A237E;padding-bottom:15px;margin-bottom:20px}" +
             ".header h1{color:#1A237E;font-size:24px;margin:0}" +
-            ".header .sub{color:#666;font-size:13px;margin-top:5px}" +
             ".summary{display:flex;justify-content:space-around;margin:20px 0;gap:10px}" +
             ".summary-card{flex:1;text-align:center;padding:15px 10px;background:#f8f9fa;border-radius:12px}" +
             ".summary-card .val{font-size:26px;font-weight:700}" +
@@ -532,9 +525,6 @@ public class MiraInventoryProFragment extends Fragment {
         Toast.makeText(getContext(), "🖨️ Opening print dialog...", Toast.LENGTH_SHORT).show();
     }
 
-    // ============================================
-    // ⏱️ Timer
-    // ============================================
     private void startTimer() {
         timerRunnable = () -> {
             long e = System.currentTimeMillis() - startTime;
@@ -543,15 +533,14 @@ public class MiraInventoryProFragment extends Fragment {
         };
         handler.post(timerRunnable);
     }
+
     private void stopTimer() { if (timerRunnable != null) handler.removeCallbacks(timerRunnable); }
+
     private void updateUI() {
         tvScannedCount.setText(String.valueOf(scannedCount));
         tvVariance.setText(String.valueOf(varianceCount));
     }
 
-    // ============================================
-    // 🔊 Sound
-    // ============================================
     private void playInventorySound(String type) {
         if (!soundEnabled) return;
         try {
@@ -579,22 +568,23 @@ public class MiraInventoryProFragment extends Fragment {
             } catch (Exception ignored) {}
         }
     }
+
     private void safePlay(com.example.uhf.activity.UHFMainActivity a, int id) { try { a.playSound(id); } catch (Exception ignored) {} }
+
     private void loadInventorySettings() {
+        if (getContext() == null) return;
         android.content.SharedPreferences p = getContext().getSharedPreferences("MIRA_BRIDGE_SETTINGS", android.content.Context.MODE_PRIVATE);
         soundEnabled = "true".equals(p.getString("inventory_sound", "true"));
         vibrateEnabled = "true".equals(p.getString("inventory_vibrate", "true"));
     }
 
-    // ============================================
-    // 📋 Model & Adapter
-    // ============================================
     public static class InventoryItem {
         String serial, title, karat, weight, status, location;
         public InventoryItem(String s, String t, String k, String w, String st, String l) {
             serial=s; title=t; karat=k; weight=w; status=st; location=l;
         }
     }
+
     private class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.VH> {
         private final List<InventoryItem> items;
         public InventoryAdapter(List<InventoryItem> i) { this.items = i; }
@@ -613,9 +603,10 @@ public class MiraInventoryProFragment extends Fragment {
             VH(View v) { super(v); s=v.findViewById(R.id.tvItemStatus); serial=v.findViewById(R.id.tvItemSerial); title=v.findViewById(R.id.tvItemTitle); details=v.findViewById(R.id.tvItemDetails); }
         }
     }
+
     @Override public void onDestroyView() {
         super.onDestroyView();
         stopTimer();
         if (simulationRunnable != null) simulationHandler.removeCallbacks(simulationRunnable);
     }
-        }
+                    }
