@@ -322,6 +322,29 @@ public class UHFReadTagFragment extends Fragment {
             }
         }
     }
+/**
+ * 🧪 دالة اختبارية لإظهار شكل البطاقة والتحقق الثلاثي فوراً
+ */
+private void showMockVerificationResult() {
+    if (cardMiraResult != null) {
+        cardMiraResult.setVisibility(View.VISIBLE); // إظهار البطاقة فوراً
+    }
+    
+    if (tvMiraProductName != null) tvMiraProductName.setText("خاتم ذهب 21K");
+    if (tvPurityVal != null) tvPurityVal.setText("21K");
+    if (tvWeightVal != null) tvWeightVal.setText("10.00g (Scale: 10.00g)");
+    if (tvValueVal != null) tvValueVal.setText("$750");
+    if (tvSerialVal != null) tvSerialVal.setText("SN: 070045537109");
+    
+    if (tvHeaderStatus != null) {
+        tvHeaderStatus.setText("✅✅✅ TRI-VERIFIED (100%) — MATCHED");
+        tvHeaderStatus.setTextColor(Color.parseColor("#4ADE80"));
+    }
+    if (tvStatusBadge != null) {
+        tvStatusBadge.setText("3X VERIFIED");
+        tvStatusBadge.setTextColor(Color.parseColor("#4ADE80"));
+    }
+}
 
     @Override
     public void onDestroy() {
