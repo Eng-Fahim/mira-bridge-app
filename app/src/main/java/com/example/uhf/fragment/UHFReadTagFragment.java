@@ -79,6 +79,8 @@ public class UHFReadTagFragment extends Fragment {
         // 1️⃣ بدء تشغيل الميزان الذكي تلقائياً عند فتح الشاشة
         initSmartScale();
 
+        showMockVerificationResult();
+
         // ربط زر المسح اليدوي/التحقق
         if (btnScan != null) {
             btnScan.setOnClickListener(v -> {
