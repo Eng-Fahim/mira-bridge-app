@@ -110,7 +110,13 @@ mTabHost.addTab(
     mTabHost.newTabSpec("JewelryDashboard").setIndicator("💎"),
     JewelryDashboardFragment.class, null
 );
+// 🛒 MIRA POS Mode - وضع البيع
+mTabHost.addTab(
+    mTabHost.newTabSpec("POS Mode").setIndicator("🛒"),
+    MiraPosFragment.class, null
+);
 
+        
         // 📷 Scan
         mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_scan))
             .setIndicator(getString(R.string.uhf_msg_tab_scan)),
