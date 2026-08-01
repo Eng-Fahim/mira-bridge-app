@@ -19,7 +19,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
-import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -39,7 +38,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public class MiraInventoryProFragment extends Fragment {
+public class MiraInventoryProFragment extends KeyDwonFragment {
 
     // UI
     private TextView tvInventoryStatus, tvExpectedCount, tvScannedCount, tvVariance;
@@ -578,6 +577,11 @@ public class MiraInventoryProFragment extends Fragment {
         vibrateEnabled = "true".equals(p.getString("inventory_vibrate", "true"));
     }
 
+    @Override
+    public void myOnKeyDwon() {
+        // مطلوب من KeyDwonFragment
+    }
+
     public static class InventoryItem {
         String serial, title, karat, weight, status, location;
         public InventoryItem(String s, String t, String k, String w, String st, String l) {
@@ -609,4 +613,4 @@ public class MiraInventoryProFragment extends Fragment {
         stopTimer();
         if (simulationRunnable != null) simulationHandler.removeCallbacks(simulationRunnable);
     }
-                    }
+}
