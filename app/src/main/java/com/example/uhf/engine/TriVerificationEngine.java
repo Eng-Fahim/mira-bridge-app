@@ -14,24 +14,21 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 🟢 محرك المطابقة الثلاثية الهجين
- * 
- * يدمج ثلاث تقنيات للتحقق من القطعة:
- * 1. RFID UHF - قراءة EPC
- * 2. GS1 DataMatrix - قراءة GTIN + Serial
- * 3. Smart Scale - قراءة الوزن الفعلي
+ * 🟢 محرك المطابقة الثلاثية الهجين (MIRA ID Tri-Verification Engine)
  */
 public class TriVerificationEngine {
 
     private static final String TAG = "TriVerification";
     private static final String BASE_URL = "https://ams.ibreg.org/wp-json/mira-gate/v1";
     private static final String API_KEY = "mira_gate_test071234567890abcdefghijklmnop";
+    
+    // ⚖️ هامش السماحية المقبول للوزن (±0.2 غرام)
+    private static final double WEIGHT_TOLERANCE = 0.2;
 
-    private Handler handler = new Handler(Looper.getMainLooper());
+    private final Handler handler = new Handler(Looper.getMainLooper());
     private VerificationListener listener;
-    private Map<String, VerificationResult> cache = new HashMap<>();
+    private final Map<String, VerificationResult> cache = new HashMap<>();
 
-    // 🟢 مستويات التحقق
     public enum VerificationLevel {
         TRIPLE_VERIFIED(100, "✅✅✅ مطابقة ثلاثية كاملة"),
         DOUBLE_VERIFIED_RFID_GS1(90, "✅✅ مطابقة RFID + GS1"),
@@ -52,23 +49,20 @@ public class TriVerificationEngine {
         }
     }
 
-    /**
-     * 🟢 نموذج نتيجة التحقق
-     */
     public static class VerificationResult {
         public VerificationLevel level;
-        public String epc;
-        public String gtin;
-        public String serial;
-        public String title;
-        public String karat;
-        public double expectedWeight;
-        public double actualWeight;
-        public int rssi;
-        public String barcodeData;
-        public boolean rfidOk;
-        public boolean gs1Ok;
-        public boolean weightOk;
+        public String epc = "";
+        public String gtin = "";
+        public String serial = "";
+        public String title = "غير معروف";
+        public String karat = "-";
+        public double expectedWeight = 0.0;
+        public double actualWeight = 0.0;
+        public int rssi = 0;
+        public String barcodeData = "";
+        public boolean rfidOk = false;
+        public boolean gs1Ok = false;
+        public boolean weightOk = false;
         public long timestamp;
         public String message;
 
@@ -102,14 +96,19 @@ public class TriVerificationEngine {
         this.listener = listener;
     }
 
-    /**
-     * 🟢 تحقق ثلاثي كامل
-     */
     public void verifyFull(String epc, String gs1Data, double actualWeight, int rssi) {
-        // 🟢 الخطوة 1: استعلام MIRA ID
+        if (epc == null || epc.trim().isEmpty()) {
+            notifyError("رمز EPC غير صالحة");
+            return;
+        }
+
         queryMiraCloud(epc, (itemData) -> {
             if (itemData == null) {
-                notifyResult(new VerificationResult(VerificationLevel.UNKNOWN));
+                VerificationResult unknownResult = new VerificationResult(VerificationLevel.UNKNOWN);
+                unknownResult.epc = epc;
+                unknownResult.actualWeight = actualWeight;
+                unknownResult.rssi = rssi;
+                notifyResult(unknownResult);
                 return;
             }
 
@@ -117,64 +116,51 @@ public class TriVerificationEngine {
             result.epc = epc;
             result.actualWeight = actualWeight;
             result.rssi = rssi;
-            result.barcodeData = gs1Data;
+            result.barcodeData = gs1Data != null ? gs1Data : "";
             result.title = itemData.title;
             result.karat = itemData.karat;
             result.expectedWeight = itemData.weight;
             result.gtin = itemData.gtin;
             result.serial = itemData.serial;
 
-            // 🟢 الخطوة 2: تحقق RFID
-            result.rfidOk = (epc != null && !epc.isEmpty());
+            // 1️⃣ تحقق RFID
+            result.rfidOk = true;
 
-            // 🟢 الخطوة 3: تحقق GS1
-            if (gs1Data != null && !gs1Data.isEmpty()) {
+            // 2️⃣ تحقق GS1
+            if (gs1Data != null && !gs1Data.trim().isEmpty()) {
                 String extractedGtin = extractGtinFromGS1(gs1Data);
-                result.gs1Ok = itemData.gtin.equals(extractedGtin) || 
-                               itemData.serial.equals(extractedGtin);
+                result.gs1Ok = (itemData.gtin != null && itemData.gtin.equalsIgnoreCase(extractedGtin)) ||
+                               (itemData.serial != null && itemData.serial.equalsIgnoreCase(extractedGtin));
             }
 
-            // 🟢 الخطوة 4: تحقق الوزن (±0.2g هامش)
-            if (actualWeight > 0) {
-                result.weightOk = Math.abs(itemData.weight - actualWeight) <= 0.2;
+            // 3️⃣ تحقق الوزن
+            if (actualWeight > 0 && itemData.weight > 0) {
+                result.weightOk = Math.abs(itemData.weight - actualWeight) <= WEIGHT_TOLERANCE;
             }
 
-            // 🟢 الخطوة 5: تحديد المستوى
+            // 4️⃣ تحديد المستوى النهائي
             result.level = determineLevel(result);
             result.message = result.level.label;
 
-            // 🟢 تخزين مؤقت
+            // تخزين مؤقت
             cache.put(epc, result);
 
-            // 🟢 إشعار
             notifyResult(result);
         });
     }
 
-    /**
-     * 🟢 تحقق RFID + GS1 فقط (بدون ميزان)
-     */
     public void verifyRfidGs1(String epc, String gs1Data, int rssi) {
         verifyFull(epc, gs1Data, 0, rssi);
     }
 
-    /**
-     * 🟢 تحقق RFID + وزن (بدون GS1)
-     */
     public void verifyRfidWeight(String epc, double actualWeight, int rssi) {
         verifyFull(epc, null, actualWeight, rssi);
     }
 
-    /**
-     * 🟢 تحقق RFID فقط
-     */
     public void verifyRfidOnly(String epc, int rssi) {
         verifyFull(epc, null, 0, rssi);
     }
 
-    /**
-     * 🟢 تحديد مستوى التحقق
-     */
     private VerificationLevel determineLevel(VerificationResult r) {
         boolean rfid = r.rfidOk;
         boolean gs1 = r.gs1Ok;
@@ -190,27 +176,25 @@ public class TriVerificationEngine {
         return VerificationLevel.MISMATCH;
     }
 
-    /**
-     * 🟢 استخراج GTIN من GS1 DataMatrix
-     */
     private String extractGtinFromGS1(String gs1Data) {
-        // الصيغة: (01)06291337000016(21)ABC123
+        if (gs1Data == null) return "";
+        
+        // تحليل معيار GS1 (01)
         if (gs1Data.contains("(01)")) {
             int start = gs1Data.indexOf("(01)") + 4;
             int end = gs1Data.indexOf("(", start);
             if (end == -1) end = gs1Data.length();
-            return gs1Data.substring(start, Math.min(start + 14, end)).trim();
+            String extracted = gs1Data.substring(start, Math.min(start + 14, end)).trim();
+            return cleanBarcode(extracted);
         }
-        // إذا كان GTIN مباشر
-        if (gs1Data.matches("\\d{13,14}")) {
-            return gs1Data.length() == 14 ? gs1Data.substring(0, 13) : gs1Data;
-        }
-        return gs1Data;
+        
+        return cleanBarcode(gs1Data.trim());
     }
 
-    /**
-     * 🟢 استعلام MIRA ID
-     */
+    private String cleanBarcode(String code) {
+        return code.replaceAll("[^0-9a-zA-Z]", "");
+    }
+
     private void queryMiraCloud(String code, ItemDataCallback callback) {
         new Thread(() -> {
             try {
@@ -221,6 +205,7 @@ public class TriVerificationEngine {
                 conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
                 conn.setDoOutput(true);
                 conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
 
                 JSONObject body = new JSONObject();
                 body.put("epc", code);
@@ -239,11 +224,11 @@ public class TriVerificationEngine {
 
                     if (item != null) {
                         ItemData data = new ItemData();
-                        data.title = item.optString("title", "");
+                        data.title = item.optString("title", "قطعة غير معنونة");
                         data.gtin = item.optString("gtin", "");
                         data.serial = item.optString("serial", "");
-                        data.karat = item.optString("karat", "");
-                        data.weight = item.optDouble("weight", 0);
+                        data.karat = item.optString("karat", "-");
+                        data.weight = item.optDouble("weight", 0.0);
                         data.status = item.optString("status", "");
                         data.location = item.optString("location", "");
                         callback.onResult(data);
@@ -262,6 +247,14 @@ public class TriVerificationEngine {
         handler.post(() -> {
             if (listener != null) {
                 listener.onVerificationComplete(result);
+            }
+        });
+    }
+
+    private void notifyError(String errorMsg) {
+        handler.post(() -> {
+            if (listener != null) {
+                listener.onVerificationError(errorMsg);
             }
         });
     }
