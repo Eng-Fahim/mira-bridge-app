@@ -1,12 +1,19 @@
 package com.example.uhf.fragment;
 
+import android.app.AlertDialog;
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -19,6 +26,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -34,7 +42,7 @@ import java.util.Locale;
 
 public class MiraInventoryFragment extends Fragment {
 
-    // UI Elements
+    // UI
     private TextView tvInventoryStatus, tvExpectedCount, tvScannedCount, tvMissingCount;
     private TextView tvAccuracy, tvElapsedTime, tvLocation, tvLastScan, tvRssi;
     private View progressScanned;
@@ -45,6 +53,7 @@ public class MiraInventoryFragment extends Fragment {
     private boolean isScanning = false;
     private int expectedCount = 0;
     private int scannedCount = 0;
+    private int foundCount = 0;
     private int missingCount = 0;
     private int sessionId = 0;
     private long startTime = 0;
@@ -60,31 +69,22 @@ public class MiraInventoryFragment extends Fragment {
     private Runnable simulationRunnable;
     private int simulationIndex = 0;
 
-    // 🟢 قائمة القطع الاختبارية (GTINs حقيقية + اختبارية)
-    private String[][] testItems = {
-        {"070000000010", "Gold Ring 21K", "21K", "5.20g", "Main Showroom"},
-        {"070000000030", "Gold Bracelet 18K", "18K", "12.80g", "Main Showroom"},
-        {"070000000040", "Gold Necklace 24K", "24K", "25.00g", "Main Showroom"},
-        {"070000000050", "Gold Earrings 21K", "21K", "3.20g", "Main Showroom"},
-        {"0700000007927", "Gold Chain 18K", "18K", "15.50g", "Main Showroom"},
-        {"0700000007928", "Gold Bangle 22K", "22K", "18.30g", "Main Showroom"},
-        {"0700000007929", "Gold Pendant 21K", "21K", "8.10g", "Main Showroom"},
-        {"070045537109", "Gold Coin 24K", "24K", "10.00g", "Main Showroom"},
-        {"070069121817", "Gold Cufflinks 18K", "18K", "6.40g", "Main Showroom"},
-        {"070073594930", "Gold Anklet 21K", "21K", "7.80g", "Main Showroom"},
-        {"070077306396", "Gold Brooch 22K", "22K", "9.20g", "Main Showroom"},
-        {"BWA-26000101", "21K Diamond Ring", "21K", "5.20g", "Main Showroom"},
-    };
-
-    private static final String API_URL = "https://ams.ibreg.org/wp-json/mira-gate/v1/authorize";
+    // API
+    private static final String BASE_URL = "https://ams.ibreg.org/wp-json/mira-gate/v1";
     private static final String API_KEY = "mira_gate_test071234567890abcdefghijklmnop";
+
+    // 🟢 GTINs حقيقية من قاعدة البيانات
+    private String[] realGtins = {
+        "070000000010", "070000000030", "070000000040", "070000000050",
+        "0700000007927", "0700000007928", "0700000007929",
+        "070045537109", "070069121817", "070073594930", "070077306396"
+    };
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.fragment_mira_inventory, container, false);
 
-        // Bind Views
         tvInventoryStatus = v.findViewById(R.id.tvInventoryStatus);
         tvExpectedCount = v.findViewById(R.id.tvExpectedCount);
         tvScannedCount = v.findViewById(R.id.tvScannedCount);
@@ -100,15 +100,18 @@ public class MiraInventoryFragment extends Fragment {
         btnGenerateReport = v.findViewById(R.id.btnGenerateReport);
         rvInventoryItems = v.findViewById(R.id.rvInventoryItems);
 
-        // Setup RecyclerView
         adapter = new InventoryAdapter(scannedItems);
         rvInventoryItems.setLayoutManager(new LinearLayoutManager(getContext()));
         rvInventoryItems.setAdapter(adapter);
 
-        // Click Listeners
+        // 🟢 الحالة الأولية
+        btnStartInventory.setEnabled(true);
+        btnStopInventory.setEnabled(false);
+        btnGenerateReport.setEnabled(false);
+        
         btnStartInventory.setOnClickListener(view -> startInventory());
         btnStopInventory.setOnClickListener(view -> stopInventory());
-        btnGenerateReport.setOnClickListener(view -> generateReport());
+        btnGenerateReport.setOnClickListener(view -> generatePrintableReport());
 
         updateUI();
 
@@ -119,33 +122,31 @@ public class MiraInventoryFragment extends Fragment {
     // 🟢 بدء جلسة الجرد
     // ============================================
     private void startInventory() {
+        // 🟢 تعطيل الأزرار المناسبة
+        btnStartInventory.setEnabled(false);
+        btnStartInventory.setText("● SCANNING...");
+        btnStopInventory.setEnabled(true);
+        btnGenerateReport.setEnabled(false);
+
         isScanning = true;
         startTime = System.currentTimeMillis();
         scannedItems.clear();
         scannedCount = 0;
+        foundCount = 0;
         simulationIndex = 0;
         adapter.notifyDataSetChanged();
 
         tvInventoryStatus.setText("● SCANNING");
         tvInventoryStatus.setTextColor(Color.parseColor("#38BDF8"));
 
-        // 🟢 محاكاة - بيانات اختبارية
-        expectedCount = testItems.length;
-        sessionId = (int) (System.currentTimeMillis() / 1000);
-        tvExpectedCount.setText(String.valueOf(expectedCount));
-        tvLocation.setText("Main Showroom");
-        updateUI();
-
-        // 🟢 استدعاء API لبدء الجلسة
-        startInventorySessionOnServer();
+        // 🟢 بدء جلسة على السيرفر
+        startSessionOnServer();
 
         // 🟢 بدء المؤقت
         startTimer();
 
         // 🟢 بدء المحاكاة
         startSimulation();
-
-        Toast.makeText(getContext(), "🟢 Inventory Started - " + expectedCount + " items expected", Toast.LENGTH_SHORT).show();
     }
 
     // ============================================
@@ -154,120 +155,44 @@ public class MiraInventoryFragment extends Fragment {
     private void stopInventory() {
         isScanning = false;
 
-        // إيقاف المحاكاة
         if (simulationRunnable != null) {
             simulationHandler.removeCallbacks(simulationRunnable);
         }
 
-        tvInventoryStatus.setText("● IDLE");
+        btnStartInventory.setEnabled(true);
+        btnStartInventory.setText("▶ START");
+        btnStopInventory.setEnabled(false);
+        btnGenerateReport.setEnabled(true);
+
+        tvInventoryStatus.setText("● COMPLETED");
         tvInventoryStatus.setTextColor(Color.parseColor("#22C55E"));
 
         stopTimer();
 
-        // استدعاء API لإغلاق الجلسة
-        closeInventorySessionOnServer();
+        // 🟢 إغلاق الجلسة على السيرفر
+        closeSessionOnServer();
 
-        Toast.makeText(getContext(), "🔴 Inventory Stopped - " + scannedCount + " items scanned", Toast.LENGTH_SHORT).show();
+        // 🟢 تحديث missing count
+        missingCount = expectedCount - foundCount;
+        if (missingCount < 0) missingCount = 0;
+        updateUI();
+
+        Toast.makeText(getContext(), "✅ Inventory Complete: " + foundCount + "/" + expectedCount, Toast.LENGTH_LONG).show();
     }
 
     // ============================================
-    // 🟢 محاكاة المسح التلقائي
+    // ☁️ بدء الجلسة على السيرفر
     // ============================================
-    private void startSimulation() {
-        simulationIndex = 0;
-        simulationRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (!isScanning || simulationIndex >= testItems.length) {
-                    if (isScanning) {
-                        stopInventory();
-                        Toast.makeText(getContext(), "✅ Simulation Complete: " + scannedCount + "/" + expectedCount + " items", Toast.LENGTH_LONG).show();
-                    }
-                    return;
-                }
-
-                String[] item = testItems[simulationIndex];
-                String serial = item[0];
-                String title = item[1];
-                String karat = item[2];
-                String weight = item[3];
-                String location = item[4];
-
-                // إضافة إلى القائمة
-                scannedItems.add(0, new InventoryItem(serial, title, karat, weight, "✓", location));
-                scannedCount++;
-                adapter.notifyItemInserted(0);
-                rvInventoryItems.scrollToPosition(0);
-
-                // تحديث الواجهة
-                tvLastScan.setText(serial);
-                tvRssi.setText("-" + (40 + (int)(Math.random() * 30)) + " dBm");
-                updateUI();
-
-                // محاكاة استعلام MIRA ID
-                simulateMiraQuery(serial, title, karat, weight);
-
-                simulationIndex++;
-
-                // تأخير عشوائي بين المسحات
-                int delay = 600 + (int)(Math.random() * 900);
-                simulationHandler.postDelayed(this, delay);
-            }
-        };
-
-        simulationHandler.postDelayed(simulationRunnable, 800);
-    }
-
-    // ============================================
-    // 🟢 محاكاة استعلام MIRA ID
-    // ============================================
-    private void simulateMiraQuery(String serial, String title, String karat, String weight) {
+    private void startSessionOnServer() {
         new Thread(() -> {
             try {
-                URL url = new URL(API_URL);
+                URL url = new URL(BASE_URL + "/inventory/start-session");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
                 conn.setDoOutput(true);
-                conn.setConnectTimeout(5000);
-
-                JSONObject body = new JSONObject();
-                body.put("epc", serial);
-                body.put("gate_id", "handheld_c72");
-                body.put("rssi", "-" + (40 + (int)(Math.random() * 30)));
-                conn.getOutputStream().write(body.toString().getBytes("utf-8"));
-
-                int responseCode = conn.getResponseCode();
-                if (responseCode == 200) {
-                    BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                    StringBuilder sb = new StringBuilder();
-                    String line;
-                    while ((line = in.readLine()) != null) sb.append(line);
-                    in.close();
-
-                    // 🟢 يمكن استخدام الرد لتحديث معلومات القطعة
-                    JSONObject json = new JSONObject(sb.toString());
-                    // Log response for debugging
-                }
-            } catch (Exception e) {
-                // فشل الاتصال - يتم تجاهله في المحاكاة
-            }
-        }).start();
-    }
-
-    // ============================================
-    // ☁️ بدء جلسة الجرد في MIRA ID
-    // ============================================
-    private void startInventorySessionOnServer() {
-        new Thread(() -> {
-            try {
-                URL url = new URL("https://ams.ibreg.org/wp-json/mira-gate/v1/inventory/start-session");
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
-                conn.setDoOutput(true);
+                conn.setConnectTimeout(8000);
 
                 JSONObject body = new JSONObject();
                 body.put("location", "Main Showroom");
@@ -277,41 +202,45 @@ public class MiraInventoryFragment extends Fragment {
                 if (conn.getResponseCode() == 200) {
                     BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                     StringBuilder sb = new StringBuilder();
-                    String line;
-                    while ((line = in.readLine()) != null) sb.append(line);
+                    String l;
+                    while ((l = in.readLine()) != null) sb.append(l);
                     in.close();
 
                     JSONObject json = new JSONObject(sb.toString());
-                    int serverSessionId = json.optInt("session_id", 0);
-                    int serverExpected = json.optInt("expected_count", 0);
+                    sessionId = json.optInt("session_id", 0);
+                    expectedCount = json.optInt("expected_count", realGtins.length);
 
                     getActivity().runOnUiThread(() -> {
-                        if (serverSessionId > 0) sessionId = serverSessionId;
-                        if (serverExpected > 0) {
-                            expectedCount = serverExpected;
-                            tvExpectedCount.setText(String.valueOf(expectedCount));
-                        }
+                        tvExpectedCount.setText(String.valueOf(expectedCount));
+                        tvLocation.setText("Main Showroom");
                         updateUI();
                     });
                 }
             } catch (Exception e) {
                 // استخدام القيم المحلية
+                sessionId = (int) (System.currentTimeMillis() / 1000);
+                expectedCount = realGtins.length;
+                getActivity().runOnUiThread(() -> {
+                    tvExpectedCount.setText(String.valueOf(expectedCount));
+                    updateUI();
+                });
             }
         }).start();
     }
 
     // ============================================
-    // ☁️ إغلاق جلسة الجرد
+    // ☁️ إغلاق الجلسة على السيرفر
     // ============================================
-    private void closeInventorySessionOnServer() {
+    private void closeSessionOnServer() {
         new Thread(() -> {
             try {
-                URL url = new URL("https://ams.ibreg.org/wp-json/mira-gate/v1/inventory/close-session");
+                URL url = new URL(BASE_URL + "/inventory/close-session");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json");
                 conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
                 conn.setDoOutput(true);
+                conn.setConnectTimeout(8000);
 
                 JSONObject body = new JSONObject();
                 body.put("session_id", sessionId);
@@ -320,190 +249,278 @@ public class MiraInventoryFragment extends Fragment {
                 if (conn.getResponseCode() == 200) {
                     BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                     StringBuilder sb = new StringBuilder();
-                    String line;
-                    while ((line = in.readLine()) != null) sb.append(line);
+                    String l;
+                    while ((l = in.readLine()) != null) sb.append(l);
                     in.close();
 
                     JSONObject json = new JSONObject(sb.toString());
-                    JSONObject report = json.getJSONObject("report");
-                    double accuracy = report.optDouble("accuracy", 0);
-
-                    getActivity().runOnUiThread(() -> {
-                        tvAccuracy.setText("Accuracy: " + accuracy + "%");
-                        updateUI();
-                    });
+                    JSONObject report = json.optJSONObject("report");
+                    if (report != null) {
+                        double acc = report.optDouble("accuracy", 0);
+                        getActivity().runOnUiThread(() -> {
+                            tvAccuracy.setText("Accuracy: " + acc + "%");
+                            updateUI();
+                        });
+                    }
                 }
             } catch (Exception e) {
-                // تجاهل
+                getActivity().runOnUiThread(() -> updateUI());
             }
         }).start();
+    }
+
+    // ============================================
+    // 🤖 محاكاة المسح - مع استعلام MIRA ID
+    // ============================================
+    private void startSimulation() {
+        simulationIndex = 0;
+        simulationRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!isScanning || simulationIndex >= realGtins.length) {
+                    if (isScanning) stopInventory();
+                    return;
+                }
+
+                String gtin = realGtins[simulationIndex];
+                queryMiraForInventory(gtin, simulationIndex);
+                simulationIndex++;
+
+                int delay = 500 + (int)(Math.random() * 1000);
+                simulationHandler.postDelayed(this, delay);
+            }
+        };
+        simulationHandler.postDelayed(simulationRunnable, 500);
+    }
+
+    private void queryMiraForInventory(String gtin, int index) {
+        new Thread(() -> {
+            try {
+                URL url = new URL(BASE_URL + "/authorize");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(5000);
+
+                JSONObject body = new JSONObject();
+                body.put("epc", gtin);
+                body.put("gate_id", "handheld_c72");
+                body.put("rssi", "-" + (40 + (int)(Math.random() * 30)));
+                conn.getOutputStream().write(body.toString().getBytes("utf-8"));
+
+                String title = "Item " + gtin.substring(gtin.length() - 4);
+                String karat = "21K";
+                String weight = "5.20g";
+                String location = "Main Showroom";
+                String status = "✓";
+                boolean found = true;
+
+                if (conn.getResponseCode() == 200) {
+                    BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                    StringBuilder sb = new StringBuilder();
+                    String l;
+                    while ((l = in.readLine()) != null) sb.append(l);
+                    in.close();
+
+                    JSONObject json = new JSONObject(sb.toString());
+                    JSONObject item = json.optJSONObject("item");
+                    JSONObject decision = json.optJSONObject("decision");
+
+                    if (item != null) {
+                        title = item.optString("title", title);
+                        karat = item.optString("karat", karat);
+                        weight = item.optString("weight", weight);
+                        location = item.optString("location", location);
+                        status = decision != null && decision.optBoolean("allowed", false) ? "✓" : "⚠️";
+                        found = true;
+                    } else {
+                        status = "✗";
+                        found = false;
+                    }
+                }
+
+                String finalTitle = title;
+                String finalKarat = karat;
+                String finalWeight = weight;
+                String finalLocation = location;
+                String finalStatus = status;
+                boolean finalFound = found;
+
+                getActivity().runOnUiThread(() -> {
+                    scannedItems.add(0, new InventoryItem(gtin, finalTitle, finalKarat, finalWeight, finalStatus, finalLocation));
+                    scannedCount++;
+                    if (finalFound) foundCount++;
+                    adapter.notifyItemInserted(0);
+                    rvInventoryItems.scrollToPosition(0);
+
+                    tvLastScan.setText(gtin);
+                    tvRssi.setText("-" + (40 + (int)(Math.random() * 30)) + " dBm");
+                    tvScannedCount.setText(String.valueOf(scannedCount));
+                    
+                    double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 0;
+                    tvAccuracy.setText("Accuracy: " + String.format("%.1f%%", acc));
+                    
+                    if (rvInventoryItems.getWidth() > 0) {
+                        int pct = expectedCount > 0 ? (scannedCount * 100) / expectedCount : 0;
+                        progressScanned.getLayoutParams().width = Math.max(1, (pct * rvInventoryItems.getWidth()) / 100);
+                        progressScanned.requestLayout();
+                    }
+                });
+
+                // 🟢 تسجيل في session_items على السيرفر
+                recordScanOnServer(gtin, finalStatus);
+
+            } catch (Exception e) {
+                getActivity().runOnUiThread(() -> {
+                    scannedItems.add(0, new InventoryItem(gtin, "Unknown", "-", "-", "✗", "Unknown"));
+                    scannedCount++;
+                    adapter.notifyItemInserted(0);
+                    tvLastScan.setText(gtin + " (offline)");
+                });
+            }
+        }).start();
+    }
+
+    private void recordScanOnServer(String code, String status) {
+        new Thread(() -> {
+            try {
+                URL url = new URL(BASE_URL + "/inventory/scan-item");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(5000);
+
+                JSONObject body = new JSONObject();
+                body.put("session_id", sessionId);
+                body.put("code", code);
+                body.put("rssi", "-" + (40 + (int)(Math.random() * 30)));
+                conn.getOutputStream().write(body.toString().getBytes("utf-8"));
+                conn.getResponseCode();
+            } catch (Exception ignored) {}
+        }).start();
+    }
+
+    // ============================================
+    // 📋 تقرير قابل للطباعة
+    // ============================================
+    private void generatePrintableReport() {
+        String reportHtml = buildReportHtml();
+        
+        WebView webView = new WebView(getContext());
+        webView.getSettings().setJavaScriptEnabled(true);
+        webView.loadDataWithBaseURL(null, reportHtml, "text/html", "UTF-8", null);
+
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                PrintManager printManager = (PrintManager) getContext().getSystemService(getContext().PRINT_SERVICE);
+                PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter("MIRA_Inventory_Report");
+                printManager.print("MIRA Inventory Report", printAdapter, new PrintAttributes.Builder().build());
+            }
+        });
+        
+        Toast.makeText(getContext(), "🖨️ Opening print dialog...", Toast.LENGTH_SHORT).show();
+    }
+
+    private String buildReportHtml() {
+        StringBuilder rows = new StringBuilder();
+        int count = 1;
+        for (InventoryItem item : scannedItems) {
+            String color = "✓".equals(item.status) ? "#22C55E" : "#EF4444";
+            rows.append(String.format(
+                "<tr><td>%d</td><td style='color:%s'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
+                count++, color, item.status, item.serial, item.title, item.karat, item.weight));
+        }
+
+        return "<!DOCTYPE html><html dir='ltr'><head><meta charset='UTF-8'>" +
+            "<style>body{font-family:'Cairo',sans-serif;color:#1a1a1a;padding:20px}" +
+            "h1{color:#1A237E;text-align:center;border-bottom:3px solid #1A237E;padding-bottom:10px}" +
+            ".summary{display:flex;justify-content:space-around;margin:20px 0}" +
+            ".summary div{text-align:center;padding:10px 20px;background:#f5f5f5;border-radius:8px}" +
+            ".summary .val{font-size:24px;font-weight:bold;color:#1A237E}" +
+            "table{width:100%;border-collapse:collapse;margin-top:20px}" +
+            "th{background:#1A237E;color:white;padding:10px;text-align:left}" +
+            "td{padding:8px;border-bottom:1px solid #ddd}" +
+            "tr:nth-child(even){background:#f9f9f9}" +
+            ".footer{text-align:center;margin-top:30px;color:#666;font-size:12px}" +
+            "</style></head><body>" +
+            "<h1>📊 MIRA Inventory Report</h1>" +
+            "<p style='text-align:center'>Date: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()) + " | Location: Main Showroom</p>" +
+            "<div class='summary'>" +
+            "<div><div class='val'>" + expectedCount + "</div>Expected</div>" +
+            "<div><div class='val'>" + foundCount + "</div>Found</div>" +
+            "<div><div class='val'>" + missingCount + "</div>Missing</div>" +
+            "<div><div class='val'>" + String.format("%.1f%%", expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 0) + "</div>Accuracy</div>" +
+            "</div>" +
+            "<table><tr><th>#</th><th>Status</th><th>GTIN/Serial</th><th>Item</th><th>Karat</th><th>Weight</th></tr>" +
+            rows.toString() +
+            "</table>" +
+            "<div class='footer'>MIRA Technology © 2026 | mira-id.com | Generated by MIRA Bridge™</div>" +
+            "</body></html>";
     }
 
     // ============================================
     // ⏱️ المؤقت
     // ============================================
     private void startTimer() {
-        timerRunnable = new Runnable() {
-            @Override
-            public void run() {
-                long elapsed = System.currentTimeMillis() - startTime;
-                long seconds = (elapsed / 1000) % 60;
-                long minutes = (elapsed / (1000 * 60)) % 60;
-                long hours = (elapsed / (1000 * 60 * 60)) % 24;
-                tvElapsedTime.setText(String.format("%02d:%02d:%02d", hours, minutes, seconds));
-                handler.postDelayed(this, 1000);
-            }
+        timerRunnable = () -> {
+            long elapsed = System.currentTimeMillis() - startTime;
+            long s = (elapsed / 1000) % 60;
+            long m = (elapsed / (1000 * 60)) % 60;
+            long h = (elapsed / (1000 * 60 * 60)) % 24;
+            tvElapsedTime.setText(String.format("%02d:%02d:%02d", h, m, s));
+            handler.postDelayed(timerRunnable, 1000);
         };
         handler.post(timerRunnable);
     }
 
     private void stopTimer() {
-        if (timerRunnable != null) {
-            handler.removeCallbacks(timerRunnable);
-        }
+        if (timerRunnable != null) handler.removeCallbacks(timerRunnable);
     }
 
-    // ============================================
-    // 📋 توليد تقرير
-    // ============================================
-    private void generateReport() {
-        StringBuilder report = new StringBuilder();
-        report.append("═══════════════════════════\n");
-        report.append("  MIRA INVENTORY REPORT\n");
-        report.append("═══════════════════════════\n");
-        report.append("Date: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date())).append("\n");
-        report.append("Location: Main Showroom\n");
-        report.append("───────────────────────────\n");
-        report.append("Expected: ").append(expectedCount).append("\n");
-        report.append("Scanned:  ").append(scannedCount).append("\n");
-        report.append("Missing:  ").append(missingCount).append("\n");
-        report.append("Accuracy: ").append(String.format("%.1f%%", expectedCount > 0 ? (scannedCount * 100.0 / expectedCount) : 0)).append("\n");
-        report.append("───────────────────────────\n");
-        report.append("Duration: ").append(tvElapsedTime.getText()).append("\n");
-        report.append("═══════════════════════════\n\n");
-        report.append("SCANNED ITEMS:\n");
-        report.append("───────────────────────────\n");
-
-        int count = 1;
-        for (InventoryItem item : scannedItems) {
-            report.append(String.format("%2d. %s | %s | %s | %s\n",
-                count++, item.serial, item.title, item.karat, item.weight));
-        }
-
-        report.append("═══════════════════════════\n");
-        report.append("MIRA Technology © 2026\n");
-        report.append("mira-id.com\n");
-
-        tvLastScan.setText("Report Generated ✓");
-        Toast.makeText(getContext(), "📋 Report Generated!\n" + scannedCount + " items listed", Toast.LENGTH_LONG).show();
-
-        // يمكن حفظ التقرير أو مشاركته
-        android.content.ClipboardManager clipboard = (android.content.ClipboardManager)
-            getContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-        android.content.ClipData clip = android.content.ClipData.newPlainText("MIRA Report", report.toString());
-        clipboard.setPrimaryClip(clip);
-        Toast.makeText(getContext(), "📋 Report copied to clipboard!", Toast.LENGTH_SHORT).show();
-    }
-
-    // ============================================
-    // 🟢 تحديث الواجهة
-    // ============================================
     private void updateUI() {
         tvScannedCount.setText(String.valueOf(scannedCount));
-        missingCount = expectedCount - scannedCount;
-        if (missingCount < 0) missingCount = 0;
         tvMissingCount.setText(String.valueOf(missingCount));
-
-        double accuracy = expectedCount > 0 ? ((double) scannedCount / expectedCount) * 100 : 0;
-        tvAccuracy.setText("Accuracy: " + String.format("%.1f%%", accuracy));
-
-        // Progress bar
-        if (rvInventoryItems.getWidth() > 0) {
-            int progressPercent = expectedCount > 0 ? (scannedCount * 100) / expectedCount : 0;
-            int maxWidth = rvInventoryItems.getWidth();
-            progressScanned.getLayoutParams().width = Math.max(1, (progressPercent * maxWidth) / 100);
-            progressScanned.requestLayout();
-        }
     }
 
     // ============================================
-    // 📋 نموذج عنصر الجرد
+    // 📋 Model & Adapter
     // ============================================
     public static class InventoryItem {
-        String serial;
-        String title;
-        String karat;
-        String weight;
-        String status;
-        String location;
-
-        public InventoryItem(String serial, String title, String karat, String weight, String status, String location) {
-            this.serial = serial;
-            this.title = title;
-            this.karat = karat;
-            this.weight = weight;
-            this.status = status;
-            this.location = location;
+        String serial, title, karat, weight, status, location;
+        public InventoryItem(String s, String t, String k, String w, String st, String l) {
+            serial=s; title=t; karat=k; weight=w; status=st; location=l;
         }
     }
 
-    // ============================================
-    // 📋 Adapter للقائمة
-    // ============================================
-    private class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.ViewHolder> {
-
+    private class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.VH> {
         private List<InventoryItem> items;
-
-        public InventoryAdapter(List<InventoryItem> items) {
-            this.items = items;
+        public InventoryAdapter(List<InventoryItem> items) { this.items = items; }
+        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int t) {
+            return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_inventory, p, false));
         }
-
-        @NonNull
-        @Override
-        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View v = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_inventory, parent, false);
-            return new ViewHolder(v);
+        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
+            InventoryItem item = items.get(pos);
+            h.s.setText(item.status);
+            h.serial.setText(item.serial);
+            h.title.setText(item.title);
+            h.details.setText(item.karat + " | " + item.weight);
+            h.s.setTextColor("✓".equals(item.status) ? Color.parseColor("#22C55E") : Color.parseColor("#EF4444"));
         }
-
-        @Override
-        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            InventoryItem item = items.get(position);
-            holder.tvStatus.setText(item.status);
-            holder.tvSerial.setText(item.serial);
-            holder.tvTitle.setText(item.title);
-            holder.tvDetails.setText(item.karat + " | " + item.weight);
-
-            if ("✓".equals(item.status)) {
-                holder.tvStatus.setTextColor(Color.parseColor("#22C55E"));
-            } else {
-                holder.tvStatus.setTextColor(Color.parseColor("#EF4444"));
-            }
-        }
-
-        @Override
-        public int getItemCount() {
-            return items.size();
-        }
-
-        class ViewHolder extends RecyclerView.ViewHolder {
-            TextView tvStatus, tvSerial, tvTitle, tvDetails;
-            ViewHolder(View v) {
-                super(v);
-                tvStatus = v.findViewById(R.id.tvItemStatus);
-                tvSerial = v.findViewById(R.id.tvItemSerial);
-                tvTitle = v.findViewById(R.id.tvItemTitle);
-                tvDetails = v.findViewById(R.id.tvItemDetails);
-            }
+        @Override public int getItemCount() { return items.size(); }
+        class VH extends RecyclerView.ViewHolder {
+            TextView s, serial, title, details;
+            VH(View v) { super(v); s=v.findViewById(R.id.tvItemStatus); serial=v.findViewById(R.id.tvItemSerial); title=v.findViewById(R.id.tvItemTitle); details=v.findViewById(R.id.tvItemDetails); }
         }
     }
 
-    @Override
-    public void onDestroyView() {
+    @Override public void onDestroyView() {
         super.onDestroyView();
         stopTimer();
-        if (simulationRunnable != null) {
-            simulationHandler.removeCallbacks(simulationRunnable);
-        }
+        if (simulationRunnable != null) simulationHandler.removeCallbacks(simulationRunnable);
     }
-            }
+                }
