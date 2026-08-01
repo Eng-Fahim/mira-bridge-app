@@ -131,6 +131,97 @@ public class UHFReadTagFragment extends Fragment {
      * إرسال رمز EPC/Tag إلى خادم MIRA المعتمد وتحديث بطاقة العرض.
      */
     public void sendTagToMiraServer(final String epc, final String rssi) {
+
+        // ⚡ 1. تمرير القراءة فوراً إلى شاشة البيع POS Mode إذا كانت هي الشاشة النشطة
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).onTagRead(epc);
+        }
+
+        SharedPreferences prefs = null;
+        if (getContext() != null) {
+            prefs = getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        }   SharedPreferences prefs = null;
+        if (getContext() != null) {
+            prefs = getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        }
+
+        final boolean showCard = prefs == null || prefs.getBoolean("show_mira_card", true);
+
+        // إظهار البطاقة في حالة الإعدادات المفعلة
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(() -> {
+                if (showCard && cardMiraResult != null) {
+                    cardMiraResult.setVisibility(View.VISIBLE);
+                }
+            });
+        }
+
+        final SharedPreferences finalPrefs = prefs;
+
+        // تنفيذ الطلب الشبكي في Thread منفصل
+        new Thread(() -> {
+            InputStream inputStream = null;
+            try {
+                String apiUrl = "https://ams.ibreg.org/wp-json/mira-gate/v1/authorize";
+                String apiKey = "mira_gate_test071234567890abcdefghijklmnop";
+                String gateId = "handheld_c72";
+
+                if (finalPrefs != null) {
+                    apiUrl = finalPrefs.getString("mira_api_url", apiUrl);
+                    apiKey = finalPrefs.getString("mira_api_key", apiKey);
+                    gateId = finalPrefs.getString("mira_gate_id", gateId);
+                }
+
+                URL url = new URL(apiUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                conn.setRequestProperty("X-MIRA-API-Key", apiKey);
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                conn.setDoOutput(true);
+
+                // تجهيز جسم الطلب JSON
+                JSONObject jsonParam = new JSONObject();
+                jsonParam.put("epc", epc);
+                jsonParam.put("gate_id", gateId);
+                if (rssi != null && !rssi.isEmpty()) {
+                    jsonParam.put("rssi", rssi);
+                }
+                
+                // 📡 إرسال وزن الميزان الفعلي المباشر للسيرفر للتأكيد إن وجد
+                if (liveScaleWeight > 0) {
+                    jsonParam.put("scale_weight", liveScaleWeight);
+                }
+
+                try (OutputStream os = conn.getOutputStream()) {
+                    byte[] input = jsonParam.toString().getBytes("utf-8");
+                    os.write(input, 0, input.length);
+                }
+
+                final int responseCode = conn.getResponseCode();
+                inputStream = (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream();
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, "utf-8"));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    response.append(line.trim());
+                }
+
+                final String jsonResponseStr = response.toString();
+
+                // معالجة النتيجة وتحديث عناصر الواجهة بالمحرك الثلاثي
+    /**
+     * إرسال رمز EPC/Tag إلى خادم MIRA المعتمد وتحديث بطاقة العرض.
+     */
+    public void sendTagToMiraServer(final String epc, final String rssi) {
+
+        // ⚡ 1. تمرير القراءة فوراً إلى شاشة البيع POS Mode إذا كانت هي الشاشة النشطة
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).onTagRead(epc);
+        }
+
         SharedPreferences prefs = null;
         if (getContext() != null) {
             prefs = getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -224,6 +315,8 @@ public class UHFReadTagFragment extends Fragment {
             }
         }).start();
     }
+
+                
 
     /**
      * 💎 دالة تجميع الاستجابة وتطبيق التحقق الثلاثي الـ Hybrid Tri-Verification على الواجهة
