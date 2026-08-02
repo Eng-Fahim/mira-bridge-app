@@ -1,6 +1,5 @@
 package com.example.uhf.fragment;
 
-import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -10,6 +9,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -25,7 +25,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public class MiraSalesHistoryFragment extends BaseFragment {
+public class MiraSalesHistoryFragment extends Fragment {
 
     private RecyclerView rvSales;
     private MiraSalesAdapter adapter;
@@ -33,20 +33,21 @@ public class MiraSalesHistoryFragment extends BaseFragment {
     private MiraApiClient apiClient;
     private TextView tvEmpty;
 
+    @Nullable
     @Override
-    protected int getLayoutResId() {
-        return R.layout.fragment_mira_sales_history;
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.fragment_mira_sales_history, container, false);
     }
 
     @Override
-    protected void initViews(View view) {
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
         rvSales = view.findViewById(R.id.rvMiraSalesHistory);
         tvEmpty = view.findViewById(R.id.tvMiraEmptySales);
         apiClient = MiraApiClient.getInstance(requireContext());
-    }
 
-    @Override
-    protected void setupListeners() {
         rvSales.setLayoutManager(new LinearLayoutManager(getContext()));
         adapter = new MiraSalesAdapter(saleList, this::openReceipt);
         rvSales.setAdapter(adapter);
@@ -111,25 +112,19 @@ public class MiraSalesHistoryFragment extends BaseFragment {
 
         MiraSaleItem(String saleId, String customerName, double amount, int itemCount,
                      String paymentMethod, String date, String rawJson) {
-            this.saleId = saleId;
-            this.customerName = customerName;
-            this.amount = amount;
-            this.itemCount = itemCount;
-            this.paymentMethod = paymentMethod;
-            this.date = date;
-            this.rawJson = rawJson;
+            this.saleId = saleId; this.customerName = customerName;
+            this.amount = amount; this.itemCount = itemCount;
+            this.paymentMethod = paymentMethod; this.date = date; this.rawJson = rawJson;
         }
     }
 
     class MiraSalesAdapter extends RecyclerView.Adapter<MiraSalesAdapter.VH> {
         List<MiraSaleItem> items;
         OnMiraSaleClickListener listener;
-
         interface OnMiraSaleClickListener { void onClick(MiraSaleItem sale); }
 
         MiraSalesAdapter(List<MiraSaleItem> items, OnMiraSaleClickListener listener) {
-            this.items = items;
-            this.listener = listener;
+            this.items = items; this.listener = listener;
         }
 
         @NonNull @Override
@@ -149,9 +144,7 @@ public class MiraSalesHistoryFragment extends BaseFragment {
                 Date d = sdf.parse(s.date);
                 SimpleDateFormat display = new SimpleDateFormat("dd/MM/yyyy HH:mm", new Locale("ar"));
                 h.tvDate.setText(d != null ? display.format(d) : s.date);
-            } catch (Exception e) {
-                h.tvDate.setText(s.date);
-            }
+            } catch (Exception e) { h.tvDate.setText(s.date); }
             h.itemView.setOnClickListener(v -> listener.onClick(s));
         }
 
