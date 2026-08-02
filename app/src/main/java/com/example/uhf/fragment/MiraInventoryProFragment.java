@@ -74,9 +74,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private MiraApiClient apiClient;
 
     private final String[] realGtins = {
-        "070000000010", "070045537109", "070000000030", "070069121817",
-        "070000000040", "070077306396", "070000000050", "070073594930",
-        "0700000007927", "0700000007928", "0700000007929"
+        "170000000010", "170045537109", "170000000030", "170069121817",
+        "170000000040", "170077306396", "170000000050", "170073594930",
+        "1700000007927", "1700000007928", "1700000007929"
     };
 
     @Nullable
@@ -151,20 +151,19 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (cardComparison != null) cardComparison.setVisibility(View.VISIBLE); // 🟢 إظهار بطاقة المقارنة دائماً
     }
 
-    // ===================== API Calls (معدلة لتصحيح قراءة الجرد السابق) =====================
+    // ===================== API Calls (قراءة وسحب بيانات الجرد) =====================
 
     private void loadLastSnapshot() {
         new Thread(() -> {
-            int loadedPrevItems = 10;
+            int loadedPrevItems = 0;
             String loadedDate = "لا يوجد جرد سابق";
-            String loadedAccuracy = "98.5%";
+            String loadedAccuracy = "100%";
 
             try {
                 MiraApiClient.ApiResponse response = apiClient.getLastSnapshot("Main Showroom");
                 if (response.isSuccess && response.data != null) {
                     JSONObject snapshotObj = response.data;
                     
-                    // 🟢 فحص هيكلية الاستجابة (سواء داخل snapshot أو مباشرة في data)
                     if (snapshotObj.has("snapshot")) {
                         snapshotObj = snapshotObj.optJSONObject("snapshot");
                     } else if (snapshotObj.has("snapshots")) {
@@ -175,9 +174,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     }
 
                     if (snapshotObj != null) {
-                        loadedPrevItems = snapshotObj.optInt("total_items", snapshotObj.optInt("found_count", 10));
+                        loadedPrevItems = snapshotObj.optInt("total_items", snapshotObj.optInt("found_count", 0));
                         loadedDate = snapshotObj.optString("snapshot_date", snapshotObj.optString("created_at", loadedDate));
-                        double acc = snapshotObj.optDouble("accuracy", 98.5);
+                        double acc = snapshotObj.optDouble("accuracy", 100.0);
                         loadedAccuracy = String.format(Locale.US, "%.1f%%", acc);
                     }
                 }
@@ -406,7 +405,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (btnStopInventory != null) btnStopInventory.setEnabled(true);
         if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
 
-        // 🟢 إبقاء كارت المقارنة ظاهراً وتحديث قيم السلسلة
         if (cardComparison != null) cardComparison.setVisibility(View.VISIBLE);
         updateComparisonCard();
 
