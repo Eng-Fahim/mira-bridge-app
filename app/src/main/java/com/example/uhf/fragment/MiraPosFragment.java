@@ -1,6 +1,7 @@
 package com.example.uhf.fragment;
 import androidx.fragment.app.FragmentManager;
-
+// أضف في بداية الملف مع imports الأخرى
+import com.example.uhf.api.MiraApiClient;
 
 import android.content.Context;
 import android.content.SharedPreferences;
