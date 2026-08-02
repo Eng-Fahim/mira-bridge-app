@@ -121,7 +121,7 @@ public class MiraSalesHistoryFragment extends Fragment {
     class MiraSalesAdapter extends RecyclerView.Adapter<MiraSalesAdapter.VH> {
         List<MiraSaleItem> items;
         OnMiraSaleClickListener listener;
-        interface OnMiraSaleClickListener { void onClick(MiraSaleItem sale); }
+        static interface OnMiraSaleClickListener { void onClick(MiraSaleItem sale); }
 
         MiraSalesAdapter(List<MiraSaleItem> items, OnMiraSaleClickListener listener) {
             this.items = items; this.listener = listener;
