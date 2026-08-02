@@ -44,15 +44,7 @@ public class MiraPosFragment extends Fragment {
     private static final String PREFS_NAME = "mira_settings";
     private static final String PENDING_SALES_PREFS = "pos_pending_sales";
 
-    private TextView tvScaleStatus, tvItemCount, tvTotalAmount, tvCartStatus;
-    private EditText etManualEpc;
-    private Button btnAddManual, btnCheckout, btnClearCart;
-    private Button btnOpenScanner, btnPosRFIDMode;
-    private RecyclerView rvCartItems;
-
-    private boolean isRFIDModeActive = false;
-
-    // ⭐ أسعار الذهب الافتراضية للعيارات
+    // ⭐ أسعار الذهب الافتراضية
     private static final Map<String, Double> GOLD_RATES = new HashMap<>();
     static {
         GOLD_RATES.put("24K", 75.0);
@@ -61,6 +53,16 @@ public class MiraPosFragment extends Fragment {
         GOLD_RATES.put("18K", 56.25);
     }
 
+    // ===================== UI Elements =====================
+    private TextView tvScaleStatus, tvItemCount, tvTotalAmount, tvCartStatus;
+    private EditText etManualEpc;
+    private Button btnAddManual, btnCheckout, btnClearCart;
+    private Button btnOpenScanner, btnPosRFIDMode;
+    private RecyclerView rvCartItems;
+
+    private boolean isRFIDModeActive = false;
+
+    // ===================== Cart Data =====================
     public static class CartItem {
         public String epc, name, karat, status, serialNo, gtin, location;
         public double weight, scaleWeight, price;
@@ -80,6 +82,8 @@ public class MiraPosFragment extends Fragment {
     private CartAdapter cartAdapter;
     private SmartScaleConnector scaleConnector;
     private double liveScaleWeight = 0.0;
+
+    // ===================== Lifecycle =====================
 
     @Nullable @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -109,6 +113,8 @@ public class MiraPosFragment extends Fragment {
         if (getActivity() instanceof UHFMainActivity)
             ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
     }
+
+    // ===================== Initialization =====================
 
     private void bindViews(View view) {
         tvScaleStatus = view.findViewById(R.id.tvPosScaleStatus);
@@ -143,6 +149,8 @@ public class MiraPosFragment extends Fragment {
         if (btnPosRFIDMode != null) btnPosRFIDMode.setOnClickListener(v -> { UIHelper.hideKeyboard(getActivity()); toggleRFIDMode(); });
     }
 
+    // ===================== Smart Scale =====================
+
     private void initSmartScale() {
         scaleConnector = new SmartScaleConnector();
         scaleConnector.setListener(new SmartScaleConnector.ScaleListener() {
@@ -169,6 +177,8 @@ public class MiraPosFragment extends Fragment {
         });
     }
 
+    // ===================== Barcode Scanner =====================
+
     private void openBarcodeScanner() {
         MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
         sf.setOnBarcodeScannedListener((data, format) -> { onBarcodeScanned(data); if (getParentFragmentManager().getBackStackEntryCount() > 0) getParentFragmentManager().popBackStack(); });
@@ -179,6 +189,8 @@ public class MiraPosFragment extends Fragment {
             getParentFragmentManager().beginTransaction().replace(android.R.id.content, sf).addToBackStack("barcode_scanner").commit();
         }
     }
+
+    // ===================== RFID Direct Mode =====================
 
     private void toggleRFIDMode() {
         isRFIDModeActive = !isRFIDModeActive;
@@ -225,7 +237,7 @@ public class MiraPosFragment extends Fragment {
                         return;
                     }
                 }
-                // ⭐ لم يتم العثور على القطعة
+                // ⭐ قطعة غير موجودة
                 handleItemNotFound(code);
 
             } catch (Exception e) {
@@ -243,18 +255,18 @@ public class MiraPosFragment extends Fragment {
 
             String vaultStatus = item != null ? item.optString("status", "").toLowerCase() : "";
 
-            // ⭐ تحديد التوفر
+            // ⭐ تحديد التوفر الصحيح
             boolean isAvailable;
             if (vaultStatus.equals("sold")) isAvailable = false;
             else if (vaultStatus.equals("reserved")) isAvailable = false;
-            else if (vaultStatus.equals("in_stock") || vaultStatus.equals("available") || vaultStatus.equals("transferred")) isAvailable = true;
+            else if (vaultStatus.equals("in_stock") || vaultStatus.equals("available") || vaultStatus.equals("transferred") || vaultStatus.isEmpty()) isAvailable = true;
             else isAvailable = (decision != null && decision.optBoolean("allowed", false));
 
             String title = item.optString("title", "قطعة");
             String karat = item.optString("karat", "21K");
             double weight = item.optDouble("weight", item.optDouble("gross_weight", 0));
 
-            // ⭐ السعر الحقيقي
+            // ⭐ السعر الحقيقي من API
             double price = item.optDouble("dynamic_retail_price", 0);
             if (price <= 0) price = item.optDouble("retail_price", 0);
             if (price <= 0) price = item.optDouble("price", 0);
@@ -293,9 +305,7 @@ public class MiraPosFragment extends Fragment {
     // ⭐ قطعة غير موجودة - لا تضفها للسلة
     private void handleItemNotFound(String code) {
         if (getActivity() != null) {
-            getActivity().runOnUiThread(() -> {
-                showToast("❌ لم يتم العثور على القطعة: " + code);
-            });
+            getActivity().runOnUiThread(() -> showToast("❌ لم يتم العثور على القطعة: " + code));
         }
     }
 
@@ -367,7 +377,6 @@ public class MiraPosFragment extends Fragment {
                     if (response.isSuccess) {
                         playAlertSound(1);
                         clearCart();
-                        // ⭐ عرض الإيصال بأمان
                         showReceiptSafe(response.data != null ? response.data.toString() : "{}");
                     } else {
                         tvCartStatus.setText("❌ فشل (" + response.code + ")"); tvCartStatus.setTextColor(Color.parseColor("#EF4444"));
@@ -385,16 +394,12 @@ public class MiraPosFragment extends Fragment {
         }).start();
     }
 
-    // ⭐ عرض الإيصال بأمان - يمنع الانهيار
+    // ⭐ عرض الإيصال بأمان
     private void showReceiptSafe(String responseJson) {
         try {
             if (getParentFragmentManager() != null && !getParentFragmentManager().isStateSaved()) {
                 MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(responseJson);
-                getParentFragmentManager()
-                        .beginTransaction()
-                        .add(android.R.id.content, receipt)
-                        .addToBackStack("mira_receipt")
-                        .commit();
+                getParentFragmentManager().beginTransaction().add(android.R.id.content, receipt).addToBackStack("mira_receipt").commit();
             }
         } catch (Exception e) {
             Log.e(TAG, "Receipt error: " + e.getMessage());
@@ -432,24 +437,44 @@ public class MiraPosFragment extends Fragment {
 
     // ===================== Adapter =====================
 
-    private static class CartAdapter extends RecyclerView.Adapter<CartAdapter.VH> {
-        interface OnRemoveListener { void onRemove(int pos); }
-        private final List<CartItem> items; private final OnRemoveListener l;
-        CartAdapter(List<CartItem> items, OnRemoveListener l) { this.items = items; this.l = l; }
-        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int t) { return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_pos_cart_row, p, false)); }
-        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
-            CartItem item = items.get(pos);
-            h.tvTitle.setText(item.name); h.tvEpc.setText("EPC: " + item.epc);
-            h.tvKaratWeight.setText(String.format(Locale.US, "%s | %.2fg", item.karat, item.scaleWeight > 0 ? item.scaleWeight : item.weight));
-            h.tvPrice.setText(String.format(Locale.US, "$%,.2f", item.price));
-            if (item.isAvailable) { h.tvStatus.setText("✅ متاحة"); h.tvStatus.setTextColor(Color.parseColor("#4ADE80")); }
-            else { h.tvStatus.setText("❌ " + item.status); h.tvStatus.setTextColor(Color.parseColor("#EF4444")); }
-            h.btnRemove.setOnClickListener(v -> { if (h.getAdapterPosition() != RecyclerView.NO_POSITION) l.onRemove(h.getAdapterPosition()); });
+    private static class CartAdapter extends RecyclerView.Adapter<CartAdapter.ViewHolder> {
+        interface OnRemoveListener { void onRemove(int position); }
+        private final List<CartItem> items; private final OnRemoveListener removeListener;
+        CartAdapter(List<CartItem> items, OnRemoveListener listener) { this.items = items; this.removeListener = listener; }
+
+        @NonNull @Override public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            return new ViewHolder(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_pos_cart_row, parent, false));
         }
+
+        @Override public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+            CartItem item = items.get(position);
+            holder.tvTitle.setText(item.name);
+            holder.tvEpc.setText("EPC: " + item.epc);
+            holder.tvKaratWeight.setText(String.format(Locale.US, "%s | %.2fg", item.karat, item.scaleWeight > 0 ? item.scaleWeight : item.weight));
+            holder.tvPrice.setText(String.format(Locale.US, "$%,.2f", item.price));
+            if (item.isAvailable) { holder.tvStatus.setText("✅ متاحة للبيع"); holder.tvStatus.setTextColor(Color.parseColor("#4ADE80")); }
+            else {
+                String st; int c;
+                switch (item.status.toUpperCase()) {
+                    case "SOLD": st = "❌ مباعة مسبقاً"; c = Color.parseColor("#EF4444"); break;
+                    case "RESERVED": st = "🔒 محجوزة"; c = Color.parseColor("#F59E0B"); break;
+                    default: st = "⚠️ " + item.status; c = Color.parseColor("#EF4444");
+                }
+                holder.tvStatus.setText(st); holder.tvStatus.setTextColor(c);
+            }
+            holder.btnRemove.setOnClickListener(v -> { if (holder.getAdapterPosition() != RecyclerView.NO_POSITION) removeListener.onRemove(holder.getAdapterPosition()); });
+        }
+
         @Override public int getItemCount() { return items.size(); }
-        static class VH extends RecyclerView.ViewHolder {
+
+        static class ViewHolder extends RecyclerView.ViewHolder {
             TextView tvTitle, tvEpc, tvKaratWeight, tvPrice, tvStatus; View btnRemove;
-            VH(View v) { super(v); tvTitle = v.findViewById(R.id.tvRowItemTitle); tvEpc = v.findViewById(R.id.tvRowItemEpc); tvKaratWeight = v.findViewById(R.id.tvRowItemKaratWeight); tvPrice = v.findViewById(R.id.tvRowItemPrice); tvStatus = v.findViewById(R.id.tvRowItemStatus); btnRemove = v.findViewById(R.id.btnRowRemove); }
+            ViewHolder(View v) {
+                super(v);
+                tvTitle = v.findViewById(R.id.tvRowItemTitle); tvEpc = v.findViewById(R.id.tvRowItemEpc);
+                tvKaratWeight = v.findViewById(R.id.tvRowItemKaratWeight); tvPrice = v.findViewById(R.id.tvRowItemPrice);
+                tvStatus = v.findViewById(R.id.tvRowItemStatus); btnRemove = v.findViewById(R.id.btnRowRemove);
+            }
         }
     }
-    }
+}
