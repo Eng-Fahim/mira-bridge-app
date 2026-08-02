@@ -8,6 +8,7 @@ import android.os.Looper;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -37,6 +38,8 @@ import java.util.Locale;
 
 public class MiraInventoryProFragment extends KeyDwonFragment {
 
+    private static final String TAG = "MiraInventoryPro";
+
     private TextView tvInventoryStatus, tvExpectedCount, tvScannedCount, tvVariance;
     private TextView tvAccuracy, tvElapsedTime, tvLocation, tvLastScan, tvRssi;
     private TextView tvLastAuditDate, tvLastAccuracy, tvHighValueCount;
@@ -52,7 +55,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private int scannedCount = 0;
     private int foundCount = 0;
     private int varianceCount = 0;
-    private int prevTotalItems = 10;
+    private int prevTotalItems = 0; // القيمة الافتراضية للجرد السابق
     private int sessionId = 0;
     private long startTime = 0;
 
@@ -145,28 +148,46 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
         if (tvExpectedCount != null) tvExpectedCount.setText(String.valueOf(realGtins.length));
         if (cardHighValue != null) cardHighValue.setVisibility(View.VISIBLE);
+        if (cardComparison != null) cardComparison.setVisibility(View.VISIBLE); // 🟢 إظهار بطاقة المقارنة دائماً
     }
 
-    // ===================== API Calls =====================
+    // ===================== API Calls (معدلة لتصحيح قراءة الجرد السابق) =====================
 
     private void loadLastSnapshot() {
         new Thread(() -> {
             int loadedPrevItems = 10;
-            String loadedDate = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+            String loadedDate = "لا يوجد جرد سابق";
+            String loadedAccuracy = "98.5%";
 
             try {
                 MiraApiClient.ApiResponse response = apiClient.getLastSnapshot("Main Showroom");
                 if (response.isSuccess && response.data != null) {
-                    JSONObject snapshot = response.data.optJSONObject("snapshot");
-                    if (snapshot != null) {
-                        loadedPrevItems = snapshot.optInt("total_items", 10);
-                        loadedDate = snapshot.optString("snapshot_date", loadedDate);
+                    JSONObject snapshotObj = response.data;
+                    
+                    // 🟢 فحص هيكلية الاستجابة (سواء داخل snapshot أو مباشرة في data)
+                    if (snapshotObj.has("snapshot")) {
+                        snapshotObj = snapshotObj.optJSONObject("snapshot");
+                    } else if (snapshotObj.has("snapshots")) {
+                        JSONArray arr = snapshotObj.optJSONArray("snapshots");
+                        if (arr != null && arr.length() > 0) {
+                            snapshotObj = arr.optJSONObject(0);
+                        }
+                    }
+
+                    if (snapshotObj != null) {
+                        loadedPrevItems = snapshotObj.optInt("total_items", snapshotObj.optInt("found_count", 10));
+                        loadedDate = snapshotObj.optString("snapshot_date", snapshotObj.optString("created_at", loadedDate));
+                        double acc = snapshotObj.optDouble("accuracy", 98.5);
+                        loadedAccuracy = String.format(Locale.US, "%.1f%%", acc);
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                Log.e(TAG, "Error loading snapshot: " + e.getMessage());
+            }
 
             final int finalItems = loadedPrevItems;
             final String finalDate = loadedDate;
+            final String finalAccuracy = loadedAccuracy;
 
             if (isAdded() && getActivity() != null) {
                 getActivity().runOnUiThread(() -> {
@@ -174,8 +195,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     prevTotalItems = finalItems;
                     if (tvLastAuditDate != null)
                         tvLastAuditDate.setText(finalDate.length() > 10 ? finalDate.substring(0, 10) : finalDate);
-                    if (tvLastAccuracy != null) tvLastAccuracy.setText("98.1%");
+                    if (tvLastAccuracy != null) tvLastAccuracy.setText(finalAccuracy);
                     if (tvPrevItems != null) tvPrevItems.setText(String.valueOf(prevTotalItems));
+                    updateComparisonCard();
                 });
             }
         }).start();
@@ -198,7 +220,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                                 for (int i = 0; i < Math.min(3, items.length()); i++) {
                                     JSONObject item = items.optJSONObject(i);
                                     if (item != null) {
-                                        list.append("• ").append(item.optString("item_title")).append("\n");
+                                        list.append("• ").append(item.optString("item_title", item.optString("title", "قطع عالية قيمة"))).append("\n");
                                     }
                                 }
                                 tvHighValueList.setText(list.toString());
@@ -212,7 +234,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
     private void queryMiraForInventory(String gtin) {
         new Thread(() -> {
-            String title = "قطعة ذهب - " + gtin.substring(gtin.length() - 4);
+            String title = "قطعة ذهب - " + gtin.substring(Math.max(0, gtin.length() - 4));
             String karat = "21K";
             String weight = String.format(Locale.US, "%.2fg", 5.0 + (Math.random() * 10));
             String location = "Main Showroom";
@@ -236,7 +258,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                         String vaultStatus = item.optString("status", "");
                         location = item.optString("location", location);
 
-                        switch (vaultStatus) {
+                        switch (vaultStatus.toLowerCase()) {
                             case "sold":
                                 status = "⚠️"; found = false; break;
                             case "in_stock":
@@ -276,6 +298,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
                     double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 0;
                     if (tvAccuracy != null) tvAccuracy.setText(String.format(Locale.US, "%.1f%%", acc));
+
+                    // 🟢 تحديث شاشة المقارنة حيّاً أثناء الجرد
+                    updateComparisonCard();
                 });
             }
         }).start();
@@ -298,6 +323,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
             if (getActivity() != null) {
                 getActivity().runOnUiThread(() -> {
+                    if (!isAdded()) return;
                     if (tvExpectedCount != null) {
                         tvExpectedCount.setText(blind ? "???" : String.valueOf(expectedCount));
                     }
@@ -380,7 +406,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (btnStopInventory != null) btnStopInventory.setEnabled(true);
         if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
 
-        if (cardComparison != null) cardComparison.setVisibility(View.GONE);
+        // 🟢 إبقاء كارت المقارنة ظاهراً وتحديث قيم السلسلة
+        if (cardComparison != null) cardComparison.setVisibility(View.VISIBLE);
+        updateComparisonCard();
 
         if (tvInventoryStatus != null) {
             tvInventoryStatus.setText("● SCANNING");
@@ -418,23 +446,27 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
         varianceCount = Math.max(0, expectedCount - foundCount);
 
-        if (cardComparison != null) {
-            cardComparison.setVisibility(View.VISIBLE);
-            if (tvCurrItems != null) tvCurrItems.setText(String.valueOf(foundCount));
-            if (tvPrevItems != null) tvPrevItems.setText(String.valueOf(prevTotalItems));
-
-            int delta = foundCount - prevTotalItems;
-            if (tvDeltaItems != null) {
-                tvDeltaItems.setText((delta >= 0 ? "+" : "") + delta);
-                tvDeltaItems.setTextColor(delta >= 0 ? Color.parseColor("#22C55E") : Color.parseColor("#EF4444"));
-            }
-        }
-
+        updateComparisonCard();
         updateUI();
         createSnapshotOnServer();
 
         if (getContext() != null) {
             Toast.makeText(getContext(), "✅ Complete: " + foundCount + "/" + expectedCount, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    // 🟢 دالة مخصصة لتحديث بطاقة المقارنة بين الجرد السابق والجالي
+    private void updateComparisonCard() {
+        if (cardComparison == null) return;
+        cardComparison.setVisibility(View.VISIBLE);
+
+        if (tvPrevItems != null) tvPrevItems.setText(String.valueOf(prevTotalItems));
+        if (tvCurrItems != null) tvCurrItems.setText(String.valueOf(foundCount));
+
+        int delta = foundCount - prevTotalItems;
+        if (tvDeltaItems != null) {
+            tvDeltaItems.setText((delta >= 0 ? "+" : "") + delta);
+            tvDeltaItems.setTextColor(delta >= 0 ? Color.parseColor("#22C55E") : Color.parseColor("#EF4444"));
         }
     }
 
@@ -457,7 +489,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private void generateProReport() {
-        if (getContext() == null) return;
+        if (getContext() == null || !isAdded()) return;
 
         StringBuilder rows = new StringBuilder();
         int count = 1;
@@ -514,7 +546,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
-                if (getContext() == null) return;
+                if (getContext() == null || !isAdded()) return;
                 PrintManager pm = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
                 if (pm != null) {
                     PrintDocumentAdapter pda = view.createPrintDocumentAdapter("MIRA_Inventory_Pro_Report");
@@ -634,4 +666,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (rvInventoryItems != null) rvInventoryItems.setAdapter(null);
         super.onDestroyView();
     }
-                                   }
+}
