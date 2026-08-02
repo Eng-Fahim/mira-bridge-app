@@ -25,7 +25,7 @@
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/btnCloseReceipt"
+            android:id="@+id/btnMiraCloseReceipt"
             android:layout_width="36dp"
             android:layout_height="36dp"
             android:background="@drawable/bg_circle_dark"
@@ -37,7 +37,7 @@
 
     <!-- WebView Receipt -->
     <WebView
-        android:id="@+id/webReceipt"
+        android:id="@+id/webMiraReceipt"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1" />
@@ -51,7 +51,7 @@
         android:orientation="horizontal">
 
         <Button
-            android:id="@+id/btnPrintReceipt"
+            android:id="@+id/btnMiraPrintReceipt"
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
@@ -63,7 +63,7 @@
             android:textStyle="bold" />
 
         <Button
-            android:id="@+id/btnShareReceipt"
+            android:id="@+id/btnMiraShareReceipt"
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
@@ -75,7 +75,7 @@
             android:textStyle="bold" />
 
         <Button
-            android:id="@+id/btnSaveReceipt"
+            android:id="@+id/btnMiraSaveReceipt"
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
