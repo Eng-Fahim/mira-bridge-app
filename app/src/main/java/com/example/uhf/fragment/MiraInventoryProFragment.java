@@ -346,32 +346,47 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private void createSnapshotOnServer() {
-        new Thread(() -> {
-            try {
-                JSONObject payload = new JSONObject();
-                payload.put("session_id", sessionId);
-                payload.put("location", "Main Showroom");
-                payload.put("total_items", foundCount);
-                payload.put("total_weight", calculateTotalWeight());
-                payload.put("total_value", calculateTotalValue());
-
-                JSONArray itemsJson = new JSONArray();
-                for (InventoryItem item : scannedItems) {
-                    JSONObject obj = new JSONObject();
-                    obj.put("serial", item.serial);
-                    obj.put("title", item.title);
-                    obj.put("karat", item.karat);
-                    obj.put("weight", item.weight);
-                    obj.put("status", item.status);
-                    obj.put("location", item.location);
-                    itemsJson.put(obj);
-                }
-                payload.put("items", itemsJson);
-
-                apiClient.createInventorySnapshot(payload);
-            } catch (Exception ignored) {}
-        }).start();
+    // 🟢 1. شرط حماية جذري: منع حفظ أية snapshot إذا لم تكن هناك عناصر مقروءة
+    if (scannedItems == null || scannedItems.isEmpty() || foundCount == 0) {
+        Log.w(TAG, "⚠️ Cancelled snapshot creation: No scanned items available (foundCount is 0).");
+        return;
     }
+
+    new Thread(() -> {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("session_id", sessionId);
+            payload.put("location", "Main Showroom");
+            payload.put("total_items", foundCount); // استخدام العناصر الموجودة بالفعل
+            payload.put("total_weight", calculateTotalWeight());
+            payload.put("total_value", calculateTotalValue());
+
+            JSONArray itemsJson = new JSONArray();
+            // 🟢 استخدام نسخ مؤقت للقائمة لتفادي أخطاء الـ Thread Concurrency
+            List<InventoryItem> tempItems = new ArrayList<>(scannedItems);
+            
+            for (InventoryItem item : tempItems) {
+                JSONObject obj = new JSONObject();
+                obj.put("serial", item.serial);
+                obj.put("title", item.title);
+                obj.put("karat", item.karat);
+                obj.put("weight", item.weight);
+                obj.put("status", item.status);
+                obj.put("location", item.location);
+                itemsJson.put(obj);
+            }
+            payload.put("items", itemsJson);
+
+            // إرسال البيانات فقط بعد التحقق التام من وجود محتوى
+            MiraApiClient.ApiResponse response = apiClient.createInventorySnapshot(payload);
+            if (response.isSuccess) {
+                Log.d(TAG, "✅ Snapshot saved successfully with " + tempItems.size() + " items.");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error creating snapshot: " + e.getMessage());
+        }
+    }).start();
+}
 
     private double calculateTotalWeight() {
         double total = 0;
