@@ -165,11 +165,14 @@ public class POSCheckoutDialog extends DialogFragment {
         }
     }
 
-    public static class POSCheckoutData {
+        public static class POSCheckoutData {
         public String customerName = "";
         public String customerPhone = "";
-        public String paymentMethod = "";
+        public String customerEmail = ""; // 👈 تم إعادتها لإزالة الخطأ
+        public String paymentMethod = "💵 نقدي (Cash)";
+        public String notes = "";         // 👈 تم إعادتها لإزالة الخطأ
         public double discount = 0;
         public double finalAmount = 0;
     }
+
 }
