@@ -64,6 +64,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="📍 Main Showroom"
+                        android:textAlignment="viewStart"
                         android:textColor="#E2E8F0"
                         android:textSize="12sp" />
 
@@ -82,6 +83,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:text="Last Scan: None"
+                    android:textAlignment="viewStart"
                     android:textColor="#64748B"
                     android:textSize="11sp" />
 
@@ -225,6 +227,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="Accuracy: 0.0%"
+                android:textAlignment="viewStart"
                 android:textColor="#22C55E"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -240,11 +243,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Last Audit: -"
+                android:textAlignment="viewEnd"
                 android:textColor="#64748B"
                 android:textSize="12sp" />
         </LinearLayout>
 
-        <!-- Comparison Section (CardComparison) -->
+        <!-- Comparison Section (CardComparison) - Swapped Order for Correct RTL/LTR flow -->
         <androidx.cardview.widget.CardView
             android:id="@+id/cardComparison"
             android:layout_width="match_parent"
@@ -261,10 +265,12 @@
                 android:padding="12dp"
                 android:weightSum="3">
 
+                <!-- 1. Previous Column -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:gravity="center"
                     android:orientation="vertical">
 
                     <TextView
@@ -284,10 +290,12 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
+                <!-- 2. Current Column -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:gravity="center"
                     android:orientation="vertical">
 
                     <TextView
@@ -307,10 +315,12 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
+                <!-- 3. Delta Column -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:gravity="center"
                     android:orientation="vertical">
 
                     <TextView
@@ -357,6 +367,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="💎 High Value Watch"
+                        android:textAlignment="viewStart"
                         android:textColor="#F59E0B"
                         android:textSize="12sp"
                         android:textStyle="bold" />
@@ -376,6 +387,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
+                    android:textAlignment="viewStart"
                     android:textColor="#94A3B8"
                     android:textSize="11sp" />
             </LinearLayout>
