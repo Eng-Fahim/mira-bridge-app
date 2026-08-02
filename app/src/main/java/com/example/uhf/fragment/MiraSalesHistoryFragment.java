@@ -33,6 +33,11 @@ public class MiraSalesHistoryFragment extends Fragment {
     private MiraApiClient apiClient;
     private TextView tvEmpty;
 
+    // ⭐ الـ interface هنا - خارج الـ Adapter
+    private interface OnMiraSaleClickListener { 
+        void onClick(MiraSaleItem sale); 
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -112,18 +117,23 @@ public class MiraSalesHistoryFragment extends Fragment {
 
         MiraSaleItem(String saleId, String customerName, double amount, int itemCount,
                      String paymentMethod, String date, String rawJson) {
-            this.saleId = saleId; this.customerName = customerName;
-            this.amount = amount; this.itemCount = itemCount;
-            this.paymentMethod = paymentMethod; this.date = date; this.rawJson = rawJson;
+            this.saleId = saleId;
+            this.customerName = customerName;
+            this.amount = amount;
+            this.itemCount = itemCount;
+            this.paymentMethod = paymentMethod;
+            this.date = date;
+            this.rawJson = rawJson;
         }
     }
 
     class MiraSalesAdapter extends RecyclerView.Adapter<MiraSalesAdapter.VH> {
         List<MiraSaleItem> items;
-        OnMiraSaleClickListener listener;
-        private interface OnMiraSaleClickListener { void onClick(MiraSaleItem sale); }
+        OnMiraSaleClickListener listener; // ⭐ يستخدم الـ interface من الأعلى
+
         MiraSalesAdapter(List<MiraSaleItem> items, OnMiraSaleClickListener listener) {
-            this.items = items; this.listener = listener;
+            this.items = items;
+            this.listener = listener;
         }
 
         @NonNull @Override
