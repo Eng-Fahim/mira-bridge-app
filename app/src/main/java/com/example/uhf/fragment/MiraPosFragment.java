@@ -285,6 +285,7 @@ public class MiraPosFragment extends Fragment {
 
             if (getActivity() != null) {
                 getActivity().runOnUiThread(() -> {
+                    if (!isAdded()) return;
                     if (!isAvailable) {
                         showToast("❌ لا يمكن إضافة هذه القطعة: " + vaultStatus.toUpperCase());
                         return;
@@ -305,7 +306,9 @@ public class MiraPosFragment extends Fragment {
     // ⭐ قطعة غير موجودة - لا تضفها للسلة
     private void handleItemNotFound(String code) {
         if (getActivity() != null) {
-            getActivity().runOnUiThread(() -> showToast("❌ لم يتم العثور على القطعة: " + code));
+            getActivity().runOnUiThread(() -> {
+                if (isAdded()) showToast("❌ لم يتم العثور على القطعة: " + code);
+            });
         }
     }
 
@@ -318,6 +321,7 @@ public class MiraPosFragment extends Fragment {
         for (CartItem item : cartList) { totalSum += item.price; if (!item.isAvailable) hasUnavailable = true; }
         final int count = totalItems; final double sum = totalSum; final boolean unavailable = hasUnavailable;
         if (getActivity() != null) getActivity().runOnUiThread(() -> {
+            if (!isAdded()) return;
             tvItemCount.setText(String.valueOf(count));
             tvTotalAmount.setText(String.format(Locale.US, "$%,.2f", sum));
             if (count == 0) { tvCartStatus.setText("جاهز لمسح القطع والخواتم..."); tvCartStatus.setTextColor(Color.parseColor("#94A3B8")); btnCheckout.setEnabled(false); btnCheckout.setAlpha(0.5f); }
@@ -373,38 +377,70 @@ public class MiraPosFragment extends Fragment {
 
                 MiraApiClient.ApiResponse response = client.checkout(payload);
 
-                if (getActivity() != null) getActivity().runOnUiThread(() -> {
-                    if (response.isSuccess) {
-                        playAlertSound(1);
-                        clearCart();
-                        showReceiptSafe(response.data != null ? response.data.toString() : "{}");
-                    } else {
-                        tvCartStatus.setText("❌ فشل (" + response.code + ")"); tvCartStatus.setTextColor(Color.parseColor("#EF4444"));
-                        btnCheckout.setEnabled(true); btnCheckout.setAlpha(1.0f);
-                        showToast("❌ فشل البيع: " + response.code);
-                    }
-                });
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (!isAdded()) return;
+
+                        if (response.isSuccess) {
+                            playAlertSound(1);
+                            String jsonResponse = response.data != null ? response.data.toString() : "{}";
+                            clearCart();
+                            
+                            // 🟢 استدعاء آمن ومحمي لعرض الإيصال بدون Crash
+                            showReceiptSafe(jsonResponse);
+                        } else {
+                            tvCartStatus.setText("❌ فشل (" + response.code + ")"); tvCartStatus.setTextColor(Color.parseColor("#EF4444"));
+                            btnCheckout.setEnabled(true); btnCheckout.setAlpha(1.0f);
+                            showToast("❌ فشل البيع: " + response.code);
+                        }
+                    });
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Checkout error: " + e.getMessage());
-                if (getActivity() != null) getActivity().runOnUiThread(() -> {
-                    saveSaleLocally(data); clearCart(); btnCheckout.setEnabled(true); btnCheckout.setAlpha(1.0f);
-                    showToast("💾 تم الحفظ محلياً");
-                });
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (!isAdded()) return;
+                        saveSaleLocally(data); clearCart(); btnCheckout.setEnabled(true); btnCheckout.setAlpha(1.0f);
+                        showToast("💾 تم الحفظ محلياً");
+                    });
+                }
             }
         }).start();
     }
 
-    // ⭐ عرض الإيصال بأمان
+    // ⭐ عرض الإيصال بأمان تام ومنع انهيار التطبيق
     private void showReceiptSafe(String responseJson) {
-        try {
-            if (getParentFragmentManager() != null && !getParentFragmentManager().isStateSaved()) {
-                MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(responseJson);
-                getParentFragmentManager().beginTransaction().add(android.R.id.content, receipt).addToBackStack("mira_receipt").commit();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Receipt error: " + e.getMessage());
+        View rootView = getView();
+        if (rootView == null || !isAdded()) {
             showToast("✅ تم البيع بنجاح!");
+            return;
         }
+
+        // 🛡️ جدولة العملية على الـ Main Thread لضمان إغلاق الحوارات واستقرار الـ FragmentManager
+        rootView.post(() -> {
+            try {
+                if (!isAdded() || isDetached() || getActivity() == null) return;
+
+                FragmentManager fm = getParentFragmentManager();
+                if (fm != null && !fm.isStateSaved() && !fm.isDestroyed()) {
+                    MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(responseJson);
+                    
+                    int containerId = (getView() != null && getView().getParent() != null) 
+                            ? ((View) getView().getParent()).getId() 
+                            : android.R.id.content;
+
+                    fm.beginTransaction()
+                      .replace(containerId, receipt)
+                      .addToBackStack("mira_receipt")
+                      .commitAllowingStateLoss(); // 🛡️ منع خطأ حفظ حالة الـ Fragment (IllegalStateException)
+                } else {
+                    showToast("✅ تم البيع بنجاح!");
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Receipt error prevented crash: " + e.getMessage());
+                showToast("✅ تم البيع بنجاح!");
+            }
+        });
     }
 
     private void saveSaleLocally(POSCheckoutDialog.POSCheckoutData data) {
@@ -425,6 +461,7 @@ public class MiraPosFragment extends Fragment {
         try {
             JSONArray pending = new JSONArray(getContext().getSharedPreferences(PENDING_SALES_PREFS, Context.MODE_PRIVATE).getString("pending", "[]"));
             if (pending.length() > 0 && getActivity() != null) getActivity().runOnUiThread(() -> {
+                if (!isAdded()) return;
                 tvCartStatus.setText("⚠️ " + pending.length() + " عملية معلقة"); tvCartStatus.setTextColor(Color.parseColor("#F59E0B"));
             });
         } catch (Exception ignored) {}
