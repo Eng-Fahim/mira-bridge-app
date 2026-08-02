@@ -43,7 +43,7 @@
                             android:id="@+id/tvInventoryStatus"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="● READY"
+                            android:text="● جاهز للجرد"
                             android:textColor="#94A3B8"
                             android:textSize="13sp"
                             android:textStyle="bold" />
@@ -77,7 +77,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="📍 Main Showroom"
+                        android:text="📍 المعرض الرئيسي"
                         android:textAlignment="viewStart"
                         android:textColor="#F1F5F9"
                         android:textSize="12sp"
@@ -101,7 +101,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="Last Scan: None"
+                    android:text="آخر قراءة: لا يوجد"
                     android:textAlignment="viewStart"
                     android:textColor="#64748B"
                     android:textSize="11sp" />
@@ -168,7 +168,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="Expected"
+                        android:text="المتوقع"
                         android:textColor="#94A3B8"
                         android:textSize="11sp" />
                 </LinearLayout>
@@ -204,7 +204,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="Scanned"
+                        android:text="الممسوح"
                         android:textColor="#94A3B8"
                         android:textSize="11sp" />
                 </LinearLayout>
@@ -240,7 +240,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="Variance"
+                        android:text="التفاوت"
                         android:textColor="#94A3B8"
                         android:textSize="11sp" />
                 </LinearLayout>
@@ -261,7 +261,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Accuracy: 0.0%"
+                android:text="الدقة: 0.0%"
                 android:textAlignment="viewStart"
                 android:textColor="#22C55E"
                 android:textSize="12sp"
@@ -277,19 +277,19 @@
                 android:id="@+id/tvLastAuditDate"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Last Audit: -"
+                android:text="آخر جرد: -"
                 android:textAlignment="viewEnd"
                 android:textColor="#94A3B8"
                 android:textSize="12sp" />
         </LinearLayout>
 
-        <!-- Comparison Matrix (Aligned for RTL/LTR precision) -->
+        <!-- Comparison Matrix (Visible by default for RTL/LTR precision) -->
         <androidx.cardview.widget.CardView
             android:id="@+id/cardComparison"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:visibility="gone"
+            android:visibility="visible"
             app:cardBackgroundColor="#1E293B"
             app:cardCornerRadius="12dp">
 
@@ -311,7 +311,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Previous"
+                        android:text="الجرد السابق"
                         android:textColor="#94A3B8"
                         android:textSize="11sp" />
 
@@ -336,7 +336,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Current"
+                        android:text="الجرد الحالي"
                         android:textColor="#94A3B8"
                         android:textSize="11sp" />
 
@@ -361,7 +361,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Delta"
+                        android:text="الفارق"
                         android:textColor="#94A3B8"
                         android:textSize="11sp" />
 
@@ -401,7 +401,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="💎 High Value Watch"
+                        android:text="💎 مراقبة القطع عالية القيمة"
                         android:textAlignment="viewStart"
                         android:textColor="#F59E0B"
                         android:textSize="12sp"
@@ -445,7 +445,7 @@
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:backgroundTint="#0284C7"
-                android:text="Start Scan"
+                android:text="بدء المسح"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold"
@@ -458,7 +458,7 @@
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:backgroundTint="#475569"
-                android:text="Blind Scan"
+                android:text="مسح أعمى"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold"
@@ -480,7 +480,7 @@
                 android:layout_weight="1"
                 android:backgroundTint="#DC2626"
                 android:enabled="false"
-                android:text="Stop Scan"
+                android:text="إيقاف"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold"
@@ -494,7 +494,7 @@
                 android:layout_weight="1"
                 android:backgroundTint="#16A34A"
                 android:enabled="false"
-                android:text="Report"
+                android:text="التقرير"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold"
