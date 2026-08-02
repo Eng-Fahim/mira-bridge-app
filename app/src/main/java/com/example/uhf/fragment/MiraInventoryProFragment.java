@@ -24,7 +24,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
-import com.example.uhf.api.MiraApiClient; // ⭐ العميل المركزي
+import com.example.uhf.api.MiraApiClient;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -68,7 +68,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private boolean soundEnabled = true;
     private boolean vibrateEnabled = true;
 
-    // ⭐ استخدام العميل المركزي
     private MiraApiClient apiClient;
 
     private final String[] realGtins = {
@@ -81,10 +80,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.fragment_mira_inventory_pro, container, false);
-        
-        // ⭐ تهيئة العميل
         apiClient = MiraApiClient.getInstance(requireContext());
-        
         bindViews(v);
         setupRecyclerView();
         setupClickListeners();
@@ -151,25 +147,20 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (cardHighValue != null) cardHighValue.setVisibility(View.VISIBLE);
     }
 
-    // ===================== ⭐ API Calls via MiraApiClient =====================
+    // ===================== API Calls =====================
 
-    /**
-     * 📊 جلب آخر لقطة جرد
-     */
     private void loadLastSnapshot() {
         new Thread(() -> {
             int loadedPrevItems = 10;
             String loadedDate = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
 
             try {
-                // ⭐ استخدام العميل المركزي
                 MiraApiClient.ApiResponse response = apiClient.getLastSnapshot("Main Showroom");
-
                 if (response.isSuccess && response.data != null) {
                     JSONObject snapshot = response.data.optJSONObject("snapshot");
                     if (snapshot != null) {
                         loadedPrevItems = snapshot.optInt("total_items", 10);
-                        loadedDate = snapshot.optString("date", loadedDate);
+                        loadedDate = snapshot.optString("snapshot_date", loadedDate);
                     }
                 }
             } catch (Exception ignored) {}
@@ -181,7 +172,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                 getActivity().runOnUiThread(() -> {
                     if (!isAdded()) return;
                     prevTotalItems = finalItems;
-                    if (tvLastAuditDate != null) tvLastAuditDate.setText(finalDate.length() > 10 ? finalDate.substring(0, 10) : finalDate);
+                    if (tvLastAuditDate != null)
+                        tvLastAuditDate.setText(finalDate.length() > 10 ? finalDate.substring(0, 10) : finalDate);
                     if (tvLastAccuracy != null) tvLastAccuracy.setText("98.1%");
                     if (tvPrevItems != null) tvPrevItems.setText(String.valueOf(prevTotalItems));
                 });
@@ -189,15 +181,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }).start();
     }
 
-    /**
-     * 💎 جلب القطع عالية القيمة
-     */
     private void loadHighValueItems() {
         new Thread(() -> {
             try {
-                // ⭐ استخدام العميل المركزي
                 MiraApiClient.ApiResponse response = apiClient.getHighValueItems("Main Showroom", 3000);
-
                 if (response.isSuccess && response.data != null) {
                     int count = response.data.optInt("count", 0);
                     JSONArray items = response.data.optJSONArray("items");
@@ -223,9 +210,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }).start();
     }
 
-    /**
-     * 🔍 استعلام عن قطعة للجرد
-     */
     private void queryMiraForInventory(String gtin) {
         new Thread(() -> {
             String title = "قطعة ذهب - " + gtin.substring(gtin.length() - 4);
@@ -237,10 +221,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             String rssi = "-" + (40 + (int)(Math.random() * 30));
 
             try {
-                // ⭐ استخدام العميل المركزي
                 JSONObject extraParams = new JSONObject();
                 extraParams.put("rssi", rssi);
-                
+
                 MiraApiClient.ApiResponse response = apiClient.authorize(gtin, "inventory", extraParams);
 
                 if (response.isSuccess && response.data != null) {
@@ -250,6 +233,21 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                         karat = item.optString("karat", karat);
                         double w = item.optDouble("weight", 0);
                         if (w > 0) weight = String.format(Locale.US, "%.2fg", w);
+                        String vaultStatus = item.optString("status", "");
+                        location = item.optString("location", location);
+
+                        switch (vaultStatus) {
+                            case "sold":
+                                status = "⚠️"; found = false; break;
+                            case "in_stock":
+                            case "available":
+                            case "transferred":
+                                status = "✓"; found = true; break;
+                            case "reserved":
+                                status = "🔒"; found = false; break;
+                            default:
+                                status = "✓"; found = true;
+                        }
                     }
                 }
             } catch (Exception ignored) {}
@@ -283,31 +281,86 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }).start();
     }
 
-    /**
-     * 📤 إغلاق جلسة الجرد على السيرفر
-     */
+    private void startSessionOnServer(boolean blind) {
+        new Thread(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.startInventorySession("Main Showroom", blind ? "blind" : "full");
+                if (response.isSuccess && response.data != null) {
+                    sessionId = response.data.optInt("session_id", 0);
+                    int serverExpected = response.data.optInt("expected_count", 0);
+                    if (serverExpected > 0) {
+                        expectedCount = serverExpected;
+                    }
+                }
+            } catch (Exception e) {
+                expectedCount = realGtins.length;
+            }
+
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    if (tvExpectedCount != null) {
+                        tvExpectedCount.setText(blind ? "???" : String.valueOf(expectedCount));
+                    }
+                    startSimulation();
+                });
+            }
+        }).start();
+    }
+
     private void closeSessionOnServer() {
         new Thread(() -> {
             try {
                 JSONObject payload = new JSONObject();
                 payload.put("session_id", sessionId);
+                payload.put("found_count", foundCount);
+                payload.put("expected_count", expectedCount);
+                payload.put("variance", varianceCount);
                 apiClient.closeInventorySession(payload);
             } catch (Exception ignored) {}
         }).start();
     }
 
-    /**
-     * 📸 إنشاء لقطة جرد على السيرفر
-     */
     private void createSnapshotOnServer() {
         new Thread(() -> {
             try {
                 JSONObject payload = new JSONObject();
                 payload.put("session_id", sessionId);
                 payload.put("location", "Main Showroom");
+                payload.put("total_items", foundCount);
+                payload.put("total_weight", calculateTotalWeight());
+                payload.put("total_value", calculateTotalValue());
+
+                JSONArray itemsJson = new JSONArray();
+                for (InventoryItem item : scannedItems) {
+                    JSONObject obj = new JSONObject();
+                    obj.put("serial", item.serial);
+                    obj.put("title", item.title);
+                    obj.put("karat", item.karat);
+                    obj.put("weight", item.weight);
+                    obj.put("status", item.status);
+                    obj.put("location", item.location);
+                    itemsJson.put(obj);
+                }
+                payload.put("items", itemsJson);
+
                 apiClient.createInventorySnapshot(payload);
             } catch (Exception ignored) {}
         }).start();
+    }
+
+    private double calculateTotalWeight() {
+        double total = 0;
+        for (InventoryItem item : scannedItems) {
+            try {
+                String w = item.weight.replace("g", "").replace("f", "").trim();
+                total += Double.parseDouble(w);
+            } catch (Exception ignored) {}
+        }
+        return Math.round(total * 1000.0) / 1000.0;
+    }
+
+    private double calculateTotalValue() {
+        return Math.round(calculateTotalWeight() * 65 * 100.0) / 100.0;
     }
 
     // ===================== Inventory Logic =====================
@@ -335,8 +388,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }
 
         playInventorySound("start");
+        startSessionOnServer(blindMode);
         startTimer();
-        startSimulation();
 
         if (getContext() != null) {
             Toast.makeText(getContext(), "🟢 " + (blindMode ? "BLIND" : "FULL") + " Inventory Started", Toast.LENGTH_SHORT).show();
@@ -410,8 +463,13 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         int count = 1;
         for (int i = scannedItems.size() - 1; i >= 0; i--) {
             InventoryItem item = scannedItems.get(i);
-            String color = "✓".equals(item.status) ? "#22C55E" : "#EF4444";
-            String icon = "✓".equals(item.status) ? "✅" : "⚠️";
+            String color, icon;
+            switch (item.status) {
+                case "✓":  color = "#22C55E"; icon = "✅"; break;
+                case "⚠️": color = "#F59E0B"; icon = "⚠️"; break;
+                case "🔒": color = "#3B82F6"; icon = "🔒"; break;
+                default:   color = "#EF4444"; icon = "❌";
+            }
             rows.append(String.format(Locale.US,
                 "<tr><td>%d</td><td style='color:%s'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
                 count++, color, icon, item.serial, item.title, item.karat, item.weight));
@@ -513,10 +571,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         else stopInventory();
     }
 
+    // ===================== Models =====================
+
     public static class InventoryItem {
         String serial, title, karat, weight, status, location;
         public InventoryItem(String s, String t, String k, String w, String st, String l) {
-            serial=s; title=t; karat=k; weight=w; status=st; location=l;
+            serial = s; title = t; karat = k; weight = w; status = st; location = l;
         }
     }
 
@@ -535,24 +595,31 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             InventoryItem item = items.get(pos);
             if (h.s != null) {
                 h.s.setText(item.status);
-                h.s.setTextColor("✓".equals(item.status) ? Color.parseColor("#22C55E") : Color.parseColor("#EF4444"));
+                switch (item.status) {
+                    case "✓":  h.s.setTextColor(Color.parseColor("#22C55E")); break;
+                    case "⚠️": h.s.setTextColor(Color.parseColor("#F59E0B")); break;
+                    case "🔒": h.s.setTextColor(Color.parseColor("#3B82F6")); break;
+                    default:   h.s.setTextColor(Color.parseColor("#EF4444"));
+                }
             }
             if (h.serial != null) h.serial.setText(item.serial);
             if (h.title != null) h.title.setText(item.title);
             if (h.details != null) h.details.setText(item.karat + " | " + item.weight);
+            if (h.location != null) h.location.setText(item.location);
         }
 
         @Override
         public int getItemCount() { return items.size(); }
 
         class VH extends RecyclerView.ViewHolder {
-            TextView s, serial, title, details;
+            TextView s, serial, title, details, location;
             VH(View v) {
                 super(v);
-                s=v.findViewById(R.id.tvItemStatus);
-                serial=v.findViewById(R.id.tvItemSerial);
-                title=v.findViewById(R.id.tvItemTitle);
-                details=v.findViewById(R.id.tvItemDetails);
+                s = v.findViewById(R.id.tvItemStatus);
+                serial = v.findViewById(R.id.tvItemSerial);
+                title = v.findViewById(R.id.tvItemTitle);
+                details = v.findViewById(R.id.tvItemDetails);
+                location = v.findViewById(R.id.tvItemLocation);
             }
         }
     }
@@ -567,4 +634,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (rvInventoryItems != null) rvInventoryItems.setAdapter(null);
         super.onDestroyView();
     }
-    }
+                                   }
