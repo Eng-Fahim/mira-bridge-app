@@ -359,108 +359,100 @@ public class MiraPosFragment extends Fragment {
     }
 
     /**
-     * 🔍 جلب بيانات القطعة والتحقق من توفرها في سيرفر MIRA ID
-     * يدعم: RFID EPC, GS1 DATAMATRIX, Serial Number, GTIN
-     */
-    private void processRingEpc(final String code, final String source) {
-        playAlertSound(1);
+ * 🔍 جلب بيانات القطعة - نسخة مبسطة باستخدام MiraApiClient
+ */
+private void processRingEpc(final String code, final String source) {
+    playAlertSound(1);
 
-        new Thread(() -> {
-            try {
-                SharedPreferences prefs = getContext() != null ?
-                        getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) : null;
+    new Thread(() -> {
+        try {
+            // ⚡ استخدام العميل المركزي
+            MiraApiClient client = MiraApiClient.getInstance(getContext());
 
-                String apiUrl = "https://ams.ibreg.org/wp-json/mira-gate/v1/authorize";
-                String apiKey = "mira_gate_test071234567890abcdefghijklmnop";
-
-                if (prefs != null) {
-                    apiUrl = prefs.getString("mira_api_url", apiUrl);
-                    apiKey = prefs.getString("mira_api_key", apiKey);
-                }
-
-                URL url = new URL(apiUrl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-                conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-                conn.setDoOutput(true);
-
-                JSONObject jsonParam = new JSONObject();
-                jsonParam.put("epc", code);
-                jsonParam.put("context", "pos_sale");
-                jsonParam.put("source", source);
-                if (liveScaleWeight > 0) {
-                    jsonParam.put("scale_weight", liveScaleWeight);
-                }
-
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(jsonParam.toString().getBytes("utf-8"));
-                }
-
-                int responseCode = conn.getResponseCode();
-                InputStream is = (responseCode >= 200 && responseCode < 300) ?
-                        conn.getInputStream() : conn.getErrorStream();
-                BufferedReader reader = new BufferedReader(new InputStreamReader(is, "utf-8"));
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) response.append(line);
-
-                final String responseStr = response.toString();
-                Log.d(TAG, "API Response [" + source + "]: " + responseStr);
-
-                JSONObject resObj = new JSONObject(responseStr);
-                JSONObject item = resObj.optJSONObject("item");
-                JSONObject decision = resObj.optJSONObject("decision");
-                JSONObject barcode = item != null ? item.optJSONObject("barcode") : null;
-
-                boolean isAvailable = decision != null && decision.optBoolean("allowed", true);
-                String title = item != null ? item.optString("title", "خاتم ذهب") :
-                        "Item " + code.substring(Math.max(0, code.length() - 6));
-                String karat = item != null ? item.optString("karat", "21K") : "21K";
-                double weight = item != null ? item.optDouble("weight", 5.0) : 5.0;
-                double price = item != null ? item.optDouble("price", 350.0) : 350.0;
-                String status = item != null ? item.optString("status", "AVAILABLE") : "AVAILABLE";
-                String serialNo = item != null ? item.optString("serial", code) : code;
-                String gtin = (barcode != null) ? barcode.optString("gtin13", "") : "";
-                String location = item != null ? item.optString("location", "") : "";
-                int itemId = item != null ? item.optInt("id", 0) : 0;
-
-                CartItem cartItem = new CartItem(code, title, karat, weight,
-                        liveScaleWeight, price, isAvailable, status);
-                cartItem.serialNo = serialNo;
-                cartItem.gtin = gtin;
-                cartItem.location = location;
-                cartItem.itemId = itemId;
-
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> {
-                        scannedEpcs.add(code);
-                        cartList.add(0, cartItem);
-                        cartAdapter.notifyItemInserted(0);
-                        rvCartItems.scrollToPosition(0);
-                        updateCartSummary();
-                    });
-                }
-
-            } catch (Exception e) {
-                Log.e(TAG, "Error fetching item: " + e.getMessage());
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> {
-                        CartItem fallbackItem = new CartItem(code,
-                                "قطعة (غير متصلة)", "21K", 5.2,
-                                liveScaleWeight, 420.0, true, "OFFLINE");
-                        fallbackItem.serialNo = code;
-                        scannedEpcs.add(code);
-                        cartList.add(0, fallbackItem);
-                        cartAdapter.notifyItemInserted(0);
-                        updateCartSummary();
-                    });
-                }
+            // تجهيز المعاملات الإضافية
+            JSONObject extraParams = new JSONObject();
+            extraParams.put("source", source);
+            if (liveScaleWeight > 0) {
+                extraParams.put("scale_weight", liveScaleWeight);
             }
-        }).start();
+
+            // استدعاء API
+            MiraApiClient.ApiResponse response = client.authorize(code, "pos_sale", extraParams);
+
+            if (response.isSuccess && response.data != null) {
+                parseItemResponse(code, response.data);
+            } else {
+                throw new Exception(response.error != null ? response.error : "Unknown error");
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error fetching item: " + e.getMessage());
+            handleItemError(code);
+        }
+    }).start();
+}
+
+/**
+ * تحليل استجابة القطعة
+ */
+private void parseItemResponse(String code, JSONObject data) {
+    try {
+        JSONObject item = data.optJSONObject("item");
+        JSONObject decision = data.optJSONObject("decision");
+        JSONObject barcode = item != null ? item.optJSONObject("barcode") : null;
+
+        boolean isAvailable = decision != null && decision.optBoolean("allowed", true);
+        String title = item != null ? item.optString("title", "خاتم ذهب") :
+                "Item " + code.substring(Math.max(0, code.length() - 6));
+        String karat = item != null ? item.optString("karat", "21K") : "21K";
+        double weight = item != null ? item.optDouble("weight", 5.0) : 5.0;
+        double price = item != null ? item.optDouble("price", 350.0) : 350.0;
+        String status = item != null ? item.optString("status", "AVAILABLE") : "AVAILABLE";
+        String serialNo = item != null ? item.optString("serial", code) : code;
+        String gtin = (barcode != null) ? barcode.optString("gtin13", "") : "";
+        String location = item != null ? item.optString("location", "") : "";
+        int itemId = item != null ? item.optInt("id", 0) : 0;
+
+        CartItem cartItem = new CartItem(code, title, karat, weight,
+                liveScaleWeight, price, isAvailable, status);
+        cartItem.serialNo = serialNo;
+        cartItem.gtin = gtin;
+        cartItem.location = location;
+        cartItem.itemId = itemId;
+
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(() -> {
+                scannedEpcs.add(code);
+                cartList.add(0, cartItem);
+                cartAdapter.notifyItemInserted(0);
+                rvCartItems.scrollToPosition(0);
+                updateCartSummary();
+            });
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Parse error: " + e.getMessage());
+        handleItemError(code);
     }
+}
+
+/**
+ * معالجة خطأ جلب القطعة
+ */
+private void handleItemError(String code) {
+    if (getActivity() != null) {
+        getActivity().runOnUiThread(() -> {
+            CartItem fallbackItem = new CartItem(code,
+                    "قطعة (غير متصلة)", "21K", 5.2,
+                    liveScaleWeight, 420.0, true, "OFFLINE");
+            fallbackItem.serialNo = code;
+            scannedEpcs.add(code);
+            cartList.add(0, fallbackItem);
+            cartAdapter.notifyItemInserted(0);
+            updateCartSummary();
+        });
+    }
+}
+    
 
     // ===================== Cart Management =====================
 
@@ -568,129 +560,81 @@ public class MiraPosFragment extends Fragment {
 
 
     private void executeCheckout(POSCheckoutDialog.POSCheckoutData checkoutData) {
-        btnCheckout.setEnabled(false);
-        btnCheckout.setAlpha(0.5f);
-        tvCartStatus.setText("جاري إتمام البيع وتحديث الهوية الرقمية...");
-        tvCartStatus.setTextColor(Color.parseColor("#F59E0B"));
+    btnCheckout.setEnabled(false);
+    btnCheckout.setAlpha(0.5f);
+    tvCartStatus.setText("جاري إتمام البيع وتحديث الهوية الرقمية...");
+    tvCartStatus.setTextColor(Color.parseColor("#F59E0B"));
 
-        new Thread(() -> {
-            try {
-                SharedPreferences prefs = getContext() != null ?
-                        getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) : null;
+    new Thread(() -> {
+        try {
+            // ⚡ استخدام العميل المركزي
+            MiraApiClient client = MiraApiClient.getInstance(getContext());
 
-                String apiUrl = "https://ams.ibreg.org/wp-json/mira-gate/v1/pos/checkout";
-                String apiKey = "mira_gate_test071234567890abcdefghijklmnop";
+            JSONObject payload = new JSONObject();
+            payload.put("action", "COMPLETE_POS_SALE");
+            payload.put("gate_id", client.getGateId());
+            payload.put("timestamp", System.currentTimeMillis() / 1000);
 
-                if (prefs != null) {
-                    apiUrl = prefs.getString("mira_pos_checkout_url", apiUrl);
-                    apiKey = prefs.getString("mira_api_key", apiKey);
-                }
+            // بيانات العميل
+            JSONObject customer = new JSONObject();
+            customer.put("name", checkoutData.customerName);
+            customer.put("phone", checkoutData.customerPhone);
+            customer.put("payment_method", checkoutData.paymentMethod);
+            payload.put("customer", customer);
 
-                URL url = new URL(apiUrl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-                conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-                conn.setConnectTimeout(10000);
-                conn.setReadTimeout(10000);
-                conn.setDoOutput(true);
+            // القطع
+            JSONArray itemsArr = new JSONArray();
+            for (CartItem item : cartList) {
+                JSONObject obj = new JSONObject();
+                obj.put("epc", item.epc);
+                obj.put("serial_no", item.serialNo);
+                obj.put("title", item.name);
+                obj.put("karat", item.karat);
+                obj.put("weight", item.weight);
+                obj.put("sale_price", item.price);
+                obj.put("new_status", "SOLD");
+                itemsArr.put(obj);
+            }
+            payload.put("items", itemsArr);
 
-                JSONObject payload = new JSONObject();
-                payload.put("action", "COMPLETE_POS_SALE");
-                payload.put("gate_id", prefs != null ? prefs.getString("mira_gate_id", "handheld_c72") : "handheld_c72");
-                payload.put("timestamp", System.currentTimeMillis() / 1000);
+            // الدفع
+            JSONObject payment = new JSONObject();
+            payment.put("subtotal", getCartTotal());
+            payment.put("discount_percent", checkoutData.discount);
+            payment.put("final_amount", checkoutData.finalAmount);
+            payload.put("payment", payment);
 
-                JSONObject customer = new JSONObject();
-                customer.put("name", checkoutData.customerName);
-                customer.put("phone", checkoutData.customerPhone);
-                customer.put("email", checkoutData.customerEmail);
-                customer.put("payment_method", checkoutData.paymentMethod);
-                customer.put("notes", checkoutData.notes);
-                payload.put("customer", customer);
+            // ⚡ استدعاء API
+            MiraApiClient.ApiResponse response = client.checkout(payload);
 
-                JSONArray itemsArr = new JSONArray();
-                for (CartItem item : cartList) {
-                    JSONObject obj = new JSONObject();
-                    obj.put("epc", item.epc);
-                    obj.put("serial_no", item.serialNo);
-                    obj.put("gtin", item.gtin);
-                    obj.put("item_id", item.itemId);
-                    obj.put("title", item.name);
-                    obj.put("karat", item.karat);
-                    obj.put("weight", item.weight);
-                    obj.put("scale_weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
-                    obj.put("sale_price", item.price);
-                    obj.put("new_status", "SOLD");
-                    obj.put("location", item.location);
-                    itemsArr.put(obj);
-                }
-                payload.put("items", itemsArr);
-
-                JSONObject payment = new JSONObject();
-                payment.put("subtotal", getCartTotal());
-                payment.put("discount_percent", checkoutData.discount);
-                payment.put("discount_amount", getCartTotal() * checkoutData.discount / 100);
-                payment.put("final_amount", checkoutData.finalAmount);
-                payment.put("currency", "USD");
-                payload.put("payment", payment);
-
-                try (OutputStream os = conn.getOutputStream()) {
-                    byte[] input = payload.toString().getBytes("utf-8");
-                    os.write(input, 0, input.length);
-                }
-
-                int responseCode = conn.getResponseCode();
-                InputStream is = (responseCode >= 200 && responseCode < 300) ?
-                        conn.getInputStream() : conn.getErrorStream();
-                BufferedReader reader = new BufferedReader(new InputStreamReader(is, "utf-8"));
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) response.append(line);
-
-                final String responseStr = response.toString();
-                final int finalCode = responseCode;
-
-                Log.d(TAG, "Checkout Response [" + finalCode + "]: " + responseStr);
-
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> {
-                        if (finalCode >= 200 && finalCode < 300) {
-                            playAlertSound(1);
-                            String successMsg = "✅ تم إتمام البيع بنجاح!\n" +
-                                    "العميل: " + checkoutData.customerName + "\n" +
-                                    "القطع: " + cartList.size() + "\n" +
-                                    "المبلغ: " + String.format(Locale.US, "$%,.2f", checkoutData.finalAmount);
-                            Toast.makeText(getContext(), successMsg, Toast.LENGTH_LONG).show();
-                            clearCart();
-                        } else {
-                            tvCartStatus.setText("❌ فشل إتمام البيع (" + finalCode + ")");
-                            tvCartStatus.setTextColor(Color.parseColor("#EF4444"));
-                            btnCheckout.setEnabled(true);
-                            btnCheckout.setAlpha(1.0f);
-                            Log.e(TAG, "Checkout failed: " + responseStr);
-                            Toast.makeText(getContext(), "❌ فشل الاتصال بالخادم. حاول مرة أخرى.", Toast.LENGTH_LONG).show();
-                        }
-                    });
-                }
-
-            } catch (Exception e) {
-                Log.e(TAG, "Checkout exception: " + e.getMessage());
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> {
-                        saveSaleLocally(checkoutData);
-                        tvCartStatus.setText("💾 تم حفظ البيع محلياً (بانتظار المزامنة)");
-                        tvCartStatus.setTextColor(Color.parseColor("#F59E0B"));
-                        Toast.makeText(getContext(),
-                                "✅ تم حفظ عملية البيع محلياً (في انتظار المزامنة)",
-                                Toast.LENGTH_LONG).show();
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    if (response.isSuccess) {
+                        playAlertSound(1);
+                        Toast.makeText(getContext(), "✅ تم إتمام البيع بنجاح!", Toast.LENGTH_LONG).show();
                         clearCart();
+                    } else {
+                        tvCartStatus.setText("❌ فشل إتمام البيع (" + response.code + ")");
+                        tvCartStatus.setTextColor(Color.parseColor("#EF4444"));
                         btnCheckout.setEnabled(true);
                         btnCheckout.setAlpha(1.0f);
-                    });
-                }
+                    }
+                });
             }
-        }).start();
-    }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Checkout exception: " + e.getMessage());
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    saveSaleLocally(checkoutData);
+                    clearCart();
+                    btnCheckout.setEnabled(true);
+                    btnCheckout.setAlpha(1.0f);
+                });
+            }
+        }
+    }).start();
+}
 
     private void saveSaleLocally(POSCheckoutDialog.POSCheckoutData checkoutData) {
         if (getContext() != null) {
@@ -848,4 +792,4 @@ public class MiraPosFragment extends Fragment {
             }
         }
     }
-                    }
+}
