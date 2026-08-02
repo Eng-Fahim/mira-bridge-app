@@ -98,6 +98,12 @@ public class MiraApiClient {
     public ApiResponse getSettings() {
         return get("/settings/" + gateId);
     }
+    /**
+    * 📊 جلب سجل المبيعات
+    */
+    public ApiResponse getSalesHistory() {
+        return get("/pos/sales");
+    }
 
     public ApiResponse saveSettings(JSONObject settings) {
         JSONObject payload = new JSONObject();
