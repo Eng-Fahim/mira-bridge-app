@@ -15,6 +15,7 @@ import android.view.ViewGroup;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -47,6 +48,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private CardView cardComparison, cardHighValue;
     private Button btnStartInventory, btnBlindInventory, btnStopInventory, btnGenerateReport;
     private RecyclerView rvInventoryItems;
+    private ProgressBar progressScanned;
 
     private boolean isScanning = false;
     private boolean isBlindMode = false;
@@ -74,11 +76,18 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
     private MiraApiClient apiClient;
 
-    // قائمة أكواد حقيقية للاستعلام المباشر من قاعدة البيانات أثناء المحاكاة
+    // 🎯 قائمة الأكواد الحقيقية الخاصة بك حصرياً (EAN-13 / GTIN-13 تبدأ بـ 07)
     private final String[] simulationGtins = {
-        "170000000010", "170045537109", "170000000030", "170069121817",
-        "170000000040", "170077306396", "170000000050", "170073594930",
-        "1700000007927", "1700000007928", "1700000007929"
+        "0700000007885", "0700000007886", "0700000007887", "0700000007888", "0700000007889",
+        "0700000007890", "0700000007891", "0700000007892", "0700000007893", "0700000007894",
+        "0700000007895", "0700000007896", "0700000007897", "0700000007898", "0700000007899",
+        "0700000007900", "0700000007901", "0700000007902", "0700000007903", "0700000007904",
+        "0700000007905", "0700000007906", "0700000007907", "0700000007908", "0700000007909",
+        "0700000007910", "0700000007911", "0700000007912", "0700000007913", "0700000007914",
+        "0700000007915", "0700000007916", "0700000007917", "0700000007918", "0700000007919",
+        "0700000007920", "0700000007921", "0700000007922", "0700000007923", "0700000007924",
+        "0700000007925", "0700000007926", "0700000007927", "0700000007928", "0700000007929",
+        "0700000007930", "0700000007931", "0700000007932", "0700000013764", "070000000040"
     };
 
     @Nullable
@@ -97,7 +106,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         loadInventorySettings();
-        loadLastSnapshot();
+        loadLastSnapshot(); // 🟢 جلب بيانات الجرد السابق وتفعيل بطاقة المقارنة فوراً
         loadHighValueItems();
     }
 
@@ -125,6 +134,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         btnStopInventory = v.findViewById(R.id.btnStopInventory);
         btnGenerateReport = v.findViewById(R.id.btnGenerateReport);
         rvInventoryItems = v.findViewById(R.id.rvInventoryItems);
+        progressScanned = v.findViewById(R.id.progressScanned);
     }
 
     private void setupRecyclerView() {
@@ -147,7 +157,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (btnBlindInventory != null) btnBlindInventory.setEnabled(true);
         if (btnStopInventory != null) btnStopInventory.setEnabled(false);
         if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
-        if (tvExpectedCount != null) tvExpectedCount.setText(String.valueOf(simulationGtins.length));
+        expectedCount = simulationGtins.length;
+        if (tvExpectedCount != null) tvExpectedCount.setText(String.valueOf(expectedCount));
+        
+        // 🟢 إظهار بطاقة الجرد السابق في الواجهة بشكل دائم
         if (cardComparison != null) cardComparison.setVisibility(View.VISIBLE);
     }
 
@@ -193,9 +206,11 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     if (!isAdded()) return;
                     prevTotalItems = finalItems;
                     if (tvLastAuditDate != null)
-                        tvLastAuditDate.setText(finalDate.length() > 10 ? finalDate.substring(0, 10) : finalDate);
+                        tvLastAuditDate.setText("Last Audit: " + (finalDate.length() > 10 ? finalDate.substring(0, 10) : finalDate));
                     if (tvLastAccuracy != null) tvLastAccuracy.setText(finalAccuracy);
                     if (tvPrevItems != null) tvPrevItems.setText(String.valueOf(prevTotalItems));
+                    
+                    // 🟢 ضمان ظهور البطاقة وتحديث الفارق مع الجرد السابق
                     updateComparisonCard();
                 });
             }
@@ -231,10 +246,11 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }).start();
     }
 
-    // 🟢 معالجة مسح الكود (يستعلم حقيقياً من DB ويعزف الصوت المنشود)
+    // 🟢 معالجة مسح الكود (استعلام حقيقي حصرياً من قاعدة البيانات)
     public void processScannedTag(String epcOrGtin, String rssi) {
         if (!isScanning) return;
 
+        // منع تكرار نفس الكود
         for (InventoryItem item : scannedItems) {
             if (item.serial.equalsIgnoreCase(epcOrGtin)) return;
         }
@@ -291,14 +307,21 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                         if (adapter != null) adapter.notifyItemInserted(0);
                         if (rvInventoryItems != null) rvInventoryItems.scrollToPosition(0);
 
-                        if (tvLastScan != null) tvLastScan.setText(epcOrGtin);
+                        if (tvLastScan != null) tvLastScan.setText("Last Scan: " + epcOrGtin);
                         if (tvRssi != null) tvRssi.setText((rssi != null ? rssi : "-45") + " dBm");
                         if (tvScannedCount != null) tvScannedCount.setText(String.valueOf(scannedCount));
                         if (tvVariance != null) tvVariance.setText(String.valueOf(Math.max(0, expectedCount - foundCount)));
 
-                        double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 100.0;
-                        if (tvAccuracy != null) tvAccuracy.setText(String.format(Locale.US, "%.1f%%", acc));
+                        // تحديث شريط التقدم بذكاء
+                        if (progressScanned != null && expectedCount > 0) {
+                            int pct = (int) ((scannedCount * 100.0) / expectedCount);
+                            progressScanned.setProgress(Math.min(100, pct));
+                        }
 
+                        double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 100.0;
+                        if (tvAccuracy != null) tvAccuracy.setText(String.format(Locale.US, "Accuracy: %.1f%%", acc));
+
+                        // 🟢 تحديث الأرقام الحية في بطاقة الجرد السابق
                         updateComparisonCard();
                     });
                 }
@@ -326,14 +349,13 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     if (tvExpectedCount != null) {
                         tvExpectedCount.setText(blind ? "???" : String.valueOf(expectedCount));
                     }
-                    // 🟢 البدء الفوري للمحاكاة وتغذية الـ UI بالبيانات من DB
                     startSimulation();
                 });
             }
         }).start();
     }
 
-    // 🟢 دالة المحاكاة التفاعلية
+    // 🟢 دالة المحاكاة المباشرة الحصرية للأكواد الحقيقية
     private void startSimulation() {
         simulationIndex = 0;
         simulationRunnable = new Runnable() {
@@ -343,13 +365,14 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     if (isScanning) stopInventory();
                     return;
                 }
+                // جلب الكود الحقيقي المضمون فقط
                 String gtin = simulationGtins[simulationIndex];
                 processScannedTag(gtin, "-" + (40 + (int)(Math.random() * 25)));
                 simulationIndex++;
-                simulationHandler.postDelayed(this, 750);
+                simulationHandler.postDelayed(this, 500); // إرسال كود كل نصف ثانية
             }
         };
-        simulationHandler.postDelayed(simulationRunnable, 400);
+        simulationHandler.postDelayed(simulationRunnable, 300);
     }
 
     private void closeSessionOnServer() {
@@ -440,7 +463,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         startTimer();
 
         if (getContext() != null) {
-            Toast.makeText(getContext(), "🟢 بدأت عملية الجرد بالمحاكاة الحية", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "🟢 بدأت عملية الجرد الحقيقية بالمحاكاة", Toast.LENGTH_SHORT).show();
         }
     }
 
