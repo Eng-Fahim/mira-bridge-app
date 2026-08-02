@@ -3,8 +3,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0F172A"
-    android:fillViewport="true">
+    android:background="#090D16"
+    android:fillViewport="true"
+    android:layoutDirection="rtl">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -18,7 +19,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
             app:cardBackgroundColor="#1E293B"
-            app:cardCornerRadius="14dp"
+            app:cardCornerRadius="16dp"
             app:cardElevation="6dp">
 
             <LinearLayout
@@ -43,8 +44,8 @@
                             android:id="@+id/tvInventoryStatus"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="● جاهز للجرد"
-                            android:textColor="#94A3B8"
+                            android:text="📡 القارئ اليدوي: جاهز للجرد"
+                            android:textColor="#38BDF8"
                             android:textSize="13sp"
                             android:textStyle="bold" />
 
@@ -55,11 +56,11 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_alignParentEnd="true"
-                        android:background="#334155"
+                        android:background="#0F172A"
                         android:paddingHorizontal="10dp"
                         android:paddingVertical="4dp"
                         android:text="00:00:00"
-                        android:textColor="#38BDF8"
+                        android:textColor="#F59E0B"
                         android:textSize="13sp"
                         android:textStyle="bold" />
                 </RelativeLayout>
@@ -77,7 +78,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="📍 المعرض الرئيسي"
+                        android:text="📍 المعرض الرئيسي - صنعاء"
                         android:textAlignment="viewStart"
                         android:textColor="#F1F5F9"
                         android:textSize="12sp"
@@ -89,8 +90,8 @@
                         android:layout_height="wrap_content"
                         android:background="#0F172A"
                         android:paddingHorizontal="8dp"
-                        android:paddingVertical="2dp"
-                        android:text="-0 dBm"
+                        android:paddingVertical="3dp"
+                        android:text="إشارة RFID: -0 dBm"
                         android:textColor="#94A3B8"
                         android:textSize="11sp" />
                 </LinearLayout>
@@ -101,7 +102,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="آخر قراءة: لا يوجد"
+                    android:text="آخر قراءة RFID: لا يوجد"
                     android:textAlignment="viewStart"
                     android:textColor="#64748B"
                     android:textSize="11sp" />
@@ -145,7 +146,7 @@
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 app:cardBackgroundColor="#1E293B"
-                app:cardCornerRadius="12dp"
+                app:cardCornerRadius="14dp"
                 app:cardElevation="3dp">
 
                 <LinearLayout
@@ -168,7 +169,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="المتوقع"
+                        android:text="المتوقع بالسيستم"
                         android:textColor="#94A3B8"
                         android:textSize="11sp" />
                 </LinearLayout>
@@ -181,7 +182,7 @@
                 android:layout_marginHorizontal="2dp"
                 android:layout_weight="1"
                 app:cardBackgroundColor="#1E293B"
-                app:cardCornerRadius="12dp"
+                app:cardCornerRadius="14dp"
                 app:cardElevation="3dp">
 
                 <LinearLayout
@@ -204,7 +205,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="الممسوح"
+                        android:text="الممسوح بالقارئ"
                         android:textColor="#94A3B8"
                         android:textSize="11sp" />
                 </LinearLayout>
@@ -217,7 +218,7 @@
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 app:cardBackgroundColor="#1E293B"
-                app:cardCornerRadius="12dp"
+                app:cardCornerRadius="14dp"
                 app:cardElevation="3dp">
 
                 <LinearLayout
@@ -240,7 +241,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="التفاوت"
+                        android:text="العجز / التفاوت"
                         android:textColor="#94A3B8"
                         android:textSize="11sp" />
                 </LinearLayout>
@@ -254,14 +255,14 @@
             android:layout_marginBottom="12dp"
             android:background="#1E293B"
             android:orientation="horizontal"
-            android:padding="10dp">
+            android:padding="12dp">
 
             <TextView
                 android:id="@+id/tvAccuracy"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="الدقة: 0.0%"
+                android:text="الدقة الحالية: 0.0%"
                 android:textAlignment="viewStart"
                 android:textColor="#22C55E"
                 android:textSize="12sp"
@@ -283,7 +284,7 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
-        <!-- Comparison Matrix (Visible by default for RTL/LTR precision) -->
+        <!-- Comparison Matrix -->
         <androidx.cardview.widget.CardView
             android:id="@+id/cardComparison"
             android:layout_width="match_parent"
@@ -291,7 +292,7 @@
             android:layout_marginBottom="12dp"
             android:visibility="visible"
             app:cardBackgroundColor="#1E293B"
-            app:cardCornerRadius="12dp">
+            app:cardCornerRadius="14dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -300,7 +301,6 @@
                 android:padding="12dp"
                 android:weightSum="3">
 
-                <!-- Previous Audit -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -325,7 +325,6 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <!-- Current Audit -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -350,7 +349,6 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <!-- Delta / Net Variance -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -384,7 +382,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="14dp"
             app:cardBackgroundColor="#1E293B"
-            app:cardCornerRadius="12dp">
+            app:cardCornerRadius="14dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -401,7 +399,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="💎 مراقبة القطع عالية القيمة"
+                        android:text="💎 قطع مجوهرات عالية القيمة"
                         android:textAlignment="viewStart"
                         android:textColor="#F59E0B"
                         android:textSize="12sp"
@@ -441,28 +439,28 @@
             <Button
                 android:id="@+id/btnStartInventory"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="50dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:backgroundTint="#0284C7"
-                android:text="بدء المسح"
+                android:text="📡 بدء مسح RFID"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="10dp" />
 
             <Button
                 android:id="@+id/btnBlindInventory"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="50dp"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:backgroundTint="#475569"
-                android:text="مسح أعمى"
+                android:text="⚡ مسح أعمى بالقارئ"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="10dp" />
         </LinearLayout>
 
         <!-- Secondary Actions Group -->
@@ -475,30 +473,30 @@
             <Button
                 android:id="@+id/btnStopInventory"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="50dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:backgroundTint="#DC2626"
                 android:enabled="false"
-                android:text="إيقاف"
+                android:text="🛑 إيقاف القارئ"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="10dp" />
 
             <Button
                 android:id="@+id/btnGenerateReport"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="50dp"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:backgroundTint="#16A34A"
                 android:enabled="false"
-                android:text="التقرير"
+                android:text="📄 تقرير الجرد"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="10dp" />
         </LinearLayout>
 
         <!-- Realtime Scanned Items List View -->
@@ -506,7 +504,7 @@
             android:layout_width="match_parent"
             android:layout_height="320dp"
             app:cardBackgroundColor="#020617"
-            app:cardCornerRadius="10dp">
+            app:cardCornerRadius="12dp">
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvInventoryItems"
