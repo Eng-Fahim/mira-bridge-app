@@ -1,7 +1,4 @@
 package com.example.uhf.fragment;
-import androidx.fragment.app.FragmentManager;
-// أضف في بداية الملف مع imports الأخرى
-import com.example.uhf.api.MiraApiClient;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -19,25 +16,20 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
+import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.dialog.POSCheckoutDialog;
 import com.example.uhf.engine.SmartScaleConnector;
-
 import com.example.uhf.tools.UIHelper;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -52,6 +44,7 @@ import java.util.Set;
  * - ⌨️ الإدخال اليدوي للكود
  * - ⚖️ الربط مع قراءات الميزان اللحظية
  * - 📋 نموذج تفاصيل العميل قبل إتمام البيع
+ * - 🧾 إيصال بيع احترافي بعد البيع
  * - 🔄 تحديث حالة المخزون والهوية الرقمية
  * - 💾 حفظ محلي عند فشل الاتصال
  */
@@ -119,30 +112,17 @@ public class MiraPosFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-
-        // ربط عناصر الواجهة
         bindViews(view);
-
-        // تهيئة القائمة
         setupRecyclerView();
-
-        // ربط الأحداث
         setupListeners();
-
-        // بدء الميزان الذكي
         initSmartScale();
-
-        // تحميل المبيعات المعلقة
         checkPendingSales();
-
-        // تحديث الملخص
         updateCartSummary();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        // تسجيل هذا الفragment كمستقبل نشط للـ RFID
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
         }
@@ -151,7 +131,6 @@ public class MiraPosFragment extends Fragment {
     @Override
     public void onPause() {
         super.onPause();
-        // إلغاء التسجيل عند الخروج من التبويب
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
         }
@@ -164,16 +143,12 @@ public class MiraPosFragment extends Fragment {
         tvItemCount = view.findViewById(R.id.tvPosItemCount);
         tvTotalAmount = view.findViewById(R.id.tvPosTotalAmount);
         tvCartStatus = view.findViewById(R.id.tvPosCartStatus);
-
         etManualEpc = view.findViewById(R.id.etPosManualEpc);
         btnAddManual = view.findViewById(R.id.btnPosAddManual);
         btnCheckout = view.findViewById(R.id.btnPosCheckout);
         btnClearCart = view.findViewById(R.id.btnPosClearCart);
-
-        // ⭐ أزرار المسح الجديدة
         btnOpenScanner = view.findViewById(R.id.btnOpenScanner);
         btnPosRFIDMode = view.findViewById(R.id.btnPosRFIDMode);
-
         rvCartItems = view.findViewById(R.id.rvPosCartItems);
     }
 
@@ -184,8 +159,8 @@ public class MiraPosFragment extends Fragment {
     }
 
     private void setupListeners() {
-        // ⌨️ زر الإضافة اليدوية
         btnAddManual.setOnClickListener(v -> {
+            UIHelper.hideKeyboard(getActivity());
             String epc = etManualEpc.getText().toString().trim();
             if (!epc.isEmpty()) {
                 processRingEpc(epc, "manual");
@@ -195,20 +170,28 @@ public class MiraPosFragment extends Fragment {
             }
         });
 
-        // 🗑️ زر مسح السلة
-        btnClearCart.setOnClickListener(v -> clearCart());
+        btnClearCart.setOnClickListener(v -> {
+            UIHelper.hideKeyboard(getActivity());
+            clearCart();
+        });
 
-        // 💳 زر إتمام البيع
-        btnCheckout.setOnClickListener(v -> processCheckoutAndStockUpdate());
+        btnCheckout.setOnClickListener(v -> {
+            UIHelper.hideKeyboard(getActivity());
+            processCheckoutAndStockUpdate();
+        });
 
-        // 📷 زر فتح ماسح GS1 DATAMATRIX
         if (btnOpenScanner != null) {
-            btnOpenScanner.setOnClickListener(v -> openBarcodeScanner());
+            btnOpenScanner.setOnClickListener(v -> {
+                UIHelper.hideKeyboard(getActivity());
+                openBarcodeScanner();
+            });
         }
 
-        // 📡 زر تفعيل/تعطيل RFID المباشر
         if (btnPosRFIDMode != null) {
-            btnPosRFIDMode.setOnClickListener(v -> toggleRFIDMode());
+            btnPosRFIDMode.setOnClickListener(v -> {
+                UIHelper.hideKeyboard(getActivity());
+                toggleRFIDMode();
+            });
         }
     }
 
@@ -264,22 +247,15 @@ public class MiraPosFragment extends Fragment {
 
     // ===================== 📷 Barcode Scanner =====================
 
-   
-        /**
-     * 📷 فتح ماسح GS1 DATAMATRIX بالكاميرا
-     */
     private void openBarcodeScanner() {
         MiraBarcodeScannerFragment scannerFragment = new MiraBarcodeScannerFragment();
         scannerFragment.setOnBarcodeScannedListener((data, format) -> {
-            // عند مسح باركود، أرسل إلى POS
             onBarcodeScanned(data);
-            // العودة إلى شاشة POS
             if (getParentFragmentManager().getBackStackEntryCount() > 0) {
                 getParentFragmentManager().popBackStack();
             }
         });
 
-        // ⚡ تم تصحيح الـ Container ID لاستخدام الحاوية الجذرية لـ Fragment الحالي بأمان
         if (getView() != null && getView().getParent() != null) {
             int containerId = ((View) getView().getParent()).getId();
             getParentFragmentManager()
@@ -288,7 +264,6 @@ public class MiraPosFragment extends Fragment {
                     .addToBackStack("barcode_scanner")
                     .commit();
         } else {
-            // حل احتياطي استخدام android.R.id.content
             getParentFragmentManager()
                     .beginTransaction()
                     .replace(android.R.id.content, scannerFragment)
@@ -297,36 +272,26 @@ public class MiraPosFragment extends Fragment {
         }
     }
 
-
     // ===================== 📡 RFID Direct Mode =====================
 
-    /**
-     * 📡 تفعيل/تعطيل استقبال RFID المباشر
-     */
     private void toggleRFIDMode() {
         isRFIDModeActive = !isRFIDModeActive;
 
         if (isRFIDModeActive) {
-            // تفعيل وضع RFID
             btnPosRFIDMode.setText("📡 RFID نشط");
             btnPosRFIDMode.setTextColor(Color.parseColor("#FFFFFF"));
             btnPosRFIDMode.setBackgroundResource(R.drawable.bg_rfid_btn_active);
             tvCartStatus.setText("📡 جاهز لاستقبال مسح RFID المباشر...");
             tvCartStatus.setTextColor(Color.parseColor("#4ADE80"));
-
-            // تسجيل كمستقبل نشط
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
             }
         } else {
-            // تعطيل وضع RFID
             btnPosRFIDMode.setText("📡 مسح RFID");
             btnPosRFIDMode.setTextColor(Color.parseColor("#FFFFFF"));
             btnPosRFIDMode.setBackgroundResource(R.drawable.bg_rfid_btn);
             tvCartStatus.setText("جاهز لمسح القطع والخواتم...");
             tvCartStatus.setTextColor(Color.parseColor("#94A3B8"));
-
-            // إلغاء التسجيل
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
             }
@@ -335,9 +300,6 @@ public class MiraPosFragment extends Fragment {
 
     // ===================== Tag Processing =====================
 
-    /**
-     * 📥 نقطة الدعم الرئيسية: يتم استدعاؤها فور مسح Ring EPC بواسطة قارئ RFID
-     */
     public void onRingScanned(String epc) {
         if (scannedEpcs.contains(epc)) {
             playAlertSound(2);
@@ -347,9 +309,6 @@ public class MiraPosFragment extends Fragment {
         processRingEpc(epc, "rfid");
     }
 
-    /**
-     * 📱 استدعاء من مسح GS1 DATAMATRIX
-     */
     public void onBarcodeScanned(String barcodeData) {
         if (scannedEpcs.contains(barcodeData)) {
             playAlertSound(2);
@@ -359,101 +318,101 @@ public class MiraPosFragment extends Fragment {
         processRingEpc(barcodeData, "barcode");
     }
 
-    /**
- * 🔍 جلب بيانات القطعة - نسخة مبسطة باستخدام MiraApiClient
- */
-private void processRingEpc(final String code, final String source) {
-    playAlertSound(1);
+    private void processRingEpc(final String code, final String source) {
+        playAlertSound(1);
 
-    new Thread(() -> {
+        new Thread(() -> {
+            try {
+                MiraApiClient client = MiraApiClient.getInstance(getContext());
+
+                JSONObject extraParams = new JSONObject();
+                extraParams.put("source", source);
+                if (liveScaleWeight > 0) {
+                    extraParams.put("scale_weight", liveScaleWeight);
+                }
+
+                MiraApiClient.ApiResponse response = client.authorize(code, "pos_sale", extraParams);
+
+                if (response.isSuccess && response.data != null) {
+                    parseItemResponse(code, response.data);
+                } else {
+                    throw new Exception(response.error != null ? response.error : "Unknown error");
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error fetching item: " + e.getMessage());
+                handleItemError(code);
+            }
+        }).start();
+    }
+
+    private void parseItemResponse(String code, JSONObject data) {
         try {
-            // ⚡ استخدام العميل المركزي
-            MiraApiClient client = MiraApiClient.getInstance(getContext());
+            JSONObject item = data.optJSONObject("item");
+            JSONObject decision = data.optJSONObject("decision");
+            JSONObject barcode = item != null ? item.optJSONObject("barcode") : null;
 
-            // تجهيز المعاملات الإضافية
-            JSONObject extraParams = new JSONObject();
-            extraParams.put("source", source);
-            if (liveScaleWeight > 0) {
-                extraParams.put("scale_weight", liveScaleWeight);
-            }
+            String vaultStatus = item != null ? item.optString("status", "").toLowerCase() : "";
+            boolean isAvailable;
 
-            // استدعاء API
-            MiraApiClient.ApiResponse response = client.authorize(code, "pos_sale", extraParams);
-
-            if (response.isSuccess && response.data != null) {
-                parseItemResponse(code, response.data);
+            if (vaultStatus.equals("sold")) {
+                isAvailable = false;
+            } else if (vaultStatus.equals("in_stock") || vaultStatus.equals("available") || vaultStatus.isEmpty()) {
+                isAvailable = true;
             } else {
-                throw new Exception(response.error != null ? response.error : "Unknown error");
+                isAvailable = decision != null && decision.optBoolean("allowed", false);
             }
 
+            String title = item != null ? item.optString("title", "خاتم ذهب") :
+                    "Item " + code.substring(Math.max(0, code.length() - 6));
+            String karat = item != null ? item.optString("karat", "21K") : "21K";
+            double weight = item != null ? item.optDouble("weight", 5.0) : 5.0;
+            double price = item != null ? item.optDouble("price", 350.0) : 350.0;
+            String serialNo = item != null ? item.optString("serial", code) : code;
+            String gtin = (barcode != null) ? barcode.optString("gtin13", "") : "";
+            String location = item != null ? item.optString("location", "") : "";
+            int itemId = item != null ? item.optInt("id", 0) : 0;
+
+            CartItem cartItem = new CartItem(code, title, karat, weight,
+                    liveScaleWeight, price, isAvailable, vaultStatus.toUpperCase());
+            cartItem.serialNo = serialNo;
+            cartItem.gtin = gtin;
+            cartItem.location = location;
+            cartItem.itemId = itemId;
+
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    if (!isAvailable) {
+                        showToast("❌ لا يمكن إضافة هذه القطعة: " + vaultStatus.toUpperCase());
+                        return;
+                    }
+                    scannedEpcs.add(code);
+                    cartList.add(0, cartItem);
+                    cartAdapter.notifyItemInserted(0);
+                    rvCartItems.scrollToPosition(0);
+                    updateCartSummary();
+                });
+            }
         } catch (Exception e) {
-            Log.e(TAG, "Error fetching item: " + e.getMessage());
+            Log.e(TAG, "Parse error: " + e.getMessage());
             handleItemError(code);
         }
-    }).start();
-}
+    }
 
-/**
- * تحليل استجابة القطعة
- */
-private void parseItemResponse(String code, JSONObject data) {
-    try {
-        JSONObject item = data.optJSONObject("item");
-        JSONObject decision = data.optJSONObject("decision");
-        JSONObject barcode = item != null ? item.optJSONObject("barcode") : null;
-
-        boolean isAvailable = decision != null && decision.optBoolean("allowed", true);
-        String title = item != null ? item.optString("title", "خاتم ذهب") :
-                "Item " + code.substring(Math.max(0, code.length() - 6));
-        String karat = item != null ? item.optString("karat", "21K") : "21K";
-        double weight = item != null ? item.optDouble("weight", 5.0) : 5.0;
-        double price = item != null ? item.optDouble("price", 350.0) : 350.0;
-        String status = item != null ? item.optString("status", "AVAILABLE") : "AVAILABLE";
-        String serialNo = item != null ? item.optString("serial", code) : code;
-        String gtin = (barcode != null) ? barcode.optString("gtin13", "") : "";
-        String location = item != null ? item.optString("location", "") : "";
-        int itemId = item != null ? item.optInt("id", 0) : 0;
-
-        CartItem cartItem = new CartItem(code, title, karat, weight,
-                liveScaleWeight, price, isAvailable, status);
-        cartItem.serialNo = serialNo;
-        cartItem.gtin = gtin;
-        cartItem.location = location;
-        cartItem.itemId = itemId;
-
+    private void handleItemError(String code) {
         if (getActivity() != null) {
             getActivity().runOnUiThread(() -> {
+                CartItem fallbackItem = new CartItem(code,
+                        "قطعة (غير متصلة)", "21K", 5.2,
+                        liveScaleWeight, 420.0, true, "OFFLINE");
+                fallbackItem.serialNo = code;
                 scannedEpcs.add(code);
-                cartList.add(0, cartItem);
+                cartList.add(0, fallbackItem);
                 cartAdapter.notifyItemInserted(0);
-                rvCartItems.scrollToPosition(0);
                 updateCartSummary();
             });
         }
-    } catch (Exception e) {
-        Log.e(TAG, "Parse error: " + e.getMessage());
-        handleItemError(code);
     }
-}
-
-/**
- * معالجة خطأ جلب القطعة
- */
-private void handleItemError(String code) {
-    if (getActivity() != null) {
-        getActivity().runOnUiThread(() -> {
-            CartItem fallbackItem = new CartItem(code,
-                    "قطعة (غير متصلة)", "21K", 5.2,
-                    liveScaleWeight, 420.0, true, "OFFLINE");
-            fallbackItem.serialNo = code;
-            scannedEpcs.add(code);
-            cartList.add(0, fallbackItem);
-            cartAdapter.notifyItemInserted(0);
-            updateCartSummary();
-        });
-    }
-}
-    
 
     // ===================== Cart Management =====================
 
@@ -523,119 +482,114 @@ private void handleItemError(String code) {
 
     // ===================== Checkout Process =====================
 
-                private void processCheckoutAndStockUpdate() {
-    // التأكد من أن السلة ليست فارغة وأن الـ Fragment متصل بالنشاط
-    if (cartList == null || cartList.isEmpty()) {
-        Toast.makeText(getContext(), "السلة فارغة!", Toast.LENGTH_SHORT).show();
-        return;
-    }
-
-    if (!isAdded() || getActivity() == null) return;
-
-    // إخفاء لوحة المفاتيح
-    UIHelper.hideKeyboard(getActivity());
-
-    try {
-        double totalAmount = getCartTotal();
-
-        // إنشاء كائن الدايلوج
-        POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(totalAmount, cartList.size());
-        
-        // ربط الـ Listener
-        dialog.setCheckoutListener(checkoutData -> executeCheckout(checkoutData));
-
-        // ⚡ استخدام FragmentManager الخاص بالنشاط الرئيسي بأمان
-        FragmentManager fm = getActivity().getSupportFragmentManager();
-        
-        // منع الانهيار في حال كان النظام في حالة SaveInstanceState
-        if (!fm.isStateSaved()) {
-            dialog.show(fm, "POSCheckoutDialog");
+    private void processCheckoutAndStockUpdate() {
+        if (cartList == null || cartList.isEmpty()) {
+            Toast.makeText(getContext(), "السلة فارغة!", Toast.LENGTH_SHORT).show();
+            return;
         }
-    } catch (Exception e) {
-        Log.e("POS_CHECKOUT_ERROR", "حدث خطأ أثناء فتح نافذة البيع: " + e.getMessage(), e);
-        Toast.makeText(getContext(), "خطأ في فتح النافذة: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        if (!isAdded() || getActivity() == null) return;
+
+        UIHelper.hideKeyboard(getActivity());
+
+        try {
+            double totalAmount = getCartTotal();
+            POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(totalAmount, cartList.size());
+            dialog.setCheckoutListener(checkoutData -> executeCheckout(checkoutData));
+
+            FragmentManager fm = getActivity().getSupportFragmentManager();
+            if (!fm.isStateSaved()) {
+                dialog.show(fm, "POSCheckoutDialog");
+            }
+        } catch (Exception e) {
+            Log.e("POS_CHECKOUT_ERROR", "حدث خطأ أثناء فتح نافذة البيع: " + e.getMessage(), e);
+            Toast.makeText(getContext(), "خطأ في فتح النافذة: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
-}
-
-
-
 
     private void executeCheckout(POSCheckoutDialog.POSCheckoutData checkoutData) {
-    btnCheckout.setEnabled(false);
-    btnCheckout.setAlpha(0.5f);
-    tvCartStatus.setText("جاري إتمام البيع وتحديث الهوية الرقمية...");
-    tvCartStatus.setTextColor(Color.parseColor("#F59E0B"));
+        btnCheckout.setEnabled(false);
+        btnCheckout.setAlpha(0.5f);
+        tvCartStatus.setText("جاري إتمام البيع وتحديث الهوية الرقمية...");
+        tvCartStatus.setTextColor(Color.parseColor("#F59E0B"));
 
-    new Thread(() -> {
-        try {
-            // ⚡ استخدام العميل المركزي
-            MiraApiClient client = MiraApiClient.getInstance(getContext());
+        new Thread(() -> {
+            try {
+                MiraApiClient client = MiraApiClient.getInstance(getContext());
 
-            JSONObject payload = new JSONObject();
-            payload.put("action", "COMPLETE_POS_SALE");
-            payload.put("gate_id", client.getGateId());
-            payload.put("timestamp", System.currentTimeMillis() / 1000);
+                JSONObject payload = new JSONObject();
+                payload.put("action", "COMPLETE_POS_SALE");
+                payload.put("gate_id", client.getGateId());
+                payload.put("timestamp", System.currentTimeMillis() / 1000);
 
-            // بيانات العميل
-            JSONObject customer = new JSONObject();
-            customer.put("name", checkoutData.customerName);
-            customer.put("phone", checkoutData.customerPhone);
-            customer.put("payment_method", checkoutData.paymentMethod);
-            payload.put("customer", customer);
+                JSONObject customer = new JSONObject();
+                customer.put("name", checkoutData.customerName);
+                customer.put("phone", checkoutData.customerPhone);
+                customer.put("payment_method", checkoutData.paymentMethod);
+                payload.put("customer", customer);
 
-            // القطع
-            JSONArray itemsArr = new JSONArray();
-            for (CartItem item : cartList) {
-                JSONObject obj = new JSONObject();
-                obj.put("epc", item.epc);
-                obj.put("serial_no", item.serialNo);
-                obj.put("title", item.name);
-                obj.put("karat", item.karat);
-                obj.put("weight", item.weight);
-                obj.put("sale_price", item.price);
-                obj.put("new_status", "SOLD");
-                itemsArr.put(obj);
-            }
-            payload.put("items", itemsArr);
+                JSONArray itemsArr = new JSONArray();
+                for (CartItem item : cartList) {
+                    JSONObject obj = new JSONObject();
+                    obj.put("epc", item.epc);
+                    obj.put("serial_no", item.serialNo);
+                    obj.put("title", item.name);
+                    obj.put("karat", item.karat);
+                    obj.put("weight", item.weight);
+                    obj.put("sale_price", item.price);
+                    obj.put("new_status", "SOLD");
+                    itemsArr.put(obj);
+                }
+                payload.put("items", itemsArr);
 
-            // الدفع
-            JSONObject payment = new JSONObject();
-            payment.put("subtotal", getCartTotal());
-            payment.put("discount_percent", checkoutData.discount);
-            payment.put("final_amount", checkoutData.finalAmount);
-            payload.put("payment", payment);
+                JSONObject payment = new JSONObject();
+                payment.put("subtotal", getCartTotal());
+                payment.put("discount_percent", checkoutData.discount);
+                payment.put("final_amount", checkoutData.finalAmount);
+                payload.put("payment", payment);
 
-            // ⚡ استدعاء API
-            MiraApiClient.ApiResponse response = client.checkout(payload);
+                MiraApiClient.ApiResponse response = client.checkout(payload);
 
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    if (response.isSuccess) {
-                        playAlertSound(1);
-                        Toast.makeText(getContext(), "✅ تم إتمام البيع بنجاح!", Toast.LENGTH_LONG).show();
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (response.isSuccess) {
+                            playAlertSound(1);
+                            // ⭐ عرض إيصال البيع
+                            showReceipt(response.data != null ? response.data.toString() : "{}");
+                            clearCart();
+                        } else {
+                            tvCartStatus.setText("❌ فشل إتمام البيع (" + response.code + ")");
+                            tvCartStatus.setTextColor(Color.parseColor("#EF4444"));
+                            btnCheckout.setEnabled(true);
+                            btnCheckout.setAlpha(1.0f);
+                        }
+                    });
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "Checkout exception: " + e.getMessage());
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        saveSaleLocally(checkoutData);
                         clearCart();
-                    } else {
-                        tvCartStatus.setText("❌ فشل إتمام البيع (" + response.code + ")");
-                        tvCartStatus.setTextColor(Color.parseColor("#EF4444"));
                         btnCheckout.setEnabled(true);
                         btnCheckout.setAlpha(1.0f);
-                    }
-                });
+                    });
+                }
             }
+        }).start();
+    }
 
-        } catch (Exception e) {
-            Log.e(TAG, "Checkout exception: " + e.getMessage());
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    saveSaleLocally(checkoutData);
-                    clearCart();
-                    btnCheckout.setEnabled(true);
-                    btnCheckout.setAlpha(1.0f);
-                });
-            }
+    // ⭐ عرض إيصال البيع
+    private void showReceipt(String responseJson) {
+        if (getParentFragmentManager() != null) {
+            MiraReceiptFragment receiptFragment = MiraReceiptFragment.newInstance(responseJson);
+            getParentFragmentManager()
+                    .beginTransaction()
+                    .replace(android.R.id.content, receiptFragment)
+                    .addToBackStack("mira_receipt")
+                    .commit();
         }
-    }).start();
-}
+    }
 
     private void saveSaleLocally(POSCheckoutDialog.POSCheckoutData checkoutData) {
         if (getContext() != null) {
@@ -649,9 +603,7 @@ private void handleItemError(String code) {
                 sale.put("timestamp", System.currentTimeMillis() / 1000);
                 sale.put("customer_name", checkoutData.customerName);
                 sale.put("customer_phone", checkoutData.customerPhone);
-                sale.put("customer_email", checkoutData.customerEmail);
                 sale.put("payment_method", checkoutData.paymentMethod);
-                sale.put("notes", checkoutData.notes);
                 sale.put("discount_percent", checkoutData.discount);
                 sale.put("subtotal", getCartTotal());
                 sale.put("final_amount", checkoutData.finalAmount);
@@ -672,7 +624,6 @@ private void handleItemError(String code) {
 
                 pending.put(sale);
                 prefs.edit().putString("pending", pending.toString()).apply();
-
                 Log.d(TAG, "Sale saved locally. Pending count: " + pending.length());
             } catch (Exception e) {
                 Log.e(TAG, "Local save error: " + e.getMessage());
@@ -715,8 +666,6 @@ private void handleItemError(String code) {
         }
     }
 
-    // ===================== Lifecycle Cleanup =====================
-
     @Override
     public void onDestroy() {
         super.onDestroy();
@@ -729,9 +678,7 @@ private void handleItemError(String code) {
 
     private static class CartAdapter extends RecyclerView.Adapter<CartAdapter.ViewHolder> {
 
-        interface OnRemoveListener {
-            void onRemove(int position);
-        }
+        interface OnRemoveListener { void onRemove(int position); }
 
         private final List<CartItem> items;
         private final OnRemoveListener removeListener;
@@ -741,12 +688,10 @@ private void handleItemError(String code) {
             this.removeListener = listener;
         }
 
-        @NonNull
-        @Override
+        @NonNull @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View v = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_pos_cart_row, parent, false);
-            return new ViewHolder(v);
+            return new ViewHolder(LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_pos_cart_row, parent, false));
         }
 
         @Override
@@ -759,11 +704,26 @@ private void handleItemError(String code) {
             holder.tvPrice.setText(String.format(Locale.US, "$%,.2f", item.price));
 
             if (item.isAvailable) {
-                holder.tvStatus.setText("متاحة للبيع");
+                holder.tvStatus.setText("✅ متاحة للبيع");
                 holder.tvStatus.setTextColor(Color.parseColor("#4ADE80"));
             } else {
-                holder.tvStatus.setText("غير متاحة (" + item.status + ")");
-                holder.tvStatus.setTextColor(Color.parseColor("#EF4444"));
+                String statusText;
+                int color;
+                switch (item.status.toUpperCase()) {
+                    case "SOLD":
+                        statusText = "❌ مباعة مسبقاً";
+                        color = Color.parseColor("#EF4444");
+                        break;
+                    case "RESERVED":
+                        statusText = "🔒 محجوزة";
+                        color = Color.parseColor("#F59E0B");
+                        break;
+                    default:
+                        statusText = "⚠️ " + item.status;
+                        color = Color.parseColor("#EF4444");
+                }
+                holder.tvStatus.setText(statusText);
+                holder.tvStatus.setTextColor(color);
             }
 
             holder.btnRemove.setOnClickListener(v -> {
@@ -774,9 +734,7 @@ private void handleItemError(String code) {
         }
 
         @Override
-        public int getItemCount() {
-            return items.size();
-        }
+        public int getItemCount() { return items.size(); }
 
         static class ViewHolder extends RecyclerView.ViewHolder {
             TextView tvTitle, tvEpc, tvKaratWeight, tvPrice, tvStatus;
@@ -793,4 +751,4 @@ private void handleItemError(String code) {
             }
         }
     }
-}
+                }
