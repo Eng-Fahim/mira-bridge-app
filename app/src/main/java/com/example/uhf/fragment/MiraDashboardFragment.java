@@ -13,15 +13,12 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
-// استيراد الـ R الصحيح الخاص بالمشروع
 import com.example.uhf.R;
+import com.example.uhf.api.MiraApiClient; // ⭐ العميل المركزي
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -43,18 +40,21 @@ public class MiraDashboardFragment extends Fragment {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Handler timeHandler = new Handler(Looper.getMainLooper());
 
-    private static final String BASE_URL = "https://ams.ibreg.org/wp-json/mira-gate/v1/dashboard/summary";
-    private static final String API_KEY = "mira_gate_test071234567890abcdefghijklmnop"; 
+    // ⭐ العميل المركزي
+    private MiraApiClient apiClient;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
 
+        // ⭐ تهيئة العميل
+        apiClient = MiraApiClient.getInstance(requireContext());
+
         initViews(v);
         setupNavigationListeners();
         startTimeClock();
-        fetchDashboardDataFromApi();
+        fetchDashboardData(); // ⭐ استخدام الدالة الجديدة
 
         return v;
     }
@@ -85,22 +85,11 @@ public class MiraDashboardFragment extends Fragment {
         cardSettings = v.findViewById(R.id.cardSettings);
     }
 
-    /**
-     * إعداد التنقل المباشر
-     */
     private void setupNavigationListeners() {
-        if (cardScan != null) {
-            cardScan.setOnClickListener(v -> showToast("فتح شاشة الفحص"));
-        }
-        if (cardGate != null) {
-            cardGate.setOnClickListener(v -> showToast("فتح شاشة البوابة"));
-        }
-        if (cardRadar != null) {
-            cardRadar.setOnClickListener(v -> showToast("فتح شاشة الرادار"));
-        }
-        if (cardSettings != null) {
-            cardSettings.setOnClickListener(v -> showToast("فتح شاشة الإعدادات"));
-        }
+        if (cardScan != null) cardScan.setOnClickListener(v -> showToast("فتح شاشة الفحص"));
+        if (cardGate != null) cardGate.setOnClickListener(v -> showToast("فتح شاشة البوابة"));
+        if (cardRadar != null) cardRadar.setOnClickListener(v -> showToast("فتح شاشة الرادار"));
+        if (cardSettings != null) cardSettings.setOnClickListener(v -> showToast("فتح شاشة الإعدادات"));
     }
 
     private void showToast(String message) {
@@ -109,9 +98,6 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    /**
-     * تحديث الساعة والتاريخ حيّاً
-     */
     private void startTimeClock() {
         timeHandler.post(new Runnable() {
             @Override
@@ -128,66 +114,149 @@ public class MiraDashboardFragment extends Fragment {
         });
     }
 
+    // ===================== ⭐ API Calls via MiraApiClient =====================
+
     /**
-     * جلب البيانات من REST API
+     * 📊 جلب بيانات لوحة القيادة من API
      */
-    private void fetchDashboardDataFromApi() {
-    executor.execute(() -> {
-        try {
-            // 🟢 استخدم الرابط الكامل مباشرة
-            URL url = new URL("https://ams.ibreg.org/wp-json/mira-gate/v1/dashboard/summary");
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
-            conn.setRequestProperty("Accept", "application/json");
-            conn.setConnectTimeout(5000);
+    private void fetchDashboardData() {
+        executor.execute(() -> {
+            try {
+                // ⭐ استخدام العميل المركزي - استدعاء واحد فقط
+                MiraApiClient.ApiResponse response = apiClient.getDashboardSummary();
 
-            int responseCode = conn.getResponseCode();
-            if (responseCode == 200) {
-                BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = in.readLine()) != null) {
-                    response.append(line);
+                if (response.isSuccess && response.data != null) {
+                    JSONObject summary = response.data.optJSONObject("summary");
+                    
+                    if (summary != null) {
+                        int totalItems = summary.optInt("total_items", 0);
+                        int soldToday = summary.optInt("sold_today", 0);
+                        int activeGates = summary.optInt("active_gates", 0);
+                        JSONArray recentLogs = summary.optJSONArray("recent_logs");
+
+                        mainHandler.post(() -> {
+                            // تحديث الإحصائيات
+                            if (tvTotalItems != null) tvTotalItems.setText(formatNumber(totalItems));
+                            if (tvSoldToday != null) tvSoldToday.setText(String.valueOf(soldToday));
+                            if (tvActiveGates != null) tvActiveGates.setText(String.valueOf(activeGates));
+
+                            // تحديث المؤشرات
+                            if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFF16A34A);
+                            if (indicatorDb != null) indicatorDb.setBackgroundColor(0xFF16A34A);
+                            if (indicatorGate != null) {
+                                indicatorGate.setBackgroundColor(activeGates > 0 ? 0xFF16A34A : 0xFFF59E0B);
+                            }
+
+                            // تحديث الأنشطة الأخيرة
+                            updateRecentLogs(recentLogs);
+
+                            // تحديث وقت المزامنة
+                            if (tvLastSync != null) {
+                                tvLastSync.setText("🟢 متصل | تم التحديث: " +
+                                    new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date()));
+                            }
+                            if (tvSystemStatus != null) {
+                                tvSystemStatus.setText("✅ جميع الأنظمة تعمل");
+                            }
+                        });
+                    }
+                } else {
+                    // فشل الاستجابة
+                    mainHandler.post(() -> handleApiError(response.code, response.error));
                 }
-                in.close();
 
-                JSONObject jsonResponse = new JSONObject(response.toString());
-                if (jsonResponse.optBoolean("success")) {
-                    JSONObject summary = jsonResponse.getJSONObject("summary");
-                    int totalItems = summary.optInt("total_items", 0);
-                    int soldToday = summary.optInt("sold_today", 0);
-                    int activeGates = summary.optInt("active_gates", 0);
-
-                    mainHandler.post(() -> {
-                        if (tvTotalItems != null) tvTotalItems.setText(String.valueOf(totalItems));
-                        if (tvSoldToday != null) tvSoldToday.setText(String.valueOf(soldToday));
-                        if (tvActiveGates != null) tvActiveGates.setText(String.valueOf(activeGates));
-                        if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFF16A34A);
-                        if (indicatorDb != null) indicatorDb.setBackgroundColor(0xFF16A34A);
-                        if (tvLastSync != null) tvLastSync.setText("تم التحديث: " + 
-                            new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date()));
-                    });
-                }
-            } else {
-                mainHandler.post(() -> {
-                    if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFFDC2626);
-                    if (tvLastSync != null) tvLastSync.setText("خطأ: " + responseCode);
-                });
+            } catch (Exception e) {
+                mainHandler.post(() -> handleApiError(-1, e.getMessage()));
             }
-        } catch (Exception e) {
-            mainHandler.post(() -> {
-                if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFFDC2626);
-                if (tvLastSync != null) tvLastSync.setText("غير متصل: " + e.getMessage());
-            });
+        });
+    }
+
+    /**
+     * تحديث قائمة الأنشطة الأخيرة
+     */
+    private void updateRecentLogs(JSONArray recentLogs) {
+        if (recentLogs == null || recentLogs.length() == 0) {
+            if (tvRecent1 != null) tvRecent1.setText("— لا توجد أنشطة حديثة —");
+            if (tvRecent2 != null) tvRecent2.setText("");
+            if (tvRecent3 != null) tvRecent3.setText("");
+            return;
         }
-    });
+
+        TextView[] recentViews = {tvRecent1, tvRecent2, tvRecent3};
+        for (int i = 0; i < Math.min(recentLogs.length(), 3); i++) {
+            JSONObject log = recentLogs.optJSONObject(i);
+            if (log != null && recentViews[i] != null) {
+                String epc = log.optString("epc", "—");
+                String action = log.optString("action_taken", "—");
+                String time = log.optString("created_at", "");
+                
+                // تنسيق الوقت
+                String displayTime = "";
+                if (!time.isEmpty()) {
+                    try {
+                        displayTime = time.substring(11, 16); // HH:mm
+                    } catch (Exception e) {
+                        displayTime = time;
+                    }
+                }
+
+                String icon = getActionIcon(action);
+                recentViews[i].setText(String.format("%s %s | %s | %s", icon, displayTime, action, epc));
+            }
+        }
+    }
+
+    /**
+     * أيقونة حسب نوع النشاط
+     */
+    private String getActionIcon(String action) {
+        if (action == null) return "📋";
+        switch (action.toUpperCase()) {
+            case "AUTHORIZED": return "✅";
+            case "DENIED": return "🚨";
+            case "INVENTORY_SCAN": return "📊";
+            case "POS_SOLD": return "💰";
+            case "SPOTLIGHT": return "💡";
+            case "PROGRAMMED": return "🔧";
+            case "LOCKED": return "🔒";
+            case "DEACTIVATED": return "⚡";
+            default: return "📋";
+        }
+    }
+
+    /**
+     * معالجة أخطاء API
+     */
+    private void handleApiError(int code, String error) {
+        if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFFDC2626);
+        if (indicatorDb != null) indicatorDb.setBackgroundColor(0xFFF59E0B);
+        if (indicatorGate != null) indicatorGate.setBackgroundColor(0xFF94A3B8);
+        
+        if (tvSystemStatus != null) {
+            tvSystemStatus.setText("⚠️ خطأ في الاتصال");
+        }
+        if (tvLastSync != null) {
+            String errorMsg = error != null && !error.isEmpty() ? error : "Code: " + code;
+            if (errorMsg.length() > 30) errorMsg = errorMsg.substring(0, 30) + "...";
+            tvLastSync.setText("🔴 غير متصل: " + errorMsg);
+        }
+    }
+
+    /**
+     * تنسيق الأرقام الكبيرة
+     */
+    private String formatNumber(int number) {
+        if (number >= 1000) {
+            return String.format(Locale.US, "%d,%03d", number / 1000, number % 1000);
+        }
+        return String.valueOf(number);
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
         timeHandler.removeCallbacksAndMessages(null);
+        mainHandler.removeCallbacksAndMessages(null);
         executor.shutdown();
     }
 }
