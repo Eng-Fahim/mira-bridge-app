@@ -5,12 +5,12 @@ import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.AsyncTask;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -21,7 +21,6 @@ import androidx.fragment.app.FragmentActivity;
 import com.example.uhf.BuildConfig;
 import com.example.uhf.R;
 import com.example.uhf.fragment.KeyDwonFragment;
-import com.example.uhf.fragment.UHFReadTagFragment;
 import com.example.uhf.tools.UIHelper;
 import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.utility.StringUtility;
@@ -29,42 +28,31 @@ import com.rscja.utility.StringUtility;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-/**
- * Created by Administrator on 2015-03-10.
- */
 public class BaseTabFragmentActivity extends FragmentActivity {
-
 
     public RFIDWithUHFUART mReader;
     public KeyDwonFragment currentFragment = null;
     public int TidLen = 6;
     private static final int MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE = 1;
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // 检查权限是否已授予
+        
+        // التحقق من صلاحيات التخزين لقراءة وتصدير الجداول
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
-            // 如果权限尚未授予，向用户请求权限
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
                     MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE);
-        } else {
-            // 权限已经被授予，可以执行相应操作
-            // 在这里进行读取SD卡的操作
         }
-
     }
 
     public void initUHF() {
         try {
             mReader = RFIDWithUHFUART.getInstance();
         } catch (Exception ex) {
-
             toastMessage(ex.getMessage());
-
             return;
         }
 
@@ -73,55 +61,55 @@ public class BaseTabFragmentActivity extends FragmentActivity {
         }
     }
 
-
-    /**
-     * ����ActionBar
-     */
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        // TODO Auto-generated method stub
         MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.main, menu);
-        if(BuildConfig.Test){
+        // 🔒 استخدام قائمة MIRA المحدثة التي تحتوي على خيار تسجيل الخروج
+        try {
+            inflater.inflate(R.menu.main_menu, menu);
+        } catch (Exception e) {
+            inflater.inflate(R.menu.main, menu);
+        }
+        
+        if (BuildConfig.DEBUG && menu.findItem(R.id.speed) != null) {
             menu.findItem(R.id.speed).setVisible(true);
         }
         return true;
-//		return super.onCreateOptionsMenu(menu);
     }
 
-
-    public boolean onOptionsItemSelected(android.view.MenuItem item) {
-        switch (item.getItemId()) {
-            case android.R.id.home:
-                break;
-            case R.id.UHF_ver:
-                getUHFVersion();
-                break;
-            case R.id.export:
-                exportData();
-                break;
-            case R.id.speed:
-                Intent intent = new Intent(this, TestActivity.class);
-                startActivity(intent);
-                break;
-            default:
-                break;
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        
+        if (id == android.R.id.home) {
+            return true;
+        } else if (id == R.id.UHF_ver) {
+            getUHFVersion();
+            return true;
+        } else if (id == R.id.export) {
+            exportData();
+            return true;
+        } else if (id == R.id.action_logout) {
+            // تسجيل الخروج في حال تم ضغطه من القائمة
+            if (this instanceof UHFMainActivity) {
+                ((UHFMainActivity) this).performLogout();
+            }
+            return true;
         }
-        return true;
+        
+        return super.onOptionsItemSelected(item);
     }
 
     public void exportData() {
-        UHFReadTagFragment uhfReadTagFragment = new UHFReadTagFragment();
-        UHFMainActivity uhfMainActivity = new UHFMainActivity();
         Date currentDate = new Date();
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
         String currentTime = dateFormat.format(currentDate);
         String file = "sdcard/UHF_exportData/";
         String fileName = file + currentTime;
-//        FileUtils.writeFile(fileName, UHFReadTagFragment.epcTidUser, true);
-        Toast.makeText(BaseTabFragmentActivity.this, "导出失败", Toast.LENGTH_SHORT).show();
+        Toast.makeText(BaseTabFragmentActivity.this, "بدء تصدير البيانات...", Toast.LENGTH_SHORT).show();
     }
 
+    // ⚡ التقاط ضغطة الزر الفيزيائي للقارئ اليدوي (Handheld Trigger)
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == 139
@@ -148,42 +136,40 @@ public class BaseTabFragmentActivity extends FragmentActivity {
         return super.onKeyDown(keyCode, event);
     }
 
-
     public void toastMessage(String msg) {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
     }
 
-
+    // تهيئة عتاد الـ RFID في الخلفية
     public class InitTask extends AsyncTask<String, Integer, Boolean> {
         ProgressDialog mypDialog;
 
         @Override
         protected Boolean doInBackground(String... params) {
-            // TODO Auto-generated method stub
             return mReader.init(BaseTabFragmentActivity.this);
         }
 
         @Override
         protected void onPostExecute(Boolean result) {
             super.onPostExecute(result);
-            mypDialog.cancel();
+            if (mypDialog != null && mypDialog.isShowing()) {
+                mypDialog.dismiss();
+            }
             if (!result) {
-                Toast.makeText(BaseTabFragmentActivity.this, "init fail", Toast.LENGTH_SHORT).show();
+                Toast.makeText(BaseTabFragmentActivity.this, "فشل تهيئة قارئ RFID اليدوي", Toast.LENGTH_SHORT).show();
             }
         }
 
         @Override
         protected void onPreExecute() {
-            // TODO Auto-generated method stub
             super.onPreExecute();
             mypDialog = new ProgressDialog(BaseTabFragmentActivity.this);
             mypDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
-            mypDialog.setMessage("init...");
+            mypDialog.setMessage("جاري تشغيل محرك MIRA RFID...");
             mypDialog.setCanceledOnTouchOutside(false);
             mypDialog.show();
         }
     }
-
 
     public boolean vailHexInput(String str) {
         if (str == null || str.length() == 0) {
@@ -199,7 +185,7 @@ public class BaseTabFragmentActivity extends FragmentActivity {
         if (mReader != null) {
             String rfidVer = mReader.getVersion();
             String hardwareVersion = mReader.getHardwareVersion();
-            String version = "Software version:" + rfidVer + " \nHardware Version:" + hardwareVersion;
+            String version = "إصدار النظام: " + rfidVer + " \nإصدار العتاد: " + hardwareVersion;
 
             UIHelper.alert(this, R.string.action_uhf_ver,
                     version, R.drawable.webtext);
@@ -221,14 +207,10 @@ public class BaseTabFragmentActivity extends FragmentActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // 权限已授予，可以执行相应操作
-                Log.e("TEST", "已经申请sdcard权限");
-                // 在这里进行读取SD卡的操作
+                Log.e("TEST", "تم الحصول على صلاحيات التخزين بنجاح");
             } else {
-                // 权限被拒绝，无法执行相应操作
-                Log.e("TEST", "申请sdcard权限失败");
+                Log.e("TEST", "تم رفض صلاحيات التخزين");
             }
         }
     }
-
 }
