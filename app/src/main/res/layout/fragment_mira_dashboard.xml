@@ -3,8 +3,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F1F5F9"
-    android:fillViewport="true">
+    android:background="#090D16"
+    android:fillViewport="true"
+    android:layoutDirection="rtl">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -12,63 +13,128 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- 1. شريط التحية والوقت -->
-        <androidx.cardview.widget.CardView
+        <!-- 0. Header Brand Bar -->
+        <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="#1E293B"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="2dp">
+            android:layout_marginBottom="16dp">
 
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
+                android:layout_alignParentStart="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
                 <TextView
-                    android:id="@+id/tvGreeting"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="مساء الخير 🌤️"
-                    android:textColor="#FFFFFF"
+                    android:text="🏷️ MIRA"
+                    android:textColor="#38BDF8"
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:orientation="horizontal">
+                    android:layout_marginStart="4dp"
+                    android:text="BRIDGE™"
+                    android:textColor="#F8FAFC"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:background="#132338"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:text="ONLINE 🟢"
+                android:textColor="#22C55E"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </RelativeLayout>
+
+        <!-- 1. شريط التحية والوقت (Hero Card) -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="#1E293B"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="8dp">
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:orientation="vertical">
 
                     <TextView
-                        android:id="@+id/tvDate"
-                        android:layout_width="0dp"
+                        android:id="@+id/tvGreeting"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="التاريخ"
+                        android:text="أهلاً بك، المهندس 🌤️"
+                        android:textColor="#FFFFFF"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="📍 المعرض الرئيسي - صنعاء"
                         android:textColor="#94A3B8"
-                        android:textSize="12sp" />
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:gravity="end"
+                    android:orientation="vertical">
 
                     <TextView
                         android:id="@+id/tvTime"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:background="#0F172A"
+                        android:paddingHorizontal="10dp"
+                        android:paddingVertical="4dp"
                         android:text="00:00:00"
                         android:textColor="#38BDF8"
-                        android:textSize="12sp"
+                        android:textSize="14sp"
                         android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvDate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="الأحد، 2 أغسطس"
+                        android:textColor="#64748B"
+                        android:textSize="11sp" />
                 </LinearLayout>
-            </LinearLayout>
+
+            </RelativeLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- 2. بطاقات الإحصائيات (Metrics) -->
+        <!-- 2. بطاقات الإحصائيات (Metrics Dashboard Grid) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:orientation="horizontal">
+            android:layout_marginBottom="16dp"
+            android:orientation="horizontal"
+            android:weightSum="3">
 
             <!-- Total Items -->
             <androidx.cardview.widget.CardView
@@ -76,31 +142,32 @@
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="#FFFFFF"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
+                app:cardBackgroundColor="#1E293B"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="4dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
                     android:orientation="vertical"
                     android:padding="12dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="إجمالي القطع"
-                        android:textColor="#64748B"
+                        android:text="إجمالي المخزون"
+                        android:textColor="#94A3B8"
                         android:textSize="11sp" />
 
                     <TextView
                         android:id="@+id/tvTotalItems"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
+                        android:layout_marginTop="6dp"
                         android:text="0"
-                        android:textColor="#0F172A"
-                        android:textSize="18sp"
+                        android:textColor="#F8FAFC"
+                        android:textSize="20sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
@@ -111,13 +178,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="2dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="#FFFFFF"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
+                app:cardBackgroundColor="#1E293B"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="4dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
                     android:orientation="vertical"
                     android:padding="12dp">
 
@@ -125,17 +193,17 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="المباع اليوم"
-                        android:textColor="#64748B"
+                        android:textColor="#94A3B8"
                         android:textSize="11sp" />
 
                     <TextView
                         android:id="@+id/tvSoldToday"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
+                        android:layout_marginTop="6dp"
                         android:text="0"
-                        android:textColor="#16A34A"
-                        android:textSize="18sp"
+                        android:textColor="#22C55E"
+                        android:textSize="20sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
@@ -146,13 +214,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="#FFFFFF"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
+                app:cardBackgroundColor="#1E293B"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="4dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
                     android:orientation="vertical"
                     android:padding="12dp">
 
@@ -160,50 +229,48 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="البوابات النشطة"
-                        android:textColor="#64748B"
+                        android:textColor="#94A3B8"
                         android:textSize="11sp" />
 
                     <TextView
                         android:id="@+id/tvActiveGates"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
+                        android:layout_marginTop="6dp"
                         android:text="0"
-                        android:textColor="#2563EB"
-                        android:textSize="18sp"
+                        android:textColor="#38BDF8"
+                        android:textSize="20sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
         </LinearLayout>
 
-        <!-- 3. مؤشرات حالة النظام والمزامنة -->
+        <!-- 3. مؤشرات حالة النظام والمزامنة الحية -->
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="#FFFFFF"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            android:layout_marginBottom="18dp"
+            app:cardBackgroundColor="#1E293B"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="4dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="12dp">
+                android:padding="14dp">
 
-                <LinearLayout
+                <RelativeLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:layout_height="wrap_content">
 
                     <TextView
                         android:id="@+id/tvSystemStatus"
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="حالة النظام"
-                        android:textColor="#0F172A"
+                        android:layout_alignParentStart="true"
+                        android:text="⚡ حالة الربط والسيرفرات"
+                        android:textColor="#F1F5F9"
                         android:textSize="13sp"
                         android:textStyle="bold" />
 
@@ -211,44 +278,48 @@
                         android:id="@+id/tvLastSync"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="آخر مزامنة"
-                        android:textColor="#64748B"
+                        android:layout_alignParentEnd="true"
+                        android:text="آخر مزامنة: الآن"
+                        android:textColor="#94A3B8"
                         android:textSize="11sp" />
-                </LinearLayout>
+                </RelativeLayout>
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginVertical="8dp"
-                    android:background="#E2E8F0" />
+                    android:layout_marginVertical="10dp"
+                    android:background="#334155" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:weightSum="3">
 
                     <!-- API -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
+                        android:background="#0F172A"
                         android:gravity="center"
-                        android:orientation="horizontal">
+                        android:paddingVertical="6dp"
+                        android:layout_marginEnd="3dp">
 
                         <View
                             android:id="@+id/indicatorApi"
                             android:layout_width="8dp"
                             android:layout_height="8dp"
                             android:layout_marginEnd="6dp"
-                            android:background="#16A34A" />
+                            android:background="#22C55E" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="API Serv"
-                            android:textColor="#334155"
-                            android:textSize="11sp" />
+                            android:text="API Cloud"
+                            android:textColor="#CBD5E1"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
                     </LinearLayout>
 
                     <!-- Database -->
@@ -256,77 +327,83 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
+                        android:background="#0F172A"
                         android:gravity="center"
-                        android:orientation="horizontal">
+                        android:paddingVertical="6dp"
+                        android:layout_marginHorizontal="3dp">
 
                         <View
                             android:id="@+id/indicatorDb"
                             android:layout_width="8dp"
                             android:layout_height="8dp"
                             android:layout_marginEnd="6dp"
-                            android:background="#16A34A" />
+                            android:background="#22C55E" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Database"
-                            android:textColor="#334155"
-                            android:textSize="11sp" />
+                            android:textColor="#CBD5E1"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
                     </LinearLayout>
 
-                    <!-- Gate -->
+                    <!-- Gates Hub -->
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
+                        android:background="#0F172A"
                         android:gravity="center"
-                        android:orientation="horizontal">
+                        android:paddingVertical="6dp"
+                        android:layout_marginStart="3dp">
 
                         <View
                             android:id="@+id/indicatorGate"
                             android:layout_width="8dp"
                             android:layout_height="8dp"
                             android:layout_marginEnd="6dp"
-                            android:background="#16A34A" />
+                            android:background="#22C55E" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Gates Hub"
-                            android:textColor="#334155"
-                            android:textSize="11sp" />
+                            android:textColor="#CBD5E1"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- 4. اختصارات الوصول السريع (Cards/Buttons) -->
+        <!-- 4. اختصارات الوصول السريع (Quick Actions Matrix) -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="🚀 الوصول السريع"
-            android:textColor="#0F172A"
+            android:layout_marginBottom="10dp"
+            android:text="🚀 العمليات الميدانية"
+            android:textColor="#F1F5F9"
             android:textSize="13sp"
             android:textStyle="bold" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="6dp"
+            android:layout_marginBottom="8dp"
             android:orientation="horizontal">
 
             <androidx.cardview.widget.CardView
                 android:id="@+id/cardScan"
                 android:layout_width="0dp"
-                android:layout_height="70dp"
+                android:layout_height="76dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:clickable="true"
                 android:focusable="true"
-                app:cardBackgroundColor="#FFFFFF"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
+                app:cardBackgroundColor="#1E293B"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="4dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -338,15 +415,15 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="🔍"
-                        android:textSize="18sp" />
+                        android:textSize="20sp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
+                        android:layout_marginTop="4dp"
                         android:text="الجرد والمسح"
-                        android:textColor="#0F172A"
-                        android:textSize="11sp"
+                        android:textColor="#F8FAFC"
+                        android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
@@ -354,14 +431,14 @@
             <androidx.cardview.widget.CardView
                 android:id="@+id/cardGate"
                 android:layout_width="0dp"
-                android:layout_height="70dp"
+                android:layout_height="76dp"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:clickable="true"
                 android:focusable="true"
-                app:cardBackgroundColor="#FFFFFF"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
+                app:cardBackgroundColor="#1E293B"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="4dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -373,15 +450,15 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="🚪"
-                        android:textSize="18sp" />
+                        android:textSize="20sp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
+                        android:layout_marginTop="4dp"
                         android:text="رقابة البوابات"
-                        android:textColor="#0F172A"
-                        android:textSize="11sp"
+                        android:textColor="#F8FAFC"
+                        android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
@@ -390,20 +467,20 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
+            android:layout_marginBottom="18dp"
             android:orientation="horizontal">
 
             <androidx.cardview.widget.CardView
                 android:id="@+id/cardRadar"
                 android:layout_width="0dp"
-                android:layout_height="70dp"
+                android:layout_height="76dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 android:clickable="true"
                 android:focusable="true"
-                app:cardBackgroundColor="#FFFFFF"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
+                app:cardBackgroundColor="#1E293B"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="4dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -415,15 +492,15 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="📡"
-                        android:textSize="18sp" />
+                        android:textSize="20sp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
+                        android:layout_marginTop="4dp"
                         android:text="الرادار والبحث"
-                        android:textColor="#0F172A"
-                        android:textSize="11sp"
+                        android:textColor="#F8FAFC"
+                        android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
@@ -431,14 +508,14 @@
             <androidx.cardview.widget.CardView
                 android:id="@+id/cardSettings"
                 android:layout_width="0dp"
-                android:layout_height="70dp"
+                android:layout_height="76dp"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:clickable="true"
                 android:focusable="true"
-                app:cardBackgroundColor="#FFFFFF"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp">
+                app:cardBackgroundColor="#1E293B"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="4dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -450,78 +527,123 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="⚙️"
-                        android:textSize="18sp" />
+                        android:textSize="20sp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
+                        android:layout_marginTop="4dp"
                         android:text="الإعدادات"
-                        android:textColor="#0F172A"
-                        android:textSize="11sp"
+                        android:textColor="#F8FAFC"
+                        android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
         </LinearLayout>
 
-        <!-- 5. السجل والنشاط الأخير (Recent Activity) -->
+        <!-- 5. سجل النشاط والعمليات المباشرة (Live Stream Log) -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="📋 النشاط الأخير"
-            android:textColor="#0F172A"
+            android:layout_marginBottom="10dp"
+            android:text="📋 السجل المباشر للعمليات"
+            android:textColor="#F1F5F9"
             android:textSize="13sp"
             android:textStyle="bold" />
 
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="#FFFFFF"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
+            app:cardBackgroundColor="#1E293B"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="4dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="12dp">
+                android:padding="14dp">
 
-                <TextView
-                    android:id="@+id/tvRecent1"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="لا توجد أنشطة"
-                    android:textColor="#334155"
-                    android:textSize="12sp" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvRecent1"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="• تم تنفيذ مزامنة شاملة للمخزون"
+                        android:textColor="#E2E8F0"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="08:00 AM"
+                        android:textColor="#64748B"
+                        android:textSize="10sp" />
+                </LinearLayout>
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:layout_marginVertical="8dp"
-                    android:background="#F1F5F9" />
+                    android:background="#334155" />
 
-                <TextView
-                    android:id="@+id/tvRecent2"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="لا توجد أنشطة"
-                    android:textColor="#334155"
-                    android:textSize="12sp" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvRecent2"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="• بوابة المعرض الرئيسي: متصلة ونشطة"
+                        android:textColor="#E2E8F0"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="07:45 AM"
+                        android:textColor="#64748B"
+                        android:textSize="10sp" />
+                </LinearLayout>
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:layout_marginVertical="8dp"
-                    android:background="#F1F5F9" />
+                    android:background="#334155" />
 
-                <TextView
-                    android:id="@+id/tvRecent3"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="لا توجد أنشطة"
-                    android:textColor="#334155"
-                    android:textSize="12sp" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvRecent3"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="• النظام جاهز لبدء عمليات الجرد"
+                        android:textColor="#E2E8F0"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="07:30 AM"
+                        android:textColor="#64748B"
+                        android:textSize="10sp" />
+                </LinearLayout>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
