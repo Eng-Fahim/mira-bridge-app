@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0F172A"
+    android:background="?android:attr/colorBackground"
     android:layoutDirection="rtl"
     android:textDirection="rtl">
 
@@ -22,8 +22,8 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="#1E293B"
-                app:strokeColor="#D97706"
+                app:cardBackgroundColor="?attr/colorSurface"
+                app:strokeColor="?attr/colorSecondary"
                 app:strokeWidth="1dp"
                 app:cardCornerRadius="12dp"
                 android:layout_marginBottom="16dp">
@@ -46,7 +46,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="الخطوة 1 من 4: الربط والتصنيف"
-                            android:textColor="#F59E0B"
+                            android:textColor="?attr/colorSecondary"
                             android:textSize="13sp"
                             android:textStyle="bold" />
 
@@ -55,8 +55,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="WAITING"
-                            android:background="#334155"
-                            android:textColor="#FFFFFF"
+                            android:background="?attr/colorSurfaceVariant"
+                            android:textColor="?attr/colorOnSurfaceVariant"
                             android:paddingHorizontal="8dp"
                             android:paddingVertical="4dp"
                             android:textSize="10sp" />
@@ -67,19 +67,18 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        app:boxBackgroundColor="#0F172A"
-                        app:hintTextColor="#94A3B8"
+                        app:boxBackgroundColor="?android:attr/colorBackground"
+                        app:hintTextColor="?attr/colorOnSurfaceVariant"
                         app:endIconMode="custom"
                         app:endIconDrawable="@android:drawable/ic_menu_camera"
-                        app:endIconTint="#F59E0B">
+                        app:endIconTint="?attr/colorSecondary">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etEpc"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:hint="رمز الشريحة (EPC / GTIN)..."
-                            android:textColor="#F59E0B"
-                            android:fontFamily="monospace"
+                            android:textColor="?attr/colorSecondary"
                             android:textSize="14sp"
                             android:textDirection="ltr" />
                     </com.google.android.material.textfield.TextInputLayout>
@@ -98,7 +97,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="تصنيف القطعة"
-                    android:textColor="#E2E8F0"
+                    android:textColor="?attr/colorOnBackground"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="8dp"/>
@@ -143,13 +142,13 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:hint="عنوان ووصف القطعة"
-                    app:boxBackgroundColor="#1E293B">
+                    app:boxBackgroundColor="?attr/colorSurface">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etTitle"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textColor="#FFFFFF" />
+                        android:textColor="?attr/colorOnSurface" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <HorizontalScrollView
@@ -178,7 +177,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="مواصفات المعدن والوزن"
-                    android:textColor="#E2E8F0"
+                    android:textColor="?attr/colorOnBackground"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="8dp"/>
@@ -188,7 +187,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="معدن القطعة:"
-                    android:textColor="#94A3B8"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp" />
 
                 <com.google.android.material.chip.ChipGroup
@@ -225,7 +224,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="العيار:"
-                    android:textColor="#94A3B8"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp"
                     android:layout_marginTop="8dp"/>
 
@@ -270,7 +269,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    app:cardBackgroundColor="#1E293B">
+                    app:cardBackgroundColor="?attr/colorSurface">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -282,7 +281,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="الوزن القائم (جرام)"
-                            android:textColor="#E2E8F0"
+                            android:textColor="?attr/colorOnSurface"
                             android:textStyle="bold" />
 
                         <EditText
@@ -292,7 +291,7 @@
                             android:inputType="numberDecimal"
                             android:hint="0.000"
                             android:textSize="24sp"
-                            android:textColor="#10B981"
+                            android:textColor="?attr/colorPrimary"
                             android:gravity="center"
                             android:background="@null"
                             android:layout_marginTop="4dp" />
@@ -300,7 +299,7 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:background="#334155"
+                            android:background="?attr/colorSurfaceVariant"
                             android:layout_marginVertical="8dp"/>
 
                         <LinearLayout
@@ -313,7 +312,7 @@
                                 android:layout_weight="1"
                                 android:layout_height="wrap_content"
                                 android:text="القيمة التقديرية للذهب الخام:"
-                                android:textColor="#94A3B8"
+                                android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="12sp" />
 
                             <TextView
@@ -321,7 +320,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="0.00 $"
-                                android:textColor="#F59E0B"
+                                android:textColor="?attr/colorSecondary"
                                 android:textSize="14sp"
                                 android:textStyle="bold" />
                         </LinearLayout>
@@ -341,7 +340,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="الأحجار والتطعيم"
-                    android:textColor="#E2E8F0"
+                    android:textColor="?attr/colorOnBackground"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="8dp"/>
@@ -357,7 +356,7 @@
                         android:layout_weight="1"
                         android:layout_height="wrap_content"
                         android:text="هل القطعة مرصعة بأحجار / زركون؟"
-                        android:textColor="#CBD5E1"
+                        android:textColor="?attr/colorOnBackground"
                         android:textSize="13sp" />
 
                     <com.google.android.material.switchmaterial.SwitchMaterial
@@ -366,7 +365,7 @@
                         android:layout_height="wrap_content" />
                 </LinearLayout>
 
-                <!-- الحقول الخاصة بالأحجار (تظهر وتختفي تلقائياً) -->
+                <!-- الحقول الخاصة بالأحجار -->
                 <LinearLayout
                     android:id="@+id/layoutStonesDetails"
                     android:layout_width="match_parent"
@@ -379,13 +378,13 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:hint="نوع الأحجار (مثال: ألماس، زركون، ياقوت...)"
-                        app:boxBackgroundColor="#1E293B">
+                        app:boxBackgroundColor="?attr/colorSurface">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etStoneType"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:textColor="#FFFFFF" />
+                            android:textColor="?attr/colorOnSurface" />
                     </com.google.android.material.textfield.TextInputLayout>
 
                     <LinearLayout
@@ -400,14 +399,14 @@
                             android:layout_height="wrap_content"
                             android:layout_marginEnd="4dp"
                             android:hint="وزن الأحجار (قيراط)"
-                            app:boxBackgroundColor="#1E293B">
+                            app:boxBackgroundColor="?attr/colorSurface">
 
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/etStoneWeight"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:inputType="numberDecimal"
-                                android:textColor="#FFFFFF" />
+                                android:textColor="?attr/colorOnSurface" />
                         </com.google.android.material.textfield.TextInputLayout>
 
                         <com.google.android.material.textfield.TextInputLayout
@@ -416,14 +415,14 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="4dp"
                             android:hint="عدد الأحجار"
-                            app:boxBackgroundColor="#1E293B">
+                            app:boxBackgroundColor="?attr/colorSurface">
 
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/etStoneCount"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:inputType="number"
-                                android:textColor="#FFFFFF" />
+                                android:textColor="?attr/colorOnSurface" />
                         </com.google.android.material.textfield.TextInputLayout>
                     </LinearLayout>
 
@@ -432,14 +431,14 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:hint="القيمة الإضافية للأحجار ($)"
-                        app:boxBackgroundColor="#1E293B">
+                        app:boxBackgroundColor="?attr/colorSurface">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etStoneValue"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:inputType="numberDecimal"
-                            android:textColor="#10B981" />
+                            android:textColor="?attr/colorPrimary" />
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
             </LinearLayout>
@@ -456,7 +455,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="صور القطعة والاعتماد النهائي"
-                    android:textColor="#E2E8F0"
+                    android:textColor="?attr/colorOnBackground"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="8dp"/>
@@ -467,15 +466,15 @@
                     android:layout_width="match_parent"
                     android:layout_height="50dp"
                     android:text="📷 التقاط / إرفاق صور القطعة"
-                    android:textColor="#38BDF8"
-                    app:strokeColor="#38BDF8" />
+                    android:textColor="?attr/colorPrimary"
+                    app:strokeColor="?attr/colorPrimary" />
 
                 <TextView
                     android:id="@+id/tvPhotosCount"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="لم يتم إرفاق صور بعد"
-                    android:textColor="#94A3B8"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="11sp"
                     android:layout_gravity="center"
                     android:layout_marginTop="4dp" />
@@ -488,7 +487,8 @@
                     android:layout_marginTop="20dp"
                     android:text="اعتماد الموزون وتصدير MIRA ID"
                     android:textSize="16sp"
-                    app:backgroundTint="#10B981" />
+                    app:backgroundTint="?attr/colorSecondary"
+                    android:textColor="?attr/colorOnSecondary" />
             </LinearLayout>
 
         </LinearLayout>
