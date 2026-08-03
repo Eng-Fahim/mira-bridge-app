@@ -18,7 +18,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- 📡 Live RFID & Manual Input Card -->
+            <!-- 📡 Live Bar & Progress Indicator -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -32,24 +32,23 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:padding="12dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:layout_marginBottom="8dp">
+                        android:gravity="center_vertical">
 
                         <TextView
+                            android:id="@+id/tvStepTitle"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="معرف الشريحة (EPC / GTIN)"
+                            android:text="الخطوة 1 من 4: الربط والتصنيف"
                             android:textColor="#F59E0B"
-                            android:textSize="14sp"
-                            android:textStyle="bold"
-                            android:gravity="start" />
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/tvStatusBadge"
@@ -60,168 +59,438 @@
                             android:textColor="#FFFFFF"
                             android:paddingHorizontal="8dp"
                             android:paddingVertical="4dp"
-                            android:textSize="11sp" />
+                            android:textSize="10sp" />
                     </LinearLayout>
 
-                    <!-- حقل إدخال يدوي + إمكانية مسح الباركود -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/tilEpc"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
                         app:boxBackgroundColor="#0F172A"
                         app:hintTextColor="#94A3B8"
                         app:endIconMode="custom"
                         app:endIconDrawable="@android:drawable/ic_menu_camera"
-                        app:endIconTint="#F59E0B"
-                        app:endIconContentDescription="مسح باركود/QR">
+                        app:endIconTint="#F59E0B">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etEpc"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:hint="امسح الـ RFID أو أدخل الرمز يدوياً..."
+                            android:hint="رمز الشريحة (EPC / GTIN)..."
                             android:textColor="#F59E0B"
                             android:fontFamily="monospace"
-                            android:textSize="15sp"
-                            android:textDirection="ltr"
-                            android:gravity="start|center_vertical"
-                            android:singleLine="true" />
+                            android:textSize="14sp"
+                            android:textDirection="ltr" />
                     </com.google.android.material.textfield.TextInputLayout>
-
-                    <TextView
-                        android:id="@+id/tvRfidHint"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="💡 يمكنك استخدام الزر الجانبي للـ C72 أو إدخال الكود يدوياً"
-                        android:textColor="#94A3B8"
-                        android:textSize="11sp"
-                        android:layout_marginTop="8dp"
-                        android:gravity="start" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Types Grid -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="تصنيف القطعة"
-                android:textColor="#E2E8F0"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="8dp"
-                android:gravity="start" />
-
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/chipGroupTypes"
+            <!-- ==================== الخطوة 1: التصنيف والوصف ==================== -->
+            <LinearLayout
+                android:id="@+id/step1Layout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:singleSelection="true">
+                android:orientation="vertical"
+                android:visibility="visible">
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipRing"
-                    style="@style/Widget.MaterialComponents.Chip.Choice"
+                <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="💍 خاتم" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipSet"
-                    style="@style/Widget.MaterialComponents.Chip.Choice"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="💎 طقم" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipBracelet"
-                    style="@style/Widget.MaterialComponents.Chip.Choice"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="📿 سوار" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/chipNecklace"
-                    style="@style/Widget.MaterialComponents.Chip.Choice"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="📐 عقد" />
-            </com.google.android.material.chip.ChipGroup>
-
-            <!-- Title Input & Chips -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:hint="عنوان وصف القطعة"
-                app:boxBackgroundColor="#1E293B"
-                app:hintTextColor="#94A3B8">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etTitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textColor="#FFFFFF"
-                    android:gravity="start" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <HorizontalScrollView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:scrollbars="none">
+                    android:text="تصنيف القطعة"
+                    android:textColor="#E2E8F0"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp"/>
 
                 <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/chipGroupSuggestions"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/chipGroupTypes"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:singleLine="true" />
-            </HorizontalScrollView>
+                    app:singleSelection="true">
 
-            <!-- Weight Card -->
-            <com.google.android.material.card.MaterialCardView
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipRing"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="💍 خاتم" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipSet"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="💎 طقم" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipBracelet"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="📿 سوار" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipNecklace"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="📐 عقد" />
+                </com.google.android.material.chip.ChipGroup>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:hint="عنوان ووصف القطعة"
+                    app:boxBackgroundColor="#1E293B">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="#FFFFFF" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:scrollbars="none">
+
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/chipGroupSuggestions"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        app:singleLine="true" />
+                </HorizontalScrollView>
+            </LinearLayout>
+
+            <!-- ==================== الخطوة 2: مواصفات الذهب والوزن والقيمة ==================== -->
+            <LinearLayout
+                android:id="@+id/step2Layout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                app:cardBackgroundColor="#1E293B">
+                android:orientation="vertical"
+                android:layout_marginTop="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="مواصفات المعدن والوزن"
+                    android:textColor="#E2E8F0"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp"/>
+
+                <!-- لون المعدن -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="معدن القطعة:"
+                    android:textColor="#94A3B8"
+                    android:textSize="12sp" />
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chipGroupMetalColor"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:singleSelection="true">
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipYellowGold"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🟡 ذهب أصفر"
+                        android:checked="true" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipWhiteGold"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="⚪ ذهب أبيض" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chipRoseGold"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🔴 ذهب وردي" />
+                </com.google.android.material.chip.ChipGroup>
+
+                <!-- العيار -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="العيار:"
+                    android:textColor="#94A3B8"
+                    android:textSize="12sp"
+                    android:layout_marginTop="8dp"/>
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chipGroupKarat"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:singleSelection="true">
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip24K"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="24K" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip21K"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="21K"
+                        android:checked="true" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip18K"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="18K" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip14K"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="14K" />
+                </com.google.android.material.chip.ChipGroup>
+
+                <!-- الوزن القائم وحساب التكلفة -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    app:cardBackgroundColor="#1E293B">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="الوزن القائم (جرام)"
+                            android:textColor="#E2E8F0"
+                            android:textStyle="bold" />
+
+                        <EditText
+                            android:id="@+id/etGrossWeight"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="numberDecimal"
+                            android:hint="0.000"
+                            android:textSize="24sp"
+                            android:textColor="#10B981"
+                            android:gravity="center"
+                            android:background="@null"
+                            android:layout_marginTop="4dp" />
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:background="#334155"
+                            android:layout_marginVertical="8dp"/>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:layout_height="wrap_content"
+                                android:text="القيمة التقديرية للذهب الخام:"
+                                android:textColor="#94A3B8"
+                                android:textSize="12sp" />
+
+                            <TextView
+                                android:id="@+id/tvEstimatedGoldValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0.00 $"
+                                android:textColor="#F59E0B"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
+            <!-- ==================== الخطوة 3: الأحجار والتطعيم ==================== -->
+            <LinearLayout
+                android:id="@+id/step3Layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="الأحجار والتطعيم"
+                    android:textColor="#E2E8F0"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp"/>
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
                     <TextView
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
                         android:layout_height="wrap_content"
-                        android:text="الوزن القائم (جرام)"
-                        android:textColor="#E2E8F0"
-                        android:textStyle="bold"
-                        android:gravity="start" />
+                        android:text="هل القطعة مرصعة بأحجار / زركون؟"
+                        android:textColor="#CBD5E1"
+                        android:textSize="13sp" />
 
-                    <EditText
-                        android:id="@+id/etGrossWeight"
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchHasStones"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
+
+                <!-- الحقول الخاصة بالأحجار (تظهر وتختفي تلقائياً) -->
+                <LinearLayout
+                    android:id="@+id/layoutStonesDetails"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:layout_marginTop="8dp">
+
+                    <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="numberDecimal"
-                        android:hint="0.000"
-                        android:textSize="26sp"
-                        android:textColor="#10B981"
-                        android:gravity="center"
-                        android:background="@null"
-                        android:layout_marginTop="8dp" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+                        android:hint="نوع الأحجار (مثال: ألماس، زركون، ياقوت...)"
+                        app:boxBackgroundColor="#1E293B">
 
-            <!-- Submit Button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnSaveIdentity"
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etStoneType"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="#FFFFFF" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="8dp">
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="4dp"
+                            android:hint="وزن الأحجار (قيراط)"
+                            app:boxBackgroundColor="#1E293B">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etStoneWeight"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="numberDecimal"
+                                android:textColor="#FFFFFF" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:hint="عدد الأحجار"
+                            app:boxBackgroundColor="#1E293B">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etStoneCount"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:textColor="#FFFFFF" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                    </LinearLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:hint="القيمة الإضافية للأحجار ($)"
+                        app:boxBackgroundColor="#1E293B">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etStoneValue"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="numberDecimal"
+                            android:textColor="#10B981" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ==================== الخطوة 4: الصور والاعتماد ==================== -->
+            <LinearLayout
+                android:id="@+id/step4Layout"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="24dp"
-                android:text="اعتماد الموزون وتصدير MIRA ID"
-                android:textSize="16sp"
-                app:backgroundTint="#10B981" />
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="صور القطعة والاعتماد النهائي"
+                    android:textColor="#E2E8F0"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAddPhotos"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:text="📷 التقاط / إرفاق صور القطعة"
+                    android:textColor="#38BDF8"
+                    app:strokeColor="#38BDF8" />
+
+                <TextView
+                    android:id="@+id/tvPhotosCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="لم يتم إرفاق صور بعد"
+                    android:textColor="#94A3B8"
+                    android:textSize="11sp"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="4dp" />
+
+                <!-- Submit Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSaveIdentity"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="20dp"
+                    android:text="اعتماد الموزون وتصدير MIRA ID"
+                    android:textSize="16sp"
+                    app:backgroundTint="#10B981" />
+            </LinearLayout>
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
