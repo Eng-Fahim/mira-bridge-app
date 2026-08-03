@@ -4,22 +4,19 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.View;
-import android.widget.ProgressBar;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.uhf.R;
 import com.example.uhf.tools.SessionManager;
-import com.google.android.material.button.MaterialButton;
-import com.google.android.material.textfield.TextInputEditText;
 
 public class LoginActivity extends AppCompatActivity {
 
-    private TextInputEditText etServerUrl, etUsername, etPassword;
-    private MaterialButton btnLogin;
-    private ProgressBar pbLoading;
+    private EditText etUsername, etPassword;
+    private Button btnLogin;
     private SessionManager sessionManager;
 
     @Override
@@ -40,17 +37,14 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void initViews() {
-        etServerUrl = findViewById(R.id.etServerUrl);
         etUsername = findViewById(R.id.etUsername);
         etPassword = findViewById(R.id.etPassword);
         btnLogin = findViewById(R.id.btnLogin);
-        pbLoading = findViewById(R.id.pbLoading);
 
         btnLogin.setOnClickListener(v -> attemptLogin());
     }
 
     private void attemptLogin() {
-        String server = etServerUrl.getText() != null ? etServerUrl.getText().toString().trim() : "";
         String username = etUsername.getText() != null ? etUsername.getText().toString().trim() : "";
         String password = etPassword.getText() != null ? etPassword.getText().toString().trim() : "";
 
@@ -64,13 +58,15 @@ public class LoginActivity extends AppCompatActivity {
             return;
         }
 
-        showLoading(true);
+        btnLogin.setEnabled(false);
+        btnLogin.setText("جاري التحقق...");
 
-        // 💡 محاكاة عملية التحقق أو الربط مع السيرفر
+        // محاكاة عملية التحقق واختيار الدور تلقائياً
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            showLoading(false);
+            btnLogin.setEnabled(true);
+            btnLogin.setText("🔐 التحقق والدخول للنظام");
 
-            // تحديد الدور بناءً على اسم المستخدم للتحقق من الصلاحيات (مرحلياً)
+            // تحديد الدور بناءً على اسم المستخدم للتحقق من الصلاحيات
             SessionManager.Role role = SessionManager.Role.ADMIN;
             if (username.toLowerCase().contains("pos")) {
                 role = SessionManager.Role.POS_OPERATOR;
@@ -78,21 +74,16 @@ public class LoginActivity extends AppCompatActivity {
                 role = SessionManager.Role.INVENTORY_MGR;
             }
 
-            sessionManager.createLoginSession(username, role.name(), "MIRA_TOKEN_9988", server);
+            sessionManager.createLoginSession(username, role.name(), "MIRA_TOKEN_9988", "https://api.mira.cloud");
             Toast.makeText(LoginActivity.this, "تم تسجيل الدخول بنجاح: " + username, Toast.LENGTH_SHORT).show();
 
             navigateToMain();
-        }, 1200);
-    }
-
-    private void showLoading(boolean loading) {
-        pbLoading.setVisibility(loading ? View.VISIBLE : View.GONE);
-        btnLogin.setEnabled(!loading);
-        btnLogin.setText(loading ? "" : "دخول المنظومة");
+        }, 1000);
     }
 
     private void navigateToMain() {
-        Intent intent = new Intent(LoginActivity.class, UHFMainActivity.class);
+        // ✅ إصلاح Context الـ Intent هنا (استخدام LoginActivity.this بدلاً من LoginActivity.class)
+        Intent intent = new Intent(LoginActivity.this, UHFMainActivity.class);
         startActivity(intent);
         finish();
     }
