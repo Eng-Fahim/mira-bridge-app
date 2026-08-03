@@ -87,13 +87,20 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         setContentView(R.layout.activity_main);
         checkReadWritePermission();
-        setTitle("MIRA Bridge™ - " + sessionManager.getUserName());
+        
+        // ✅ استخدام getDisplayName أولاً، ثم getUsername كاحتياط
+        String displayName = sessionManager.getDisplayName();
+        if (displayName == null || displayName.isEmpty()) {
+            displayName = sessionManager.getUsername();
+        }
+        setTitle("MIRA Bridge™ - " + displayName);
+        
         initSound();
         initUHF();
         initViewPageData();
     }
 
-    // 🔄 الاستجابة الفورية لتغيير وضع الجهاز (Light/Dark Mode) بدون فقدان البيانات
+    // 🔄 الاستجابة الفورية لتغيير وضع الجهاز (Light/Dark Mode)
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
@@ -286,7 +293,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ============================================
     public void performLogout() {
         if (sessionManager != null) {
-            sessionManager.logout();
+            sessionManager.logout();  // ✅ موجودة الآن في SessionManager
         }
         navigateToLogin();
     }
