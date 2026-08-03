@@ -3,14 +3,14 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0B0F17"
+    android:background="?attr/colorSurface"
     android:orientation="vertical">
 
     <!-- Header Toolbar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#111827"
+        android:background="?attr/colorSurfaceVariant"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="16dp"
@@ -21,7 +21,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="🛒 MIRA POS — وضع البيع"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -33,48 +33,50 @@
             android:paddingHorizontal="10dp"
             android:paddingVertical="4dp"
             android:text="⚖️ الميزان: جاري البحث..."
-            android:textColor="#38BDF8"
+            android:textColor="?attr/colorPrimary"
             android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
-<!-- أضف هذا داخل LinearLayout header بعد tvPosScaleStatus -->
-<LinearLayout
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:paddingHorizontal="12dp"
-    android:paddingVertical="8dp"
-    android:gravity="center">
 
-    <Button
-        android:id="@+id/btnOpenScanner"
-        android:layout_width="0dp"
-        android:layout_height="44dp"
-        android:layout_weight="1"
-        android:layout_marginEnd="6dp"
-        android:background="@drawable/bg_scanner_btn"
-        android:text="📷 مسح GS1"
-        android:textColor="#FFFFFF"
-        android:textSize="13sp"
-        android:textStyle="bold" />
+    <!-- Scan Action Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp"
+        android:gravity="center">
 
-    <Button
-        android:id="@+id/btnPosRFIDMode"
-        android:layout_width="0dp"
-        android:layout_height="44dp"
-        android:layout_weight="1"
-        android:layout_marginStart="6dp"
-        android:background="@drawable/bg_rfid_btn"
-        android:text="📡 مسح RFID"
-        android:textColor="#FFFFFF"
-        android:textSize="13sp"
-        android:textStyle="bold" />
-</LinearLayout>
+        <Button
+            android:id="@+id/btnOpenScanner"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:backgroundTint="?attr/colorPrimary"
+            android:text="📷 مسح GS1"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnPosRFIDMode"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:backgroundTint="?attr/colorSecondary"
+            android:text="📡 مسح RFID"
+            android:textColor="?attr/colorOnSecondary"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
     <!-- Status Banner -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#1E293B"
+        android:background="?attr/colorSurfaceVariant"
         android:gravity="center"
         android:paddingVertical="8dp">
 
@@ -83,7 +85,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="جاهز لمسح القطع والخواتم..."
-            android:textColor="#94A3B8"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -101,11 +103,11 @@
             android:layout_height="44dp"
             android:layout_weight="1"
             android:layout_marginEnd="8dp"
-            android:background="@drawable/bg_dark_input"
+            android:background="?attr/colorSurfaceVariant"
             android:hint="ادخل كود EPC الخاتم يدوياً..."
-            android:textColorHint="#64748B"
+            android:textColorHint="?attr/colorOnSurfaceVariant"
             android:paddingHorizontal="12dp"
-            android:textColor="#FACE15"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="13sp"
             android:textStyle="bold" />
 
@@ -113,9 +115,9 @@
             android:id="@+id/btnPosAddManual"
             android:layout_width="80dp"
             android:layout_height="44dp"
-            android:background="@drawable/bg_blue_btn"
+            android:backgroundTint="?attr/colorPrimary"
             android:text="إضافة"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnPrimary"
             android:textSize="12sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -133,7 +135,7 @@
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardBackgroundColor="#111827"
+        app:cardBackgroundColor="?attr/colorSurfaceVariant"
         app:cardCornerRadius="0dp"
         app:cardElevation="8dp">
 
@@ -160,7 +162,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="عدد القطع"
-                        android:textColor="#64748B"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp"
                         android:textStyle="bold" />
 
@@ -169,7 +171,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        android:textColor="#FFFFFF"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="18sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -184,7 +186,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="المبلغ الإجمالي"
-                        android:textColor="#64748B"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp"
                         android:textStyle="bold" />
 
@@ -193,7 +195,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="$0.00"
-                        android:textColor="#FACE15"
+                        android:textColor="?attr/colorPrimary"
                         android:textSize="22sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -209,7 +211,7 @@
                     android:layout_width="90dp"
                     android:layout_height="48dp"
                     android:layout_marginEnd="8dp"
-                    android:background="@drawable/bg_dark_input"
+                    android:backgroundTint="?attr/colorSurface"
                     android:text="مسح"
                     android:textColor="#EF4444"
                     android:textSize="12sp"
@@ -220,9 +222,9 @@
                     android:layout_width="0dp"
                     android:layout_height="48dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_blue_btn"
+                    android:backgroundTint="?attr/colorPrimary"
                     android:text="إتمام البيع وتحديث المخزون"
-                    android:textColor="#FFFFFF"
+                    android:textColor="?attr/colorOnPrimary"
                     android:textSize="13sp"
                     android:textStyle="bold" />
             </LinearLayout>
