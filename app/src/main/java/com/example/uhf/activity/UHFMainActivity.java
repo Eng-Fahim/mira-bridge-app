@@ -293,7 +293,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ============================================
     public void performLogout() {
         if (sessionManager != null) {
-            sessionManager.logout();  // ✅ موجودة الآن في SessionManager
+            sessionManager.logout();
         }
         navigateToLogin();
     }
@@ -305,35 +305,77 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         finish();
     }
 
+    // ============================================
+    // 🚪 قائمة الخيارات - onCreateOptionsMenu (نسخة واحدة فقط)
+    // ============================================
     @Override
-public boolean onCreateOptionsMenu(Menu menu) {
-    getMenuInflater().inflate(R.menu.main_menu, menu);
-    return true;
-}
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main_menu, menu);
+        return true;
+    }
 
-@Override
-public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-    int id = item.getItemId();
-    
-    if (id == R.id.export) {
-        exportData();
-        return true;
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
+        
+        if (id == R.id.export) {
+            exportData();
+            return true;
+        }
+        if (id == R.id.action_logout) {
+            showLogoutConfirmation();
+            return true;
+        }
+        if (id == R.id.action_profile) {
+            showProfileDialog();
+            return true;
+        }
+        if (id == R.id.action_settings) {
+            // توجيه للإعدادات
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
-    if (id == R.id.action_logout) {
-        showLogoutConfirmation();
-        return true;
-    }
-    if (id == R.id.action_profile) {
-        showProfileDialog();
-        return true;
-    }
-    if (id == R.id.action_settings) {
-        return true;
-    }
-    return super.onOptionsItemSelected(item);
-}
 
+    /**
+     * 🟢 عرض حوار تأكيد تسجيل الخروج
+     */
+    private void showLogoutConfirmation() {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("تسجيل الخروج")
+            .setMessage("هل أنت متأكد من تسجيل الخروج من منظومة MIRA؟\n\nسيتم إنهاء جلستك الحالية.")
+            .setPositiveButton("تسجيل الخروج", (dialog, which) -> performLogout())
+            .setNegativeButton("إلغاء", null)
+            .setIcon(android.R.drawable.ic_dialog_alert)
+            .show();
+    }
 
+    /**
+     * 🟢 عرض معلومات المستخدم الحالي
+     */
+    private void showProfileDialog() {
+        String username = sessionManager.getUsername();
+        String displayName = sessionManager.getDisplayName();
+        String role = sessionManager.getRoleString();
+        String serverUrl = sessionManager.getServerUrl();
+        
+        String message = "👤 المستخدم: " + displayName + "\n"
+                       + "📧 اسم الدخول: " + username + "\n"
+                       + "🔐 الصلاحية: " + role + "\n"
+                       + "🌐 الخادم: " + serverUrl;
+        
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("ملف المستخدم")
+            .setMessage(message)
+            .setPositiveButton("موافق", null)
+            .setNeutralButton("تسجيل الخروج", (d, w) -> showLogoutConfirmation())
+            .setIcon(R.drawable.ic_person)
+            .show();
+    }
+
+    // ============================================
+    // 🔚 onDestroy
+    // ============================================
     @Override
     protected void onDestroy() {
         Log.e(TAG, "onDestroy()");
@@ -361,6 +403,9 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         new ExportExcelAsyncTask(this, tagList).execute();
     }
 
+    // ============================================
+    // 🔊 نظام الصوت
+    // ============================================
     HashMap<Integer, Integer> soundMap = new HashMap<Integer, Integer>();
     private SoundPool soundPool;
     private float volumnRatio;
@@ -381,51 +426,7 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
             soundPool = null;
         }
     }
-// ============================================
-// 🚪 قائمة الخيارات - تسجيل الخروج
-// ============================================
-@Override
-public boolean onCreateOptionsMenu(Menu menu) {
-    getMenuInflater().inflate(R.menu.main_menu, menu);
-    return true;
-}
 
-
-/**
- * 🟢 عرض حوار تأكيد تسجيل الخروج
- */
-private void showLogoutConfirmation() {
-    new androidx.appcompat.app.AlertDialog.Builder(this)
-        .setTitle("تسجيل الخروج")
-        .setMessage("هل أنت متأكد من تسجيل الخروج من منظومة MIRA؟\n\nسيتم إنهاء جلستك الحالية.")
-        .setPositiveButton("تسجيل الخروج", (dialog, which) -> performLogout())
-        .setNegativeButton("إلغاء", null)
-        .setIcon(android.R.drawable.ic_dialog_alert)
-        .show();
-}
-
-/**
- * 🟢 عرض معلومات المستخدم الحالي
- */
-private void showProfileDialog() {
-    String username = sessionManager.getUsername();
-    String displayName = sessionManager.getDisplayName();
-    String role = sessionManager.getRoleString();
-    String serverUrl = sessionManager.getServerUrl();
-    
-    String message = "👤 المستخدم: " + displayName + "\n"
-                   + "📧 اسم الدخول: " + username + "\n"
-                   + "🔐 الصلاحية: " + role + "\n"
-                   + "🌐 الخادم: " + serverUrl;
-    
-    new androidx.appcompat.app.AlertDialog.Builder(this)
-        .setTitle("ملف المستخدم")
-        .setMessage(message)
-        .setPositiveButton("موافق", null)
-        .setNeutralButton("تسجيل الخروج", (d, w) -> showLogoutConfirmation())
-        .setIcon(R.drawable.ic_person)
-        .show();
-}
     public void playSound(int id) {
         if (soundPool == null) return;
         float audioMaxVolume = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
@@ -438,6 +439,9 @@ private void showProfileDialog() {
         }
     }
 
+    // ============================================
+    // 📂 الصلاحيات
+    // ============================================
     private void checkReadWritePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (!Environment.isExternalStorageManager()) {
@@ -456,6 +460,9 @@ private void showProfileDialog() {
         }
     }
 
+    // ============================================
+    // 💬 Toast
+    // ============================================
     private Toast toast;
     public void showToast(String text) {
         if (toast != null) toast.cancel();
@@ -465,6 +472,9 @@ private void showProfileDialog() {
     public void showToast(int resId) { showToast(getString(resId)); }
     public void playSoundDelayed(int speed) { playSoundThread.play(speed); }
 
+    // ============================================
+    // 🔊 PlaySoundThread
+    // ============================================
     private Object objectLock = new Object();
     private class PlaySoundThread extends Thread {
         private boolean isStop = false;
