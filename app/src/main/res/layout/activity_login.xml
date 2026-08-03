@@ -1,240 +1,180 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#090D16"
     android:fillViewport="true"
+    android:background="?android:attr/colorBackground"
     android:layoutDirection="rtl">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="24dp"
+        android:gravity="center_horizontal">
 
-        <!-- Top Status Bar: Device Authorization -->
-        <RelativeLayout
-            android:layout_width="match_parent"
+        <!-- Logo Section -->
+        <LinearLayout
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:layout_marginBottom="32dp">
+            android:layout_marginTop="32dp"
+            android:gravity="center"
+            android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/tvDeviceStatus"
+            <com.google.android.material.textview.MaterialTextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_alignParentStart="true"
-                android:background="#132338"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="5dp"
-                android:text="🔒 جهاز موثق: HH-READER-04"
-                android:textColor="#38BDF8"
-                android:textSize="11sp"
+                android:text="💎 MIRA"
+                android:textColor="?attr/colorSecondary"
+                android:textSize="30sp"
                 android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/tvSecurityLevel"
+            <com.google.android.material.textview.MaterialTextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_alignParentEnd="true"
-                android:text="MIRA-SEC v2.4"
-                android:textColor="#64748B"
-                android:textSize="11sp" />
-        </RelativeLayout>
+                android:layout_marginTop="2dp"
+                android:text="JEWELRY ENTERPRISE PLATFORM"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp"
+                android:letterSpacing="0.1" />
+        </LinearLayout>
 
-        <!-- Brand Identity Logo & Titles -->
-        <ImageView
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:layout_marginBottom="12dp"
-            android:contentDescription="MIRA Logo"
-            android:src="@android:drawable/ic_lock_lock"
-            app:tint="#F59E0B" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="MIRA"
-            android:textColor="#F59E0B"
-            android:textSize="28sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="JEWELRY ENTERPRISE"
-            android:textColor="#F8FAFC"
-            android:textSize="12sp"
-            android:letterSpacing="0.15"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="32dp"
-            android:text="بوابة المصادقة وإدارة الصلاحيات الموحدة"
-            android:textColor="#94A3B8"
-            android:textSize="12sp" />
-
-        <!-- Security Main Form Card -->
-        <androidx.cardview.widget.CardView
+        <!-- Main Card Form -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="#1E293B"
+            android:layout_marginTop="28dp"
             app:cardCornerRadius="20dp"
-            app:cardElevation="8dp">
+            app:cardElevation="4dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="?attr/colorSurfaceVariant">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="22dp">
 
-                <!-- RFID Card Scanning Zone -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/cardRfidAuth"
+                <com.google.android.material.textview.MaterialTextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="تسجيل الدخول الموحد"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="20dp"
+                    android:text="يرجى إدخال بيانات الاعتماد أو استخدام البصمة"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="11sp" />
+
+                <!-- Server URL Field -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilServerUrl"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:hint="رابط خادم النظام / API URL">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etServerUrl"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textUri"
+                        android:text="https://api.mira.cloud"
+                        android:textSize="13sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Username Field -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilUsername"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:hint="اسم المستخدم / Username">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etUsername"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text"
+                        android:textSize="13sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Password Field -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilPassword"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="20dp"
-                    app:cardBackgroundColor="#0F172A"
-                    app:cardCornerRadius="12dp">
+                    android:hint="كلمة المرور / Password"
+                    app:endIconMode="password_toggle">
 
-                    <LinearLayout
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etPassword"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:orientation="horizontal"
-                        android:padding="14dp">
+                        android:inputType="textPassword"
+                        android:textSize="13sp" />
+                </com.google.android.material.textfield.TextInputLayout>
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="💳"
-                            android:textSize="22sp" />
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="تمرير بطاقة الموظف (RFID Badging)"
-                                android:textColor="#F8FAFC"
-                                android:textSize="12sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/tvRfidStatus"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:text="القارئ اليدوي في انتظار بطاقة الموظف..."
-                                android:textColor="#22C55E"
-                                android:textSize="10sp" />
-                        </LinearLayout>
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-                <!-- Divider -->
-                <RelativeLayout
+                <!-- Buttons Layout: Login & Biometric -->
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="20dp">
+                    android:orientation="horizontal"
+                    android:weightSum="3">
 
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_centerVertical="true"
-                        android:background="#334155" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnLogin"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="2.1"
+                        android:text="دخول المنظومة"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        app:cornerRadius="10dp" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_centerInParent="true"
-                        android:background="#1E293B"
-                        android:paddingHorizontal="12dp"
-                        android:text="أو تسجيل الدخول اليدوي"
-                        android:textColor="#64748B"
-                        android:textSize="11sp" />
-                </RelativeLayout>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnBiometric"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="0.9"
+                        android:text="🔒 بصمة"
+                        android:textSize="12sp"
+                        app:cornerRadius="10dp" />
+                </LinearLayout>
 
-                <!-- Username Input -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="6dp"
-                    android:text="اسم المستخدم / رقم الموظف"
-                    android:textColor="#94A3B8"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-
-                <EditText
-                    android:id="@+id/etUsername"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginBottom="16dp"
-                    android:background="#0F172A"
-                    android:hint="أدخل معرف الموظف..."
-                    android:inputType="text"
-                    android:paddingHorizontal="14dp"
-                    android:textColor="#F8FAFC"
-                    android:textColorHint="#475569"
-                    android:textSize="13sp" />
-
-                <!-- Password Input -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="6dp"
-                    android:text="كلمة المرور الأمنية"
-                    android:textColor="#94A3B8"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-
-                <EditText
-                    android:id="@+id/etPassword"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginBottom="24dp"
-                    android:background="#0F172A"
-                    android:hint="••••••••••••"
-                    android:inputType="textPassword"
-                    android:paddingHorizontal="14dp"
-                    android:textColor="#F8FAFC"
-                    android:textColorHint="#475569"
-                    android:textSize="13sp" />
-
-                <!-- Submit Button -->
-                <Button
-                    android:id="@+id/btnLogin"
-                    android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:backgroundTint="#F59E0B"
-                    android:text="🔐 التحقق والدخول للنظام"
-                    android:textColor="#090D16"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="10dp" />
+                <!-- Progress Bar Container -->
+                <ProgressBar
+                    android:id="@+id/pbLoading"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="12dp"
+                    android:visibility="gone" />
 
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- Footer Info -->
-        <TextView
+        <com.google.android.material.textview.MaterialTextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            android:text="تشفير محمي بنظام MIRA Trust Architecture™"
-            android:textColor="#475569"
+            android:layout_marginTop="24dp"
+            android:text="MIRA Trust Architecture™ • API Authenticated"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="10sp" />
 
     </LinearLayout>
-</ScrollView>
+</androidx.core.widget.NestedScrollView>
