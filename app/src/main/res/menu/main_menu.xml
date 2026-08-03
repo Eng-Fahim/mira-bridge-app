@@ -2,16 +2,28 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- عرض اسم الموظف/الدور الحالي -->
     <item
-        android:id="@+id/action_user_info"
-        android:title="الموظف الحالي"
+        android:id="@+id/action_profile"
+        android:title="ملفي"
+        android:icon="@android:drawable/ic_menu_info_details"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_settings"
+        android:title="الإعدادات"
+        android:icon="@android:drawable/ic_menu_preferences"
         app:showAsAction="never" />
 
-    <!-- زر تسجيل الخروج وإغلاق الجلسة -->
+    <item
+        android:id="@+id/export"
+        android:title="تصدير البيانات"
+        android:icon="@android:drawable/ic_menu_upload"
+        app:showAsAction="never" />
+
     <item
         android:id="@+id/action_logout"
+        android:title="تسجيل الخروج"
         android:icon="@android:drawable/ic_lock_power_off"
-        android:title="🔒 تسجيل الخروج"
         app:showAsAction="ifRoom" />
+
 </menu>
