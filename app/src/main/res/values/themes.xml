@@ -1,45 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    
-    <!-- Base application light theme -->
+
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
-        
-        <!-- 🔤 1. تعيين خط Cairo المباشر -->
+
+        <!-- 🔤 1. الخط الافتراضي العام -->
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
 
-        <!-- 🔤 2. إجبار Material 3 Typography على استخدام خط Cairo لكل المستويات -->
+        <!-- 🔤 2. ربط جميع أوزان واستخدامات Material 3 Typography بخط Cairo -->
         <item name="textAppearanceDisplayLarge">@style/AppTextAppearance</item>
         <item name="textAppearanceDisplayMedium">@style/AppTextAppearance</item>
         <item name="textAppearanceDisplaySmall">@style/AppTextAppearance</item>
-        <item name="textAppearanceHeadlineLarge">@style/AppTextAppearance</item>
-        <item name="textAppearanceHeadlineMedium">@style/AppTextAppearance</item>
-        <item name="textAppearanceHeadlineSmall">@style/AppTextAppearance</item>
-        <item name="textAppearanceTitleLarge">@style/AppTextAppearance</item>
-        <item name="textAppearanceTitleMedium">@style/AppTextAppearance</item>
-        <item name="textAppearanceTitleSmall">@style/AppTextAppearance</item>
+        
+        <item name="textAppearanceHeadlineLarge">@style/AppTextAppearance.Bold</item>
+        <item name="textAppearanceHeadlineMedium">@style/AppTextAppearance.Bold</item>
+        <item name="textAppearanceHeadlineSmall">@style/AppTextAppearance.Bold</item>
+        
+        <item name="textAppearanceTitleLarge">@style/AppTextAppearance.Bold</item>
+        <item name="textAppearanceTitleMedium">@style/AppTextAppearance.Medium</item>
+        <item name="textAppearanceTitleSmall">@style/AppTextAppearance.Medium</item>
+        
         <item name="textAppearanceBodyLarge">@style/AppTextAppearance</item>
         <item name="textAppearanceBodyMedium">@style/AppTextAppearance</item>
         <item name="textAppearanceBodySmall">@style/AppTextAppearance</item>
-        <item name="textAppearanceLabelLarge">@style/AppTextAppearance</item>
+        
+        <item name="textAppearanceLabelLarge">@style/AppTextAppearance.Medium</item>
         <item name="textAppearanceLabelMedium">@style/AppTextAppearance</item>
         <item name="textAppearanceLabelSmall">@style/AppTextAppearance</item>
 
-        <!-- 🔤 3. إجبار عناصر TextView و Buttons التقليدية -->
+        <!-- 🔤 3. إجبار المكونات الأساسية (Buttons, TextViews, Tabs, Checkboxes) -->
         <item name="android:textViewStyle">@style/AppTextViewStyle</item>
         <item name="materialButtonStyle">@style/AppButtonStyle</item>
+        <item name="buttonStyle">@style/AppButtonStyle</item>
+        <item name="radioButtonStyle">@style/AppRadioButtonStyle</item>
+        <item name="checkboxStyle">@style/AppCheckBoxStyle</item>
+        <item name="tabStyle">@style/AppTabStyle</item>
 
-        <!-- 🎨 ألوان الوضع الفاتح -->
+        <!-- 🎨 الألوان -->
         <item name="colorPrimary">#1A237E</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="colorPrimaryContainer">#E8EAF6</item>
         <item name="colorOnPrimaryContainer">#1A237E</item>
-
         <item name="colorSecondary">#C5A059</item>
         <item name="colorOnSecondary">#FFFFFF</item>
         <item name="colorSecondaryContainer">#FFF9EC</item>
         <item name="colorOnSecondaryContainer">#8C6D23</item>
-
         <item name="android:colorBackground">#F8F9FA</item>
         <item name="colorOnBackground">#191C1E</item>
         <item name="colorSurface">#FFFFFF</item>
@@ -48,25 +53,64 @@
         <item name="colorOnSurfaceVariant">#44474E</item>
     </style>
 
-    <!-- 🔤 ستايل النصوص الموحد لـ Material 3 -->
+    <!-- ============================================ -->
+    <!-- 🔤 قواعد وأنماط الخطوط والأوزان (Typography Styles) -->
+    <!-- ============================================ -->
+
+    <!-- Regular (400) -->
     <style name="AppTextAppearance" parent="TextAppearance.Material3.BodyMedium">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textFontWeight">400</item>
     </style>
 
-    <!-- 🔤 ستايل الـ TextView العادي (تم التصحيح هنا) -->
+    <!-- Medium (500) -->
+    <style name="AppTextAppearance.Medium">
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textStyle">normal</item>
+        <item name="android:textFontWeight">500</item>
+    </style>
+
+    <!-- Bold (700) -->
+    <style name="AppTextAppearance.Bold">
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textFontWeight">700</item>
+    </style>
+
+    <!-- 🔤 ستايل الـ TextView -->
     <style name="AppTextViewStyle" parent="Widget.AppCompat.TextView">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
 
-    <!-- 🔤 ستايل الأزرار -->
+    <!-- 🔤 ستايل الأزرار (Material Buttons) - يحل مشكلة أزرار بدء المسح والتقرير -->
     <style name="AppButtonStyle" parent="Widget.Material3.Button">
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+
+    <!-- 🔤 ستايل RadioButton & CheckBox -->
+    <style name="AppRadioButtonStyle" parent="Widget.AppCompat.CompoundButton.RadioButton">
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
+    </style>
+
+    <style name="AppCheckBoxStyle" parent="Widget.AppCompat.CompoundButton.CheckBox">
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
+    </style>
+
+    <!-- 🔤 ستايل التبويبات (Tabs) -->
+    <style name="AppTabStyle" parent="Widget.Material3.TabLayout">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
 
     <!-- الثيم الرئيسي -->
     <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo" />
-    
+
 </resources>
