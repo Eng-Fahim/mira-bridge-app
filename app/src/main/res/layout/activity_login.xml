@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:fillViewport="true"
     android:background="?android:attr/colorBackground"
-    android:layoutDirection="rtl">
+    android:layoutDirection="ltr">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -18,35 +18,47 @@
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
+            android:layout_marginTop="48dp"
             android:gravity="center"
             android:orientation="vertical">
 
             <com.google.android.material.textview.MaterialTextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="💎 MIRA"
-                android:textColor="?attr/colorSecondary"
-                android:textSize="30sp"
-                android:textStyle="bold" />
+                android:text="◆ MIRA"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="34sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.05" />
 
             <com.google.android.material.textview.MaterialTextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="JEWELRY ENTERPRISE PLATFORM"
+                android:layout_marginTop="4dp"
+                android:text="Enterprise Authentication"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp"
-                android:letterSpacing="0.1" />
+                android:textSize="12sp"
+                android:letterSpacing="0.15" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvAppVersion"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="MIRA Enterprise"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="10sp"
+                android:alpha="0.6" />
         </LinearLayout>
 
-        <!-- Main Card Form -->
+        <!-- Main Card -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/loginCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="4dp"
+            android:layout_marginTop="32dp"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="6dp"
             app:strokeWidth="1dp"
             app:strokeColor="?attr/colorSurfaceVariant">
 
@@ -54,33 +66,35 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="22dp">
+                android:padding="24dp">
 
                 <com.google.android.material.textview.MaterialTextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="تسجيل الدخول الموحد"
+                    android:text="Sign In"
                     android:textColor="?attr/colorOnSurface"
-                    android:textSize="18sp"
+                    android:textSize="22sp"
                     android:textStyle="bold" />
 
                 <com.google.android.material.textview.MaterialTextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:layout_marginBottom="20dp"
-                    android:text="يرجى إدخال بيانات الاعتماد أو استخدام البصمة"
+                    android:layout_marginBottom="24dp"
+                    android:text="Enter your credentials to continue"
                     android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="11sp" />
+                    android:textSize="12sp" />
 
-                <!-- Server URL Field -->
+                <!-- Server URL -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilServerUrl"
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    android:hint="رابط خادم النظام / API URL">
+                    android:layout_marginBottom="14dp"
+                    android:hint="Server URL"
+                    app:startIconDrawable="@android:drawable/ic_menu_compass"
+                    app:startIconTint="?attr/colorOnSurfaceVariant">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etServerUrl"
@@ -91,31 +105,46 @@
                         android:textSize="13sp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Username Field -->
+                <!-- Connection Status -->
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tvConnectionStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="14dp"
+                    android:text="⚪ Waiting for server URL"
+                    android:textSize="10sp"
+                    android:alpha="0.7" />
+
+                <!-- Username -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilUsername"
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    android:hint="اسم المستخدم / Username">
+                    android:layout_marginBottom="14dp"
+                    android:hint="Username"
+                    app:startIconDrawable="@android:drawable/ic_menu_myplaces"
+                    app:startIconTint="?attr/colorOnSurfaceVariant">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etUsername"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="text"
-                        android:textSize="13sp" />
+                        android:textSize="13sp"
+                        android:imeOptions="actionNext" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Password Field -->
+                <!-- Password -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilPassword"
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="20dp"
-                    android:hint="كلمة المرور / Password"
+                    android:layout_marginBottom="24dp"
+                    android:hint="Password"
+                    app:startIconDrawable="@android:drawable/ic_lock_lock"
+                    app:startIconTint="?attr/colorOnSurfaceVariant"
                     app:endIconMode="password_toggle">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -123,10 +152,11 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="textPassword"
-                        android:textSize="13sp" />
+                        android:textSize="13sp"
+                        android:imeOptions="actionDone" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Buttons Layout -->
+                <!-- Buttons -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -136,46 +166,49 @@
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnLogin"
                         android:layout_width="0dp"
-                        android:layout_height="52dp"
+                        android:layout_height="54dp"
                         android:layout_weight="2.1"
-                        android:text="دخول المنظومة"
-                        android:textSize="14sp"
+                        android:text="Sign In"
+                        android:textSize="15sp"
                         android:textStyle="bold"
-                        app:cornerRadius="10dp" />
+                        android:enabled="false"
+                        android:alpha="0.5"
+                        app:cornerRadius="12dp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnBiometric"
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="0dp"
-                        android:layout_height="52dp"
+                        android:layout_height="54dp"
                         android:layout_marginStart="8dp"
                         android:layout_weight="0.9"
-                        android:text="🔒 بصمة"
-                        android:textSize="12sp"
-                        app:cornerRadius="10dp" />
+                        android:text="🔒"
+                        android:textSize="18sp"
+                        app:cornerRadius="12dp"
+                        app:strokeWidth="1.5dp" />
                 </LinearLayout>
 
-                <!-- ✅ Loading Container محسن -->
+                <!-- Loading -->
                 <LinearLayout
                     android:id="@+id/loadingContainer"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="16dp"
                     android:gravity="center"
                     android:orientation="horizontal"
                     android:visibility="gone">
 
                     <ProgressBar
                         android:id="@+id/pbLoading"
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
                         android:indeterminateTint="?attr/colorPrimary" />
 
                     <com.google.android.material.textview.MaterialTextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="10dp"
-                        android:text="جاري الاتصال بالخادم..."
+                        android:text="Authenticating..."
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -183,14 +216,15 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Footer Info -->
+        <!-- Footer -->
         <com.google.android.material.textview.MaterialTextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="MIRA Trust Architecture™ • API Authenticated"
+            android:layout_marginTop="32dp"
+            android:text="MIRA Trust Architecture™ • Secured by API"
             android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="10sp" />
+            android:textSize="10sp"
+            android:alpha="0.5" />
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
