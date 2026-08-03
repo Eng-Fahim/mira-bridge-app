@@ -2,7 +2,7 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- 👤 الملف الشخصي - يظهر مباشرة في شريط الأدوات -->
+    <!-- 👤 الملف الشخصي -->
     <item
         android:id="@+id/action_profile"
         android:title="Profile"
@@ -10,7 +10,7 @@
         app:showAsAction="ifRoom"
         android:orderInCategory="10" />
 
-    <!-- 🚪 تسجيل الخروج - يظهر مباشرة في شريط الأدوات -->
+    <!-- 🚪 تسجيل الخروج -->
     <item
         android:id="@+id/action_logout"
         android:title="Sign Out"
@@ -18,7 +18,6 @@
         app:showAsAction="ifRoom"
         android:orderInCategory="20" />
 
-    <!-- ➖ فاصل -->
     <group android:id="@+id/group_advanced"
         android:orderInCategory="100">
 
@@ -36,7 +35,7 @@
             android:icon="@drawable/ic_info"
             app:showAsAction="never" />
 
-        <!-- ⚡ اختبار السرعة -->
+        <!-- ⚡ اختبار السرعة (مخفي) -->
         <item
             android:id="@+id/speed"
             android:title="Speed Test"
