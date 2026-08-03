@@ -18,7 +18,7 @@
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="48dp"
+            android:layout_marginTop="64dp"
             android:gravity="center"
             android:orientation="vertical">
 
@@ -27,7 +27,7 @@
                 android:layout_height="wrap_content"
                 android:text="◆ MIRA"
                 android:textColor="?attr/colorPrimary"
-                android:textSize="34sp"
+                android:textSize="36sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.05" />
 
@@ -39,16 +39,6 @@
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="12sp"
                 android:letterSpacing="0.15" />
-
-            <com.google.android.material.textview.MaterialTextView
-                android:id="@+id/tvAppVersion"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="MIRA Enterprise"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="10sp"
-                android:alpha="0.6" />
         </LinearLayout>
 
         <!-- Main Card -->
@@ -56,64 +46,33 @@
             android:id="@+id/loginCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
+            android:layout_marginTop="40dp"
             app:cardCornerRadius="24dp"
-            app:cardElevation="6dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorSurfaceVariant">
+            app:cardElevation="4dp"
+            app:strokeWidth="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="24dp">
+                android:padding="28dp">
 
                 <com.google.android.material.textview.MaterialTextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Sign In"
                     android:textColor="?attr/colorOnSurface"
-                    android:textSize="22sp"
+                    android:textSize="24sp"
                     android:textStyle="bold" />
 
                 <com.google.android.material.textview.MaterialTextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:layout_marginBottom="24dp"
+                    android:layout_marginBottom="28dp"
                     android:text="Enter your credentials to continue"
                     android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="12sp" />
-
-                <!-- Server URL -->
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/tilServerUrl"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="14dp"
-                    android:hint="Server URL"
-                    app:startIconDrawable="@android:drawable/ic_menu_compass"
-                    app:startIconTint="?attr/colorOnSurfaceVariant">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etServerUrl"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="textUri"
-                        android:text="https://ams.ibreg.org/wp-json/mira-gate/v1"
-                        android:textSize="13sp" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <!-- Connection Status -->
-                <com.google.android.material.textview.MaterialTextView
-                    android:id="@+id/tvConnectionStatus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="14dp"
-                    android:text="⚪ Waiting for server URL"
-                    android:textSize="10sp"
-                    android:alpha="0.7" />
+                    android:textSize="13sp" />
 
                 <!-- Username -->
                 <com.google.android.material.textfield.TextInputLayout
@@ -121,7 +80,7 @@
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="14dp"
+                    android:layout_marginBottom="16dp"
                     android:hint="Username"
                     app:startIconDrawable="@android:drawable/ic_menu_myplaces"
                     app:startIconTint="?attr/colorOnSurfaceVariant">
@@ -131,7 +90,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="text"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         android:imeOptions="actionNext" />
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -141,7 +100,7 @@
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="24dp"
+                    android:layout_marginBottom="28dp"
                     android:hint="Password"
                     app:startIconDrawable="@android:drawable/ic_lock_lock"
                     app:startIconTint="?attr/colorOnSurfaceVariant"
@@ -152,7 +111,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="textPassword"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         android:imeOptions="actionDone" />
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -166,25 +125,25 @@
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnLogin"
                         android:layout_width="0dp"
-                        android:layout_height="54dp"
-                        android:layout_weight="2.1"
+                        android:layout_height="56dp"
+                        android:layout_weight="2.2"
                         android:text="Sign In"
-                        android:textSize="15sp"
+                        android:textSize="16sp"
                         android:textStyle="bold"
                         android:enabled="false"
                         android:alpha="0.5"
-                        app:cornerRadius="12dp" />
+                        app:cornerRadius="14dp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnBiometric"
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="0dp"
-                        android:layout_height="54dp"
+                        android:layout_height="56dp"
                         android:layout_marginStart="8dp"
-                        android:layout_weight="0.9"
+                        android:layout_weight="0.8"
                         android:text="🔒"
-                        android:textSize="18sp"
-                        app:cornerRadius="12dp"
+                        android:textSize="20sp"
+                        app:cornerRadius="14dp"
                         app:strokeWidth="1.5dp" />
                 </LinearLayout>
 
@@ -216,15 +175,90 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- 🔧 Server Settings (زر صغير أسفل الشاشة) -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvServerSettings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="40dp"
+            android:text="🔧 Server Settings"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="11sp"
+            android:alpha="0.4"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="12dp" />
+
+        <!-- Server URL (مخفي افتراضياً) -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/serverConfigCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="?attr/colorSurfaceVariant">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Server Configuration"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="12dp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilServerUrl"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="API Server URL">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etServerUrl"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textUri"
+                        android:text="https://ams.ibreg.org/wp-json/mira-gate/v1"
+                        android:textSize="12sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal"
+                    android:gravity="end">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSaveServer"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Save"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- Footer -->
         <com.google.android.material.textview.MaterialTextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:text="MIRA Trust Architecture™ • Secured by API"
+            android:layout_marginTop="24dp"
+            android:text="MIRA Trust Architecture™"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="10sp"
-            android:alpha="0.5" />
+            android:alpha="0.4" />
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
