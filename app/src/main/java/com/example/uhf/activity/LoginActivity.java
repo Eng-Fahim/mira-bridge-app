@@ -138,7 +138,6 @@ public class LoginActivity extends AppCompatActivity {
                                 navigateToMain();
                             } else {
                                 String msg = jsonResponse.optString("message", "بيانات الاعتماد غير صالحة");
-                                Toast.NotFound(LoginActivity.this); // استبدال بـ Toast صحيح
                                 Toast.makeText(LoginActivity.this, msg, Toast.LENGTH_LONG).show();
                             }
                         } catch (JSONException e) {
