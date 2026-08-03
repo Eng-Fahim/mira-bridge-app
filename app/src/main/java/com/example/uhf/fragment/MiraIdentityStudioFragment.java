@@ -101,29 +101,51 @@ public class MiraIdentityStudioFragment extends Fragment {
         binding.btnSaveIdentity.setOnClickListener(v -> finalizeItemIdentity());
     }
 
-    private void calculateEstimatedGoldValue() {
-        String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString() : "";
-        if (weightStr.isEmpty()) {
-            binding.tvEstimatedGoldValue.setText("0.00 $");
-            return;
-        }
-
-        try {
-            double weight = Double.parseDouble(weightStr);
-            double karatMultiplier = 0.875; // 21K افتراضي
-
-            int checkedId = binding.chipGroupKarat.getCheckedChipId();
-            if (checkedId == binding.chip24K.getId()) karatMultiplier = 1.0;
-            else if (checkedId == binding.chip21K.getId()) karatMultiplier = 0.875;
-            else if (checkedId == binding.chip18K.getId()) karatMultiplier = 0.750;
-            else if (checkedId == binding.chip14K.getId()) karatMultiplier = 0.583;
-
-            double estimatedValue = weight * karatMultiplier * goldGramBasePriceUSD;
-            binding.tvEstimatedGoldValue.setText(String.format("%.2f $", estimatedValue));
-        } catch (Exception e) {
-            binding.tvEstimatedGoldValue.setText("0.00 $");
-        }
+    /**
+ * 🧮 دالة حساب التكلفة بناءً على جدول أسعار الذهب والهوامش في نظام MIRA ID
+ */
+private void calculateEstimatedGoldValue() {
+    String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
+    
+    if (weightStr.isEmpty()) {
+        binding.tvEstimatedGoldValue.setText("0.00 $");
+        return;
     }
+
+    try {
+        double weight = Double.parseDouble(weightStr);
+        double pricePerGram = getGoldPriceByKarat(); // جلب السعر حسب العيار المحدد من إعدادات النظام
+
+        // 1️⃣ حساب قيمة الذهب الخام
+        double rawGoldValue = weight * pricePerGram;
+        
+        // 2️⃣ عرض النتيجة (يمكنك تغيير الرمز إلى ﷼ أو $ حسب العملة المختارة في النظام)
+        binding.tvEstimatedGoldValue.setText(String.format("%.2f $", rawGoldValue));
+
+    } catch (NumberFormatException e) {
+        binding.tvEstimatedGoldValue.setText("0.00 $");
+    }
+}
+
+/**
+ * 📡 جلب سعر جرام الذهب للعيار المختار من جدول أسعار MIRA ID (يمكن ربطها بـ API أو SharedPreferences)
+ */
+private double getGoldPriceByKarat() {
+    int checkedId = binding.chipGroupKarat.getCheckedChipId();
+
+    // ملاحظة: قم بتبديل هذه القيم بالقيم القادمة من API الإعدادات لديك
+    if (checkedId == binding.chip24K.getId()) {
+        return 75.0; // سعر بيع/شراء 24k المعتمد في النظام
+    } else if (checkedId == binding.chip21K.getId()) {
+        return 65.62; // سعر بيع/شراء 21k المعتمد في النظام (مثلاً: 54,250.80 YER / سعر الصرف)
+    } else if (checkedId == binding.chip18K.getId()) {
+        return 56.25; // سعر بيع/شراء 18k المعتمد في النظام
+    } else if (checkedId == binding.chip14K.getId()) {
+        return 43.75; // سعر بيع/شراء 14k المعتمد في النظام
+    }
+
+    return 65.62; // افتراضي (21k)
+}
 
     public void onRfidScanned(String epc) {
         if (getActivity() == null) return;
