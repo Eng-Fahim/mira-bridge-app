@@ -72,33 +72,38 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private MiraPosFragment activePOSFragment = null;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        // تأكيد وضع التبديل التلقائي مع النظام (Day/Night)
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-        
-        super.onCreate(savedInstanceState);
+protected void onCreate(Bundle savedInstanceState) {
+    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+    super.onCreate(savedInstanceState);
 
-        // حماية الشاشة الرئيسية: التحقق من تسجيل الدخول
-        sessionManager = new SessionManager(this);
-        if (!sessionManager.isLoggedIn()) {
-            navigateToLogin();
-            return;
-        }
+    sessionManager = new SessionManager(this);
+    if (!sessionManager.isLoggedIn()) {
+        navigateToLogin();
+        return;
+    }
 
-        setContentView(R.layout.activity_main);
-        checkReadWritePermission();
+    setContentView(R.layout.activity_main);
+
+    // ✅ تفعيل Toolbar كـ ActionBar (حتى تظهر القائمة)
+    com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
+    if (toolbar != null) {
+        setSupportActionBar(toolbar);
         
-        // استخدام getDisplayName أولاً، ثم getUsername كاحتياط
+        // تعيين العنوان
         String displayName = sessionManager.getDisplayName();
         if (displayName == null || displayName.isEmpty()) {
             displayName = sessionManager.getUsername();
         }
-        setTitle("MIRA Bridge - " + displayName);
-        
-        initSound();
-        initUHF();
-        initViewPageData();
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("MIRA Bridge - " + displayName);
+        }
     }
+
+    checkReadWritePermission();
+    initSound();
+    initUHF();
+    initViewPageData();
+}
 
     // الاستجابة الفورية لتغيير وضع الجهاز (Light/Dark Mode)
     @Override
