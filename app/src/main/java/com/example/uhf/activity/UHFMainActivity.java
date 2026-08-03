@@ -228,10 +228,11 @@ protected void onCreate(Bundle savedInstanceState) {
         }
 
         // MIRA Web (PWA)
-        mTabHost.addTab(
+       /* mTabHost.addTab(
             mTabHost.newTabSpec("MIRA Web").setIndicator("🌐"),
             MiraPWAWebFragment.class, null
-        );
+        );*/
+        
 
         // Dashboard الرئيسي
         mTabHost.addTab(
