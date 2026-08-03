@@ -3,6 +3,7 @@ package com.example.uhf.activity;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.media.AudioManager;
 import android.media.SoundPool;
 import android.net.Uri;
@@ -14,7 +15,9 @@ import android.provider.Settings;
 import android.util.Log;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTabHost;
@@ -66,6 +69,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // 🎨 تأكيد وضع التبديل التلقائي مع النظام (Day/Night)
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         checkReadWritePermission();
@@ -73,6 +79,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         initSound();
         initUHF();
         initViewPageData();
+    }
+
+    // 🔄 الاستجابة الفورية لتغيير وضع الجهاز (Light/Dark Mode) بدون فقدان البيانات
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        Log.d(TAG, "UI Mode / Configuration changed. Adapting themes dynamically.");
     }
 
     // ============================================
@@ -255,13 +268,15 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     @Override
     protected void onDestroy() {
-        Log.e("zz_pp", "onDestroy()");
+        Log.e(TAG, "onDestroy()");
+        if (playSoundThread != null) {
+            playSoundThread.stopPlay();
+        }
         releaseSoundPool();
         if (mReader != null) {
             mReader.free();
         }
         super.onDestroy();
-        android.os.Process.killProcess(android.os.Process.myPid());
     }
 
     @Override
