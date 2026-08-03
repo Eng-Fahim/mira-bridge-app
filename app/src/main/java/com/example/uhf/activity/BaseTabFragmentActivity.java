@@ -14,9 +14,9 @@ import android.view.MenuInflater;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity; // 👈 1. استيراد AppCompatActivity
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.fragment.app.FragmentActivity;
 
 import com.example.uhf.BuildConfig;
 import com.example.uhf.R;
@@ -31,8 +31,9 @@ import java.util.Date;
 
 /**
  * Created by Administrator on 2015-03-10.
+ * Updated to support Material Design 3 & Custom Fonts (Cairo)
  */
-public class BaseTabFragmentActivity extends FragmentActivity {
+public class BaseTabFragmentActivity extends AppCompatActivity { // 👈 2. التغيير إلى AppCompatActivity
 
 
     public RFIDWithUHFUART mReader;
@@ -75,18 +76,16 @@ public class BaseTabFragmentActivity extends FragmentActivity {
 
 
     /**
-     * ����ActionBar
+     * ActionBar
      */
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        // TODO Auto-generated method stub
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.main, menu);
         if(BuildConfig.Test){
             menu.findItem(R.id.speed).setVisible(true);
         }
         return true;
-//		return super.onCreateOptionsMenu(menu);
     }
 
 
@@ -118,7 +117,6 @@ public class BaseTabFragmentActivity extends FragmentActivity {
         String currentTime = dateFormat.format(currentDate);
         String file = "sdcard/UHF_exportData/";
         String fileName = file + currentTime;
-//        FileUtils.writeFile(fileName, UHFReadTagFragment.epcTidUser, true);
         Toast.makeText(BaseTabFragmentActivity.this, "导出失败", Toast.LENGTH_SHORT).show();
     }
 
@@ -159,7 +157,6 @@ public class BaseTabFragmentActivity extends FragmentActivity {
 
         @Override
         protected Boolean doInBackground(String... params) {
-            // TODO Auto-generated method stub
             return mReader.init(BaseTabFragmentActivity.this);
         }
 
@@ -174,7 +171,6 @@ public class BaseTabFragmentActivity extends FragmentActivity {
 
         @Override
         protected void onPreExecute() {
-            // TODO Auto-generated method stub
             super.onPreExecute();
             mypDialog = new ProgressDialog(BaseTabFragmentActivity.this);
             mypDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
@@ -221,15 +217,11 @@ public class BaseTabFragmentActivity extends FragmentActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // 权限已授予，可以执行相应操作
                 Log.e("TEST", "已经申请sdcard权限");
-                // 在这里进行读取SD卡的操作
             } else {
-                // 权限被拒绝，无法执行相应操作
                 Log.e("TEST", "申请sdcard权限失败");
             }
         }
     }
 
 }
-
