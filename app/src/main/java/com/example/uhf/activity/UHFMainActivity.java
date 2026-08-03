@@ -62,23 +62,23 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public FragmentTabHost mTabHost;
     private FragmentManager fm;
     public int selectIndex = -1;
-    public ArrayList<UHFTAGInfo> tagList = new ArrayList<UHFTAGInfo>();
+    public ArrayList<UHFTAGInfo> tagList = new ArrayList<>();
     public boolean loopFlag = false;
     private PlaySoundThread playSoundThread = null;
     public Fragment currentFragment;
     private SessionManager sessionManager;
 
-    // ⭐ POS Mode - مستقبل RFID النشط
+    // POS Mode - مستقبل RFID النشط
     private MiraPosFragment activePOSFragment = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // 🎨 تأكيد وضع التبديل التلقائي مع النظام (Day/Night)
+        // تأكيد وضع التبديل التلقائي مع النظام (Day/Night)
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         
         super.onCreate(savedInstanceState);
 
-        // 🔒 حماية الشاشة الرئيسية: التحقق من تسجيل الدخول
+        // حماية الشاشة الرئيسية: التحقق من تسجيل الدخول
         sessionManager = new SessionManager(this);
         if (!sessionManager.isLoggedIn()) {
             navigateToLogin();
@@ -88,19 +88,19 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         setContentView(R.layout.activity_main);
         checkReadWritePermission();
         
-        // ✅ استخدام getDisplayName أولاً، ثم getUsername كاحتياط
+        // استخدام getDisplayName أولاً، ثم getUsername كاحتياط
         String displayName = sessionManager.getDisplayName();
         if (displayName == null || displayName.isEmpty()) {
             displayName = sessionManager.getUsername();
         }
-        setTitle("MIRA Bridge™ - " + displayName);
+        setTitle("MIRA Bridge - " + displayName);
         
         initSound();
         initUHF();
         initViewPageData();
     }
 
-    // 🔄 الاستجابة الفورية لتغيير وضع الجهاز (Light/Dark Mode)
+    // الاستجابة الفورية لتغيير وضع الجهاز (Light/Dark Mode)
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
@@ -108,7 +108,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     // ============================================
-    // 🟢 POS Mode - تسجيل وإلغاء المستقبل النشط
+    // POS Mode - تسجيل وإلغاء المستقبل النشط
     // ============================================
     public void setActivePOSFragment(MiraPosFragment fragment) {
         this.activePOSFragment = fragment;
@@ -116,7 +116,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     // ============================================
-    // 🟢 التحقق من حالة القارئ
+    // التحقق من حالة القارئ
     // ============================================
     public boolean isReaderReady() {
         try {
@@ -127,10 +127,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     // ============================================
-    // 🟢 استقبال مسح RFID - توجيه ذكي
+    // استقبال مسح RFID - توجيه ذكي
     // ============================================
     public void onTagRead(String epc) {
-        // 🟢 الأولوية لـ POS Mode إذا كان نشطاً
+        // الأولوية لـ POS Mode إذا كان نشطاً
         if (activePOSFragment != null && activePOSFragment.isVisible()) {
             activePOSFragment.onRingScanned(epc);
             Log.d(TAG, "RFID → Active POS: " + epc);
@@ -142,7 +142,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             String currentTabTag = mTabHost.getCurrentTabTag();
             Fragment fragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
 
-            // 🆔 توجيه المسح لـ Identity Studio عند قراءة أي شريحة
+            // توجيه المسح لـ Identity Studio عند قراءة أي شريحة
             if (fragment instanceof MiraIdentityStudioFragment && fragment.isVisible()) {
                 ((MiraIdentityStudioFragment) fragment).onRfidScanned(epc);
                 Log.d(TAG, "RFID → Identity Studio: " + epc);
@@ -160,7 +160,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     // ============================================
-    // 🟢 تفويض onActivityResult للـ Fragment الحالي
+    // تفويض onActivityResult للـ Fragment الحالي
     // ============================================
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
@@ -180,16 +180,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     // ============================================
-    // 🔐 تصفية التبويبات حسب الصلاحيات (Role-Based Access)
+    // تصفية التبويبات حسب الصلاحيات (Role-Based Access)
     // ============================================
     protected void initViewPageData() {
         fm = getSupportFragmentManager();
-        mTabHost = (FragmentTabHost) findViewById(android.R.id.tabhost);
+        mTabHost = findViewById(android.R.id.tabhost);
         mTabHost.setup(this, fm, R.id.realtabcontent);
 
         SessionManager.Role role = sessionManager.getUserRole();
 
-        // 💎 لوحة المجوهرات والـ POS (تظهر للمدراء والمبيعات)
+        // لوحة المجوهرات والـ POS (تظهر للمدراء والمبيعات)
         if (role == SessionManager.Role.ADMIN || role == SessionManager.Role.POS_OPERATOR) {
             mTabHost.addTab(
                 mTabHost.newTabSpec("JewelryDashboard").setIndicator("💎"),
@@ -202,12 +202,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             );
         }
 
-        // 📷 شاشة القراءة والتتبع (متاحة للجميع)
+        // شاشة القراءة والتتبع (متاحة للجميع)
         mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_scan))
             .setIndicator(getString(R.string.uhf_msg_tab_scan)),
             UHFReadTagFragment.class, null);
 
-        // 🆔 استوديو التكوييد والجرد والرادار (للمدراء ومسؤولي الجرد)
+        // استوديو التكوييد والجرد والرادار (للمدراء ومسؤولي الجرد)
         if (role == SessionManager.Role.ADMIN || role == SessionManager.Role.INVENTORY_MGR) {
             mTabHost.addTab(
                 mTabHost.newTabSpec("IdentityStudio").setIndicator("🆔"),
@@ -222,27 +222,27 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 UHFRadarLocationFragment.class, null);
         }
 
-        // 🌐 MIRA Web (PWA)
+        // MIRA Web (PWA)
         mTabHost.addTab(
             mTabHost.newTabSpec("MIRA Web").setIndicator("🌐"),
             MiraPWAWebFragment.class, null
         );
 
-        // 🏠 Dashboard الرئيسي
+        // Dashboard الرئيسي
         mTabHost.addTab(
             mTabHost.newTabSpec("Dashboard").setIndicator("🏠"),
             MiraDashboardFragment.class, null
         );
 
-        // 🚪 بوابات الحماية MIRA Secure Gate™ (للمدراء وأمن البوابات)
+        // بوابات الحماية MIRA Secure Gate (للمدراء وأمن البوابات)
         if (role == SessionManager.Role.ADMIN || role == SessionManager.Role.GATE_SECURITY) {
             mTabHost.addTab(
-                mTabHost.newTabSpec("MIRA Secure Gate™").setIndicator("🚪"),
+                mTabHost.newTabSpec("MIRA Secure Gate").setIndicator("🚪"),
                 MiraSecureGateFragment.class, null
             );
         }
 
-        // ⚙️ التبويبات المتقدمة والإعدادات (للمدراء فقط)
+        // التبويبات المتقدمة والإعدادات (للمدراء فقط)
         if (role == SessionManager.Role.ADMIN) {
             mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_set))
                 .setIndicator(getString(R.string.uhf_msg_tab_set)),
@@ -289,7 +289,91 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     // ============================================
-    // 🚪 تسجيل الخروج وتفريغ الجلسة
+    // القائمة - onOptionsItemSelected فقط (onCreateOptionsMenu في BaseTabFragmentActivity)
+    // ============================================
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
+        
+        if (id == R.id.action_logout) {
+            showLogoutConfirmation();
+            return true;
+        }
+        if (id == R.id.action_profile) {
+            showProfileDialog();
+            return true;
+        }
+        if (id == R.id.export) {
+            exportData();
+            return true;
+        }
+        if (id == R.id.UHF_ver) {
+            getUHFVersion();
+            return true;
+        }
+        if (id == R.id.speed) {
+            Intent intent = new Intent(this, TestActivity.class);
+            startActivity(intent);
+            return true;
+        }
+        
+        return super.onOptionsItemSelected(item);
+    }
+
+    /**
+     * عرض حوار تأكيد تسجيل الخروج - تصميم عالمي
+     */
+    private void showLogoutConfirmation() {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Sign Out")
+            .setMessage("Are you sure you want to sign out of MIRA Enterprise?\n\nYour current session will be terminated.")
+            .setPositiveButton("Sign Out", (dialog, which) -> {
+                Toast.makeText(this, "Signing out...", Toast.LENGTH_SHORT).show();
+                performLogout();
+            })
+            .setNegativeButton("Cancel", null)
+            .setIcon(R.drawable.ic_logout)
+            .show();
+    }
+
+    /**
+     * عرض معلومات المستخدم الحالي - تصميم عالمي
+     */
+    private void showProfileDialog() {
+        String username = sessionManager.getUsername();
+        String displayName = sessionManager.getDisplayName();
+        String role = sessionManager.getRoleString();
+        String serverUrl = sessionManager.getServerUrl();
+        boolean biometricEnabled = sessionManager.isBiometricEnabled();
+        
+        String roleLabel;
+        switch (role) {
+            case "ADMIN": roleLabel = "Administrator"; break;
+            case "INVENTORY_MGR": roleLabel = "Inventory Manager"; break;
+            case "POS_OPERATOR": roleLabel = "POS Operator"; break;
+            case "SECURITY": roleLabel = "Security"; break;
+            case "GATE_SECURITY": roleLabel = "Gate Security"; break;
+            case "AUDITOR": roleLabel = "Auditor"; break;
+            default: roleLabel = role;
+        }
+        
+        String message = "User: " + displayName + "\n"
+                       + "Username: " + username + "\n"
+                       + "Role: " + roleLabel + "\n"
+                       + "Biometric: " + (biometricEnabled ? "Enabled" : "Disabled") + "\n"
+                       + "Server: " + serverUrl;
+        
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("User Profile")
+            .setMessage(message)
+            .setPositiveButton("Close", null)
+            .setNeutralButton("Sign Out", (d, w) -> showLogoutConfirmation())
+            .setIcon(R.drawable.ic_person_outline)
+            .show();
+    }
+
+    // ============================================
+    // تسجيل الخروج وتفريغ الجلسة
     // ============================================
     public void performLogout() {
         if (sessionManager != null) {
@@ -303,78 +387,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
     }
 
     // ============================================
-    // 🚪 قائمة الخيارات - onCreateOptionsMenu (نسخة واحدة فقط)
-    // ============================================
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.main_menu, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        int id = item.getItemId();
-        
-        if (id == R.id.export) {
-            exportData();
-            return true;
-        }
-        if (id == R.id.action_logout) {
-            showLogoutConfirmation();
-            return true;
-        }
-        if (id == R.id.action_profile) {
-            showProfileDialog();
-            return true;
-        }
-        if (id == R.id.action_settings) {
-            // توجيه للإعدادات
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
-    /**
-     * 🟢 عرض حوار تأكيد تسجيل الخروج
-     */
-    private void showLogoutConfirmation() {
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("تسجيل الخروج")
-            .setMessage("هل أنت متأكد من تسجيل الخروج من منظومة MIRA؟\n\nسيتم إنهاء جلستك الحالية.")
-            .setPositiveButton("تسجيل الخروج", (dialog, which) -> performLogout())
-            .setNegativeButton("إلغاء", null)
-            .setIcon(android.R.drawable.ic_dialog_alert)
-            .show();
-    }
-
-    /**
-     * 🟢 عرض معلومات المستخدم الحالي
-     */
-    private void showProfileDialog() {
-        String username = sessionManager.getUsername();
-        String displayName = sessionManager.getDisplayName();
-        String role = sessionManager.getRoleString();
-        String serverUrl = sessionManager.getServerUrl();
-        
-        String message = "👤 المستخدم: " + displayName + "\n"
-                       + "📧 اسم الدخول: " + username + "\n"
-                       + "🔐 الصلاحية: " + role + "\n"
-                       + "🌐 الخادم: " + serverUrl;
-        
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("ملف المستخدم")
-            .setMessage(message)
-            .setPositiveButton("موافق", null)
-            .setNeutralButton("تسجيل الخروج", (d, w) -> showLogoutConfirmation())
-            .setIcon(R.drawable.ic_person)
-            .show();
-    }
-
-    // ============================================
-    // 🔚 onDestroy
+    // onDestroy
     // ============================================
     @Override
     protected void onDestroy() {
@@ -404,9 +421,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     // ============================================
-    // 🔊 نظام الصوت
+    // نظام الصوت
     // ============================================
-    HashMap<Integer, Integer> soundMap = new HashMap<Integer, Integer>();
+    HashMap<Integer, Integer> soundMap = new HashMap<>();
     private SoundPool soundPool;
     private float volumnRatio;
     private AudioManager am;
@@ -440,7 +457,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     // ============================================
-    // 📂 الصلاحيات
+    // الصلاحيات
     // ============================================
     private void checkReadWritePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -461,7 +478,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     // ============================================
-    // 💬 Toast
+    // Toast
     // ============================================
     private Toast toast;
     public void showToast(String text) {
@@ -473,9 +490,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public void playSoundDelayed(int speed) { playSoundThread.play(speed); }
 
     // ============================================
-    // 🔊 PlaySoundThread
+    // PlaySoundThread
     // ============================================
-    private Object objectLock = new Object();
+    private final Object objectLock = new Object();
     private class PlaySoundThread extends Thread {
         private boolean isStop = false;
         int interval = 500;
