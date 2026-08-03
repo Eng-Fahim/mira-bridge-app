@@ -54,8 +54,8 @@
         <item name="android:fontFamily">@font/cairo</item>
     </style>
 
-    <!-- 🔤 ستايل الـ TextView العادي -->
-    <style name="AppTextViewStyle" parent="Widget.Material3.TextView">
+    <!-- 🔤 ستايل الـ TextView العادي (تم التصحيح هنا) -->
+    <style name="AppTextViewStyle" parent="Widget.AppCompat.TextView">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
