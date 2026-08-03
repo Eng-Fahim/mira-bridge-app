@@ -3,11 +3,15 @@
     
     <!-- Base application theme -->
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- 🔤 خط Cairo الأساسي -->
-        <item name="android:fontFamily">@font/cairo</item>
+        
+        <!-- 🔤 1. تعيين خط Cairo الشامل -->
         <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
 
-        <!-- 🎨 ألوان الوضع الفاتح (Light Theme) -->
+        <!-- 🔤 2. إجبار كافة نصوص TextView في التطبيق على استخدام خط Cairo -->
+        <item name="android:textViewStyle">@style/AppTextViewStyle</item>
+
+        <!-- 🎨 3. ألوان الوضع الفاتح (Light Theme) -->
         <item name="colorPrimary">#1A237E</item>            <!-- كحلي ملكي -->
         <item name="colorOnPrimary">#FFFFFF</item>          <!-- نص على الكحلي -->
         <item name="colorPrimaryContainer">#E8EAF6</item>   <!-- حاويات ناعمة -->
@@ -28,8 +32,17 @@
         <item name="colorOnSurfaceVariant">#44474E</item>
     </style>
 
-    <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo">
-        <item name="android:fontFamily">@font/cairo</item>
+    <!-- 🔤 ستايل مخصص يضمن تطبيق الخط على أي TextView عادي -->
+    <style name="AppTextViewStyle" parent="Widget.Material3.TextView">
         <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
     </style>
+
+    <!-- الثيم الرئيسي المستدعى في AndroidManifest.xml -->
+    <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo">
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textViewStyle">@style/AppTextViewStyle</item>
+    </style>
+    
 </resources>
