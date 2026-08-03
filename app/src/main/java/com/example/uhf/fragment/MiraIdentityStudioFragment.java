@@ -1,6 +1,8 @@
 package com.example.uhf.fragment;
 
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,7 +23,6 @@ public class MiraIdentityStudioFragment extends Fragment {
 
     private FragmentMiraIdentityStudioBinding binding;
     private final Map<String, String[]> typeSuggestions = new HashMap<>();
-    private String currentEpc = "";
 
     @Nullable
     @Override
@@ -45,6 +46,30 @@ public class MiraIdentityStudioFragment extends Fragment {
     }
 
     private void setupListeners() {
+        // 🟢 متابعة الإدخال اليدوي في حقل EPC
+        binding.etEpc.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (s.length() > 0) {
+                    binding.tvStatusBadge.setText("BOUND");
+                } else {
+                    binding.tvStatusBadge.setText("WAITING");
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        // 📷 النقر على زر الكاميرا لمسح الباركود
+        binding.tilEpc.setEndIconOnClickListener(v -> {
+            Toast.makeText(getContext(), "سيتم فتح كاميرا المسح الضوئي (Barcode/QR)...", Toast.LENGTH_SHORT).show();
+            // يمكنك فتح أكتيفيتي الكاميرا / ZXing Scanner هنا
+        });
+
         // Selection Chips Handling
         binding.chipGroupTypes.setOnCheckedStateChangeListener((group, checkedIds) -> {
             if (checkedIds.isEmpty()) return;
@@ -67,13 +92,12 @@ public class MiraIdentityStudioFragment extends Fragment {
         if (getActivity() == null) return;
 
         getActivity().runOnUiThread(() -> {
-            this.currentEpc = epc;
-            binding.tvGtinLive.setText("EPC/GTIN: " + epc);
+            binding.etEpc.setText(epc); // كتابتها تلقائياً في حقل النص
             binding.tvStatusBadge.setText("BOUND");
             binding.tvRfidHint.setText("تم التقاط شريحة RFID بنجاح!");
             
             if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).playSound(1); // تشغيل صوت المسح الناجح
+                ((UHFMainActivity) getActivity()).playSound(1); // تشغيل صوت المسح
             }
         });
     }
@@ -85,7 +109,6 @@ public class MiraIdentityStudioFragment extends Fragment {
         if (suggestions == null || getContext() == null) return;
 
         for (String suggestion : suggestions) {
-            // 🟢 تغليف الـ Context بثيم الـ Material لمنع الانهيار عند إنشاء العناصر ديناميكياً
             android.view.ContextThemeWrapper contextWrapper = new android.view.ContextThemeWrapper(
                     requireContext(), 
                     com.google.android.material.R.style.Widget_MaterialComponents_Chip_Action
@@ -100,11 +123,12 @@ public class MiraIdentityStudioFragment extends Fragment {
     }
 
     private void finalizeItemIdentity() {
-        String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString() : "";
-        String weight = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString() : "";
+        String epc = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
+        String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
+        String weight = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
 
-        if (currentEpc.isEmpty()) {
-            Toast.makeText(getContext(), "يرجى مسح شريحة RFID أولاً لربط القطعة", Toast.LENGTH_SHORT).show();
+        if (epc.isEmpty()) {
+            Toast.makeText(getContext(), "يرجى مسح أو كتابة رمز RFID / GTIN أولاً", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -118,7 +142,6 @@ public class MiraIdentityStudioFragment extends Fragment {
             return;
         }
 
-        // إرسال المسودة والتسجيل النهائي لنظام MIRA ID عبر API
         Toast.makeText(getContext(), "تمت المزامنة واعتُمدت الهوية الرقمية للقطعة بنجاح", Toast.LENGTH_LONG).show();
     }
 
