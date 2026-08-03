@@ -3,46 +3,69 @@
 
     <!-- Base application dark theme -->
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
+
+        <!-- 🔤 1. الخط الافتراضي العام للوضع الداكن -->
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
+
+        <!-- 🔤 2. ربط جميع أوزان وتصنيفات Material 3 Typography بخط Cairo -->
+        <item name="textAppearanceDisplayLarge">@style/AppTextAppearance</item>
+        <item name="textAppearanceDisplayMedium">@style/AppTextAppearance</item>
+        <item name="textAppearanceDisplaySmall">@style/AppTextAppearance</item>
         
-        <!-- 🔤 1. تعيين خط Cairo الشامل -->
-        <item name="fontFamily">@font/cairo</item>
-        <item name="android:fontFamily">@font/cairo</item>
+        <item name="textAppearanceHeadlineLarge">@style/AppTextAppearance.Bold</item>
+        <item name="textAppearanceHeadlineMedium">@style/AppTextAppearance.Bold</item>
+        <item name="textAppearanceHeadlineSmall">@style/AppTextAppearance.Bold</item>
+        
+        <item name="textAppearanceTitleLarge">@style/AppTextAppearance.Bold</item>
+        <item name="textAppearanceTitleMedium">@style/AppTextAppearance.Medium</item>
+        <item name="textAppearanceTitleSmall">@style/AppTextAppearance.Medium</item>
+        
+        <item name="textAppearanceBodyLarge">@style/AppTextAppearance</item>
+        <item name="textAppearanceBodyMedium">@style/AppTextAppearance</item>
+        <item name="textAppearanceBodySmall">@style/AppTextAppearance</item>
+        
+        <item name="textAppearanceLabelLarge">@style/AppTextAppearance.Medium</item>
+        <item name="textAppearanceLabelMedium">@style/AppTextAppearance</item>
+        <item name="textAppearanceLabelSmall">@style/AppTextAppearance</item>
 
-        <!-- 🔤 2. إجبار كافة نصوص TextView على استخدام الستايل المخصص -->
+        <!-- 🔤 3. إجبار كافة المكونات في الوضع الداكن -->
         <item name="android:textViewStyle">@style/AppTextViewStyle</item>
+        <item name="materialButtonStyle">@style/AppButtonStyle</item>
+        <item name="buttonStyle">@style/AppButtonStyle</item>
+        <item name="radioButtonStyle">@style/AppRadioButtonStyle</item>
+        <item name="checkboxStyle">@style/AppCheckBoxStyle</item>
+        <item name="tabStyle">@style/AppTabStyle</item>
 
-        <!-- 🎨 3. ألوان الوضع الداكن (Dark Theme) -->
-        <item name="colorPrimary">#90CAF9</item>            <!-- أزرق هادئ ومريح للعين -->
-        <item name="colorOnPrimary">#00325B</item>
-        <item name="colorPrimaryContainer">#004881</item>
-        <item name="colorOnPrimaryContainer">#D1E4FF</item>
+        <!-- 🌙 4. ألوان الوضع الداكن (Dark Mode Palette) -->
+        <item name="colorPrimary">#9FA8DA</item>            <!-- كحلي/أزرق فاتح مناسب للخلفيات الداكنة -->
+        <item name="colorOnPrimary">#1A237E</item>          <!-- نص داكن فوق اللون الرئيسي -->
+        <item name="colorPrimaryContainer">#283593</item>   <!-- حاويات داكنة -->
+        <item name="colorOnPrimaryContainer">#E8EAF6</item>
 
-        <!-- 💎 اللون الذهبي المشع للوضع الداكن -->
-        <item name="colorSecondary">#D4AF37</item>          <!-- ذهبي مشع -->
-        <item name="colorOnSecondary">#3A2F00</item>
-        <item name="colorSecondaryContainer">#534400</item>
-        <item name="colorOnSecondaryContainer">#FFDF7A</item>
+        <!-- 💎 الذهبي المخصص للمجوهرات في الوضع الداكن -->
+        <item name="colorSecondary">#E5C178</item>          <!-- ذهبي فاتح وواضح -->
+        <item name="colorOnSecondary">#3E2723</item>
+        <item name="colorSecondaryContainer">#4E342E</item>
+        <item name="colorOnSecondaryContainer">#FFE0B2</item>
 
-        <!-- 🖼️ ألوان الخلفيات والأسطح الفاخرة (OLED Charcoal) -->
-        <item name="android:colorBackground">#121212</item> <!-- خلفية داكنة جداً -->
-        <item name="colorOnBackground">#E2E2E6</item>       <!-- نص فاتح مريح -->
-        <item name="colorSurface">#1E1E1E</item>            <!-- بطاقات داكنة فاخرة -->
-        <item name="colorOnSurface">#E2E2E6</item>
-        <item name="colorSurfaceVariant">#2A2A2E</item>     <!-- حقول إدخال داكنة -->
-        <item name="colorOnSurfaceVariant">#C4C6D0</item>
+        <!-- 🖼️ خلفيات وأسطح داكنة متناسقة -->
+        <item name="android:colorBackground">#121212</item> <!-- خلفية داكنة عميقة -->
+        <item name="colorOnBackground">#E1E2E5</item>       <!-- نص فاتح مريح للعين -->
+        <item name="colorSurface">#1E1E1E</item>            <!-- بطاقات وأسطح عائمة -->
+        <item name="colorOnSurface">#E1E2E5</item>          <!-- نص البطاقات -->
+        <item name="colorSurfaceVariant">#2C2C2C</item>     <!-- حقول إدخال وأسطح فرعية -->
+        <item name="colorOnSurfaceVariant">#C4C6CF</item>
     </style>
 
-    <!-- 🔤 ستايل مخصص لـ TextView مع الـ Parent الصحيح المقبول في AAPT -->
-    <style name="AppTextViewStyle" parent="Widget.MaterialComponents.TextView">
+    <!-- 🔤 ستايل الأزرار للوضع الداكن -->
+    <style name="AppButtonStyle" parent="Widget.Material3.Button">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textAllCaps">false</item>
     </style>
 
-    <!-- الثيم الرئيسي المستدعى في AndroidManifest.xml -->
-    <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo">
-        <item name="fontFamily">@font/cairo</item>
-        <item name="android:fontFamily">@font/cairo</item>
-        <item name="android:textViewStyle">@style/AppTextViewStyle</item>
-    </style>
+    <!-- الثيم الرئيسي الداكن -->
+    <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo" />
 
 </resources>
