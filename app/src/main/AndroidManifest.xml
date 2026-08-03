@@ -17,16 +17,18 @@
         android:label="@string/app_name"
         android:theme="@style/CustomTheme">
         <activity
-            android:name="com.example.uhf.activity.UHFMainActivity"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
-            android:exported="true"
-            android:label="@string/app_name">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
+    android:name="com.example.uhf.activity.UHFMainActivity"
+    android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar"
+    android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+    android:exported="true"
+    android:label="@string/app_name">
+    <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
 
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+        <category android:name="android.intent.category.LAUNCHER" />
+    </intent-filter>
+</activity>
+
         <receiver
             android:name="com.example.uhf.BootBroadcastReceiver"
             android:exported="true">
