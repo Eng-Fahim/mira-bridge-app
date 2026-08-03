@@ -87,7 +87,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="textUri"
-                        android:text="https://api.mira.cloud"
+                        android:text="https://ams.ibreg.org/wp-json/mira-gate/v1"
                         android:textSize="13sp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -126,7 +126,7 @@
                         android:textSize="13sp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Buttons Layout: Login & Biometric -->
+                <!-- Buttons Layout -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -155,14 +155,30 @@
                         app:cornerRadius="10dp" />
                 </LinearLayout>
 
-                <!-- Progress Bar Container -->
-                <ProgressBar
-                    android:id="@+id/pbLoading"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="center"
-                    android:layout_marginTop="12dp"
-                    android:visibility="gone" />
+                <!-- ✅ Loading Container محسن -->
+                <LinearLayout
+                    android:id="@+id/loadingContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <ProgressBar
+                        android:id="@+id/pbLoading"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:indeterminateTint="?attr/colorPrimary" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:text="جاري الاتصال بالخادم..."
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="12sp" />
+                </LinearLayout>
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
