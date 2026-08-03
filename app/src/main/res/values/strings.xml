@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="menu_profile">ملفي</string>
+    <string name="menu_settings">الإعدادات</string>
+    <string name="menu_export">تصدير البيانات</string>
+    <string name="menu_logout">تسجيل الخروج</string>
 
     <string name="app_name">MIRA Bridge</string>
     <string name="action_settings">الإعدادات</string>
