@@ -13,6 +13,8 @@ import android.os.Environment;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -46,6 +48,7 @@ import com.example.uhf.fragment.UHFTagFlashFragment;
 import com.example.uhf.fragment.UHFTagLitFragment;
 import com.example.uhf.fragment.UHFUpgradeFragment;
 import com.example.uhf.tools.ExportExcelAsyncTask;
+import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.UIHelper;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 import com.rscja.deviceapi.interfaces.ConnectionStatus;
@@ -63,6 +66,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public boolean loopFlag = false;
     private PlaySoundThread playSoundThread = null;
     public Fragment currentFragment;
+    private SessionManager sessionManager;
 
     // ⭐ POS Mode - مستقبل RFID النشط
     private MiraPosFragment activePOSFragment = null;
@@ -73,9 +77,17 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         
         super.onCreate(savedInstanceState);
+
+        // 🔒 حماية الشاشة الرئيسية: التحقق من تسجيل الدخول
+        sessionManager = new SessionManager(this);
+        if (!sessionManager.isLoggedIn()) {
+            navigateToLogin();
+            return;
+        }
+
         setContentView(R.layout.activity_main);
         checkReadWritePermission();
-        setTitle("MIRA Bridge™");
+        setTitle("MIRA Bridge™ - " + sessionManager.getUserName());
         initSound();
         initUHF();
         initViewPageData();
@@ -160,33 +172,48 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
+    // ============================================
+    // 🔐 تصفية التبويبات حسب الصلاحيات (Role-Based Access)
+    // ============================================
     protected void initViewPageData() {
         fm = getSupportFragmentManager();
         mTabHost = (FragmentTabHost) findViewById(android.R.id.tabhost);
         mTabHost.setup(this, fm, R.id.realtabcontent);
 
-        // 💎 Jewelry Dashboard - لوحة المجوهرات
-        mTabHost.addTab(
-            mTabHost.newTabSpec("JewelryDashboard").setIndicator("💎"),
-            JewelryDashboardFragment.class, null
-        );
+        SessionManager.Role role = sessionManager.getUserRole();
 
-        // 🛒 MIRA POS Mode - وضع البيع
-        mTabHost.addTab(
-            mTabHost.newTabSpec("POS Mode").setIndicator("🛒"),
-            MiraPosFragment.class, null
-        );
+        // 💎 لوحة المجوهرات والـ POS (تظهر للمدراء والمبيعات)
+        if (role == SessionManager.Role.ADMIN || role == SessionManager.Role.POS_OPERATOR) {
+            mTabHost.addTab(
+                mTabHost.newTabSpec("JewelryDashboard").setIndicator("💎"),
+                JewelryDashboardFragment.class, null
+            );
 
-        // 📷 Scan
+            mTabHost.addTab(
+                mTabHost.newTabSpec("POS Mode").setIndicator("🛒"),
+                MiraPosFragment.class, null
+            );
+        }
+
+        // 📷 شاشة القراءة والتتبع (متاحة للجميع)
         mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_scan))
             .setIndicator(getString(R.string.uhf_msg_tab_scan)),
             UHFReadTagFragment.class, null);
 
-        // 🆔 MIRA Identity Studio - تكويد وبصمة القطع
-        mTabHost.addTab(
-            mTabHost.newTabSpec("IdentityStudio").setIndicator("🆔"),
-            MiraIdentityStudioFragment.class, null
-        );
+        // 🆔 استوديو التكوييد والجرد والرادار (للمدراء ومسؤولي الجرد)
+        if (role == SessionManager.Role.ADMIN || role == SessionManager.Role.INVENTORY_MGR) {
+            mTabHost.addTab(
+                mTabHost.newTabSpec("IdentityStudio").setIndicator("🆔"),
+                MiraIdentityStudioFragment.class, null
+            );
+
+            mTabHost.addTab(mTabHost.newTabSpec("Inventory Pro").setIndicator("📊"),
+                MiraInventoryProFragment.class, null);
+
+            mTabHost.addTab(mTabHost.newTabSpec(getResources().getString(R.string.uhf_radar_loaction))
+                .setIndicator(getResources().getString(R.string.uhf_radar_loaction)),
+                UHFRadarLocationFragment.class, null);
+        }
 
         // 🌐 MIRA Web (PWA)
         mTabHost.addTab(
@@ -194,76 +221,90 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             MiraPWAWebFragment.class, null
         );
 
-        // 🏠 Dashboard - التبويب الرئيسي
+        // 🏠 Dashboard الرئيسي
         mTabHost.addTab(
             mTabHost.newTabSpec("Dashboard").setIndicator("🏠"),
             MiraDashboardFragment.class, null
         );
 
-        // ⚙️ Config
-        mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_set))
-            .setIndicator(getString(R.string.uhf_msg_tab_set)),
-            UHFSetFragment.class, null);
+        // 🚪 بوابات الحماية MIRA Secure Gate™ (للمدراء وأمن البوابات)
+        if (role == SessionManager.Role.ADMIN || role == SessionManager.Role.GATE_SECURITY) {
+            mTabHost.addTab(
+                mTabHost.newTabSpec("MIRA Secure Gate™").setIndicator("🚪"),
+                MiraSecureGateFragment.class, null
+            );
+        }
 
-        // 📊 Inventory Pro
-        mTabHost.addTab(mTabHost.newTabSpec("Inventory Pro").setIndicator("📊"),
-            MiraInventoryProFragment.class, null);
+        // ⚙️ التبويبات المتقدمة والإعدادات (للمدراء فقط)
+        if (role == SessionManager.Role.ADMIN) {
+            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_set))
+                .setIndicator(getString(R.string.uhf_msg_tab_set)),
+                UHFSetFragment.class, null);
 
-        // 📡 Radar
-        mTabHost.addTab(mTabHost.newTabSpec(getResources().getString(R.string.uhf_radar_loaction))
-            .setIndicator(getResources().getString(R.string.uhf_radar_loaction)),
-            UHFRadarLocationFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.location))
+                .setIndicator(getString(R.string.location)),
+                UHFLocationFragment.class, null);
 
-        // 📍 Locating
-        mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.location))
-            .setIndicator(getString(R.string.location)),
-            UHFLocationFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.title_tag_lit))
+                .setIndicator(getString(R.string.title_tag_lit)),
+                UHFTagLitFragment.class, null);
 
-        // 💡 Tag Lit
-        mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.title_tag_lit))
-            .setIndicator(getString(R.string.title_tag_lit)),
-            UHFTagLitFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.title_tag_flash))
+                .setIndicator(getString(R.string.title_tag_flash)),
+                UHFTagFlashFragment.class, null);
 
-        // ⚡ Tag Flash
-        mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.title_tag_flash))
-            .setIndicator(getString(R.string.title_tag_flash)),
-            UHFTagFlashFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_read_write))
+                .setIndicator(getString(R.string.uhf_msg_tab_read_write)),
+                UHFReadWriteFragment.class, null);
 
-        // Read/Write
-        mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_read_write))
-            .setIndicator(getString(R.string.uhf_msg_tab_read_write)),
-            UHFReadWriteFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_lock))
+                .setIndicator(getString(R.string.uhf_msg_tab_lock)),
+                UHFLockFragment.class, null);
 
-        // Lock
-        mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_lock))
-            .setIndicator(getString(R.string.uhf_msg_tab_lock)),
-            UHFLockFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_kill))
+                .setIndicator(getString(R.string.uhf_msg_tab_kill)),
+                UHFKillFragment.class, null);
 
-        // Kill
-        mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_kill))
-            .setIndicator(getString(R.string.uhf_msg_tab_kill)),
-            UHFKillFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("Protected-ShortRange").setIndicator("P-SR"),
+                ProtectedModeAndShortRangeModeFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("MarginRead").setIndicator("MR"),
+                MarginReadFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("NxpUcodeDna").setIndicator("DNA"),
+                AuthenticateNxpUcodeDnaFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("BlockWrite").setIndicator("BW"),
+                BlockWriteFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("BlockPermalock").setIndicator("BP"),
+                BlockPermalockFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.action_rfid_upgrader))
+                .setIndicator(getString(R.string.action_rfid_upgrader)),
+                UHFUpgradeFragment.class, null);
+        }
+    }
 
-        // 🚪 MIRA Secure Gate™
-        mTabHost.addTab(
-            mTabHost.newTabSpec("MIRA Secure Gate™").setIndicator("🚪"),
-            MiraSecureGateFragment.class, null
-        );
+    // ============================================
+    // 🚪 تسجيل الخروج وتفريغ الجلسة
+    // ============================================
+    public void performLogout() {
+        if (sessionManager != null) {
+            sessionManager.logout();
+        }
+        navigateToLogin();
+    }
 
-        // تبويبات متقدمة (مخفية أو ثانوية)
-        mTabHost.addTab(mTabHost.newTabSpec("Protected-ShortRange").setIndicator("P-SR"),
-            ProtectedModeAndShortRangeModeFragment.class, null);
-        mTabHost.addTab(mTabHost.newTabSpec("MarginRead").setIndicator("MR"),
-            MarginReadFragment.class, null);
-        mTabHost.addTab(mTabHost.newTabSpec("NxpUcodeDna").setIndicator("DNA"),
-            AuthenticateNxpUcodeDnaFragment.class, null);
-        mTabHost.addTab(mTabHost.newTabSpec("BlockWrite").setIndicator("BW"),
-            BlockWriteFragment.class, null);
-        mTabHost.addTab(mTabHost.newTabSpec("BlockPermalock").setIndicator("BP"),
-            BlockPermalockFragment.class, null);
-        mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.action_rfid_upgrader))
-            .setIndicator(getString(R.string.action_rfid_upgrader)),
-            UHFUpgradeFragment.class, null);
+    private void navigateToLogin() {
+        Intent intent = new Intent(this, LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.export) {
+            exportData();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     @Override
