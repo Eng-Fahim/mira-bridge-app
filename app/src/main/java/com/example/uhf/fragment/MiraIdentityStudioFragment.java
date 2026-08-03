@@ -79,20 +79,26 @@ public class MiraIdentityStudioFragment extends Fragment {
     }
 
     private void populateSuggestions(String typeKey) {
-        binding.chipGroupSuggestions.removeAllViews();
-        String[] suggestions = typeSuggestions.get(typeKey);
+    binding.chipGroupSuggestions.removeAllViews();
+    String[] suggestions = typeSuggestions.get(typeKey);
 
-        if (suggestions == null) return;
+    if (suggestions == null || getContext() == null) return;
 
-        for (String suggestion : suggestions) {
-            Chip chip = new Chip(requireContext());
-            chip.setText(suggestion);
-            chip.setClickable(true);
-            chip.setCheckable(false);
-            chip.setOnClickListener(v -> binding.etTitle.setText(suggestion));
-            binding.chipGroupSuggestions.addView(chip);
-        }
+    for (String suggestion : suggestions) {
+        // 🟢 استخدام ContextThemeWrapper لضمان تطبيق ثيم MaterialComponents على الـ Chip برمجياً
+        android.view.ContextThemeWrapper contextWrapper = new android.view.ContextThemeWrapper(
+                requireContext(), 
+                com.google.android.material.R.style.Widget_MaterialComponents_Chip_Action
+        );
+        Chip chip = new Chip(contextWrapper);
+        chip.setText(suggestion);
+        chip.setClickable(true);
+        chip.setCheckable(false);
+        chip.setOnClickListener(v -> binding.etTitle.setText(suggestion));
+        binding.chipGroupSuggestions.addView(chip);
     }
+}
+
 
     private void finalizeItemIdentity() {
         String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString() : "";
