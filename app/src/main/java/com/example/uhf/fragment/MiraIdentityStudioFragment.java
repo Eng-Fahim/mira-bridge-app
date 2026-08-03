@@ -177,11 +177,13 @@ private double getGoldPriceByKarat() {
         }
     }
 
-    private void finalizeItemIdentity() {
+        private void finalizeItemIdentity() {
         String epc = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
         String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
-        String weight = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
+        String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
+        String barcode = binding.etBarcode != null && binding.etBarcode.getText() != null ? binding.etBarcode.getText().toString().trim() : "";
 
+        // 1. التحقق من الحقول الإلزامية
         if (epc.isEmpty()) {
             Toast.makeText(getContext(), "يرجى مسح أو كتابة رمز RFID / GTIN أولاً", Toast.LENGTH_SHORT).show();
             return;
@@ -190,13 +192,86 @@ private double getGoldPriceByKarat() {
             Toast.makeText(getContext(), "يرجى كتابة أو اختيار عنوان القطعة", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (weight.isEmpty()) {
+        if (weightStr.isEmpty()) {
             Toast.makeText(getContext(), "يرجى تحديد وزن القطعة", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        Toast.makeText(getContext(), "تمت المزامنة واعتُمدت الهوية الرقمية الكاملة للقطعة بنجاح! 💎", Toast.LENGTH_LONG).show();
+        double grossWeight = Double.parseDouble(weightStr);
+        String purityCode = getSelectedKaratCode(); // دالة مساعدة للحصول على العيار المختار (21K, 18K...)
+
+        // تعطيل الزر مؤقتاً أثناء الإرسال لمنع التكرار
+        binding.btnSaveIdentity.setEnabled(false);
+
+        // 2. التنفيذ في Background Thread عبر MiraApiClient
+        java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
+            com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(requireContext());
+            
+            // إرسال طلب التكويد إلى السيرفر
+            com.example.uhf.api.MiraApiClient.ApiResponse response = client.encodeItem(
+                    epc,
+                    barcode,
+                    title,
+                    purityCode,
+                    grossWeight,
+                    grossWeight, // netWeight
+                    0.0,         // المصنعية (سيأخذ الافتراضي من السيرفر إذا كانت 0)
+                    0.0,         // الهامش (سيأخذ الافتراضي من السيرفر إذا كانت 0)
+                    "مجوهرات",
+                    "المعرض الرئيسي"
+            );
+
+            // 3. العودة للـ UI Thread لتحديث الواجهة وتطبيق تجربة المستخدم (UX)
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    binding.btnSaveIdentity.setEnabled(true);
+
+                    if (response.isSuccess) {
+                        // تشغيل صوت النجاح
+                        if (getActivity() instanceof UHFMainActivity) {
+                            ((UHFMainActivity) getActivity()).playSound(1);
+                        }
+
+                        Toast.makeText(getContext(), "تمت المزامنة واعتُمدت الهوية الرقمية للقطعة بنجاح! 💎", Toast.LENGTH_LONG).show();
+
+                        // 🔄 التفريغ الذكي للحقول للتكويد التالي
+                        resetFormForNextScan();
+
+                    } else {
+                        Toast.makeText(getContext(), "خطأ في التكويد: " + response.error, Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        });
     }
+
+    /**
+     * 🧹 تفريغ الحقول المتغيرة فقط لتجهيز الشاشة للقطعة التالية
+     */
+    private void resetFormForNextScan() {
+        binding.etEpc.setText("");
+        if (binding.etBarcode != null) binding.etBarcode.setText("");
+        binding.etTitle.setText("");
+        binding.etGrossWeight.setText("");
+        binding.tvStatusBadge.setText("WAITING");
+        binding.tvEstimatedGoldValue.setText("0.00 $");
+        
+        // إعادة التركيز لحقل المسح
+        binding.etEpc.requestFocus();
+    }
+
+    /**
+     * 🏷️ جلب كود العيار المختار من الـ Chips
+     */
+    private String getSelectedKaratCode() {
+        int checkedId = binding.chipGroupKarat.getCheckedChipId();
+        if (checkedId == binding.chip24K.getId()) return "24K";
+        if (checkedId == binding.chip21K.getId()) return "21K";
+        if (checkedId == binding.chip18K.getId()) return "18K";
+        if (checkedId == binding.chip14K.getId()) return "14K";
+        return "21K"; // افتراضي
+    }
+
 
     @Override
     public void onDestroyView() {
