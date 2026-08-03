@@ -45,12 +45,8 @@ public class MiraApiClient {
         this.gateId = prefs.getString("mira_gate_id", DEFAULT_GATE_ID);
     }
 
-    // ===================== 🆕 AUTHENTICATION =====================
+    // ===================== 🔑 AUTHENTICATION =====================
 
-    /**
-     * 🔑 مصادقة المستخدم - تسجيل الدخول
-     * Endpoint: POST /auth/login
-     */
     public ApiResponse login(String username, String password, String deviceId) {
         JSONObject payload = new JSONObject();
         try {
@@ -65,10 +61,6 @@ public class MiraApiClient {
         return post("/auth/login", payload);
     }
 
-    /**
-     * 🔑 مصادقة سريعة باستخدام التوكن المخزن
-     * Endpoint: POST /auth/validate-token
-     */
     public ApiResponse validateToken(String token) {
         JSONObject payload = new JSONObject();
         try {
@@ -80,10 +72,6 @@ public class MiraApiClient {
         return post("/auth/validate-token", payload);
     }
 
-    /**
-     * 🚪 تسجيل الخروج وإنهاء الجلسة على السيرفر
-     * Endpoint: POST /auth/logout
-     */
     public ApiResponse logout(String token) {
         JSONObject payload = new JSONObject();
         try {
@@ -95,18 +83,10 @@ public class MiraApiClient {
         return post("/auth/logout", payload);
     }
 
-    /**
-     * 👤 جلب بيانات المستخدم الحالي وصلاحياته
-     * Endpoint: GET /auth/me
-     */
     public ApiResponse getCurrentUser() {
         return get("/auth/me");
     }
 
-    /**
-     * 🔄 تجديد التوكن قبل انتهاء صلاحيته
-     * Endpoint: POST /auth/refresh-token
-     */
     public ApiResponse refreshToken(String oldToken) {
         JSONObject payload = new JSONObject();
         try {
@@ -118,10 +98,6 @@ public class MiraApiClient {
         return post("/auth/refresh-token", payload);
     }
 
-    /**
-     * 📱 تسجيل جهاز جديد للمصادقة البيومترية
-     * Endpoint: POST /auth/register-biometric
-     */
     public ApiResponse registerBiometric(String token, String deviceId, String publicKey) {
         JSONObject payload = new JSONObject();
         try {
@@ -135,10 +111,6 @@ public class MiraApiClient {
         return post("/auth/register-biometric", payload);
     }
 
-    /**
-     * 🔐 تحقق بيومتري بعد المصادقة الأولية
-     * Endpoint: POST /auth/verify-biometric
-     */
     public ApiResponse verifyBiometric(String token, String signedChallenge) {
         JSONObject payload = new JSONObject();
         try {
@@ -151,7 +123,7 @@ public class MiraApiClient {
         return post("/auth/verify-biometric", payload);
     }
 
-    // ===================== 🔑 AUTHORIZE (موجودة مسبقاً) =====================
+    // ===================== 🔑 AUTHORIZE =====================
 
     public ApiResponse authorize(String epc, String contextType, JSONObject extraParams) {
         JSONObject payload = new JSONObject();
@@ -170,14 +142,203 @@ public class MiraApiClient {
         return post("/authorize", payload);
     }
 
-    // ===================== باقي الدوال كما هي =====================
-    // (encodeItem, getGoldRatesAndSettings, checkout, getItemDetail,
-    //  getDashboardSummary, getDashboardFull, startInventorySession,
-    //  scanInventoryItem, closeInventorySession, heartbeat, إلخ...)
+    // ===================== 📊 DASHBOARD =====================
 
-    // [... جميع الدوال الأخرى تبقى كما هي بدون تغيير ...]
+    public ApiResponse getDashboardSummary() {
+        return get("/dashboard/summary");
+    }
 
-    // ===================== Core HTTP Methods =====================
+    public ApiResponse getDashboardFull() {
+        return get("/dashboard/full");
+    }
+
+    // ===================== 🛒 POS =====================
+
+    public ApiResponse checkout(JSONObject payload) {
+        return post("/pos/checkout", payload);
+    }
+
+    public ApiResponse getSalesHistory() {
+        return get("/pos/sales");
+    }
+
+    // ===================== 🏷️ ITEM DETAIL =====================
+
+    public ApiResponse getItemDetail(String code) {
+        return get("/item/" + code);
+    }
+
+    // ===================== 📸 SNAPSHOTS =====================
+
+    public ApiResponse getLastSnapshot(String location) {
+        return get("/inventory/last-snapshot?location=" + (location != null ? location : "Main Showroom"));
+    }
+
+    public ApiResponse getInventoryHistory(String location, int limit) {
+        return get("/inventory/history/" + location + "?limit=" + limit);
+    }
+
+    // ===================== 💎 HIGH VALUE ITEMS =====================
+
+    public ApiResponse getHighValueItems(String location, double threshold) {
+        return get("/inventory/high-value?location=" + (location != null ? location : "Main Showroom") + "&threshold=" + threshold);
+    }
+
+    // ===================== 📊 INVENTORY =====================
+
+    public ApiResponse startInventorySession(String location, String type) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("location", location != null ? location : "default");
+            payload.put("type", type != null ? type : "full");
+        } catch (Exception ignored) {}
+        return post("/inventory/start-session", payload);
+    }
+
+    public ApiResponse startBlindInventory(String location, String category) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("location", location != null ? location : "Main Showroom");
+            if (category != null && !category.isEmpty()) {
+                payload.put("category", category);
+            }
+        } catch (Exception ignored) {}
+        return post("/inventory/blind-start", payload);
+    }
+
+    public ApiResponse scanInventoryItem(int sessionId, String code, String rssi) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("session_id", sessionId);
+            payload.put("code", code);
+            if (rssi != null) payload.put("rssi", rssi);
+        } catch (Exception ignored) {}
+        return post("/inventory/scan-item", payload);
+    }
+
+    public ApiResponse closeInventorySession(JSONObject payload) {
+        return post("/inventory/close-session", payload);
+    }
+
+    public ApiResponse createInventorySnapshot(JSONObject payload) {
+        return post("/inventory/create-snapshot", payload);
+    }
+
+    public ApiResponse getInventorySettings(String location) {
+        return get("/inventory/settings/" + (location != null ? location : "default"));
+    }
+
+    // ===================== 🏷️ ENCODE ITEM =====================
+
+    public ApiResponse encodeItem(JSONObject itemPayload) {
+        return post("/encode-item", itemPayload);
+    }
+
+    public ApiResponse encodeItem(String epc, String barcode, String title, String purityCode,
+                                  double grossWeight, double netWeight, double makingPerGram,
+                                  double profitMargin, String category, String location) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("epc", epc);
+            payload.put("barcode", barcode != null ? barcode : "");
+            payload.put("title", title != null ? title : "قطعة مجوهرات");
+            payload.put("purity_code", purityCode != null ? purityCode : "21K");
+            payload.put("gross_weight", grossWeight);
+            payload.put("net_weight", netWeight);
+            payload.put("making_per_gram", makingPerGram);
+            payload.put("profit_margin", profitMargin);
+            payload.put("category", category != null ? category : "مجوهرات");
+            payload.put("location", location != null ? location : "المعرض الرئيسي");
+            payload.put("gate_id", gateId);
+        } catch (Exception e) {
+            Log.e(TAG, "Error building encode payload: " + e.getMessage());
+        }
+        return encodeItem(payload);
+    }
+
+    // ===================== 📈 GOLD RATES =====================
+
+    public ApiResponse getGoldRatesAndSettings() {
+        return get("/gold-rates");
+    }
+
+    // ===================== 🚪 GATES =====================
+
+    public ApiResponse getGates() {
+        return get("/gates");
+    }
+
+    public ApiResponse getGatesStats() {
+        return get("/gates/stats");
+    }
+
+    // ===================== 💓 HEARTBEAT =====================
+
+    public ApiResponse heartbeat(String status, int battery) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("gate_id", gateId);
+            payload.put("status", status != null ? status : "online");
+            if (battery > 0) payload.put("battery", battery);
+        } catch (Exception ignored) {}
+        return post("/heartbeat", payload);
+    }
+
+    // ===================== ⚙️ SETTINGS =====================
+
+    public ApiResponse getSettings() {
+        return get("/settings/" + gateId);
+    }
+
+    public ApiResponse saveSettings(JSONObject settings) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("gate_id", gateId);
+            payload.put("settings", settings);
+        } catch (Exception ignored) {}
+        return post("/settings", payload);
+    }
+
+    // ===================== 🔧 TAG OPERATIONS =====================
+
+    public ApiResponse spotlightTags(String[] tags) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("gate_id", gateId);
+            payload.put("tags", new JSONArray(java.util.Arrays.asList(tags)));
+        } catch (Exception ignored) {}
+        return post("/spotlight", payload);
+    }
+
+    public ApiResponse programTag(String serial, String newEpc) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("serial", serial);
+            payload.put("new_epc", newEpc);
+            payload.put("gate_id", gateId);
+        } catch (Exception ignored) {}
+        return post("/program", payload);
+    }
+
+    public ApiResponse lockTag(String serial) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("serial", serial);
+            payload.put("gate_id", gateId);
+        } catch (Exception ignored) {}
+        return post("/lock", payload);
+    }
+
+    public ApiResponse deactivateTag(String serial) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("serial", serial);
+            payload.put("gate_id", gateId);
+        } catch (Exception ignored) {}
+        return post("/deactivate", payload);
+    }
+
+    // ===================== CORE HTTP METHODS =====================
 
     private ApiResponse post(String endpoint, JSONObject payload) {
         HttpURLConnection conn = null;
@@ -261,12 +422,12 @@ public class MiraApiClient {
         return new ApiResponse(responseCode, json, null);
     }
 
-    // ===================== Getters =====================
+    // ===================== GETTERS =====================
 
     public String getGateId() { return gateId; }
     public String getApiUrl() { return apiUrl; }
 
-    // ===================== ApiResponse =====================
+    // ===================== API RESPONSE CLASS =====================
 
     public static class ApiResponse {
         public final int code;
@@ -301,4 +462,4 @@ public class MiraApiClient {
             return null;
         }
     }
-}
+                }
