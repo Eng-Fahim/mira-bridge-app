@@ -3,6 +3,7 @@
     android:versionCode="1"
     android:versionName="1.0">
 
+    <!-- الأذونات المقررة للتطبيق -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
@@ -14,22 +15,30 @@
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:theme="@style/Theme.Uhfuartdemo"> <!-- 👈 التعديل 1: توحيد ثيم التطبيق -->
+        android:theme="@style/Theme.Uhfuartdemo">
 
+        <!-- 1️⃣ شاشة تسجيل الدخول (تصبح هي الـ LAUNCHER التي تفتح أولاً) -->
         <activity
-            android:name="com.example.uhf.activity.UHFMainActivity"
-            android:theme="@style/Theme.Uhfuartdemo" 
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" 
+            android:name="com.example.uhf.activity.LoginActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
             android:exported="true"
-            android:label="@string/app_name">
-            <!-- 👆 التعديل 2: ربط الـ Activity بثيمك المخصص + إضافة uiMode لضمان السلاسة عند التبديل -->
-            
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Uhfuartdemo">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
+        <!-- 2️⃣ الشاشة الرئيسية (تصبح exported="false" ولا تفتح إلا بعد تسجيل الدخول) -->
+        <activity
+            android:name="com.example.uhf.activity.UHFMainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Uhfuartdemo" />
+
+        <!-- مستقبل بدء التشغيل الذاتي -->
         <receiver
             android:name="com.example.uhf.BootBroadcastReceiver"
             android:exported="true">
@@ -39,6 +48,7 @@
             </intent-filter>
         </receiver>
 
+        <!-- باقي شاشات النظام الخاصة بك -->
         <activity
             android:name="com.example.uhf.filebrowser.FileManagerActivity"
             android:configChanges="orientation|screenSize|uiMode"
