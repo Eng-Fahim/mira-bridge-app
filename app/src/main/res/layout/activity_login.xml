@@ -14,33 +14,45 @@
         android:padding="24dp"
         android:gravity="center_horizontal">
 
-        <!-- Logo Section -->
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="64dp"
-            android:gravity="center"
-            android:orientation="vertical">
+        
+<!-- Logo Section -->
+<LinearLayout
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="64dp"
+    android:gravity="center"
+    android:orientation="vertical">
 
-            <com.google.android.material.textview.MaterialTextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="◆ MIRA"
-                android:textColor="?attr/colorPrimary"
-                android:textSize="36sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.05" />
+    <com.google.android.material.textview.MaterialTextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="◆ MIRA"
+        android:textColor="?attr/colorPrimary"
+        android:textSize="36sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.05" />
 
-            <com.google.android.material.textview.MaterialTextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Enterprise Authentication"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="12sp"
-                android:letterSpacing="0.15" />
-        </LinearLayout>
+    <com.google.android.material.textview.MaterialTextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Enterprise Authentication"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="12sp"
+        android:letterSpacing="0.15" />
 
+    <!-- ✅ أضف هذا العنصر -->
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/tvAppVersion"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="v1.0.0"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="10sp"
+        android:alpha="0.5" />
+
+</LinearLayout>
         <!-- Main Card -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/loginCard"
