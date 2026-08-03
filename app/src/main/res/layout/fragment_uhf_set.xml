@@ -1,1041 +1,1154 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="fill_parent"
-    android:layout_height="fill_parent"
-    android:scrollbars="none"
-    android:background="#F5F7FA">
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?android:attr/colorBackground"
+    android:fillViewport="true"
+    android:scrollbars="none">
 
     <LinearLayout
-        android:layout_width="fill_parent"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="4dp">
+        android:padding="8dp">
 
         <!-- ============================================ -->
-<!-- 🟢 نمط العمل (Working Mode) -->
-<!-- ============================================ -->
-<LinearLayout
-    android:layout_width="fill_parent"
-    android:layout_height="wrap_content"
-    android:layout_margin="2dp"
-    android:background="@drawable/rectangle_bg"
-    android:orientation="vertical">
-
-    <TextView
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:background="#0D47A1"
-        android:padding="10dp"
-        android:text="🌍 نمط العمل (Working Mode)"
-        android:textColor="#FFFFFF"
-        android:textSize="16sp"
-        android:textStyle="bold" />
-
-    <LinearLayout
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="10dp"
-        android:background="#FFFFFF">
-
-        <Spinner
-            android:id="@+id/spWorkingMode"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:entries="@array/working_modes" />
-
-        <TextView
+        <!-- 🟢 1. نمط العمل (Working Mode) -->
+        <!-- ============================================ -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="🇾🇪 MIRA Yemen: أمثل لليمن | 🌍 Standard: عالمي | 📡 RFID: قارئ فقط | 🛠️ Dev: تطوير"
-            android:textColor="#666666"
-            android:textSize="11sp"
-            android:layout_marginTop="4dp" />
-    </LinearLayout>
-</LinearLayout>
-
-        <!-- ============================================ -->
-        <!-- 🟢 قسم MIRA Bridge - إعدادات الاتصال -->
-        <!-- ============================================ -->
-        <LinearLayout
-            android:layout_width="fill_parent"
-            android:layout_height="wrap_content"
-            android:layout_margin="2dp"
-            android:background="@drawable/rectangle_bg"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:background="#1A237E"
-                android:padding="10dp"
-                android:text="🔑 إعدادات اتصال MIRA Bridge"
-                android:textColor="#FFFFFF"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+            android:layout_margin="4dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="0dp">
 
             <LinearLayout
-                android:layout_width="fill_parent"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="10dp"
-                android:background="#FFFFFF">
+                android:orientation="vertical">
 
-                <!-- API URL -->
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="رابط MIRA API:"
-                    android:textSize="14sp"
-                    android:textColor="#333333" />
-
-                <Spinner
-                    android:id="@+id/spMiraApiUrl"
                     android:layout_width="match_parent"
-                    android:layout_height="44dp"
-                    android:entries="@array/mira_api_urls"
-                    android:layout_marginBottom="8dp" />
+                    android:layout_height="wrap_content"
+                    android:background="?attr/colorPrimary"
+                    android:padding="12dp"
+                    android:text="🌍 نمط العمل (Working Mode)"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
 
-                <!-- API Key -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <Spinner
+                        android:id="@+id/spWorkingMode"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:entries="@array/working_modes" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="🇾🇪 MIRA Yemen: أمثل لليمن | 🌍 Standard: عالمي | 📡 RFID: قارئ فقط | 🛠️ Dev: تطوير"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ============================================ -->
+        <!-- 🟢 2. قسم MIRA Bridge - إعدادات الاتصال -->
+        <!-- ============================================ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="4dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="مفتاح API:"
-                    android:textSize="14sp"
-                    android:textColor="#333333" />
-
-                <EditText
-                    android:id="@+id/etMiraApiKey"
                     android:layout_width="match_parent"
-                    android:layout_height="44dp"
-                    android:hint="أدخل مفتاح API"
-                    android:inputType="textPassword"
-                    android:text="mira_gate_test071234567890abcdefghijklmnop"
-                    android:layout_marginBottom="8dp"
-                    android:background="@drawable/edittext_border"
-                    android:paddingHorizontal="10dp" />
+                    android:layout_height="wrap_content"
+                    android:background="?attr/colorPrimary"
+                    android:padding="12dp"
+                    android:text="🔑 إعدادات اتصال MIRA Bridge"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
 
-                <!-- Gate ID -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <!-- API URL -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="رابط MIRA API:"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <Spinner
+                        android:id="@+id/spMiraApiUrl"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginBottom="12dp"
+                        android:entries="@array/mira_api_urls" />
+
+                    <!-- API Key -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:hint="مفتاح API"
+                        app:passwordToggleEnabled="true">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etMiraApiKey"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textPassword"
+                            android:text="mira_gate_test071234567890abcdefghijklmnop"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- Gate ID -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:hint="معرف البوابة (Gate ID)">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etMiraGateId"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="handheld_c72"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- زر اختبار الاتصال + حالة -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnTestMiraConnection"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:backgroundTint="?attr/colorPrimary"
+                            android:text="🔍 اختبار الاتصال"
+                            android:textColor="?attr/colorOnPrimary"
+                            android:textStyle="bold"
+                            app:cornerRadius="8dp" />
+
+                        <TextView
+                            android:id="@+id/tvMiraConnectionStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="⚪ غير متصل"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ============================================ -->
+        <!-- 🟢 3. قسم إعدادات التطبيق -->
+        <!-- ============================================ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="4dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="معرف البوابة (Gate ID):"
-                    android:textSize="14sp"
-                    android:textColor="#333333" />
-
-                <EditText
-                    android:id="@+id/etMiraGateId"
                     android:layout_width="match_parent"
-                    android:layout_height="44dp"
-                    android:hint="handheld_c72"
-                    android:text="handheld_c72"
-                    android:layout_marginBottom="8dp"
-                    android:background="@drawable/edittext_border"
-                    android:paddingHorizontal="10dp" />
+                    android:layout_height="wrap_content"
+                    android:background="?attr/colorPrimary"
+                    android:padding="12dp"
+                    android:text="🔊 إعدادات تطبيق MIRA Bridge"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
 
-                <!-- زر اختبار الاتصال + حالة -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <CheckBox
+                        android:id="@+id/cbSoundOnScan"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:paddingVertical="6dp"
+                        android:text="🔔 صوت عند المسح"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+
+                    <CheckBox
+                        android:id="@+id/cbShowMiraCard"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:paddingVertical="6dp"
+                        android:text="📱 عرض بطاقة MIRA تلقائياً"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+
+                    <CheckBox
+                        android:id="@+id/cbRadarSimulation"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:paddingVertical="6dp"
+                        android:text="📡 وضع محاكاة الرادار (للتطوير)"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+
+                    <CheckBox
+                        android:id="@+id/cbAutoQueryMira"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:paddingVertical="6dp"
+                        android:text="🔍 استعلام MIRA تلقائي عند المسح"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ============================================ -->
+        <!-- 📷 4. إعدادات المسح (Scan Mode) -->
+        <!-- ============================================ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="4dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/colorPrimary"
+                    android:padding="12dp"
+                    android:text="📷 إعدادات المسح (Scan Mode)"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="4dp"
+                        android:text="طريقة المسح الأساسية:"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <RadioGroup
+                        android:id="@+id/rgScanMode"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp">
+
+                        <RadioButton
+                            android:id="@+id/rbRfidMode"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:paddingVertical="4dp"
+                            android:text="📡 RFID UHF (قارئ Chainway)"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp" />
+
+                        <RadioButton
+                            android:id="@+id/rbCameraMode"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:paddingVertical="4dp"
+                            android:text="📷 كاميرا الهاتف (QR / GS1 DataMatrix)"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp" />
+
+                        <RadioButton
+                            android:id="@+id/rbHybridMode"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:paddingVertical="4dp"
+                            android:text="🔀 هجين (RFID + كاميرا + يدوي)"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp" />
+
+                        <RadioButton
+                            android:id="@+id/rbManualMode"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:paddingVertical="4dp"
+                            android:text="⌨️ إدخال يدوي فقط"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp" />
+                    </RadioGroup>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="8dp"
+                        android:background="?attr/colorOutlineVariant" />
+
+                    <CheckBox
+                        android:id="@+id/cbAutoScan"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="false"
+                        android:paddingVertical="4dp"
+                        android:text="🔄 تفعيل المسح التلقائي المستمر"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+
+                    <CheckBox
+                        android:id="@+id/cbAutoOpenCamera"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:paddingVertical="4dp"
+                        android:text="📸 فتح الكاميرا تلقائياً عند اختيار وضع الكاميرا"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+
+                    <CheckBox
+                        android:id="@+id/cbShowScanFrame"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:paddingVertical="4dp"
+                        android:text="🎯 إظهار إطار المسح في الكاميرا"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+
+                    <CheckBox
+                        android:id="@+id/cbParseGS1"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:paddingVertical="4dp"
+                        android:text="🔍 تحليل GS1 DataMatrix تلقائياً (GTIN + Serial + Weight)"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+
+                    <CheckBox
+                        android:id="@+id/cbVibrateOnScan"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:paddingVertical="4dp"
+                        android:text="📳 اهتزاز عند المسح الناجح"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ============================================ -->
+        <!-- 📊 5. إعدادات الجرد -->
+        <!-- ============================================ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="4dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/colorPrimary"
+                    android:padding="12dp"
+                    android:text="📊 إعدادات الجرد (Inventory)"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="نمط الجرد:"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <Spinner
+                        android:id="@+id/spInventoryMode"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginBottom="8dp"
+                        android:entries="@array/inventory_modes" />
+
+                    <CheckBox
+                        android:id="@+id/cbInventorySound"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:paddingVertical="4dp"
+                        android:text="🔊 صوت عند كل مسح"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+
+                    <CheckBox
+                        android:id="@+id/cbInventoryVibrate"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:paddingVertical="4dp"
+                        android:text="📳 اهتزاز عند كل مسح"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+
+                    <CheckBox
+                        android:id="@+id/cbInventoryAutoStop"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="false"
+                        android:paddingVertical="4dp"
+                        android:text="⏹️ إيقاف تلقائي عند الاكتمال"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+
+                    <CheckBox
+                        android:id="@+id/cbInventoryShowImages"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="false"
+                        android:paddingVertical="4dp"
+                        android:text="🖼️ عرض صور القطع أثناء الجرد"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+
+                    <CheckBox
+                        android:id="@+id/cbInventorySortByLocation"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:paddingVertical="4dp"
+                        android:text="📍 ترتيب حسب الموقع"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ============================================ -->
+        <!-- 📡 6. قسم إعدادات القارئ RFID -->
+        <!-- ============================================ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="4dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/colorPrimary"
+                    android:padding="12dp"
+                    android:text="📡 إعدادات قارئ RFID"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <!-- التردد -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/tvMode"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp" />
+
+                        <Spinner
+                            android:id="@+id/spFrequency"
+                            android:layout_width="match_parent"
+                            android:layout_height="48dp"
+                            android:entries="@array/arrayMode" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnSetFrequency"
+                            android:layout_width="0dp"
+                            android:layout_height="44dp"
+                            android:layout_weight="1"
+                            android:backgroundTint="?attr/colorPrimary"
+                            android:text="@string/btSetFre"
+                            android:textColor="?attr/colorOnPrimary"
+                            app:cornerRadius="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnGetFrequency"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="44dp"
+                            android:layout_marginStart="12dp"
+                            android:layout_weight="1"
+                            android:text="@string/btGetFre"
+                            android:textColor="?attr/colorPrimary"
+                            app:cornerRadius="8dp"
+                            app:strokeColor="?attr/colorPrimary" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?attr/colorOutlineVariant" />
+
+                <!-- الطاقة -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/uhf_title_power"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp" />
+
+                        <Spinner
+                            android:id="@+id/spPower"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:entries="@array/arrayPower" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/uhf_title_dbm"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnSetPower"
+                            android:layout_width="0dp"
+                            android:layout_height="44dp"
+                            android:layout_weight="1"
+                            android:backgroundTint="?attr/colorPrimary"
+                            android:text="@string/uhf_btn_setpower"
+                            android:textColor="?attr/colorOnPrimary"
+                            app:cornerRadius="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnGetPower"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="44dp"
+                            android:layout_marginStart="12dp"
+                            android:layout_weight="1"
+                            android:text="@string/uhf_btn_getpower"
+                            android:textColor="?attr/colorPrimary"
+                            app:cornerRadius="8dp"
+                            app:strokeColor="?attr/colorPrimary" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- تردد أمريكا/أخرى -->
+                <LinearLayout
+                    android:id="@+id/ll_freHop"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp"
+                    android:visibility="gone">
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginBottom="8dp"
+                        android:background="?attr/colorOutlineVariant" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/freHopType"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp" />
+
+                        <RadioGroup
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <RadioButton
+                                android:id="@+id/rb_America"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:checked="true"
+                                android:onClick="onClick_rbAmerica"
+                                android:text="@string/America"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="14sp" />
+
+                            <RadioButton
+                                android:id="@+id/rb_Others"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:onClick="onClick_rbOthers"
+                                android:text="@string/Others"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="14sp" />
+                        </RadioGroup>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/tvFreHop"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp" />
+
+                        <Spinner
+                            android:id="@+id/spFreHop"
+                            android:layout_width="match_parent"
+                            android:layout_height="48dp"
+                            android:entries="@array/arrayFreHop_us" />
+                    </LinearLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSetFreHop"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="8dp"
+                        android:backgroundTint="?attr/colorPrimary"
+                        android:text="@string/btSetFreHop"
+                        android:textColor="?attr/colorOnPrimary"
+                        app:cornerRadius="8dp" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ============================================ -->
+        <!-- 📡 7. إعدادات متقدمة للقارئ -->
+        <!-- ============================================ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="4dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/colorSurfaceVariant"
+                    android:padding="12dp"
+                    android:text="🔧 إعدادات متقدمة للقارئ"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <!-- معلمات الربط -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/uhf_title_link"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp" />
+
+                        <Spinner
+                            android:id="@+id/splinkParams"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:entries="@array/arrayLink" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnSetLinkParams"
+                            android:layout_width="0dp"
+                            android:layout_height="44dp"
+                            android:layout_weight="1"
+                            android:backgroundTint="?attr/colorPrimary"
+                            android:text="@string/uhf_btn_setLinkParams"
+                            android:textColor="?attr/colorOnPrimary"
+                            app:cornerRadius="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnGetLinkParams"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="44dp"
+                            android:layout_marginStart="12dp"
+                            android:layout_weight="1"
+                            android:text="@string/uhf_btn_getLinkParams"
+                            android:textColor="?attr/colorPrimary"
+                            app:cornerRadius="8dp"
+                            app:strokeColor="?attr/colorPrimary" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?attr/colorOutlineVariant" />
+
+                <!-- Memory Bank -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/uhf_btn_memoryBank"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp" />
+
+                        <Spinner
+                            android:id="@+id/spMemoryBank"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:entries="@array/arrayMemoryBank" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/llMemoryBankParams"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Offset:"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="13sp" />
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etOffset"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:inputType="number"
+                            android:text="0"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/word"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="Length:"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="13sp" />
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etLength"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:inputType="number"
+                            android:text="6"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/word"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnSetMemoryBank"
+                            android:layout_width="0dp"
+                            android:layout_height="44dp"
+                            android:layout_weight="1"
+                            android:backgroundTint="?attr/colorPrimary"
+                            android:text="@string/er_dsoft_get_Set"
+                            android:textColor="?attr/colorOnPrimary"
+                            app:cornerRadius="8dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnGetMemoryBank"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="44dp"
+                            android:layout_marginStart="12dp"
+                            android:layout_weight="1"
+                            android:text="@string/er_dsoft_get_Get"
+                            android:textColor="?attr/colorPrimary"
+                            app:cornerRadius="8dp"
+                            app:strokeColor="?attr/colorPrimary" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?attr/colorOutlineVariant" />
+
+                <!-- Session -->
+                <LinearLayout
+                    android:id="@+id/llSession"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Session:"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="13sp" />
+
+                    <Spinner
+                        android:id="@+id/spSession"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:entries="@array/arraySession"
+                        android:minWidth="90dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:text="Target:"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="13sp" />
+
+                    <Spinner
+                        android:id="@+id/spTarget"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:entries="@array/arrayInventoried"
+                        android:minWidth="90dp" />
+                </LinearLayout>
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginTop="4dp">
+                    android:paddingHorizontal="12dp"
+                    android:paddingBottom="12dp">
 
-                    <Button
-                        android:id="@+id/btnTestMiraConnection"
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSetSession"
                         android:layout_width="0dp"
-                        android:layout_height="42dp"
+                        android:layout_height="44dp"
                         android:layout_weight="1"
-                        android:background="#1A73E8"
-                        android:text="🔍 اختبار الاتصال"
-                        android:textColor="#FFFFFF"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvMiraConnectionStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
-                        android:text="⚪ غير متصل"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- ============================================ -->
-        <!-- 🟢 قسم إعدادات التطبيق -->
-        <!-- ============================================ -->
-        <LinearLayout
-            android:layout_width="fill_parent"
-            android:layout_height="wrap_content"
-            android:layout_margin="2dp"
-            android:background="@drawable/rectangle_bg"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:background="#1A73E8"
-                android:padding="10dp"
-                android:text="🔊 إعدادات تطبيق MIRA Bridge"
-                android:textColor="#FFFFFF"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <LinearLayout
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="10dp"
-                android:background="#FFFFFF">
-
-                <CheckBox
-                    android:id="@+id/cbSoundOnScan"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:checked="true"
-                    android:text="🔔 صوت عند المسح"
-                    android:textSize="15sp"
-                    android:paddingVertical="8dp" />
-
-                <CheckBox
-                    android:id="@+id/cbShowMiraCard"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:checked="true"
-                    android:text="📱 عرض بطاقة MIRA تلقائياً"
-                    android:textSize="15sp"
-                    android:paddingVertical="8dp" />
-
-                <CheckBox
-                    android:id="@+id/cbRadarSimulation"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:checked="true"
-                    android:text="📡 وضع محاكاة الرادار (للتطوير)"
-                    android:textSize="15sp"
-                    android:paddingVertical="8dp" />
-
-                <CheckBox
-                    android:id="@+id/cbAutoQueryMira"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:checked="true"
-                    android:text="🔍 استعلام MIRA تلقائي عند المسح"
-                    android:textSize="15sp"
-                    android:paddingVertical="8dp" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- ============================================ -->
-<!-- 📷 إعدادات المسح (Scan Mode) -->
-<!-- ============================================ -->
-<LinearLayout
-    android:layout_width="fill_parent"
-    android:layout_height="wrap_content"
-    android:layout_margin="2dp"
-    android:background="@drawable/rectangle_bg"
-    android:orientation="vertical">
-
-    <TextView
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:background="#00695C"
-        android:padding="10dp"
-        android:text="📷 إعدادات المسح (Scan Mode)"
-        android:textColor="#FFFFFF"
-        android:textSize="16sp"
-        android:textStyle="bold" />
-
-    <LinearLayout
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="10dp"
-        android:background="#FFFFFF">
-
-        <!-- طريقة المسح -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="طريقة المسح الأساسية:"
-            android:textColor="#333333"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="4dp" />
-
-        <RadioGroup
-            android:id="@+id/rgScanMode"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp">
-
-            <RadioButton
-                android:id="@+id/rbRfidMode"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="📡 RFID UHF (قارئ Chainway)"
-                android:textSize="14sp"
-                android:paddingVertical="6dp"
-                android:checked="true" />
-
-            <RadioButton
-                android:id="@+id/rbCameraMode"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="📷 كاميرا الهاتف (QR / GS1 DataMatrix)"
-                android:textSize="14sp"
-                android:paddingVertical="6dp" />
-
-            <RadioButton
-                android:id="@+id/rbHybridMode"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="🔀 هجين (RFID + كاميرا + يدوي)"
-                android:textSize="14sp"
-                android:paddingVertical="6dp" />
-
-            <RadioButton
-                android:id="@+id/rbManualMode"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="⌨️ إدخال يدوي فقط"
-                android:textSize="14sp"
-                android:paddingVertical="6dp" />
-        </RadioGroup>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#E0E0E0"
-            android:layout_marginVertical="8dp" />
-
-        <!-- خيارات إضافية -->
-        <CheckBox
-            android:id="@+id/cbAutoScan"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="🔄 تفعيل المسح التلقائي المستمر"
-            android:textSize="14sp"
-            android:paddingVertical="6dp"
-            android:checked="false" />
-
-        <CheckBox
-            android:id="@+id/cbAutoOpenCamera"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="📸 فتح الكاميرا تلقائياً عند اختيار وضع الكاميرا"
-            android:textSize="14sp"
-            android:paddingVertical="6dp"
-            android:checked="true" />
-
-        <CheckBox
-            android:id="@+id/cbShowScanFrame"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="🎯 إظهار إطار المسح في الكاميرا"
-            android:textSize="14sp"
-            android:paddingVertical="6dp"
-            android:checked="true" />
-
-        <CheckBox
-            android:id="@+id/cbParseGS1"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="🔍 تحليل GS1 DataMatrix تلقائياً (GTIN + Serial + Weight)"
-            android:textSize="14sp"
-            android:paddingVertical="6dp"
-            android:checked="true" />
-
-        <CheckBox
-            android:id="@+id/cbVibrateOnScan"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="📳 اهتزاز عند المسح الناجح"
-            android:textSize="14sp"
-            android:paddingVertical="6dp"
-            android:checked="true" />
-
-    </LinearLayout>
-</LinearLayout>
-        <!-- ============================================ -->
-<!-- 📊 إعدادات الجرد -->
-<!-- ============================================ -->
-<LinearLayout
-    android:layout_width="fill_parent"
-    android:layout_height="wrap_content"
-    android:layout_margin="2dp"
-    android:background="@drawable/rectangle_bg"
-    android:orientation="vertical">
-
-    <TextView
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:background="#4A148C"
-        android:padding="10dp"
-        android:text="📊 إعدادات الجرد (Inventory)"
-        android:textColor="#FFFFFF"
-        android:textSize="16sp"
-        android:textStyle="bold" />
-
-    <LinearLayout
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="10dp"
-        android:background="#FFFFFF">
-
-        <!-- نمط الجرد -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="نمط الجرد:"
-            android:textColor="#333333"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <Spinner
-            android:id="@+id/spInventoryMode"
-            android:layout_width="match_parent"
-            android:layout_height="42dp"
-            android:entries="@array/inventory_modes"
-            android:layout_marginBottom="8dp" />
-
-        <CheckBox
-            android:id="@+id/cbInventorySound"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="🔊 صوت عند كل مسح"
-            android:textSize="14sp"
-            android:checked="true"
-            android:paddingVertical="6dp" />
-
-        <CheckBox
-            android:id="@+id/cbInventoryVibrate"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="📳 اهتزاز عند كل مسح"
-            android:textSize="14sp"
-            android:checked="true"
-            android:paddingVertical="6dp" />
-
-        <CheckBox
-            android:id="@+id/cbInventoryAutoStop"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="⏹️ إيقاف تلقائي عند الاكتمال"
-            android:textSize="14sp"
-            android:checked="false"
-            android:paddingVertical="6dp" />
-
-        <CheckBox
-            android:id="@+id/cbInventoryShowImages"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="🖼️ عرض صور القطع أثناء الجرد"
-            android:textSize="14sp"
-            android:checked="false"
-            android:paddingVertical="6dp" />
-
-        <CheckBox
-            android:id="@+id/cbInventorySortByLocation"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="📍 ترتيب حسب الموقع"
-            android:textSize="14sp"
-            android:checked="true"
-            android:paddingVertical="6dp" />
-    </LinearLayout>
-</LinearLayout>
-        <!-- ============================================ -->
-        <!-- 📡 قسم إعدادات القارئ RFID (الأصلي) -->
-        <!-- ============================================ -->
-        <LinearLayout
-            android:layout_width="fill_parent"
-            android:layout_height="wrap_content"
-            android:layout_margin="2dp"
-            android:background="@drawable/rectangle_bg"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:background="@color/blue1"
-                android:padding="10dp"
-                android:text="📡 إعدادات قارئ RFID"
-                android:textColor="#FFFFFF"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <!-- التردد -->
-            <LinearLayout
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:background="@color/gray1"
-                android:orientation="vertical"
-                android:paddingBottom="5dp">
-
-                <LinearLayout
-                    android:layout_width="fill_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingLeft="10dp"
-                    android:paddingRight="10dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/tvMode"
-                        android:textSize="16sp" />
-
-                    <Spinner
-                        android:id="@+id/spFrequency"
-                        android:layout_width="fill_parent"
-                        android:layout_height="wrap_content"
-                        android:entries="@array/arrayMode"
-                        android:gravity="center_horizontal"
-                        android:minHeight="46dp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="fill_parent"
-                    android:layout_height="wrap_content"
-                    android:padding="5dp">
-
-                    <Button
-                        android:id="@+id/btnSetFrequency"
-                        android:layout_width="0dip"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:background="@drawable/button_bg"
-                        android:text="@string/btSetFre"
-                        android:textColor="@color/white"
-                        android:textSize="16sp" />
-
-                    <Button
-                        android:id="@+id/btnGetFrequency"
-                        android:layout_width="0dip"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="20dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/button_bg"
-                        android:text="@string/btGetFre"
-                        android:textColor="@color/white"
-                        android:textSize="16sp" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- الطاقة -->
-            <LinearLayout
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:background="@color/white"
-                android:orientation="vertical"
-                android:paddingTop="5dp"
-                android:paddingBottom="3dp">
-
-                <LinearLayout
-                    android:layout_width="fill_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="5dp"
-                    android:paddingLeft="10dp"
-                    android:paddingRight="10dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/uhf_title_power"
-                        android:textSize="16sp" />
-
-                    <Spinner
-                        android:id="@+id/spPower"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:entries="@array/arrayPower"
-                        android:gravity="center_horizontal" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/uhf_title_dbm" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="fill_parent"
-                    android:layout_height="wrap_content"
-                    android:padding="5dp">
-
-                    <Button
-                        android:id="@+id/btnSetPower"
-                        android:layout_width="0dip"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:background="@drawable/button_bg"
-                        android:text="@string/uhf_btn_setpower"
-                        android:textColor="@color/white"
-                        android:textSize="16sp" />
-
-                    <Button
-                        android:id="@+id/btnGetPower"
-                        android:layout_width="0dip"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="20dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/button_bg"
-                        android:text="@string/uhf_btn_getpower"
-                        android:textColor="@color/white"
-                        android:textSize="16sp" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- تردد أمريكا/أخرى (مخفي افتراضياً) -->
-            <LinearLayout
-                android:id="@+id/ll_freHop"
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:background="@color/gray1"
-                android:orientation="vertical"
-                android:paddingTop="5dp"
-                android:paddingBottom="5dp"
-                android:visibility="gone">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:paddingLeft="10dp"
-                    android:paddingRight="10dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/freHopType"
-                        android:textSize="16sp" />
-
-                    <RadioGroup
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <RadioButton
-                            android:id="@+id/rb_America"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginLeft="10dp"
-                            android:checked="true"
-                            android:onClick="onClick_rbAmerica"
-                            android:text="@string/America"
-                            android:textColor="@drawable/check_text_color"
-                            android:textSize="15sp" />
-
-                        <RadioButton
-                            android:id="@+id/rb_Others"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginLeft="10dp"
-                            android:onClick="onClick_rbOthers"
-                            android:text="@string/Others"
-                            android:textColor="@drawable/check_text_color"
-                            android:textSize="15sp" />
-                    </RadioGroup>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="fill_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingLeft="10dp"
-                    android:paddingRight="10dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/tvFreHop"
-                        android:textSize="16sp" />
-
-                    <Spinner
-                        android:id="@+id/spFreHop"
-                        android:layout_width="fill_parent"
-                        android:layout_height="wrap_content"
-                        android:entries="@array/arrayFreHop_us"
-                        android:gravity="center_horizontal" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="fill_parent"
-                    android:layout_height="wrap_content"
-                    android:padding="5dp">
-
-                    <Button
-                        android:id="@+id/btnSetFreHop"
-                        android:layout_width="0dip"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:background="@drawable/button_bg"
-                        android:text="@string/btSetFreHop"
-                        android:textColor="@color/white"
-                        android:textSize="16sp" />
-                </LinearLayout>
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- ============================================ -->
-        <!-- 📡 إعدادات متقدمة للقارئ -->
-        <!-- ============================================ -->
-        <LinearLayout
-            android:layout_width="fill_parent"
-            android:layout_height="wrap_content"
-            android:layout_margin="2dp"
-            android:background="@drawable/rectangle_bg2"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:background="#455A64"
-                android:padding="10dp"
-                android:text="🔧 إعدادات متقدمة للقارئ"
-                android:textColor="#FFFFFF"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <!-- معلمات الربط -->
-            <LinearLayout
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:background="@color/gray1"
-                android:orientation="vertical"
-                android:paddingTop="5dp"
-                android:paddingBottom="5dp">
-
-                <LinearLayout
-                    android:layout_width="fill_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="5dp"
-                    android:paddingLeft="10dp"
-                    android:paddingRight="10dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/uhf_title_link"
-                        android:textSize="16sp" />
-
-                    <Spinner
-                        android:id="@+id/splinkParams"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:entries="@array/arrayLink" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="fill_parent"
-                    android:layout_height="wrap_content"
-                    android:padding="5dp">
-
-                    <Button
-                        android:id="@+id/btnSetLinkParams"
-                        android:layout_width="0dip"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:background="@drawable/button_bg3"
-                        android:text="@string/uhf_btn_setLinkParams"
-                        android:textColor="@color/white"
-                        android:textSize="16sp" />
-
-                    <Button
-                        android:id="@+id/btnGetLinkParams"
-                        android:layout_width="0dip"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="20dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/button_bg3"
-                        android:text="@string/uhf_btn_getLinkParams"
-                        android:textColor="@color/white"
-                        android:textSize="16sp" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- Memory Bank -->
-            <LinearLayout
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:background="@color/white"
-                android:orientation="vertical"
-                android:paddingTop="5dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingHorizontal="10dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/uhf_btn_memoryBank"
-                        android:textSize="16sp" />
-
-                    <Spinner
-                        android:id="@+id/spMemoryBank"
-                        android:layout_width="wrap_content"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:entries="@array/arrayMemoryBank" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/llMemoryBankParams"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="10dp"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Offset:"
-                        android:textSize="16sp" />
-
-                    <EditText
-                        android:id="@+id/etOffset"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:inputType="number"
-                        android:text="0" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/word" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="20dp"
-                        android:text="Length:"
-                        android:textSize="16sp" />
-
-                    <EditText
-                        android:id="@+id/etLength"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:inputType="number"
-                        android:text="6" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/word" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="fill_parent"
-                    android:layout_height="wrap_content"
-                    android:padding="5dp">
-
-                    <Button
-                        android:id="@+id/btnSetMemoryBank"
-                        android:layout_width="0dip"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:background="@drawable/button_bg3"
+                        android:backgroundTint="?attr/colorPrimary"
                         android:text="@string/er_dsoft_get_Set"
-                        android:textColor="@color/white"
-                        android:textSize="16sp" />
+                        android:textColor="?attr/colorOnPrimary"
+                        app:cornerRadius="8dp" />
 
-                    <Button
-                        android:id="@+id/btnGetMemoryBank"
-                        android:layout_width="0dip"
-                        android:layout_height="wrap_content"
-                        android:layout_marginLeft="20dp"
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnGetSession"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_marginStart="12dp"
                         android:layout_weight="1"
-                        android:background="@drawable/button_bg3"
                         android:text="@string/er_dsoft_get_Get"
-                        android:textColor="@color/white"
-                        android:textSize="16sp" />
+                        android:textColor="?attr/colorPrimary"
+                        app:cornerRadius="8dp"
+                        app:strokeColor="?attr/colorPrimary" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?attr/colorOutlineVariant" />
+
+                <!-- Fast Inventory -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingEnd="8dp"
+                        android:text="@string/tv_fast_inventory"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="13sp" />
+
+                    <Spinner
+                        android:id="@+id/spFastInventory"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:entries="@array/arrayFastInventory" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp"
+                    android:paddingBottom="12dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSetFastInventory"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:backgroundTint="?attr/colorPrimary"
+                        android:text="@string/er_dsoft_get_Set"
+                        android:textColor="?attr/colorOnPrimary"
+                        app:cornerRadius="8dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnGetFastInventory"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:text="@string/er_dsoft_get_Get"
+                        android:textColor="?attr/colorPrimary"
+                        app:cornerRadius="8dp"
+                        app:strokeColor="?attr/colorPrimary" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?attr/colorOutlineVariant" />
+
+                <!-- Tag Focus + FastID -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <CheckBox
+                        android:id="@+id/cbTagFocus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingVertical="4dp"
+                        android:text="@string/tagFocus"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+
+                    <CheckBox
+                        android:id="@+id/cbFastID"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingVertical="4dp"
+                        android:text="@string/fastID"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
                 </LinearLayout>
             </LinearLayout>
-
-            <!-- Session -->
-            <LinearLayout
-                android:id="@+id/llSession"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@color/gray1"
-                android:orientation="horizontal"
-                android:paddingLeft="3dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Session:" />
-
-                <Spinner
-                    android:id="@+id/spSession"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:entries="@array/arraySession"
-                    android:minWidth="100dp"
-                    android:minHeight="46dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="20dp"
-                    android:text="Target:" />
-
-                <Spinner
-                    android:id="@+id/spTarget"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:entries="@array/arrayInventoried"
-                    android:minWidth="100dp"
-                    android:minHeight="46dp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@color/gray1">
-
-                <Button
-                    android:id="@+id/btnSetSession"
-                    android:layout_width="0dip"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:background="@drawable/button_bg3"
-                    android:text="@string/er_dsoft_get_Set"
-                    android:textColor="@color/white" />
-
-                <Button
-                    android:id="@+id/btnGetSession"
-                    android:layout_width="0dip"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="20dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/button_bg3"
-                    android:text="@string/er_dsoft_get_Get"
-                    android:textColor="@color/white" />
-            </LinearLayout>
-
-            <!-- Fast Inventory -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
-                android:orientation="horizontal"
-                android:paddingLeft="3dp"
-                android:background="@color/white"
-                android:paddingVertical="5dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:paddingEnd="6dp"
-                    android:text="@string/tv_fast_inventory" />
-
-                <Spinner
-                    android:id="@+id/spFastInventory"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:entries="@array/arrayFastInventory"
-                    android:minHeight="46dp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:padding="5dp"
-                android:background="@color/white">
-
-                <Button
-                    android:id="@+id/btnSetFastInventory"
-                    android:layout_width="0dip"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:background="@drawable/button_bg3"
-                    android:text="@string/er_dsoft_get_Set"
-                    android:textColor="@color/white" />
-
-                <Button
-                    android:id="@+id/btnGetFastInventory"
-                    android:layout_width="0dip"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="20dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/button_bg3"
-                    android:text="@string/er_dsoft_get_Get"
-                    android:textColor="@color/white" />
-            </LinearLayout>
-
-            <!-- Tag Focus + FastID -->
-            <LinearLayout
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"
-                android:background="@color/gray1"
-                android:orientation="vertical"
-                android:paddingTop="5dp"
-                android:paddingBottom="5dp">
-
-                <CheckBox
-                    android:id="@+id/cbTagFocus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="10dp"
-                    android:paddingTop="5dp"
-                    android:paddingBottom="5dp"
-                    android:text="@string/tagFocus"
-                    android:textColor="@drawable/check_text_color2" />
-
-                <CheckBox
-                    android:id="@+id/cbFastID"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginLeft="10dp"
-                    android:layout_marginTop="10dp"
-                    android:paddingTop="5dp"
-                    android:paddingBottom="5dp"
-                    android:text="@string/fastID"
-                    android:textColor="@drawable/check_text_color2" />
-            </LinearLayout>
-        </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- ============================================ -->
-        <!-- 🔄 أزرار نهائية -->
+        <!-- 🔄 8. أزرار نهائية -->
         <!-- ============================================ -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:orientation="horizontal"
-            android:padding="4dp"
-            android:layout_marginTop="4dp">
+            android:padding="4dp">
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSaveAllSettings"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="50dp"
+                android:layout_marginEnd="6dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                android:background="#1A73E8"
+                android:backgroundTint="?attr/colorPrimary"
                 android:text="💾 حفظ جميع الإعدادات"
-                android:textColor="#FFFFFF"
-                android:textStyle="bold" />
+                android:textColor="?attr/colorOnPrimary"
+                android:textStyle="bold"
+                app:cornerRadius="10dp" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnFactoryReset"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="6dp"
                 android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                android:background="#F44336"
+                android:backgroundTint="?attr/colorError"
                 android:text="🔄 إعادة ضبط المصنع"
-                android:textColor="#FFFFFF"
-                android:textStyle="bold" />
+                android:textColor="?attr/colorOnError"
+                android:textStyle="bold"
+                app:cornerRadius="10dp" />
         </LinearLayout>
 
     </LinearLayout>
-</ScrollView>
+</androidx.core.widget.NestedScrollView>
