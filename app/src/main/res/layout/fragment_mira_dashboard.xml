@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#090D16"
+    android:background="?android:attr/colorBackground"
     android:fillViewport="true"
     android:layoutDirection="rtl">
 
@@ -30,7 +30,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="💎 MIRA"
-                    android:textColor="#F59E0B"
+                    android:textColor="?attr/colorSecondary"
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
@@ -39,7 +39,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="4dp"
                     android:text="BRIDGE™"
-                    android:textColor="#F8FAFC"
+                    android:textColor="?attr/colorOnBackground"
                     android:textSize="14sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -50,23 +50,24 @@
                 android:layout_height="wrap_content"
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
-                android:background="#132338"
+                android:background="?attr/colorSurfaceVariant"
                 android:paddingHorizontal="10dp"
                 android:paddingVertical="4dp"
                 android:text="🟢 ONLINE"
-                android:textColor="#22C55E"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="11sp"
                 android:textStyle="bold" />
         </RelativeLayout>
 
         <!-- ==================== 2. بطاقة التحية والمستخدم ==================== -->
-        <androidx.cardview.widget.CardView
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="#1E293B"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="16dp"
-            app:cardElevation="8dp">
+            app:cardElevation="8dp"
+            app:strokeWidth="0dp">
 
             <RelativeLayout
                 android:layout_width="match_parent"
@@ -84,7 +85,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="أهلاً بك، المهندس 🌤️"
-                        android:textColor="#FFFFFF"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="18sp"
                         android:textStyle="bold" />
 
@@ -94,7 +95,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="📍 المعرض الرئيسي - صنعاء"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
                 </LinearLayout>
 
@@ -109,11 +110,11 @@
                         android:id="@+id/tvTime"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:background="#0F172A"
+                        android:background="?android:attr/colorBackground"
                         android:paddingHorizontal="10dp"
                         android:paddingVertical="4dp"
                         android:text="00:00:00"
-                        android:textColor="#38BDF8"
+                        android:textColor="?attr/colorSecondary"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -123,12 +124,12 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:text="الأحد، 2 أغسطس"
-                        android:textColor="#64748B"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
                 </LinearLayout>
 
             </RelativeLayout>
-        </androidx.cardview.widget.CardView>
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- ==================== 3. إحصائيات المخزون والمجوهرات ==================== -->
         <TextView
@@ -136,7 +137,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             android:text="⚖️ إحصائيات المخزون والذهب"
-            android:textColor="#94A3B8"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -148,14 +149,15 @@
             android:weightSum="3">
 
             <!-- إجمالي القطع -->
-            <androidx.cardview.widget.CardView
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="#1E293B"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="14dp"
-                app:cardElevation="4dp">
+                app:cardElevation="4dp"
+                app:strokeWidth="0dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -168,7 +170,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="إجمالي القطع"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
                     <TextView
@@ -177,21 +179,22 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:text="0"
-                        android:textColor="#F8FAFC"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="20sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-            </androidx.cardview.widget.CardView>
+            </com.google.android.material.card.MaterialCardView>
 
             <!-- الوزن الإجمالي -->
-            <androidx.cardview.widget.CardView
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="2dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="#1E293B"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="14dp"
-                app:cardElevation="4dp">
+                app:cardElevation="4dp"
+                app:strokeWidth="0dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -204,7 +207,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="الوزن (ذهب)"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
                     <TextView
@@ -213,21 +216,22 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:text="0 g"
-                        android:textColor="#F59E0B"
+                        android:textColor="?attr/colorSecondary"
                         android:textSize="20sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-            </androidx.cardview.widget.CardView>
+            </com.google.android.material.card.MaterialCardView>
 
             <!-- المباع اليوم -->
-            <androidx.cardview.widget.CardView
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="#1E293B"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="14dp"
-                app:cardElevation="4dp">
+                app:cardElevation="4dp"
+                app:strokeWidth="0dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -240,7 +244,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="المباع اليوم"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
                     <TextView
@@ -249,21 +253,22 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:text="0"
-                        android:textColor="#22C55E"
+                        android:textColor="?attr/colorPrimary"
                         android:textSize="20sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-            </androidx.cardview.widget.CardView>
+            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
 
         <!-- ==================== 4. حركة المبيعات التفصيلية ==================== -->
-        <androidx.cardview.widget.CardView
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="#1E293B"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="14dp"
-            app:cardElevation="4dp">
+            app:cardElevation="4dp"
+            app:strokeWidth="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -282,7 +287,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="مبيعات اليوم"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
                     <TextView
@@ -291,7 +296,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="--"
-                        android:textColor="#38BDF8"
+                        android:textColor="?attr/colorSecondary"
                         android:textSize="16sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -299,7 +304,7 @@
                 <View
                     android:layout_width="1dp"
                     android:layout_height="match_parent"
-                    android:background="#334155" />
+                    android:background="?attr/colorSurfaceVariant" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -312,7 +317,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="مبيعات الشهر"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
                     <TextView
@@ -321,7 +326,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="--"
-                        android:textColor="#F8FAFC"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="16sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -329,7 +334,7 @@
                 <View
                     android:layout_width="1dp"
                     android:layout_height="match_parent"
-                    android:background="#334155" />
+                    android:background="?attr/colorSurfaceVariant" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -342,7 +347,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="مبيعات السنة"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
                     <TextView
@@ -351,12 +356,12 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="--"
-                        android:textColor="#F8FAFC"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="16sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- ==================== 5. حالة بوابات RFID ==================== -->
         <TextView
@@ -364,17 +369,18 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             android:text="📡 حالة بوابات الحماية RFID"
-            android:textColor="#94A3B8"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp"
             android:textStyle="bold" />
 
-        <androidx.cardview.widget.CardView
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="#1E293B"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="14dp"
-            app:cardElevation="4dp">
+            app:cardElevation="4dp"
+            app:strokeWidth="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -393,7 +399,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="مفعلة"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
                     <TextView
@@ -402,7 +408,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="0"
-                        android:textColor="#22C55E"
+                        android:textColor="?attr/colorPrimary"
                         android:textSize="18sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -418,7 +424,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="أوفلاين"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
                     <TextView
@@ -427,7 +433,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="0"
-                        android:textColor="#64748B"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="18sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -443,7 +449,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="إنذارات اليوم"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
                     <TextView
@@ -452,21 +458,22 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="0"
-                        android:textColor="#EF4444"
+                        android:textColor="?attr/colorError"
                         android:textSize="18sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- ==================== 6. مؤشرات النظام ==================== -->
-        <androidx.cardview.widget.CardView
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="#1E293B"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="14dp"
-            app:cardElevation="4dp">
+            app:cardElevation="4dp"
+            app:strokeWidth="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -483,7 +490,7 @@
                         android:layout_height="wrap_content"
                         android:layout_alignParentStart="true"
                         android:text="⚡ حالة الربط والسيرفرات"
-                        android:textColor="#F1F5F9"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="13sp"
                         android:textStyle="bold" />
 
@@ -493,7 +500,7 @@
                         android:layout_height="wrap_content"
                         android:layout_alignParentEnd="true"
                         android:text="آخر مزامنة: الآن"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
                 </RelativeLayout>
 
@@ -501,7 +508,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:layout_marginVertical="10dp"
-                    android:background="#334155" />
+                    android:background="?attr/colorSurfaceVariant" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -513,7 +520,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:background="#0F172A"
+                        android:background="?android:attr/colorBackground"
                         android:gravity="center"
                         android:paddingVertical="6dp"
                         android:layout_marginEnd="3dp">
@@ -523,13 +530,13 @@
                             android:layout_width="8dp"
                             android:layout_height="8dp"
                             android:layout_marginEnd="6dp"
-                            android:background="#22C55E" />
+                            android:background="?attr/colorPrimary" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="API Cloud"
-                            android:textColor="#CBD5E1"
+                            android:textColor="?attr/colorOnSurface"
                             android:textSize="11sp"
                             android:textStyle="bold" />
                     </LinearLayout>
@@ -538,7 +545,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:background="#0F172A"
+                        android:background="?android:attr/colorBackground"
                         android:gravity="center"
                         android:paddingVertical="6dp"
                         android:layout_marginHorizontal="3dp">
@@ -548,13 +555,13 @@
                             android:layout_width="8dp"
                             android:layout_height="8dp"
                             android:layout_marginEnd="6dp"
-                            android:background="#22C55E" />
+                            android:background="?attr/colorPrimary" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="قاعدة البيانات"
-                            android:textColor="#CBD5E1"
+                            android:textColor="?attr/colorOnSurface"
                             android:textSize="11sp"
                             android:textStyle="bold" />
                     </LinearLayout>
@@ -563,7 +570,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:background="#0F172A"
+                        android:background="?android:attr/colorBackground"
                         android:gravity="center"
                         android:paddingVertical="6dp"
                         android:layout_marginStart="3dp">
@@ -573,19 +580,19 @@
                             android:layout_width="8dp"
                             android:layout_height="8dp"
                             android:layout_marginEnd="6dp"
-                            android:background="#22C55E" />
+                            android:background="?attr/colorPrimary" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Gates Hub"
-                            android:textColor="#CBD5E1"
+                            android:textColor="?attr/colorOnSurface"
                             android:textSize="11sp"
                             android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- ==================== 7. اختصارات الوصول السريع ==================== -->
         <TextView
@@ -593,7 +600,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="10dp"
             android:text="🚀 العمليات الميدانية"
-            android:textColor="#F1F5F9"
+            android:textColor="?attr/colorOnBackground"
             android:textSize="13sp"
             android:textStyle="bold" />
 
@@ -603,7 +610,7 @@
             android:layout_marginBottom="8dp"
             android:orientation="horizontal">
 
-            <androidx.cardview.widget.CardView
+            <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardScan"
                 android:layout_width="0dp"
                 android:layout_height="76dp"
@@ -612,9 +619,10 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground"
-                app:cardBackgroundColor="#1E293B"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="14dp"
-                app:cardElevation="4dp">
+                app:cardElevation="4dp"
+                app:strokeWidth="0dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -633,13 +641,13 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="الجرد والمسح"
-                        android:textColor="#F8FAFC"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-            </androidx.cardview.widget.CardView>
+            </com.google.android.material.card.MaterialCardView>
 
-            <androidx.cardview.widget.CardView
+            <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardGate"
                 android:layout_width="0dp"
                 android:layout_height="76dp"
@@ -648,9 +656,10 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground"
-                app:cardBackgroundColor="#1E293B"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="14dp"
-                app:cardElevation="4dp">
+                app:cardElevation="4dp"
+                app:strokeWidth="0dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -669,11 +678,11 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="رقابة البوابات"
-                        android:textColor="#F8FAFC"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-            </androidx.cardview.widget.CardView>
+            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
 
         <LinearLayout
@@ -682,7 +691,7 @@
             android:layout_marginBottom="16dp"
             android:orientation="horizontal">
 
-            <androidx.cardview.widget.CardView
+            <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardRadar"
                 android:layout_width="0dp"
                 android:layout_height="76dp"
@@ -691,9 +700,10 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground"
-                app:cardBackgroundColor="#1E293B"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="14dp"
-                app:cardElevation="4dp">
+                app:cardElevation="4dp"
+                app:strokeWidth="0dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -712,13 +722,13 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="الرادار والبحث"
-                        android:textColor="#F8FAFC"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-            </androidx.cardview.widget.CardView>
+            </com.google.android.material.card.MaterialCardView>
 
-            <androidx.cardview.widget.CardView
+            <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardSettings"
                 android:layout_width="0dp"
                 android:layout_height="76dp"
@@ -727,9 +737,10 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground"
-                app:cardBackgroundColor="#1E293B"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="14dp"
-                app:cardElevation="4dp">
+                app:cardElevation="4dp"
+                app:strokeWidth="0dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -748,11 +759,11 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="الإعدادات"
-                        android:textColor="#F8FAFC"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-            </androidx.cardview.widget.CardView>
+            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
 
         <!-- ==================== 8. سجل الجرد والتتبع ==================== -->
@@ -761,17 +772,18 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             android:text="🔍 سجل عمليات الجرد بالـ RFID"
-            android:textColor="#94A3B8"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp"
             android:textStyle="bold" />
 
-        <androidx.cardview.widget.CardView
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="#1E293B"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="14dp"
-            app:cardElevation="4dp">
+            app:cardElevation="4dp"
+            app:strokeWidth="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -787,7 +799,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="آخر عملية جرد للجلسة"
-                        android:textColor="#F8FAFC"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="13sp"
                         android:textStyle="bold" />
 
@@ -797,7 +809,7 @@
                         android:layout_height="wrap_content"
                         android:layout_alignParentEnd="true"
                         android:text="--"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
                 </RelativeLayout>
 
@@ -813,7 +825,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="الدقة: --%"
-                        android:textColor="#22C55E"
+                        android:textColor="?attr/colorPrimary"
                         android:textSize="13sp"
                         android:textStyle="bold" />
 
@@ -823,11 +835,11 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="المفقود: -- قطعة"
-                        android:textColor="#EF4444"
+                        android:textColor="?attr/colorError"
                         android:textSize="13sp" />
                 </LinearLayout>
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- ==================== 9. السجل المباشر للعمليات ==================== -->
         <TextView
@@ -835,17 +847,18 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             android:text="📋 السجل المباشر للعمليات"
-            android:textColor="#F1F5F9"
+            android:textColor="?attr/colorOnBackground"
             android:textSize="13sp"
             android:textStyle="bold" />
 
-        <androidx.cardview.widget.CardView
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="#1E293B"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="14dp"
-            app:cardElevation="4dp">
+            app:cardElevation="4dp"
+            app:strokeWidth="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -865,14 +878,14 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="• تم تنفيذ مزامنة شاملة للمخزون"
-                        android:textColor="#E2E8F0"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="12sp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="08:00 AM"
-                        android:textColor="#64748B"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp" />
                 </LinearLayout>
 
@@ -880,7 +893,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:layout_marginVertical="8dp"
-                    android:background="#334155" />
+                    android:background="?attr/colorSurfaceVariant" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -894,14 +907,14 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="• بوابة المعرض الرئيسي: متصلة ونشطة"
-                        android:textColor="#E2E8F0"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="12sp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="07:45 AM"
-                        android:textColor="#64748B"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp" />
                 </LinearLayout>
 
@@ -909,7 +922,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:layout_marginVertical="8dp"
-                    android:background="#334155" />
+                    android:background="?attr/colorSurfaceVariant" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -923,18 +936,18 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="• النظام جاهز لبدء عمليات الجرد"
-                        android:textColor="#E2E8F0"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="12sp" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="07:30 AM"
-                        android:textColor="#64748B"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp" />
                 </LinearLayout>
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- ==================== 10. رسم توزيع الأوزان ==================== -->
         <TextView
@@ -942,28 +955,28 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             android:text="📊 توزيع الأوزان حسب العيار (جرام)"
-            android:textColor="#94A3B8"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp"
             android:textStyle="bold" />
 
-        <androidx.cardview.widget.CardView
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="#1E293B"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="14dp"
-            app:cardElevation="4dp">
+            app:cardElevation="4dp"
+            app:strokeWidth="0dp">
 
             <!--
-<com.github.mikephil.charting.charts.BarChart
-    android:id="@+id/barChartWeights"
-    android:layout_width="match_parent"
-    android:layout_height="190dp"
-    android:padding="8dp" />
--->
+            <com.github.mikephil.charting.charts.BarChart
+                android:id="@+id/barChartWeights"
+                android:layout_width="match_parent"
+                android:layout_height="190dp"
+                android:padding="8dp" />
+            -->
 
-
-        </androidx.cardview.widget.CardView>
+        </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
