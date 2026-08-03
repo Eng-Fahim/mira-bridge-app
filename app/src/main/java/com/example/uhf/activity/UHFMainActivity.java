@@ -160,6 +160,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_scan))
             .setIndicator(getString(R.string.uhf_msg_tab_scan)),
             UHFReadTagFragment.class, null);
+// 🆔 MIRA Identity Studio - تكويد وبصمة القطع
+mTabHost.addTab(
+    mTabHost.newTabSpec("IdentityStudio").setIndicator("🆔"),
+    MiraIdentityStudioFragment.class, null
+);
 
         // 🌐 MIRA Web (PWA)
         mTabHost.addTab(
