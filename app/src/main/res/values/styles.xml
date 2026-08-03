@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Style الحواف الدائرية العلوية للكرت السفلي -->
+    <!-- Style الحواف الدائرية العلوية للكرت السفلي (Material 3) -->
     <style name="ShapeAppearance.TopRounded" parent="ShapeAppearance.Material3.Corner.None">
         <item name="cornerSizeTopLeft">20dp</item>
         <item name="cornerSizeTopRight">20dp</item>
@@ -9,67 +9,26 @@
         <item name="cornerSizeBottomRight">0dp</item>
     </style>
 
-    <!--
-        Base application theme, dependent on API level. This theme is replaced
-        by AppBaseTheme from res/values-vXX/styles.xml on newer devices.
-    -->
-    <style name="AppBaseTheme" parent="@android:style/Theme.Holo">
-        <!-- 🔤 تعيين خط Cairo هنا لتوريثه لجميع الثيمات القديمة -->
-        <item name="android:fontFamily">@font/cairo</item>
-        <item name="fontFamily">@font/cairo</item>
-    </style>
+    <!-- إعادة توجيه الثيمات القديمة لتوريث الثيم الرئيسي الحديث بدلاً من Holo -->
+    <style name="AppBaseTheme" parent="Theme.Uhfuartdemo" />
 
-    <!-- Application theme. -->
-    <style name="AppTheme" parent="AppBaseTheme">
-        <!-- All customizations that are NOT specific to a particular API-level can go here. -->
-        <item name="android:fontFamily">@font/cairo</item>
-        <item name="fontFamily">@font/cairo</item>
-    </style>
-    
-    <style name="ActionBarBaseTheme" parent="android:style/Theme.Holo.Light"> </style>
-    
-    <style name="ActionBarBaseTheme1" parent="android:style/Theme.Holo.Light">
-        <item name="android:background">@color/white1</item>
-        <item name="android:textColor">@drawable/check_text_color</item>
-        <item name="android:fontFamily">@font/cairo</item>
-        <item name="fontFamily">@font/cairo</item>
-    </style>
-    
-    <!-- الثيم الرئيسي المستخدم للمنصة -->  
-    <style name="CustomTheme" parent="android:style/Theme.Holo.Light">  
-        <item name="android:fontFamily">@font/cairo</item>
-        <item name="fontFamily">@font/cairo</item>
-        <item name="android:actionBarTabTextStyle">@style/MyActionBarTabTextStyle</item>  
-        <item name="android:actionBarStyle">@style/MyActionBarStyle</item>
-        <item name="android:homeAsUpIndicator">@drawable/actionbar_back</item> 
-    </style>  
-     
-    <style name="MyActionBarStyle" parent="@android:style/Widget.Holo.ActionBar">
-        <!-- <item name="android:background">@color/white</item>
-        <item name="android:titleTextStyle">@style/MainActivityActionBarTitleTextStyle</item> -->
-    </style>
-   
-    <!-- Tab选项标签背景的样式 -->  
-    <style name="MyActionBarTabStyle" parent="android:style/Widget.Holo.Light.ActionBar.TabView">  
-         <!-- <item name="android:background">@color/white</item> -->  
-    </style>  
-   
-    <!-- Tab选项标签字体的样式 (تم تطبيق خط Cairo عليه خصيصاً) -->  
-    <style name="MyActionBarTabTextStyle" parent="android:style/Widget.Holo.Light.ActionBar.TabText">          
+    <style name="AppTheme" parent="Theme.Uhfuartdemo" />
+
+    <style name="CustomTheme" parent="Theme.Uhfuartdemo" />
+
+    <style name="ActionBarBaseTheme" parent="Theme.Uhfuartdemo" />
+
+    <style name="ActionBarBaseTheme1" parent="Theme.Uhfuartdemo" />
+
+    <!-- Tab options text style -->  
+    <style name="MyActionBarTabTextStyle" parent="TextAppearance.Material3.TitleMedium">          
         <item name="android:textColor">@drawable/check_text_color</item>
         <item name="android:textSize">16sp</item>  
         <item name="android:fontFamily">@font/cairo</item>
         <item name="fontFamily">@font/cairo</item>
     </style>  
-   
-    <!-- 下拉导航外部按钮的样式 -->  
-    <style name="MyDropDownNav" parent="android:style/Widget.Holo.Light.Spinner">  
-    </style>  
-       
-    <!-- 下拉导航内部按钮的样式 -->  
-    <style name="MyDropDownListView" parent="android:style/Widget.Holo.ListView.DropDown">  
-    </style>
 
+    <!-- Custom View Attributes -->
     <declare-styleable name="RadarView">
         <attr name="center_image" format="reference" />
         <attr name="image_width" format="dimension" />
