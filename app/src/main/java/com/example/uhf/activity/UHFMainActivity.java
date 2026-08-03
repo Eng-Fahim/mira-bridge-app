@@ -361,7 +361,73 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             soundPool = null;
         }
     }
+// ============================================
+// 🚪 قائمة الخيارات - تسجيل الخروج
+// ============================================
+@Override
+public boolean onCreateOptionsMenu(Menu menu) {
+    getMenuInflater().inflate(R.menu.main_menu, menu);
+    return true;
+}
 
+@Override
+public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+    int id = item.getItemId();
+    
+    if (id == R.id.action_logout) {
+        showLogoutConfirmation();
+        return true;
+    }
+    if (id == R.id.action_profile) {
+        showProfileDialog();
+        return true;
+    }
+    if (id == R.id.action_settings) {
+        // يمكن توجيهه لإعدادات التطبيق
+        return true;
+    }
+    if (id == R.id.export) {
+        exportData();
+        return true;
+    }
+    return super.onOptionsItemSelected(item);
+}
+
+/**
+ * 🟢 عرض حوار تأكيد تسجيل الخروج
+ */
+private void showLogoutConfirmation() {
+    new androidx.appcompat.app.AlertDialog.Builder(this)
+        .setTitle("تسجيل الخروج")
+        .setMessage("هل أنت متأكد من تسجيل الخروج من منظومة MIRA؟\n\nسيتم إنهاء جلستك الحالية.")
+        .setPositiveButton("تسجيل الخروج", (dialog, which) -> performLogout())
+        .setNegativeButton("إلغاء", null)
+        .setIcon(android.R.drawable.ic_dialog_alert)
+        .show();
+}
+
+/**
+ * 🟢 عرض معلومات المستخدم الحالي
+ */
+private void showProfileDialog() {
+    String username = sessionManager.getUsername();
+    String displayName = sessionManager.getDisplayName();
+    String role = sessionManager.getRoleString();
+    String serverUrl = sessionManager.getServerUrl();
+    
+    String message = "👤 المستخدم: " + displayName + "\n"
+                   + "📧 اسم الدخول: " + username + "\n"
+                   + "🔐 الصلاحية: " + role + "\n"
+                   + "🌐 الخادم: " + serverUrl;
+    
+    new androidx.appcompat.app.AlertDialog.Builder(this)
+        .setTitle("ملف المستخدم")
+        .setMessage(message)
+        .setPositiveButton("موافق", null)
+        .setNeutralButton("تسجيل الخروج", (d, w) -> showLogoutConfirmation())
+        .setIcon(R.drawable.ic_person)
+        .show();
+}
     public void playSound(int id) {
         if (soundPool == null) return;
         float audioMaxVolume = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
