@@ -5,8 +5,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#0F172A"
-    android:layoutDirection="rtl">
-
+    android:layoutDirection="rtl"
+    android:textDirection="rtl">
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
@@ -18,7 +18,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Live Status Bar -->
+            <!-- 📡 Live RFID & Manual Input Card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -38,18 +38,18 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="8dp">
 
                         <TextView
-                            android:id="@+id/tvGtinLive"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="EPC: בانتظار المسح..."
+                            android:text="معرف الشريحة (EPC / GTIN)"
                             android:textColor="#F59E0B"
-                            android:fontFamily="monospace"
                             android:textSize="14sp"
-                            android:textStyle="bold" />
+                            android:textStyle="bold"
+                            android:gravity="start" />
 
                         <TextView
                             android:id="@+id/tvStatusBadge"
@@ -63,14 +63,40 @@
                             android:textSize="11sp" />
                     </LinearLayout>
 
+                    <!-- حقل إدخال يدوي + إمكانية مسح الباركود -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/tilEpc"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:boxBackgroundColor="#0F172A"
+                        app:hintTextColor="#94A3B8"
+                        app:endIconMode="custom"
+                        app:endIconDrawable="@android:drawable/ic_menu_camera"
+                        app:endIconTint="#F59E0B"
+                        app:endIconContentDescription="مسح باركود/QR">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etEpc"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="امسح الـ RFID أو أدخل الرمز يدوياً..."
+                            android:textColor="#F59E0B"
+                            android:fontFamily="monospace"
+                            android:textSize="15sp"
+                            android:textDirection="ltr"
+                            android:gravity="start|center_vertical"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
                     <TextView
                         android:id="@+id/tvRfidHint"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="اضغط الزر الجانبي للجهاز C72 للمسح المباشر"
+                        android:text="💡 يمكنك استخدام الزر الجانبي للـ C72 أو إدخال الكود يدوياً"
                         android:textColor="#94A3B8"
-                        android:textSize="12sp"
-                        android:layout_marginTop="8dp" />
+                        android:textSize="11sp"
+                        android:layout_marginTop="8dp"
+                        android:gravity="start" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -82,7 +108,8 @@
                 android:textColor="#E2E8F0"
                 android:textSize="14sp"
                 android:textStyle="bold"
-                android:layout_marginBottom="8dp"/>
+                android:layout_marginBottom="8dp"
+                android:gravity="start" />
 
             <com.google.android.material.chip.ChipGroup
                 android:id="@+id/chipGroupTypes"
@@ -132,7 +159,8 @@
                     android:id="@+id/etTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textColor="#FFFFFF" />
+                    android:textColor="#FFFFFF"
+                    android:gravity="start" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <HorizontalScrollView
@@ -166,7 +194,8 @@
                         android:layout_height="wrap_content"
                         android:text="الوزن القائم (جرام)"
                         android:textColor="#E2E8F0"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        android:gravity="start" />
 
                     <EditText
                         android:id="@+id/etGrossWeight"
