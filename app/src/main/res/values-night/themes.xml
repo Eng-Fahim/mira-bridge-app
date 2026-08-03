@@ -3,12 +3,16 @@
 
     <!-- Base application dark theme -->
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- 🔤 خط Cairo الأساسي -->
-        <item name="android:fontFamily">@font/cairo</item>
+        
+        <!-- 🔤 1. تعيين خط Cairo الشامل -->
         <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
 
-        <!-- 🎨 ألوان الوضع الداكن (Dark Theme) -->
-        <item name="colorPrimary">#90CAF9</item>            <!-- أزرق هادئ ومريح للعين ليلاً -->
+        <!-- 🔤 2. إجبار كافة نصوص TextView في التطبيق على استخدام خط Cairo -->
+        <item name="android:textViewStyle">@style/AppTextViewStyle</item>
+
+        <!-- 🎨 3. ألوان الوضع الداكن (Dark Theme) -->
+        <item name="colorPrimary">#90CAF9</item>            <!-- أزرق هادئ ومريح للعين -->
         <item name="colorOnPrimary">#00325B</item>
         <item name="colorPrimaryContainer">#004881</item>
         <item name="colorOnPrimaryContainer">#D1E4FF</item>
@@ -20,11 +24,25 @@
         <item name="colorOnSecondaryContainer">#FFDF7A</item>
 
         <!-- 🖼️ ألوان الخلفيات والأسطح الفاخرة (OLED Charcoal) -->
-        <item name="android:colorBackground">#121212</item> <!-- خلفية رمادية غامقة جداً -->
+        <item name="android:colorBackground">#121212</item> <!-- خلفية داكنة جداً -->
         <item name="colorOnBackground">#E2E2E6</item>       <!-- نص فاتح مريح -->
         <item name="colorSurface">#1E1E1E</item>            <!-- بطاقات داكنة فاخرة -->
         <item name="colorOnSurface">#E2E2E6</item>
         <item name="colorSurfaceVariant">#2A2A2E</item>     <!-- حقول إدخال داكنة -->
         <item name="colorOnSurfaceVariant">#C4C6D0</item>
     </style>
+
+    <!-- 🔤 ستايل مخصص يضمن تطبيق الخط على أي TextView عادي -->
+    <style name="AppTextViewStyle" parent="Widget.Material3.TextView">
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
+    </style>
+
+    <!-- الثيم الرئيسي المستدعى في AndroidManifest.xml -->
+    <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo">
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textViewStyle">@style/AppTextViewStyle</item>
+    </style>
+
 </resources>
