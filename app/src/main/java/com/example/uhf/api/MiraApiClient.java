@@ -48,6 +48,49 @@ public class MiraApiClient {
         this.gateId = prefs.getString("mira_gate_id", DEFAULT_GATE_ID);
     }
 
+    // ===================== 🏷️ Item Encoding & Tagging (التكويد الجديد) =====================
+
+    /**
+     * 🟢 تكويد قطعة جديدة أو ربط RFID EPC بقطعة قائمة عبر إرسال JSON Payload
+     */
+    public ApiResponse encodeItem(JSONObject itemPayload) {
+        return post("/encode-item", itemPayload);
+    }
+
+    /**
+     * 🟢 دالة مساعدة مريحة لتكويد القطعة مباشرةً بالمعاملات التفصيلية
+     */
+    public ApiResponse encodeItem(String epc, String barcode, String title, String purityCode, 
+                                  double grossWeight, double netWeight, double makingPerGram, 
+                                  double profitMargin, String category, String location) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("epc", epc);
+            payload.put("barcode", barcode != null ? barcode : "");
+            payload.put("title", title != null ? title : "قطعة مجوهرات");
+            payload.put("purity_code", purityCode != null ? purityCode : "21K");
+            payload.put("gross_weight", grossWeight);
+            payload.put("net_weight", netWeight);
+            payload.put("making_per_gram", makingPerGram);
+            payload.put("profit_margin", profitMargin);
+            payload.put("category", category != null ? category : "مجوهرات");
+            payload.put("location", location != null ? location : "المعرض الرئيسي");
+            payload.put("gate_id", gateId);
+        } catch (Exception e) {
+            Log.e(TAG, "Error building encode payload: " + e.getMessage());
+        }
+        return encodeItem(payload);
+    }
+
+    // ===================== 📈 Gold Rates & Settings =====================
+
+    /**
+     * 🟢 جلب أسعار البورصة للعيارات والمصنعيات اللحظية
+     */
+    public ApiResponse getGoldRatesAndSettings() {
+        return get("/gold-rates");
+    }
+
     // ===================== 🔑 Authorize =====================
 
     public ApiResponse authorize(String epc, String contextType, JSONObject extraParams) {
@@ -98,9 +141,10 @@ public class MiraApiClient {
     public ApiResponse getSettings() {
         return get("/settings/" + gateId);
     }
+
     /**
-    * 📊 جلب سجل المبيعات
-    */
+     * 📊 جلب سجل المبيعات
+     */
     public ApiResponse getSalesHistory() {
         return get("/pos/sales");
     }
