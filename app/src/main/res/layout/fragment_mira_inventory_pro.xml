@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#090D16"
+    android:background="?android:attr/colorBackground"
     android:fillViewport="true"
     android:layoutDirection="rtl">
 
@@ -13,14 +13,15 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Status & System Header Card -->
-        <androidx.cardview.widget.CardView
+        <!-- ==================== 1. بطاقة رأس النظام وحالة القارئ ==================== -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="#1E293B"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="16dp"
-            app:cardElevation="6dp">
+            app:cardElevation="6dp"
+            app:strokeWidth="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -28,7 +29,7 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <!-- Live Status & Timer -->
+                <!-- الحالة المباشرة والعداد الزمني -->
                 <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content">
@@ -45,7 +46,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="📡 القارئ اليدوي: جاهز للجرد"
-                            android:textColor="#38BDF8"
+                            android:textColor="?attr/colorPrimary"
                             android:textSize="13sp"
                             android:textStyle="bold" />
 
@@ -56,16 +57,16 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_alignParentEnd="true"
-                        android:background="#0F172A"
+                        android:background="?android:attr/colorBackground"
                         android:paddingHorizontal="10dp"
                         android:paddingVertical="4dp"
                         android:text="00:00:00"
-                        android:textColor="#F59E0B"
+                        android:textColor="?attr/colorSecondary"
                         android:textSize="13sp"
                         android:textStyle="bold" />
                 </RelativeLayout>
 
-                <!-- Location & Hardware Signal Bar -->
+                <!-- الموقع وقوة إشارة الـ RFID -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -80,7 +81,7 @@
                         android:layout_weight="1"
                         android:text="📍 المعرض الرئيسي - صنعاء"
                         android:textAlignment="viewStart"
-                        android:textColor="#F1F5F9"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="12sp"
                         android:textStyle="bold" />
 
@@ -88,15 +89,15 @@
                         android:id="@+id/tvRssi"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:background="#0F172A"
+                        android:background="?android:attr/colorBackground"
                         android:paddingHorizontal="8dp"
                         android:paddingVertical="3dp"
                         android:text="إشارة RFID: -0 dBm"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
                 </LinearLayout>
 
-                <!-- Last Scan Tracking -->
+                <!-- تتبع آخر مسح -->
                 <TextView
                     android:id="@+id/tvLastScan"
                     android:layout_width="match_parent"
@@ -104,10 +105,10 @@
                     android:layout_marginTop="8dp"
                     android:text="آخر قراءة RFID: لا يوجد"
                     android:textAlignment="viewStart"
-                    android:textColor="#64748B"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="11sp" />
 
-                <!-- Intelligent Progress Bar & Percentage -->
+                <!-- شريط التقدم النسبة المئوية -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -124,14 +125,14 @@
                         android:max="100"
                         android:progress="0"
                         android:progressDrawable="@android:drawable/progress_horizontal"
-                        android:progressTint="#38BDF8" />
+                        android:progressTint="?attr/colorPrimary" />
 
                 </LinearLayout>
 
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
+        </com.google.android.material.card.MaterialCardView>
 
-        <!-- Dynamic Metrics Counters Grid -->
+        <!-- ==================== 2. شبكة عدادات الإحصائيات ==================== -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -139,15 +140,16 @@
             android:orientation="horizontal"
             android:weightSum="3">
 
-            <!-- Expected Card -->
-            <androidx.cardview.widget.CardView
+            <!-- المتوقع في النظام -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="#1E293B"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="14dp"
-                app:cardElevation="3dp">
+                app:cardElevation="3dp"
+                app:strokeWidth="0dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -161,7 +163,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        android:textColor="#F8FAFC"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="22sp"
                         android:textStyle="bold" />
 
@@ -170,20 +172,21 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="المتوقع بالسيستم"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
                 </LinearLayout>
-            </androidx.cardview.widget.CardView>
+            </com.google.android.material.card.MaterialCardView>
 
-            <!-- Scanned Card -->
-            <androidx.cardview.widget.CardView
+            <!-- الممسوح بالقارئ -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="2dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="#1E293B"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="14dp"
-                app:cardElevation="3dp">
+                app:cardElevation="3dp"
+                app:strokeWidth="0dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -197,7 +200,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        android:textColor="#38BDF8"
+                        android:textColor="?attr/colorPrimary"
                         android:textSize="22sp"
                         android:textStyle="bold" />
 
@@ -206,20 +209,21 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="الممسوح بالقارئ"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
                 </LinearLayout>
-            </androidx.cardview.widget.CardView>
+            </com.google.android.material.card.MaterialCardView>
 
-            <!-- Variance Card -->
-            <androidx.cardview.widget.CardView
+            <!-- العجز / التفاوت -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="#1E293B"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="14dp"
-                app:cardElevation="3dp">
+                app:cardElevation="3dp"
+                app:strokeWidth="0dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -233,7 +237,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        android:textColor="#EF4444"
+                        android:textColor="?attr/colorError"
                         android:textSize="22sp"
                         android:textStyle="bold" />
 
@@ -242,57 +246,67 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="العجز / التفاوت"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
                 </LinearLayout>
-            </androidx.cardview.widget.CardView>
+            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
 
-        <!-- Accuracy & Audit Status Header -->
-        <LinearLayout
+        <!-- ==================== 3. شريط نسبة الدقة وتاريخ الجرد ==================== -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:background="#1E293B"
-            android:orientation="horizontal"
-            android:padding="12dp">
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="0dp">
 
-            <TextView
-                android:id="@+id/tvAccuracy"
-                android:layout_width="0dp"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="الدقة الحالية: 0.0%"
-                android:textAlignment="viewStart"
-                android:textColor="#22C55E"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+                android:orientation="horizontal"
+                android:padding="12dp">
 
-            <TextView
-                android:id="@+id/tvLastAccuracy"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:visibility="gone" />
+                <TextView
+                    android:id="@+id/tvAccuracy"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="الدقة الحالية: 0.0%"
+                    android:textAlignment="viewStart"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/tvLastAuditDate"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="آخر جرد: -"
-                android:textAlignment="viewEnd"
-                android:textColor="#94A3B8"
-                android:textSize="12sp" />
-        </LinearLayout>
+                <TextView
+                    android:id="@+id/tvLastAccuracy"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone" />
 
-        <!-- Comparison Matrix -->
-        <androidx.cardview.widget.CardView
+                <TextView
+                    android:id="@+id/tvLastAuditDate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="آخر جرد: -"
+                    android:textAlignment="viewEnd"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ==================== 4. مصفوفة المقارنة والجرد السابق ==================== -->
+        <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardComparison"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
             android:visibility="visible"
-            app:cardBackgroundColor="#1E293B"
-            app:cardCornerRadius="14dp">
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="3dp"
+            app:strokeWidth="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -312,7 +326,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="الجرد السابق"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
                     <TextView
@@ -320,7 +334,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        android:textColor="#E2E8F0"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="15sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -336,7 +350,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="الجرد الحالي"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
                     <TextView
@@ -344,7 +358,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        android:textColor="#E2E8F0"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="15sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -360,7 +374,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="الفارق"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
                     <TextView
@@ -368,21 +382,23 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        android:textColor="#22C55E"
+                        android:textColor="?attr/colorPrimary"
                         android:textSize="15sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
+        </com.google.android.material.card.MaterialCardView>
 
-        <!-- High Value Items Watchlist -->
-        <androidx.cardview.widget.CardView
+        <!-- ==================== 5. قائمة مراقبة القطع عالية القيمة ==================== -->
+        <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardHighValue"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="14dp"
-            app:cardBackgroundColor="#1E293B"
-            app:cardCornerRadius="14dp">
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="3dp"
+            app:strokeWidth="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -401,7 +417,7 @@
                         android:layout_weight="1"
                         android:text="💎 قطع مجوهرات عالية القيمة"
                         android:textAlignment="viewStart"
-                        android:textColor="#F59E0B"
+                        android:textColor="?attr/colorSecondary"
                         android:textSize="12sp"
                         android:textStyle="bold" />
 
@@ -409,11 +425,11 @@
                         android:id="@+id/tvHighValueCount"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:background="#332912"
-                        android:paddingHorizontal="6dp"
-                        android:paddingVertical="1dp"
+                        android:background="?android:attr/colorBackground"
+                        android:paddingHorizontal="8dp"
+                        android:paddingVertical="2dp"
                         android:text="0"
-                        android:textColor="#F59E0B"
+                        android:textColor="?attr/colorSecondary"
                         android:textSize="11sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -424,87 +440,89 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:textAlignment="viewStart"
-                    android:textColor="#94A3B8"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="11sp" />
             </LinearLayout>
-        </androidx.cardview.widget.CardView>
+        </com.google.android.material.card.MaterialCardView>
 
-        <!-- Primary Actions Group -->
+        <!-- ==================== 6. مجموعة أزرار التحكم الرئيسية ==================== -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             android:orientation="horizontal">
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnStartInventory"
                 android:layout_width="0dp"
                 android:layout_height="50dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:backgroundTint="#0284C7"
+                android:backgroundTint="?attr/colorPrimary"
                 android:text="📡 بدء مسح RFID"
-                android:textColor="#FFFFFF"
+                android:textColor="?attr/colorOnPrimary"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 app:cornerRadius="10dp" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnBlindInventory"
                 android:layout_width="0dp"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
-                android:backgroundTint="#475569"
+                android:backgroundTint="?attr/colorSurfaceVariant"
                 android:text="⚡ مسح أعمى بالقارئ"
-                android:textColor="#FFFFFF"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 app:cornerRadius="10dp" />
         </LinearLayout>
 
-        <!-- Secondary Actions Group -->
+        <!-- ==================== 7. مجموعة أزرار التحكم الثانوية ==================== -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
             android:orientation="horizontal">
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnStopInventory"
                 android:layout_width="0dp"
                 android:layout_height="50dp"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                android:backgroundTint="#DC2626"
+                android:backgroundTint="?attr/colorError"
                 android:enabled="false"
                 android:text="🛑 إيقاف القارئ"
-                android:textColor="#FFFFFF"
+                android:textColor="?attr/colorOnError"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 app:cornerRadius="10dp" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnGenerateReport"
                 android:layout_width="0dp"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
-                android:backgroundTint="#16A34A"
+                android:backgroundTint="?attr/colorPrimary"
                 android:enabled="false"
                 android:text="📄 تقرير الجرد"
-                android:textColor="#FFFFFF"
+                android:textColor="?attr/colorOnPrimary"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 app:cornerRadius="10dp" />
         </LinearLayout>
 
-        <!-- Realtime Scanned Items List View -->
-        <androidx.cardview.widget.CardView
+        <!-- ==================== 8. قائمة العناصر الممسوحة المباشرة ==================== -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="320dp"
-            app:cardBackgroundColor="#020617"
-            app:cardCornerRadius="12dp">
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="3dp"
+            app:strokeWidth="0dp">
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvInventoryItems"
@@ -512,7 +530,7 @@
                 android:layout_height="match_parent"
                 android:nestedScrollingEnabled="true"
                 android:padding="6dp" />
-        </androidx.cardview.widget.CardView>
+        </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>
-</ScrollView>
+</androidx.core.widget.NestedScrollView>
