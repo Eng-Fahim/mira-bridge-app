@@ -8,7 +8,7 @@
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
 
-        <!-- 🔤 2. إجبار كافة نصوص TextView في التطبيق على استخدام خط Cairo -->
+        <!-- 🔤 2. إجبار كافة نصوص TextView على استخدام الستايل المخصص -->
         <item name="android:textViewStyle">@style/AppTextViewStyle</item>
 
         <!-- 🎨 3. ألوان الوضع الداكن (Dark Theme) -->
@@ -32,8 +32,8 @@
         <item name="colorOnSurfaceVariant">#C4C6D0</item>
     </style>
 
-    <!-- 🔤 ستايل مخصص يضمن تطبيق الخط على أي TextView عادي -->
-    <style name="AppTextViewStyle" parent="Widget.Material3.TextView">
+    <!-- 🔤 ستايل مخصص لـ TextView مع الـ Parent الصحيح المقبول في AAPT -->
+    <style name="AppTextViewStyle" parent="Widget.MaterialComponents.TextView">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
