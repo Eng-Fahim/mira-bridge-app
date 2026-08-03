@@ -112,5 +112,10 @@
 
     <!-- الثيم الرئيسي -->
     <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo" />
-
+<!-- ستايل عنوان الـ Toolbar -->
+<style name="ToolbarTitleStyle" parent="TextAppearance.Material3.TitleLarge">
+    <item name="fontFamily">@font/cairo</item>
+    <item name="android:fontFamily">@font/cairo</item>
+    <item name="android:textFontWeight">700</item>
+</style>
 </resources>
