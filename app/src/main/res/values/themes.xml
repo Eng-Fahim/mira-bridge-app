@@ -4,45 +4,69 @@
     <!-- Base application light theme -->
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
         
-        <!-- 🔤 1. تعيين خط Cairo الشامل -->
+        <!-- 🔤 1. تعيين خط Cairo المباشر -->
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
 
-        <!-- 🔤 2. إجبار كافة نصوص TextView في التطبيق على استخدام خط Cairo -->
-        <item name="android:textViewStyle">@style/AppTextViewStyle</item>
+        <!-- 🔤 2. إجبار Material 3 Typography على استخدام خط Cairo لكل المستويات -->
+        <item name="textAppearanceDisplayLarge">@style/AppTextAppearance</item>
+        <item name="textAppearanceDisplayMedium">@style/AppTextAppearance</item>
+        <item name="textAppearanceDisplaySmall">@style/AppTextAppearance</item>
+        <item name="textAppearanceHeadlineLarge">@style/AppTextAppearance</item>
+        <item name="textAppearanceHeadlineMedium">@style/AppTextAppearance</item>
+        <item name="textAppearanceHeadlineSmall">@style/AppTextAppearance</item>
+        <item name="textAppearanceTitleLarge">@style/AppTextAppearance</item>
+        <item name="textAppearanceTitleMedium">@style/AppTextAppearance</item>
+        <item name="textAppearanceTitleSmall">@style/AppTextAppearance</item>
+        <item name="textAppearanceBodyLarge">@style/AppTextAppearance</item>
+        <item name="textAppearanceBodyMedium">@style/AppTextAppearance</item>
+        <item name="textAppearanceBodySmall">@style/AppTextAppearance</item>
+        <item name="textAppearanceLabelLarge">@style/AppTextAppearance</item>
+        <item name="textAppearanceLabelMedium">@style/AppTextAppearance</item>
+        <item name="textAppearanceLabelSmall">@style/AppTextAppearance</item>
 
-        <!-- 🎨 3. ألوان الوضع الفاتح (Light Theme) -->
-        <item name="colorPrimary">#1A237E</item>            <!-- كحلي ملكي -->
-        <item name="colorOnPrimary">#FFFFFF</item>          <!-- نص على الكحلي -->
-        <item name="colorPrimaryContainer">#E8EAF6</item>   <!-- حاويات ناعمة -->
+        <!-- 🔤 3. إجبار عناصر TextView و Buttons التقليدية -->
+        <item name="android:textViewStyle">@style/AppTextViewStyle</item>
+        <item name="materialButtonStyle">@style/AppButtonStyle</item>
+
+        <!-- 🎨 ألوان الوضع الفاتح -->
+        <item name="colorPrimary">#1A237E</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#E8EAF6</item>
         <item name="colorOnPrimaryContainer">#1A237E</item>
 
-        <!-- 💎 اللون الذهبي الفاخر للمجوهرات -->
-        <item name="colorSecondary">#C5A059</item>          <!-- ذهبي -->
+        <item name="colorSecondary">#C5A059</item>
         <item name="colorOnSecondary">#FFFFFF</item>
         <item name="colorSecondaryContainer">#FFF9EC</item>
         <item name="colorOnSecondaryContainer">#8C6D23</item>
 
-        <!-- 🖼️ ألوان الخلفيات والأسطح -->
-        <item name="android:colorBackground">#F8F9FA</item> <!-- خلفية رمادية فاتحة ناعمة -->
-        <item name="colorOnBackground">#191C1E</item>       <!-- نص داكن على الخلفية -->
-        <item name="colorSurface">#FFFFFF</item>            <!-- بطاقات وأسطح بيضاء -->
-        <item name="colorOnSurface">#191C1E</item>          <!-- نص على البطاقات -->
-        <item name="colorSurfaceVariant">#F0F2F5</item>     <!-- حقول إدخال وأسطح ثانوية -->
+        <item name="android:colorBackground">#F8F9FA</item>
+        <item name="colorOnBackground">#191C1E</item>
+        <item name="colorSurface">#FFFFFF</item>
+        <item name="colorOnSurface">#191C1E</item>
+        <item name="colorSurfaceVariant">#F0F2F5</item>
         <item name="colorOnSurfaceVariant">#44474E</item>
     </style>
 
-    <!-- 🔤 ستايل مخصص يضمن تطبيق الخط على أي TextView عادي -->
-    <style name="AppTextViewStyle" parent="Widget.MaterialComponents.TextView">
+    <!-- 🔤 ستايل النصوص الموحد لـ Material 3 -->
+    <style name="AppTextAppearance" parent="TextAppearance.Material3.BodyMedium">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
     </style>
 
-    <!-- الثيم الرئيسي المستدعى في AndroidManifest.xml -->
-    <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo">
+    <!-- 🔤 ستايل الـ TextView العادي -->
+    <style name="AppTextViewStyle" parent="Widget.Material3.TextView">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
-        <item name="android:textViewStyle">@style/AppTextViewStyle</item>
     </style>
+
+    <!-- 🔤 ستايل الأزرار -->
+    <style name="AppButtonStyle" parent="Widget.Material3.Button">
+        <item name="fontFamily">@font/cairo</item>
+        <item name="android:fontFamily">@font/cairo</item>
+    </style>
+
+    <!-- الثيم الرئيسي -->
+    <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo" />
     
 </resources>
