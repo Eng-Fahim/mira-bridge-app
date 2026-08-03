@@ -954,11 +954,15 @@
             app:cardCornerRadius="14dp"
             app:cardElevation="4dp">
 
-            <com.github.mikephil.charting.charts.BarChart
-                android:id="@+id/barChartWeights"
-                android:layout_width="match_parent"
-                android:layout_height="190dp"
-                android:padding="8dp" />
+            <!--
+<com.github.mikephil.charting.charts.BarChart
+    android:id="@+id/barChartWeights"
+    android:layout_width="match_parent"
+    android:layout_height="190dp"
+    android:padding="8dp" />
+-->
+
+
         </androidx.cardview.widget.CardView>
 
     </LinearLayout>
