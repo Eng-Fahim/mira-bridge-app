@@ -11,10 +11,11 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity; // 👈 1. استيراد AppCompatActivity
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -29,113 +30,92 @@ import com.rscja.utility.StringUtility;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-/**
- * Created by Administrator on 2015-03-10.
- * Updated to support Material Design 3 & Custom Fonts (Cairo)
- */
-public class BaseTabFragmentActivity extends AppCompatActivity { // 👈 2. التغيير إلى AppCompatActivity
-
+public class BaseTabFragmentActivity extends AppCompatActivity {
 
     public RFIDWithUHFUART mReader;
     public KeyDwonFragment currentFragment = null;
     public int TidLen = 6;
     private static final int MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE = 1;
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // 检查权限是否已授予
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
-            // 如果权限尚未授予，向用户请求权限
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
                     MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE);
-        } else {
-            // 权限已经被授予，可以执行相应操作
-            // 在这里进行读取SD卡的操作
         }
-
     }
 
     public void initUHF() {
         try {
             mReader = RFIDWithUHFUART.getInstance();
         } catch (Exception ex) {
-
             toastMessage(ex.getMessage());
-
             return;
         }
-
         if (mReader != null) {
             new InitTask().execute();
         }
     }
 
-
     /**
-     * ActionBar
+     * ✅ قائمة ActionBar - مضاف فيها خيارات Profile و Logout
      */
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.main, menu);
-        if(BuildConfig.Test){
+        if (BuildConfig.Test) {
             menu.findItem(R.id.speed).setVisible(true);
         }
         return true;
     }
 
-
-    public boolean onOptionsItemSelected(android.view.MenuItem item) {
-        switch (item.getItemId()) {
-            case android.R.id.home:
-                break;
-            case R.id.UHF_ver:
-                getUHFVersion();
-                break;
-            case R.id.export:
-                exportData();
-                break;
-            case R.id.speed:
-                Intent intent = new Intent(this, TestActivity.class);
-                startActivity(intent);
-                break;
-            default:
-                break;
+    /**
+     * ✅ معالجة اختيارات القائمة - Profile و Logout تذهب للكلاس الابن
+     */
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        
+        // خيارات أساسية
+        if (id == android.R.id.home) {
+            return false;
         }
-        return true;
+        if (id == R.id.UHF_ver) {
+            getUHFVersion();
+            return true;
+        }
+        if (id == R.id.export) {
+            exportData();
+            return true;
+        }
+        if (id == R.id.speed) {
+            Intent intent = new Intent(this, TestActivity.class);
+            startActivity(intent);
+            return true;
+        }
+        
+        // ✅ خيارات Profile و Logout - تترك للكلاس الابن (UHFMainActivity)
+        // إذا لم يتم معالجتها في الابن، يتم تجاهلها هنا
+        return super.onOptionsItemSelected(item);
     }
 
     public void exportData() {
-        UHFReadTagFragment uhfReadTagFragment = new UHFReadTagFragment();
-        UHFMainActivity uhfMainActivity = new UHFMainActivity();
         Date currentDate = new Date();
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
         String currentTime = dateFormat.format(currentDate);
-        String file = "sdcard/UHF_exportData/";
-        String fileName = file + currentTime;
-        Toast.makeText(BaseTabFragmentActivity.this, "导出失败", Toast.LENGTH_SHORT).show();
+        Toast.makeText(BaseTabFragmentActivity.this, "Export failed", Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == 139
-                || keyCode == 280
-                || keyCode == 291
-                || keyCode == 293
-                || keyCode == 294
-                || keyCode == 311
-                || keyCode == 312
-                || keyCode == 313
-                || keyCode == 315
-                || keyCode == 591
-                || keyCode == 593
-                || keyCode == 594
-                || keyCode == 596
-        ) {
+        if (keyCode == 139 || keyCode == 280 || keyCode == 291 || keyCode == 293
+                || keyCode == 294 || keyCode == 311 || keyCode == 312 || keyCode == 313
+                || keyCode == 315 || keyCode == 591 || keyCode == 593 || keyCode == 594
+                || keyCode == 596) {
             if (event.getRepeatCount() == 0) {
                 if (currentFragment != null) {
                     currentFragment.myOnKeyDwon();
@@ -146,11 +126,9 @@ public class BaseTabFragmentActivity extends AppCompatActivity { // 👈 2. ال
         return super.onKeyDown(keyCode, event);
     }
 
-
     public void toastMessage(String msg) {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
     }
-
 
     public class InitTask extends AsyncTask<String, Integer, Boolean> {
         ProgressDialog mypDialog;
@@ -180,14 +158,9 @@ public class BaseTabFragmentActivity extends AppCompatActivity { // 👈 2. ال
         }
     }
 
-
     public boolean vailHexInput(String str) {
-        if (str == null || str.length() == 0) {
-            return false;
-        }
-        if (str.length() % 2 == 0) {
-            return StringUtility.isHexNumberRex(str);
-        }
+        if (str == null || str.length() == 0) return false;
+        if (str.length() % 2 == 0) return StringUtility.isHexNumberRex(str);
         return false;
     }
 
@@ -196,9 +169,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity { // 👈 2. ال
             String rfidVer = mReader.getVersion();
             String hardwareVersion = mReader.getHardwareVersion();
             String version = "Software version:" + rfidVer + " \nHardware Version:" + hardwareVersion;
-
-            UIHelper.alert(this, R.string.action_uhf_ver,
-                    version, R.drawable.webtext);
+            UIHelper.alert(this, R.string.action_uhf_ver, version, R.drawable.webtext);
         }
     }
 
@@ -206,9 +177,8 @@ public class BaseTabFragmentActivity extends AppCompatActivity { // 👈 2. ال
         try {
             return this.getPackageManager().getPackageInfo(this.getPackageName(), 0).versionName;
         } catch (PackageManager.NameNotFoundException e) {
-
+            return "";
         }
-        return "";
     }
 
     @Override
@@ -217,11 +187,10 @@ public class BaseTabFragmentActivity extends AppCompatActivity { // 👈 2. ال
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.e("TEST", "已经申请sdcard权限");
+                Log.e("TEST", "SD Card permission granted");
             } else {
-                Log.e("TEST", "申请sdcard权限失败");
+                Log.e("TEST", "SD Card permission denied");
             }
         }
     }
-
 }
