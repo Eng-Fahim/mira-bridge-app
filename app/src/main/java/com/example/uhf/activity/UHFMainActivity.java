@@ -306,13 +306,33 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == R.id.export) {
-            exportData();
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
+public boolean onCreateOptionsMenu(Menu menu) {
+    getMenuInflater().inflate(R.menu.main_menu, menu);
+    return true;
+}
+
+@Override
+public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+    int id = item.getItemId();
+    
+    if (id == R.id.export) {
+        exportData();
+        return true;
     }
+    if (id == R.id.action_logout) {
+        showLogoutConfirmation();
+        return true;
+    }
+    if (id == R.id.action_profile) {
+        showProfileDialog();
+        return true;
+    }
+    if (id == R.id.action_settings) {
+        return true;
+    }
+    return super.onOptionsItemSelected(item);
+}
+
 
     @Override
     protected void onDestroy() {
@@ -370,28 +390,6 @@ public boolean onCreateOptionsMenu(Menu menu) {
     return true;
 }
 
-@Override
-public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-    int id = item.getItemId();
-    
-    if (id == R.id.action_logout) {
-        showLogoutConfirmation();
-        return true;
-    }
-    if (id == R.id.action_profile) {
-        showProfileDialog();
-        return true;
-    }
-    if (id == R.id.action_settings) {
-        // يمكن توجيهه لإعدادات التطبيق
-        return true;
-    }
-    if (id == R.id.export) {
-        exportData();
-        return true;
-    }
-    return super.onOptionsItemSelected(item);
-}
 
 /**
  * 🟢 عرض حوار تأكيد تسجيل الخروج
