@@ -1,17 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+    
+    <!-- Base application theme -->
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
-
-        <!-- 🔤 تعيين خط Cairo الأساسي لجميع عناصر Material3 -->
+        <!-- 🔤 خط Cairo الأساسي -->
         <item name="android:fontFamily">@font/cairo</item>
         <item name="fontFamily">@font/cairo</item>
+
+        <!-- 🎨 ألوان الوضع الفاتح (Light Theme) -->
+        <item name="colorPrimary">#1A237E</item>            <!-- كحلي ملكي -->
+        <item name="colorOnPrimary">#FFFFFF</item>          <!-- نص على الكحلي -->
+        <item name="colorPrimaryContainer">#E8EAF6</item>   <!-- حاويات ناعمة -->
+        <item name="colorOnPrimaryContainer">#1A237E</item>
+
+        <!-- 💎 اللون الذهبي الفاخر للمجوهرات -->
+        <item name="colorSecondary">#C5A059</item>          <!-- ذهبي -->
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">#FFF9EC</item>
+        <item name="colorOnSecondaryContainer">#8C6D23</item>
+
+        <!-- 🖼️ ألوان الخلفيات والأسطح -->
+        <item name="android:colorBackground">#F8F9FA</item> <!-- خلفية رمادية فاتحة ناعمة -->
+        <item name="colorOnBackground">#191C1E</item>       <!-- نص داكن على الخلفية -->
+        <item name="colorSurface">#FFFFFF</item>            <!-- بطاقات وأسطح بيضاء -->
+        <item name="colorOnSurface">#191C1E</item>          <!-- نص على البطاقات -->
+        <item name="colorSurfaceVariant">#F0F2F5</item>     <!-- حقول إدخال وأسطح ثانوية -->
+        <item name="colorOnSurfaceVariant">#44474E</item>
     </style>
 
     <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo">
-        <!-- تأكيد توحيد الخط على الثيم المستدعى -->
         <item name="android:fontFamily">@font/cairo</item>
         <item name="fontFamily">@font/cairo</item>
     </style>
