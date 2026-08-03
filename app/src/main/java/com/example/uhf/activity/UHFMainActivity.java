@@ -26,6 +26,7 @@ import com.example.uhf.fragment.BlockWriteFragment;
 import com.example.uhf.fragment.JewelryDashboardFragment;
 import com.example.uhf.fragment.MarginReadFragment;
 import com.example.uhf.fragment.MiraDashboardFragment;
+import com.example.uhf.fragment.MiraIdentityStudioFragment;
 import com.example.uhf.fragment.MiraInventoryProFragment;
 import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.fragment.MiraPWAWebFragment;
@@ -109,6 +110,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             String currentTabTag = mTabHost.getCurrentTabTag();
             Fragment fragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
 
+            // 🆔 توجيه المسح لـ Identity Studio عند قراءة أي شريحة
+            if (fragment instanceof MiraIdentityStudioFragment && fragment.isVisible()) {
+                ((MiraIdentityStudioFragment) fragment).onRfidScanned(epc);
+                Log.d(TAG, "RFID → Identity Studio: " + epc);
+                return;
+            }
+
             if (fragment instanceof MiraPosFragment && fragment.isVisible()) {
                 ((MiraPosFragment) fragment).onRingScanned(epc);
                 Log.d(TAG, "RFID → POS Tab: " + epc);
@@ -116,7 +124,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
 
-        Log.d(TAG, "RFID scanned but POS not active: " + epc);
+        Log.d(TAG, "RFID scanned but no active target: " + epc);
     }
 
     // ============================================
@@ -160,11 +168,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_scan))
             .setIndicator(getString(R.string.uhf_msg_tab_scan)),
             UHFReadTagFragment.class, null);
-// 🆔 MIRA Identity Studio - تكويد وبصمة القطع
-mTabHost.addTab(
-    mTabHost.newTabSpec("IdentityStudio").setIndicator("🆔"),
-    MiraIdentityStudioFragment.class, null
-);
+
+        // 🆔 MIRA Identity Studio - تكويد وبصمة القطع
+        mTabHost.addTab(
+            mTabHost.newTabSpec("IdentityStudio").setIndicator("🆔"),
+            MiraIdentityStudioFragment.class, null
+        );
 
         // 🌐 MIRA Web (PWA)
         mTabHost.addTab(
@@ -362,4 +371,4 @@ mTabHost.addTab(
             synchronized (objectLock) { objectLock.notifyAll(); }
         }
     }
-    }
+}
