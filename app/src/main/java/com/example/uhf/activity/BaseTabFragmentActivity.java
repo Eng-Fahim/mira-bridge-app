@@ -1,4 +1,4 @@
-Package com.example.uhf.activity;
+package com.example.uhf.activity;
 
 import android.Manifest;
 import android.app.ProgressDialog;
