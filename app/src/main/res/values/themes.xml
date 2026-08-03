@@ -2,11 +2,11 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     
     <!-- Base application theme -->
-    <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
-        
-        <!-- 🔤 1. تعيين خط Cairo الشامل -->
-        <item name="fontFamily">@font/cairo</item>
-        <item name="android:fontFamily">@font/cairo</item>
+    <!-- ✅ الستايل المحدث بالـ Parent الصحيح -->
+<style name="AppTextViewStyle" parent="Widget.MaterialComponents.TextView">
+    <item name="fontFamily">@font/cairo</item>
+    <item name="android:fontFamily">@font/cairo</item>
+
 
         <!-- 🔤 2. إجبار كافة نصوص TextView في التطبيق على استخدام خط Cairo -->
         <item name="android:textViewStyle">@style/AppTextViewStyle</item>
