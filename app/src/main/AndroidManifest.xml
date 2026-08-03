@@ -43,6 +43,13 @@
             android:name="com.example.uhf.activity.TestActivity"
             android:configChanges="orientation|screenSize"
             android:exported="true" />
+        <activity
+    android:name="com.example.uhf.activity.ItemStudioActivity"
+    android:configChanges="orientation|screenSize|keyboardHidden"
+    android:exported="false"
+    android:label="MIRA Identity Studio"
+    android:windowSoftInputMode="adjustResize" />
+
     </application>
 
 </manifest>
