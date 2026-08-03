@@ -1,65 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-     >
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!--
+    <!-- 👤 الملف الشخصي - يظهر مباشرة في شريط الأدوات -->
     <item
-        android:id="@+id/action_scan"
-        android:actionViewClass="android.widget.Tab"
-        android:orderInCategory="100"
-        android:showAsAction="always"
-        android:title="@string/uhf_msg_tab_scan"/>
-    <item
-        android:id="@+id/action_read"
-        android:orderInCategory="100"
-        android:actionViewClass="android.widget.Tab"
-        android:showAsAction="always"
-        android:title="@string/uhf_msg_tab_read"/>
-    <item
-        android:id="@+id/action_write"
-        android:orderInCategory="100"
-        android:actionViewClass="android.widget.Tab"
-        android:showAsAction="always"
-        android:title="@string/uhf_msg_tab_write"/>
-    -->
-    <item
-    android:id="@+id/nav_jewelry_dashboard"
-    android:icon="@drawable/ic_dashboard"
-    android:title="لوحة تحكم المجوهرات" />
+        android:id="@+id/action_profile"
+        android:title="Profile"
+        android:icon="@drawable/ic_person_outline"
+        app:showAsAction="ifRoom"
+        android:orderInCategory="10" />
 
+    <!-- 🚪 تسجيل الخروج - يظهر مباشرة في شريط الأدوات -->
     <item
-        android:id="@+id/action_kill"
-        android:showAsAction="never"
-        android:visible="false"
-        android:title="@string/uhf_msg_tab_kill"/>
-    <item
-        android:id="@+id/action_lock"
-        android:showAsAction="never"
-        android:visible="false"
-        android:title="@string/uhf_msg_tab_lock"/>
-    <item
-        android:id="@+id/action_set"
-        android:showAsAction="never"
-        android:visible="false"
-        android:title="@string/uhf_msg_tab_set"/>
-    <item
-        android:id="@+id/action_Deactivate"
-        android:showAsAction="never"
-        android:visible="false"
-        android:title="BlockPermalock"/>
+        android:id="@+id/action_logout"
+        android:title="Sign Out"
+        android:icon="@drawable/ic_logout"
+        app:showAsAction="ifRoom"
+        android:orderInCategory="20" />
 
-    <item
-        android:id="@+id/UHF_ver"
-        android:showAsAction="never"
-        android:title="@string/action_about"/>
-    <item
-        android:id="@+id/export"
-        android:showAsAction="never"
-        android:title="@string/export"/>
-    <item
-        android:visible="false"
-        android:id="@+id/speed"
-        android:showAsAction="never"
-        android:title="Test rate"/>
+    <!-- ➖ فاصل -->
+    <group android:id="@+id/group_advanced"
+        android:orderInCategory="100">
+
+        <!-- 📤 تصدير البيانات -->
+        <item
+            android:id="@+id/export"
+            android:title="Export Data"
+            android:icon="@drawable/ic_file_download"
+            app:showAsAction="never" />
+
+        <!-- ℹ️ إصدار الجهاز -->
+        <item
+            android:id="@+id/UHF_ver"
+            android:title="Device Version"
+            android:icon="@drawable/ic_info"
+            app:showAsAction="never" />
+
+        <!-- ⚡ اختبار السرعة -->
+        <item
+            android:id="@+id/speed"
+            android:title="Speed Test"
+            android:icon="@drawable/ic_speed"
+            app:showAsAction="never"
+            android:visible="false" />
+
+    </group>
 
 </menu>
