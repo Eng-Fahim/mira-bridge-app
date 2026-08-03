@@ -1,7 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+
+    <!-- Base application dark theme -->
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+        <!-- 🔤 خط Cairo الأساسي -->
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+
+        <!-- 🎨 ألوان الوضع الداكن (Dark Theme) -->
+        <item name="colorPrimary">#90CAF9</item>            <!-- أزرق هادئ ومريح للعين ليلاً -->
+        <item name="colorOnPrimary">#00325B</item>
+        <item name="colorPrimaryContainer">#004881</item>
+        <item name="colorOnPrimaryContainer">#D1E4FF</item>
+
+        <!-- 💎 اللون الذهبي المشع للوضع الداكن -->
+        <item name="colorSecondary">#D4AF37</item>          <!-- ذهبي مشع -->
+        <item name="colorOnSecondary">#3A2F00</item>
+        <item name="colorSecondaryContainer">#534400</item>
+        <item name="colorOnSecondaryContainer">#FFDF7A</item>
+
+        <!-- 🖼️ ألوان الخلفيات والأسطح الفاخرة (OLED Charcoal) -->
+        <item name="android:colorBackground">#121212</item> <!-- خلفية رمادية غامقة جداً -->
+        <item name="colorOnBackground">#E2E2E6</item>       <!-- نص فاتح مريح -->
+        <item name="colorSurface">#1E1E1E</item>            <!-- بطاقات داكنة فاخرة -->
+        <item name="colorOnSurface">#E2E2E6</item>
+        <item name="colorSurfaceVariant">#2A2A2E</item>     <!-- حقول إدخال داكنة -->
+        <item name="colorOnSurfaceVariant">#C4C6D0</item>
     </style>
 </resources>
