@@ -45,14 +45,14 @@ public class MiraDashboardFragment extends Fragment {
     // إحصائيات المخزون (الصف العلوي - 3 بطاقات)
     private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
     
-    // المبيعات التفصيلية (اليوم/الشهر/السنة)
+    // المبيعات التفصيلية
     private TextView tvSalesToday, tvSalesMonth, tvSalesYear;
     
     // بوابات RFID
     private TextView tvGatesActive, tvGatesOffline, tvGatesAlarms;
     
     // مؤشرات حالة النظام
-    private TextView tvSystemStatus, tvLastSync;
+    private TextView tvLastSync;
     private View indicatorApi, indicatorDb, indicatorGate;
     
     // سجل الجرد والتتبع
@@ -115,7 +115,6 @@ public class MiraDashboardFragment extends Fragment {
         tvGatesAlarms = v.findViewById(R.id.tvGatesAlarms);
 
         // مؤشرات النظام
-        tvSystemStatus = v.findViewById(R.id.tvSystemStatus);
         tvLastSync = v.findViewById(R.id.tvLastSync);
         indicatorApi = v.findViewById(R.id.indicatorApi);
         indicatorDb = v.findViewById(R.id.indicatorDb);
@@ -273,7 +272,6 @@ public class MiraDashboardFragment extends Fragment {
                             String syncTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
                                 .format(new Date());
                             if (tvLastSync != null) tvLastSync.setText("آخر مزامنة: " + syncTime);
-                            if (tvSystemStatus != null) tvSystemStatus.setText("✅ جميع الأنظمة تعمل");
                             if (tvLiveStatus != null) tvLiveStatus.setText("🟢 ONLINE");
                         });
                     }
@@ -290,11 +288,10 @@ public class MiraDashboardFragment extends Fragment {
     // ==================== تحديث مؤشرات النظام ====================
     private void updateSystemIndicators(boolean gatesActive) {
         if (indicatorApi != null) 
-            indicatorApi.setBackgroundColor(0xFF16A34A); // أخضر
+            indicatorApi.setBackgroundColor(0xFF16A34A);
         if (indicatorDb != null) 
-            indicatorDb.setBackgroundColor(0xFF16A34A); // أخضر
+            indicatorDb.setBackgroundColor(0xFF16A34A);
         if (indicatorGate != null) {
-            // أخضر إذا البوابات نشطة، برتقالي إذا لا
             indicatorGate.setBackgroundColor(gatesActive ? 0xFF16A34A : 0xFFF59E0B);
         }
     }
@@ -414,9 +411,6 @@ public class MiraDashboardFragment extends Fragment {
         if (indicatorDb != null) indicatorDb.setBackgroundColor(0xFFF59E0B);
         if (indicatorGate != null) indicatorGate.setBackgroundColor(0xFF94A3B8);
         
-        if (tvSystemStatus != null) {
-            tvSystemStatus.setText("⚠️ خطأ في الاتصال بالسيرفر");
-        }
         if (tvLastSync != null) {
             String errorMsg = error != null && !error.isEmpty() ? error : "Code: " + code;
             if (errorMsg.length() > 30) errorMsg = errorMsg.substring(0, 30) + "...";
@@ -449,4 +443,4 @@ public class MiraDashboardFragment extends Fragment {
         mainHandler.removeCallbacksAndMessages(null);
         executor.shutdown();
     }
-}
+    }
