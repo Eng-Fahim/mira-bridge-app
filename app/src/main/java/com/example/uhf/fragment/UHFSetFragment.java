@@ -316,39 +316,24 @@ private void loadOrgProfile() {
 private void saveOrgProfileToCloud() {
     new Thread(() -> {
         try {
-            String apiUrl = "https://ams.ibreg.org/wp-json/mira-gate/v1/settings";
-            String apiKey = etMiraApiKey != null ? etMiraApiKey.getText().toString().trim() : "";
-            String gateId = etMiraGateId != null ? etMiraGateId.getText().toString().trim() : "";
+            JSONObject payload = new JSONObject();
+            payload.put("org_name", etOrgName.getText().toString().trim());
+            payload.put("org_slogan", etOrgSlogan.getText().toString().trim());
+            payload.put("org_phone", etOrgPhone.getText().toString().trim());
+            payload.put("org_email", etOrgEmail.getText().toString().trim());
+            payload.put("org_address", etOrgAddress.getText().toString().trim());
+            payload.put("org_website", etOrgWebsite.getText().toString().trim());
             
-            if (apiKey.isEmpty()) return;
+            MiraApiClient client = MiraApiClient.getInstance(mContext);
+            MiraApiClient.ApiResponse response = client.saveOrgProfile(payload);
             
-            URL url = new URL(apiUrl);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-            conn.setDoOutput(true);
-            
-            JSONObject body = new JSONObject();
-            body.put("gate_id", gateId);
-            
-            JSONObject settings = new JSONObject();
-            settings.put("org_name", etOrgName.getText().toString().trim());
-            settings.put("org_slogan", etOrgSlogan.getText().toString().trim());
-            settings.put("org_phone", etOrgPhone.getText().toString().trim());
-            settings.put("org_email", etOrgEmail.getText().toString().trim());
-            settings.put("org_address", etOrgAddress.getText().toString().trim());
-            settings.put("org_website", etOrgWebsite.getText().toString().trim());
-            
-            body.put("settings", settings);
-            
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(body.toString().getBytes("utf-8"));
-            }
-            
-            conn.getResponseCode();
+            mHandler.post(() -> {
+                if (response != null && response.isSuccess) {
+                    Log.d(TAG, "✅ Org profile saved to cloud");
+                } else {
+                    Log.w(TAG, "⚠️ Cloud save failed, saved locally only");
+                }
+            });
             
         } catch (Exception e) {
             Log.e(TAG, "Cloud org save error: " + e.getMessage());
