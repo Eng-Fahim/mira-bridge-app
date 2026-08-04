@@ -10,6 +10,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.activity.UHFMainActivity;
@@ -42,10 +43,18 @@ public class MiraIdentityStudioFragment extends Fragment {
     }
 
     private void initSuggestionsData() {
-        typeSuggestions.put("rings", new String[]{"خاتم سوليتير ألماسي", "خاتم محبس كلاسيك", "خاتم توينز راقي", "خاتم فص زركون ملكي"});
-        typeSuggestions.put("sets", new String[]{"طقم شبكة عروس كامل", "طقم ملكي مرصع بالألماس", "نصف طقم فاخر"});
-        typeSuggestions.put("bracelets", new String[]{"بناجر / أساور خليجي", "سوار تنادي عصري", "إسورة زرد عريضة"});
-        typeSuggestions.put("necklaces", new String[]{"عقد شوكر عصري", "قلادة بتصميم وردة", "سلسلة ذهبية ناعمة"});
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        if (isArabic) {
+            typeSuggestions.put("rings", new String[]{"خاتم سوليتير ألماسي", "خاتم محبس كلاسيك", "خاتم توينز راقي", "خاتم فص زركون ملكي"});
+            typeSuggestions.put("sets", new String[]{"طقم شبكة عروس كامل", "طقم ملكي مرصع بالألماس", "نصف طقم فاخر"});
+            typeSuggestions.put("bracelets", new String[]{"بناجر / أساور خليجي", "سوار تنادي عصري", "إسورة زرد عريضة"});
+            typeSuggestions.put("necklaces", new String[]{"عقد شوكر عصري", "قلادة بتصميم وردة", "سلسلة ذهبية ناعمة"});
+        } else {
+            typeSuggestions.put("rings", new String[]{"Diamond Solitaire Ring", "Classic Band Ring", "Luxury Twin Ring", "Royal Zircon Ring"});
+            typeSuggestions.put("sets", new String[]{"Complete Bridal Set", "Royal Diamond Set", "Luxury Half Set"});
+            typeSuggestions.put("bracelets", new String[]{"Khaleeji Bangle", "Modern Tennis Bracelet", "Wide Link Bracelet"});
+            typeSuggestions.put("necklaces", new String[]{"Modern Choker", "Flower Pendant Necklace", "Fine Gold Chain"});
+        }
     }
 
     private void setupListeners() {
@@ -92,9 +101,10 @@ public class MiraIdentityStudioFragment extends Fragment {
         });
 
         // 6. التقاط الصور
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         binding.btnAddPhotos.setOnClickListener(v -> {
-            Toast.makeText(getContext(), "سيتم فتح كاميرا الجهاز لالتقاط صورة القطعة...", Toast.LENGTH_SHORT).show();
-            binding.tvPhotosCount.setText("تم التقاط (1) صورة للقطعة");
+            Toast.makeText(getContext(), isArabic ? "سيتم فتح كاميرا الجهاز لالتقاط صورة القطعة..." : "Opening camera to capture item photo...", Toast.LENGTH_SHORT).show();
+            binding.tvPhotosCount.setText(isArabic ? "تم التقاط (1) صورة للقطعة" : "Captured (1) photo");
         });
 
         // 7. اعتماد الهوية
@@ -102,50 +112,49 @@ public class MiraIdentityStudioFragment extends Fragment {
     }
 
     /**
- * 🧮 دالة حساب التكلفة بناءً على جدول أسعار الذهب والهوامش في نظام MIRA ID
- */
-private void calculateEstimatedGoldValue() {
-    String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
-    
-    if (weightStr.isEmpty()) {
-        binding.tvEstimatedGoldValue.setText("0.00 $");
-        return;
-    }
-
-    try {
-        double weight = Double.parseDouble(weightStr);
-        double pricePerGram = getGoldPriceByKarat(); // جلب السعر حسب العيار المحدد من إعدادات النظام
-
-        // 1️⃣ حساب قيمة الذهب الخام
-        double rawGoldValue = weight * pricePerGram;
+     * 🧮 دالة حساب التكلفة بناءً على جدول أسعار الذهب والهوامش في نظام MIRA ID
+     */
+    private void calculateEstimatedGoldValue() {
+        String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
         
-        // 2️⃣ عرض النتيجة (يمكنك تغيير الرمز إلى ﷼ أو $ حسب العملة المختارة في النظام)
-        binding.tvEstimatedGoldValue.setText(String.format("%.2f $", rawGoldValue));
+        if (weightStr.isEmpty()) {
+            binding.tvEstimatedGoldValue.setText("0.00 $");
+            return;
+        }
 
-    } catch (NumberFormatException e) {
-        binding.tvEstimatedGoldValue.setText("0.00 $");
-    }
-}
+        try {
+            double weight = Double.parseDouble(weightStr);
+            double pricePerGram = getGoldPriceByKarat(); // جلب السعر حسب العيار المحدد من إعدادات النظام
 
-/**
- * 📡 جلب سعر جرام الذهب للعيار المختار من جدول أسعار MIRA ID (يمكن ربطها بـ API أو SharedPreferences)
- */
-private double getGoldPriceByKarat() {
-    int checkedId = binding.chipGroupKarat.getCheckedChipId();
+            // 1️⃣ حساب قيمة الذهب الخام
+            double rawGoldValue = weight * pricePerGram;
+            
+            // 2️⃣ عرض النتيجة
+            binding.tvEstimatedGoldValue.setText(String.format("%.2f $", rawGoldValue));
 
-    // ملاحظة: قم بتبديل هذه القيم بالقيم القادمة من API الإعدادات لديك
-    if (checkedId == binding.chip24K.getId()) {
-        return 75.0; // سعر بيع/شراء 24k المعتمد في النظام
-    } else if (checkedId == binding.chip21K.getId()) {
-        return 65.62; // سعر بيع/شراء 21k المعتمد في النظام (مثلاً: 54,250.80 YER / سعر الصرف)
-    } else if (checkedId == binding.chip18K.getId()) {
-        return 56.25; // سعر بيع/شراء 18k المعتمد في النظام
-    } else if (checkedId == binding.chip14K.getId()) {
-        return 43.75; // سعر بيع/شراء 14k المعتمد في النظام
+        } catch (NumberFormatException e) {
+            binding.tvEstimatedGoldValue.setText("0.00 $");
+        }
     }
 
-    return 65.62; // افتراضي (21k)
-}
+    /**
+     * 📡 جلب سعر جرام الذهب للعيار المختار من جدول أسعار MIRA ID
+     */
+    private double getGoldPriceByKarat() {
+        int checkedId = binding.chipGroupKarat.getCheckedChipId();
+
+        if (checkedId == binding.chip24K.getId()) {
+            return 75.0; 
+        } else if (checkedId == binding.chip21K.getId()) {
+            return 65.62; 
+        } else if (checkedId == binding.chip18K.getId()) {
+            return 56.25; 
+        } else if (checkedId == binding.chip14K.getId()) {
+            return 43.75; 
+        }
+
+        return 65.62; // افتراضي (21k)
+    }
 
     public void onRfidScanned(String epc) {
         if (getActivity() == null) return;
@@ -177,25 +186,25 @@ private double getGoldPriceByKarat() {
         }
     }
 
-            private void finalizeItemIdentity() {
+    private void finalizeItemIdentity() {
         String epc = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
         String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
         String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
         
-        // استخدام نص فارغ للباركوود إذا لم يكن هناك عنصر etBarcode في الـ XML
         String barcode = ""; 
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
 
         // 1. التحقق من الحقول الإلزامية
         if (epc.isEmpty()) {
-            Toast.makeText(getContext(), "يرجى مسح أو كتابة رمز RFID / GTIN أولاً", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), isArabic ? "يرجى مسح أو كتابة رمز RFID / GTIN أولاً" : "Please scan or enter RFID / GTIN first", Toast.LENGTH_SHORT).show();
             return;
         }
         if (title.isEmpty()) {
-            Toast.makeText(getContext(), "يرجى كتابة أو اختيار عنوان القطعة", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), isArabic ? "يرجى كتابة أو اختيار عنوان القطعة" : "Please enter or select item title", Toast.LENGTH_SHORT).show();
             return;
         }
         if (weightStr.isEmpty()) {
-            Toast.makeText(getContext(), "يرجى تحديد وزن القطعة", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), isArabic ? "يرجى تحديد وزن القطعة" : "Please specify item weight", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -217,8 +226,8 @@ private double getGoldPriceByKarat() {
                     grossWeight, // netWeight
                     0.0,         // المصنعية
                     0.0,         // الهامش
-                    "مجوهرات",
-                    "المعرض الرئيسي"
+                    isArabic ? "مجوهرات" : "Jewelry",
+                    isArabic ? "المعرض الرئيسي" : "Main Showroom"
             );
 
             if (getActivity() != null) {
@@ -230,11 +239,11 @@ private double getGoldPriceByKarat() {
                             ((UHFMainActivity) getActivity()).playSound(1);
                         }
 
-                        Toast.makeText(getContext(), "تمت المزامنة واعتُمدت الهوية الرقمية للقطعة بنجاح! 💎", Toast.LENGTH_LONG).show();
+                        Toast.makeText(getContext(), isArabic ? "تمت المزامنة واعتُمدت الهوية الرقمية للقطعة بنجاح! 💎" : "Digital identity successfully synchronized & approved! 💎", Toast.LENGTH_LONG).show();
                         resetFormForNextScan();
 
                     } else {
-                        Toast.makeText(getContext(), "خطأ في التكويد: " + response.error, Toast.LENGTH_LONG).show();
+                        Toast.makeText(getContext(), (isArabic ? "خطأ في التكويد: " : "Encoding error: ") + response.error, Toast.LENGTH_LONG).show();
                     }
                 });
             }
@@ -251,7 +260,6 @@ private double getGoldPriceByKarat() {
         binding.etEpc.requestFocus();
     }
 
-
     /**
      * 🏷️ جلب كود العيار المختار من الـ Chips
      */
@@ -263,7 +271,6 @@ private double getGoldPriceByKarat() {
         if (checkedId == binding.chip14K.getId()) return "14K";
         return "21K"; // افتراضي
     }
-
 
     @Override
     public void onDestroyView() {
