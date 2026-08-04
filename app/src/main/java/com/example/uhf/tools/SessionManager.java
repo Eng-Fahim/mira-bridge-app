@@ -20,13 +20,15 @@ public class SessionManager {
     private final SharedPreferences pref;
     private final SharedPreferences.Editor editor;
 
+    // ✅ هيكل الصلاحيات - مستويان للإدارة
     public enum Role {
-        ADMIN,
-        POS_OPERATOR,
-        INVENTORY_MGR,
-        SECURITY,
-        AUDITOR,
-        GATE_SECURITY  // ✅ أضف هذا
+        SYSTEM_ADMIN,    // 🔧 مهندس النظام - وصول كامل لكل شيء
+        ORG_ADMIN,       // 🏢 مدير الجهة - إدارة المستخدمين والمخزون
+        INVENTORY_MGR,   // 📊 مدير المخزون
+        POS_OPERATOR,    // 🛒 موظف مبيعات
+        SECURITY,        // 🔒 أمن
+        GATE_SECURITY,   // 🚪 أمن البوابات
+        AUDITOR          // 🔍 مدقق
     }
 
     public SessionManager(Context context) {
@@ -34,7 +36,8 @@ public class SessionManager {
         editor = pref.edit();
     }
 
-    // إنشاء جلسة
+    // ==================== إنشاء الجلسة ====================
+
     public void createLoginSession(String username, String role, String token, String serverUrl) {
         editor.putBoolean(KEY_IS_LOGGED_IN, true);
         editor.putString(KEY_USERNAME, username);
@@ -44,11 +47,15 @@ public class SessionManager {
         editor.apply();
     }
 
+    // ==================== استعلامات الجلسة ====================
+
     public boolean isLoggedIn() {
         return pref.getBoolean(KEY_IS_LOGGED_IN, false);
     }
 
-    // ✅ getUserRole ترجع Role مباشرة
+    /**
+     * ✅ getUserRole ترجع Role مباشرة
+     */
     public Role getUserRole() {
         String roleStr = pref.getString(KEY_USER_ROLE, "INVENTORY_MGR");
         try {
@@ -58,16 +65,40 @@ public class SessionManager {
         }
     }
 
-    // ✅ getRoleString للاستخدامات النصية
+    /**
+     * ✅ getRoleString للاستخدامات النصية
+     */
     public String getRoleString() {
         return pref.getString(KEY_USER_ROLE, "INVENTORY_MGR");
+    }
+
+    /**
+     * ✅ التحقق إذا كان المستخدم مدير نظام
+     */
+    public boolean isSystemAdmin() {
+        return "SYSTEM_ADMIN".equals(getRoleString());
+    }
+
+    /**
+     * ✅ التحقق إذا كان المستخدم مدير جهة أو أعلى
+     */
+    public boolean isOrgAdminOrHigher() {
+        String role = getRoleString();
+        return "SYSTEM_ADMIN".equals(role) || "ORG_ADMIN".equals(role);
+    }
+
+    /**
+     * ✅ التحقق إذا كان المستخدم مدير (بأي مستوى)
+     */
+    public boolean isAnyAdmin() {
+        String role = getRoleString();
+        return "SYSTEM_ADMIN".equals(role) || "ORG_ADMIN".equals(role);
     }
 
     public String getUsername() {
         return pref.getString(KEY_USERNAME, "");
     }
 
-    // ✅ اسم بديل متوافق مع UHFMainActivity
     public String getUserName() {
         return pref.getString(KEY_USERNAME, "");
     }
@@ -76,7 +107,8 @@ public class SessionManager {
         return pref.getString(KEY_AUTH_TOKEN, "");
     }
 
-    // ✅ userId
+    // ==================== userId ====================
+
     public void setUserId(int userId) {
         editor.putInt(KEY_USER_ID, userId);
         editor.apply();
@@ -86,7 +118,8 @@ public class SessionManager {
         return pref.getInt(KEY_USER_ID, 0);
     }
 
-    // ✅ displayName
+    // ==================== displayName ====================
+
     public void setDisplayName(String displayName) {
         editor.putString(KEY_DISPLAY_NAME, displayName);
         editor.apply();
@@ -97,7 +130,8 @@ public class SessionManager {
         return name.isEmpty() ? getUsername() : name;
     }
 
-    // رابط الخادم
+    // ==================== رابط الخادم ====================
+
     public String getServerUrl() {
         return pref.getString(KEY_SERVER_URL, "");
     }
@@ -107,7 +141,8 @@ public class SessionManager {
         editor.apply();
     }
 
-    // البصمة
+    // ==================== البصمة ====================
+
     public void setBiometricEnabled(boolean enabled) {
         editor.putBoolean(KEY_BIOMETRIC_ENABLED, enabled);
         editor.apply();
@@ -128,10 +163,11 @@ public class SessionManager {
     }
 
     public String getLastBiometricRole() {
-        return pref.getString(KEY_LAST_BIOMETRIC_ROLE, "ADMIN");
+        return pref.getString(KEY_LAST_BIOMETRIC_ROLE, "INVENTORY_MGR");
     }
 
-    // ✅ تسجيل الخروج
+    // ==================== تسجيل الخروج ====================
+
     public void logoutUser() {
         boolean keepBiometric = pref.getBoolean(KEY_BIOMETRIC_ENABLED, false);
         String lastUser = pref.getString(KEY_LAST_BIOMETRIC_USER, "");
@@ -148,7 +184,6 @@ public class SessionManager {
         editor.apply();
     }
 
-    // ✅ اسم بديل متوافق
     public void logout() {
         logoutUser();
     }
