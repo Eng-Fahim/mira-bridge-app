@@ -1,1010 +1,588 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/swipeRefresh"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="?android:attr/colorBackground"
-    android:fillViewport="true"
-    android:layoutDirection="rtl">
+    android:layout_height="match_parent">
 
-    <LinearLayout
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
-
-        <!-- ==================== 1. الهيدر الموحد ==================== -->
-        <RelativeLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp">
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentStart="true"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="MIRA "
-                    android:textColor="?attr/colorPrimary"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="JEWELRY ID™"
-                    android:textColor="?attr/colorSecondary"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:letterSpacing="0.05" />
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/tvLiveStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:background="?attr/colorSurfaceVariant"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="6dp"
-                android:text="● ONLINE"
-                android:textColor="?attr/colorPrimary"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-        </RelativeLayout>
-
-        <!-- ==================== 2. بطاقة التحية + أسعار الذهب المباشرة ==================== -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="6dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutlineVariant">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <!-- معلومات المستخدم والموقع -->
-                <RelativeLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:padding="16dp">
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentStart="true"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/tvGreeting"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="مرحباً بك، المهندس"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="18sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tvLocation"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:text="المعرض الرئيسي — الفرع الإقليمي"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentEnd="true"
-                        android:gravity="end"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/tvTime"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="00:00:00"
-                            android:textColor="?attr/colorSecondary"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tvDate"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="الأحد، 2 أغسطس"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-                </RelativeLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="?attr/colorSurfaceVariant" />
-
-                <!-- شريط أسعار البورصة الحية (Gold Live Ticker) -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="10dp"
-                    android:weightSum="3">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="عيار 24"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="10sp" />
-
-                        <TextView
-                            android:id="@+id/tvGoldPrice24"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="$--.--/g"
-                            android:textColor="?attr/colorSecondary"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="1dp"
-                        android:layout_height="match_parent"
-                        android:background="?attr/colorSurfaceVariant" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="عيار 21"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="10sp" />
-
-                        <TextView
-                            android:id="@+id/tvGoldPrice21"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="$--.--/g"
-                            android:textColor="?attr/colorSecondary"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="1dp"
-                        android:layout_height="match_parent"
-                        android:background="?attr/colorSurfaceVariant" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="عيار 18"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="10sp" />
-
-                        <TextView
-                            android:id="@+id/tvGoldPrice18"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="$--.--/g"
-                            android:textColor="?attr/colorSecondary"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-                </LinearLayout>
-
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- ==================== 3. إحصائيات المخزون والأوزان ==================== -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="المخزون الثمين والكتلة"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+        android:layout_height="match_parent"
+        android:background="?android:attr/colorBackground"
+        android:fillViewport="true"
+        android:layoutDirection="rtl">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:orientation="horizontal"
-            android:weightSum="3">
+            android:orientation="vertical"
+            android:padding="16dp">
 
-            <!-- إجمالي القطع -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="0dp"
+            <!-- ================= 1. الهيدر العرفي والتنفيذي ================= -->
+            <RelativeLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="4dp"
-                android:layout_weight="1"
-                app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="3dp"
-                app:strokeWidth="0dp">
+                android:layout_marginBottom="16dp">
 
                 <LinearLayout
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical"
-                    android:padding="14dp">
+                    android:layout_alignParentStart="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="إجمالي القطع"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/tvTotalItems"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="0"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- الوزن الإجمالي -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="2dp"
-                android:layout_weight="1"
-                app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="3dp"
-                app:strokeWidth="0dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical"
-                    android:padding="14dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="الوزن الكلي"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/tvTotalWeight"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="0.00 g"
-                        android:textColor="?attr/colorSecondary"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- القطع المباعة اليوم -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:layout_weight="1"
-                app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="3dp"
-                app:strokeWidth="0dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical"
-                    android:padding="14dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="قطع مباعة (اليوم)"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/tvSoldToday"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="0"
+                        android:text="MIRA "
                         android:textColor="?attr/colorPrimary"
                         android:textSize="20sp"
                         android:textStyle="bold" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-        </LinearLayout>
-
-        <!-- ==================== 4. حركة المبيعات والتحليلات ==================== -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="3dp"
-            app:strokeWidth="0dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="16dp">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="مبيعات اليوم"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/tvSalesToday"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="--"
+                        android:text="JEWELRY ID™"
                         android:textColor="?attr/colorSecondary"
-                        android:textSize="15sp"
+                        android:textSize="14sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <View
-                    android:layout_width="1dp"
-                    android:layout_height="match_parent"
-                    android:background="?attr/colorSurfaceVariant" />
+                <TextView
+                    android:id="@+id/tvLiveStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:background="?attr/colorSurfaceVariant"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="6dp"
+                    android:text="● ONLINE"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </RelativeLayout>
+
+            <!-- ================= 2. كرت الترحيب والساعة وبورصة الذهب ================= -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="?attr/colorSurface"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="?attr/colorOutlineVariant">
 
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
                     android:orientation="vertical">
 
-                    <TextView
-                        android:layout_width="wrap_content"
+                    <RelativeLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="مبيعات الشهر"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
+                        android:padding="16dp">
 
-                    <TextView
-                        android:id="@+id/tvSalesMonth"
-                        android:layout_width="wrap_content"
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentStart="true"
+                            android:gravity="start"
+                            android:orientation="vertical">
+
+                            <!-- الاسم الديناميكي والمحاذاة المضبوطة للليمين -->
+                            <TextView
+                                android:id="@+id/tvGreeting"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="مرحباً بك..."
+                                android:textAlignment="viewStart"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="18sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvLocation"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="المعرض الرئيسي — الفرع الإقليمي"
+                                android:textAlignment="viewStart"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:gravity="end"
+                            android:orientation="vertical">
+
+                            <!-- ساعة حية متغيرة بالثواني -->
+                            <TextClock
+                                android:id="@+id/tcLiveTime"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:format12Hour="hh:mm:ss a"
+                                android:format24Hour="HH:mm:ss"
+                                android:textColor="?attr/colorSecondary"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvDate"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="--"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+                    </RelativeLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="?attr/colorOutlineVariant" />
+
+                    <!-- أسعار الذهب اللحظية -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="--"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:weightSum="3">
 
-                <View
-                    android:layout_width="1dp"
-                    android:layout_height="match_parent"
-                    android:background="?attr/colorSurfaceVariant" />
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:orientation="vertical">
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="عيار 18"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:textSize="11sp" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="مبيعات السنة"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
+                            <TextView
+                                android:id="@+id/tvGoldPrice18"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="$--.--/g"
+                                android:textColor="?attr/colorSecondary"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
 
-                    <TextView
-                        android:id="@+id/tvSalesYear"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="--"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="match_parent"
+                            android:background="?attr/colorOutlineVariant" />
 
-        <!-- ==================== 5. العمليات الميدانية والوصول السريع ==================== -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
-            android:text="العمليات الميدانية والمراقبة"
-            android:textColor="?attr/colorOnBackground"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:orientation="vertical">
 
-        <GridLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:columnCount="2"
-            android:rowCount="2">
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="عيار 21"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:textSize="11sp" />
 
-            <!-- cardScan -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardScan"
-                android:layout_width="0dp"
-                android:layout_height="84dp"
-                android:layout_columnWeight="1"
-                android:layout_margin="4dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground"
-                app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="3dp"
-                app:strokeWidth="0dp">
+                            <TextView
+                                android:id="@+id/tvGoldPrice21"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="$--.--/g"
+                                android:textColor="?attr/colorSecondary"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="8dp">
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="match_parent"
+                            android:background="?attr/colorOutlineVariant" />
 
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@android:drawable/ic_menu_search"
-                        app:tint="?attr/colorPrimary" />
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:orientation="vertical">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="الجرد السريع بالـ RFID"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="عيار 24"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:textSize="11sp" />
 
-            <!-- cardGate -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardGate"
-                android:layout_width="0dp"
-                android:layout_height="84dp"
-                android:layout_columnWeight="1"
-                android:layout_margin="4dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground"
-                app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="3dp"
-                app:strokeWidth="0dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="8dp">
-
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@android:drawable/ic_lock_lock"
-                        app:tint="?attr/colorPrimary" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="رقابة بوابات الحماية"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- cardRadar -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardRadar"
-                android:layout_width="0dp"
-                android:layout_height="84dp"
-                android:layout_columnWeight="1"
-                android:layout_margin="4dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground"
-                app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="3dp"
-                app:strokeWidth="0dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="8dp">
-
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@android:drawable/ic_menu_compass"
-                        app:tint="?attr/colorPrimary" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="رادار البحث عن القطع"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
+                            <TextView
+                                android:id="@+id/tvGoldPrice24"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="$--.--/g"
+                                android:textColor="?attr/colorSecondary"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- cardSettings -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardSettings"
-                android:layout_width="0dp"
-                android:layout_height="84dp"
-                android:layout_columnWeight="1"
-                android:layout_margin="4dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground"
-                app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="3dp"
-                app:strokeWidth="0dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="8dp">
-
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@android:drawable/ic_menu_manage"
-                        app:tint="?attr/colorPrimary" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="إعدادات النظام والأجهزة"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-        </GridLayout>
-
-        <!-- ==================== 6. حالة بوابات ومستشعرات RFID ==================== -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="بوابات الحماية والأمان (RFID Gates)"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="3dp"
-            app:strokeWidth="0dp">
+            <!-- ================= 3. قسم المخزون والكتلة ================= -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:text="المخزون الثمين والكتلة"
+                android:textAlignment="viewStart"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
                 android:orientation="horizontal"
-                android:padding="16dp">
+                android:weightSum="3">
 
-                <LinearLayout
+                <!-- قطع مباعة (اليوم) -->
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="90dp"
                     android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
+                    android:layout_marginEnd="4dp"
+                    app:cardBackgroundColor="?attr/colorSurface"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="?attr/colorOutlineVariant">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="بوابات مفعلة"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:padding="8dp">
 
-                    <TextView
-                        android:id="@+id/tvGatesActive"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="0"
-                        android:textColor="?attr/colorPrimary"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="قطع مباعة (اليوم)"
+                            android:textAlignment="center"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="10sp" />
 
-                <LinearLayout
+                        <TextView
+                            android:id="@+id/tvSoldToday"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="0"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- الوزن الكلي -->
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="90dp"
                     android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
+                    android:layout_marginHorizontal="4dp"
+                    app:cardBackgroundColor="?attr/colorSurface"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="?attr/colorOutlineVariant">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="غير متصلة"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:padding="8dp">
 
-                    <TextView
-                        android:id="@+id/tvGatesOffline"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="0"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="الوزن الكلي"
+                            android:textAlignment="center"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="10sp" />
 
-                <LinearLayout
+                        <TextView
+                            android:id="@+id/tvTotalWeight"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="0.0 g"
+                            android:textColor="?attr/colorSecondary"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- إجمالي القطع -->
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="90dp"
                     android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
+                    android:layout_marginStart="4dp"
+                    app:cardBackgroundColor="?attr/colorSurface"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="?attr/colorOutlineVariant">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="أنذارات اليوم"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:padding="8dp">
 
-                    <TextView
-                        android:id="@+id/tvGatesAlarms"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="0"
-                        android:textColor="?attr/colorError"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="إجمالي القطع"
+                            android:textAlignment="center"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="10sp" />
+
+                        <TextView
+                            android:id="@+id/tvTotalItems"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="0"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
 
-        <!-- ==================== 7. حالة الربط والسيرفرات ==================== -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="3dp"
-            app:strokeWidth="0dp">
-
-            <LinearLayout
+            <!-- ================= 4. كرت ملخص المبيعات (اليوم / الشهر / السنة) ================= -->
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <RelativeLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentStart="true"
-                        android:text="حالة الربط والشبكة"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvLastSync"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentEnd="true"
-                        android:text="آخر مزامنة: الآن"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
-                </RelativeLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginVertical="10dp"
-                    android:background="?attr/colorSurfaceVariant" />
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="?attr/colorSurface"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="?attr/colorOutlineVariant">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
+                    android:paddingVertical="14dp"
                     android:weightSum="3">
 
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="3dp"
                         android:layout_weight="1"
-                        android:background="?android:attr/colorBackground"
                         android:gravity="center"
-                        android:paddingVertical="8dp">
-
-                        <View
-                            android:id="@+id/indicatorApi"
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:layout_marginEnd="6dp"
-                            android:background="?attr/colorPrimary" />
+                        android:orientation="vertical">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="API Cloud"
+                            android:text="مبيعات اليوم"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/tvSalesToday"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="--"
                             android:textColor="?attr/colorOnSurface"
-                            android:textSize="11sp"
+                            android:textSize="14sp"
                             android:textStyle="bold" />
                     </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="match_parent"
+                        android:background="?attr/colorOutlineVariant" />
 
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginHorizontal="3dp"
                         android:layout_weight="1"
-                        android:background="?android:attr/colorBackground"
                         android:gravity="center"
-                        android:paddingVertical="8dp">
-
-                        <View
-                            android:id="@+id/indicatorDb"
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:layout_marginEnd="6dp"
-                            android:background="?attr/colorPrimary" />
+                        android:orientation="vertical">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Database"
+                            android:text="مبيعات الشهر"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/tvSalesMonth"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="--"
                             android:textColor="?attr/colorOnSurface"
-                            android:textSize="11sp"
+                            android:textSize="14sp"
                             android:textStyle="bold" />
                     </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="match_parent"
+                        android:background="?attr/colorOutlineVariant" />
 
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="3dp"
                         android:layout_weight="1"
-                        android:background="?android:attr/colorBackground"
                         android:gravity="center"
-                        android:paddingVertical="8dp">
-
-                        <View
-                            android:id="@+id/indicatorGate"
-                            android:layout_width="8dp"
-                            android:layout_height="8dp"
-                            android:layout_marginEnd="6dp"
-                            android:background="?attr/colorPrimary" />
+                        android:orientation="vertical">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Gates Hub"
+                            android:text="مبيعات السنة"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/tvSalesYear"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="--"
                             android:textColor="?attr/colorOnSurface"
-                            android:textSize="11sp"
+                            android:textSize="14sp"
                             android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            </com.google.android.material.card.MaterialCardView>
 
-        <!-- ==================== 8. السجل الفوري للتتبع (Audit & Live Log) ==================== -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="سجل الأحداث والعمليات المباشرة"
-            android:textColor="?attr/colorOnBackground"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="3dp"
-            app:strokeWidth="0dp">
+            <!-- ================= 5. قسم العمليات الميدانية والمراقبة ================= -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:text="العمليات الميدانية والمراقبة"
+                android:textAlignment="viewStart"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
+                android:layout_marginBottom="8dp"
+                android:orientation="horizontal"
+                android:weightSum="2">
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                <!-- رقابة بوابات الحماية -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/btnGateSecurity"
+                    android:layout_width="0dp"
+                    android:layout_height="100dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardBackgroundColor="?attr/colorSurface"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="?attr/colorOutlineVariant">
 
-                    <TextView
-                        android:id="@+id/tvRecent1"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="• تم تنفيذ مزامنة دقيقة لبيانات الـ RFID"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="12sp" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:padding="12dp">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="08:00 AM"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="10sp" />
-                </LinearLayout>
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@drawable/ic_security"
+                            app:tint="?attr/colorPrimary" />
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginVertical="8dp"
-                    android:background="?attr/colorSurfaceVariant" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="رقابة بوابات الحماية"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                <!-- الجرد السريع بالـ RFID -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/btnRfidAudit"
+                    android:layout_width="0dp"
+                    android:layout_height="100dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardBackgroundColor="?attr/colorSurface"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="?attr/colorOutlineVariant">
 
-                    <TextView
-                        android:id="@+id/tvRecent2"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="• بوابة المعرض الرئيسي: متصلة وجاهزة"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="12sp" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:padding="12dp">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="07:45 AM"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="10sp" />
-                </LinearLayout>
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@drawable/ic_search"
+                            app:tint="?attr/colorPrimary" />
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginVertical="8dp"
-                    android:background="?attr/colorSurfaceVariant" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/tvRecent3"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="• خادم MIRA Trust Platform متصل بنجاح"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="12sp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="07:30 AM"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="10sp" />
-                </LinearLayout>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="الجرد السريع بالـ RFID"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
 
-        <!-- ==================== 9. الرسم البياني لتوزيع الأوزان ==================== -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="توزيع الأوزان حسب العيار (جرام)"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="3dp"
-            app:strokeWidth="0dp">
-
-            <com.github.mikephil.charting.charts.BarChart
-                android:id="@+id/barChartWeights"
-                android:layout_width="match_parent"
-                android:layout_height="190dp"
-                android:padding="8dp" />
-
-        </com.google.android.material.card.MaterialCardView>
-
-    </LinearLayout>
-</androidx.core.widget.NestedScrollView>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
