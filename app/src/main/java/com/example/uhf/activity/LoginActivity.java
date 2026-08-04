@@ -1,5 +1,5 @@
 package com.example.uhf.activity;
-
+import android.util.Log;
 import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.content.Intent;
