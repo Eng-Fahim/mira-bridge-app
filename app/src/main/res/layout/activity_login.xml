@@ -5,63 +5,96 @@
     android:layout_height="match_parent"
     android:fillViewport="true"
     android:background="?android:attr/colorBackground"
-    android:layoutDirection="ltr">
+    android:layoutDirection="rtl">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        xml:lang="ar"
         android:orientation="vertical"
         android:padding="24dp"
         android:gravity="center_horizontal">
 
-        
-<!-- Logo Section -->
-<LinearLayout
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:layout_marginTop="64dp"
-    android:gravity="center"
-    android:orientation="vertical">
+        <!-- Top Header & Language Switcher -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
 
-    <com.google.android.material.textview.MaterialTextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="◆ MIRA"
-        android:textColor="?attr/colorPrimary"
-        android:textSize="36sp"
-        android:textStyle="bold"
-        android:letterSpacing="0.05" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnToggleLanguage"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_alignParentStart="true"
+                android:text="English / العربية"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                app:icon="@android:drawable/ic_menu_compass"
+                app:iconSize="14dp"
+                app:iconTint="?attr/colorPrimary" />
 
-    <com.google.android.material.textview.MaterialTextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="Enterprise Authentication"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="12sp"
-        android:letterSpacing="0.15" />
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvAppVersion"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:text="v1.0.0 Enterprise"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="10sp"
+                android:alpha="0.6" />
+        </RelativeLayout>
 
-    <!-- ✅ أضف هذا العنصر -->
-    <com.google.android.material.textview.MaterialTextView
-        android:id="@+id/tvAppVersion"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="v1.0.0"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="10sp"
-        android:alpha="0.5" />
+        <!-- Logo & International Branding Section -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:gravity="center"
+            android:orientation="vertical">
 
-</LinearLayout>
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="◆ MIRA"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="38sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvBrandSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="MIRA ID™ Smart Jewelry Tag"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.05" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tvBrandDescription"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="منظومة التتبع والمصادقة المعتمدة للمجوهرات"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp" />
+        </LinearLayout>
+
         <!-- Main Card -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/loginCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="40dp"
+            android:layout_marginTop="28dp"
             app:cardCornerRadius="24dp"
-            app:cardElevation="4dp"
-            app:strokeWidth="0dp">
+            app:cardElevation="6dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="?attr/colorSurfaceVariant">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -70,19 +103,21 @@
                 android:padding="28dp">
 
                 <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tvSignInTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Sign In"
+                    android:text="تسجيل الدخول"
                     android:textColor="?attr/colorOnSurface"
-                    android:textSize="24sp"
+                    android:textSize="22sp"
                     android:textStyle="bold" />
 
                 <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tvSignInSubtitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:layout_marginBottom="28dp"
-                    android:text="Enter your credentials to continue"
+                    android:layout_marginBottom="24dp"
+                    android:text="أدخل بيانات الاعتماد الخاصة بك للمتابعة"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp" />
 
@@ -93,7 +128,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="16dp"
-                    android:hint="Username"
+                    android:hint="اسم المستخدم / البريد الإلكتروني"
+                    app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusTopStart="12dp"
                     app:startIconDrawable="@android:drawable/ic_menu_myplaces"
                     app:startIconTint="?attr/colorOnSurfaceVariant">
 
@@ -112,8 +151,12 @@
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="28dp"
-                    android:hint="Password"
+                    android:layout_marginBottom="24dp"
+                    android:hint="كلمة المرور"
+                    app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusTopStart="12dp"
                     app:startIconDrawable="@android:drawable/ic_lock_lock"
                     app:startIconTint="?attr/colorOnSurfaceVariant"
                     app:endIconMode="password_toggle">
@@ -137,26 +180,26 @@
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnLogin"
                         android:layout_width="0dp"
-                        android:layout_height="56dp"
+                        android:layout_height="52dp"
                         android:layout_weight="2.2"
-                        android:text="Sign In"
-                        android:textSize="16sp"
+                        android:text="دخول النظام"
+                        android:textSize="15sp"
                         android:textStyle="bold"
                         android:enabled="false"
                         android:alpha="0.5"
-                        app:cornerRadius="14dp" />
+                        app:cornerRadius="12dp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnBiometric"
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="0dp"
-                        android:layout_height="56dp"
+                        android:layout_height="52dp"
                         android:layout_marginStart="8dp"
                         android:layout_weight="0.8"
                         android:text="🔒"
-                        android:textSize="20sp"
-                        app:cornerRadius="14dp"
-                        app:strokeWidth="1.5dp" />
+                        android:textSize="18sp"
+                        app:cornerRadius="12dp"
+                        app:strokeWidth="1dp" />
                 </LinearLayout>
 
                 <!-- Loading -->
@@ -176,10 +219,11 @@
                         android:indeterminateTint="?attr/colorPrimary" />
 
                     <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/tvLoadingText"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="10dp"
-                        android:text="Authenticating..."
+                        android:text="جاري التحقق من الهوية والسيرفر..."
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -187,21 +231,21 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 🔧 Server Settings (زر صغير أسفل الشاشة) -->
+        <!-- Server Settings Toggle -->
         <com.google.android.material.textview.MaterialTextView
             android:id="@+id/tvServerSettings"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="40dp"
-            android:text="🔧 Server Settings"
+            android:layout_marginTop="24dp"
+            android:text="🔧 إعدادات الخادم والاتصال (Server Settings)"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="11sp"
-            android:alpha="0.4"
+            android:alpha="0.6"
             android:clickable="true"
             android:focusable="true"
-            android:padding="12dp" />
+            android:padding="8dp" />
 
-        <!-- Server URL (مخفي افتراضياً) -->
+        <!-- Server URL Card -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/serverConfigCard"
             android:layout_width="match_parent"
@@ -222,7 +266,7 @@
                 <com.google.android.material.textview.MaterialTextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Server Configuration"
+                    android:text="إعدادات مسار الخادم API"
                     android:textColor="?attr/colorOnSurface"
                     android:textSize="14sp"
                     android:textStyle="bold"
@@ -233,7 +277,11 @@
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="API Server URL">
+                    android:hint="API Server URL"
+                    app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusTopStart="12dp">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etServerUrl"
@@ -256,7 +304,7 @@
                         style="@style/Widget.Material3.Button.TextButton"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Save"
+                        android:text="حفظ الإعدادات"
                         android:textSize="12sp" />
                 </LinearLayout>
             </LinearLayout>
@@ -266,8 +314,9 @@
         <com.google.android.material.textview.MaterialTextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="MIRA Trust Architecture™"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="16dp"
+            android:text="MIRA Trust Architecture™ — Global Standards &amp; RFID Solutions"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="10sp"
             android:alpha="0.4" />
