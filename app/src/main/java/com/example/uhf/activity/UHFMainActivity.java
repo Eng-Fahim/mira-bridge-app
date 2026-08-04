@@ -1,5 +1,5 @@
-package com.example.uhf.activity;
-
+cpackage com.example.uhf.activity;
+import com.example.uhf.manager.MiraOrgProfileManager;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -70,35 +70,36 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private MiraPosFragment activePOSFragment = null;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-        super.onCreate(savedInstanceState);
+protected void onCreate(Bundle savedInstanceState) {
+    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+    super.onCreate(savedInstanceState);
 
-        sessionManager = new SessionManager(this);
-        if (!sessionManager.isLoggedIn()) {
-            navigateToLogin();
-            return;
-        }
-
-        setContentView(R.layout.activity_main);
-
-        com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
-        if (toolbar != null) {
-            setSupportActionBar(toolbar);
-            String displayName = sessionManager.getDisplayName();
-            if (displayName == null || displayName.isEmpty()) {
-                displayName = sessionManager.getUsername();
-            }
-            if (getSupportActionBar() != null) {
-                getSupportActionBar().setTitle("MIRA Bridge - " + displayName);
-            }
-        }
-
-        checkReadWritePermission();
-        initSound();
-        initUHF();
-        initViewPageData();
+    sessionManager = new SessionManager(this);
+    if (!sessionManager.isLoggedIn()) {
+        navigateToLogin();
+        return;
     }
+
+    setContentView(R.layout.activity_main);
+
+    com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
+    if (toolbar != null) {
+        setSupportActionBar(toolbar);
+        String displayName = sessionManager.getDisplayName();
+        if (displayName == null || displayName.isEmpty()) {
+            displayName = sessionManager.getUsername();
+        }
+        if (getSupportActionBar() != null) {
+            MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
+            getSupportActionBar().setTitle(orgProfile.getOrgName() + " - " + displayName);
+        }
+    }
+
+    checkReadWritePermission();
+    initSound();
+    initUHF();
+    initViewPageData();
+}
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
