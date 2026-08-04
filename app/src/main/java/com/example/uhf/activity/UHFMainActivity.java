@@ -14,6 +14,7 @@ import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -71,36 +72,44 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private MiraPosFragment activePOSFragment = null;
 
     @Override
-protected void onCreate(Bundle savedInstanceState) {
-    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-    super.onCreate(savedInstanceState);
+    protected void onCreate(Bundle savedInstanceState) {
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        super.onCreate(savedInstanceState);
 
-    sessionManager = new SessionManager(this);
-    if (!sessionManager.isLoggedIn()) {
-        navigateToLogin();
-        return;
-    }
-
-    setContentView(R.layout.activity_main);
-
-    com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
-    if (toolbar != null) {
-        setSupportActionBar(toolbar);
-        String displayName = sessionManager.getDisplayName();
-        if (displayName == null || displayName.isEmpty()) {
-            displayName = sessionManager.getUsername();
+        // 🌐 التحقق من اللغة الحالية وضبط اتجاه الواجهة بالكامل (RTL / LTR)
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        if (isArabic) {
+            getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        } else {
+            getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         }
-        if (getSupportActionBar() != null) {
-            MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
-            getSupportActionBar().setTitle(orgProfile.getOrgName() + " - " + displayName);
-        }
-    }
 
-    checkReadWritePermission();
-    initSound();
-    initUHF();
-    initViewPageData();
-}
+        sessionManager = new SessionManager(this);
+        if (!sessionManager.isLoggedIn()) {
+            navigateToLogin();
+            return;
+        }
+
+        setContentView(R.layout.activity_main);
+
+        com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            setSupportActionBar(toolbar);
+            String displayName = sessionManager.getDisplayName();
+            if (displayName == null || displayName.isEmpty()) {
+                displayName = sessionManager.getUsername();
+            }
+            if (getSupportActionBar() != null) {
+                MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
+                getSupportActionBar().setTitle(orgProfile.getOrgName() + " - " + displayName);
+            }
+        }
+
+        checkReadWritePermission();
+        initSound();
+        initUHF();
+        initViewPageData();
+    }
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
@@ -138,16 +147,17 @@ protected void onCreate(Bundle savedInstanceState) {
     }
     
     // ============================================
-    // ✅ توحيد التبويبات وتوجيهها من اليمين لليسار (RTL)
+    // ✅ توحيد التبويبات وتوجيهها حسب لغة التطبيق
     // ============================================
     protected void initViewPageData() {
         fm = getSupportFragmentManager();
         mTabHost = findViewById(android.R.id.tabhost);
         mTabHost.setup(this, fm, R.id.realtabcontent);
 
-        // فرض الاتجاه من اليمين لليسار لدعم اللغة العربية بشكل كامل
+        // ضبط اتجاه التبويبات ديناميكياً
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            mTabHost.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_RTL);
+            mTabHost.setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
         }
 
         SessionManager.Role role = sessionManager.getUserRole();
@@ -163,7 +173,7 @@ protected void onCreate(Bundle savedInstanceState) {
         // 🏠 1. لوحة التحكم الرئيسية (Dashboard)
         // ============================================
         mTabHost.addTab(
-            mTabHost.newTabSpec("Dashboard").setIndicator("🏠 الرئيسية"),
+            mTabHost.newTabSpec("Dashboard").setIndicator(isArabic ? "🏠 الرئيسية" : "🏠 Dashboard"),
             MiraDashboardFragment.class, null
         );
 
@@ -172,15 +182,15 @@ protected void onCreate(Bundle savedInstanceState) {
         // ============================================
         if (isAnyAdmin || isPosOperator) {
             mTabHost.addTab(
-                mTabHost.newTabSpec("JewelryDashboard").setIndicator("💎 المجوهرات"),
+                mTabHost.newTabSpec("JewelryDashboard").setIndicator(isArabic ? "💎 المجوهرات" : "💎 Jewelry"),
                 JewelryDashboardFragment.class, null
             );
             mTabHost.addTab(
-                mTabHost.newTabSpec("POS Mode").setIndicator("🛒 نقطة البيع"),
+                mTabHost.newTabSpec("POS Mode").setIndicator(isArabic ? "🛒 نقطة البيع" : "🛒 POS"),
                 MiraPosFragment.class, null
             );
             mTabHost.addTab(
-                mTabHost.newTabSpec("SalesHistory").setIndicator("📜 المبيعات"),
+                mTabHost.newTabSpec("SalesHistory").setIndicator(isArabic ? "📜 المبيعات" : "📜 Sales"),
                 MiraSalesHistoryFragment.class, null
             );
         }
@@ -189,7 +199,7 @@ protected void onCreate(Bundle savedInstanceState) {
         // 📷 3. شاشة القراءة والمسح السريع
         // ============================================
         mTabHost.addTab(
-            mTabHost.newTabSpec("Scan").setIndicator("📷 المسح"),
+            mTabHost.newTabSpec("Scan").setIndicator(isArabic ? "📷 المسح" : "📷 Scan"),
             UHFReadTagFragment.class, null
         );
 
@@ -198,15 +208,15 @@ protected void onCreate(Bundle savedInstanceState) {
         // ============================================
         if (isAnyAdmin || isInventoryMgr) {
             mTabHost.addTab(
-                mTabHost.newTabSpec("IdentityStudio").setIndicator("🆔 التكويد"),
+                mTabHost.newTabSpec("IdentityStudio").setIndicator(isArabic ? "🆔 التكويد" : "🆔 Identity"),
                 MiraIdentityStudioFragment.class, null
             );
             mTabHost.addTab(
-                mTabHost.newTabSpec("Inventory Pro").setIndicator("📊 المخزون"),
+                mTabHost.newTabSpec("Inventory Pro").setIndicator(isArabic ? "📊 المخزون" : "📊 Inventory"),
                 MiraInventoryProFragment.class, null
             );
             mTabHost.addTab(
-                mTabHost.newTabSpec("RadarLocation").setIndicator("🎯 الرادار"),
+                mTabHost.newTabSpec("RadarLocation").setIndicator(isArabic ? "🎯 الرادار" : "🎯 Radar"),
                 UHFRadarLocationFragment.class, null
             );
         }
@@ -216,7 +226,7 @@ protected void onCreate(Bundle savedInstanceState) {
         // ============================================
         if (isAnyAdmin || isGateSecurity) {
             mTabHost.addTab(
-                mTabHost.newTabSpec("SecureGate").setIndicator("🚪 البوابات"),
+                mTabHost.newTabSpec("SecureGate").setIndicator(isArabic ? "🚪 البوابات" : "🚪 Gate"),
                 MiraSecureGateFragment.class, null
             );
         }
@@ -226,7 +236,7 @@ protected void onCreate(Bundle savedInstanceState) {
         // ============================================
         if (isAnyAdmin) {
             mTabHost.addTab(
-                mTabHost.newTabSpec("UsersManagement").setIndicator("👥 المستخدمين"),
+                mTabHost.newTabSpec("UsersManagement").setIndicator(isArabic ? "👥 المستخدمين" : "👥 Users"),
                 UsersManagementFragment.class, null
             );
         }
@@ -235,27 +245,21 @@ protected void onCreate(Bundle savedInstanceState) {
         // ⚙️ 7. التبويبات المتقدمة والهندسية (System Admin فقط)
         // ============================================
         if (isSystemAdmin) {
-            mTabHost.addTab(mTabHost.newTabSpec("Settings").setIndicator("⚙️ الإعدادات"), UHFSetFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("Location").setIndicator("📍 المواقع"), UHFLocationFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("TagLit").setIndicator("💡 إضاءة"), UHFTagLitFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("TagFlash").setIndicator("⚡ فلاش"), UHFTagFlashFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("ReadWrite").setIndicator("📝 كتابة"), UHFReadWriteFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("Lock").setIndicator("🔒 قفل"), UHFLockFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("Kill").setIndicator("🛑 إلغاء"), UHFKillFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("Protected-ShortRange").setIndicator("🛡️ آمن"), ProtectedModeAndShortRangeModeFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("MarginRead").setIndicator("📊 الهامش"), MarginReadFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("NxpUcodeDna").setIndicator("🧬 بصمة DNA"), AuthenticateNxpUcodeDnaFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("BlockWrite").setIndicator("📦 بلوك"), BlockWriteFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("BlockPermalock").setIndicator("🔐 قفل دائم"), BlockPermalockFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("Upgrade").setIndicator("⬆️ ترقية"), UHFUpgradeFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("Settings").setIndicator(isArabic ? "⚙️ الإعدادات" : "⚙️ Settings"), UHFSetFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("Location").setIndicator(isArabic ? "📍 المواقع" : "📍 Location"), UHFLocationFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("TagLit").setIndicator(isArabic ? "💡 إضاءة" : "💡 TagLit"), UHFTagLitFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("TagFlash").setIndicator(isArabic ? "⚡ فلاش" : "⚡ Flash"), UHFTagFlashFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("ReadWrite").setIndicator(isArabic ? "📝 كتابة" : "📝 Read/Write"), UHFReadWriteFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("Lock").setIndicator(isArabic ? "🔒 قفل" : "🔒 Lock"), UHFLockFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("Kill").setIndicator(isArabic ? "🛑 إلغاء" : "🛑 Kill"), UHFKillFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("Protected-ShortRange").setIndicator(isArabic ? "🛡️ آمن" : "🛡️ Protected"), ProtectedModeAndShortRangeModeFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("MarginRead").setIndicator(isArabic ? "📊 الهامش" : "📊 Margin"), MarginReadFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("NxpUcodeDna").setIndicator(isArabic ? "🧬 بصمة DNA" : "🧬 DNA"), AuthenticateNxpUcodeDnaFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("BlockWrite").setIndicator(isArabic ? "📦 بلوك" : "📦 BlockWrite"), BlockWriteFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("BlockPermalock").setIndicator(isArabic ? "🔐 قفل دائم" : "🔐 Permalock"), BlockPermalockFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("Upgrade").setIndicator(isArabic ? "⬆️ ترقية" : "⬆️ Upgrade"), UHFUpgradeFragment.class, null);
         }
     }
-
-
-    // ============================================
-    // ✅ تصفية التبويبات حسب الصلاحيات الجديدة
-    // ============================================
-    
 
     // ============================================
     // القائمة
@@ -272,16 +276,18 @@ protected void onCreate(Bundle savedInstanceState) {
     }
 
     private void showLogoutConfirmation() {
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         new androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("Sign Out")
-            .setMessage("Are you sure you want to sign out of MIRA Enterprise?\n\nYour current session will be terminated.")
-            .setPositiveButton("Sign Out", (d, w) -> { performLogout(); })
-            .setNegativeButton("Cancel", null)
+            .setTitle(isArabic ? "تسجيل الخروج" : "Sign Out")
+            .setMessage(isArabic ? "هل أنت متأكد أنك تريد تسجيل الخروج من نظام MIRA؟\n\nسيتم إنهاء جلستك الحالية." : "Are you sure you want to sign out of MIRA Enterprise?\n\nYour current session will be terminated.")
+            .setPositiveButton(isArabic ? "تسجيل الخروج" : "Sign Out", (d, w) -> { performLogout(); })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
             .setIcon(R.drawable.ic_logout)
             .show();
     }
 
     private void showProfileDialog() {
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         String username = sessionManager.getUsername();
         String displayName = sessionManager.getDisplayName();
         String role = sessionManager.getRoleString();
@@ -300,17 +306,17 @@ protected void onCreate(Bundle savedInstanceState) {
             default:              roleLabel = role;
         }
 
-        String message = "User: " + displayName + "\n"
-                       + "Username: " + username + "\n"
-                       + "Role: " + roleLabel + "\n"
-                       + "Biometric: " + (biometricEnabled ? "Enabled" : "Disabled") + "\n"
-                       + "Server: " + serverUrl;
+        String message = (isArabic ? "المستخدم: " : "User: ") + displayName + "\n"
+                       + (isArabic ? "اسم المستخدم: " : "Username: ") + username + "\n"
+                       + (isArabic ? "الصلاحية: " : "Role: ") + roleLabel + "\n"
+                       + (isArabic ? "البصمة الحيوية: " : "Biometric: ") + (biometricEnabled ? (isArabic ? "مفعلة" : "Enabled") : (isArabic ? "معطلة" : "Disabled")) + "\n"
+                       + (isArabic ? "الخادم: " : "Server: ") + serverUrl;
 
         new androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("User Profile")
+            .setTitle(isArabic ? "ملف المستخدم" : "User Profile")
             .setMessage(message)
-            .setPositiveButton("Close", null)
-            .setNeutralButton("Sign Out", (d, w) -> showLogoutConfirmation())
+            .setPositiveButton(isArabic ? "إغلاق" : "Close", null)
+            .setNeutralButton(isArabic ? "تسجيل الخروج" : "Sign Out", (d, w) -> showLogoutConfirmation())
             .setIcon(R.drawable.ic_person_outline)
             .show();
     }
@@ -416,4 +422,4 @@ protected void onCreate(Bundle savedInstanceState) {
         }
         public void stopPlay() { isStop = true; synchronized (objectLock) { objectLock.notifyAll(); } }
     }
-        }
+}
