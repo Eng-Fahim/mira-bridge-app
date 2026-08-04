@@ -1,0 +1,15 @@
+<resources>
+    <!-- بيانات التطبيق العامة -->
+    <string name="app_name">App Name</string>
+    <string name="welcome_message">Welcome to the system</string>
+    
+    <!-- الأزرار والإجراءات -->
+    <string name="btn_login">Login</string>
+    <string name="btn_save">Save Data</string>
+    <string name="btn_cancel">Cancel</string>
+    
+    <!-- حقول الإدخال والرسائل -->
+    <string name="hint_username">Username</string>
+    <string name="hint_password">Password</string>
+    <string name="error_required_field">This field is required</string>
+</resources>
