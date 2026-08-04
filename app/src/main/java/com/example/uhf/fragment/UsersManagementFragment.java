@@ -157,82 +157,84 @@ public class UsersManagementFragment extends Fragment {
     }
 
     private void showUserDialog(@Nullable UserData existingUser) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_user_edit, null);
-        builder.setView(dialogView);
+    AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+    View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_user_edit, null);
+    builder.setView(dialogView);
 
-        TextView tvTitle = dialogView.findViewById(R.id.tvDialogTitle);
-        EditText etDisplayName = dialogView.findViewById(R.id.etDisplayName);
-        EditText etUsername = dialogView.findViewById(R.id.etUsername);
-        EditText etPassword = dialogView.findViewById(R.id.etPassword);
-        EditText etEmployeeId = dialogView.findViewById(R.id.etEmployeeId);
-        com.google.android.material.textfield.MaterialAutoCompleteTextView etRole = dialogView.findViewById(R.id.etRole);
-        EditText etDepartment = dialogView.findViewById(R.id.etDepartment);
-        Button btnCancel = dialogView.findViewById(R.id.btnCancelUser);
-        Button btnSave = dialogView.findViewById(R.id.btnSaveUser);
+    TextView tvTitle = dialogView.findViewById(R.id.tvDialogTitle);
+    EditText etDisplayName = dialogView.findViewById(R.id.etDisplayName);
+    EditText etUsername = dialogView.findViewById(R.id.etUsername);
+    EditText etPassword = dialogView.findViewById(R.id.etPassword);
+    EditText etEmployeeId = dialogView.findViewById(R.id.etEmployeeId);
+    EditText etDepartment = dialogView.findViewById(R.id.etDepartment);
+    RadioGroup rgRole = dialogView.findViewById(R.id.rgRole);
+    Button btnCancel = dialogView.findViewById(R.id.btnCancelUser);
+    Button btnSave = dialogView.findViewById(R.id.btnSaveUser);
 
-        // إعداد قائمة الصلاحيات
-        ArrayAdapter<String> roleAdapter = new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_dropdown_item_1line, ROLES_AR);
-        etRole.setAdapter(roleAdapter);
+    boolean isEdit = existingUser != null;
+    tvTitle.setText(isEdit ? "تعديل مستخدم" : "إضافة مستخدم جديد");
 
-        boolean isEdit = existingUser != null;
-        tvTitle.setText(isEdit ? "تعديل مستخدم" : "إضافة مستخدم جديد");
+    if (isEdit) {
+        etDisplayName.setText(existingUser.displayName);
+        etUsername.setText(existingUser.username);
+        etUsername.setEnabled(false);
+        etPassword.setHint("اتركه فارغاً إذا لم ترغب بالتغيير");
+        etEmployeeId.setText(existingUser.employeeId);
+        etDepartment.setText(existingUser.department);
 
-        if (isEdit) {
-            etDisplayName.setText(existingUser.displayName);
-            etUsername.setText(existingUser.username);
-            etUsername.setEnabled(false);
-            etPassword.setHint("اتركه فارغاً إذا لم ترغب بالتغيير");
-            etEmployeeId.setText(existingUser.employeeId);
-            etDepartment.setText(existingUser.department);
-
-            // تحديد الصلاحية
-            for (int i = 0; i < ROLES.length; i++) {
-                if (ROLES[i].equals(existingUser.role)) {
-                    etRole.setText(ROLES_AR[i], false);
+        // تحديد الصلاحية الحالية
+        for (int i = 0; i < rgRole.getChildCount(); i++) {
+            View child = rgRole.getChildAt(i);
+            if (child instanceof RadioButton) {
+                RadioButton rb = (RadioButton) child;
+                if (rb.getTag().equals(existingUser.role)) {
+                    rb.setChecked(true);
                     break;
                 }
             }
         }
-
-        AlertDialog dialog = builder.create();
-
-        btnCancel.setOnClickListener(v -> dialog.dismiss());
-
-        btnSave.setOnClickListener(v -> {
-            String displayName = etDisplayName.getText().toString().trim();
-            String username = etUsername.getText().toString().trim();
-            String password = etPassword.getText().toString().trim();
-            String employeeId = etEmployeeId.getText().toString().trim();
-            String roleAr = etRole.getText().toString().trim();
-            String department = etDepartment.getText().toString().trim();
-
-            if (displayName.isEmpty() || username.isEmpty()) {
-                Toast.makeText(getContext(), "الاسم واسم المستخدم مطلوبان", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            if (!isEdit && password.isEmpty()) {
-                Toast.makeText(getContext(), "كلمة المرور مطلوبة", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            // تحويل اسم الصلاحية العربي للإنجليزي
-            String role = "INVENTORY_MGR";
-            for (int i = 0; i < ROLES_AR.length; i++) {
-                if (ROLES_AR[i].equals(roleAr)) {
-                    role = ROLES[i];
-                    break;
-                }
-            }
-
-            saveUser(isEdit ? existingUser.id : 0, username, password, displayName, role, employeeId, department, isEdit);
-            dialog.dismiss();
-        });
-
-        dialog.show();
+    } else {
+        // افتراضياً: مدير المخزون
+        RadioButton defaultRole = dialogView.findViewById(R.id.rbInventoryMgr);
+        if (defaultRole != null) defaultRole.setChecked(true);
     }
 
+    AlertDialog dialog = builder.create();
+
+    btnCancel.setOnClickListener(v -> dialog.dismiss());
+
+    btnSave.setOnClickListener(v -> {
+        String displayName = etDisplayName.getText().toString().trim();
+        String username = etUsername.getText().toString().trim();
+        String password = etPassword.getText().toString().trim();
+        String employeeId = etEmployeeId.getText().toString().trim();
+        String department = etDepartment.getText().toString().trim();
+
+        if (displayName.isEmpty() || username.isEmpty()) {
+            Toast.makeText(getContext(), "الاسم واسم المستخدم مطلوبان", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!isEdit && password.isEmpty()) {
+            Toast.makeText(getContext(), "كلمة المرور مطلوبة", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // استخراج الصلاحية المختارة
+        String role = "INVENTORY_MGR";
+        int selectedId = rgRole.getCheckedRadioButtonId();
+        if (selectedId != -1) {
+            View selectedView = rgRole.findViewById(selectedId);
+            if (selectedView != null && selectedView.getTag() != null) {
+                role = selectedView.getTag().toString();
+            }
+        }
+
+        saveUser(isEdit ? existingUser.id : 0, username, password, displayName, role, employeeId, department, isEdit);
+        dialog.dismiss();
+    });
+
+    dialog.show();
+}
     private void saveUser(int userId, String username, String password, String displayName,
                           String role, String employeeId, String department, boolean isEdit) {
         Executors.newSingleThreadExecutor().execute(() -> {
