@@ -11,6 +11,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
@@ -179,6 +180,10 @@ public class JewelryDashboardFragment extends Fragment {
                                     int gActive, int gOffline, int gAlarms,
                                     String aDate, double aAccuracy, int aMissing,
                                     float k24, float k22, float k21, float k18) {
+        
+        // التحقق من لغة التطبيق الحالية
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+
         // المخزن
         tvTotalItems.setText(String.format(Locale.US, "%,d", items));
         tvTotalWeight.setText(String.format(Locale.US, "%.1f g", weight));
@@ -193,10 +198,15 @@ public class JewelryDashboardFragment extends Fragment {
         tvGatesOffline.setText(String.valueOf(gOffline));
         tvGatesAlarms.setText(String.valueOf(gAlarms));
 
-        // الجرد
+        // الجرد (يتكيف مع اللغة ديناميكياً)
         tvLastAuditDate.setText(aDate);
-        tvAuditAccuracy.setText(String.format(Locale.US, "الدقة: %.1f%%", aAccuracy));
-        tvAuditMissing.setText(String.format(Locale.US, "المفقود: %d قطعة", aMissing));
+        if (isArabic) {
+            tvAuditAccuracy.setText(String.format(Locale.US, "الدقة: %.1f%%", aAccuracy));
+            tvAuditMissing.setText(String.format(Locale.US, "المفقود: %d قطعة", aMissing));
+        } else {
+            tvAuditAccuracy.setText(String.format(Locale.US, "Accuracy: %.1f%%", aAccuracy));
+            tvAuditMissing.setText(String.format(Locale.US, "Missing: %d pcs", aMissing));
+        }
 
         // الرسم البياني للأوزان
         List<BarEntry> barEntries = new ArrayList<>();
