@@ -18,6 +18,7 @@ public class MiraApiClient {
 
     private static final String TAG = "MiraApiClient";
     private static final String PREFS_NAME = "mira_settings";
+    private static final String SESSION_PREFS = "MiraEnterpriseSession";
 
     private static final String DEFAULT_API_URL = "https://ams.ibreg.org/wp-json/mira-gate/v1";
     private static final String DEFAULT_API_KEY = "mira_gate_test071234567890abcdefghijklmnop";
@@ -44,23 +45,7 @@ public class MiraApiClient {
         this.apiKey = prefs.getString("mira_api_key", DEFAULT_API_KEY);
         this.gateId = prefs.getString("mira_gate_id", DEFAULT_GATE_ID);
     }
-public ApiResponse getUsers() {
-    return get("/auth/users");
-}
 
-public ApiResponse createUser(JSONObject payload) {
-    return post("/auth/users/create", payload);
-}
-
-public ApiResponse updateUser(JSONObject payload) {
-    return post("/auth/users/update", payload);
-}
-
-public ApiResponse deleteUser(int userId) {
-    JSONObject p = new JSONObject();
-    try { p.put("user_id", userId); } catch (Exception ignored) {}
-    return post("/auth/users/delete", p);
-}
     // ===================== 🔑 AUTHENTICATION =====================
 
     public ApiResponse login(String username, String password, String deviceId) {
@@ -100,7 +85,7 @@ public ApiResponse deleteUser(int userId) {
     }
 
     public ApiResponse getCurrentUser() {
-        return get("/auth/me");
+        return getWithAuth("/auth/me");
     }
 
     public ApiResponse refreshToken(String oldToken) {
@@ -111,7 +96,7 @@ public ApiResponse deleteUser(int userId) {
         } catch (Exception e) {
             Log.e(TAG, "Error building refresh payload: " + e.getMessage());
         }
-        return post("/auth/refresh-token", payload);
+        return postWithAuth("/auth/refresh-token", payload);
     }
 
     public ApiResponse registerBiometric(String token, String deviceId, String publicKey) {
@@ -137,6 +122,26 @@ public ApiResponse deleteUser(int userId) {
             Log.e(TAG, "Error building biometric verify payload: " + e.getMessage());
         }
         return post("/auth/verify-biometric", payload);
+    }
+
+    // ===================== 👥 USERS MANAGEMENT =====================
+
+    public ApiResponse getUsers() {
+        return getWithAuth("/auth/users");
+    }
+
+    public ApiResponse createUser(JSONObject payload) {
+        return postWithAuth("/auth/users/create", payload);
+    }
+
+    public ApiResponse updateUser(JSONObject payload) {
+        return postWithAuth("/auth/users/update", payload);
+    }
+
+    public ApiResponse deleteUser(int userId) {
+        JSONObject p = new JSONObject();
+        try { p.put("user_id", userId); } catch (Exception ignored) {}
+        return postWithAuth("/auth/users/delete", p);
     }
 
     // ===================== 🔑 AUTHORIZE =====================
@@ -356,6 +361,77 @@ public ApiResponse deleteUser(int userId) {
 
     // ===================== CORE HTTP METHODS =====================
 
+    private String getAuthToken() {
+        SharedPreferences prefs = context.getSharedPreferences(SESSION_PREFS, Context.MODE_PRIVATE);
+        return prefs.getString("authToken", "");
+    }
+
+    private ApiResponse getWithAuth(String endpoint) {
+        HttpURLConnection conn = null;
+        try {
+            String fullUrl = apiUrl + endpoint;
+            Log.d(TAG, "GET(Auth) " + fullUrl);
+
+            URL url = new URL(fullUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
+            String token = getAuthToken();
+            if (!token.isEmpty()) {
+                conn.setRequestProperty("X-MIRA-Auth-Token", token);
+            }
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+
+            return buildResponse(conn);
+
+        } catch (Exception e) {
+            Log.e(TAG, "GET(Auth) Error: " + e.getMessage());
+            return new ApiResponse(-1, null, e.getMessage());
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    private ApiResponse postWithAuth(String endpoint, JSONObject payload) {
+        HttpURLConnection conn = null;
+        try {
+            String fullUrl = apiUrl + endpoint;
+            Log.d(TAG, "POST(Auth) " + fullUrl);
+
+            URL url = new URL(fullUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
+            String token = getAuthToken();
+            if (!token.isEmpty()) {
+                conn.setRequestProperty("X-MIRA-Auth-Token", token);
+            }
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            conn.setDoOutput(true);
+
+            if (payload != null) {
+                String jsonString = payload.toString();
+                Log.d(TAG, "Payload: " + jsonString);
+                try (OutputStream os = conn.getOutputStream()) {
+                    byte[] input = jsonString.getBytes("utf-8");
+                    os.write(input, 0, input.length);
+                }
+            }
+
+            return buildResponse(conn);
+
+        } catch (Exception e) {
+            Log.e(TAG, "POST(Auth) Error: " + e.getMessage());
+            return new ApiResponse(-1, null, e.getMessage());
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
     private ApiResponse post(String endpoint, JSONObject payload) {
         HttpURLConnection conn = null;
         try {
@@ -478,4 +554,4 @@ public ApiResponse deleteUser(int userId) {
             return null;
         }
     }
-                }
+}
