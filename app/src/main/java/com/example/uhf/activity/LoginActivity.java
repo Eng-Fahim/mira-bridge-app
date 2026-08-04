@@ -127,12 +127,27 @@ public class LoginActivity extends AppCompatActivity {
         });
 
         // زر التبديل بين اللغات
+                // زر التبديل بين اللغات (عربي / إنجليزي)
         if (btnToggleLanguage != null) {
             btnToggleLanguage.setOnClickListener(v -> {
                 isArabic = !isArabic;
+                
+                // تطبيق اللغة الجديدة على مستوى التطبيق بالكامل باستخدام AppCompatDelegate
+                if (isArabic) {
+                    androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(
+                        androidx.core.os.LocaleListCompat.forLanguageTags("ar")
+                    );
+                } else {
+                    androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(
+                        androidx.core.os.LocaleListCompat.forLanguageTags("en")
+                    );
+                }
+                
+                // تحديث النصوص والاتجاهات فورياً
                 updateUiLanguage(isArabic);
             });
         }
+
         
         // تطبيق بروفايل وشعار الجهة المحفوظ ديناميكياً
         applyOrgProfile();
@@ -169,31 +184,37 @@ public class LoginActivity extends AppCompatActivity {
             }
         });
     }
-    
-    /**
+        /**
      * 🌐 تحديث نصوص الواجهة واتجاهها بناءً على اللغة المختارة
      */
     private void updateUiLanguage(boolean arabic) {
         if (arabic) {
+            // ضبط الاتجاه لليمين (العربية)
             getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            
             if (tvSignInTitle != null) tvSignInTitle.setText("تسجيل الدخول");
             if (tvSignInSubtitle != null) tvSignInSubtitle.setText("أدخل بيانات الاعتماد الخاصة بك للمتابعة");
             if (tilUsername != null) tilUsername.setHint("اسم المستخدم");
             if (tilPassword != null) tilPassword.setHint("كلمة المرور");
             if (btnLogin != null && (pbLoading == null || !pbLoading.isShown())) btnLogin.setText("دخول النظام");
             if (tvServerSettings != null) tvServerSettings.setText("🔧 إعدادات الخادم والاتصال (Server Settings)");
+            if (btnToggleLanguage != null) btnToggleLanguage.setText("EN / AR");
         } else {
+            // ضبط الاتجاه لليسار (الإنجليزية)
             getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+            
             if (tvSignInTitle != null) tvSignInTitle.setText("Sign In");
             if (tvSignInSubtitle != null) tvSignInSubtitle.setText("Enter your credentials to continue");
             if (tilUsername != null) tilUsername.setHint("Username");
             if (tilPassword != null) tilPassword.setHint("Password");
             if (btnLogin != null && (pbLoading == null || !pbLoading.isShown())) btnLogin.setText("Sign In");
             if (tvServerSettings != null) tvServerSettings.setText("🔧 Server Configuration");
+            if (btnToggleLanguage != null) btnToggleLanguage.setText("AR / EN");
         }
         
         applyOrgProfile();
     }
+
 
     /**
      * 🏢 تطبيق بيانات وشعار الجهة المحفوظة ديناميكياً على الواجهة
