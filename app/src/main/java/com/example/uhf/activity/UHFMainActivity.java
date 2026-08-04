@@ -193,7 +193,13 @@ protected void onCreate(Bundle savedInstanceState) {
         mTabHost.setup(this, fm, R.id.realtabcontent);
 
         SessionManager.Role role = sessionManager.getUserRole();
-
+// 👥 إدارة المستخدمين (للمدراء فقط)
+if (role == SessionManager.Role.ADMIN) {
+    mTabHost.addTab(
+        mTabHost.newTabSpec("UsersManagement").setIndicator("👥"),
+        UsersManagementFragment.class, null
+    );
+}
         // لوحة المجوهرات والـ POS (تظهر للمدراء والمبيعات)
         if (role == SessionManager.Role.ADMIN || role == SessionManager.Role.POS_OPERATOR) {
             mTabHost.addTab(
