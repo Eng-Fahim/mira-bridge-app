@@ -147,9 +147,8 @@ protected void onCreate(Bundle savedInstanceState) {
             currentFragment.onActivityResult(requestCode, resultCode, data);
         }
     }
-
     // ============================================
-    // ✅ تصفية التبويبات حسب الصلاحيات الجديدة
+    // ✅ إعادة ترتيب التبويبات وجعل الداشبورد (Dashboard) هي الأولى
     // ============================================
     protected void initViewPageData() {
         fm = getSupportFragmentManager();
@@ -167,17 +166,15 @@ protected void onCreate(Bundle savedInstanceState) {
         boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
 
         // ============================================
-        // 👥 إدارة المستخدمين: SYSTEM_ADMIN + ORG_ADMIN
+        // 🏠 1. Dashboard: متاح للجميع (أول تبويب رئيسي يفتح تلقائياً)
         // ============================================
-        if (isAnyAdmin) {
-            mTabHost.addTab(
-                mTabHost.newTabSpec("UsersManagement").setIndicator("👥"),
-                UsersManagementFragment.class, null
-            );
-        }
+        mTabHost.addTab(
+            mTabHost.newTabSpec("Dashboard").setIndicator("🏠"),
+            MiraDashboardFragment.class, null
+        );
 
         // ============================================
-        // 💎 لوحة المجوهرات والـ POS: كل المدراء + موظفي المبيعات
+        // 💎 2. لوحة المجوهرات والـ POS: كل المدراء + موظفي المبيعات
         // ============================================
         if (isAnyAdmin || isPosOperator) {
             mTabHost.addTab(
@@ -191,14 +188,14 @@ protected void onCreate(Bundle savedInstanceState) {
         }
 
         // ============================================
-        // 📷 شاشة القراءة: متاحة للجميع
+        // 📷 3. شاشة القراءة والمسح السريع: متاحة للجميع
         // ============================================
         mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_scan))
             .setIndicator(getString(R.string.uhf_msg_tab_scan)),
             UHFReadTagFragment.class, null);
 
         // ============================================
-        // 🆔 استوديو التكويد والجرد: كل المدراء + مدير المخزون
+        // 🆔 4. استوديو التكويد والجرد: كل المدراء + مدير المخزون
         // ============================================
         if (isAnyAdmin || isInventoryMgr) {
             mTabHost.addTab(
@@ -215,15 +212,7 @@ protected void onCreate(Bundle savedInstanceState) {
         }
 
         // ============================================
-        // 🏠 Dashboard: متاح للجميع
-        // ============================================
-        mTabHost.addTab(
-            mTabHost.newTabSpec("Dashboard").setIndicator("🏠"),
-            MiraDashboardFragment.class, null
-        );
-
-        // ============================================
-        // 🚪 البوابات: كل المدراء + أمن البوابات
+        // 🚪 5. البوابات الأمنية: كل المدراء + أمن البوابات
         // ============================================
         if (isAnyAdmin || isGateSecurity) {
             mTabHost.addTab(
@@ -233,7 +222,17 @@ protected void onCreate(Bundle savedInstanceState) {
         }
 
         // ============================================
-        // ⚙️ التبويبات المتقدمة: SYSTEM_ADMIN فقط (مهندس النظام)
+        // 👥 6. إدارة المستخدمين: SYSTEM_ADMIN + ORG_ADMIN
+        // ============================================
+        if (isAnyAdmin) {
+            mTabHost.addTab(
+                mTabHost.newTabSpec("UsersManagement").setIndicator("👥"),
+                UsersManagementFragment.class, null
+            );
+        }
+
+        // ============================================
+        // ⚙️ 7. التبويبات المتقدمة والهندسية: SYSTEM_ADMIN فقط
         // ============================================
         if (isSystemAdmin) {
             mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_set))
@@ -272,6 +271,11 @@ protected void onCreate(Bundle savedInstanceState) {
                 UHFUpgradeFragment.class, null);
         }
     }
+
+    // ============================================
+    // ✅ تصفية التبويبات حسب الصلاحيات الجديدة
+    // ============================================
+    
 
     // ============================================
     // القائمة
