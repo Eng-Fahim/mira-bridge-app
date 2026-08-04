@@ -1,6 +1,6 @@
 package com.example.uhf.fragment;
 import com.example.uhf.manager.MiraOrgProfileManager;
-
+import android.util.Log;
 
 
 import android.app.AlertDialog;
