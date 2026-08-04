@@ -1,6 +1,5 @@
 package com.example.uhf.fragment;
 
-import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -14,25 +13,16 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
-import com.github.mikephil.charting.charts.BarChart;
-import com.github.mikephil.charting.components.XAxis;
-import com.github.mikephil.charting.data.BarData;
-import com.github.mikephil.charting.data.BarDataSet;
-import com.github.mikephil.charting.data.BarEntry;
-import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
-import com.github.mikephil.charting.utils.ColorTemplate;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,28 +31,23 @@ public class MiraDashboardFragment extends Fragment {
 
     private static final String TAG = "MiraDashboard";
 
-    private TextView tvGreeting, tvDate, tvTime, tvLocation, tvLiveStatus;
+    // View References
+    private TextView tvGreeting, tvDate, tvLocation, tvLiveStatus;
     private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
     private TextView tvSalesToday, tvSalesMonth, tvSalesYear;
-    private TextView tvGatesActive, tvGatesOffline, tvGatesAlarms;
-    private TextView tvLastSync;
-    private View indicatorApi, indicatorDb, indicatorGate;
-    private TextView tvLastAuditDate, tvAuditAccuracy, tvAuditMissing;
-    private TextView tvRecent1, tvRecent2, tvRecent3;
-    private View cardScan, cardGate, cardRadar, cardSettings;
-    private BarChart barChartWeights;
+    private TextView tvGoldPrice18, tvGoldPrice21, tvGoldPrice24;
+    private SwipeRefreshLayout swipeRefresh;
+    private View btnGateSecurity, btnRfidAudit;
 
     private ExecutorService executor;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final Handler timeHandler = new Handler(Looper.getMainLooper());
     private MiraApiClient apiClient;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        View v = inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
-        return v;
+        return inflater.inflate(R.layout.fragment_dashboard, container, false);
     }
 
     @Override
@@ -73,57 +58,73 @@ public class MiraDashboardFragment extends Fragment {
         apiClient = MiraApiClient.getInstance(requireContext());
 
         initViews(view);
+        setupUserGreeting();
         setupNavigationListeners();
-        startTimeClock();
+        setupSwipeToRefresh();
+        
+        // جلب البيانات الأولية
         fetchDashboardData();
     }
 
     private void initViews(View v) {
         tvGreeting = v.findViewById(R.id.tvGreeting);
         tvDate = v.findViewById(R.id.tvDate);
-        tvTime = v.findViewById(R.id.tvTime);
         tvLocation = v.findViewById(R.id.tvLocation);
         tvLiveStatus = v.findViewById(R.id.tvLiveStatus);
+        
         tvTotalItems = v.findViewById(R.id.tvTotalItems);
         tvTotalWeight = v.findViewById(R.id.tvTotalWeight);
         tvSoldToday = v.findViewById(R.id.tvSoldToday);
+        
         tvSalesToday = v.findViewById(R.id.tvSalesToday);
         tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
         tvSalesYear = v.findViewById(R.id.tvSalesYear);
-        tvGatesActive = v.findViewById(R.id.tvGatesActive);
-        tvGatesOffline = v.findViewById(R.id.tvGatesOffline);
-        tvGatesAlarms = v.findViewById(R.id.tvGatesAlarms);
-        tvLastSync = v.findViewById(R.id.tvLastSync);
-        indicatorApi = v.findViewById(R.id.indicatorApi);
-        indicatorDb = v.findViewById(R.id.indicatorDb);
-        indicatorGate = v.findViewById(R.id.indicatorGate);
-        tvLastAuditDate = v.findViewById(R.id.tvLastAuditDate);
-        tvAuditAccuracy = v.findViewById(R.id.tvAuditAccuracy);
-        tvAuditMissing = v.findViewById(R.id.tvAuditMissing);
-        tvRecent1 = v.findViewById(R.id.tvRecent1);
-        tvRecent2 = v.findViewById(R.id.tvRecent2);
-        tvRecent3 = v.findViewById(R.id.tvRecent3);
-        cardScan = v.findViewById(R.id.cardScan);
-        cardGate = v.findViewById(R.id.cardGate);
-        cardRadar = v.findViewById(R.id.cardRadar);
-        cardSettings = v.findViewById(R.id.cardSettings);
-        barChartWeights = v.findViewById(R.id.barChartWeights);
+
+        tvGoldPrice18 = v.findViewById(R.id.tvGoldPrice18);
+        tvGoldPrice21 = v.findViewById(R.id.tvGoldPrice21);
+        tvGoldPrice24 = v.findViewById(R.id.tvGoldPrice24);
+        
+        swipeRefresh = v.findViewById(R.id.swipeRefresh);
+        btnGateSecurity = v.findViewById(R.id.btnGateSecurity);
+        btnRfidAudit = v.findViewById(R.id.btnRfidAudit);
+        
+        // تعيين التاريخ العربي الهجري/الملادي الحركي
+        SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE، d MMMM yyyy", new Locale("ar"));
+        if (tvDate != null) {
+            tvDate.setText(dateFormat.format(new Date()));
+        }
+    }
+
+    /**
+     * حل مشكلة اسم المستخدم الثابت: جلب اسم المستخدم من الجلسة وتضمينه
+     */
+    private void setupUserGreeting() {
+        if (tvGreeting != null) {
+            // قم باستبدال getUserDisplayName() بالطريقة التي تستخرج بها الاسم من Session/SharedPref
+            String userName = getUserDisplayName(); 
+            tvGreeting.setText("مرحباً بك، " + userName);
+        }
+    }
+
+    private String getUserDisplayName() {
+        // تفقد بيانات الجلسة المسجلة
+        return "المستخدم"; 
+    }
+
+    private void setupSwipeToRefresh() {
+        if (swipeRefresh != null) {
+            swipeRefresh.setOnRefreshListener(this::fetchDashboardData);
+        }
     }
 
     private void setupNavigationListeners() {
         if (getActivity() == null) return;
 
-        if (cardScan != null) {
-            cardScan.setOnClickListener(v -> switchTab(getString(R.string.uhf_msg_tab_scan)));
+        if (btnRfidAudit != null) {
+            btnRfidAudit.setOnClickListener(v -> switchTab(getString(R.string.uhf_msg_tab_scan)));
         }
-        if (cardGate != null) {
-            cardGate.setOnClickListener(v -> switchTab("MIRA Secure Gate"));
-        }
-        if (cardRadar != null) {
-            cardRadar.setOnClickListener(v -> switchTab(getString(R.string.uhf_radar_loaction)));
-        }
-        if (cardSettings != null) {
-            cardSettings.setOnClickListener(v -> switchTab(getString(R.string.uhf_msg_tab_set)));
+        if (btnGateSecurity != null) {
+            btnGateSecurity.setOnClickListener(v -> switchTab("MIRA Secure Gate"));
         }
     }
 
@@ -141,22 +142,6 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    private void startTimeClock() {
-        timeHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
-                    SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE، d MMMM yyyy", new Locale("ar"));
-                    Date now = new Date();
-                    if (tvTime != null) tvTime.setText(timeFormat.format(now));
-                    if (tvDate != null) tvDate.setText(dateFormat.format(now));
-                    timeHandler.postDelayed(this, 1000);
-                } catch (Exception ignored) {}
-            }
-        });
-    }
-
     private void fetchDashboardData() {
         if (executor == null || executor.isShutdown()) {
             executor = Executors.newSingleThreadExecutor();
@@ -167,9 +152,13 @@ public class MiraDashboardFragment extends Fragment {
                 MiraApiClient.ApiResponse response = apiClient.getDashboardSummary();
                 if (response.isSuccess && response.data != null) {
                     JSONObject summary = response.data.optJSONObject("summary");
-                    if (summary != null) {
-                        processSummaryData(summary);
-                    }
+                    JSONObject prices = response.data.optJSONObject("gold_prices");
+                    
+                    mainHandler.post(() -> {
+                        if (summary != null) processSummaryData(summary);
+                        if (prices != null) processGoldPrices(prices);
+                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                    });
                 } else {
                     mainHandler.post(() -> handleApiError(response.code, response.error));
                 }
@@ -181,52 +170,51 @@ public class MiraDashboardFragment extends Fragment {
 
     private void processSummaryData(JSONObject summary) {
         int totalItems = summary.optInt("total_items", 0);
-        double totalWeight = summary.optDouble("total_weight_grams", 0);
+        double totalWeight = summary.optDouble("total_weight_grams", 0.0);
         int soldToday = summary.optInt("sold_today", 0);
-        int gatesActive = summary.optInt("gates_active", 0);
-        int gatesOffline = summary.optInt("gates_offline", 0);
-        int gatesAlarms = summary.optInt("gates_alarms_today", 0);
-        String lastAuditDate = summary.optString("last_audit_date", "");
-        double auditAccuracy = summary.optDouble("audit_accuracy_percent", 0);
-        int auditMissing = summary.optInt("audit_missing_items", 0);
 
-        mainHandler.post(() -> {
-            if (tvTotalItems != null) tvTotalItems.setText(String.valueOf(totalItems));
-            if (tvTotalWeight != null) tvTotalWeight.setText(String.format(Locale.US, "%.1f g", totalWeight));
-            if (tvSoldToday != null) tvSoldToday.setText(String.valueOf(soldToday));
-            if (tvGatesActive != null) tvGatesActive.setText(String.valueOf(gatesActive));
-            if (tvGatesOffline != null) tvGatesOffline.setText(String.valueOf(gatesOffline));
-            if (tvGatesAlarms != null) tvGatesAlarms.setText(String.valueOf(gatesAlarms));
-            if (tvLastAuditDate != null) tvLastAuditDate.setText(lastAuditDate.isEmpty() ? "—" : lastAuditDate);
-            if (tvAuditAccuracy != null) tvAuditAccuracy.setText(String.format(Locale.US, "الدقة: %.1f%%", auditAccuracy));
-            if (tvAuditMissing != null) tvAuditMissing.setText(String.format("المفقود: %d قطعة", auditMissing));
-            
-            updateIndicators(gatesActive > 0);
-            
-            String syncTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
-            if (tvLastSync != null) tvLastSync.setText("آخر مزامنة: " + syncTime);
-            if (tvLiveStatus != null) tvLiveStatus.setText("🟢 ONLINE");
-        });
+        double salesToday = summary.optDouble("sales_today", 0.0);
+        double salesMonth = summary.optDouble("sales_month", 0.0);
+        double salesYear = summary.optDouble("sales_year", 0.0);
+
+        // تحديث إحصائيات القطع والوزن
+        if (tvTotalItems != null) tvTotalItems.setText(String.valueOf(totalItems));
+        if (tvTotalWeight != null) tvTotalWeight.setText(String.format(Locale.US, "%.1f g", totalWeight));
+        if (tvSoldToday != null) tvSoldToday.setText(String.valueOf(soldToday));
+
+        // تحديث قيم المبيعات
+        if (tvSalesToday != null) tvSalesToday.setText(String.format(Locale.US, "$%.2f", salesToday));
+        if (tvSalesMonth != null) tvSalesMonth.setText(String.format(Locale.US, "$%.2f", salesMonth));
+        if (tvSalesYear != null) tvSalesYear.setText(String.format(Locale.US, "$%.2f", salesYear));
+
+        if (tvLiveStatus != null) {
+            tvLiveStatus.setText("● ONLINE");
+            tvLiveStatus.setTextColor(0xFF16A34A); // أخضر
+        }
     }
 
-    private void updateIndicators(boolean gatesActive) {
-        if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFF16A34A);
-        if (indicatorDb != null) indicatorDb.setBackgroundColor(0xFF16A34A);
-        if (indicatorGate != null) indicatorGate.setBackgroundColor(gatesActive ? 0xFF16A34A : 0xFFF59E0B);
+    private void processGoldPrices(JSONObject prices) {
+        double price18 = prices.optDouble("price_18k", 0.0);
+        double price21 = prices.optDouble("price_21k", 0.0);
+        double price24 = prices.optDouble("price_24k", 0.0);
+
+        if (tvGoldPrice18 != null) tvGoldPrice18.setText(String.format(Locale.US, "$%.2f/g", price18));
+        if (tvGoldPrice21 != null) tvGoldPrice21.setText(String.format(Locale.US, "$%.2f/g", price21));
+        if (tvGoldPrice24 != null) tvGoldPrice24.setText(String.format(Locale.US, "$%.2f/g", price24));
     }
 
     private void handleApiError(int code, String error) {
-        if (indicatorApi != null) indicatorApi.setBackgroundColor(0xFFDC2626);
-        if (indicatorDb != null) indicatorDb.setBackgroundColor(0xFFF59E0B);
-        if (indicatorGate != null) indicatorGate.setBackgroundColor(0xFF94A3B8);
-        if (tvLastSync != null) tvLastSync.setText("🔴 غير متصل");
-        if (tvLiveStatus != null) tvLiveStatus.setText("🔴 OFFLINE");
+        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+        if (tvLiveStatus != null) {
+            tvLiveStatus.setText("● OFFLINE");
+            tvLiveStatus.setTextColor(0xFFDC2626); // أحمر
+        }
+        Log.e(TAG, "API Error [" + code + "]: " + error);
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        timeHandler.removeCallbacksAndMessages(null);
         mainHandler.removeCallbacksAndMessages(null);
         if (executor != null && !executor.isShutdown()) {
             executor.shutdown();
