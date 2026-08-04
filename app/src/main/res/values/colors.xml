@@ -77,7 +77,9 @@
     <color name="viewfinder_frame">#ff000000</color>
     <color name="viewfinder_laser">#ffff0000</color>
     <color name="viewfinder_mask">#60000000</color>
-
+<color name="primary">#1A237E</color>
+<color name="on_surface_variant">#44474E</color>
+<color name="outline">#CBD5E1</color>
     <!--zxing end-->
 
     <string-array name="colors" translatable="false">
