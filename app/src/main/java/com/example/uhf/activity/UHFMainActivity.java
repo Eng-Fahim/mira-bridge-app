@@ -51,6 +51,7 @@ import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.UIHelper;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 import com.rscja.deviceapi.interfaces.ConnectionStatus;
+import com.example.uhf.fragment.MiraSalesHistoryFragment;
 
 import java.util.ArrayList;
 import java.util.HashMap;
