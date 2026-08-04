@@ -11,7 +11,6 @@ import android.util.Size;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -40,15 +39,6 @@ import com.google.mlkit.vision.common.InputImage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/**
- * 📷 MIRA GS1 DATAMATRIX Scanner
- * ماسح باركود احترافي يدعم:
- * - GS1 DataMatrix
- * - QR Code
- * - EAN-13 / GTIN
- * - Code-128
- * - جميع صيغ GS1
- */
 public class MiraBarcodeScannerFragment extends Fragment {
 
     private static final String TAG = "MiraBarcodeScanner";
@@ -59,8 +49,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
     private View scanLine;
     private TextView tvScanStatus;
     private TextView tvScannedData;
-    private ImageButton btnCloseScanner;
-    private ImageButton btnToggleFlash;
 
     private ProcessCameraProvider cameraProvider;
     private ExecutorService cameraExecutor;
@@ -68,11 +56,9 @@ public class MiraBarcodeScannerFragment extends Fragment {
     private ToneGenerator toneGenerator;
 
     private boolean isScanning = true;
-    private boolean isFlashOn = false;
     private long lastScanTime = 0;
     private static final long SCAN_COOLDOWN_MS = 1500;
 
-    // مستمع الباركود
     private OnBarcodeScannedListener barcodeListener;
 
     public interface OnBarcodeScannedListener {
@@ -101,47 +87,43 @@ public class MiraBarcodeScannerFragment extends Fragment {
         scanLine = view.findViewById(R.id.scanLine);
         tvScanStatus = view.findViewById(R.id.tvScanStatus);
         tvScannedData = view.findViewById(R.id.tvScannedData);
-        btnCloseScanner = view.findViewById(R.id.btnCloseScanner);
-        btnToggleFlash = view.findViewById(R.id.btnToggleFlash);
 
-        // ✅ زر الإغلاق (×)
-        if (btnCloseScanner != null) {
-            btnCloseScanner.setOnClickListener(v -> closeScanner());
+        // ✅ زر الإغلاق
+        View btnClose = view.findViewById(R.id.btnCloseScanner);
+        if (btnClose != null) {
+            btnClose.setOnClickListener(v -> closeScanner());
         }
 
         // ✅ زر الفلاش
-        if (btnToggleFlash != null) {
-            btnToggleFlash.setOnClickListener(v -> toggleFlash());
+        View btnFlash = view.findViewById(R.id.btnToggleFlash);
+        if (btnFlash != null) {
+            btnFlash.setOnClickListener(v -> toggleFlash());
         }
 
         cameraExecutor = Executors.newSingleThreadExecutor();
         toneGenerator = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100);
 
-        // تهيئة ماسح الباركود
         initBarcodeScanner();
 
-        // طلب صلاحية الكاميرا
         if (hasCameraPermission()) {
             startCamera();
         } else {
             requestCameraPermission();
         }
 
-        // تشغيل Animation خط المسح
         startScanAnimation();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-
         // ✅ معالجة زر الرجوع للجهاز
         if (getView() != null) {
             getView().setFocusableInTouchMode(true);
             getView().requestFocus();
             getView().setOnKeyListener((v, keyCode, event) -> {
                 if (event.getAction() == android.view.KeyEvent.ACTION_UP
-                        && keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+                    && keyCode == android.view.KeyEvent.KEYCODE_BACK) {
                     closeScanner();
                     return true;
                 }
@@ -250,10 +232,7 @@ public class MiraBarcodeScannerFragment extends Fragment {
 
     private void onBarcodeDetected(String data, int format) {
         long currentTime = System.currentTimeMillis();
-
-        if (currentTime - lastScanTime < SCAN_COOLDOWN_MS) {
-            return;
-        }
+        if (currentTime - lastScanTime < SCAN_COOLDOWN_MS) return;
         lastScanTime = currentTime;
 
         toneGenerator.startTone(ToneGenerator.TONE_PROP_ACK, 150);
@@ -287,7 +266,6 @@ public class MiraBarcodeScannerFragment extends Fragment {
     private void forwardToPOS(String data) {
         if (getActivity() instanceof UHFMainActivity) {
             UHFMainActivity activity = (UHFMainActivity) getActivity();
-
             Fragment posFragment = activity.getSupportFragmentManager()
                     .findFragmentByTag("POS Mode");
             if (posFragment instanceof MiraPosFragment && posFragment.isVisible()) {
@@ -298,22 +276,14 @@ public class MiraBarcodeScannerFragment extends Fragment {
         }
     }
 
-    // ===================== ✅ الإغلاق الآمن =====================
+    // ===================== ✅ إغلاق الماسح =====================
 
-    /**
-     * إغلاق الماسح والعودة للصفحة السابقة بأمان تام
-     */
     private void closeScanner() {
         try {
-            // إيقاف المسح
             isScanning = false;
-
-            // إيقاف الكاميرا
             if (cameraProvider != null) {
                 cameraProvider.unbindAll();
             }
-
-            // العودة للصفحة السابقة
             if (getParentFragmentManager().getBackStackEntryCount() > 0) {
                 getParentFragmentManager().popBackStack();
             } else if (getActivity() != null) {
@@ -321,45 +291,22 @@ public class MiraBarcodeScannerFragment extends Fragment {
             }
         } catch (Exception e) {
             Log.e(TAG, "Error closing scanner: " + e.getMessage());
-            // محاولة أخيرة للرجوع
-            try {
-                if (getActivity() != null) {
-                    getActivity().onBackPressed();
-                }
-            } catch (Exception ignored) {}
+            if (getActivity() != null) {
+                getActivity().onBackPressed();
+            }
         }
-    }
-
-    // ===================== فلاش =====================
-
-    private void toggleFlash() {
-        if (cameraProvider == null) return;
-
-        isFlashOn = !isFlashOn;
-        // ملاحظة: تفعيل الفلاش يحتاج CameraControl من CameraX
-        // هذه نسخة مبسطة
-        if (btnToggleFlash != null) {
-            btnToggleFlash.setImageResource(isFlashOn ?
-                    android.R.drawable.ic_menu_manage :
-                    android.R.drawable.ic_menu_manage);
-        }
-        Toast.makeText(getContext(), isFlashOn ? "فلاش يعمل" : "فلاش متوقف", Toast.LENGTH_SHORT).show();
     }
 
     // ===================== Animation =====================
 
     private void startScanAnimation() {
-        if (scanLine == null || scannerOverlay == null) return;
-
-        float maxTranslation = scannerOverlay.getHeight() - scanLine.getHeight();
+        if (scanLine == null) return;
         scanLine.animate()
-                .translationY(maxTranslation)
+                .translationY(scannerOverlay.getHeight())
                 .setDuration(2000)
                 .withEndAction(() -> {
                     scanLine.setTranslationY(0);
-                    if (isScanning && isAdded()) {
-                        startScanAnimation();
-                    }
+                    if (isScanning) startScanAnimation();
                 })
                 .start();
     }
@@ -382,29 +329,17 @@ public class MiraBarcodeScannerFragment extends Fragment {
         }
     }
 
-    public void pauseScanning() {
-        isScanning = false;
-    }
-
-    public void resumeScanning() {
-        isScanning = true;
-        lastScanTime = 0;
-    }
+    public void pauseScanning() { isScanning = false; }
+    public void resumeScanning() { isScanning = true; lastScanTime = 0; }
+    public void toggleFlash() { /* TODO */ }
 
     // ===================== Cleanup =====================
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        isScanning = false;
-        if (cameraExecutor != null) {
-            cameraExecutor.shutdown();
-        }
-        if (barcodeScanner != null) {
-            barcodeScanner.close();
-        }
-        if (toneGenerator != null) {
-            toneGenerator.release();
-        }
+        if (cameraExecutor != null) cameraExecutor.shutdown();
+        if (barcodeScanner != null) barcodeScanner.close();
+        if (toneGenerator != null) toneGenerator.release();
     }
-                                            }
+}
