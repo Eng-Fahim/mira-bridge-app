@@ -185,7 +185,13 @@ protected void onCreate(Bundle savedInstanceState) {
                 mTabHost.newTabSpec("POS Mode").setIndicator("🛒"),
                 MiraPosFragment.class, null
             );
+            mTabHost.addTab(
+                mTabHost.newTabSpec("SalesHistory").setIndicator("📜"),
+                MiraSalesHistoryFragment.class, null
+            );
         }
+                
+
 
         // ============================================
         // 📷 3. شاشة القراءة والمسح السريع: متاحة للجميع
