@@ -36,7 +36,6 @@
         app:layout_constraintTop_toTopOf="@+id/btnToggleLanguage" />
 
     <!-- Center Content Group (Logo + Login Card) -->
-    <!-- Logo & Branding -->
     <LinearLayout
         android:id="@+id/logoContainer"
         android:layout_width="match_parent"
@@ -83,6 +82,17 @@
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp"
             android:textStyle="bold" />
+            
+        <!-- وصف الماركة / الشعار الفرعي الذي يتطلبه الكود -->
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvBrandDescription"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="منظومة التتبع والمصادقة المعتمدة للمجوهرات"
+            android:textColor="?attr/colorOutline"
+            android:textSize="11sp"
+            android:gravity="center" />
     </LinearLayout>
 
     <!-- Login Card -->
@@ -106,7 +116,7 @@
             android:orientation="vertical"
             android:padding="28dp">
 
-            <!-- Dynamic Text Alignment (viewStart adapts to RTL/LTR) -->
+            <!-- Dynamic Text Alignment -->
             <com.google.android.material.textview.MaterialTextView
                 android:id="@+id/tvSignInTitle"
                 android:layout_width="match_parent"
@@ -185,7 +195,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:weightSum="3"
-                android:layoutDirection="locale"> <!-- ensures LTR/RTL button placement -->
+                android:layoutDirection="locale">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnLogin"
@@ -218,6 +228,53 @@
 
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
+
+    <!-- عناصر الخادم المخفية (لإتاحة عمل الكود تماماً وإخفائها عن الواجهة الرئيسية للمستخدم) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="parent">
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvServerSettings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/serverConfigCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/tilServerUrl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etServerUrl"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSaveServer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- حاوية التحميل ومؤشر التقدم -->
+        <FrameLayout
+            android:id="@+id/loadingContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+            <ProgressBar
+                android:id="@+id/pbLoading"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </FrameLayout>
+    </LinearLayout>
 
     <!-- Footer -->
     <com.google.android.material.textview.MaterialTextView
