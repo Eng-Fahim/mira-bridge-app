@@ -102,7 +102,6 @@ public class LoginActivity extends AppCompatActivity {
         loadingContainer = findViewById(R.id.loadingContainer);
         loginCard = findViewById(R.id.loginCard);
 
-        // تعبئة رابط الخادم المحفوظ
         String savedUrl = sessionManager.getServerUrl();
         if (savedUrl != null && !savedUrl.isEmpty()) {
             etServerUrl.setText(savedUrl);
@@ -134,9 +133,43 @@ public class LoginActivity extends AppCompatActivity {
         }
         
         // تطبيق بروفايل وشعار الجهة المحفوظ ديناميكياً
+        
         applyOrgProfile();
+        loadOrgProfileFromCloud();
     }
 
+/**
+ * ☁️ جلب بيانات الجهة من السحابة وتحديث المحلية
+ */
+private void loadOrgProfileFromCloud() {
+    bgExecutor.execute(() -> {
+        try {
+            MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                String orgName = response.data.optString("org_name", "");
+                
+                if (!orgName.isEmpty()) {
+                    // حفظ محلياً للتحديث
+                    getSharedPreferences("MIRA_ORG_PROFILE", Context.MODE_PRIVATE)
+                        .edit()
+                        .putString("org_name", orgName)
+                        .putString("org_slogan", response.data.optString("org_slogan", ""))
+                        .putString("org_phone", response.data.optString("org_phone", ""))
+                        .putString("org_email", response.data.optString("org_email", ""))
+                        .putString("org_address", response.data.optString("org_address", ""))
+                        .putString("org_website", response.data.optString("org_website", ""))
+                        .apply();
+                    
+                    mainHandler.post(() -> applyOrgProfile());
+                }
+            }
+        } catch (Exception e) {
+            Log.e("LoginActivity", "Cloud org load error: " + e.getMessage());
+        }
+    });
+}
+    
     /**
      * 🌐 تحديث نصوص الواجهة واتجاهها بناءً على اللغة المختارة
      */
