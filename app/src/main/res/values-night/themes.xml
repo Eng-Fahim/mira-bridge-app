@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Base application dark theme -->
+    <!-- Base application dark theme (Luxury Dark Gold Edition) -->
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
 
         <!-- 🔤 1. الخط الافتراضي العام للوضع الداكن -->
@@ -37,25 +37,29 @@
         <item name="checkboxStyle">@style/AppCheckBoxStyle</item>
         <item name="tabStyle">@style/AppTabStyle</item>
 
-        <!-- 🌙 4. ألوان الوضع الداكن (Dark Mode Palette) -->
-        <item name="colorPrimary">#9FA8DA</item>            <!-- كحلي/أزرق فاتح مناسب للخلفيات الداكنة -->
-        <item name="colorOnPrimary">#1A237E</item>          <!-- نص داكن فوق اللون الرئيسي -->
-        <item name="colorPrimaryContainer">#283593</item>   <!-- حاويات داكنة -->
-        <item name="colorOnPrimaryContainer">#E8EAF6</item>
+        <!-- 🌙 4. لوحة الألوان الفاخرة للوضع الداكن (Luxury Dark Gold) -->
+        <item name="colorPrimary">#D4AF37</item>            <!-- ذهبي رئيسي ساطع وفاخر -->
+        <item name="colorOnPrimary">#0B0B0C</item>          
+        <item name="colorPrimaryContainer">#2A2413</item>   
+        <item name="colorOnPrimaryContainer">#F4E8B1</item>
 
-        <!-- 💎 الذهبي المخصص للمجوهرات في الوضع الداكن -->
-        <item name="colorSecondary">#E5C178</item>          <!-- ذهبي فاتح وواضح -->
-        <item name="colorOnSecondary">#3E2723</item>
-        <item name="colorSecondaryContainer">#4E342E</item>
-        <item name="colorOnSecondaryContainer">#FFE0B2</item>
+        <!-- 💎 الذهب الدافئ الثانوي للمجوهرات -->
+        <item name="colorSecondary">#C5A059</item>          
+        <item name="colorOnSecondary">#0B0B0C</item>
+        <item name="colorSecondaryContainer">#1E1C14</item>
+        <item name="colorOnSecondaryContainer">#E6D5A9</item>
 
-        <!-- 🖼️ خلفيات وأسطح داكنة متناسقة -->
-        <item name="android:colorBackground">#121212</item> <!-- خلفية داكنة عميقة -->
-        <item name="colorOnBackground">#E1E2E5</item>       <!-- نص فاتح مريح للعين -->
-        <item name="colorSurface">#1E1E1E</item>            <!-- بطاقات وأسطح عائمة -->
-        <item name="colorOnSurface">#E1E2E5</item>          <!-- نص البطاقات -->
-        <item name="colorSurfaceVariant">#2C2C2C</item>     <!-- حقول إدخال وأسطح فرعية -->
-        <item name="colorOnSurfaceVariant">#C4C6CF</item>
+        <!-- 🖼️ خلفيات وأسطح كربونية داكنة عميقة متناسقة -->
+        <item name="android:colorBackground">#0B0B0C</item> <!-- أسود كربوني عميق مريح للعين -->
+        <item name="colorOnBackground">#F3F4F6</item>       
+        <item name="colorSurface">#141416</item>            <!-- بطاقات وأسطح عائمة بفخامة -->
+        <item name="colorOnSurface">#F3F4F6</item>          
+        <item name="colorSurfaceVariant">#1E1E22</item>     <!-- حقول إدخال وأسطح فرعية -->
+        <item name="colorOnSurfaceVariant">#A1A1AA</item>
+        
+        <!-- حدود وإطارات الوضع الداكن -->
+        <item name="colorOutline">#2D2D35</item>
+        <item name="colorOutlineVariant">#23232A</item>
     </style>
 
     <!-- 🔤 ستايل الأزرار للوضع الداكن -->
