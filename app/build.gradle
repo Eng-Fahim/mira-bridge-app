@@ -10,7 +10,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.example.uhf"
+        applicationId "com.mira.jewelry.enterprise"
         minSdk 26
         targetSdk 33
         versionCode 2
@@ -48,7 +48,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
 
-        // 自定义apk名称
+        // Custom APK name configuration
         android.applicationVariants.all { variant ->
             variant.outputs.all {
                 outputFileName = "UHF-serial_v${defaultConfig.versionName}.apk"
