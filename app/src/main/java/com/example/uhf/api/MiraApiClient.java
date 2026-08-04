@@ -377,10 +377,14 @@ public class MiraApiClient {
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             conn.setRequestProperty("X-MIRA-API-Key", apiKey);
+            
             String token = getAuthToken();
             if (!token.isEmpty()) {
+                // إرسال التوكن بالصيغة القياسية والمخصصة معاً لضمان قبول السيرفر لها
+                conn.setRequestProperty("Authorization", "Bearer " + token);
                 conn.setRequestProperty("X-MIRA-Auth-Token", token);
             }
+            
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(15000);
 
@@ -405,10 +409,14 @@ public class MiraApiClient {
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             conn.setRequestProperty("X-MIRA-API-Key", apiKey);
+            
             String token = getAuthToken();
             if (!token.isEmpty()) {
+                // إرسال التوكن بالصيغة القياسية والمخصصة معاً لضمان قبول السيرفر لها
+                conn.setRequestProperty("Authorization", "Bearer " + token);
                 conn.setRequestProperty("X-MIRA-Auth-Token", token);
             }
+            
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(15000);
             conn.setDoOutput(true);
