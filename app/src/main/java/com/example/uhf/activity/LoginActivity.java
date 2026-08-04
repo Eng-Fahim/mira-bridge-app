@@ -166,54 +166,44 @@ public class LoginActivity extends AppCompatActivity {
     /**
      * 🏢 تطبيق بيانات وشعار الجهة المحفوظة ديناميكياً على الواجهة
      */
-    private void applyOrgProfile() {
-        MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
-        
-        String orgName = orgProfile.getOrgName();
-        String orgSlogan = orgProfile.getOrgSlogan();
-        String logoPath = orgProfile.getOrgLogoPath();
+    /**
+ * 🏢 تطبيق بيانات وشعار الجهة المحفوظة ديناميكياً على الواجهة
+ */
+private void applyOrgProfile() {
+    MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
+    
+    String orgName = orgProfile.getOrgName();
+    String orgSlogan = orgProfile.getOrgSlogan();
 
-        // 1. اسم الماركة/الجهة في العنوان الرئيسي
-        if (tvBrandName != null && orgName != null && !orgName.isEmpty()) {
-            tvBrandName.setText(orgName);
-        }
+    // 1. اسم الماركة/الجهة في العنوان الرئيسي
+    if (tvBrandName != null && orgName != null && !orgName.isEmpty()) {
+        tvBrandName.setText(orgName);
+    }
 
-        // 2. تحديث العنوان الفرعي
-        if (tvBrandSubtitle != null) {
-            if (orgName != null && !orgName.isEmpty() && !orgName.equals("MIRA Jewelry")) {
-                tvBrandSubtitle.setText(orgName + " Enterprise");
-            } else {
-                tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
-            }
-        }
-        
-        // 3. تحديث الوصف بشعار الجهة
-        if (tvBrandDescription != null) {
-            if (orgSlogan != null && !orgSlogan.isEmpty() && !orgSlogan.equals("Jewelry Enterprise Platform")) {
-                tvBrandDescription.setText(orgSlogan);
-            } else {
-                tvBrandDescription.setText(isArabic ? "منظومة التتبع والمصادقة المعتمدة للمجوهرات" : "Enterprise Jewelry Traceability & Authentication");
-            }
-        }
-
-        // 4. تحميل شعار الجهة المحفوظ إن وجد أو الشعار الـ Vector الفخم برمجياً
-        if (ivAppLogo != null) {
-            if (logoPath != null && !logoPath.isEmpty() && new File(logoPath).exists()) {
-                try {
-                    Bitmap bitmap = BitmapFactory.decodeFile(logoPath);
-                    if (bitmap != null) {
-                        ivAppLogo.setImageBitmap(bitmap);
-                    } else {
-                        ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
-                    }
-                } catch (Exception e) {
-                    ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
-                }
-            } else {
-                ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
-            }
+    // 2. تحديث العنوان الفرعي
+    if (tvBrandSubtitle != null) {
+        if (orgName != null && !orgName.isEmpty() && !orgName.equals("MIRA Jewelry")) {
+            tvBrandSubtitle.setText(orgName + " Enterprise");
+        } else {
+            tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
         }
     }
+    
+    // 3. تحديث الوصف بشعار الجهة
+    if (tvBrandDescription != null) {
+        if (orgSlogan != null && !orgSlogan.isEmpty() && !orgSlogan.equals("Jewelry Enterprise Platform")) {
+            tvBrandDescription.setText(orgSlogan);
+        } else {
+            tvBrandDescription.setText(isArabic ? "منظومة التتبع والمصادقة المعتمدة للمجوهرات" : "Enterprise Jewelry Traceability & Authentication");
+        }
+    }
+
+    // 4. عرض الشعار الفخم المعتمد برمجياً
+    if (ivAppLogo != null) {
+        ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
+    }
+}
+
 
     /**
      * 🔧 إظهار/إخفاء إعدادات الخادم (للمسؤولين فقط)
