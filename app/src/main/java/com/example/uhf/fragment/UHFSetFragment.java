@@ -85,7 +85,10 @@ public class UHFSetFragment extends KeyDwonFragment implements OnClickListener {
 private CheckBox cbInventorySound, cbInventoryVibrate, cbInventoryAutoStop;
 private CheckBox cbInventoryShowImages, cbInventorySortByLocation;
 private Spinner spInventoryMode;
-
+// 🏢 بيانات الجهة
+private EditText etOrgName, etOrgSlogan, etOrgPhone, etOrgEmail, etOrgAddress, etOrgWebsite;
+private Button btnSaveOrgProfile;
+private TextView tvOrgStatus;
     // =============================================
     // 🟢 عناصر RFID المُحقونة بـ ViewInject
     // =============================================
@@ -188,6 +191,20 @@ private Spinner spInventoryMode;
         View root = inflater.inflate(R.layout.fragment_uhf_set, container, false);
         ViewUtils.inject(this, root);
 
+        // 🏢 ربط عناصر بيانات الجهة
+etOrgName = root.findViewById(R.id.etOrgName);
+etOrgSlogan = root.findViewById(R.id.etOrgSlogan);
+etOrgPhone = root.findViewById(R.id.etOrgPhone);
+etOrgEmail = root.findViewById(R.id.etOrgEmail);
+etOrgAddress = root.findViewById(R.id.etOrgAddress);
+etOrgWebsite = root.findViewById(R.id.etOrgWebsite);
+btnSaveOrgProfile = root.findViewById(R.id.btnSaveOrgProfile);
+tvOrgStatus = root.findViewById(R.id.tvOrgStatus);
+
+if (btnSaveOrgProfile != null) {
+    btnSaveOrgProfile.setOnClickListener(v -> saveOrgProfile());
+}
+
         // ربط عناصر RFID
         spSessionID = root.findViewById(R.id.spSession);
         spInventoried = root.findViewById(R.id.spTarget);
@@ -243,7 +260,98 @@ spInventoryMode = root.findViewById(R.id.spInventoryMode);
 
         return root;
     }
+// =============================================
+// 🏢 بيانات الجهة - حفظ وتحميل
+// =============================================
 
+private void saveOrgProfile() {
+    SharedPreferences prefs = mContext.getSharedPreferences("MIRA_ORG_PROFILE", Context.MODE_PRIVATE);
+    SharedPreferences.Editor editor = prefs.edit();
+    
+    editor.putString("org_name", etOrgName.getText().toString().trim());
+    editor.putString("org_slogan", etOrgSlogan.getText().toString().trim());
+    editor.putString("org_phone", etOrgPhone.getText().toString().trim());
+    editor.putString("org_email", etOrgEmail.getText().toString().trim());
+    editor.putString("org_address", etOrgAddress.getText().toString().trim());
+    editor.putString("org_website", etOrgWebsite.getText().toString().trim());
+    editor.apply();
+    
+    // تحديث الواجهة الرئيسية
+    if (mContext != null && mContext.getSupportActionBar() != null) {
+        String orgName = etOrgName.getText().toString().trim();
+        if (!orgName.isEmpty()) {
+            mContext.getSupportActionBar().setTitle(orgName + " - MIRA");
+        }
+    }
+    
+    // حفظ في السحابة
+    saveOrgProfileToCloud();
+    
+    if (tvOrgStatus != null) {
+        tvOrgStatus.setText("✅ تم حفظ بيانات الجهة بنجاح");
+        tvOrgStatus.setTextColor(Color.parseColor("#4CAF50"));
+        
+        new Handler().postDelayed(() -> {
+            if (tvOrgStatus != null) tvOrgStatus.setText("");
+        }, 3000);
+    }
+    
+    Toast.makeText(mContext, "✅ تم حفظ بيانات الجهة وتعميمها", Toast.LENGTH_SHORT).show();
+}
+
+private void loadOrgProfile() {
+    SharedPreferences prefs = mContext.getSharedPreferences("MIRA_ORG_PROFILE", Context.MODE_PRIVATE);
+    
+    if (etOrgName != null) etOrgName.setText(prefs.getString("org_name", "MIRA Jewelry"));
+    if (etOrgSlogan != null) etOrgSlogan.setText(prefs.getString("org_slogan", "Jewelry Enterprise Platform"));
+    if (etOrgPhone != null) etOrgPhone.setText(prefs.getString("org_phone", ""));
+    if (etOrgEmail != null) etOrgEmail.setText(prefs.getString("org_email", ""));
+    if (etOrgAddress != null) etOrgAddress.setText(prefs.getString("org_address", ""));
+    if (etOrgWebsite != null) etOrgWebsite.setText(prefs.getString("org_website", ""));
+}
+
+private void saveOrgProfileToCloud() {
+    new Thread(() -> {
+        try {
+            String apiUrl = "https://ams.ibreg.org/wp-json/mira-gate/v1/settings";
+            String apiKey = etMiraApiKey != null ? etMiraApiKey.getText().toString().trim() : "";
+            String gateId = etMiraGateId != null ? etMiraGateId.getText().toString().trim() : "";
+            
+            if (apiKey.isEmpty()) return;
+            
+            URL url = new URL(apiUrl);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            conn.setDoOutput(true);
+            
+            JSONObject body = new JSONObject();
+            body.put("gate_id", gateId);
+            
+            JSONObject settings = new JSONObject();
+            settings.put("org_name", etOrgName.getText().toString().trim());
+            settings.put("org_slogan", etOrgSlogan.getText().toString().trim());
+            settings.put("org_phone", etOrgPhone.getText().toString().trim());
+            settings.put("org_email", etOrgEmail.getText().toString().trim());
+            settings.put("org_address", etOrgAddress.getText().toString().trim());
+            settings.put("org_website", etOrgWebsite.getText().toString().trim());
+            
+            body.put("settings", settings);
+            
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(body.toString().getBytes("utf-8"));
+            }
+            
+            conn.getResponseCode();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Cloud org save error: " + e.getMessage());
+        }
+    }).start();
+}
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
@@ -326,6 +434,8 @@ if (mContext != null && mContext.mReader != null) {
 
         // 🟢 تحميل الإعدادات المحفوظة
         loadMiraSettings();
+        // 🏢 تحميل بيانات الجهة
+loadOrgProfile();
     }
 
     @Override
