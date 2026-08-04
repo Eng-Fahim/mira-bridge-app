@@ -35,8 +35,8 @@ public class LoginActivity extends AppCompatActivity {
 
     private TextInputEditText etServerUrl, etUsername, etPassword;
     private TextInputLayout tilServerUrl, tilUsername, tilPassword;
-    private MaterialButton btnLogin, btnBiometric, btnSaveServer;
-    private MaterialTextView tvServerSettings, tvAppVersion;
+    private MaterialButton btnLogin, btnBiometric, btnSaveServer, btnToggleLanguage;
+    private MaterialTextView tvServerSettings, tvAppVersion, tvBrandSubtitle, tvBrandDescription, tvSignInTitle, tvSignInSubtitle;
     private MaterialCardView serverConfigCard;
     private ProgressBar pbLoading;
     private View loadingContainer, loginCard;
@@ -46,6 +46,8 @@ public class LoginActivity extends AppCompatActivity {
     private BiometricPrompt.PromptInfo promptInfo;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Executor bgExecutor = Executors.newSingleThreadExecutor();
+
+    private boolean isArabic = true; // اللغة الافتراضية عربية
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,12 +60,13 @@ public class LoginActivity extends AppCompatActivity {
             return;
         }
 
-        setContentView(R.layout.activity_login);
+        setContentView(R.layout.activity_login); // تأكد أن ملف الـ XML الخاص بك يحمل هذا الاسم ويحتوي على العناصر الجديدة
         initViews();
         setupBiometric();
         setupServerConfigToggle();
         animateEntrance();
         setupTextWatchers();
+        updateUiLanguage(isArabic); // تطبيق اللغة الافتراضية عند البدء
     }
 
     private void initViews() {
@@ -76,8 +79,13 @@ public class LoginActivity extends AppCompatActivity {
         btnLogin = findViewById(R.id.btnLogin);
         btnBiometric = findViewById(R.id.btnBiometric);
         btnSaveServer = findViewById(R.id.btnSaveServer);
+        btnToggleLanguage = findViewById(R.id.btnToggleLanguage);
         tvServerSettings = findViewById(R.id.tvServerSettings);
         tvAppVersion = findViewById(R.id.tvAppVersion);
+        tvBrandSubtitle = findViewById(R.id.tvBrandSubtitle);
+        tvBrandDescription = findViewById(R.id.tvBrandDescription);
+        tvSignInTitle = findViewById(R.id.tvSignInTitle);
+        tvSignInSubtitle = findViewById(R.id.tvSignInSubtitle);
         serverConfigCard = findViewById(R.id.serverConfigCard);
         pbLoading = findViewById(R.id.pbLoading);
         loadingContainer = findViewById(R.id.loadingContainer);
@@ -91,19 +99,55 @@ public class LoginActivity extends AppCompatActivity {
 
         // رقم الإصدار
         try {
-            tvAppVersion.setText("v" + getPackageManager().getPackageInfo(getPackageName(), 0).versionName);
+            tvAppVersion.setText("v" + getPackageManager().getPackageInfo(getPackageName(), 0).versionName + " Enterprise");
         } catch (Exception e) {
-            tvAppVersion.setText("");
+            tvAppVersion.setText("v1.0.0 Enterprise");
         }
 
         apiClient = MiraApiClient.getInstance(this);
 
         btnLogin.setOnClickListener(v -> attemptApiLogin());
+        
         btnSaveServer.setOnClickListener(v -> {
             String url = getText(etServerUrl);
             sessionManager.setServerUrl(url);
-            Toast.makeText(this, "✓ Server URL saved", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, isArabic ? "✓ تم حفظ رابط الخادم بنجاح" : "✓ Server URL saved", Toast.LENGTH_SHORT).show();
         });
+
+        // زر التبديل بين اللغات
+        if (btnToggleLanguage != null) {
+            btnToggleLanguage.setOnClickListener(v -> {
+                isArabic = !isArabic;
+                updateUiLanguage(isArabic);
+            });
+        }
+    }
+
+    /**
+     * 🌐 تحديث نصوص الواجهة واتجاهها بناءً على اللغة المختارة
+     */
+    private void updateUiLanguage(boolean arabic) {
+        if (arabic) {
+            getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            if (tvBrandSubtitle != null) tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
+            if (tvBrandDescription != null) tvBrandDescription.setText("منظومة التتبع والمصادقة المعتمدة للمجوهرات");
+            if (tvSignInTitle != null) tvSignInTitle.setText("تسجيل الدخول");
+            if (tvSignInSubtitle != null) tvSignInSubtitle.setText("أدخل بيانات الاعتماد الخاصة بك للمتابعة");
+            if (tilUsername != null) tilUsername.setHint("اسم المستخدم / البريد الإلكتروني");
+            if (tilPassword != null) tilPassword.setHint("كلمة المرور");
+            if (btnLogin != null && !pbLoading.isShown()) btnLogin.setText("دخول النظام");
+            if (tvServerSettings != null) tvServerSettings.setText("🔧 إعدادات الخادم والاتصال (Server Settings)");
+        } else {
+            getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+            if (tvBrandSubtitle != null) tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
+            if (tvBrandDescription != null) tvBrandDescription.setText("Enterprise Jewelry Traceability & Authentication");
+            if (tvSignInTitle != null) tvSignInTitle.setText("Sign In");
+            if (tvSignInSubtitle != null) tvSignInSubtitle.setText("Enter your credentials to continue");
+            if (tilUsername != null) tilUsername.setHint("Username");
+            if (tilPassword != null) tilPassword.setHint("Password");
+            if (btnLogin != null && !pbLoading.isShown()) btnLogin.setText("Sign In");
+            if (tvServerSettings != null) tvServerSettings.setText("🔧 Server Configuration");
+        }
     }
 
     /**
@@ -115,20 +159,22 @@ public class LoginActivity extends AppCompatActivity {
                 serverConfigCard.setVisibility(View.VISIBLE);
                 serverConfigCard.setAlpha(0f);
                 serverConfigCard.animate().alpha(1f).setDuration(300).start();
-                tvServerSettings.setText("🔧 Hide Server Settings");
+                tvServerSettings.setText(isArabic ? "🔧 إخفاء إعدادات الخادم" : "🔧 Hide Server Settings");
             } else {
                 serverConfigCard.animate().alpha(0f).setDuration(200).withEndAction(() -> {
                     serverConfigCard.setVisibility(View.GONE);
                 }).start();
-                tvServerSettings.setText("🔧 Server Settings");
+                tvServerSettings.setText(isArabic ? "🔧 إعدادات الخادم والاتصال (Server Settings)" : "🔧 Server Configuration");
             }
         });
 
-        // الضغط المطول على الشعار يظهر الإعدادات أيضاً
-        findViewById(R.id.loginCard).setOnLongClickListener(v -> {
-            tvServerSettings.performClick();
-            return true;
-        });
+        // الضغط المطول على البطاقة يظهر الإعدادات أيضاً
+        if (loginCard != null) {
+            loginCard.setOnLongClickListener(v -> {
+                tvServerSettings.performClick();
+                return true;
+            });
+        }
     }
 
     private void animateEntrance() {
@@ -177,12 +223,12 @@ public class LoginActivity extends AppCompatActivity {
         String password = getText(etPassword);
 
         if (username.isEmpty()) {
-            tilUsername.setError("Username required");
+            tilUsername.setError(isArabic ? "اسم المستخدم مطلوب" : "Username required");
             shakeView(tilUsername);
             return;
         }
         if (password.length() < 4) {
-            tilPassword.setError("Password too short");
+            tilPassword.setError(isArabic ? "كلمة المرور قصيرة جداً" : "Password too short");
             shakeView(tilPassword);
             return;
         }
@@ -203,8 +249,8 @@ public class LoginActivity extends AppCompatActivity {
                     handleLoginSuccess(response, username);
                 } else {
                     String errorMsg = response != null
-                        ? response.optString("message", "Invalid credentials")
-                        : "Connection failed";
+                        ? response.optString("message", isArabic ? "بيانات الاعتماد غير صالحة" : "Invalid credentials")
+                        : (isArabic ? "فشل الاتصال بالخادم" : "Connection failed");
                     Toast.makeText(LoginActivity.this, errorMsg, Toast.LENGTH_LONG).show();
                     shakeView(loginCard);
                 }
@@ -225,7 +271,7 @@ public class LoginActivity extends AppCompatActivity {
         sessionManager.saveBiometricUser(username, roleStr);
         sessionManager.setBiometricEnabled(true);
 
-        Toast.makeText(this, "Welcome " + displayName + " ✓", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, (isArabic ? "أهلاً بك " : "Welcome ") + displayName + " ✓", Toast.LENGTH_SHORT).show();
         mainHandler.postDelayed(this::navigateToMain, 400);
     }
 
@@ -249,10 +295,10 @@ public class LoginActivity extends AppCompatActivity {
                     if (!sessionManager.isLoggedIn()) {
                         sessionManager.createLoginSession(lastUser, lastRole, "BIOMETRIC_TOKEN", sessionManager.getServerUrl());
                     }
-                    Toast.makeText(LoginActivity.this, "Welcome back " + lastUser + " 👋", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(LoginActivity.this, (isArabic ? "أهلاً عودتك " : "Welcome back ") + lastUser + " 👋", Toast.LENGTH_SHORT).show();
                     navigateToMain();
                 } else {
-                    Toast.makeText(LoginActivity.this, "Sign in with password first", Toast.LENGTH_LONG).show();
+                    Toast.makeText(LoginActivity.this, isArabic ? "قم بتسجيل الدخول بكلمة المرور أولاً" : "Sign in with password first", Toast.LENGTH_LONG).show();
                 }
             }
             @Override
@@ -263,14 +309,14 @@ public class LoginActivity extends AppCompatActivity {
             }
             @Override
             public void onAuthenticationFailed() {
-                Toast.makeText(LoginActivity.this, "Fingerprint not recognized", Toast.LENGTH_SHORT).show();
+                Toast.makeText(LoginActivity.this, isArabic ? "لم يتم التعرف على بصمة الإصبع" : "Fingerprint not recognized", Toast.LENGTH_SHORT).show();
             }
         });
 
         promptInfo = new BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Biometric Sign In")
-            .setSubtitle("Use your fingerprint to sign in")
-            .setNegativeButtonText("Use password")
+            .setTitle(isArabic ? "تسجيل الدخول الحيوي (Biometric)" : "Biometric Sign In")
+            .setSubtitle(isArabic ? "استخدم بصمة الإصبع لتسجيل الدخول السريع" : "Use your fingerprint to sign in")
+            .setNegativeButtonText(isArabic ? "استخدام كلمة المرور" : "Use password")
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
             .build();
 
@@ -278,7 +324,7 @@ public class LoginActivity extends AppCompatActivity {
             if (!sessionManager.getLastBiometricUser().isEmpty() || sessionManager.isLoggedIn()) {
                 biometricPrompt.authenticate(promptInfo);
             } else {
-                Toast.makeText(this, "Sign in with password first to enable biometric", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, isArabic ? "سجل الدخول بكلمة المرور أولاً لتفعيل البصمة" : "Sign in with password first to enable biometric", Toast.LENGTH_LONG).show();
             }
         });
     }
@@ -287,7 +333,11 @@ public class LoginActivity extends AppCompatActivity {
         if (loadingContainer != null) loadingContainer.setVisibility(loading ? View.VISIBLE : View.GONE);
         btnLogin.setEnabled(!loading);
         btnBiometric.setEnabled(!loading);
-        btnLogin.setText(loading ? "" : "Sign In");
+        if (loading) {
+            btnLogin.setText("");
+        } else {
+            btnLogin.setText(isArabic ? "دخول النظام" : "Sign In");
+        }
         etUsername.setEnabled(!loading);
         etPassword.setEnabled(!loading);
     }
