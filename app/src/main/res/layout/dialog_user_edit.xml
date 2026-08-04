@@ -4,14 +4,14 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:fillViewport="true"
-    android:scrollbars="none">
+    android:scrollbars="none"
+    android:background="@drawable/bg_dialog_rounded"> <!-- إضافة خلفية صلبة بدائرية جذابة -->
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp"
-        android:layoutDirection="rtl">
+        android:padding="20dp">
 
         <!-- العنوان مع أيقونة -->
         <LinearLayout
@@ -19,16 +19,16 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="24dp">
+            android:layout_marginBottom="20dp">
 
             <ImageView
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:src="@drawable/ic_person_outline"
                 android:tint="?attr/colorPrimary"
                 android:layout_marginEnd="12dp"
                 android:background="@drawable/circle_primary_bg"
-                android:padding="10dp" />
+                android:padding="8dp" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -42,7 +42,7 @@
                     android:layout_height="wrap_content"
                     android:text="إضافة مستخدم جديد"
                     android:textColor="?attr/colorOnSurface"
-                    android:textSize="18sp"
+                    android:textSize="17sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -51,7 +51,7 @@
                     android:layout_height="wrap_content"
                     android:text="أدخل بيانات المستخدم والصلاحية المطلوبة"
                     android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="11sp"
+                    android:textSize="12sp"
                     android:layout_marginTop="2dp" />
             </LinearLayout>
         </LinearLayout>
@@ -89,7 +89,7 @@
                     android:layout_height="wrap_content"
                     android:text="البيانات"
                     android:textColor="?attr/colorPrimary"
-                    android:textSize="10sp" />
+                    android:textSize="11sp" />
             </LinearLayout>
 
             <View
@@ -97,7 +97,7 @@
                 android:layout_width="40dp"
                 android:layout_height="2dp"
                 android:background="?attr/colorPrimary"
-                android:layout_marginBottom="18dp" />
+                android:layout_marginBottom="16dp" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -123,7 +123,7 @@
                     android:layout_height="wrap_content"
                     android:text="الصلاحية"
                     android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="10sp" />
+                    android:textSize="11sp" />
             </LinearLayout>
         </LinearLayout>
 
@@ -138,7 +138,7 @@
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
+                android:layout_marginBottom="10dp"
                 android:hint="الاسم الكامل *"
                 app:startIconDrawable="@drawable/ic_person_outline"
                 app:startIconTint="?attr/colorPrimary"
@@ -159,9 +159,9 @@
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
+                android:layout_marginBottom="10dp"
                 android:hint="اسم المستخدم *"
-                app:startIconDrawable="@android:drawable/ic_menu_myplaces"
+                app:startIconDrawable="@drawable/ic_person_outline"
                 app:startIconTint="?attr/colorPrimary"
                 style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 app:counterEnabled="true"
@@ -182,8 +182,6 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="4dp"
                 android:hint="كلمة المرور *"
-                app:startIconDrawable="@android:drawable/ic_lock_lock"
-                app:startIconTint="?attr/colorPrimary"
                 style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 app:endIconMode="password_toggle">
 
@@ -249,10 +247,8 @@
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
+                android:layout_marginBottom="10dp"
                 android:hint="رقم الموظف"
-                app:startIconDrawable="@android:drawable/ic_menu_agenda"
-                app:startIconTint="?attr/colorPrimary"
                 style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -270,8 +266,6 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
                 android:hint="القسم"
-                app:startIconDrawable="@android:drawable/ic_menu_sort_by_size"
-                app:startIconTint="?attr/colorPrimary"
                 style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.MaterialAutoCompleteTextView
@@ -310,9 +304,9 @@
                 android:layout_height="wrap_content"
                 android:text="اختر صلاحية المستخدم"
                 android:textColor="?attr/colorOnSurface"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
-                android:layout_marginBottom="14dp" />
+                android:layout_marginBottom="12dp" />
 
             <RadioGroup
                 android:id="@+id/rgRole"
@@ -324,11 +318,10 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
-                    app:cardCornerRadius="12dp"
+                    app:cardCornerRadius="10dp"
                     app:cardElevation="0dp"
                     app:strokeWidth="1dp"
-                    app:strokeColor="?attr/colorOutline"
-                    android:checkable="true">
+                    app:strokeColor="?attr/colorOutline">
 
                     <RadioButton
                         android:id="@+id/rbAdmin"
@@ -337,9 +330,8 @@
                         android:text="👑 مدير النظام"
                         android:textSize="13sp"
                         android:textStyle="bold"
-                        android:padding="14dp"
-                        android:tag="ADMIN"
-                        android:checked="false" />
+                        android:padding="12dp"
+                        android:tag="ADMIN" />
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- 📊 مدير المخزون -->
@@ -347,7 +339,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
-                    app:cardCornerRadius="12dp"
+                    app:cardCornerRadius="10dp"
                     app:cardElevation="0dp"
                     app:strokeWidth="1dp"
                     app:strokeColor="?attr/colorOutline">
@@ -359,7 +351,7 @@
                         android:text="📊 مدير المخزون"
                         android:textSize="13sp"
                         android:textStyle="bold"
-                        android:padding="14dp"
+                        android:padding="12dp"
                         android:tag="INVENTORY_MGR"
                         android:checked="true" />
                 </com.google.android.material.card.MaterialCardView>
@@ -369,7 +361,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
-                    app:cardCornerRadius="12dp"
+                    app:cardCornerRadius="10dp"
                     app:cardElevation="0dp"
                     app:strokeWidth="1dp"
                     app:strokeColor="?attr/colorOutline">
@@ -381,7 +373,7 @@
                         android:text="🛒 موظف مبيعات"
                         android:textSize="13sp"
                         android:textStyle="bold"
-                        android:padding="14dp"
+                        android:padding="12dp"
                         android:tag="POS_OPERATOR" />
                 </com.google.android.material.card.MaterialCardView>
 
@@ -390,7 +382,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
-                    app:cardCornerRadius="12dp"
+                    app:cardCornerRadius="10dp"
                     app:cardElevation="0dp"
                     app:strokeWidth="1dp"
                     app:strokeColor="?attr/colorOutline">
@@ -402,7 +394,7 @@
                         android:text="🔒 أمن"
                         android:textSize="13sp"
                         android:textStyle="bold"
-                        android:padding="14dp"
+                        android:padding="12dp"
                         android:tag="SECURITY" />
                 </com.google.android.material.card.MaterialCardView>
 
@@ -411,7 +403,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
-                    app:cardCornerRadius="12dp"
+                    app:cardCornerRadius="10dp"
                     app:cardElevation="0dp"
                     app:strokeWidth="1dp"
                     app:strokeColor="?attr/colorOutline">
@@ -423,7 +415,7 @@
                         android:text="🚪 أمن البوابات"
                         android:textSize="13sp"
                         android:textStyle="bold"
-                        android:padding="14dp"
+                        android:padding="12dp"
                         android:tag="GATE_SECURITY" />
                 </com.google.android.material.card.MaterialCardView>
 
@@ -431,7 +423,7 @@
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:cardCornerRadius="12dp"
+                    app:cardCornerRadius="10dp"
                     app:cardElevation="0dp"
                     app:strokeWidth="1dp"
                     app:strokeColor="?attr/colorOutline">
@@ -443,7 +435,7 @@
                         android:text="🔍 مدقق"
                         android:textSize="13sp"
                         android:textStyle="bold"
-                        android:padding="14dp"
+                        android:padding="12dp"
                         android:tag="AUDITOR" />
                 </com.google.android.material.card.MaterialCardView>
 
