@@ -18,6 +18,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -28,7 +29,6 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
@@ -131,8 +131,10 @@ public class MiraInventoryFragment extends Fragment {
     // 🟢 بدء جلسة الجرد
     // ============================================
     private void startInventory() {
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        
         btnStartInventory.setEnabled(false);
-        btnStartInventory.setText("● SCANNING...");
+        btnStartInventory.setText(isArabic ? "● جاري الجرد..." : "● SCANNING...");
         btnStopInventory.setEnabled(true);
         btnGenerateReport.setEnabled(false);
 
@@ -144,7 +146,7 @@ public class MiraInventoryFragment extends Fragment {
         simulationIndex = 0;
         adapter.notifyDataSetChanged();
 
-        tvInventoryStatus.setText("● SCANNING");
+        tvInventoryStatus.setText(isArabic ? "● جاري الجرد" : "● SCANNING");
         tvInventoryStatus.setTextColor(Color.parseColor("#38BDF8"));
 
         // 🟢 صوت + اهتزاز البدء
@@ -154,7 +156,7 @@ public class MiraInventoryFragment extends Fragment {
         startTimer();
         startSimulation();
 
-        Toast.makeText(getContext(), "🟢 Inventory Started - " + realGtins.length + " items expected", Toast.LENGTH_SHORT).show();
+        Toast.makeText(getContext(), isArabic ? "🟢 بدأ الجرد - متوقع " + realGtins.length + " قطعة" : "🟢 Inventory Started - " + realGtins.length + " items expected", Toast.LENGTH_SHORT).show();
     }
 
     // ============================================
@@ -162,6 +164,7 @@ public class MiraInventoryFragment extends Fragment {
     // ============================================
     private void stopInventory() {
         isScanning = false;
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
 
         // 🟢 صوت + اهتزاز الاكتمال
         playInventorySound("complete");
@@ -171,11 +174,11 @@ public class MiraInventoryFragment extends Fragment {
         }
 
         btnStartInventory.setEnabled(true);
-        btnStartInventory.setText("▶ START");
+        btnStartInventory.setText(isArabic ? "▶ بدء الجرد" : "▶ START");
         btnStopInventory.setEnabled(false);
         btnGenerateReport.setEnabled(true);
 
-        tvInventoryStatus.setText("● COMPLETED");
+        tvInventoryStatus.setText(isArabic ? "● مكتمل" : "● COMPLETED");
         tvInventoryStatus.setTextColor(Color.parseColor("#22C55E"));
 
         stopTimer();
@@ -185,13 +188,16 @@ public class MiraInventoryFragment extends Fragment {
         if (missingCount < 0) missingCount = 0;
         updateUI();
 
-        Toast.makeText(getContext(), "✅ Complete: " + foundCount + "/" + expectedCount, Toast.LENGTH_LONG).show();
+        Toast.makeText(getContext(), (isArabic ? "✅ اكتمل الجرد: " : "✅ Complete: ") + foundCount + "/" + expectedCount, Toast.LENGTH_LONG).show();
     }
 
     // ============================================
     // ☁️ بدء الجلسة على السيرفر
     // ============================================
     private void startSessionOnServer() {
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        String showroomName = isArabic ? "المعرض الرئيسي" : "Main Showroom";
+
         new Thread(() -> {
             try {
                 URL url = new URL(BASE_URL + "/inventory/start-session");
@@ -203,7 +209,7 @@ public class MiraInventoryFragment extends Fragment {
                 conn.setConnectTimeout(8000);
 
                 JSONObject body = new JSONObject();
-                body.put("location", "Main Showroom");
+                body.put("location", showroomName);
                 body.put("type", "full");
                 conn.getOutputStream().write(body.toString().getBytes("utf-8"));
 
@@ -218,19 +224,24 @@ public class MiraInventoryFragment extends Fragment {
                     sessionId = json.optInt("session_id", 0);
                     expectedCount = json.optInt("expected_count", realGtins.length);
 
-                    getActivity().runOnUiThread(() -> {
-                        tvExpectedCount.setText(String.valueOf(expectedCount));
-                        tvLocation.setText("Main Showroom");
-                        updateUI();
-                    });
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            tvExpectedCount.setText(String.valueOf(expectedCount));
+                            tvLocation.setText(showroomName);
+                            updateUI();
+                        });
+                    }
                 }
             } catch (Exception e) {
                 sessionId = (int) (System.currentTimeMillis() / 1000);
                 expectedCount = realGtins.length;
-                getActivity().runOnUiThread(() -> {
-                    tvExpectedCount.setText(String.valueOf(expectedCount));
-                    updateUI();
-                });
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        tvExpectedCount.setText(String.valueOf(expectedCount));
+                        tvLocation.setText(showroomName);
+                        updateUI();
+                    });
+                }
             }
         }).start();
     }
@@ -239,6 +250,8 @@ public class MiraInventoryFragment extends Fragment {
     // ☁️ إغلاق الجلسة على السيرفر
     // ============================================
     private void closeSessionOnServer() {
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+
         new Thread(() -> {
             try {
                 URL url = new URL(BASE_URL + "/inventory/close-session");
@@ -264,14 +277,18 @@ public class MiraInventoryFragment extends Fragment {
                     JSONObject report = json.optJSONObject("report");
                     if (report != null) {
                         double acc = report.optDouble("accuracy", 0);
-                        getActivity().runOnUiThread(() -> {
-                            tvAccuracy.setText("Accuracy: " + acc + "%");
-                            updateUI();
-                        });
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                tvAccuracy.setText((isArabic ? "الدقة: " : "Accuracy: ") + String.format(Locale.US, "%.1f%%", acc));
+                                updateUI();
+                            });
+                        }
                     }
                 }
             } catch (Exception e) {
-                getActivity().runOnUiThread(() -> updateUI());
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> updateUI());
+                }
             }
         }).start();
     }
@@ -299,105 +316,111 @@ public class MiraInventoryFragment extends Fragment {
     }
 
     private void queryMiraForInventory(String gtin) {
-    new Thread(() -> {
-        String title = gtin;
-        String karat = "-";
-        String weight = "-";
-        String location = "Main Showroom";
-        String status = "✗";
-        boolean found = false;
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        String defaultLocation = isArabic ? "المعرض الرئيسي" : "Main Showroom";
 
-        try {
-            URL url = new URL(BASE_URL + "/authorize");
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(5000);
+        new Thread(() -> {
+            String title = gtin;
+            String karat = "-";
+            String weight = "-";
+            String location = defaultLocation;
+            String status = "✗";
+            boolean found = false;
 
-            JSONObject body = new JSONObject();
-            body.put("epc", gtin);
-            body.put("gate_id", "handheld_c72");
-            body.put("rssi", "-" + (40 + (int)(Math.random() * 30)));
-            conn.getOutputStream().write(body.toString().getBytes("utf-8"));
+            try {
+                URL url = new URL(BASE_URL + "/authorize");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setRequestProperty("X-MIRA-API-Key", API_KEY);
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(5000);
 
-            if (conn.getResponseCode() == 200) {
-                BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                StringBuilder sb = new StringBuilder();
-                String l;
-                while ((l = in.readLine()) != null) sb.append(l);
-                in.close();
+                JSONObject body = new JSONObject();
+                body.put("epc", gtin);
+                body.put("gate_id", "handheld_c72");
+                body.put("rssi", "-" + (40 + (int)(Math.random() * 30)));
+                conn.getOutputStream().write(body.toString().getBytes("utf-8"));
 
-                JSONObject json = new JSONObject(sb.toString());
-                JSONObject item = json.optJSONObject("item");
+                if (conn.getResponseCode() == 200) {
+                    BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                    StringBuilder sb = new StringBuilder();
+                    String l;
+                    while ((l = in.readLine()) != null) sb.append(l);
+                    in.close();
 
-                if (item != null) {
-                    title = item.optString("title", gtin);
-                    karat = item.optString("karat", "-");
-                    double w = item.optDouble("weight", 0);
-                    weight = w > 0 ? String.format(Locale.US, "%.1fg", w) : "-";
-                    location = item.optString("location", "Main Showroom");
+                    JSONObject json = new JSONObject(sb.toString());
+                    JSONObject item = json.optJSONObject("item");
 
-                    String vaultStatus = item.optString("status", "");
-                    if (vaultStatus.equals("in_stock") || vaultStatus.equals("available") ||
-                        vaultStatus.equals("sold") || vaultStatus.equals("display") ||
-                        vaultStatus.equals("reserved")) {
-                        status = "✓";
-                        found = true;
-                    } else if (vaultStatus.equals("deleted")) {
-                        status = "✗";
-                        found = false;
-                    } else {
-                        status = "✓";
-                        found = true;
+                    if (item != null) {
+                        title = item.optString("title", gtin);
+                        karat = item.optString("karat", "-");
+                        double w = item.optDouble("weight", 0);
+                        weight = w > 0 ? String.format(Locale.US, "%.1fg", w) : "-";
+                        location = item.optString("location", defaultLocation);
+
+                        String vaultStatus = item.optString("status", "");
+                        if (vaultStatus.equals("in_stock") || vaultStatus.equals("available") ||
+                            vaultStatus.equals("sold") || vaultStatus.equals("display") ||
+                            vaultStatus.equals("reserved")) {
+                            status = "✓";
+                            found = true;
+                        } else if (vaultStatus.equals("deleted")) {
+                            status = "✗";
+                            found = false;
+                        } else {
+                            status = "✓";
+                            found = true;
+                        }
                     }
                 }
-            }
-        } catch (Exception e) {
-            title = "Error";
-            status = "✗";
-            found = false;
-        }
-
-        String finalTitle = title;
-        String finalKarat = karat;
-        String finalWeight = weight;
-        String finalLocation = location;
-        String finalStatus = status;
-        boolean finalFound = found;
-
-        getActivity().runOnUiThread(() -> {
-            scannedItems.add(0, new InventoryItem(gtin, finalTitle, finalKarat, finalWeight, finalStatus, finalLocation));
-
-            if ("✓".equals(finalStatus)) {
-                playInventorySound("scan");
-            } else {
-                playInventorySound("alert");
+            } catch (Exception e) {
+                title = isArabic ? "خطأ" : "Error";
+                status = "✗";
+                found = false;
             }
 
-            scannedCount++;
-            if (finalFound) foundCount++;
-            adapter.notifyItemInserted(0);
-            rvInventoryItems.scrollToPosition(0);
+            String finalTitle = title;
+            String finalKarat = karat;
+            String finalWeight = weight;
+            String finalLocation = location;
+            String finalStatus = status;
+            boolean finalFound = found;
 
-            tvLastScan.setText(gtin);
-            tvRssi.setText("-" + (40 + (int)(Math.random() * 30)) + " dBm");
-            tvScannedCount.setText(String.valueOf(scannedCount));
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    scannedItems.add(0, new InventoryItem(gtin, finalTitle, finalKarat, finalWeight, finalStatus, finalLocation));
 
-            double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 0;
-            tvAccuracy.setText("Accuracy: " + String.format(Locale.US, "%.1f%%", acc));
+                    if ("✓".equals(finalStatus)) {
+                        playInventorySound("scan");
+                    } else {
+                        playInventorySound("alert");
+                    }
 
-            if (rvInventoryItems.getWidth() > 0) {
-                int pct = expectedCount > 0 ? (scannedCount * 100) / expectedCount : 0;
-                progressScanned.getLayoutParams().width = Math.max(1, (pct * rvInventoryItems.getWidth()) / 100);
-                progressScanned.requestLayout();
+                    scannedCount++;
+                    if (finalFound) foundCount++;
+                    adapter.notifyItemInserted(0);
+                    rvInventoryItems.scrollToPosition(0);
+
+                    tvLastScan.setText(gtin);
+                    tvRssi.setText("-" + (40 + (int)(Math.random() * 30)) + " dBm");
+                    tvScannedCount.setText(String.valueOf(scannedCount));
+
+                    double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 0;
+                    tvAccuracy.setText((isArabic ? "الدقة: " : "Accuracy: ") + String.format(Locale.US, "%.1f%%", acc));
+
+                    if (rvInventoryItems.getWidth() > 0) {
+                        int pct = expectedCount > 0 ? (scannedCount * 100) / expectedCount : 0;
+                        progressScanned.getLayoutParams().width = Math.max(1, (pct * rvInventoryItems.getWidth()) / 100);
+                        progressScanned.requestLayout();
+                    }
+                });
             }
-        });
 
-        recordScanOnServer(gtin, finalStatus);
-    }).start();
-}
+            recordScanOnServer(gtin, finalStatus);
+        }).start();
+    }
+
     private void recordScanOnServer(String code, String status) {
         new Thread(() -> {
             try {
@@ -423,7 +446,10 @@ public class MiraInventoryFragment extends Fragment {
     // 📋 تقرير قابل للطباعة
     // ============================================
     private void generatePrintableReport() {
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         String reportHtml = buildReportHtml();
+
+        if (getContext() == null) return;
 
         WebView webView = new WebView(getContext());
         webView.getSettings().setJavaScriptEnabled(true);
@@ -432,16 +458,20 @@ public class MiraInventoryFragment extends Fragment {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
+                if (getContext() == null) return;
                 PrintManager printManager = (PrintManager) getContext().getSystemService(getContext().PRINT_SERVICE);
-                PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter("MIRA_Inventory_Report");
-                printManager.print("MIRA Inventory Report", printAdapter, new PrintAttributes.Builder().build());
+                if (printManager != null) {
+                    PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter("MIRA_Inventory_Report");
+                    printManager.print("MIRA Inventory Report", printAdapter, new PrintAttributes.Builder().build());
+                }
             }
         });
 
-        Toast.makeText(getContext(), "🖨️ Opening print dialog...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(getContext(), isArabic ? "🖨️ جاري فتح نافذة الطباعة..." : "🖨️ Opening print dialog...", Toast.LENGTH_SHORT).show();
     }
 
     private String buildReportHtml() {
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         StringBuilder rows = new StringBuilder();
         int count = 1;
 
@@ -454,23 +484,41 @@ public class MiraInventoryFragment extends Fragment {
                 "<tr>" +
                 "<td style='text-align:center;'>%d</td>" +
                 "<td style='text-align:center;color:%s;font-size:18px;'>%s</td>" +
-                "<td style='direction:rtl;text-align:right;'>%s</td>" +
-                "<td style='direction:rtl;text-align:right;'>%s</td>" +
+                "<td style='direction:%s;text-align:%s;'>%s</td>" +
+                "<td style='direction:%s;text-align:%s;'>%s</td>" +
                 "<td style='text-align:center;'>%s</td>" +
                 "<td style='text-align:center;'>%s</td>" +
                 "</tr>",
-                count++, color, icon, item.serial, item.title, item.karat, item.weight
+                count++, color, icon, 
+                isArabic ? "rtl" : "ltr", isArabic ? "right" : "left", item.serial,
+                isArabic ? "rtl" : "ltr", isArabic ? "right" : "left", item.title,
+                item.karat, item.weight
             ));
         }
 
         double accuracyVal = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 0;
         String accuracyColor = accuracyVal >= 98 ? "#22C55E" : accuracyVal >= 90 ? "#F59E0B" : "#EF4444";
 
-        return "<!DOCTYPE html><html dir='rtl'><head><meta charset='UTF-8'>" +
+        String dir = isArabic ? "rtl" : "ltr";
+        String reportTitle = isArabic ? "📊 تقرير الجرد" : "📊 Inventory Report";
+        String showroomText = isArabic ? "📍 الموقع: المعرض الرئيسي - صنعاء" : "📍 Location: Main Showroom - Sana'a";
+        String expectedLbl = isArabic ? "العدد المتوقع" : "Expected Count";
+        String foundLbl = isArabic ? "✅ تم العثور" : "✅ Found";
+        String missingLbl = isArabic ? "❌ مفقود" : "❌ Missing";
+        String accuracyLbl = isArabic ? "📊 الدقة" : "📊 Accuracy";
+        String colHash = "#";
+        String colStatus = isArabic ? "الحالة" : "Status";
+        String colCode = isArabic ? "الرمز" : "Code";
+        String colItem = isArabic ? "القطعة" : "Item";
+        String colKarat = isArabic ? "العيار" : "Karat";
+        String colWeight = isArabic ? "الوزن" : "Weight";
+        String durationText = isArabic ? "المدة: " : "Duration: ";
+
+        return "<!DOCTYPE html><html dir='" + dir + "'><head><meta charset='UTF-8'>" +
             "<meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
             "<style>" +
             "@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');" +
-            "body{font-family:'Cairo',sans-serif;color:#1a1a1a;padding:20px;direction:rtl;background:#fff}" +
+            "body{font-family:'Cairo',sans-serif;color:#1a1a1a;padding:20px;direction:" + dir + ";background:#fff}" +
             ".header{text-align:center;border-bottom:3px solid #1A237E;padding-bottom:15px;margin-bottom:20px}" +
             ".header h1{color:#1A237E;font-size:24px;margin:0}" +
             ".header .sub{color:#666;font-size:13px;margin-top:5px}" +
@@ -489,25 +537,25 @@ public class MiraInventoryFragment extends Fragment {
             "</style></head><body>" +
             "<div class='logo'>🏷️ MIRA BRIDGE™</div>" +
             "<div class='header'>" +
-            "<h1>📊 تقرير الجرد</h1>" +
-            "<div class='sub'>" + new SimpleDateFormat("yyyy-MM-dd  |  HH:mm:ss", new Locale("ar")).format(new Date()) + "</div>" +
-            "<div class='sub'>📍 الموقع: المعرض الرئيسي - صنعاء</div>" +
+            "<h1>" + reportTitle + "</h1>" +
+            "<div class='sub'>" + new SimpleDateFormat("yyyy-MM-dd  |  HH:mm:ss", new Locale(isArabic ? "ar" : "en")).format(new Date()) + "</div>" +
+            "<div class='sub'>" + showroomText + "</div>" +
             "</div>" +
             "<div class='summary'>" +
-            "<div class='summary-card'><div class='val'>" + expectedCount + "</div><div class='lbl'>العدد المتوقع</div></div>" +
-            "<div class='summary-card found'><div class='val'>" + foundCount + "</div><div class='lbl'>✅ تم العثور</div></div>" +
-            "<div class='summary-card missing'><div class='val'>" + missingCount + "</div><div class='lbl'>❌ مفقود</div></div>" +
-            "<div class='summary-card accuracy'><div class='val'>" + String.format(Locale.US, "%.1f%%", accuracyVal) + "</div><div class='lbl'>📊 الدقة</div></div>" +
+            "<div class='summary-card'><div class='val'>" + expectedCount + "</div><div class='lbl'>" + expectedLbl + "</div></div>" +
+            "<div class='summary-card found'><div class='val'>" + foundCount + "</div><div class='lbl'>" + foundLbl + "</div></div>" +
+            "<div class='summary-card missing'><div class='val'>" + missingCount + "</div><div class='lbl'>" + missingLbl + "</div></div>" +
+            "<div class='summary-card accuracy'><div class='val'>" + String.format(Locale.US, "%.1f%%", accuracyVal) + "</div><div class='lbl'>" + accuracyLbl + "</div></div>" +
             "</div>" +
             "<table>" +
-            "<tr><th>#</th><th>الحالة</th><th>الرمز</th><th>القطعة</th><th>العيار</th><th>الوزن</th></tr>" +
+            "<tr><th>" + colHash + "</th><th>" + colStatus + "</th><th>" + colCode + "</th><th>" + colItem + "</th><th>" + colKarat + "</th><th>" + colWeight + "</th></tr>" +
             rows.toString() +
             "</table>" +
             "<div class='footer'>" +
             "<strong>MIRA Technology © 2026</strong><br>" +
             "mira-id.com | ams.ibreg.org<br>" +
-            "تم الإنشاء بواسطة MIRA Bridge™<br>" +
-            "المدة: " + tvElapsedTime.getText() +
+            (isArabic ? "تم الإنشاء بواسطة MIRA Bridge™<br>" : "Generated by MIRA Bridge™<br>") +
+            durationText + tvElapsedTime.getText() +
             "</div>" +
             "</body></html>";
     }
@@ -591,6 +639,7 @@ public class MiraInventoryFragment extends Fragment {
     // 🟢 تحميل إعدادات الجرد
     // ============================================
     private void loadInventorySettings() {
+        if (getContext() == null) return;
         android.content.SharedPreferences prefs = getContext().getSharedPreferences("MIRA_BRIDGE_SETTINGS", android.content.Context.MODE_PRIVATE);
         soundEnabled = "true".equals(prefs.getString("inventory_sound", "true"));
         vibrateEnabled = "true".equals(prefs.getString("inventory_vibrate", "true"));
@@ -602,64 +651,64 @@ public class MiraInventoryFragment extends Fragment {
     // 🔊 تشغيل صوت
     // ============================================
     private void playInventorySound(String type) {
-    if (!soundEnabled) return;
+        if (!soundEnabled) return;
 
-    try {
-        if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
-            com.example.uhf.activity.UHFMainActivity activity =
-                (com.example.uhf.activity.UHFMainActivity) getActivity();
-            
-            if (activity == null) return;  // 🟢 حماية
-
-            switch (type) {
-                case "start":
-                    safePlaySound(activity, 1);
-                    break;
-                case "scan":
-                    safePlaySound(activity, 1);
-                    break;
-                case "complete":
-                    safePlaySound(activity, 1);
-                    safePlaySound(activity, 1);
-                    break;
-                case "alert":
-                    safePlaySound(activity, 2);
-                    break;
-            }
-        }
-    } catch (Exception e) {
-        // تجاهل أي خطأ
-    }
-
-    // 🟢 اهتزاز
-    if (vibrateEnabled && getContext() != null) {
         try {
-            android.os.Vibrator vibrator = (android.os.Vibrator) getContext().getSystemService(android.content.Context.VIBRATOR_SERVICE);
-            if (vibrator != null && vibrator.hasVibrator()) {
+            if (getActivity() instanceof com.example.uhf.activity.UHFMainActivity) {
+                com.example.uhf.activity.UHFMainActivity activity =
+                    (com.example.uhf.activity.UHFMainActivity) getActivity();
+                
+                if (activity == null) return;
+
                 switch (type) {
                     case "start":
-                        vibrator.vibrate(200);
-                        break;
-                    case "complete":
-                        vibrator.vibrate(new long[]{0, 100, 100, 100, 100, 300}, -1);
+                        safePlaySound(activity, 1);
                         break;
                     case "scan":
-                        vibrator.vibrate(50);
+                        safePlaySound(activity, 1);
+                        break;
+                    case "complete":
+                        safePlaySound(activity, 1);
+                        safePlaySound(activity, 1);
+                        break;
+                    case "alert":
+                        safePlaySound(activity, 2);
                         break;
                 }
             }
         } catch (Exception e) {
-            // تجاهل
+            // تجاهل أي خطأ
+        }
+
+        // 🟢 اهتزاز
+        if (vibrateEnabled && getContext() != null) {
+            try {
+                android.os.Vibrator vibrator = (android.os.Vibrator) getContext().getSystemService(android.content.Context.VIBRATOR_SERVICE);
+                if (vibrator != null && vibrator.hasVibrator()) {
+                    switch (type) {
+                        case "start":
+                            vibrator.vibrate(200);
+                            break;
+                        case "complete":
+                            vibrator.vibrate(new long[]{0, 100, 100, 100, 100, 300}, -1);
+                            break;
+                        case "scan":
+                            vibrator.vibrate(50);
+                            break;
+                    }
+                }
+            } catch (Exception e) {
+                // تجاهل
+            }
         }
     }
-}
 
-// 🟢 دالة آمنة لتشغيل الصوت
-private void safePlaySound(com.example.uhf.activity.UHFMainActivity activity, int soundId) {
-    try {
-        activity.playSound(soundId);
-    } catch (Exception e) {
-        // الصوت غير متوفر - تجاهل
+    // 🟢 دالة آمنة لتشغيل الصوت
+    private void safePlaySound(com.example.uhf.activity.UHFMainActivity activity, int soundId) {
+        try {
+            activity.playSound(soundId);
+        } catch (Exception e) {
+            // الصوت غير متوفر - تجاهل
+        }
     }
-}
 }
