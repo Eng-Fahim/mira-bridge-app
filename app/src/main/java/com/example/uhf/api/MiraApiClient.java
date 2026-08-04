@@ -123,7 +123,16 @@ public class MiraApiClient {
         }
         return post("/auth/verify-biometric", payload);
     }
+// ===================== 🏢 ORGANIZATION PROFILE =====================
 
+public ApiResponse saveOrgProfile(JSONObject payload) {
+    return postWithAuth("/org-profile/save", payload);
+}
+
+public ApiResponse getOrgProfile() {
+    return get("/org-profile/get");
+}
+    
     // ===================== 👥 USERS MANAGEMENT =====================
 
     public ApiResponse getUsers() {
