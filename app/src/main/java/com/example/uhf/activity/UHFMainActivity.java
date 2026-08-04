@@ -136,29 +136,22 @@ protected void onCreate(Bundle savedInstanceState) {
             }
         }
     }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (mTabHost != null) {
-            Fragment fragment = getSupportFragmentManager().findFragmentByTag(mTabHost.getCurrentTabTag());
-            if (fragment != null) fragment.onActivityResult(requestCode, resultCode, data);
-        }
-        if (currentFragment instanceof UHFReadTagFragment) {
-            currentFragment.onActivityResult(requestCode, resultCode, data);
-        }
-    }
+    
     // ============================================
-    // ✅ إعادة ترتيب التبويبات وجعل الداشبورد (Dashboard) هي الأولى
+    // ✅ توحيد التبويبات وتوجيهها من اليمين لليسار (RTL)
     // ============================================
     protected void initViewPageData() {
         fm = getSupportFragmentManager();
         mTabHost = findViewById(android.R.id.tabhost);
         mTabHost.setup(this, fm, R.id.realtabcontent);
 
+        // فرض الاتجاه من اليمين لليسار لدعم اللغة العربية بشكل كامل
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            mTabHost.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_RTL);
+        }
+
         SessionManager.Role role = sessionManager.getUserRole();
 
-        // متغيرات مساعدة للصلاحيات
         boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
         boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
         boolean isAnyAdmin = isSystemAdmin || isOrgAdmin;
@@ -167,117 +160,97 @@ protected void onCreate(Bundle savedInstanceState) {
         boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
 
         // ============================================
-        // 🏠 1. Dashboard: متاح للجميع (أول تبويب رئيسي يفتح تلقائياً)
+        // 🏠 1. لوحة التحكم الرئيسية (Dashboard)
         // ============================================
         mTabHost.addTab(
-            mTabHost.newTabSpec("Dashboard").setIndicator("🏠"),
+            mTabHost.newTabSpec("Dashboard").setIndicator("🏠 الرئيسية"),
             MiraDashboardFragment.class, null
         );
 
         // ============================================
-        // 💎 2. لوحة المجوهرات والـ POS: كل المدراء + موظفي المبيعات
+        // 💎 2. لوحة المجوهرات، ونقطة البيع، والسجل
         // ============================================
         if (isAnyAdmin || isPosOperator) {
             mTabHost.addTab(
-                mTabHost.newTabSpec("JewelryDashboard").setIndicator("💎"),
+                mTabHost.newTabSpec("JewelryDashboard").setIndicator("💎 المجوهرات"),
                 JewelryDashboardFragment.class, null
             );
             mTabHost.addTab(
-                mTabHost.newTabSpec("POS Mode").setIndicator("🛒"),
+                mTabHost.newTabSpec("POS Mode").setIndicator("🛒 نقطة البيع"),
                 MiraPosFragment.class, null
             );
             mTabHost.addTab(
-                mTabHost.newTabSpec("SalesHistory").setIndicator("📜"),
+                mTabHost.newTabSpec("SalesHistory").setIndicator("📜 المبيعات"),
                 MiraSalesHistoryFragment.class, null
             );
         }
-                
-
 
         // ============================================
-        // 📷 3. شاشة القراءة والمسح السريع: متاحة للجميع
+        // 📷 3. شاشة القراءة والمسح السريع
         // ============================================
-        mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_scan))
-            .setIndicator(getString(R.string.uhf_msg_tab_scan)),
-            UHFReadTagFragment.class, null);
+        mTabHost.addTab(
+            mTabHost.newTabSpec("Scan").setIndicator("📷 المسح"),
+            UHFReadTagFragment.class, null
+        );
 
         // ============================================
-        // 🆔 4. استوديو التكويد والجرد: كل المدراء + مدير المخزون
+        // 🆔 4. استوديو التكويد، المخزون والرادار
         // ============================================
         if (isAnyAdmin || isInventoryMgr) {
             mTabHost.addTab(
-                mTabHost.newTabSpec("IdentityStudio").setIndicator("🆔"),
+                mTabHost.newTabSpec("IdentityStudio").setIndicator("🆔 التكويد"),
                 MiraIdentityStudioFragment.class, null
             );
             mTabHost.addTab(
-                mTabHost.newTabSpec("Inventory Pro").setIndicator("📊"),
+                mTabHost.newTabSpec("Inventory Pro").setIndicator("📊 المخزون"),
                 MiraInventoryProFragment.class, null
             );
-            mTabHost.addTab(mTabHost.newTabSpec(getResources().getString(R.string.uhf_radar_loaction))
-                .setIndicator(getResources().getString(R.string.uhf_radar_loaction)),
-                UHFRadarLocationFragment.class, null);
+            mTabHost.addTab(
+                mTabHost.newTabSpec("RadarLocation").setIndicator("🎯 الرادار"),
+                UHFRadarLocationFragment.class, null
+            );
         }
 
         // ============================================
-        // 🚪 5. البوابات الأمنية: كل المدراء + أمن البوابات
+        // 🚪 5. البوابات الأمنية
         // ============================================
         if (isAnyAdmin || isGateSecurity) {
             mTabHost.addTab(
-                mTabHost.newTabSpec("MIRA Secure Gate").setIndicator("🚪"),
+                mTabHost.newTabSpec("SecureGate").setIndicator("🚪 البوابات"),
                 MiraSecureGateFragment.class, null
             );
         }
 
         // ============================================
-        // 👥 6. إدارة المستخدمين: SYSTEM_ADMIN + ORG_ADMIN
+        // 👥 6. إدارة المستخدمين
         // ============================================
         if (isAnyAdmin) {
             mTabHost.addTab(
-                mTabHost.newTabSpec("UsersManagement").setIndicator("👥"),
+                mTabHost.newTabSpec("UsersManagement").setIndicator("👥 المستخدمين"),
                 UsersManagementFragment.class, null
             );
         }
 
         // ============================================
-        // ⚙️ 7. التبويبات المتقدمة والهندسية: SYSTEM_ADMIN فقط
+        // ⚙️ 7. التبويبات المتقدمة والهندسية (System Admin فقط)
         // ============================================
         if (isSystemAdmin) {
-            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_set))
-                .setIndicator(getString(R.string.uhf_msg_tab_set)),
-                UHFSetFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.location))
-                .setIndicator(getString(R.string.location)),
-                UHFLocationFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.title_tag_lit))
-                .setIndicator(getString(R.string.title_tag_lit)),
-                UHFTagLitFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.title_tag_flash))
-                .setIndicator(getString(R.string.title_tag_flash)),
-                UHFTagFlashFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_read_write))
-                .setIndicator(getString(R.string.uhf_msg_tab_read_write)),
-                UHFReadWriteFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_lock))
-                .setIndicator(getString(R.string.uhf_msg_tab_lock)),
-                UHFLockFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.uhf_msg_tab_kill))
-                .setIndicator(getString(R.string.uhf_msg_tab_kill)),
-                UHFKillFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("Protected-ShortRange").setIndicator("P-SR"),
-                ProtectedModeAndShortRangeModeFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("MarginRead").setIndicator("MR"),
-                MarginReadFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("NxpUcodeDna").setIndicator("DNA"),
-                AuthenticateNxpUcodeDnaFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("BlockWrite").setIndicator("BW"),
-                BlockWriteFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("BlockPermalock").setIndicator("BP"),
-                BlockPermalockFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec(getString(R.string.action_rfid_upgrader))
-                .setIndicator(getString(R.string.action_rfid_upgrader)),
-                UHFUpgradeFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("Settings").setIndicator("⚙️ الإعدادات"), UHFSetFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("Location").setIndicator("📍 المواقع"), UHFLocationFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("TagLit").setIndicator("💡 إضاءة"), UHFTagLitFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("TagFlash").setIndicator("⚡ فلاش"), UHFTagFlashFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("ReadWrite").setIndicator("📝 كتابة"), UHFReadWriteFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("Lock").setIndicator("🔒 قفل"), UHFLockFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("Kill").setIndicator("🛑 إلغاء"), UHFKillFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("Protected-ShortRange").setIndicator("🛡️ آمن"), ProtectedModeAndShortRangeModeFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("MarginRead").setIndicator("📊 الهامش"), MarginReadFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("NxpUcodeDna").setIndicator("🧬 بصمة DNA"), AuthenticateNxpUcodeDnaFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("BlockWrite").setIndicator("📦 بلوك"), BlockWriteFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("BlockPermalock").setIndicator("🔐 قفل دائم"), BlockPermalockFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("Upgrade").setIndicator("⬆️ ترقية"), UHFUpgradeFragment.class, null);
         }
     }
+
 
     // ============================================
     // ✅ تصفية التبويبات حسب الصلاحيات الجديدة
