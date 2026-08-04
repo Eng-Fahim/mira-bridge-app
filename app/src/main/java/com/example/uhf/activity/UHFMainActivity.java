@@ -1,4 +1,4 @@
-cpackage com.example.uhf.activity;
+package com.example.uhf.activity;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import android.Manifest;
 import android.content.Intent;
