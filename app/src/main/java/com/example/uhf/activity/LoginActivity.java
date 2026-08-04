@@ -1,18 +1,20 @@
 package com.example.uhf.activity;
-import android.util.Log;
+
 import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.View;
 import android.view.animation.AccelerateDecelerateInterpolator;
+import android.view.animation.AnimationUtils;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
@@ -33,7 +35,6 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.android.material.textview.MaterialTextView;
 
-import java.io.File;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
@@ -46,7 +47,7 @@ public class LoginActivity extends AppCompatActivity {
     private ImageView ivAppLogo;
     private MaterialCardView serverConfigCard;
     private ProgressBar pbLoading;
-    private View loadingContainer, loginCard;
+    private View loadingContainer, loginCard, logoContainer;
     
     private SessionManager sessionManager;
     private MiraApiClient apiClient;
@@ -101,6 +102,7 @@ public class LoginActivity extends AppCompatActivity {
         pbLoading = findViewById(R.id.pbLoading);
         loadingContainer = findViewById(R.id.loadingContainer);
         loginCard = findViewById(R.id.loginCard);
+        logoContainer = findViewById(R.id.logoContainer);
 
         String savedUrl = sessionManager.getServerUrl();
         if (savedUrl != null && !savedUrl.isEmpty()) {
@@ -133,42 +135,40 @@ public class LoginActivity extends AppCompatActivity {
         }
         
         // تطبيق بروفايل وشعار الجهة المحفوظ ديناميكياً
-        
         applyOrgProfile();
         loadOrgProfileFromCloud();
     }
 
-/**
- * ☁️ جلب بيانات الجهة من السحابة وتحديث المحلية
- */
-private void loadOrgProfileFromCloud() {
-    bgExecutor.execute(() -> {
-        try {
-            MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
-            
-            if (response != null && response.isSuccess && response.data != null) {
-                String orgName = response.data.optString("org_name", "");
+    /**
+     * ☁️ جلب بيانات الجهة من السحابة وتحديث المحلية
+     */
+    private void loadOrgProfileFromCloud() {
+        bgExecutor.execute(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
                 
-                if (!orgName.isEmpty()) {
-                    // حفظ محلياً للتحديث
-                    getSharedPreferences("MIRA_ORG_PROFILE", Context.MODE_PRIVATE)
-                        .edit()
-                        .putString("org_name", orgName)
-                        .putString("org_slogan", response.data.optString("org_slogan", ""))
-                        .putString("org_phone", response.data.optString("org_phone", ""))
-                        .putString("org_email", response.data.optString("org_email", ""))
-                        .putString("org_address", response.data.optString("org_address", ""))
-                        .putString("org_website", response.data.optString("org_website", ""))
-                        .apply();
+                if (response != null && response.isSuccess && response.data != null) {
+                    String orgName = response.data.optString("org_name", "");
                     
-                    mainHandler.post(() -> applyOrgProfile());
+                    if (!orgName.isEmpty()) {
+                        getSharedPreferences("MIRA_ORG_PROFILE", Context.MODE_PRIVATE)
+                            .edit()
+                            .putString("org_name", orgName)
+                            .putString("org_slogan", response.data.optString("org_slogan", ""))
+                            .putString("org_phone", response.data.optString("org_phone", ""))
+                            .putString("org_email", response.data.optString("org_email", ""))
+                            .putString("org_address", response.data.optString("org_address", ""))
+                            .putString("org_website", response.data.optString("org_website", ""))
+                            .apply();
+                        
+                        mainHandler.post(this::applyOrgProfile);
+                    }
                 }
+            } catch (Exception e) {
+                Log.e("LoginActivity", "Cloud org load error: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.e("LoginActivity", "Cloud org load error: " + e.getMessage());
-        }
-    });
-}
+        });
+    }
     
     /**
      * 🌐 تحديث نصوص الواجهة واتجاهها بناءً على اللغة المختارة
@@ -178,7 +178,7 @@ private void loadOrgProfileFromCloud() {
             getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
             if (tvSignInTitle != null) tvSignInTitle.setText("تسجيل الدخول");
             if (tvSignInSubtitle != null) tvSignInSubtitle.setText("أدخل بيانات الاعتماد الخاصة بك للمتابعة");
-            if (tilUsername != null) tilUsername.setHint("اسم المستخدم / البريد الإلكتروني");
+            if (tilUsername != null) tilUsername.setHint("اسم المستخدم");
             if (tilPassword != null) tilPassword.setHint("كلمة المرور");
             if (btnLogin != null && (pbLoading == null || !pbLoading.isShown())) btnLogin.setText("دخول النظام");
             if (tvServerSettings != null) tvServerSettings.setText("🔧 إعدادات الخادم والاتصال (Server Settings)");
@@ -186,57 +186,48 @@ private void loadOrgProfileFromCloud() {
             getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
             if (tvSignInTitle != null) tvSignInTitle.setText("Sign In");
             if (tvSignInSubtitle != null) tvSignInSubtitle.setText("Enter your credentials to continue");
-            if (tilUsername != null) tilUsername.setHint("Username / Email");
+            if (tilUsername != null) tilUsername.setHint("Username");
             if (tilPassword != null) tilPassword.setHint("Password");
             if (btnLogin != null && (pbLoading == null || !pbLoading.isShown())) btnLogin.setText("Sign In");
             if (tvServerSettings != null) tvServerSettings.setText("🔧 Server Configuration");
         }
         
-        // إعادة تطبيق الهوية لترجمة الوصف حسب اللغة إن أمكن
         applyOrgProfile();
     }
 
     /**
      * 🏢 تطبيق بيانات وشعار الجهة المحفوظة ديناميكياً على الواجهة
      */
-    /**
- * 🏢 تطبيق بيانات وشعار الجهة المحفوظة ديناميكياً على الواجهة
- */
-private void applyOrgProfile() {
-    MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
-    
-    String orgName = orgProfile.getOrgName();
-    String orgSlogan = orgProfile.getOrgSlogan();
+    private void applyOrgProfile() {
+        MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
+        
+        String orgName = orgProfile.getOrgName();
+        String orgSlogan = orgProfile.getOrgSlogan();
 
-    // 1. اسم الماركة/الجهة في العنوان الرئيسي
-    if (tvBrandName != null && orgName != null && !orgName.isEmpty()) {
-        tvBrandName.setText(orgName);
-    }
+        if (tvBrandName != null && orgName != null && !orgName.isEmpty()) {
+            tvBrandName.setText(orgName);
+        }
 
-    // 2. تحديث العنوان الفرعي
-    if (tvBrandSubtitle != null) {
-        if (orgName != null && !orgName.isEmpty() && !orgName.equals("MIRA Jewelry")) {
-            tvBrandSubtitle.setText(orgName + " Enterprise");
-        } else {
-            tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
+        if (tvBrandSubtitle != null) {
+            if (orgName != null && !orgName.isEmpty() && !orgName.equals("MIRA Jewelry")) {
+                tvBrandSubtitle.setText(orgName + " Enterprise");
+            } else {
+                tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
+            }
+        }
+        
+        if (tvBrandDescription != null) {
+            if (orgSlogan != null && !orgSlogan.isEmpty() && !orgSlogan.equals("Jewelry Enterprise Platform")) {
+                tvBrandDescription.setText(orgSlogan);
+            } else {
+                tvBrandDescription.setText(isArabic ? "منظومة التتبع والمصادقة المعتمدة للمجوهرات" : "Enterprise Jewelry Traceability & Authentication");
+            }
+        }
+
+        if (ivAppLogo != null) {
+            ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
         }
     }
-    
-    // 3. تحديث الوصف بشعار الجهة
-    if (tvBrandDescription != null) {
-        if (orgSlogan != null && !orgSlogan.isEmpty() && !orgSlogan.equals("Jewelry Enterprise Platform")) {
-            tvBrandDescription.setText(orgSlogan);
-        } else {
-            tvBrandDescription.setText(isArabic ? "منظومة التتبع والمصادقة المعتمدة للمجوهرات" : "Enterprise Jewelry Traceability & Authentication");
-        }
-    }
-
-    // 4. عرض الشعار الفخم المعتمد برمجياً
-    if (ivAppLogo != null) {
-        ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
-    }
-}
-
 
     /**
      * 🔧 إظهار/إخفاء إعدادات الخادم (للمسؤولين فقط)
@@ -258,7 +249,6 @@ private void applyOrgProfile() {
             });
         }
 
-        // الضغط المطول على البطاقة يظهر الإعدادات أيضاً
         if (loginCard != null) {
             loginCard.setOnLongClickListener(v -> {
                 if (tvServerSettings != null) {
@@ -280,6 +270,11 @@ private void applyOrgProfile() {
             .setInterpolator(new AccelerateDecelerateInterpolator())
             .setStartDelay(150)
             .start();
+
+        if (logoContainer != null) {
+            android.view.animation.Animation fadeInUp = AnimationUtils.loadAnimation(this, R.anim.fade_in_up);
+            logoContainer.startAnimation(fadeInUp);
+        }
     }
 
     private void setupTextWatchers() {
@@ -309,6 +304,22 @@ private void applyOrgProfile() {
         return (editText != null && editText.getText() != null) ? editText.getText().toString().trim() : "";
     }
 
+    /**
+     * 🎵 توليد تأثير صوتي فوري برمجياً بدون الحاجة لملفات خارجية
+     */
+    private void playTone(boolean isSuccess) {
+        try {
+            ToneGenerator toneGen = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80);
+            if (isSuccess) {
+                toneGen.startTone(ToneGenerator.TONE_PROP_ACK, 150); // نغمة قبول أنيقة
+            } else {
+                toneGen.startTone(ToneGenerator.TONE_SUP_ERROR, 250); // نغمة خطأ
+            }
+        } catch (Exception e) {
+            Log.e("LoginActivity", "Tone error: " + e.getMessage());
+        }
+    }
+
     // ==========================================
     // 🌐 تسجيل الدخول
     // ==========================================
@@ -319,11 +330,13 @@ private void applyOrgProfile() {
         if (username.isEmpty()) {
             tilUsername.setError(isArabic ? "اسم المستخدم مطلوب" : "Username required");
             shakeView(tilUsername);
+            playTone(false);
             return;
         }
         if (password.length() < 4) {
             tilPassword.setError(isArabic ? "كلمة المرور قصيرة جداً" : "Password too short");
             shakeView(tilPassword);
+            playTone(false);
             return;
         }
 
@@ -342,6 +355,7 @@ private void applyOrgProfile() {
                 if (response != null && response.isSuccess) {
                     handleLoginSuccess(response, username);
                 } else {
+                    playTone(false);
                     String errorMsg = response != null
                         ? response.optString("message", isArabic ? "بيانات الاعتماد غير صالحة" : "Invalid credentials")
                         : (isArabic ? "فشل الاتصال بالخادم" : "Connection failed");
@@ -353,6 +367,8 @@ private void applyOrgProfile() {
     }
 
     private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username) {
+        playTone(true);
+
         String token = response.optString("token", "");
         String roleStr = response.optString("role", "ADMIN");
         String displayName = response.optString("display_name", username);
@@ -389,20 +405,24 @@ private void applyOrgProfile() {
                     if (!sessionManager.isLoggedIn()) {
                         sessionManager.createLoginSession(lastUser, lastRole, "BIOMETRIC_TOKEN", sessionManager.getServerUrl());
                     }
+                    playTone(true);
                     Toast.makeText(LoginActivity.this, (isArabic ? "أهلاً عودتك " : "Welcome back ") + lastUser + " 👋", Toast.LENGTH_SHORT).show();
                     navigateToMain();
                 } else {
+                    playTone(false);
                     Toast.makeText(LoginActivity.this, isArabic ? "قم بتسجيل الدخول بكلمة المرور أولاً" : "Sign in with password first", Toast.LENGTH_LONG).show();
                 }
             }
             @Override
             public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
                 if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                    playTone(false);
                     Toast.makeText(LoginActivity.this, "Error: " + errString, Toast.LENGTH_SHORT).show();
                 }
             }
             @Override
             public void onAuthenticationFailed() {
+                playTone(false);
                 Toast.makeText(LoginActivity.this, isArabic ? "لم يتم التعرف على بصمة الإصبع" : "Fingerprint not recognized", Toast.LENGTH_SHORT).show();
             }
         });
@@ -419,6 +439,7 @@ private void applyOrgProfile() {
                 if (!sessionManager.getLastBiometricUser().isEmpty() || sessionManager.isLoggedIn()) {
                     biometricPrompt.authenticate(promptInfo);
                 } else {
+                    playTone(false);
                     Toast.makeText(this, isArabic ? "سجل الدخول بكلمة المرور أولاً لتفعيل البصمة" : "Sign in with password first to enable biometric", Toast.LENGTH_LONG).show();
                 }
             });
