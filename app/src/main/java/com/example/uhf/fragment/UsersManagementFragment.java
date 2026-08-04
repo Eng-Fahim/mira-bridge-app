@@ -90,36 +90,44 @@ public class UsersManagementFragment extends Fragment {
 
         loadUsers();
     }
-
-    private void loadUsers() {
+private void loadUsers() {
     Executors.newSingleThreadExecutor().execute(() -> {
         MiraApiClient.ApiResponse response = apiClient.getUsers();
-        mainHandler.post(() -> {
-            if (response != null) {
-    android.util.Log.d("MIRA_USERS", "Response Raw: " + response.toString());
-}
+        
+        // طباعة الاستجابة في Logcat للتشخيص
+        if (response != null) {
+            android.util.Log.d("MIRA_USERS", "Response Raw: " + response.toString());
+        }
 
+        mainHandler.post(() -> {
             if (response != null && response.isSuccess) {
-                // نمرر الـ response كاملاً لمعالجة كل الحالات
                 parseUsersResponse(response);
             } else {
-                String errorMsg = (response != null && response.optString("message", null) != null) 
-                        ? response.optString("message", "فشل تحميل المستخدمين")
-                        : "فشل الاتصال بالخادم";
+                // استخراج الرسالة بأمان بدون استخدام optString مباشرة على ApiResponse
+                String errorMsg = "فشل تحميل المستخدمين";
+                if (response != null) {
+                    if (response.message != null && !response.message.isEmpty()) {
+                        errorMsg = response.message;
+                    } else if (response.data != null && response.data.has("message")) {
+                        errorMsg = response.data.optString("message", errorMsg);
+                    }
+                } else {
+                    errorMsg = "فشل الاتصال بالخادم";
+                }
+                
                 Toast.makeText(getContext(), errorMsg, Toast.LENGTH_SHORT).show();
             }
         });
     });
 }
 
-
-    private void parseUsersResponse(MiraApiClient.ApiResponse response) {
+private void parseUsersResponse(MiraApiClient.ApiResponse response) {
     userList.clear();
     if (response == null) return;
 
     JSONArray usersArray = null;
 
-    // 1. إذا كان الـ data عبارة عن JSONObject
+    // 1. البحث داخل response.data إذا كان JSONObject
     if (response.data != null) {
         if (response.data.has("users")) {
             usersArray = response.data.optJSONArray("users");
@@ -128,16 +136,16 @@ public class UsersManagementFragment extends Fragment {
         }
     }
 
-    // 2. إذا كانت الاستجابة المباشرة تحتوي على JSONArray (في حال وجود jsonArray داخل ApiResponse)
+    // 2. إذا كانت الاستجابة المباشرة عبارة عن JSONArray في response.jsonArray
     if (usersArray == null && response.jsonArray != null) {
         usersArray = response.jsonArray;
     }
 
-    // 3. في حال لم تجد أي مصفوفة
-    if (usersArray == null) {
-        Toast.makeText(getContext(), "لا توجد بيانات مستخدمين أو تنسيق غير مدعوم", Toast.LENGTH_SHORT).show();
+    // 3. حالة عدم العثور على مصفوفة
+    if (usersArray == null || usersArray.length() == 0) {
+        Toast.makeText(getContext(), "لا توجد بيانات مستخدمين لعرضها", Toast.LENGTH_SHORT).show();
+        filterUsers("");
         updateStats();
-        adapter.notifyDataSetChanged();
         return;
     }
 
