@@ -44,7 +44,23 @@ public class MiraApiClient {
         this.apiKey = prefs.getString("mira_api_key", DEFAULT_API_KEY);
         this.gateId = prefs.getString("mira_gate_id", DEFAULT_GATE_ID);
     }
+public ApiResponse getUsers() {
+    return get("/auth/users");
+}
 
+public ApiResponse createUser(JSONObject payload) {
+    return post("/auth/users/create", payload);
+}
+
+public ApiResponse updateUser(JSONObject payload) {
+    return post("/auth/users/update", payload);
+}
+
+public ApiResponse deleteUser(int userId) {
+    JSONObject p = new JSONObject();
+    try { p.put("user_id", userId); } catch (Exception ignored) {}
+    return post("/auth/users/delete", p);
+}
     // ===================== 🔑 AUTHENTICATION =====================
 
     public ApiResponse login(String username, String password, String deviceId) {
