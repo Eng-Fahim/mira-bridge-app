@@ -1,7 +1,10 @@
 package com.example.uhf.activity;
 
 import android.animation.ObjectAnimator;
+import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -10,6 +13,7 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
 import android.view.animation.AccelerateDecelerateInterpolator;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
@@ -21,6 +25,7 @@ import androidx.core.content.ContextCompat;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -28,6 +33,7 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.android.material.textview.MaterialTextView;
 
+import java.io.File;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
@@ -36,14 +42,17 @@ public class LoginActivity extends AppCompatActivity {
     private TextInputEditText etServerUrl, etUsername, etPassword;
     private TextInputLayout tilServerUrl, tilUsername, tilPassword;
     private MaterialButton btnLogin, btnBiometric, btnSaveServer, btnToggleLanguage;
-    private MaterialTextView tvServerSettings, tvAppVersion, tvBrandSubtitle, tvBrandDescription, tvSignInTitle, tvSignInSubtitle;
+    private MaterialTextView tvServerSettings, tvAppVersion, tvBrandName, tvBrandSubtitle, tvBrandDescription, tvSignInTitle, tvSignInSubtitle;
+    private ImageView ivAppLogo;
     private MaterialCardView serverConfigCard;
     private ProgressBar pbLoading;
     private View loadingContainer, loginCard;
+    
     private SessionManager sessionManager;
     private MiraApiClient apiClient;
     private BiometricPrompt biometricPrompt;
     private BiometricPrompt.PromptInfo promptInfo;
+    
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Executor bgExecutor = Executors.newSingleThreadExecutor();
 
@@ -60,7 +69,7 @@ public class LoginActivity extends AppCompatActivity {
             return;
         }
 
-        setContentView(R.layout.activity_login); // تأكد أن ملف الـ XML الخاص بك يحمل هذا الاسم ويحتوي على العناصر الجديدة
+        setContentView(R.layout.activity_login);
         initViews();
         setupBiometric();
         setupServerConfigToggle();
@@ -82,19 +91,20 @@ public class LoginActivity extends AppCompatActivity {
         btnToggleLanguage = findViewById(R.id.btnToggleLanguage);
         tvServerSettings = findViewById(R.id.tvServerSettings);
         tvAppVersion = findViewById(R.id.tvAppVersion);
+        tvBrandName = findViewById(R.id.tvBrandName);
         tvBrandSubtitle = findViewById(R.id.tvBrandSubtitle);
         tvBrandDescription = findViewById(R.id.tvBrandDescription);
         tvSignInTitle = findViewById(R.id.tvSignInTitle);
         tvSignInSubtitle = findViewById(R.id.tvSignInSubtitle);
+        ivAppLogo = findViewById(R.id.ivAppLogo);
         serverConfigCard = findViewById(R.id.serverConfigCard);
         pbLoading = findViewById(R.id.pbLoading);
         loadingContainer = findViewById(R.id.loadingContainer);
         loginCard = findViewById(R.id.loginCard);
 
-        
         // تعبئة رابط الخادم المحفوظ
         String savedUrl = sessionManager.getServerUrl();
-        if (!savedUrl.isEmpty()) {
+        if (savedUrl != null && !savedUrl.isEmpty()) {
             etServerUrl.setText(savedUrl);
         }
 
@@ -122,6 +132,8 @@ public class LoginActivity extends AppCompatActivity {
                 updateUiLanguage(isArabic);
             });
         }
+        
+        // تطبيق بروفايل وشعار الجهة المحفوظ ديناميكياً
         applyOrgProfile();
     }
 
@@ -131,68 +143,104 @@ public class LoginActivity extends AppCompatActivity {
     private void updateUiLanguage(boolean arabic) {
         if (arabic) {
             getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-            if (tvBrandSubtitle != null) tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
-            if (tvBrandDescription != null) tvBrandDescription.setText("منظومة التتبع والمصادقة المعتمدة للمجوهرات");
             if (tvSignInTitle != null) tvSignInTitle.setText("تسجيل الدخول");
             if (tvSignInSubtitle != null) tvSignInSubtitle.setText("أدخل بيانات الاعتماد الخاصة بك للمتابعة");
             if (tilUsername != null) tilUsername.setHint("اسم المستخدم / البريد الإلكتروني");
             if (tilPassword != null) tilPassword.setHint("كلمة المرور");
-            if (btnLogin != null && !pbLoading.isShown()) btnLogin.setText("دخول النظام");
+            if (btnLogin != null && (pbLoading == null || !pbLoading.isShown())) btnLogin.setText("دخول النظام");
             if (tvServerSettings != null) tvServerSettings.setText("🔧 إعدادات الخادم والاتصال (Server Settings)");
         } else {
             getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-            if (tvBrandSubtitle != null) tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
-            if (tvBrandDescription != null) tvBrandDescription.setText("Enterprise Jewelry Traceability & Authentication");
             if (tvSignInTitle != null) tvSignInTitle.setText("Sign In");
             if (tvSignInSubtitle != null) tvSignInSubtitle.setText("Enter your credentials to continue");
-            if (tilUsername != null) tilUsername.setHint("Username");
+            if (tilUsername != null) tilUsername.setHint("Username / Email");
             if (tilPassword != null) tilPassword.setHint("Password");
-            if (btnLogin != null && !pbLoading.isShown()) btnLogin.setText("Sign In");
+            if (btnLogin != null && (pbLoading == null || !pbLoading.isShown())) btnLogin.setText("Sign In");
             if (tvServerSettings != null) tvServerSettings.setText("🔧 Server Configuration");
         }
+        
+        // إعادة تطبيق الهوية لترجمة الوصف حسب اللغة إن أمكن
+        applyOrgProfile();
     }
-/**
- * 🏢 تطبيق بيانات الجهة على شاشة تسجيل الدخول
- */
-private void applyOrgProfile() {
-    com.example.uhf.manager.MiraOrgProfileManager orgProfile = 
-        com.example.uhf.manager.MiraOrgProfileManager.getInstance(this);
-    
-    String orgName = orgProfile.getOrgName();
-    String orgSlogan = orgProfile.getOrgSlogan();
-    
-    // تحديث العنوان الفرعي باسم الجهة
-    if (tvBrandSubtitle != null && !orgName.isEmpty() && !orgName.equals("MIRA Jewelry")) {
-        tvBrandSubtitle.setText(orgName);
+
+    /**
+     * 🏢 تطبيق بيانات وشعار الجهة المحفوظة ديناميكياً على الواجهة
+     */
+    private void applyOrgProfile() {
+        MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
+        
+        String orgName = orgProfile.getOrgName();
+        String orgSlogan = orgProfile.getOrgSlogan();
+        String logoPath = orgProfile.getOrgLogoPath();
+
+        // 1. اسم الماركة/الجهة في العنوان الرئيسي
+        if (tvBrandName != null && orgName != null && !orgName.isEmpty()) {
+            tvBrandName.setText(orgName);
+        }
+
+        // 2. تحديث العنوان الفرعي
+        if (tvBrandSubtitle != null) {
+            if (orgName != null && !orgName.isEmpty() && !orgName.equals("MIRA Jewelry")) {
+                tvBrandSubtitle.setText(orgName + " Enterprise");
+            } else {
+                tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
+            }
+        }
+        
+        // 3. تحديث الوصف بشعار الجهة
+        if (tvBrandDescription != null) {
+            if (orgSlogan != null && !orgSlogan.isEmpty() && !orgSlogan.equals("Jewelry Enterprise Platform")) {
+                tvBrandDescription.setText(orgSlogan);
+            } else {
+                tvBrandDescription.setText(isArabic ? "منظومة التتبع والمصادقة المعتمدة للمجوهرات" : "Enterprise Jewelry Traceability & Authentication");
+            }
+        }
+
+        // 4. تحميل شعار الجهة المحفوظ إن وجد أو الشعار الـ Vector الفخم برمجياً
+        if (ivAppLogo != null) {
+            if (logoPath != null && !logoPath.isEmpty() && new File(logoPath).exists()) {
+                try {
+                    Bitmap bitmap = BitmapFactory.decodeFile(logoPath);
+                    if (bitmap != null) {
+                        ivAppLogo.setImageBitmap(bitmap);
+                    } else {
+                        ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
+                    }
+                } catch (Exception e) {
+                    ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
+                }
+            } else {
+                ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
+            }
+        }
     }
-    
-    // تحديث الوصف بشعار الجهة
-    if (tvBrandDescription != null && !orgSlogan.isEmpty() && !orgSlogan.equals("Jewelry Enterprise Platform")) {
-        tvBrandDescription.setText(orgSlogan);
-    }
-}
+
     /**
      * 🔧 إظهار/إخفاء إعدادات الخادم (للمسؤولين فقط)
      */
     private void setupServerConfigToggle() {
-        tvServerSettings.setOnClickListener(v -> {
-            if (serverConfigCard.getVisibility() == View.GONE) {
-                serverConfigCard.setVisibility(View.VISIBLE);
-                serverConfigCard.setAlpha(0f);
-                serverConfigCard.animate().alpha(1f).setDuration(300).start();
-                tvServerSettings.setText(isArabic ? "🔧 إخفاء إعدادات الخادم" : "🔧 Hide Server Settings");
-            } else {
-                serverConfigCard.animate().alpha(0f).setDuration(200).withEndAction(() -> {
-                    serverConfigCard.setVisibility(View.GONE);
-                }).start();
-                tvServerSettings.setText(isArabic ? "🔧 إعدادات الخادم والاتصال (Server Settings)" : "🔧 Server Configuration");
-            }
-        });
+        if (tvServerSettings != null) {
+            tvServerSettings.setOnClickListener(v -> {
+                if (serverConfigCard.getVisibility() == View.GONE) {
+                    serverConfigCard.setVisibility(View.VISIBLE);
+                    serverConfigCard.setAlpha(0f);
+                    serverConfigCard.animate().alpha(1f).setDuration(300).start();
+                    tvServerSettings.setText(isArabic ? "🔧 إخفاء إعدادات الخادم" : "🔧 Hide Server Settings");
+                } else {
+                    serverConfigCard.animate().alpha(0f).setDuration(200).withEndAction(() -> {
+                        serverConfigCard.setVisibility(View.GONE);
+                    }).start();
+                    tvServerSettings.setText(isArabic ? "🔧 إعدادات الخادم والاتصال (Server Settings)" : "🔧 Server Configuration");
+                }
+            });
+        }
 
         // الضغط المطول على البطاقة يظهر الإعدادات أيضاً
         if (loginCard != null) {
             loginCard.setOnLongClickListener(v -> {
-                tvServerSettings.performClick();
+                if (tvServerSettings != null) {
+                    tvServerSettings.performClick();
+                }
                 return true;
             });
         }
@@ -220,20 +268,22 @@ private void applyOrgProfile() {
                 updateLoginButtonState();
             }
         };
-        etUsername.addTextChangedListener(watcher);
-        etPassword.addTextChangedListener(watcher);
+        if (etUsername != null) etUsername.addTextChangedListener(watcher);
+        if (etPassword != null) etPassword.addTextChangedListener(watcher);
     }
 
     private void updateLoginButtonState() {
         String username = getText(etUsername);
         String password = getText(etPassword);
         boolean valid = !username.isEmpty() && password.length() >= 4;
-        btnLogin.setEnabled(valid);
-        btnLogin.setAlpha(valid ? 1f : 0.5f);
+        if (btnLogin != null) {
+            btnLogin.setEnabled(valid);
+            btnLogin.setAlpha(valid ? 1f : 0.5f);
+        }
     }
 
     private String getText(TextInputEditText editText) {
-        return editText.getText() != null ? editText.getText().toString().trim() : "";
+        return (editText != null && editText.getText() != null) ? editText.getText().toString().trim() : "";
     }
 
     // ==========================================
@@ -302,7 +352,7 @@ private void applyOrgProfile() {
     private void setupBiometric() {
         BiometricManager bm = BiometricManager.from(this);
         if (bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) != BiometricManager.BIOMETRIC_SUCCESS) {
-            btnBiometric.setVisibility(View.GONE);
+            if (btnBiometric != null) btnBiometric.setVisibility(View.GONE);
             return;
         }
 
@@ -341,29 +391,34 @@ private void applyOrgProfile() {
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
             .build();
 
-        btnBiometric.setOnClickListener(v -> {
-            if (!sessionManager.getLastBiometricUser().isEmpty() || sessionManager.isLoggedIn()) {
-                biometricPrompt.authenticate(promptInfo);
-            } else {
-                Toast.makeText(this, isArabic ? "سجل الدخول بكلمة المرور أولاً لتفعيل البصمة" : "Sign in with password first to enable biometric", Toast.LENGTH_LONG).show();
-            }
-        });
+        if (btnBiometric != null) {
+            btnBiometric.setOnClickListener(v -> {
+                if (!sessionManager.getLastBiometricUser().isEmpty() || sessionManager.isLoggedIn()) {
+                    biometricPrompt.authenticate(promptInfo);
+                } else {
+                    Toast.makeText(this, isArabic ? "سجل الدخول بكلمة المرور أولاً لتفعيل البصمة" : "Sign in with password first to enable biometric", Toast.LENGTH_LONG).show();
+                }
+            });
+        }
     }
 
     private void showLoading(boolean loading) {
         if (loadingContainer != null) loadingContainer.setVisibility(loading ? View.VISIBLE : View.GONE);
-        btnLogin.setEnabled(!loading);
-        btnBiometric.setEnabled(!loading);
-        if (loading) {
-            btnLogin.setText("");
-        } else {
-            btnLogin.setText(isArabic ? "دخول النظام" : "Sign In");
+        if (btnLogin != null) {
+            btnLogin.setEnabled(!loading);
+            if (loading) {
+                btnLogin.setText("");
+            } else {
+                btnLogin.setText(isArabic ? "دخول النظام" : "Sign In");
+            }
         }
-        etUsername.setEnabled(!loading);
-        etPassword.setEnabled(!loading);
+        if (btnBiometric != null) btnBiometric.setEnabled(!loading);
+        if (etUsername != null) etUsername.setEnabled(!loading);
+        if (etPassword != null) etPassword.setEnabled(!loading);
     }
 
     private void shakeView(View view) {
+        if (view == null) return;
         ObjectAnimator.ofFloat(view, "translationX", 0, 20, -20, 20, -20, 10, -10, 5, -5, 0)
             .setDuration(500).start();
     }
