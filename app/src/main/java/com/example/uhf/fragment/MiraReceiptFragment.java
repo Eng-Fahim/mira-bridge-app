@@ -63,8 +63,11 @@ public class MiraReceiptFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        Context context = getContext();
+        if (context == null) return;
+
         // 🏢 تهيئة مدير بيانات الجهة
-        orgProfile = MiraOrgProfileManager.getInstance(requireContext());
+        orgProfile = MiraOrgProfileManager.getInstance(context);
 
         webView = view.findViewById(R.id.webMiraReceipt);
         btnPrint = view.findViewById(R.id.btnMiraPrintReceipt);
@@ -72,10 +75,10 @@ public class MiraReceiptFragment extends Fragment {
         btnSave = view.findViewById(R.id.btnMiraSaveReceipt);
         btnClose = view.findViewById(R.id.btnMiraCloseReceipt);
 
-        btnPrint.setOnClickListener(v -> printReceipt());
-        btnShare.setOnClickListener(v -> shareReceipt());
-        btnSave.setOnClickListener(v -> saveReceiptAsPDF());
-        btnClose.setOnClickListener(v -> {
+        if (btnPrint != null) btnPrint.setOnClickListener(v -> printReceipt());
+        if (btnShare != null) btnShare.setOnClickListener(v -> shareReceipt());
+        if (btnSave != null) btnSave.setOnClickListener(v -> saveReceiptAsPDF());
+        if (btnClose != null) btnClose.setOnClickListener(v -> {
             if (getParentFragmentManager() != null) {
                 getParentFragmentManager().popBackStack();
             }
@@ -83,16 +86,19 @@ public class MiraReceiptFragment extends Fragment {
 
         if (getArguments() != null) {
             String json = getArguments().getString(ARG_TRANSACTION);
-            try {
-                transactionData = new JSONObject(json);
-                loadReceiptHTML();
-            } catch (Exception e) {
-                Toast.makeText(getContext(), "خطأ في بيانات الإيصال", Toast.LENGTH_SHORT).show();
+            if (json != null && !json.isEmpty()) {
+                try {
+                    transactionData = new JSONObject(json);
+                    loadReceiptHTML();
+                } catch (Exception e) {
+                    showToast("خطأ في بيانات الإيصال");
+                }
             }
         }
     }
 
     private void loadReceiptHTML() {
+        if (webView == null || transactionData == null) return;
         try {
             JSONObject transaction = transactionData.optJSONObject("transaction");
             if (transaction == null) transaction = transactionData;
@@ -131,7 +137,7 @@ public class MiraReceiptFragment extends Fragment {
             webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
 
         } catch (Exception e) {
-            Toast.makeText(getContext(), "خطأ في تحميل الإيصال", Toast.LENGTH_SHORT).show();
+            showToast("خطأ في تحميل الإيصال");
         }
     }
 
@@ -155,7 +161,7 @@ public class MiraReceiptFragment extends Fragment {
 
         // ترجمة طريقة الدفع
         String paymentMethodAr;
-        switch (paymentMethod) {
+        switch (paymentMethod.toLowerCase()) {
             case "cash": paymentMethodAr = "نقداً"; break;
             case "card": paymentMethodAr = "بطاقة"; break;
             case "transfer": paymentMethodAr = "تحويل بنكي"; break;
@@ -172,7 +178,7 @@ public class MiraReceiptFragment extends Fragment {
             ".header .org-name{font-size:22px;font-weight:800;letter-spacing:1px;margin-bottom:2px}" +
             ".header .org-slogan{font-size:10px;opacity:.85;margin-bottom:4px}" +
             ".header .contact{font-size:9px;opacity:.7;margin-bottom:12px}" +
-            ".header .checkmark{width:64px;height:64px;background:#4ADE80;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:12px auto;font-size:32px}" +
+            ".header .checkmark{width:64px;height:64px;background:#4ADE80;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:12px auto;font-size:32px;color:#fff}" +
             ".info{padding:20px;border-bottom:1px solid #e2e8f0}" +
             ".info .row{display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px}" +
             ".info .label{color:#64748b}.info .value{font-weight:600}" +
@@ -230,7 +236,7 @@ public class MiraReceiptFragment extends Fragment {
     }
 
     private void printReceipt() {
-        if (getContext() == null) return;
+        if (getContext() == null || webView == null) return;
         PrintManager pm = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
         if (pm != null) {
             PrintDocumentAdapter adapter = webView.createPrintDocumentAdapter("MIRA_Receipt_" + orgProfile.getOrgName());
@@ -249,12 +255,12 @@ public class MiraReceiptFragment extends Fragment {
                 (transactionData != null ? transactionData.toString() : ""));
             startActivity(Intent.createChooser(shareIntent, "مشاركة الإيصال عبر"));
         } catch (Exception e) {
-            Toast.makeText(getContext(), "خطأ في المشاركة", Toast.LENGTH_SHORT).show();
+            showToast("خطأ في المشاركة");
         }
     }
 
     private void saveReceiptAsPDF() {
-        Toast.makeText(getContext(), "📄 جاري حفظ الإيصال...", Toast.LENGTH_SHORT).show();
+        showToast("📄 جاري حفظ الإيصال...");
         try {
             PdfDocument document = new PdfDocument();
             PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(595, 842, 1).create();
@@ -279,9 +285,15 @@ public class MiraReceiptFragment extends Fragment {
             document.close();
             fos.close();
 
-            Toast.makeText(getContext(), "✅ تم الحفظ: " + fileName, Toast.LENGTH_LONG).show();
+            showToast("✅ تم الحفظ: " + fileName);
         } catch (Exception e) {
-            Toast.makeText(getContext(), "❌ فشل الحفظ: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            showToast("❌ فشل الحفظ: " + e.getMessage());
         }
     }
-            }
+
+    private void showToast(String message) {
+        if (getContext() != null && isAdded()) {
+            Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+        }
+    }
+}
