@@ -12,12 +12,14 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.Fragment;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.tools.SessionManager;
 
 import org.json.JSONObject;
 
@@ -42,6 +44,7 @@ public class MiraDashboardFragment extends Fragment {
     private ExecutorService executor;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private MiraApiClient apiClient;
+    private SessionManager sessionManager;
 
     @Nullable
     @Override
@@ -56,6 +59,7 @@ public class MiraDashboardFragment extends Fragment {
         
         executor = Executors.newSingleThreadExecutor();
         apiClient = MiraApiClient.getInstance(requireContext());
+        sessionManager = new SessionManager(requireContext());
 
         initViews(view);
         setupUserGreeting();
@@ -88,27 +92,42 @@ public class MiraDashboardFragment extends Fragment {
         btnGateSecurity = v.findViewById(R.id.btnGateSecurity);
         btnRfidAudit = v.findViewById(R.id.btnRfidAudit);
         
-        // تعيين التاريخ العربي الهجري/الملادي الحركي
-        SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE، d MMMM yyyy", new Locale("ar"));
+        // التحقق من لغة التطبيق الحالية لتنسيق التاريخ
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        Locale currentLocale = isArabic ? new Locale("ar") : Locale.US;
+        SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE، d MMMM yyyy", currentLocale);
         if (tvDate != null) {
             tvDate.setText(dateFormat.format(new Date()));
         }
     }
 
     /**
-     * حل مشكلة اسم المستخدم الثابت: جلب اسم المستخدم من الجلسة وتضمينه
+     * جلب اسم المستخدم الفعلي من SessionManager وتكييف التحية حسب اللغة
      */
     private void setupUserGreeting() {
         if (tvGreeting != null) {
-            // قم باستبدال getUserDisplayName() بالطريقة التي تستخرج بها الاسم من Session/SharedPref
-            String userName = getUserDisplayName(); 
-            tvGreeting.setText("مرحباً بك، " + userName);
+            boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+            String userName = getUserDisplayName();
+            if (isArabic) {
+                tvGreeting.setText("مرحباً بك، " + userName);
+            } else {
+                tvGreeting.setText("Welcome, " + userName);
+            }
         }
     }
 
     private String getUserDisplayName() {
-        // تفقد بيانات الجلسة المسجلة
-        return "المستخدم"; 
+        if (sessionManager != null) {
+            String name = sessionManager.getDisplayName();
+            if (name == null || name.isEmpty()) {
+                name = sessionManager.getUsername();
+            }
+            if (name != null && !name.isEmpty()) {
+                return name;
+            }
+        }
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        return isArabic ? "المستخدم" : "User";
     }
 
     private void setupSwipeToRefresh() {
@@ -124,7 +143,7 @@ public class MiraDashboardFragment extends Fragment {
             btnRfidAudit.setOnClickListener(v -> switchTab(getString(R.string.uhf_msg_tab_scan)));
         }
         if (btnGateSecurity != null) {
-            btnGateSecurity.setOnClickListener(v -> switchTab("MIRA Secure Gate"));
+            btnGateSecurity.setOnClickListener(v -> switchTab("SecureGate"));
         }
     }
 
@@ -137,7 +156,8 @@ public class MiraDashboardFragment extends Fragment {
                 }
             }
         } catch (Exception e) {
-            Toast.makeText(getContext(), "جاري الفتح...", Toast.LENGTH_SHORT).show();
+            boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+            Toast.makeText(getContext(), isArabic ? "جاري الفتح..." : "Opening...", Toast.LENGTH_SHORT).show();
             Log.e(TAG, "Error switching tab: " + e.getMessage());
         }
     }
