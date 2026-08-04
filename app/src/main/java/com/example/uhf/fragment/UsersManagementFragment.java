@@ -90,88 +90,82 @@ public class UsersManagementFragment extends Fragment {
 
         loadUsers();
     }
-private void loadUsers() {
-    Executors.newSingleThreadExecutor().execute(() -> {
-        MiraApiClient.ApiResponse response = apiClient.getUsers();
-        
-        // طباعة الاستجابة في Logcat للتشخيص
-        if (response != null) {
-            android.util.Log.d("MIRA_USERS", "Response Raw: " + response.toString());
-        }
 
-        mainHandler.post(() -> {
-            if (response != null && response.isSuccess) {
-                parseUsersResponse(response);
-            } else {
-                // استخراج الرسالة بأمان بدون استخدام optString مباشرة على ApiResponse
-                String errorMsg = "فشل تحميل المستخدمين";
-                if (response != null) {
-                    if (response.message != null && !response.message.isEmpty()) {
-                        errorMsg = response.message;
-                    } else if (response.data != null && response.data.has("message")) {
-                        errorMsg = response.data.optString("message", errorMsg);
-                    }
-                } else {
-                    errorMsg = "فشل الاتصال بالخادم";
-                }
-                
-                Toast.makeText(getContext(), errorMsg, Toast.LENGTH_SHORT).show();
+    private void loadUsers() {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            MiraApiClient.ApiResponse response = apiClient.getUsers();
+            
+            if (response != null) {
+                android.util.Log.d("MIRA_USERS", "Response Raw: " + response.toString());
             }
+
+            mainHandler.post(() -> {
+                if (response != null && response.isSuccess) {
+                    parseUsersResponse(response);
+                } else {
+                    String errorMsg = "فشل تحميل المستخدمين";
+                    if (response != null) {
+                        if (response.message != null && !response.message.isEmpty()) {
+                            errorMsg = response.message;
+                        } else if (response.data != null && response.data.has("message")) {
+                            errorMsg = response.data.optString("message", errorMsg);
+                        }
+                    } else {
+                        errorMsg = "فشل الاتصال بالخادم";
+                    }
+                    
+                    Toast.makeText(getContext(), errorMsg, Toast.LENGTH_SHORT).show();
+                }
+            });
         });
-    });
-}
+    }
 
-private void parseUsersResponse(MiraApiClient.ApiResponse response) {
-    userList.clear();
-    if (response == null) return;
+    private void parseUsersResponse(MiraApiClient.ApiResponse response) {
+        userList.clear();
+        if (response == null) return;
 
-    JSONArray usersArray = null;
+        JSONArray usersArray = null;
 
-    // 1. البحث داخل response.data إذا كان JSONObject
-    if (response.data != null) {
-        if (response.data.has("users")) {
-            usersArray = response.data.optJSONArray("users");
-        } else if (response.data.has("data")) {
-            usersArray = response.data.optJSONArray("data");
+        if (response.data != null) {
+            if (response.data.has("users")) {
+                usersArray = response.data.optJSONArray("users");
+            } else if (response.data.has("data")) {
+                usersArray = response.data.optJSONArray("data");
+            }
         }
-    }
 
-    // 2. إذا كانت الاستجابة المباشرة عبارة عن JSONArray في response.jsonArray
-    if (usersArray == null && response.jsonArray != null) {
-        usersArray = response.jsonArray;
-    }
+        if (usersArray == null && response.jsonArray != null) {
+            usersArray = response.jsonArray;
+        }
 
-    // 3. حالة عدم العثور على مصفوفة
-    if (usersArray == null || usersArray.length() == 0) {
-        Toast.makeText(getContext(), "لا توجد بيانات مستخدمين لعرضها", Toast.LENGTH_SHORT).show();
-        filterUsers("");
+        if (usersArray == null || usersArray.length() == 0) {
+            Toast.makeText(getContext(), "لا توجد بيانات مستخدمين لعرضها", Toast.LENGTH_SHORT).show();
+            filterUsers("");
+            updateStats();
+            return;
+        }
+
+        for (int i = 0; i < usersArray.length(); i++) {
+            JSONObject u = usersArray.optJSONObject(i);
+            if (u == null) continue;
+
+            UserData user = new UserData();
+            user.id = u.optInt("id", u.optInt("user_id", 0));
+            user.username = u.optString("username", "");
+            user.displayName = u.optString("display_name", u.optString("name", user.username));
+            user.role = u.optString("role", "INVENTORY_MGR");
+            user.department = u.optString("department", "");
+            user.employeeId = u.optString("employee_id", "");
+            user.status = u.optString("status", "active");
+            user.lastLogin = u.optString("last_login", "");
+            user.isOnline = u.optBoolean("is_online", false);
+
+            userList.add(user);
+        }
+
+        filterUsers(etSearchUser.getText().toString());
         updateStats();
-        return;
     }
-
-    // قراءة عناصر القائمة
-    for (int i = 0; i < usersArray.length(); i++) {
-        JSONObject u = usersArray.optJSONObject(i);
-        if (u == null) continue;
-
-        UserData user = new UserData();
-        user.id = u.optInt("id", u.optInt("user_id", 0));
-        user.username = u.optString("username", "");
-        user.displayName = u.optString("display_name", u.optString("name", user.username));
-        user.role = u.optString("role", "INVENTORY_MGR");
-        user.department = u.optString("department", "");
-        user.employeeId = u.optString("employee_id", "");
-        user.status = u.optString("status", "active");
-        user.lastLogin = u.optString("last_login", "");
-        user.isOnline = u.optBoolean("is_online", false);
-
-        userList.add(user);
-    }
-
-    filterUsers(etSearchUser.getText().toString());
-    updateStats();
-}
-
 
     private void filterUsers(String query) {
         filteredList.clear();
@@ -203,9 +197,6 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
         tvOnlineNow.setText(String.valueOf(online));
     }
 
-    // ============================================
-    // 🪜 حوار إضافة/تعديل مستخدم - خطوتين ذكي
-    // ============================================
     private void showUserDialog(@Nullable UserData existingUser) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_user_edit, null);
@@ -217,7 +208,6 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
 
         boolean isEdit = existingUser != null;
 
-        // ==================== عناصر الواجهة ====================
         TextView tvTitle = dialogView.findViewById(R.id.tvDialogTitle);
         TextView tvSubtitle = dialogView.findViewById(R.id.tvDialogSubtitle);
         EditText etDisplayName = dialogView.findViewById(R.id.etDisplayName);
@@ -243,16 +233,13 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
         View vStrength4 = dialogView.findViewById(R.id.vStrength4);
         TextView tvStrengthLabel = dialogView.findViewById(R.id.tvStrengthLabel);
 
-        // ==================== إعداد الأقسام ====================
         String[] departments = {"المبيعات", "المخزون", "الإدارة", "الأمن", "التدقيق", "المشتريات", "خدمة العملاء"};
         ArrayAdapter<String> deptAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, departments);
         etDepartment.setAdapter(deptAdapter);
 
-        // ==================== العنوان ====================
         tvTitle.setText(isEdit ? "تعديل مستخدم" : "إضافة مستخدم جديد");
         tvSubtitle.setText(isEdit ? "تعديل بيانات المستخدم الحالي" : "أدخل بيانات المستخدم والصلاحية المطلوبة");
 
-        // ==================== ملء البيانات في حالة التعديل ====================
         if (isEdit) {
             etDisplayName.setText(existingUser.displayName);
             etUsername.setText(existingUser.username);
@@ -263,7 +250,6 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
                 etDepartment.setText(existingUser.department, false);
             }
 
-            // تحديد الصلاحية الحالية
             for (int i = 0; i < rgRole.getChildCount(); i++) {
                 View child = rgRole.getChildAt(i);
                 RadioButton rb = null;
@@ -279,7 +265,6 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
                 }
             }
 
-            // في حالة التعديل: إظهار كل شيء دفعة واحدة
             layoutStep1.setVisibility(View.VISIBLE);
             layoutStep2.setVisibility(View.VISIBLE);
             if (stepsIndicator != null) stepsIndicator.setVisibility(View.GONE);
@@ -289,7 +274,6 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
             if (btnPrevStep != null) btnPrevStep.setVisibility(View.GONE);
             btnSaveUser.setVisibility(View.VISIBLE);
         } else {
-            // إضافة جديد: إظهار الخطوة 1 فقط
             layoutStep1.setVisibility(View.VISIBLE);
             layoutStep2.setVisibility(View.GONE);
             if (stepsIndicator != null) stepsIndicator.setVisibility(View.VISIBLE);
@@ -300,7 +284,6 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
             btnSaveUser.setVisibility(View.GONE);
         }
 
-        // ==================== مؤشر قوة كلمة المرور ====================
         etPassword.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
@@ -311,7 +294,6 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
             }
         });
 
-        // ==================== زر التالي ====================
         if (btnNextStep != null) {
             btnNextStep.setOnClickListener(v -> {
                 String displayName = etDisplayName.getText().toString().trim();
@@ -334,14 +316,12 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
                     return;
                 }
 
-                // الانتقال للخطوة 2
                 layoutStep1.setVisibility(View.GONE);
                 layoutStep2.setVisibility(View.VISIBLE);
                 btnNextStep.setVisibility(View.GONE);
                 btnSaveUser.setVisibility(View.VISIBLE);
                 if (btnPrevStep != null) btnPrevStep.setVisibility(View.VISIBLE);
 
-                // تحديث مؤشر الخطوات
                 if (tvStep1 != null) {
                     tvStep1.setBackgroundResource(R.drawable.circle_outline);
                     tvStep1.setTextColor(ContextCompat.getColor(requireContext(), R.color.on_surface_variant));
@@ -356,7 +336,6 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
             });
         }
 
-        // ==================== زر الرجوع ====================
         if (btnPrevStep != null) {
             btnPrevStep.setOnClickListener(v -> {
                 layoutStep1.setVisibility(View.VISIBLE);
@@ -376,12 +355,10 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
             });
         }
 
-        // ==================== زر الإلغاء ====================
         if (btnCancel != null) {
             btnCancel.setOnClickListener(v -> dialog.dismiss());
         }
 
-        // ==================== زر الحفظ ====================
         btnSaveUser.setOnClickListener(v -> {
             String displayName = etDisplayName.getText().toString().trim();
             String username = etUsername.getText().toString().trim();
@@ -398,7 +375,6 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
                 return;
             }
 
-            // استخراج الصلاحية المختارة
             String role = "INVENTORY_MGR";
             int selectedId = rgRole.getCheckedRadioButtonId();
             if (selectedId != -1) {
@@ -415,7 +391,6 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
         dialog.show();
     }
 
-    // ==================== قوة كلمة المرور ====================
     private int getPasswordStrength(String password) {
         int score = 0;
         if (password.length() >= 4) score++;
@@ -443,7 +418,6 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
         label.setTextColor(strength > 0 ? colors[strength] : gray);
     }
 
-    // ==================== حفظ المستخدم ====================
     private void saveUser(int userId, String username, String password, String displayName,
                           String role, String employeeId, String department, boolean isEdit) {
         Executors.newSingleThreadExecutor().execute(() -> {
@@ -471,14 +445,22 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
                     Toast.makeText(getContext(), isEdit ? "تم التعديل بنجاح" : "تمت الإضافة بنجاح", Toast.LENGTH_SHORT).show();
                     loadUsers();
                 } else {
-                    String msg = response != null ? response.optString("message", "فشل") : "فشل الاتصال";
+                    String msg = "فشل العملية";
+                    if (response != null) {
+                        if (response.message != null && !response.message.isEmpty()) {
+                            msg = response.message;
+                        } else if (response.data != null && response.data.has("message")) {
+                            msg = response.data.optString("message", msg);
+                        }
+                    } else {
+                        msg = "فشل الاتصال بالخادم";
+                    }
                     Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
                 }
             });
         });
     }
 
-    // ==================== حذف مستخدم ====================
     private void deleteUser(int userId, String name) {
         new AlertDialog.Builder(requireContext())
             .setTitle("حذف مستخدم")
@@ -570,4 +552,4 @@ private void parseUsersResponse(MiraApiClient.ApiResponse response) {
             }
         }
     }
-                                           }
+}
