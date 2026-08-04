@@ -21,6 +21,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -66,7 +67,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable timerRunnable;
 
-    // 🟢 معالج وخيط المحاكاة المباشرة
     private final Handler simulationHandler = new Handler(Looper.getMainLooper());
     private Runnable simulationRunnable;
     private int simulationIndex = 0;
@@ -76,7 +76,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
     private MiraApiClient apiClient;
 
-    // 🎯 قائمة الأكواد الحقيقية الخاصة بك حصرياً (EAN-13 / GTIN-13 تبدأ بـ 07)
     private final String[] simulationGtins = {
         "0700000007885", "0700000007886", "0700000007887", "0700000007888", "0700000007889",
         "0700000007890", "0700000007891", "0700000007892", "0700000007893", "0700000007894",
@@ -94,7 +93,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.fragment_mira_inventory_pro, container, false);
-        apiClient = MiraApiClient.getInstance(requireContext());
+        if (getContext() != null) {
+            apiClient = MiraApiClient.getInstance(getContext());
+        }
         bindViews(v);
         setupRecyclerView();
         setupClickListeners();
@@ -106,7 +107,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         loadInventorySettings();
-        loadLastSnapshot(); // 🟢 جلب بيانات الجرد السابق وتفعيل بطاقة المقارنة فوراً
+        loadLastSnapshot(); 
         loadHighValueItems();
     }
 
@@ -159,22 +160,23 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
         expectedCount = simulationGtins.length;
         if (tvExpectedCount != null) tvExpectedCount.setText(String.valueOf(expectedCount));
-        
-        // 🟢 إظهار بطاقة الجرد السابق في الواجهة بشكل دائم
         if (cardComparison != null) cardComparison.setVisibility(View.VISIBLE);
     }
 
-    // ===================== جلب البيانات الحقيقية من السيرفر =====================
+    // ===================== جلب البيانات الحقيقية من السيرفر بآمان =====================
 
     private void loadLastSnapshot() {
+        if (apiClient == null) return;
         new Thread(() -> {
             int loadedPrevItems = 0;
             String loadedDate = "---";
             String loadedAccuracy = "100%";
 
             try {
-                MiraApiClient.ApiResponse response = apiClient.getLastSnapshot("Main Showroom");
-                if (response.isSuccess && response.data != null) {
+                boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+                String showroom = isArabic ? "المعرض الرئيسي" : "Main Showroom";
+                MiraApiClient.ApiResponse response = apiClient.getLastSnapshot(showroom);
+                if (response != null && response.isSuccess && response.data != null) {
                     JSONObject snapshotObj = response.data;
                     
                     if (snapshotObj.has("snapshot")) {
@@ -205,12 +207,11 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                 getActivity().runOnUiThread(() -> {
                     if (!isAdded()) return;
                     prevTotalItems = finalItems;
+                    boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
                     if (tvLastAuditDate != null)
-                        tvLastAuditDate.setText("Last Audit: " + (finalDate.length() > 10 ? finalDate.substring(0, 10) : finalDate));
+                        tvLastAuditDate.setText((isArabic ? "الجرد السابق: " : "Last Audit: ") + (finalDate.length() > 10 ? finalDate.substring(0, 10) : finalDate));
                     if (tvLastAccuracy != null) tvLastAccuracy.setText(finalAccuracy);
                     if (tvPrevItems != null) tvPrevItems.setText(String.valueOf(prevTotalItems));
-                    
-                    // 🟢 ضمان ظهور البطاقة وتحديث الفارق مع الجرد السابق
                     updateComparisonCard();
                 });
             }
@@ -218,10 +219,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private void loadHighValueItems() {
+        if (apiClient == null) return;
         new Thread(() -> {
             try {
-                MiraApiClient.ApiResponse response = apiClient.getHighValueItems("Main Showroom", 3000);
-                if (response.isSuccess && response.data != null) {
+                boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+                MiraApiClient.ApiResponse response = apiClient.getHighValueItems(isArabic ? "المعرض الرئيسي" : "Main Showroom", 3000);
+                if (response != null && response.isSuccess && response.data != null) {
                     int count = response.data.optInt("count", 0);
                     JSONArray items = response.data.optJSONArray("items");
 
@@ -234,7 +237,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                                 for (int i = 0; i < Math.min(3, items.length()); i++) {
                                     JSONObject item = items.optJSONObject(i);
                                     if (item != null) {
-                                        list.append("• ").append(item.optString("item_title", item.optString("title", "قطعة عالية قيمة"))).append("\n");
+                                        list.append("• ").append(item.optString("item_title", item.optString("title", "قطعة عالية القيمة"))).append("\n");
                                     }
                                 }
                                 tvHighValueList.setText(list.toString());
@@ -246,11 +249,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }).start();
     }
 
-    // 🟢 معالجة مسح الكود (استعلام حقيقي حصرياً من قاعدة البيانات)
     public void processScannedTag(String epcOrGtin, String rssi) {
-        if (!isScanning) return;
+        if (!isScanning || apiClient == null) return;
 
-        // منع تكرار نفس الكود
         for (InventoryItem item : scannedItems) {
             if (item.serial.equalsIgnoreCase(epcOrGtin)) return;
         }
@@ -262,17 +263,18 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
                 MiraApiClient.ApiResponse response = apiClient.authorize(epcOrGtin, "inventory", extraParams);
 
-                String title = "قطعة غير معرفة";
-                String karat = "---";
+                boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+                String title = isArabic ? "قطعة غير معرفة" : "Unknown Item";
+                String karat = "21K";
                 String weight = "0.00g";
-                String location = "Main Showroom";
+                String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
                 String status = "⚠️";
                 boolean found = false;
 
-                if (response.isSuccess && response.data != null) {
+                if (response != null && response.isSuccess && response.data != null) {
                     JSONObject item = response.data.optJSONObject("item");
                     if (item != null) {
-                        title = item.optString("title", item.optString("name", "قطعة ذهب"));
+                        title = item.optString("title", item.optString("name", title));
                         karat = item.optString("karat", "21K");
                         double w = item.optDouble("weight", 0);
                         weight = String.format(Locale.US, "%.2fg", w);
@@ -285,7 +287,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                             case "in_stock":
                             case "available":
                             case "transferred":
-                                status = "✓"; found = true; break;
                             default:
                                 status = "✓"; found = true;
                         }
@@ -307,21 +308,20 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                         if (adapter != null) adapter.notifyItemInserted(0);
                         if (rvInventoryItems != null) rvInventoryItems.scrollToPosition(0);
 
-                        if (tvLastScan != null) tvLastScan.setText("Last Scan: " + epcOrGtin);
+                        boolean ar = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+                        if (tvLastScan != null) tvLastScan.setText((ar ? "آخر مسح: " : "Last Scan: ") + epcOrGtin);
                         if (tvRssi != null) tvRssi.setText((rssi != null ? rssi : "-45") + " dBm");
                         if (tvScannedCount != null) tvScannedCount.setText(String.valueOf(scannedCount));
                         if (tvVariance != null) tvVariance.setText(String.valueOf(Math.max(0, expectedCount - foundCount)));
 
-                        // تحديث شريط التقدم بذكاء
                         if (progressScanned != null && expectedCount > 0) {
                             int pct = (int) ((scannedCount * 100.0) / expectedCount);
                             progressScanned.setProgress(Math.min(100, pct));
                         }
 
                         double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 100.0;
-                        if (tvAccuracy != null) tvAccuracy.setText(String.format(Locale.US, "Accuracy: %.1f%%", acc));
+                        if (tvAccuracy != null) tvAccuracy.setText(String.format(Locale.US, ar ? "الدقة: %.1f%%" : "Accuracy: %.1f%%", acc));
 
-                        // 🟢 تحديث الأرقام الحية في بطاقة الجرد السابق
                         updateComparisonCard();
                     });
                 }
@@ -332,17 +332,19 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private void startSessionOnServer(boolean blind) {
+        if (apiClient == null) return;
         new Thread(() -> {
             try {
-                MiraApiClient.ApiResponse response = apiClient.startInventorySession("Main Showroom", blind ? "blind" : "full");
-                if (response.isSuccess && response.data != null) {
+                boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+                MiraApiClient.ApiResponse response = apiClient.startInventorySession(isArabic ? "المعرض الرئيسي" : "Main Showroom", blind ? "blind" : "full");
+                if (response != null && response.isSuccess && response.data != null) {
                     sessionId = response.data.optInt("session_id", 0);
                     int serverExpected = response.data.optInt("expected_count", 0);
                     if (serverExpected > 0) expectedCount = serverExpected;
                 }
             } catch (Exception ignored) {}
 
-            if (getActivity() != null) {
+            if (isAdded() && getActivity() != null) {
                 getActivity().runOnUiThread(() -> {
                     if (!isAdded()) return;
                     if (expectedCount == 0) expectedCount = simulationGtins.length;
@@ -355,7 +357,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }).start();
     }
 
-    // 🟢 دالة المحاكاة المباشرة الحصرية للأكواد الحقيقية
     private void startSimulation() {
         simulationIndex = 0;
         simulationRunnable = new Runnable() {
@@ -365,17 +366,17 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     if (isScanning) stopInventory();
                     return;
                 }
-                // جلب الكود الحقيقي المضمون فقط
                 String gtin = simulationGtins[simulationIndex];
                 processScannedTag(gtin, "-" + (40 + (int)(Math.random() * 25)));
                 simulationIndex++;
-                simulationHandler.postDelayed(this, 500); // إرسال كود كل نصف ثانية
+                simulationHandler.postDelayed(this, 500);
             }
         };
         simulationHandler.postDelayed(simulationRunnable, 300);
     }
 
     private void closeSessionOnServer() {
+        if (apiClient == null) return;
         new Thread(() -> {
             try {
                 JSONObject payload = new JSONObject();
@@ -389,13 +390,14 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private void createSnapshotOnServer() {
-        if (scannedItems.isEmpty() || foundCount == 0) return;
+        if (scannedItems.isEmpty() || foundCount == 0 || apiClient == null) return;
 
         new Thread(() -> {
             try {
                 JSONObject payload = new JSONObject();
                 payload.put("session_id", sessionId);
-                payload.put("location", "Main Showroom");
+                boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+                payload.put("location", isArabic ? "المعرض الرئيسي" : "Main Showroom");
                 payload.put("total_items", foundCount);
                 payload.put("total_weight", calculateTotalWeight());
                 payload.put("total_value", calculateTotalValue());
@@ -414,8 +416,11 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                 }
                 payload.put("items", itemsJson);
 
+                // 🟢 إرسال الـ Snapshot وحفظها بنجاح عبر الـ Client
                 apiClient.createInventorySnapshot(payload);
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to create snapshot: " + e.getMessage());
+            }
         }).start();
     }
 
@@ -423,7 +428,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         double total = 0;
         for (InventoryItem item : scannedItems) {
             try {
-                String w = item.weight.replace("g", "").trim();
+                String w = item.weight.replace("g", "").replace("غرام", "").trim();
                 total += Double.parseDouble(w);
             } catch (Exception ignored) {}
         }
@@ -433,8 +438,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private double calculateTotalValue() {
         return Math.round(calculateTotalWeight() * 65 * 100.0) / 100.0;
     }
-
-    // ===================== التحكم في الجرد =====================
 
     private void startInventory(boolean blindMode) {
         isBlindMode = blindMode;
@@ -453,8 +456,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (cardComparison != null) cardComparison.setVisibility(View.VISIBLE);
         updateComparisonCard();
 
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         if (tvInventoryStatus != null) {
-            tvInventoryStatus.setText("● SCANNING");
+            tvInventoryStatus.setText(isArabic ? "● جاري الجرد" : "● SCANNING");
             tvInventoryStatus.setTextColor(Color.parseColor("#38BDF8"));
         }
 
@@ -463,7 +467,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         startTimer();
 
         if (getContext() != null) {
-            Toast.makeText(getContext(), "🟢 بدأت عملية الجرد الحقيقية بالمحاكاة", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), isArabic ? "🟢 بدأت عملية الجرد المتقدم" : "🟢 Pro Inventory Started", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -479,8 +483,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (btnStopInventory != null) btnStopInventory.setEnabled(false);
         if (btnGenerateReport != null) btnGenerateReport.setEnabled(true);
 
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         if (tvInventoryStatus != null) {
-            tvInventoryStatus.setText("● COMPLETED");
+            tvInventoryStatus.setText(isArabic ? "● مكتمل" : "● COMPLETED");
             tvInventoryStatus.setTextColor(Color.parseColor("#22C55E"));
         }
 
@@ -490,10 +495,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         varianceCount = Math.max(0, expectedCount - foundCount);
 
         updateComparisonCard();
-        createSnapshotOnServer();
+        createSnapshotOnServer(); // 🟢 تنفيذ عملية تخزين البيانات بنجاح في الخلفية
 
         if (getContext() != null) {
-            Toast.makeText(getContext(), "✅ اكتمل الجرد: " + foundCount + " قطعة", Toast.LENGTH_LONG).show();
+            Toast.makeText(getContext(), (isArabic ? "✅ اكتمل الجرد: " : "✅ Complete: ") + foundCount + (isArabic ? " قطعة" : " items"), Toast.LENGTH_LONG).show();
         }
     }
 
@@ -514,6 +519,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private void generateProReport() {
         if (getContext() == null || !isAdded()) return;
 
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         StringBuilder rows = new StringBuilder();
         int count = 1;
         for (int i = scannedItems.size() - 1; i >= 0; i--) {
@@ -531,9 +537,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         double accVal = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 100.0;
         String accColor = accVal >= 98 ? "#22C55E" : accVal >= 90 ? "#F59E0B" : "#EF4444";
 
-        String html = "<!DOCTYPE html><html dir='rtl'><head><meta charset='UTF-8'><style>" +
+        String dir = isArabic ? "rtl" : "ltr";
+        String html = "<!DOCTYPE html><html dir='" + dir + "'><head><meta charset='UTF-8'><style>" +
             "@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');" +
-            "body{font-family:'Cairo',sans-serif;color:#1a1a1a;padding:20px;direction:rtl;background:#fff}" +
+            "body{font-family:'Cairo',sans-serif;color:#1a1a1a;padding:20px;direction:" + dir + ";background:#fff}" +
             ".header{text-align:center;border-bottom:3px solid #1A237E;padding-bottom:15px;margin-bottom:20px}" +
             ".header h1{color:#1A237E;font-size:24px;margin:0}" +
             ".summary{display:flex;justify-content:space-around;margin:20px 0;gap:10px}" +
@@ -549,17 +556,17 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             "@media print{body{padding:0}}" +
             "</style></head><body>" +
             "<div style='text-align:center;font-weight:700;color:#1A237E;letter-spacing:2px'>🏷️ MIRA BRIDGE™</div>" +
-            "<div class='header'><h1>📊 تقرير الجرد المتقدم</h1>" +
-            "<div class='sub'>" + new SimpleDateFormat("yyyy-MM-dd | HH:mm:ss", new Locale("ar")).format(new Date()) + "</div>" +
-            "<div class='sub'>📍 المعرض الرئيسي - صنعاء | نمط: " + (isBlindMode ? "جرد أعمى" : "جرد كامل") + "</div></div>" +
+            "<div class='header'><h1>" + (isArabic ? "📊 تقرير الجرد المتقدم" : "📊 Pro Inventory Report") + "</h1>" +
+            "<div class='sub'>" + new SimpleDateFormat("yyyy-MM-dd | HH:mm:ss", new Locale(isArabic ? "ar" : "en")).format(new Date()) + "</div>" +
+            "<div class='sub'>" + (isArabic ? "📍 المعرض الرئيسي - صنعاء | نمط: " : "📍 Main Showroom | Mode: ") + (isBlindMode ? (isArabic ? "جرد أعمى" : "Blind") : (isArabic ? "جرد كامل" : "Full")) + "</div></div>" +
             "<div class='summary'>" +
-            "<div class='summary-card'><div class='val'>" + expectedCount + "</div><div class='lbl'>العدد المتوقع</div></div>" +
-            "<div class='summary-card found'><div class='val'>" + foundCount + "</div><div class='lbl'>✅ تم العثور</div></div>" +
-            "<div class='summary-card variance'><div class='val'>" + varianceCount + "</div><div class='lbl'>❌ التفاوت</div></div>" +
-            "<div class='summary-card accuracy'><div class='val'>" + String.format(Locale.US, "%.1f%%", accVal) + "</div><div class='lbl'>📊 الدقة</div></div>" +
+            "<div class='summary-card'><div class='val'>" + expectedCount + "</div><div class='lbl'>" + (isArabic ? "العدد المتوقع" : "Expected") + "</div></div>" +
+            "<div class='summary-card found'><div class='val'>" + foundCount + "</div><div class='lbl'>" + (isArabic ? "✅ تم العثور" : "✅ Found") + "</div></div>" +
+            "<div class='summary-card variance'><div class='val'>" + varianceCount + "</div><div class='lbl'>" + (isArabic ? "❌ التفاوت" : "❌ Variance") + "</div></div>" +
+            "<div class='summary-card accuracy'><div class='val'>" + String.format(Locale.US, "%.1f%%", accVal) + "</div><div class='lbl'>" + (isArabic ? "📊 الدقة" : "📊 Accuracy") + "</div></div>" +
             "</div>" +
-            "<table><tr><th>#</th><th>الحالة</th><th>الرمز</th><th>القطعة</th><th>العيار</th><th>الوزن</th></tr>" + rows.toString() + "</table>" +
-            "<div class='footer'><strong>MIRA Technology © 2026</strong><br>mira-id.com | تم الإنشاء بواسطة MIRA Bridge™ Pro</div>" +
+            "<table><tr><th>#</th><th>" + (isArabic ? "الحالة" : "Status") + "</th><th>" + (isArabic ? "الرمز" : "Code") + "</th><th>" + (isArabic ? "القطعة" : "Item") + "</th><th>" + (isArabic ? "العيار" : "Karat") + "</th><th>" + (isArabic ? "الوزن" : "Weight") + "</th></tr>" + rows.toString() + "</table>" +
+            "<div class='footer'><strong>MIRA Technology © 2026</strong><br>mira-id.com | " + (isArabic ? "تم الإنشاء بواسطة MIRA Bridge™ Pro" : "Generated by MIRA Bridge™ Pro") + "</div>" +
             "</body></html>";
 
         WebView webView = new WebView(requireContext());
@@ -576,7 +583,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                 }
             }
         });
-        Toast.makeText(getContext(), "🖨️ فتح نافذة الطباعة...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(getContext(), isArabic ? "🖨️ فتح نافذة الطباعة..." : "🖨️ Opening print dialog...", Toast.LENGTH_SHORT).show();
     }
 
     private void startTimer() {
@@ -619,8 +626,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (!isScanning) startInventory(false);
         else stopInventory();
     }
-
-    // ===================== Models =====================
 
     public static class InventoryItem {
         String serial, title, karat, weight, status, location;
