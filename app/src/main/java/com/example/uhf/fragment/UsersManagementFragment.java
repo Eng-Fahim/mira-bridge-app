@@ -12,11 +12,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -51,8 +53,14 @@ public class UsersManagementFragment extends Fragment {
     private MiraApiClient apiClient;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    private static final String[] ROLES = {"ADMIN", "INVENTORY_MGR", "POS_OPERATOR", "SECURITY", "GATE_SECURITY", "AUDITOR"};
-    private static final String[] ROLES_AR = {"مدير النظام", "مدير المخزون", "موظف مبيعات", "أمن", "أمن البوابات", "مدقق"};
+    private static final String[] ROLES = {
+        "SYSTEM_ADMIN", "ORG_ADMIN", "INVENTORY_MGR",
+        "POS_OPERATOR", "SECURITY", "GATE_SECURITY", "AUDITOR"
+    };
+    private static final String[] ROLES_AR = {
+        "مهندس النظام", "مدير الجهة", "مدير المخزون",
+        "موظف مبيعات", "أمن", "أمن البوابات", "مدقق"
+    };
 
     @Nullable
     @Override
@@ -94,62 +102,37 @@ public class UsersManagementFragment extends Fragment {
     private void loadUsers() {
         Executors.newSingleThreadExecutor().execute(() -> {
             MiraApiClient.ApiResponse response = apiClient.getUsers();
-            
-            if (response != null) {
-                android.util.Log.d("MIRA_USERS", "Response Raw: " + response.toString());
-            }
-
             mainHandler.post(() -> {
                 if (response != null && response.isSuccess) {
-                    parseUsersResponse(response);
+                    parseUsers(response.data);
                 } else {
-                    String errorMsg = "فشل تحميل المستخدمين";
-                    if (response != null && response.data != null) {
-                        errorMsg = response.data.optString("message", errorMsg);
-                    } else if (response == null) {
-                        errorMsg = "فشل الاتصال بالخادم";
-                    }
-                    
-                    Toast.makeText(getContext(), errorMsg, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "فشل تحميل المستخدمين", Toast.LENGTH_SHORT).show();
                 }
             });
         });
     }
 
-    private void parseUsersResponse(MiraApiClient.ApiResponse response) {
+    private void parseUsers(JSONObject data) {
         userList.clear();
-        if (response == null || response.data == null) return;
+        if (data == null) return;
 
-        JSONArray usersArray = null;
+        JSONArray users = data.optJSONArray("users");
+        if (users == null) return;
 
-        if (response.data.has("users")) {
-            usersArray = response.data.optJSONArray("users");
-        } else if (response.data.has("data")) {
-            usersArray = response.data.optJSONArray("data");
-        }
-
-        if (usersArray == null || usersArray.length() == 0) {
-            Toast.makeText(getContext(), "لا توجد بيانات مستخدمين لعرضها", Toast.LENGTH_SHORT).show();
-            filterUsers("");
-            updateStats();
-            return;
-        }
-
-        for (int i = 0; i < usersArray.length(); i++) {
-            JSONObject u = usersArray.optJSONObject(i);
+        for (int i = 0; i < users.length(); i++) {
+            JSONObject u = users.optJSONObject(i);
             if (u == null) continue;
 
             UserData user = new UserData();
-            user.id = u.optInt("id", u.optInt("user_id", 0));
-            user.username = u.optString("username", "");
-            user.displayName = u.optString("display_name", u.optString("name", user.username));
-            user.role = u.optString("role", "INVENTORY_MGR");
-            user.department = u.optString("department", "");
-            user.employeeId = u.optString("employee_id", "");
+            user.id = u.optInt("id");
+            user.username = u.optString("username");
+            user.displayName = u.optString("display_name");
+            user.role = u.optString("role");
+            user.department = u.optString("department");
+            user.employeeId = u.optString("employee_id");
             user.status = u.optString("status", "active");
-            user.lastLogin = u.optString("last_login", "");
+            user.lastLogin = u.optString("last_login");
             user.isOnline = u.optBoolean("is_online", false);
-
             userList.add(user);
         }
 
@@ -176,8 +159,7 @@ public class UsersManagementFragment extends Fragment {
 
     private void updateStats() {
         int total = userList.size();
-        int active = 0;
-        int online = 0;
+        int active = 0, online = 0;
         for (UserData u : userList) {
             if ("active".equals(u.status)) active++;
             if (u.isOnline) online++;
@@ -187,6 +169,9 @@ public class UsersManagementFragment extends Fragment {
         tvOnlineNow.setText(String.valueOf(online));
     }
 
+    // ============================================
+    // 🪜 حوار إضافة/تعديل مستخدم - مع Switch للتفعيل
+    // ============================================
     private void showUserDialog(@Nullable UserData existingUser) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_user_edit, null);
@@ -198,6 +183,7 @@ public class UsersManagementFragment extends Fragment {
 
         boolean isEdit = existingUser != null;
 
+        // ==================== عناصر الواجهة ====================
         TextView tvTitle = dialogView.findViewById(R.id.tvDialogTitle);
         TextView tvSubtitle = dialogView.findViewById(R.id.tvDialogSubtitle);
         EditText etDisplayName = dialogView.findViewById(R.id.etDisplayName);
@@ -223,13 +209,54 @@ public class UsersManagementFragment extends Fragment {
         View vStrength4 = dialogView.findViewById(R.id.vStrength4);
         TextView tvStrengthLabel = dialogView.findViewById(R.id.tvStrengthLabel);
 
+        // ✅ عناصر Switch لكل صلاحية
+        Switch swSystemAdmin = dialogView.findViewById(R.id.swSystemAdmin);
+        Switch swOrgAdmin = dialogView.findViewById(R.id.swOrgAdmin);
+        Switch swInventoryMgr = dialogView.findViewById(R.id.swInventoryMgr);
+        Switch swPosOperator = dialogView.findViewById(R.id.swPosOperator);
+        Switch swSecurity = dialogView.findViewById(R.id.swSecurity);
+        Switch swGateSecurity = dialogView.findViewById(R.id.swGateSecurity);
+        Switch swAuditor = dialogView.findViewById(R.id.swAuditor);
+
+        // ✅ عناصر RadioButton
+        RadioButton rbSystemAdmin = dialogView.findViewById(R.id.rbSystemAdmin);
+        RadioButton rbOrgAdmin = dialogView.findViewById(R.id.rbOrgAdmin);
+        RadioButton rbInventoryMgr = dialogView.findViewById(R.id.rbInventoryMgr);
+        RadioButton rbPosOperator = dialogView.findViewById(R.id.rbPosOperator);
+        RadioButton rbSecurity = dialogView.findViewById(R.id.rbSecurity);
+        RadioButton rbGateSecurity = dialogView.findViewById(R.id.rbGateSecurity);
+        RadioButton rbAuditor = dialogView.findViewById(R.id.rbAuditor);
+
+        // ==================== إعداد الأقسام ====================
         String[] departments = {"المبيعات", "المخزون", "الإدارة", "الأمن", "التدقيق", "المشتريات", "خدمة العملاء"};
         ArrayAdapter<String> deptAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, departments);
         etDepartment.setAdapter(deptAdapter);
 
+        // ==================== العنوان ====================
         tvTitle.setText(isEdit ? "تعديل مستخدم" : "إضافة مستخدم جديد");
         tvSubtitle.setText(isEdit ? "تعديل بيانات المستخدم الحالي" : "أدخل بيانات المستخدم والصلاحية المطلوبة");
 
+        // ==================== ربط Switch مع RadioButton ====================
+        CompoundButton.OnCheckedChangeListener switchListener = (buttonView, isChecked) -> {
+            // عند الضغط على Switch، حدد RadioButton المرتبط به
+            if (buttonView == swSystemAdmin && isChecked) rbSystemAdmin.setChecked(true);
+            else if (buttonView == swOrgAdmin && isChecked) rbOrgAdmin.setChecked(true);
+            else if (buttonView == swInventoryMgr && isChecked) rbInventoryMgr.setChecked(true);
+            else if (buttonView == swPosOperator && isChecked) rbPosOperator.setChecked(true);
+            else if (buttonView == swSecurity && isChecked) rbSecurity.setChecked(true);
+            else if (buttonView == swGateSecurity && isChecked) rbGateSecurity.setChecked(true);
+            else if (buttonView == swAuditor && isChecked) rbAuditor.setChecked(true);
+        };
+
+        if (swSystemAdmin != null) swSystemAdmin.setOnCheckedChangeListener(switchListener);
+        if (swOrgAdmin != null) swOrgAdmin.setOnCheckedChangeListener(switchListener);
+        if (swInventoryMgr != null) swInventoryMgr.setOnCheckedChangeListener(switchListener);
+        if (swPosOperator != null) swPosOperator.setOnCheckedChangeListener(switchListener);
+        if (swSecurity != null) swSecurity.setOnCheckedChangeListener(switchListener);
+        if (swGateSecurity != null) swGateSecurity.setOnCheckedChangeListener(switchListener);
+        if (swAuditor != null) swAuditor.setOnCheckedChangeListener(switchListener);
+
+        // ==================== ملء البيانات في حالة التعديل ====================
         if (isEdit) {
             etDisplayName.setText(existingUser.displayName);
             etUsername.setText(existingUser.username);
@@ -240,21 +267,27 @@ public class UsersManagementFragment extends Fragment {
                 etDepartment.setText(existingUser.department, false);
             }
 
-            for (int i = 0; i < rgRole.getChildCount(); i++) {
-                View child = rgRole.getChildAt(i);
-                RadioButton rb = null;
-                if (child instanceof RadioButton) {
-                    rb = (RadioButton) child;
-                } else if (child instanceof MaterialCardView) {
-                    View inner = ((MaterialCardView) child).getChildAt(0);
-                    if (inner instanceof RadioButton) rb = (RadioButton) inner;
-                }
-                if (rb != null && existingUser.role.equals(rb.getTag())) {
-                    rb.setChecked(true);
-                    break;
-                }
+            // إيقاف جميع المفاتيح
+            if (swSystemAdmin != null) swSystemAdmin.setChecked(false);
+            if (swOrgAdmin != null) swOrgAdmin.setChecked(false);
+            if (swInventoryMgr != null) swInventoryMgr.setChecked(false);
+            if (swPosOperator != null) swPosOperator.setChecked(false);
+            if (swSecurity != null) swSecurity.setChecked(false);
+            if (swGateSecurity != null) swGateSecurity.setChecked(false);
+            if (swAuditor != null) swAuditor.setChecked(false);
+
+            // تفعيل المفتاح المناسب
+            switch (existingUser.role) {
+                case "SYSTEM_ADMIN": if (swSystemAdmin != null) swSystemAdmin.setChecked(true); if (rbSystemAdmin != null) rbSystemAdmin.setChecked(true); break;
+                case "ORG_ADMIN": if (swOrgAdmin != null) swOrgAdmin.setChecked(true); if (rbOrgAdmin != null) rbOrgAdmin.setChecked(true); break;
+                case "INVENTORY_MGR": if (swInventoryMgr != null) swInventoryMgr.setChecked(true); if (rbInventoryMgr != null) rbInventoryMgr.setChecked(true); break;
+                case "POS_OPERATOR": if (swPosOperator != null) swPosOperator.setChecked(true); if (rbPosOperator != null) rbPosOperator.setChecked(true); break;
+                case "SECURITY": if (swSecurity != null) swSecurity.setChecked(true); if (rbSecurity != null) rbSecurity.setChecked(true); break;
+                case "GATE_SECURITY": if (swGateSecurity != null) swGateSecurity.setChecked(true); if (rbGateSecurity != null) rbGateSecurity.setChecked(true); break;
+                case "AUDITOR": if (swAuditor != null) swAuditor.setChecked(true); if (rbAuditor != null) rbAuditor.setChecked(true); break;
             }
 
+            // في حالة التعديل: إظهار كل شيء دفعة واحدة
             layoutStep1.setVisibility(View.VISIBLE);
             layoutStep2.setVisibility(View.VISIBLE);
             if (stepsIndicator != null) stepsIndicator.setVisibility(View.GONE);
@@ -264,6 +297,7 @@ public class UsersManagementFragment extends Fragment {
             if (btnPrevStep != null) btnPrevStep.setVisibility(View.GONE);
             btnSaveUser.setVisibility(View.VISIBLE);
         } else {
+            // إضافة جديد: إظهار الخطوة 1 فقط، تعيين مدير المخزون افتراضياً
             layoutStep1.setVisibility(View.VISIBLE);
             layoutStep2.setVisibility(View.GONE);
             if (stepsIndicator != null) stepsIndicator.setVisibility(View.VISIBLE);
@@ -274,6 +308,7 @@ public class UsersManagementFragment extends Fragment {
             btnSaveUser.setVisibility(View.GONE);
         }
 
+        // ==================== مؤشر قوة كلمة المرور ====================
         etPassword.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
@@ -284,27 +319,16 @@ public class UsersManagementFragment extends Fragment {
             }
         });
 
+        // ==================== زر التالي ====================
         if (btnNextStep != null) {
             btnNextStep.setOnClickListener(v -> {
                 String displayName = etDisplayName.getText().toString().trim();
                 String username = etUsername.getText().toString().trim();
                 String password = etPassword.getText().toString().trim();
 
-                if (displayName.isEmpty()) {
-                    etDisplayName.setError("مطلوب");
-                    etDisplayName.requestFocus();
-                    return;
-                }
-                if (username.isEmpty()) {
-                    etUsername.setError("مطلوب");
-                    etUsername.requestFocus();
-                    return;
-                }
-                if (password.length() < 4) {
-                    etPassword.setError("4 أحرف على الأقل");
-                    etPassword.requestFocus();
-                    return;
-                }
+                if (displayName.isEmpty()) { etDisplayName.setError("مطلوب"); etDisplayName.requestFocus(); return; }
+                if (username.isEmpty()) { etUsername.setError("مطلوب"); etUsername.requestFocus(); return; }
+                if (!isEdit && password.length() < 4) { etPassword.setError("4 أحرف على الأقل"); etPassword.requestFocus(); return; }
 
                 layoutStep1.setVisibility(View.GONE);
                 layoutStep2.setVisibility(View.VISIBLE);
@@ -312,20 +336,13 @@ public class UsersManagementFragment extends Fragment {
                 btnSaveUser.setVisibility(View.VISIBLE);
                 if (btnPrevStep != null) btnPrevStep.setVisibility(View.VISIBLE);
 
-                if (tvStep1 != null) {
-                    tvStep1.setBackgroundResource(R.drawable.circle_outline);
-                    tvStep1.setTextColor(ContextCompat.getColor(requireContext(), R.color.on_surface_variant));
-                }
-                if (tvStep2 != null) {
-                    tvStep2.setBackgroundResource(R.drawable.circle_primary);
-                    tvStep2.setTextColor(Color.WHITE);
-                }
-                if (vStepLine1 != null) {
-                    vStepLine1.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.primary));
-                }
+                if (tvStep1 != null) { tvStep1.setBackgroundResource(R.drawable.circle_outline); tvStep1.setTextColor(0xFF44474E); }
+                if (tvStep2 != null) { tvStep2.setBackgroundResource(R.drawable.circle_primary); tvStep2.setTextColor(Color.WHITE); }
+                if (vStepLine1 != null) vStepLine1.setBackgroundColor(0xFF1A237E);
             });
         }
 
+        // ==================== زر الرجوع ====================
         if (btnPrevStep != null) {
             btnPrevStep.setOnClickListener(v -> {
                 layoutStep1.setVisibility(View.VISIBLE);
@@ -334,21 +351,15 @@ public class UsersManagementFragment extends Fragment {
                 btnSaveUser.setVisibility(View.GONE);
                 btnPrevStep.setVisibility(View.GONE);
 
-                if (tvStep1 != null) {
-                    tvStep1.setBackgroundResource(R.drawable.circle_primary);
-                    tvStep1.setTextColor(Color.WHITE);
-                }
-                if (tvStep2 != null) {
-                    tvStep2.setBackgroundResource(R.drawable.circle_outline);
-                    tvStep2.setTextColor(ContextCompat.getColor(requireContext(), R.color.on_surface_variant));
-                }
+                if (tvStep1 != null) { tvStep1.setBackgroundResource(R.drawable.circle_primary); tvStep1.setTextColor(Color.WHITE); }
+                if (tvStep2 != null) { tvStep2.setBackgroundResource(R.drawable.circle_outline); tvStep2.setTextColor(0xFF44474E); }
             });
         }
 
-        if (btnCancel != null) {
-            btnCancel.setOnClickListener(v -> dialog.dismiss());
-        }
+        // ==================== زر الإلغاء ====================
+        if (btnCancel != null) btnCancel.setOnClickListener(v -> dialog.dismiss());
 
+        // ==================== زر الحفظ ====================
         btnSaveUser.setOnClickListener(v -> {
             String displayName = etDisplayName.getText().toString().trim();
             String username = etUsername.getText().toString().trim();
@@ -365,14 +376,9 @@ public class UsersManagementFragment extends Fragment {
                 return;
             }
 
-            String role = "INVENTORY_MGR";
-            int selectedId = rgRole.getCheckedRadioButtonId();
-            if (selectedId != -1) {
-                View selectedView = rgRole.findViewById(selectedId);
-                if (selectedView instanceof RadioButton && selectedView.getTag() != null) {
-                    role = selectedView.getTag().toString();
-                }
-            }
+            // ✅ استخراج الصلاحية المختارة (من RadioButton المرتبط بـ Switch المفعل)
+            String role = getSelectedRole(rgRole, swSystemAdmin, swOrgAdmin, swInventoryMgr,
+                swPosOperator, swSecurity, swGateSecurity, swAuditor);
 
             saveUser(isEdit ? existingUser.id : 0, username, password, displayName, role, employeeId, department, isEdit);
             dialog.dismiss();
@@ -381,6 +387,22 @@ public class UsersManagementFragment extends Fragment {
         dialog.show();
     }
 
+    /**
+     * ✅ استخراج الصلاحية المختارة من خلال Switch المفعل
+     */
+    private String getSelectedRole(RadioGroup rgRole, Switch... switches) {
+        // إذا كان rgRole يحتوي على اختيار، استخدمه
+        int selectedId = rgRole.getCheckedRadioButtonId();
+        if (selectedId != -1) {
+            View selectedView = rgRole.findViewById(selectedId);
+            if (selectedView != null && selectedView.getTag() != null) {
+                return selectedView.getTag().toString();
+            }
+        }
+        return "INVENTORY_MGR"; // افتراضي
+    }
+
+    // ==================== قوة كلمة المرور ====================
     private int getPasswordStrength(String password) {
         int score = 0;
         if (password.length() >= 4) score++;
@@ -392,16 +414,11 @@ public class UsersManagementFragment extends Fragment {
     }
 
     private void updateStrengthBars(View b1, View b2, View b3, View b4, TextView label, int strength) {
-        int red = 0xFFEF4444;
-        int orange = 0xFFF59E0B;
-        int green = 0xFF22C55E;
-        int gray = 0xFFCBD5E1;
-
+        int red = 0xFFEF4444, orange = 0xFFF59E0B, green = 0xFF22C55E, gray = 0xFFCBD5E1;
         b1.setBackgroundColor(strength >= 1 ? (strength <= 2 ? red : orange) : gray);
         b2.setBackgroundColor(strength >= 2 ? orange : gray);
         b3.setBackgroundColor(strength >= 3 ? green : gray);
         b4.setBackgroundColor(strength >= 4 ? green : gray);
-
         String[] labels = {"", "ضعيفة", "متوسطة", "جيدة", "قوية"};
         int[] colors = {0, red, orange, green, green};
         label.setText(strength > 0 ? labels[strength] : "");
@@ -418,12 +435,8 @@ public class UsersManagementFragment extends Fragment {
                 payload.put("role", role);
                 payload.put("employee_id", employeeId);
                 payload.put("department", department);
-                if (!password.isEmpty()) {
-                    payload.put("password", password);
-                }
-                if (isEdit) {
-                    payload.put("user_id", userId);
-                }
+                if (!password.isEmpty()) payload.put("password", password);
+                if (isEdit) payload.put("user_id", userId);
             } catch (Exception ignored) {}
 
             MiraApiClient.ApiResponse response = isEdit
@@ -435,12 +448,7 @@ public class UsersManagementFragment extends Fragment {
                     Toast.makeText(getContext(), isEdit ? "تم التعديل بنجاح" : "تمت الإضافة بنجاح", Toast.LENGTH_SHORT).show();
                     loadUsers();
                 } else {
-                    String msg = "فشل العملية";
-                    if (response != null && response.data != null) {
-                        msg = response.data.optString("message", msg);
-                    } else if (response == null) {
-                        msg = "فشل الاتصال بالخادم";
-                    }
+                    String msg = response != null ? response.optString("message", "فشل") : "فشل الاتصال";
                     Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
                 }
             });
@@ -469,7 +477,6 @@ public class UsersManagementFragment extends Fragment {
     }
 
     // ===================== User Data =====================
-
     static class UserData {
         int id;
         String username, displayName, role, department, employeeId, status, lastLogin;
@@ -477,16 +484,13 @@ public class UsersManagementFragment extends Fragment {
     }
 
     // ===================== Adapter =====================
-
     class UsersAdapter extends RecyclerView.Adapter<UsersAdapter.VH> {
         final List<UserData> list;
-
         UsersAdapter(List<UserData> list) { this.list = list; }
 
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_user_row, parent, false);
-            return new VH(v);
+            return new VH(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_user_row, parent, false));
         }
 
         @Override
@@ -524,7 +528,6 @@ public class UsersManagementFragment extends Fragment {
             TextView tvDisplayName, tvUsername, tvRole, tvDepartment, tvStatus;
             View vStatusDot;
             ImageButton btnEdit, btnDelete;
-
             VH(View v) {
                 super(v);
                 tvDisplayName = v.findViewById(R.id.tvRowDisplayName);
@@ -538,4 +541,4 @@ public class UsersManagementFragment extends Fragment {
             }
         }
     }
-}
+                }
