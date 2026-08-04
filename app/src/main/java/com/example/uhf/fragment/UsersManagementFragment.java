@@ -92,45 +92,78 @@ public class UsersManagementFragment extends Fragment {
     }
 
     private void loadUsers() {
-        Executors.newSingleThreadExecutor().execute(() -> {
-            MiraApiClient.ApiResponse response = apiClient.getUsers();
-            mainHandler.post(() -> {
-                if (response != null && response.isSuccess) {
-                    parseUsers(response.data);
-                } else {
-                    Toast.makeText(getContext(), "فشل تحميل المستخدمين", Toast.LENGTH_SHORT).show();
-                }
-            });
+    Executors.newSingleThreadExecutor().execute(() -> {
+        MiraApiClient.ApiResponse response = apiClient.getUsers();
+        mainHandler.post(() -> {
+            if (response != null) {
+    android.util.Log.d("MIRA_USERS", "Response Raw: " + response.toString());
+}
+
+            if (response != null && response.isSuccess) {
+                // نمرر الـ response كاملاً لمعالجة كل الحالات
+                parseUsersResponse(response);
+            } else {
+                String errorMsg = (response != null && response.optString("message", null) != null) 
+                        ? response.optString("message", "فشل تحميل المستخدمين")
+                        : "فشل الاتصال بالخادم";
+                Toast.makeText(getContext(), errorMsg, Toast.LENGTH_SHORT).show();
+            }
         });
-    }
+    });
+}
 
-    private void parseUsers(JSONObject data) {
-        userList.clear();
-        if (data == null) return;
 
-        JSONArray users = data.optJSONArray("users");
-        if (users == null) return;
+    private void parseUsersResponse(MiraApiClient.ApiResponse response) {
+    userList.clear();
+    if (response == null) return;
 
-        for (int i = 0; i < users.length(); i++) {
-            JSONObject u = users.optJSONObject(i);
-            if (u == null) continue;
+    JSONArray usersArray = null;
 
-            UserData user = new UserData();
-            user.id = u.optInt("id");
-            user.username = u.optString("username");
-            user.displayName = u.optString("display_name");
-            user.role = u.optString("role");
-            user.department = u.optString("department");
-            user.employeeId = u.optString("employee_id");
-            user.status = u.optString("status", "active");
-            user.lastLogin = u.optString("last_login");
-            user.isOnline = u.optBoolean("is_online", false);
-            userList.add(user);
+    // 1. إذا كان الـ data عبارة عن JSONObject
+    if (response.data != null) {
+        if (response.data.has("users")) {
+            usersArray = response.data.optJSONArray("users");
+        } else if (response.data.has("data")) {
+            usersArray = response.data.optJSONArray("data");
         }
-
-        filterUsers(etSearchUser.getText().toString());
-        updateStats();
     }
+
+    // 2. إذا كانت الاستجابة المباشرة تحتوي على JSONArray (في حال وجود jsonArray داخل ApiResponse)
+    if (usersArray == null && response.jsonArray != null) {
+        usersArray = response.jsonArray;
+    }
+
+    // 3. في حال لم تجد أي مصفوفة
+    if (usersArray == null) {
+        Toast.makeText(getContext(), "لا توجد بيانات مستخدمين أو تنسيق غير مدعوم", Toast.LENGTH_SHORT).show();
+        updateStats();
+        adapter.notifyDataSetChanged();
+        return;
+    }
+
+    // قراءة عناصر القائمة
+    for (int i = 0; i < usersArray.length(); i++) {
+        JSONObject u = usersArray.optJSONObject(i);
+        if (u == null) continue;
+
+        UserData user = new UserData();
+        user.id = u.optInt("id", u.optInt("user_id", 0));
+        user.username = u.optString("username", "");
+        user.displayName = u.optString("display_name", u.optString("name", user.username));
+        user.role = u.optString("role", "INVENTORY_MGR");
+        user.department = u.optString("department", "");
+        user.employeeId = u.optString("employee_id", "");
+        user.status = u.optString("status", "active");
+        user.lastLogin = u.optString("last_login", "");
+        user.isOnline = u.optBoolean("is_online", false);
+
+        userList.add(user);
+    }
+
+    filterUsers(etSearchUser.getText().toString());
+    updateStats();
+}
+
 
     private void filterUsers(String query) {
         filteredList.clear();
