@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
+    android:orientation="vertical"
+    android:layoutDirection="rtl">
+
+    <!-- شريط العنوان -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorPrimary"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="14dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="👥 إدارة المستخدمين والصلاحيات"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnAddUser"
+            android:layout_width="wrap_content"
+            android:layout_height="38dp"
+            android:backgroundTint="@android:color/white"
+            android:text="+ إضافة مستخدم"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            app:cornerRadius="8dp" />
+    </LinearLayout>
+
+    <!-- ملخص سريع -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:background="?attr/colorSurfaceVariant">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvTotalUsers"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="مستخدم"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="?attr/colorOutline" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvActiveUsers"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#22C55E"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="نشط"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="?attr/colorOutline" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvOnlineNow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#3B82F6"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="متصل الآن"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- شريط بحث -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="12dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <EditText
+            android:id="@+id/etSearchUser"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            android:background="?attr/colorSurfaceVariant"
+            android:hint="بحث عن مستخدم..."
+            android:textColorHint="?attr/colorOnSurfaceVariant"
+            android:paddingHorizontal="12dp"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btnRefreshUsers"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:backgroundTint="?attr/colorPrimary"
+            android:text="🔄"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="16sp" />
+    </LinearLayout>
+
+    <!-- قائمة المستخدمين -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvUsersList"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingHorizontal="12dp"
+        android:clipToPadding="false" />
+
+</LinearLayout>
