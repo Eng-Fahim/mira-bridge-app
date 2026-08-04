@@ -4,8 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:fillViewport="true"
-    android:scrollbars="none"
-    android:background="@drawable/bg_dialog_rounded"> <!-- إضافة خلفية صلبة بدائرية جذابة -->
+    android:scrollbars="none">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -134,7 +133,6 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- الاسم الظاهر -->
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -155,13 +153,12 @@
                     android:imeOptions="actionNext" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- اسم المستخدم -->
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="10dp"
                 android:hint="اسم المستخدم *"
-                app:startIconDrawable="@drawable/ic_person_outline"
+                app:startIconDrawable="@drawable/ic_user"
                 app:startIconTint="?attr/colorPrimary"
                 style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 app:counterEnabled="true"
@@ -176,7 +173,6 @@
                     android:imeOptions="actionNext" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- كلمة المرور مع مؤشر القوة -->
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -199,51 +195,16 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginBottom="12dp"
+                android:layout_marginBottom="10dp"
                 android:gravity="center_vertical">
 
-                <View
-                    android:id="@+id/vStrength1"
-                    android:layout_width="0dp"
-                    android:layout_height="3dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="3dp"
-                    android:background="?attr/colorOutline" />
-
-                <View
-                    android:id="@+id/vStrength2"
-                    android:layout_width="0dp"
-                    android:layout_height="3dp"
-                    android:layout_weight="1"
-                    android:layout_marginHorizontal="3dp"
-                    android:background="?attr/colorOutline" />
-
-                <View
-                    android:id="@+id/vStrength3"
-                    android:layout_width="0dp"
-                    android:layout_height="3dp"
-                    android:layout_weight="1"
-                    android:layout_marginHorizontal="3dp"
-                    android:background="?attr/colorOutline" />
-
-                <View
-                    android:id="@+id/vStrength4"
-                    android:layout_width="0dp"
-                    android:layout_height="3dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="3dp"
-                    android:background="?attr/colorOutline" />
-
-                <TextView
-                    android:id="@+id/tvStrengthLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text=""
-                    android:textSize="10sp" />
+                <View android:id="@+id/vStrength1" android:layout_width="0dp" android:layout_height="3dp" android:layout_weight="1" android:layout_marginEnd="3dp" android:background="?attr/colorOutline" />
+                <View android:id="@+id/vStrength2" android:layout_width="0dp" android:layout_height="3dp" android:layout_weight="1" android:layout_marginHorizontal="3dp" android:background="?attr/colorOutline" />
+                <View android:id="@+id/vStrength3" android:layout_width="0dp" android:layout_height="3dp" android:layout_weight="1" android:layout_marginHorizontal="3dp" android:background="?attr/colorOutline" />
+                <View android:id="@+id/vStrength4" android:layout_width="0dp" android:layout_height="3dp" android:layout_weight="1" android:layout_marginStart="3dp" android:background="?attr/colorOutline" />
+                <TextView android:id="@+id/tvStrengthLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="" android:textSize="10sp" />
             </LinearLayout>
 
-            <!-- رقم الموظف -->
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -260,7 +221,6 @@
                     android:imeOptions="actionNext" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- القسم -->
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -277,7 +237,6 @@
                     android:imeOptions="actionDone" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- زر التالي -->
             <Button
                 android:id="@+id/btnNextStep"
                 android:layout_width="match_parent"
@@ -288,7 +247,6 @@
                 android:textStyle="bold"
                 android:backgroundTint="?attr/colorPrimary"
                 app:cornerRadius="12dp" />
-
         </LinearLayout>
 
         <!-- ==================== الخطوة 2: اختيار الصلاحية ==================== -->
@@ -313,8 +271,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
 
-                <!-- 👑 مدير النظام -->
+                <!-- 🔧 مهندس النظام -->
                 <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardSystemAdmin"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
@@ -323,19 +282,76 @@
                     app:strokeWidth="1dp"
                     app:strokeColor="?attr/colorOutline">
 
-                    <RadioButton
-                        android:id="@+id/rbAdmin"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="👑 مدير النظام"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:padding="12dp"
-                        android:tag="ADMIN" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:padding="12dp">
+
+                        <RadioButton
+                            android:id="@+id/rbSystemAdmin"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🔧 مهندس النظام"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:tag="SYSTEM_ADMIN"
+                            android:buttonTint="?attr/colorPrimary" />
+
+                        <Switch
+                            android:id="@+id/swSystemAdmin"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:thumbTint="?attr/colorPrimary"
+                            android:trackTint="?attr/colorSurfaceVariant" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- 🏢 مدير الجهة -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardOrgAdmin"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    app:cardCornerRadius="10dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="?attr/colorOutline">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:padding="12dp">
+
+                        <RadioButton
+                            android:id="@+id/rbOrgAdmin"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🏢 مدير الجهة"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:tag="ORG_ADMIN"
+                            android:buttonTint="?attr/colorPrimary" />
+
+                        <Switch
+                            android:id="@+id/swOrgAdmin"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:thumbTint="?attr/colorPrimary"
+                            android:trackTint="?attr/colorSurfaceVariant" />
+                    </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- 📊 مدير المخزون -->
                 <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardInventoryMgr"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
@@ -344,20 +360,38 @@
                     app:strokeWidth="1dp"
                     app:strokeColor="?attr/colorOutline">
 
-                    <RadioButton
-                        android:id="@+id/rbInventoryMgr"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="📊 مدير المخزون"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:padding="12dp"
-                        android:tag="INVENTORY_MGR"
-                        android:checked="true" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:padding="12dp">
+
+                        <RadioButton
+                            android:id="@+id/rbInventoryMgr"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="📊 مدير المخزون"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:tag="INVENTORY_MGR"
+                            android:checked="true"
+                            android:buttonTint="?attr/colorPrimary" />
+
+                        <Switch
+                            android:id="@+id/swInventoryMgr"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:thumbTint="?attr/colorPrimary"
+                            android:trackTint="?attr/colorSurfaceVariant" />
+                    </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- 🛒 موظف مبيعات -->
                 <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardPosOperator"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
@@ -366,19 +400,37 @@
                     app:strokeWidth="1dp"
                     app:strokeColor="?attr/colorOutline">
 
-                    <RadioButton
-                        android:id="@+id/rbPosOperator"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="🛒 موظف مبيعات"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:padding="12dp"
-                        android:tag="POS_OPERATOR" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:padding="12dp">
+
+                        <RadioButton
+                            android:id="@+id/rbPosOperator"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🛒 موظف مبيعات"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:tag="POS_OPERATOR"
+                            android:buttonTint="?attr/colorPrimary" />
+
+                        <Switch
+                            android:id="@+id/swPosOperator"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:thumbTint="?attr/colorPrimary"
+                            android:trackTint="?attr/colorSurfaceVariant" />
+                    </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- 🔒 أمن -->
                 <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardSecurity"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
@@ -387,19 +439,37 @@
                     app:strokeWidth="1dp"
                     app:strokeColor="?attr/colorOutline">
 
-                    <RadioButton
-                        android:id="@+id/rbSecurity"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="🔒 أمن"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:padding="12dp"
-                        android:tag="SECURITY" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:padding="12dp">
+
+                        <RadioButton
+                            android:id="@+id/rbSecurity"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🔒 أمن"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:tag="SECURITY"
+                            android:buttonTint="?attr/colorPrimary" />
+
+                        <Switch
+                            android:id="@+id/swSecurity"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:thumbTint="?attr/colorPrimary"
+                            android:trackTint="?attr/colorSurfaceVariant" />
+                    </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- 🚪 أمن البوابات -->
                 <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardGateSecurity"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="8dp"
@@ -408,19 +478,37 @@
                     app:strokeWidth="1dp"
                     app:strokeColor="?attr/colorOutline">
 
-                    <RadioButton
-                        android:id="@+id/rbGateSecurity"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="🚪 أمن البوابات"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:padding="12dp"
-                        android:tag="GATE_SECURITY" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:padding="12dp">
+
+                        <RadioButton
+                            android:id="@+id/rbGateSecurity"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🚪 أمن البوابات"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:tag="GATE_SECURITY"
+                            android:buttonTint="?attr/colorPrimary" />
+
+                        <Switch
+                            android:id="@+id/swGateSecurity"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:thumbTint="?attr/colorPrimary"
+                            android:trackTint="?attr/colorSurfaceVariant" />
+                    </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- 🔍 مدقق -->
                 <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardAuditor"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     app:cardCornerRadius="10dp"
@@ -428,15 +516,32 @@
                     app:strokeWidth="1dp"
                     app:strokeColor="?attr/colorOutline">
 
-                    <RadioButton
-                        android:id="@+id/rbAuditor"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="🔍 مدقق"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:padding="12dp"
-                        android:tag="AUDITOR" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:padding="12dp">
+
+                        <RadioButton
+                            android:id="@+id/rbAuditor"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🔍 مدقق"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:tag="AUDITOR"
+                            android:buttonTint="?attr/colorPrimary" />
+
+                        <Switch
+                            android:id="@+id/swAuditor"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:thumbTint="?attr/colorPrimary"
+                            android:trackTint="?attr/colorSurfaceVariant" />
+                    </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
             </RadioGroup>
