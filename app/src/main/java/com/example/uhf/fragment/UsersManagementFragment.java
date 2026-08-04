@@ -1,6 +1,7 @@
 package com.example.uhf.fragment;
 
 import android.app.AlertDialog;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -13,17 +14,22 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
+import com.google.android.material.card.MaterialCardView;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -156,85 +162,247 @@ public class UsersManagementFragment extends Fragment {
         tvOnlineNow.setText(String.valueOf(online));
     }
 
+    // ============================================
+    // 🪜 حوار إضافة/تعديل مستخدم - خطوتين ذكي
+    // ============================================
     private void showUserDialog(@Nullable UserData existingUser) {
-    AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-    View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_user_edit, null);
-    builder.setView(dialogView);
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_user_edit, null);
+        builder.setView(dialogView);
+        AlertDialog dialog = builder.create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
 
-    TextView tvTitle = dialogView.findViewById(R.id.tvDialogTitle);
-    EditText etDisplayName = dialogView.findViewById(R.id.etDisplayName);
-    EditText etUsername = dialogView.findViewById(R.id.etUsername);
-    EditText etPassword = dialogView.findViewById(R.id.etPassword);
-    EditText etEmployeeId = dialogView.findViewById(R.id.etEmployeeId);
-    EditText etDepartment = dialogView.findViewById(R.id.etDepartment);
-    RadioGroup rgRole = dialogView.findViewById(R.id.rgRole);
-    Button btnCancel = dialogView.findViewById(R.id.btnCancelUser);
-    Button btnSave = dialogView.findViewById(R.id.btnSaveUser);
+        boolean isEdit = existingUser != null;
 
-    boolean isEdit = existingUser != null;
-    tvTitle.setText(isEdit ? "تعديل مستخدم" : "إضافة مستخدم جديد");
+        // ==================== عناصر الواجهة ====================
+        TextView tvTitle = dialogView.findViewById(R.id.tvDialogTitle);
+        TextView tvSubtitle = dialogView.findViewById(R.id.tvDialogSubtitle);
+        EditText etDisplayName = dialogView.findViewById(R.id.etDisplayName);
+        EditText etUsername = dialogView.findViewById(R.id.etUsername);
+        EditText etPassword = dialogView.findViewById(R.id.etPassword);
+        EditText etEmployeeId = dialogView.findViewById(R.id.etEmployeeId);
+        com.google.android.material.textfield.MaterialAutoCompleteTextView etDepartment = dialogView.findViewById(R.id.etDepartment);
+        RadioGroup rgRole = dialogView.findViewById(R.id.rgRole);
+        Button btnCancel = dialogView.findViewById(R.id.btnCancelUser);
+        Button btnNextStep = dialogView.findViewById(R.id.btnNextStep);
+        Button btnPrevStep = dialogView.findViewById(R.id.btnPrevStep);
+        Button btnSaveUser = dialogView.findViewById(R.id.btnSaveUser);
+        LinearLayout layoutStep1 = dialogView.findViewById(R.id.layoutStep1);
+        LinearLayout layoutStep2 = dialogView.findViewById(R.id.layoutStep2);
+        LinearLayout layoutButtons1 = dialogView.findViewById(R.id.layoutButtons1);
+        LinearLayout stepsIndicator = dialogView.findViewById(R.id.stepsIndicator);
+        TextView tvStep1 = dialogView.findViewById(R.id.tvStep1);
+        TextView tvStep2 = dialogView.findViewById(R.id.tvStep2);
+        View vStepLine1 = dialogView.findViewById(R.id.vStepLine1);
+        View vStrength1 = dialogView.findViewById(R.id.vStrength1);
+        View vStrength2 = dialogView.findViewById(R.id.vStrength2);
+        View vStrength3 = dialogView.findViewById(R.id.vStrength3);
+        View vStrength4 = dialogView.findViewById(R.id.vStrength4);
+        TextView tvStrengthLabel = dialogView.findViewById(R.id.tvStrengthLabel);
 
-    if (isEdit) {
-        etDisplayName.setText(existingUser.displayName);
-        etUsername.setText(existingUser.username);
-        etUsername.setEnabled(false);
-        etPassword.setHint("اتركه فارغاً إذا لم ترغب بالتغيير");
-        etEmployeeId.setText(existingUser.employeeId);
-        etDepartment.setText(existingUser.department);
+        // ==================== إعداد الأقسام ====================
+        String[] departments = {"المبيعات", "المخزون", "الإدارة", "الأمن", "التدقيق", "المشتريات", "خدمة العملاء"};
+        ArrayAdapter<String> deptAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, departments);
+        etDepartment.setAdapter(deptAdapter);
 
-        // تحديد الصلاحية الحالية
-        for (int i = 0; i < rgRole.getChildCount(); i++) {
-            View child = rgRole.getChildAt(i);
-            if (child instanceof RadioButton) {
-                RadioButton rb = (RadioButton) child;
-                if (rb.getTag().equals(existingUser.role)) {
+        // ==================== العنوان ====================
+        tvTitle.setText(isEdit ? "تعديل مستخدم" : "إضافة مستخدم جديد");
+        tvSubtitle.setText(isEdit ? "تعديل بيانات المستخدم الحالي" : "أدخل بيانات المستخدم والصلاحية المطلوبة");
+
+        // ==================== ملء البيانات في حالة التعديل ====================
+        if (isEdit) {
+            etDisplayName.setText(existingUser.displayName);
+            etUsername.setText(existingUser.username);
+            etUsername.setEnabled(false);
+            etPassword.setHint("اتركه فارغاً إذا لم ترغب بالتغيير");
+            etEmployeeId.setText(existingUser.employeeId);
+            if (existingUser.department != null && !existingUser.department.isEmpty()) {
+                etDepartment.setText(existingUser.department, false);
+            }
+
+            // تحديد الصلاحية الحالية
+            for (int i = 0; i < rgRole.getChildCount(); i++) {
+                View child = rgRole.getChildAt(i);
+                RadioButton rb = null;
+                if (child instanceof RadioButton) {
+                    rb = (RadioButton) child;
+                } else if (child instanceof MaterialCardView) {
+                    View inner = ((MaterialCardView) child).getChildAt(0);
+                    if (inner instanceof RadioButton) rb = (RadioButton) inner;
+                }
+                if (rb != null && existingUser.role.equals(rb.getTag())) {
                     rb.setChecked(true);
                     break;
                 }
             }
+
+            // في حالة التعديل: إظهار كل شيء دفعة واحدة
+            layoutStep1.setVisibility(View.VISIBLE);
+            layoutStep2.setVisibility(View.VISIBLE);
+            if (stepsIndicator != null) stepsIndicator.setVisibility(View.GONE);
+            if (btnNextStep != null) btnNextStep.setVisibility(View.GONE);
+            if (layoutButtons1 != null) layoutButtons1.setVisibility(View.VISIBLE);
+            if (btnCancel != null) btnCancel.setVisibility(View.VISIBLE);
+            if (btnPrevStep != null) btnPrevStep.setVisibility(View.GONE);
+            btnSaveUser.setVisibility(View.VISIBLE);
+        } else {
+            // إضافة جديد: إظهار الخطوة 1 فقط
+            layoutStep1.setVisibility(View.VISIBLE);
+            layoutStep2.setVisibility(View.GONE);
+            if (stepsIndicator != null) stepsIndicator.setVisibility(View.VISIBLE);
+            if (btnNextStep != null) btnNextStep.setVisibility(View.VISIBLE);
+            if (layoutButtons1 != null) layoutButtons1.setVisibility(View.GONE);
+            if (btnCancel != null) btnCancel.setVisibility(View.GONE);
+            if (btnPrevStep != null) btnPrevStep.setVisibility(View.GONE);
+            btnSaveUser.setVisibility(View.GONE);
         }
-    } else {
-        // افتراضياً: مدير المخزون
-        RadioButton defaultRole = dialogView.findViewById(R.id.rbInventoryMgr);
-        if (defaultRole != null) defaultRole.setChecked(true);
+
+        // ==================== مؤشر قوة كلمة المرور ====================
+        etPassword.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                int strength = getPasswordStrength(s.toString());
+                updateStrengthBars(vStrength1, vStrength2, vStrength3, vStrength4, tvStrengthLabel, strength);
+            }
+        });
+
+        // ==================== زر التالي ====================
+        if (btnNextStep != null) {
+            btnNextStep.setOnClickListener(v -> {
+                String displayName = etDisplayName.getText().toString().trim();
+                String username = etUsername.getText().toString().trim();
+                String password = etPassword.getText().toString().trim();
+
+                if (displayName.isEmpty()) {
+                    etDisplayName.setError("مطلوب");
+                    etDisplayName.requestFocus();
+                    return;
+                }
+                if (username.isEmpty()) {
+                    etUsername.setError("مطلوب");
+                    etUsername.requestFocus();
+                    return;
+                }
+                if (password.length() < 4) {
+                    etPassword.setError("4 أحرف على الأقل");
+                    etPassword.requestFocus();
+                    return;
+                }
+
+                // الانتقال للخطوة 2
+                layoutStep1.setVisibility(View.GONE);
+                layoutStep2.setVisibility(View.VISIBLE);
+                btnNextStep.setVisibility(View.GONE);
+                btnSaveUser.setVisibility(View.VISIBLE);
+                if (btnPrevStep != null) btnPrevStep.setVisibility(View.VISIBLE);
+
+                // تحديث مؤشر الخطوات
+                if (tvStep1 != null) {
+                    tvStep1.setBackgroundResource(R.drawable.circle_outline);
+                    tvStep1.setTextColor(ContextCompat.getColor(requireContext(), R.color.on_surface_variant));
+                }
+                if (tvStep2 != null) {
+                    tvStep2.setBackgroundResource(R.drawable.circle_primary);
+                    tvStep2.setTextColor(Color.WHITE);
+                }
+                if (vStepLine1 != null) {
+                    vStepLine1.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.primary));
+                }
+            });
+        }
+
+        // ==================== زر الرجوع ====================
+        if (btnPrevStep != null) {
+            btnPrevStep.setOnClickListener(v -> {
+                layoutStep1.setVisibility(View.VISIBLE);
+                layoutStep2.setVisibility(View.GONE);
+                if (btnNextStep != null) btnNextStep.setVisibility(View.VISIBLE);
+                btnSaveUser.setVisibility(View.GONE);
+                btnPrevStep.setVisibility(View.GONE);
+
+                if (tvStep1 != null) {
+                    tvStep1.setBackgroundResource(R.drawable.circle_primary);
+                    tvStep1.setTextColor(Color.WHITE);
+                }
+                if (tvStep2 != null) {
+                    tvStep2.setBackgroundResource(R.drawable.circle_outline);
+                    tvStep2.setTextColor(ContextCompat.getColor(requireContext(), R.color.on_surface_variant));
+                }
+            });
+        }
+
+        // ==================== زر الإلغاء ====================
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        // ==================== زر الحفظ ====================
+        btnSaveUser.setOnClickListener(v -> {
+            String displayName = etDisplayName.getText().toString().trim();
+            String username = etUsername.getText().toString().trim();
+            String password = etPassword.getText().toString().trim();
+            String employeeId = etEmployeeId.getText().toString().trim();
+            String department = etDepartment.getText().toString().trim();
+
+            if (displayName.isEmpty() || username.isEmpty()) {
+                Toast.makeText(getContext(), "الاسم واسم المستخدم مطلوبان", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (!isEdit && password.isEmpty()) {
+                Toast.makeText(getContext(), "كلمة المرور مطلوبة", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // استخراج الصلاحية المختارة
+            String role = "INVENTORY_MGR";
+            int selectedId = rgRole.getCheckedRadioButtonId();
+            if (selectedId != -1) {
+                View selectedView = rgRole.findViewById(selectedId);
+                if (selectedView instanceof RadioButton && selectedView.getTag() != null) {
+                    role = selectedView.getTag().toString();
+                }
+            }
+
+            saveUser(isEdit ? existingUser.id : 0, username, password, displayName, role, employeeId, department, isEdit);
+            dialog.dismiss();
+        });
+
+        dialog.show();
     }
 
-    AlertDialog dialog = builder.create();
+    // ==================== قوة كلمة المرور ====================
+    private int getPasswordStrength(String password) {
+        int score = 0;
+        if (password.length() >= 4) score++;
+        if (password.length() >= 6) score++;
+        if (password.matches(".*[A-Z].*")) score++;
+        if (password.matches(".*[0-9].*")) score++;
+        if (password.matches(".*[!@#$%^&*].*")) score++;
+        return Math.min(score, 4);
+    }
 
-    btnCancel.setOnClickListener(v -> dialog.dismiss());
+    private void updateStrengthBars(View b1, View b2, View b3, View b4, TextView label, int strength) {
+        int red = 0xFFEF4444;
+        int orange = 0xFFF59E0B;
+        int green = 0xFF22C55E;
+        int gray = 0xFFCBD5E1;
 
-    btnSave.setOnClickListener(v -> {
-        String displayName = etDisplayName.getText().toString().trim();
-        String username = etUsername.getText().toString().trim();
-        String password = etPassword.getText().toString().trim();
-        String employeeId = etEmployeeId.getText().toString().trim();
-        String department = etDepartment.getText().toString().trim();
+        b1.setBackgroundColor(strength >= 1 ? (strength <= 2 ? red : orange) : gray);
+        b2.setBackgroundColor(strength >= 2 ? orange : gray);
+        b3.setBackgroundColor(strength >= 3 ? green : gray);
+        b4.setBackgroundColor(strength >= 4 ? green : gray);
 
-        if (displayName.isEmpty() || username.isEmpty()) {
-            Toast.makeText(getContext(), "الاسم واسم المستخدم مطلوبان", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (!isEdit && password.isEmpty()) {
-            Toast.makeText(getContext(), "كلمة المرور مطلوبة", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        String[] labels = {"", "ضعيفة", "متوسطة", "جيدة", "قوية"};
+        int[] colors = {0, red, orange, green, green};
+        label.setText(strength > 0 ? labels[strength] : "");
+        label.setTextColor(strength > 0 ? colors[strength] : gray);
+    }
 
-        // استخراج الصلاحية المختارة
-        String role = "INVENTORY_MGR";
-        int selectedId = rgRole.getCheckedRadioButtonId();
-        if (selectedId != -1) {
-            View selectedView = rgRole.findViewById(selectedId);
-            if (selectedView != null && selectedView.getTag() != null) {
-                role = selectedView.getTag().toString();
-            }
-        }
-
-        saveUser(isEdit ? existingUser.id : 0, username, password, displayName, role, employeeId, department, isEdit);
-        dialog.dismiss();
-    });
-
-    dialog.show();
-}
+    // ==================== حفظ المستخدم ====================
     private void saveUser(int userId, String username, String password, String displayName,
                           String role, String employeeId, String department, boolean isEdit) {
         Executors.newSingleThreadExecutor().execute(() -> {
@@ -269,6 +437,7 @@ public class UsersManagementFragment extends Fragment {
         });
     }
 
+    // ==================== حذف مستخدم ====================
     private void deleteUser(int userId, String name) {
         new AlertDialog.Builder(requireContext())
             .setTitle("حذف مستخدم")
@@ -360,4 +529,4 @@ public class UsersManagementFragment extends Fragment {
             }
         }
     }
-              }
+                                           }
