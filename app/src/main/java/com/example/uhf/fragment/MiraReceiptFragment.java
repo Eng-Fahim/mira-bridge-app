@@ -17,7 +17,6 @@ import android.view.ViewGroup;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -25,6 +24,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
+import com.example.uhf.manager.MiraOrgProfileManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -42,6 +42,7 @@ public class MiraReceiptFragment extends Fragment {
     private JSONObject transactionData;
     private WebView webView;
     private Button btnPrint, btnShare, btnSave, btnClose;
+    private MiraOrgProfileManager orgProfile;
 
     public static MiraReceiptFragment newInstance(String transactionJson) {
         MiraReceiptFragment fragment = new MiraReceiptFragment();
@@ -61,6 +62,9 @@ public class MiraReceiptFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+
+        // 🏢 تهيئة مدير بيانات الجهة
+        orgProfile = MiraOrgProfileManager.getInstance(requireContext());
 
         webView = view.findViewById(R.id.webMiraReceipt);
         btnPrint = view.findViewById(R.id.btnMiraPrintReceipt);
@@ -134,6 +138,30 @@ public class MiraReceiptFragment extends Fragment {
     private String buildHTML(String saleId, String customerName, String customerPhone,
                               String paymentMethod, String timestamp, double subtotal,
                               double discount, double finalAmount, int itemCount, String itemsHTML) {
+        
+        // 🏢 جلب بيانات الجهة
+        String orgName = orgProfile.getOrgName();
+        String orgSlogan = orgProfile.getOrgSlogan();
+        String orgPhone = orgProfile.getOrgPhone();
+        String orgEmail = orgProfile.getOrgEmail();
+        String orgAddress = orgProfile.getOrgAddress();
+        String orgWebsite = orgProfile.getOrgWebsite();
+
+        // بناء سطر التواصل
+        StringBuilder contactLine = new StringBuilder();
+        if (!orgPhone.isEmpty()) contactLine.append("📞 ").append(orgPhone).append(" &nbsp; ");
+        if (!orgEmail.isEmpty()) contactLine.append("📧 ").append(orgEmail);
+        if (contactLine.length() == 0) contactLine.append("MIRA Enterprise Platform");
+
+        // ترجمة طريقة الدفع
+        String paymentMethodAr;
+        switch (paymentMethod) {
+            case "cash": paymentMethodAr = "نقداً"; break;
+            case "card": paymentMethodAr = "بطاقة"; break;
+            case "transfer": paymentMethodAr = "تحويل بنكي"; break;
+            default: paymentMethodAr = paymentMethod;
+        }
+
         return "<!DOCTYPE html><html dir='rtl'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
             "<style>" +
             "@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');" +
@@ -141,9 +169,10 @@ public class MiraReceiptFragment extends Fragment {
             "body{font-family:'Cairo',sans-serif;background:#f8fafc;padding:20px;direction:rtl;color:#1e293b}" +
             ".receipt{max-width:400px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)}" +
             ".header{background:linear-gradient(135deg,#1A237E,#283593);color:#fff;padding:24px 20px;text-align:center}" +
-            ".header .logo{font-size:24px;font-weight:800;letter-spacing:3px;margin-bottom:4px}" +
-            ".header .subtitle{font-size:11px;opacity:.8}" +
-            ".header .checkmark{width:64px;height:64px;background:#4ADE80;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:16px auto;font-size:32px}" +
+            ".header .org-name{font-size:22px;font-weight:800;letter-spacing:1px;margin-bottom:2px}" +
+            ".header .org-slogan{font-size:10px;opacity:.85;margin-bottom:4px}" +
+            ".header .contact{font-size:9px;opacity:.7;margin-bottom:12px}" +
+            ".header .checkmark{width:64px;height:64px;background:#4ADE80;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:12px auto;font-size:32px}" +
             ".info{padding:20px;border-bottom:1px solid #e2e8f0}" +
             ".info .row{display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px}" +
             ".info .label{color:#64748b}.info .value{font-weight:600}" +
@@ -154,26 +183,49 @@ public class MiraReceiptFragment extends Fragment {
             ".totals{padding:16px 20px;background:#f8fafc;border-top:2px solid #e2e8f0}" +
             ".totals .row{display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px}" +
             ".totals .total{font-size:20px;font-weight:800;color:#1A237E;margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0}" +
-            ".footer{text-align:center;padding:16px 20px;font-size:10px;color:#94a3b8;border-top:1px solid #f1f5f9}" +
-            ".footer .mira{color:#1A237E;font-weight:700}" +
+            ".footer{text-align:center;padding:16px 20px;font-size:10px;color:#94a3b8;border-top:1px solid #f1f5f9;line-height:1.8}" +
+            ".footer .org-footer{color:#1A237E;font-weight:700;font-size:12px}" +
             "@media print{body{background:#fff;padding:0}.receipt{box-shadow:none;max-width:100%;border-radius:0}}" +
             "</style></head><body><div class='receipt'>" +
-            "<div class='header'><div class='logo'>🏷️ MIRA</div><div class='subtitle'>BRIDGE™ POS</div>" +
-            "<div class='checkmark'>✓</div><div style='font-size:18px;font-weight:700'>تم البيع بنجاح!</div></div>" +
+            
+            // 🏢 Header - اسم وشعار الجهة
+            "<div class='header'>" +
+            "<div class='org-name'>" + orgName + "</div>" +
+            "<div class='org-slogan'>" + orgSlogan + "</div>" +
+            "<div class='contact'>" + contactLine.toString() + "</div>" +
+            "<div class='checkmark'>✓</div>" +
+            "<div style='font-size:18px;font-weight:700'>تم البيع بنجاح!</div></div>" +
+            
+            // معلومات العملية
             "<div class='info'>" +
             "<div class='row'><span class='label'>رقم العملية</span><span class='value'>#" + saleId + "</span></div>" +
             "<div class='row'><span class='label'>التاريخ</span><span class='value'>" + timestamp + "</span></div>" +
             "<div class='row'><span class='label'>العميل</span><span class='value'>" + customerName + "</span></div>" +
             (customerPhone.isEmpty() ? "" : "<div class='row'><span class='label'>الهاتف</span><span class='value'>" + customerPhone + "</span></div>") +
-            "<div class='row'><span class='label'>طريقة الدفع</span><span class='value'>" + paymentMethod + "</span></div>" +
+            "<div class='row'><span class='label'>طريقة الدفع</span><span class='value'>" + paymentMethodAr + "</span></div>" +
             "<div class='row'><span class='label'>عدد القطع</span><span class='value'>" + itemCount + "</span></div>" +
-            "</div><div class='items'><h3>📋 القطع المباعة</h3>" +
+            "</div>" +
+            
+            // القطع المباعة
+            "<div class='items'><h3>📋 القطع المباعة</h3>" +
             "<table><tr><th>#</th><th>القطعة</th><th>العيار</th><th>الوزن</th><th>السعر</th></tr>" +
-            itemsHTML + "</table></div><div class='totals'>" +
+            itemsHTML + "</table></div>" +
+            
+            // المبالغ
+            "<div class='totals'>" +
             "<div class='row'><span>المجموع الفرعي</span><span>$" + String.format(Locale.US, "%,.2f", subtotal) + "</span></div>" +
             (discount > 0 ? "<div class='row'><span>الخصم (" + discount + "%)</span><span style='color:#EF4444'>-$" + String.format(Locale.US, "%,.2f", subtotal * discount / 100) + "</span></div>" : "") +
             "<div class='row total'><span>المبلغ النهائي</span><span>$" + String.format(Locale.US, "%,.2f", finalAmount) + "</span></div>" +
-            "</div><div class='footer'><span class='mira'>MIRA Technology</span> © 2026<br>mira-id.com | MIRA Bridge™</div>" +
+            "</div>" +
+            
+            // Footer - توقيع الجهة
+            "<div class='footer'>" +
+            "<div class='org-footer'>" + orgName + "</div>" +
+            (!orgAddress.isEmpty() ? orgAddress + "<br>" : "") +
+            (!orgWebsite.isEmpty() ? orgWebsite + "<br>" : "") +
+            "MIRA Trust Architecture™ © 2026" +
+            "</div>" +
+            
             "</div></body></html>";
     }
 
@@ -181,8 +233,8 @@ public class MiraReceiptFragment extends Fragment {
         if (getContext() == null) return;
         PrintManager pm = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
         if (pm != null) {
-            PrintDocumentAdapter adapter = webView.createPrintDocumentAdapter("MIRA_Receipt");
-            pm.print("MIRA Receipt", adapter, new PrintAttributes.Builder().build());
+            PrintDocumentAdapter adapter = webView.createPrintDocumentAdapter("MIRA_Receipt_" + orgProfile.getOrgName());
+            pm.print("MIRA Receipt - " + orgProfile.getOrgName(), adapter, new PrintAttributes.Builder().build());
         }
     }
 
@@ -190,9 +242,12 @@ public class MiraReceiptFragment extends Fragment {
         try {
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
             shareIntent.setType("text/plain");
-            shareIntent.putExtra(Intent.EXTRA_TEXT, "MIRA Bridge™ - إيصال بيع\n" + 
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, "إيصال بيع - " + orgProfile.getOrgName());
+            shareIntent.putExtra(Intent.EXTRA_TEXT, 
+                orgProfile.getOrgName() + " - إيصال بيع\n" + 
+                orgProfile.getOrgSlogan() + "\n\n" +
                 (transactionData != null ? transactionData.toString() : ""));
-            startActivity(Intent.createChooser(shareIntent, "مشاركة الإيصال"));
+            startActivity(Intent.createChooser(shareIntent, "مشاركة الإيصال عبر"));
         } catch (Exception e) {
             Toast.makeText(getContext(), "خطأ في المشاركة", Toast.LENGTH_SHORT).show();
         }
@@ -207,8 +262,13 @@ public class MiraReceiptFragment extends Fragment {
             Canvas canvas = page.getCanvas();
             Paint paint = new Paint();
             paint.setColor(Color.BLACK);
-            paint.setTextSize(12);
-            canvas.drawText("MIRA Bridge™ - إيصال بيع", 40, 40, paint);
+            paint.setTextSize(14);
+            paint.setFakeBoldText(true);
+            canvas.drawText(orgProfile.getOrgName(), 40, 40, paint);
+            paint.setTextSize(10);
+            paint.setFakeBoldText(false);
+            canvas.drawText(orgProfile.getOrgSlogan(), 40, 58, paint);
+            canvas.drawText("إيصال بيع - " + new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(new Date()), 40, 76, paint);
             document.finishPage(page);
 
             String fileName = "MIRA_Receipt_" + System.currentTimeMillis() + ".pdf";
@@ -224,4 +284,4 @@ public class MiraReceiptFragment extends Fragment {
             Toast.makeText(getContext(), "❌ فشل الحفظ: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
-}
+            }
