@@ -16,7 +16,9 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.camera.core.Camera;
+import androidx.camera.core.CameraControl;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
@@ -51,6 +53,10 @@ public class MiraBarcodeScannerFragment extends Fragment {
     private TextView tvScannedData;
 
     private ProcessCameraProvider cameraProvider;
+    private Camera camera;
+    private CameraControl cameraControl;
+    private boolean isFlashOn = false;
+
     private ExecutorService cameraExecutor;
     private BarcodeScanner barcodeScanner;
     private ToneGenerator toneGenerator;
@@ -189,7 +195,8 @@ public class MiraBarcodeScannerFragment extends Fragment {
                         .build();
 
                 cameraProvider.unbindAll();
-                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis);
+                camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis);
+                cameraControl = camera.getCameraControl();
 
             } catch (Exception e) {
                 Log.e(TAG, "Camera start error: " + e.getMessage());
@@ -238,17 +245,18 @@ public class MiraBarcodeScannerFragment extends Fragment {
         toneGenerator.startTone(ToneGenerator.TONE_PROP_ACK, 150);
 
         String formatName = getBarcodeFormatName(format);
+        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
 
         if (getActivity() != null) {
             getActivity().runOnUiThread(() -> {
                 tvScannedData.setText(formatName + ": " + data);
                 tvScannedData.setVisibility(View.VISIBLE);
-                tvScanStatus.setText("✅ تم المسح");
+                tvScanStatus.setText(isArabic ? "✅ تم المسح" : "✅ Scanned");
                 tvScanStatus.setTextColor(Color.parseColor("#4ADE80"));
 
                 tvScannedData.postDelayed(() -> {
                     tvScannedData.setVisibility(View.GONE);
-                    tvScanStatus.setText("📷 جاهز للمسح...");
+                    tvScanStatus.setText(isArabic ? "📷 جاهز للمسح..." : "📷 Ready to scan...");
                     tvScanStatus.setTextColor(Color.parseColor("#38BDF8"));
                 }, 2000);
             });
@@ -281,6 +289,9 @@ public class MiraBarcodeScannerFragment extends Fragment {
     private void closeScanner() {
         try {
             isScanning = false;
+            if (cameraControl != null) {
+                cameraControl.enableTorch(false);
+            }
             if (cameraProvider != null) {
                 cameraProvider.unbindAll();
             }
@@ -311,7 +322,7 @@ public class MiraBarcodeScannerFragment extends Fragment {
                 .start();
     }
 
-    // ===================== Utilities =====================
+    // ===================== Utilities & Features =====================
 
     private String getBarcodeFormatName(int format) {
         switch (format) {
@@ -331,13 +342,24 @@ public class MiraBarcodeScannerFragment extends Fragment {
 
     public void pauseScanning() { isScanning = false; }
     public void resumeScanning() { isScanning = true; lastScanTime = 0; }
-    public void toggleFlash() { /* TODO */ }
+    
+    public void toggleFlash() {
+        if (cameraControl != null) {
+            isFlashOn = !isFlashOn;
+            cameraControl.enableTorch(isFlashOn);
+            boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+            Toast.makeText(getContext(), isFlashOn ? (isArabic ? "🔦 تم تشغيل الفلاش" : "🔦 Flash On") : (isArabic ? "🔌 تم إطفاء الفلاش" : "🔌 Flash Off"), Toast.LENGTH_SHORT).show();
+        }
+    }
 
     // ===================== Cleanup =====================
 
     @Override
     public void onDestroy() {
         super.onDestroy();
+        if (cameraControl != null) {
+            cameraControl.enableTorch(false);
+        }
         if (cameraExecutor != null) cameraExecutor.shutdown();
         if (barcodeScanner != null) barcodeScanner.close();
         if (toneGenerator != null) toneGenerator.release();
