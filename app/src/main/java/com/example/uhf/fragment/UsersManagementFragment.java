@@ -104,13 +104,9 @@ public class UsersManagementFragment extends Fragment {
                     parseUsersResponse(response);
                 } else {
                     String errorMsg = "فشل تحميل المستخدمين";
-                    if (response != null) {
-                        if (response.message != null && !response.message.isEmpty()) {
-                            errorMsg = response.message;
-                        } else if (response.data != null && response.data.has("message")) {
-                            errorMsg = response.data.optString("message", errorMsg);
-                        }
-                    } else {
+                    if (response != null && response.data != null) {
+                        errorMsg = response.data.optString("message", errorMsg);
+                    } else if (response == null) {
                         errorMsg = "فشل الاتصال بالخادم";
                     }
                     
@@ -122,20 +118,14 @@ public class UsersManagementFragment extends Fragment {
 
     private void parseUsersResponse(MiraApiClient.ApiResponse response) {
         userList.clear();
-        if (response == null) return;
+        if (response == null || response.data == null) return;
 
         JSONArray usersArray = null;
 
-        if (response.data != null) {
-            if (response.data.has("users")) {
-                usersArray = response.data.optJSONArray("users");
-            } else if (response.data.has("data")) {
-                usersArray = response.data.optJSONArray("data");
-            }
-        }
-
-        if (usersArray == null && response.jsonArray != null) {
-            usersArray = response.jsonArray;
+        if (response.data.has("users")) {
+            usersArray = response.data.optJSONArray("users");
+        } else if (response.data.has("data")) {
+            usersArray = response.data.optJSONArray("data");
         }
 
         if (usersArray == null || usersArray.length() == 0) {
@@ -446,13 +436,9 @@ public class UsersManagementFragment extends Fragment {
                     loadUsers();
                 } else {
                     String msg = "فشل العملية";
-                    if (response != null) {
-                        if (response.message != null && !response.message.isEmpty()) {
-                            msg = response.message;
-                        } else if (response.data != null && response.data.has("message")) {
-                            msg = response.data.optString("message", msg);
-                        }
-                    } else {
+                    if (response != null && response.data != null) {
+                        msg = response.data.optString("message", msg);
+                    } else if (response == null) {
                         msg = "فشل الاتصال بالخادم";
                     }
                     Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
