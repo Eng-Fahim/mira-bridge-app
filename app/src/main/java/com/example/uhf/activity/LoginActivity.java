@@ -91,6 +91,7 @@ public class LoginActivity extends AppCompatActivity {
         loadingContainer = findViewById(R.id.loadingContainer);
         loginCard = findViewById(R.id.loginCard);
 
+        
         // تعبئة رابط الخادم المحفوظ
         String savedUrl = sessionManager.getServerUrl();
         if (!savedUrl.isEmpty()) {
@@ -121,6 +122,7 @@ public class LoginActivity extends AppCompatActivity {
                 updateUiLanguage(isArabic);
             });
         }
+        applyOrgProfile();
     }
 
     /**
@@ -149,7 +151,26 @@ public class LoginActivity extends AppCompatActivity {
             if (tvServerSettings != null) tvServerSettings.setText("🔧 Server Configuration");
         }
     }
-
+/**
+ * 🏢 تطبيق بيانات الجهة على شاشة تسجيل الدخول
+ */
+private void applyOrgProfile() {
+    com.example.uhf.manager.MiraOrgProfileManager orgProfile = 
+        com.example.uhf.manager.MiraOrgProfileManager.getInstance(this);
+    
+    String orgName = orgProfile.getOrgName();
+    String orgSlogan = orgProfile.getOrgSlogan();
+    
+    // تحديث العنوان الفرعي باسم الجهة
+    if (tvBrandSubtitle != null && !orgName.isEmpty() && !orgName.equals("MIRA Jewelry")) {
+        tvBrandSubtitle.setText(orgName);
+    }
+    
+    // تحديث الوصف بشعار الجهة
+    if (tvBrandDescription != null && !orgSlogan.isEmpty() && !orgSlogan.equals("Jewelry Enterprise Platform")) {
+        tvBrandDescription.setText(orgSlogan);
+    }
+}
     /**
      * 🔧 إظهار/إخفاء إعدادات الخادم (للمسؤولين فقط)
      */
