@@ -50,6 +50,7 @@ import com.example.uhf.fragment.UHFTagFlashFragment;
 import com.example.uhf.fragment.UHFTagLitFragment;
 import com.example.uhf.fragment.UHFUpgradeFragment;
 import com.example.uhf.fragment.UsersManagementFragment;
+import com.example.uhf.fragment.MiraTransferFragment;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.ExportExcelAsyncTask;
