@@ -32,30 +32,30 @@
         <item name="checkboxStyle">@style/AppCheckBoxStyle</item>
         <item name="tabStyle">@style/AppTabStyle</item>
 
-        <!-- 🎨 لوحة الألوان الفاخرة للوضع الفاتح (Luxury Light Gold Theme) -->
-        <item name="colorPrimary">#D4AF37</item> <!-- نفس الذهبي الفاخر -->
-        <item name="colorOnPrimary">#FFFFFF</item> <!-- نص أبيض فوق الأزرار الذهبية لتباين واضح -->
-        <item name="colorPrimaryContainer">#FDF8E7</item> <!-- خلفية ذهبية فاتحة جداً للحاويات -->
-        <item name="colorOnPrimaryContainer">#2A2413</item> <!-- نص داكن داخل الحاويات الذهبية -->
+        <!-- 🎨 لوحة الألوان الفاخرة للوضع الداكن (Dark Luxury Theme) -->
+        <item name="colorPrimary">#D4AF37</item> <!-- الذهبي الفاخر -->
+        <item name="colorOnPrimary">#111827</item> <!-- نص داكن فوق الزر الذهبي للتباين الداكن -->
+        <item name="colorPrimaryContainer">#2A2413</item>
+        <item name="colorOnPrimaryContainer">#FDF8E7</item>
         
         <item name="colorSecondary">#C5A059</item>
-        <item name="colorOnSecondary">#FFFFFF</item>
-        <item name="colorSecondaryContainer">#F9F4E9</item>
-        <item name="colorOnSecondaryContainer">#1E1C14</item>
+        <item name="colorOnSecondary">#111827</item>
+        <item name="colorSecondaryContainer">#1E1C14</item>
+        <item name="colorOnSecondaryContainer">#F9F4E9</item>
 
-        <!-- 🖼️ خلفية فاتحة ونقية تبرز المحتوى -->
-        <item name="android:colorBackground">#F9FAFB</item> <!-- رمادي فاتح جداً مريح للعين -->
-        <item name="colorOnBackground">#111827</item> <!-- نصوص سوداء داكنة جداً -->
+        <!-- 🖼️ خلفية كربونية داكنة للوضع الداكن -->
+        <item name="android:colorBackground">#0B0B0C</item> <!-- أسود كربوني فخم -->
+        <item name="colorOnBackground">#F3F4F6</item> <!-- نصوص فاتحة مريحة -->
         
-        <!-- 🗂️ الأسطح والبطاقات -->
-        <item name="colorSurface">#FFFFFF</item> <!-- بطاقات بيضاء ناصعة تبرز فوق الخلفية -->
-        <item name="colorOnSurface">#111827</item> <!-- نصوص رئيسية على البطاقات -->
-        <item name="colorSurfaceVariant">#F3F4F6</item> <!-- أسطح فرعية أو حقول إدخال -->
-        <item name="colorOnSurfaceVariant">#4B5563</item> <!-- نصوص ثانوية (رمادي غامق) -->
+        <!-- 🗂️ الأسطح والبطاقات الداكنة -->
+        <item name="colorSurface">#161618</item> <!-- بطاقات رمادية داكنة تطفو فوق الخلفية الكربونية -->
+        <item name="colorOnSurface">#F9FAFB</item> <!-- نصوص رئيسية بيضاء -->
+        <item name="colorSurfaceVariant">#1E1E22</item> <!-- أسطح فرعية أو حقول إدخال داكنة -->
+        <item name="colorOnSurfaceVariant">#9CA3AF</item> <!-- نصوص ثانوية رمادية فاتحة -->
         
-        <!-- 🔲 الحدود والإطارات -->
-        <item name="colorOutline">#E5E7EB</item> <!-- فواصل وإطارات ناعمة -->
-        <item name="colorOutlineVariant">#D1D5DB</item>
+        <!-- 🔲 الحدود والإطارات الداكنة -->
+        <item name="colorOutline">#2D2D32</item>
+        <item name="colorOutlineVariant">#3F3F46</item>
     </style>
 
     <!-- ============================================ -->
