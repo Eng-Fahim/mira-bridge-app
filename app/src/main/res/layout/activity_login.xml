@@ -3,8 +3,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:attr/colorBackground"
+    android:background="@drawable/bg_luxury_pattern"
     android:padding="24dp">
+
 
     <!-- Pattern/Watermark (اختياري، يضيف عمقاً كبيراً كما في تطبيق جيب) -->
     <!-- يمكنك إضافة ImageView هنا كخلفية خفيفة إذا أردت لاحقاً -->
