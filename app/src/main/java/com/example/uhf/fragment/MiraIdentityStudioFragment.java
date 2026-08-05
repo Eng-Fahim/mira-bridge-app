@@ -30,7 +30,6 @@ public class MiraIdentityStudioFragment extends Fragment {
     private static final String TAG = "MiraIdentityStudio";
     private FragmentMiraIdentityStudioBinding binding;
     private final Map<String, String[]> typeSuggestions = new HashMap<>();
-    private double goldGramBasePriceUSD = 75.0;
 
     @Nullable
     @Override
@@ -158,10 +157,8 @@ public class MiraIdentityStudioFragment extends Fragment {
         String epc = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
         String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
         String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
-        String barcode = ""; 
         boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
 
-        // ✅ التحقق من الحقول الإلزامية
         if (epc.isEmpty()) {
             Toast.makeText(getContext(), isArabic ? "يرجى مسح أو كتابة رمز RFID / GTIN أولاً" : "Please scan or enter RFID / GTIN first", Toast.LENGTH_SHORT).show();
             return;
@@ -192,10 +189,9 @@ public class MiraIdentityStudioFragment extends Fragment {
 
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                // ✅ بناء JSON كامل للإرسال
                 JSONObject payload = new JSONObject();
                 payload.put("epc", epc);
-                payload.put("barcode", barcode);
+                payload.put("barcode", "");
                 payload.put("title", title);
                 payload.put("purity_code", purityCode);
                 payload.put("gross_weight", grossWeight);
@@ -259,8 +255,7 @@ public class MiraIdentityStudioFragment extends Fragment {
         binding.etEpc.setText("");
         binding.etTitle.setText("");
         binding.etGrossWeight.setText("");
-        if (binding.etBarcode != null) binding.etBarcode.setText("");
-        //binding.tvStatusBadge.setText("WAITING");
+        binding.tvStatusBadge.setText("WAITING");
         binding.tvEstimatedGoldValue.setText("0.00 $");
         binding.etEpc.requestFocus();
     }
@@ -279,4 +274,4 @@ public class MiraIdentityStudioFragment extends Fragment {
         super.onDestroyView();
         binding = null;
     }
-            }
+}
