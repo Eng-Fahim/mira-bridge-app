@@ -94,7 +94,6 @@ public class MiraSalesHistoryFragment extends Fragment {
 
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                // جلب المبيعات للفرع النشط
                 int branchId = branchesManager.getActiveBranchId();
                 MiraApiClient.ApiResponse response = apiClient.getSalesHistory();
 
@@ -107,13 +106,6 @@ public class MiraSalesHistoryFragment extends Fragment {
                             JSONObject sale = sales.optJSONObject(i);
                             if (sale == null) continue;
 
-                            // فلترة حسب الفرع (إذا لم يكن مدير عام)
-                            int saleBranchId = sale.optInt("branch_id", 0);
-                            if (saleBranchId > 0 && saleBranchId != branchId) {
-                                // TODO: إضافة صلاحية للمدراء العامين لرؤية الكل
-                                // حالياً: الكل يرى فرعه فقط
-                            }
-
                             MiraSaleItem item = new MiraSaleItem();
                             item.saleId = sale.optString("sale_id", sale.optString("id", "—"));
                             item.customerName = sale.optString("customer_name", isArabic ? "عميل" : "Customer");
@@ -121,7 +113,6 @@ public class MiraSalesHistoryFragment extends Fragment {
                             item.itemCount = sale.optInt("item_count", sale.optInt("total_items", 0));
                             item.paymentMethod = sale.optString("payment_method", "");
                             item.date = sale.optString("created_at", "");
-                            item.branchName = sale.optString("branch_name", "");
                             item.rawJson = sale.toString();
                             items.add(item);
                         }
@@ -180,7 +171,7 @@ public class MiraSalesHistoryFragment extends Fragment {
     // ==================== Data Class ====================
 
     static class MiraSaleItem {
-        String saleId, customerName, paymentMethod, date, rawJson, branchName;
+        String saleId, customerName, paymentMethod, date, rawJson;
         double amount;
         int itemCount;
     }
@@ -212,11 +203,11 @@ public class MiraSalesHistoryFragment extends Fragment {
             if (h.tvItems != null) h.tvItems.setText(s.itemCount + " " + (isArabic ? "قطعة" : "pcs"));
             if (h.tvPayment != null) {
                 String paymentAr;
-                switch (s.paymentMethod) {
+                switch (s.paymentMethod != null ? s.paymentMethod.toUpperCase() : "") {
                     case "CASH": paymentAr = isArabic ? "نقداً" : "Cash"; break;
                     case "CARD": paymentAr = isArabic ? "بطاقة" : "Card"; break;
                     case "TRANSFER": paymentAr = isArabic ? "تحويل" : "Transfer"; break;
-                    default: paymentAr = s.paymentMethod;
+                    default: paymentAr = s.paymentMethod != null ? s.paymentMethod : "—";
                 }
                 h.tvPayment.setText(paymentAr);
             }
@@ -227,12 +218,8 @@ public class MiraSalesHistoryFragment extends Fragment {
                     SimpleDateFormat display = new SimpleDateFormat("dd/MM/yyyy HH:mm", isArabic ? new Locale("ar") : Locale.US);
                     h.tvDate.setText(d != null ? display.format(d) : s.date);
                 } catch (Exception e) {
-                    h.tvDate.setText(s.date);
+                    h.tvDate.setText(s.date != null ? s.date : "—");
                 }
-            }
-            if (h.tvBranch != null && !s.branchName.isEmpty()) {
-                h.tvBranch.setText("📍 " + s.branchName);
-                h.tvBranch.setVisibility(View.VISIBLE);
             }
 
             h.itemView.setOnClickListener(v -> listener.onClick(s));
@@ -242,7 +229,7 @@ public class MiraSalesHistoryFragment extends Fragment {
         public int getItemCount() { return items.size(); }
 
         class VH extends RecyclerView.ViewHolder {
-            TextView tvCustomer, tvAmount, tvItems, tvPayment, tvDate, tvBranch;
+            TextView tvCustomer, tvAmount, tvItems, tvPayment, tvDate;
             VH(View v) {
                 super(v);
                 tvCustomer = v.findViewById(R.id.tvMiraSaleCustomer);
@@ -250,7 +237,6 @@ public class MiraSalesHistoryFragment extends Fragment {
                 tvItems = v.findViewById(R.id.tvMiraSaleItems);
                 tvPayment = v.findViewById(R.id.tvMiraSalePayment);
                 tvDate = v.findViewById(R.id.tvMiraSaleDate);
-                tvBranch = v.findViewById(R.id.tvMiraSaleBranch);
             }
         }
     }
