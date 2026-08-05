@@ -652,6 +652,10 @@ public ApiResponse scanTransferItem(int transferId, String epc) {
     return postWithAuth("/transfers/" + transferId + "/scan", payload);
 }
 
+    public ApiResponse updateTransfer(int transferId, JSONObject payload) {
+    return postWithAuth("/transfers/" + transferId, payload);
+    }
+
     // ===================== GETTERS =====================
 
     public String getGateId() { return gateId; }
