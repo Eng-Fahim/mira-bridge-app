@@ -27,6 +27,7 @@ import androidx.core.content.ContextCompat;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
@@ -95,7 +96,6 @@ public class LoginActivity extends AppCompatActivity {
         tvAppVersion = findViewById(R.id.tvAppVersion);
         tvBrandName = findViewById(R.id.tvBrandName);
         tvBrandSubtitle = findViewById(R.id.tvBrandSubtitle);
-       // tvBrandDescription = findViewById(R.id.tvBrandDescription);
         tvSignInTitle = findViewById(R.id.tvSignInTitle);
         tvSignInSubtitle = findViewById(R.id.tvSignInSubtitle);
         ivAppLogo = findViewById(R.id.ivAppLogo);
@@ -130,10 +130,10 @@ public class LoginActivity extends AppCompatActivity {
             btnToggleLanguage.setOnClickListener(v -> {
                 isArabic = !isArabic;
                 if (isArabic) {
-                    androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(
+                    AppCompatDelegate.setApplicationLocales(
                         androidx.core.os.LocaleListCompat.forLanguageTags("ar"));
                 } else {
-                    androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(
+                    AppCompatDelegate.setApplicationLocales(
                         androidx.core.os.LocaleListCompat.forLanguageTags("en"));
                 }
                 updateUiLanguage(isArabic);
@@ -348,14 +348,25 @@ public class LoginActivity extends AppCompatActivity {
         String roleStr = response.optString("role", "ADMIN");
         String displayName = response.optString("display_name", username);
         int userId = response.optInt("user_id", 0);
+        int branchId = response.optInt("branch_id", 1);
+        String branchName = response.optString("branch_name", "");
+        String branchCode = response.optString("branch_code", "");
         String serverUrl = getText(etServerUrl);
 
+        // حفظ الجلسة
         sessionManager.createLoginSession(username, roleStr, token, serverUrl);
         sessionManager.setDisplayName(displayName);
         sessionManager.setUserId(userId);
-        // ✅ حفظ بيانات كاملة للبصمة
+
+        // حفظ بيانات البصمة كاملة
         sessionManager.saveBiometricUser(username, roleStr, displayName, userId, token);
+        sessionManager.saveBiometricBranch(branchId, branchName);
         sessionManager.setBiometricEnabled(true);
+
+        // حفظ الفرع النشط تلقائياً وقفله
+        MiraBranchesManager bm = MiraBranchesManager.getInstance(this);
+        bm.setActiveBranch(branchId, branchName, branchCode, "", "");
+        bm.setUserBranchLocked(true);
 
         Toast.makeText(this, (isArabic ? "أهلاً بك " : "Welcome ") + displayName + " ✓", Toast.LENGTH_SHORT).show();
         mainHandler.postDelayed(this::navigateToMain, 400);
@@ -382,12 +393,21 @@ public class LoginActivity extends AppCompatActivity {
 
                 if (!lastUser.isEmpty()) {
                     if (!sessionManager.isLoggedIn()) {
-                        // ✅ إنشاء جلسة كاملة بكل البيانات
+                        // إنشاء جلسة كاملة
                         sessionManager.createLoginSession(lastUser, lastRole,
                             lastToken.isEmpty() ? "BIOMETRIC_TOKEN" : lastToken,
                             sessionManager.getServerUrl());
                         sessionManager.setDisplayName(lastDisplayName);
                         sessionManager.setUserId(lastUserId);
+
+                        // استعادة الفرع
+                        int savedBranchId = sessionManager.getLastBiometricBranchId();
+                        String savedBranchName = sessionManager.getLastBiometricBranchName();
+                        if (savedBranchId > 0) {
+                            MiraBranchesManager bm = MiraBranchesManager.getInstance(LoginActivity.this);
+                            bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
+                            bm.setUserBranchLocked(true);
+                        }
                     }
                     playTone(true);
                     String nameToShow = !lastDisplayName.isEmpty() ? lastDisplayName : lastUser;
@@ -465,4 +485,4 @@ public class LoginActivity extends AppCompatActivity {
         finish();
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
     }
-}
+            }
