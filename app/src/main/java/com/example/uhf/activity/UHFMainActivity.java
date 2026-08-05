@@ -180,6 +180,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         boolean isPosOperator = (role == SessionManager.Role.POS_OPERATOR);
         boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
 
+        // في initViewPageData، أضف
+        boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
+        boolean isAnyAdmin = isSystemAdmin || isOrgAdmin;
+        boolean isManager = isAnyAdmin || isBranchManager; // ✅ مدير بأي مستوى
+
         // 🏠 لوحة التحكم
         mTabHost.addTab(
             mTabHost.newTabSpec("Dashboard").setIndicator(isArabic ? "🏠 الرئيسية" : "🏠 Dashboard"),
