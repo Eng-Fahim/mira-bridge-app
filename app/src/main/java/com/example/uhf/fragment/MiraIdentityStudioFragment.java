@@ -158,8 +158,7 @@ public class MiraIdentityStudioFragment extends Fragment {
         String epc = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
         String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
         String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
-        String barcode = binding.etBarcode.getText() != null ? binding.etBarcode.getText().toString().trim() : "";
-
+        String barcode = ""; 
         boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
 
         // ✅ التحقق من الحقول الإلزامية
@@ -261,7 +260,7 @@ public class MiraIdentityStudioFragment extends Fragment {
         binding.etTitle.setText("");
         binding.etGrossWeight.setText("");
         if (binding.etBarcode != null) binding.etBarcode.setText("");
-        binding.tvStatusBadge.setText("WAITING");
+        //binding.tvStatusBadge.setText("WAITING");
         binding.tvEstimatedGoldValue.setText("0.00 $");
         binding.etEpc.requestFocus();
     }
