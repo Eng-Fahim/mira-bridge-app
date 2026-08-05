@@ -5,7 +5,9 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/delete-artifacts@v1
+      - name: Delete Workflow Artifacts
+        uses: geekyeggo/delete-artifact@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          older-than: 1
+          # إذا أردت حذف جميع الـ Artifacts بلا استثناء لتفريغ المساحة فوراً:
+          fail_no_artifact_match: false
+          use_github_api_token: ${{ secrets.GITHUB_TOKEN }}
