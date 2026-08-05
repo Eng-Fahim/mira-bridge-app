@@ -409,5 +409,4 @@
             android:textColor="#FFFFFF"
             android:textStyle="bold" />
     </LinearLayout>
-
-</androidx.constraintlayout.ConstraintLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>
