@@ -3,9 +3,13 @@ package com.example.uhf.fragment;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -31,41 +35,25 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Executors;
 
-/**
- * MIRA Sales History Fragment
- * 
- * يعرض جميع عمليات البيع للفرع النشط
- * - مدير الجهة يرى جميع الفروع
- * - مدير الفرع يرى فرعه فقط
- * - إمكانية فتح إيصال أي عملية ومشاركتها أو طباعتها
- * - دعم عربي/إنجليزي كامل
- */
 public class MiraSalesHistoryFragment extends Fragment {
 
-    // ==================== UI ====================
     private RecyclerView rvSales;
     private TextView tvEmpty;
+    private EditText etSearch;
+    private ImageView btnRefresh;
+    
     private MiraSalesAdapter adapter;
     private final List<MiraSaleItem> saleList = new ArrayList<>();
+    private final List<MiraSaleItem> filteredList = new ArrayList<>();
 
-    // ==================== Managers ====================
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-
     private boolean isArabic;
-
-    // ==================== Interface ====================
-    private interface OnMiraSaleClickListener {
-        void onClick(MiraSaleItem sale);
-    }
-
-    // ==================== Lifecycle ====================
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_mira_sales_history, container, false);
     }
 
@@ -79,22 +67,29 @@ public class MiraSalesHistoryFragment extends Fragment {
 
         rvSales = view.findViewById(R.id.rvMiraSalesHistory);
         tvEmpty = view.findViewById(R.id.tvMiraEmptySales);
+        etSearch = view.findViewById(R.id.etMiraSearchSales);
+        btnRefresh = view.findViewById(R.id.btnMiraRefreshSales);
 
         rvSales.setLayoutManager(new LinearLayoutManager(getContext()));
-        adapter = new MiraSalesAdapter(saleList, this::openReceipt, isArabic);
+        adapter = new MiraSalesAdapter(filteredList, this::openReceipt, isArabic);
         rvSales.setAdapter(adapter);
+
+        btnRefresh.setOnClickListener(v -> loadSalesHistory());
+
+        etSearch.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { filterSales(s.toString()); }
+            @Override public void afterTextChanged(Editable s) {}
+        });
 
         loadSalesHistory();
     }
-
-    // ==================== Load Data ====================
 
     private void loadSalesHistory() {
         if (tvEmpty != null) tvEmpty.setVisibility(View.GONE);
 
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                int branchId = branchesManager.getActiveBranchId();
                 MiraApiClient.ApiResponse response = apiClient.getSalesHistory();
 
                 if (response != null && response.isSuccess && response.data != null) {
@@ -121,35 +116,44 @@ public class MiraSalesHistoryFragment extends Fragment {
                     mainHandler.post(() -> {
                         saleList.clear();
                         saleList.addAll(items);
-                        adapter.notifyDataSetChanged();
-
-                        if (tvEmpty != null) {
-                            tvEmpty.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
-                            if (items.isEmpty()) {
-                                tvEmpty.setText(isArabic ? "📭 لا توجد عمليات بيع حتى الآن" : "📭 No sales yet");
-                            }
-                        }
+                        filterSales(etSearch.getText().toString());
                     });
                 } else {
-                    mainHandler.post(() -> {
-                        if (tvEmpty != null) {
-                            tvEmpty.setVisibility(View.VISIBLE);
-                            tvEmpty.setText(isArabic ? "⚠️ تعذر تحميل المبيعات" : "⚠️ Failed to load sales");
-                        }
-                    });
+                    mainHandler.post(() -> showEmptyState(isArabic ? "⚠️ تعذر تحميل المبيعات" : "⚠️ Failed to load sales"));
                 }
             } catch (Exception e) {
-                mainHandler.post(() -> {
-                    if (tvEmpty != null) {
-                        tvEmpty.setVisibility(View.VISIBLE);
-                        tvEmpty.setText(isArabic ? "⚠️ خطأ في التحميل" : "⚠️ Load error");
-                    }
-                });
+                mainHandler.post(() -> showEmptyState(isArabic ? "⚠️ خطأ في التحميل" : "⚠️ Load error"));
             }
         });
     }
 
-    // ==================== Open Receipt ====================
+    private void filterSales(String query) {
+        filteredList.clear();
+        if (query == null || query.trim().isEmpty()) {
+            filteredList.addAll(saleList);
+        } else {
+            String q = query.toLowerCase(Locale.ROOT);
+            for (MiraSaleItem item : saleList) {
+                if (item.customerName.toLowerCase(Locale.ROOT).contains(q) || item.saleId.toLowerCase(Locale.ROOT).contains(q)) {
+                    filteredList.add(item);
+                }
+            }
+        }
+        adapter.notifyDataSetChanged();
+        if (tvEmpty != null) {
+            tvEmpty.setVisibility(filteredList.isEmpty() ? View.VISIBLE : View.GONE);
+            if (filteredList.isEmpty()) {
+                tvEmpty.setText(isArabic ? "📭 لا توجد نتائج مطابقة" : "📭 No matching results");
+            }
+        }
+    }
+
+    private void showEmptyState(String message) {
+        if (tvEmpty != null) {
+            tvEmpty.setVisibility(View.VISIBLE);
+            tvEmpty.setText(message);
+        }
+    }
 
     private void openReceipt(MiraSaleItem sale) {
         try {
@@ -157,8 +161,7 @@ public class MiraSalesHistoryFragment extends Fragment {
                 ((UHFMainActivity) getActivity()).openReceiptFragment(sale.rawJson);
             } else {
                 MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(sale.rawJson);
-                getParentFragmentManager()
-                    .beginTransaction()
+                getParentFragmentManager().beginTransaction()
                     .replace(android.R.id.content, receipt)
                     .addToBackStack("mira_receipt")
                     .commit();
@@ -168,15 +171,11 @@ public class MiraSalesHistoryFragment extends Fragment {
         }
     }
 
-    // ==================== Data Class ====================
-
     static class MiraSaleItem {
         String saleId, customerName, paymentMethod, date, rawJson;
         double amount;
         int itemCount;
     }
-
-    // ==================== Adapter ====================
 
     class MiraSalesAdapter extends RecyclerView.Adapter<MiraSalesAdapter.VH> {
         final List<MiraSaleItem> items;
@@ -221,7 +220,6 @@ public class MiraSalesHistoryFragment extends Fragment {
                     h.tvDate.setText(s.date != null ? s.date : "—");
                 }
             }
-
             h.itemView.setOnClickListener(v -> listener.onClick(s));
         }
 
@@ -239,5 +237,9 @@ public class MiraSalesHistoryFragment extends Fragment {
                 tvDate = v.findViewById(R.id.tvMiraSaleDate);
             }
         }
+    }
+
+    private interface OnMiraSaleClickListener {
+        void onClick(MiraSaleItem sale);
     }
 }
