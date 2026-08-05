@@ -45,8 +45,8 @@ public class POSCheckoutDialog extends DialogFragment {
     private int itemCount = 0;
     private OnCheckoutListener listener;
 
-    // UI Elements
-    private TextView tvDialogItemCount, tvDialogSubtotal, tvDialogFinalAmount;
+    // UI Elements - مطابقة لملف dialog_pos_checkout.xml
+    private TextView tvItemCount, tvFinalTotal;
     private EditText etCustomerName, etCustomerPhone, etDiscount;
     private Spinner spPaymentMethod;
     private Button btnConfirmCheckout, btnCancelCheckout;
@@ -101,15 +101,14 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     private void bindViews(View view) {
-        tvDialogItemCount = view.findViewById(R.id.tvDialogItemCount);
-        tvDialogSubtotal = view.findViewById(R.id.tvDialogSubtotal);
-        tvDialogFinalAmount = view.findViewById(R.id.tvDialogFinalAmount);
-        etCustomerName = view.findViewById(R.id.etDialogCustomerName);
-        etCustomerPhone = view.findViewById(R.id.etDialogCustomerPhone);
-        etDiscount = view.findViewById(R.id.etDialogDiscount);
-        spPaymentMethod = view.findViewById(R.id.spDialogPaymentMethod);
-        btnConfirmCheckout = view.findViewById(R.id.btnDialogConfirmCheckout);
-        btnCancelCheckout = view.findViewById(R.id.btnDialogCancelCheckout);
+        tvItemCount = view.findViewById(R.id.tvItemCount);
+        tvFinalTotal = view.findViewById(R.id.tvFinalTotal);
+        etCustomerName = view.findViewById(R.id.etCustomerName);
+        etCustomerPhone = view.findViewById(R.id.etCustomerPhone);
+        spPaymentMethod = view.findViewById(R.id.spPaymentMethod);
+        etDiscount = view.findViewById(R.id.etDiscount);
+        btnCancelCheckout = view.findViewById(R.id.btnCancelCheckout);
+        btnConfirmCheckout = view.findViewById(R.id.btnConfirmCheckout);
     }
 
     private void setupSpinner() {
@@ -123,11 +122,8 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     private void setupData() {
-        if (tvDialogItemCount != null) {
-            tvDialogItemCount.setText(String.valueOf(itemCount));
-        }
-        if (tvDialogSubtotal != null) {
-            tvDialogSubtotal.setText(String.format(Locale.US, "$%,.2f", totalAmount));
+        if (tvItemCount != null) {
+            tvItemCount.setText(String.format(Locale.getDefault(), "%d قطعة", itemCount));
         }
         updateFinalAmount();
     }
@@ -143,12 +139,10 @@ public class POSCheckoutDialog extends DialogFragment {
             });
         }
 
-        // ⚡ إلغاء الدايالوج بطريقة آمنة
         if (btnCancelCheckout != null) {
             btnCancelCheckout.setOnClickListener(v -> dismissAllowingStateLoss());
         }
 
-        // ⚡ تأكيد عملية البيع وإرسال البيانات بأمان
         if (btnConfirmCheckout != null) {
             btnConfirmCheckout.setOnClickListener(v -> {
                 POSCheckoutData data = new POSCheckoutData();
@@ -166,12 +160,10 @@ public class POSCheckoutDialog extends DialogFragment {
                     data.discount = 0;
                 }
 
-                data.finalAmount = totalAmount * (1 - (data.discount / 100.0));
+                data.finalAmount = totalAmount * (1.0 - (data.discount / 100.0));
 
-                // ⚡ إغلاق النافذة بطريقة آمنة أولاً
                 dismissAllowingStateLoss();
 
-                // ⚡ استدعاء الحدث بعد إغلاق الدايالوج
                 if (listener != null) {
                     listener.onCheckout(data);
                 }
@@ -190,8 +182,8 @@ public class POSCheckoutDialog extends DialogFragment {
             }
         }
         double finalAmount = totalAmount * (1.0 - (discountPercent / 100.0));
-        if (tvDialogFinalAmount != null) {
-            tvDialogFinalAmount.setText(String.format(Locale.US, "$%,.2f", finalAmount));
+        if (tvFinalTotal != null) {
+            tvFinalTotal.setText(String.format(Locale.US, "$%,.2f", finalAmount));
         }
     }
 }
