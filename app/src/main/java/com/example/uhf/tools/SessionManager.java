@@ -16,6 +16,9 @@ public class SessionManager {
     private static final String KEY_BIOMETRIC_ENABLED = "biometricEnabled";
     private static final String KEY_LAST_BIOMETRIC_USER = "lastBiometricUser";
     private static final String KEY_LAST_BIOMETRIC_ROLE = "lastBiometricRole";
+    private static final String KEY_LAST_BIOMETRIC_DISPLAY_NAME = "lastBiometricDisplayName";
+    private static final String KEY_LAST_BIOMETRIC_USER_ID = "lastBiometricUserId";
+    private static final String KEY_LAST_BIOMETRIC_TOKEN = "lastBiometricToken";
 
     private final SharedPreferences pref;
     private final SharedPreferences.Editor editor;
@@ -53,9 +56,6 @@ public class SessionManager {
         return pref.getBoolean(KEY_IS_LOGGED_IN, false);
     }
 
-    /**
-     * ✅ getUserRole ترجع Role مباشرة
-     */
     public Role getUserRole() {
         String roleStr = pref.getString(KEY_USER_ROLE, "INVENTORY_MGR");
         try {
@@ -65,31 +65,19 @@ public class SessionManager {
         }
     }
 
-    /**
-     * ✅ getRoleString للاستخدامات النصية
-     */
     public String getRoleString() {
         return pref.getString(KEY_USER_ROLE, "INVENTORY_MGR");
     }
 
-    /**
-     * ✅ التحقق إذا كان المستخدم مدير نظام
-     */
     public boolean isSystemAdmin() {
         return "SYSTEM_ADMIN".equals(getRoleString());
     }
 
-    /**
-     * ✅ التحقق إذا كان المستخدم مدير جهة أو أعلى
-     */
     public boolean isOrgAdminOrHigher() {
         String role = getRoleString();
         return "SYSTEM_ADMIN".equals(role) || "ORG_ADMIN".equals(role);
     }
 
-    /**
-     * ✅ التحقق إذا كان المستخدم مدير (بأي مستوى)
-     */
     public boolean isAnyAdmin() {
         String role = getRoleString();
         return "SYSTEM_ADMIN".equals(role) || "ORG_ADMIN".equals(role);
@@ -152,9 +140,15 @@ public class SessionManager {
         return pref.getBoolean(KEY_BIOMETRIC_ENABLED, false);
     }
 
-    public void saveBiometricUser(String username, String role) {
+    /**
+     * ✅ حفظ بيانات كاملة للمستخدم لاستخدامها مع البصمة
+     */
+    public void saveBiometricUser(String username, String role, String displayName, int userId, String token) {
         editor.putString(KEY_LAST_BIOMETRIC_USER, username);
         editor.putString(KEY_LAST_BIOMETRIC_ROLE, role);
+        editor.putString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, displayName);
+        editor.putInt(KEY_LAST_BIOMETRIC_USER_ID, userId);
+        editor.putString(KEY_LAST_BIOMETRIC_TOKEN, token);
         editor.apply();
     }
 
@@ -166,21 +160,39 @@ public class SessionManager {
         return pref.getString(KEY_LAST_BIOMETRIC_ROLE, "INVENTORY_MGR");
     }
 
+    public String getLastBiometricDisplayName() {
+        return pref.getString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, "");
+    }
+
+    public int getLastBiometricUserId() {
+        return pref.getInt(KEY_LAST_BIOMETRIC_USER_ID, 0);
+    }
+
+    public String getLastBiometricToken() {
+        return pref.getString(KEY_LAST_BIOMETRIC_TOKEN, "");
+    }
+
     // ==================== تسجيل الخروج ====================
 
     public void logoutUser() {
         boolean keepBiometric = pref.getBoolean(KEY_BIOMETRIC_ENABLED, false);
         String lastUser = pref.getString(KEY_LAST_BIOMETRIC_USER, "");
         String lastRole = pref.getString(KEY_LAST_BIOMETRIC_ROLE, "");
-        
+        String lastDisplayName = pref.getString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, "");
+        int lastUserId = pref.getInt(KEY_LAST_BIOMETRIC_USER_ID, 0);
+        String lastToken = pref.getString(KEY_LAST_BIOMETRIC_TOKEN, "");
+
         editor.clear();
-        
+
         if (keepBiometric) {
             editor.putBoolean(KEY_BIOMETRIC_ENABLED, true);
             editor.putString(KEY_LAST_BIOMETRIC_USER, lastUser);
             editor.putString(KEY_LAST_BIOMETRIC_ROLE, lastRole);
+            editor.putString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, lastDisplayName);
+            editor.putInt(KEY_LAST_BIOMETRIC_USER_ID, lastUserId);
+            editor.putString(KEY_LAST_BIOMETRIC_TOKEN, lastToken);
         }
-        
+
         editor.apply();
     }
 
