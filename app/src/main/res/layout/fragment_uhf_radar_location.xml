@@ -8,7 +8,56 @@
     android:layout_marginHorizontal="5dp"
     android:background="#0D1B2A">
 
-    <!-- ========== حقل EPC ========== -->
+    <!-- ========== أزرار الأوضاع ========== -->
+    <LinearLayout
+        android:id="@+id/layoutModes"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="6dp"
+        android:background="#152030"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <Button
+            android:id="@+id/btnModeSingle"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="3dp"
+            android:text="🎯 محدد"
+            android:textSize="11sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#1A237E"
+            android:alpha="1.0" />
+
+        <Button
+            android:id="@+id/btnModeOpen"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="3dp"
+            android:text="📡 مفتوح"
+            android:textSize="11sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#37474F"
+            android:alpha="0.6" />
+
+        <Button
+            android:id="@+id/btnModeGate"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:layout_marginStart="3dp"
+            android:text="🚪 بوابة"
+            android:textSize="11sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#37474F"
+            android:alpha="0.6" />
+    </LinearLayout>
+
+    <!-- ========== حقل EPC + تصدير ========== -->
     <LinearLayout
         android:id="@+id/epcLayout"
         android:layout_width="match_parent"
@@ -16,9 +65,9 @@
         android:orientation="horizontal"
         android:padding="8dp"
         android:background="#1B2838"
+        app:layout_constraintTop_toBottomOf="@id/layoutModes"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintStart_toStartOf="parent">
 
         <TextView
             android:layout_width="wrap_content"
@@ -36,6 +85,58 @@
             android:textColor="#FFFFFF"
             android:textColorHint="#78909C"
             android:hint="أدخل EPC للتتبع" />
+
+        <Button
+            android:id="@+id/btnExportResults"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginStart="6dp"
+            android:text="📤"
+            android:textSize="14sp"
+            android:backgroundTint="#37474F"
+            android:textColor="#FFFFFF" />
+    </LinearLayout>
+
+    <!-- ========== مؤشر RSSI ========== -->
+    <LinearLayout
+        android:id="@+id/layoutRssi"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="6dp"
+        android:background="#1B2838"
+        android:gravity="center_vertical"
+        app:layout_constraintTop_toBottomOf="@id/epcLayout"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📶"
+            android:textSize="12sp"
+            android:layout_marginEnd="6dp" />
+
+        <ProgressBar
+            android:id="@+id/rssiBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="0dp"
+            android:layout_height="4dp"
+            android:layout_weight="1"
+            android:max="100"
+            android:progress="0"
+            android:progressTint="#4CAF50"
+            android:background="#263238" />
+
+        <TextView
+            android:id="@+id/tvRadarMode"
+            android:layout_width="80dp"
+            android:layout_height="wrap_content"
+            android:text="🎯 بحث عن قطعة"
+            android:textColor="#C8E6C9"
+            android:textSize="10sp"
+            android:gravity="end"
+            android:layout_marginStart="6dp" />
     </LinearLayout>
 
     <!-- ========== شاشة الرادار ========== -->
@@ -43,10 +144,180 @@
         android:id="@+id/radarView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        app:layout_constraintTop_toBottomOf="@id/epcLayout"
-        app:layout_constraintBottom_toTopOf="@id/_llSearchRange"
+        app:layout_constraintTop_toBottomOf="@id/layoutRssi"
+        app:layout_constraintBottom_toTopOf="@id/layoutMiraRadarInfo"
         radar:center_image="@drawable/phone"
-        android:layout_margin="8dp" />
+        android:layout_margin="4dp" />
+
+    <!-- ========== بطاقة معلومات MIRA Radar ========== -->
+    <LinearLayout
+        android:id="@+id/layoutMiraRadarInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#1A237E"
+        android:padding="8dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/layoutRecent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <View
+                android:id="@+id/statusIndicator"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:background="@drawable/indicator_green"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+id/tvRadarItemStatus"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="حالة القطعة"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvRadarItemName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📦 اسم القطعة"
+            android:textColor="#B0BEC5"
+            android:textSize="12sp"
+            android:layout_marginTop="3dp" />
+
+        <TextView
+            android:id="@+id/tvRadarItemDetails"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🏷️ التفاصيل"
+            android:textColor="#78909C"
+            android:textSize="10sp"
+            android:layout_marginTop="2dp" />
+    </LinearLayout>
+
+    <!-- ========== سجل آخر 5 قطع ========== -->
+    <LinearLayout
+        android:id="@+id/layoutRecent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="4dp"
+        android:background="#152030"
+        app:layout_constraintBottom_toTopOf="@id/layoutStats"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📋 سجل العمليات:"
+            android:textColor="#90CAF9"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="1dp" />
+
+        <TextView
+            android:id="@+id/tvRecentScans"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#78909C"
+            android:textSize="9sp"
+            android:maxLines="3" />
+    </LinearLayout>
+
+    <!-- ========== عداد الإحصائيات ========== -->
+    <LinearLayout
+        android:id="@+id/layoutStats"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="4dp"
+        android:gravity="center"
+        android:background="#152030"
+        app:layout_constraintBottom_toTopOf="@id/_llSearchRange"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/tvAuthorizedCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#4CAF50"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="✅ مصرح"
+                android:textColor="#81C784"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/tvDeniedCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#F44336"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🚨 ممنوع"
+                android:textColor="#EF9A9A"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/tvUnknownCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#FF9800"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⚠️ غير معروف"
+                android:textColor="#FFCC80"
+                android:textSize="9sp" />
+        </LinearLayout>
+    </LinearLayout>
 
     <!-- ========== شريط نطاق البحث ========== -->
     <LinearLayout
@@ -56,8 +327,7 @@
         android:orientation="horizontal"
         android:paddingHorizontal="8dp"
         android:background="#1B2838"
-        app:layout_constraintBottom_toTopOf="@id/tvSearchRange"
-        tools:ignore="MissingConstraints">
+        app:layout_constraintBottom_toTopOf="@id/tvSearchRange">
 
         <TextView
             android:layout_width="wrap_content"
@@ -102,165 +372,16 @@
         android:textStyle="bold"
         android:padding="4dp"
         android:background="#1B2838"
-        app:layout_constraintBottom_toTopOf="@id/layoutMiraRadarInfo"
-        tools:ignore="MissingConstraints" />
-
-    <!-- ============================================ -->
-    <!-- 🟢 بطاقة معلومات MIRA Radar -->
-    <!-- ============================================ -->
-    <LinearLayout
-        android:id="@+id/layoutMiraRadarInfo"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:background="#1A237E"
-        android:padding="10dp"
-        android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/layoutStats"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        tools:ignore="MissingConstraints">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <View
-                android:id="@+id/statusIndicator"
-                android:layout_width="10dp"
-                android:layout_height="10dp"
-                android:background="@drawable/indicator_green"
-                android:layout_marginEnd="8dp" />
-
-            <TextView
-                android:id="@+id/tvRadarItemStatus"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="حالة القطعة"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvRadarItemName"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="📦 اسم القطعة"
-            android:textColor="#B0BEC5"
-            android:textSize="13sp"
-            android:layout_marginTop="4dp" />
-
-        <TextView
-            android:id="@+id/tvRadarItemDetails"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="🏷️ التفاصيل"
-            android:textColor="#78909C"
-            android:textSize="11sp"
-            android:layout_marginTop="2dp" />
-    </LinearLayout>
-
-    <!-- ============================================ -->
-    <!-- 🟢 عداد الإحصائيات -->
-    <!-- ============================================ -->
-    <LinearLayout
-        android:id="@+id/layoutStats"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="6dp"
-        android:gravity="center"
-        android:background="#152030"
-        app:layout_constraintBottom_toTopOf="@id/llButton"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        tools:ignore="MissingConstraints">
-
-        <!-- مصرح -->
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center">
-
-            <TextView
-                android:id="@+id/tvAuthorizedCount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0"
-                android:textColor="#4CAF50"
-                android:textSize="20sp"
-                android:textStyle="bold" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="✅ مصرح"
-                android:textColor="#81C784"
-                android:textSize="10sp" />
-        </LinearLayout>
-
-        <!-- ممنوع -->
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center">
-
-            <TextView
-                android:id="@+id/tvDeniedCount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0"
-                android:textColor="#F44336"
-                android:textSize="20sp"
-                android:textStyle="bold" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🚨 ممنوع"
-                android:textColor="#EF9A9A"
-                android:textSize="10sp" />
-        </LinearLayout>
-
-        <!-- غير معروف -->
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center">
-
-            <TextView
-                android:id="@+id/tvUnknownCount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0"
-                android:textColor="#FF9800"
-                android:textSize="20sp"
-                android:textStyle="bold" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="⚠️ غير معروف"
-                android:textColor="#FFCC80"
-                android:textSize="10sp" />
-        </LinearLayout>
-    </LinearLayout>
+        app:layout_constraintBottom_toTopOf="@id/llButton" />
 
     <!-- ========== أزرار التحكم ========== -->
     <LinearLayout
         android:id="@+id/llButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="10dp"
+        android:layout_marginBottom="6dp"
         android:orientation="horizontal"
-        android:paddingTop="8dp"
+        android:paddingTop="6dp"
         android:paddingHorizontal="8dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -289,4 +410,4 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.constraintlayout.ConstraintLayout>
