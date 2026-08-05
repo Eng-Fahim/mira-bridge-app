@@ -262,6 +262,15 @@ public class MiraTransferFragment extends Fragment {
             h.tvTo.setText("🏢 " + t.toBranch);
             h.tvDetails.setText(t.itemCount + " قطعة • " + String.format(Locale.US, "%.1fg", t.totalWeight));
             h.tvDate.setText(t.createdAt.substring(0, Math.min(10, t.createdAt.length())));
+            // في onBindViewHolder لـ TransferAdapter:
+            h.itemView.setOnClickListener(v -> {
+                if (getParentFragmentManager() != null) {
+                    MiraTransferDetailFragment detail = MiraTransferDetailFragment.newInstance(t.id);
+                    getParentFragmentManager().beginTransaction()
+                        .replace(android.R.id.content, detail)
+                        .addToBackStack("transfer_detail")
+                        .commit();
+                }});
 
             // حالة التحويل
             String statusAr;
