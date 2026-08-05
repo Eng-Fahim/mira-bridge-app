@@ -18,9 +18,11 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.DialogFragment;
 
 import com.example.uhf.R;
+import com.example.uhf.manager.MiraOrgProfileManager;
 
 import java.util.Locale;
 
@@ -44,9 +46,10 @@ public class POSCheckoutDialog extends DialogFragment {
     private double totalAmount = 0.0;
     private int itemCount = 0;
     private OnCheckoutListener listener;
+    private boolean isArabic;
+    private MiraOrgProfileManager orgProfile;
 
-    // UI Elements - مطابقة لملف dialog_pos_checkout.xml
-    private TextView tvItemCount, tvFinalTotal;
+    private TextView tvDialogTitle, tvItemCount, tvFinalTotal;
     private EditText etCustomerName, etCustomerPhone, etDiscount;
     private Spinner spPaymentMethod;
     private Button btnConfirmCheckout, btnCancelCheckout;
@@ -70,6 +73,10 @@ public class POSCheckoutDialog extends DialogFragment {
         if (getArguments() != null) {
             totalAmount = getArguments().getDouble(ARG_TOTAL_AMOUNT, 0.0);
             itemCount = getArguments().getInt(ARG_ITEM_COUNT, 0);
+        }
+        isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        if (getContext() != null) {
+            orgProfile = MiraOrgProfileManager.getInstance(getContext());
         }
     }
 
@@ -95,12 +102,14 @@ public class POSCheckoutDialog extends DialogFragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         bindViews(view);
+        applyLanguage();
         setupSpinner();
         setupData();
         setupListeners();
     }
 
     private void bindViews(View view) {
+        tvDialogTitle = view.findViewById(R.id.tvDialogTitle);
         tvItemCount = view.findViewById(R.id.tvItemCount);
         tvFinalTotal = view.findViewById(R.id.tvFinalTotal);
         etCustomerName = view.findViewById(R.id.etCustomerName);
@@ -111,9 +120,32 @@ public class POSCheckoutDialog extends DialogFragment {
         btnConfirmCheckout = view.findViewById(R.id.btnConfirmCheckout);
     }
 
+    private void applyLanguage() {
+        if (tvDialogTitle != null) {
+            tvDialogTitle.setText(isArabic ? "إتمام عملية البيع" : "Complete Sale");
+        }
+        if (etCustomerName != null) {
+            etCustomerName.setHint(isArabic ? "اسم العميل" : "Customer Name");
+        }
+        if (etCustomerPhone != null) {
+            etCustomerPhone.setHint(isArabic ? "رقم الهاتف" : "Phone Number");
+        }
+        if (etDiscount != null) {
+            etDiscount.setHint(isArabic ? "نسبة الخصم %" : "Discount %");
+        }
+        if (btnCancelCheckout != null) {
+            btnCancelCheckout.setText(isArabic ? "إلغاء" : "Cancel");
+        }
+        if (btnConfirmCheckout != null) {
+            btnConfirmCheckout.setText(isArabic ? "تأكيد البيع ✓" : "Confirm Sale ✓");
+        }
+    }
+
     private void setupSpinner() {
         if (spPaymentMethod != null && getContext() != null) {
-            String[] methods = new String[]{"CASH", "CARD", "TRANSFER", "CREDIT"};
+            String[] methods = isArabic
+                ? new String[]{"نقداً", "بطاقة", "تحويل", "آجل"}
+                : new String[]{"CASH", "CARD", "TRANSFER", "CREDIT"};
             ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(),
                     android.R.layout.simple_spinner_item, methods);
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -123,7 +155,9 @@ public class POSCheckoutDialog extends DialogFragment {
 
     private void setupData() {
         if (tvItemCount != null) {
-            tvItemCount.setText(String.format(Locale.getDefault(), "%d قطعة", itemCount));
+            tvItemCount.setText(isArabic
+                ? String.format(Locale.getDefault(), "%d قطعة", itemCount)
+                : String.format(Locale.getDefault(), "%d items", itemCount));
         }
         updateFinalAmount();
     }
@@ -132,9 +166,7 @@ public class POSCheckoutDialog extends DialogFragment {
         if (etDiscount != null) {
             etDiscount.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    updateFinalAmount();
-                }
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) { updateFinalAmount(); }
                 @Override public void afterTextChanged(Editable s) {}
             });
         }
@@ -150,7 +182,19 @@ public class POSCheckoutDialog extends DialogFragment {
                 if (etCustomerPhone != null) data.customerPhone = etCustomerPhone.getText().toString().trim();
 
                 if (spPaymentMethod != null && spPaymentMethod.getSelectedItem() != null) {
-                    data.paymentMethod = spPaymentMethod.getSelectedItem().toString();
+                    String method = spPaymentMethod.getSelectedItem().toString();
+                    // تحويل الاسم العربي للإنجليزي
+                    if (isArabic) {
+                        switch (method) {
+                            case "نقداً": data.paymentMethod = "CASH"; break;
+                            case "بطاقة": data.paymentMethod = "CARD"; break;
+                            case "تحويل": data.paymentMethod = "TRANSFER"; break;
+                            case "آجل": data.paymentMethod = "CREDIT"; break;
+                            default: data.paymentMethod = method;
+                        }
+                    } else {
+                        data.paymentMethod = method;
+                    }
                 }
 
                 String discountStr = (etDiscount != null) ? etDiscount.getText().toString().trim() : "0";
@@ -161,7 +205,6 @@ public class POSCheckoutDialog extends DialogFragment {
                 }
 
                 data.finalAmount = totalAmount * (1.0 - (data.discount / 100.0));
-
                 dismissAllowingStateLoss();
 
                 if (listener != null) {
@@ -176,14 +219,12 @@ public class POSCheckoutDialog extends DialogFragment {
         if (etDiscount != null) {
             String val = etDiscount.getText().toString().trim();
             if (!val.isEmpty()) {
-                try {
-                    discountPercent = Double.parseDouble(val);
-                } catch (Exception ignored) {}
+                try { discountPercent = Double.parseDouble(val); } catch (Exception ignored) {}
             }
         }
         double finalAmount = totalAmount * (1.0 - (discountPercent / 100.0));
         if (tvFinalTotal != null) {
-            tvFinalTotal.setText(String.format(Locale.US, "$%,.2f", finalAmount));
+            tvFinalTotal.setText(String.format(Locale.US, "%,.0f YER", finalAmount));
         }
     }
 }
