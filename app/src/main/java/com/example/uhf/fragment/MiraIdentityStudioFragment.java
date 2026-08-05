@@ -3,6 +3,7 @@ package com.example.uhf.fragment;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -14,23 +15,27 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.activity.UHFMainActivity;
+import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.databinding.FragmentMiraIdentityStudioBinding;
 import com.google.android.material.chip.Chip;
 
+import org.json.JSONObject;
+
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Executors;
 
 public class MiraIdentityStudioFragment extends Fragment {
 
+    private static final String TAG = "MiraIdentityStudio";
     private FragmentMiraIdentityStudioBinding binding;
     private final Map<String, String[]> typeSuggestions = new HashMap<>();
-    
-    // سعر جرام الذهب 24K افتراضي للتسهيل وحساب القيمة تلقائياً ($/gram)
-    private double goldGramBasePriceUSD = 75.0; 
+    private double goldGramBasePriceUSD = 75.0;
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
         binding = FragmentMiraIdentityStudioBinding.inflate(inflater, container, false);
         return binding.getRoot();
     }
@@ -58,39 +63,28 @@ public class MiraIdentityStudioFragment extends Fragment {
     }
 
     private void setupListeners() {
-        // 1. مراقبة حقل الـ EPC اليدوي والمسح
         binding.etEpc.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 binding.tvStatusBadge.setText(s.length() > 0 ? "BOUND" : "WAITING");
             }
-            @Override
-            public void afterTextChanged(Editable s) {}
+            @Override public void afterTextChanged(Editable s) {}
         });
 
-        // 2. التحكم بظهور تفاصيل الأحجار
         binding.switchHasStones.setOnCheckedChangeListener((buttonView, isChecked) -> {
             binding.layoutStonesDetails.setVisibility(isChecked ? View.VISIBLE : View.GONE);
         });
 
-        // 3. حساب سعر الذهب الخام تلقائياً عند كتابة الوزن
         binding.etGrossWeight.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 calculateEstimatedGoldValue();
             }
-            @Override
-            public void afterTextChanged(Editable s) {}
+            @Override public void afterTextChanged(Editable s) {}
         });
 
-        // 4. تغيير العيار يعيد حساب القيمة
         binding.chipGroupKarat.setOnCheckedStateChangeListener((group, checkedIds) -> calculateEstimatedGoldValue());
 
-        // 5. اقتراحات عناوين القطع
         binding.chipGroupTypes.setOnCheckedStateChangeListener((group, checkedIds) -> {
             if (checkedIds.isEmpty()) return;
             int id = checkedIds.get(0);
@@ -100,60 +94,38 @@ public class MiraIdentityStudioFragment extends Fragment {
             else if (id == binding.chipNecklace.getId()) populateSuggestions("necklaces");
         });
 
-        // 6. التقاط الصور
         boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         binding.btnAddPhotos.setOnClickListener(v -> {
             Toast.makeText(getContext(), isArabic ? "سيتم فتح كاميرا الجهاز لالتقاط صورة القطعة..." : "Opening camera to capture item photo...", Toast.LENGTH_SHORT).show();
             binding.tvPhotosCount.setText(isArabic ? "تم التقاط (1) صورة للقطعة" : "Captured (1) photo");
         });
 
-        // 7. اعتماد الهوية
         binding.btnSaveIdentity.setOnClickListener(v -> finalizeItemIdentity());
     }
 
-    /**
-     * 🧮 دالة حساب التكلفة بناءً على جدول أسعار الذهب والهوامش في نظام MIRA ID
-     */
     private void calculateEstimatedGoldValue() {
         String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
-        
         if (weightStr.isEmpty()) {
             binding.tvEstimatedGoldValue.setText("0.00 $");
             return;
         }
-
         try {
             double weight = Double.parseDouble(weightStr);
-            double pricePerGram = getGoldPriceByKarat(); // جلب السعر حسب العيار المحدد من إعدادات النظام
-
-            // 1️⃣ حساب قيمة الذهب الخام
+            double pricePerGram = getGoldPriceByKarat();
             double rawGoldValue = weight * pricePerGram;
-            
-            // 2️⃣ عرض النتيجة
             binding.tvEstimatedGoldValue.setText(String.format("%.2f $", rawGoldValue));
-
         } catch (NumberFormatException e) {
             binding.tvEstimatedGoldValue.setText("0.00 $");
         }
     }
 
-    /**
-     * 📡 جلب سعر جرام الذهب للعيار المختار من جدول أسعار MIRA ID
-     */
     private double getGoldPriceByKarat() {
         int checkedId = binding.chipGroupKarat.getCheckedChipId();
-
-        if (checkedId == binding.chip24K.getId()) {
-            return 75.0; 
-        } else if (checkedId == binding.chip21K.getId()) {
-            return 65.62; 
-        } else if (checkedId == binding.chip18K.getId()) {
-            return 56.25; 
-        } else if (checkedId == binding.chip14K.getId()) {
-            return 43.75; 
-        }
-
-        return 65.62; // افتراضي (21k)
+        if (checkedId == binding.chip24K.getId()) return 75.0;
+        else if (checkedId == binding.chip21K.getId()) return 65.62;
+        else if (checkedId == binding.chip18K.getId()) return 56.25;
+        else if (checkedId == binding.chip14K.getId()) return 43.75;
+        return 65.62;
     }
 
     public void onRfidScanned(String epc) {
@@ -173,11 +145,7 @@ public class MiraIdentityStudioFragment extends Fragment {
         if (suggestions == null || getContext() == null) return;
 
         for (String suggestion : suggestions) {
-            android.view.ContextThemeWrapper contextWrapper = new android.view.ContextThemeWrapper(
-                    requireContext(), 
-                    com.google.android.material.R.style.Widget_MaterialComponents_Chip_Action
-            );
-            Chip chip = new Chip(contextWrapper);
+            Chip chip = new Chip(requireContext());
             chip.setText(suggestion);
             chip.setClickable(true);
             chip.setCheckable(false);
@@ -190,11 +158,11 @@ public class MiraIdentityStudioFragment extends Fragment {
         String epc = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
         String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
         String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
-        
-        String barcode = ""; 
+        String barcode = binding.etBarcode.getText() != null ? binding.etBarcode.getText().toString().trim() : "";
+
         boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
 
-        // 1. التحقق من الحقول الإلزامية
+        // ✅ التحقق من الحقول الإلزامية
         if (epc.isEmpty()) {
             Toast.makeText(getContext(), isArabic ? "يرجى مسح أو كتابة رمز RFID / GTIN أولاً" : "Please scan or enter RFID / GTIN first", Toast.LENGTH_SHORT).show();
             return;
@@ -208,68 +176,103 @@ public class MiraIdentityStudioFragment extends Fragment {
             return;
         }
 
-        double grossWeight = Double.parseDouble(weightStr);
+        double grossWeight;
+        try {
+            grossWeight = Double.parseDouble(weightStr);
+        } catch (NumberFormatException e) {
+            Toast.makeText(getContext(), isArabic ? "وزن غير صالح" : "Invalid weight", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         String purityCode = getSelectedKaratCode();
+        String category = getSelectedCategory(isArabic);
+        String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
 
         binding.btnSaveIdentity.setEnabled(false);
+        binding.btnSaveIdentity.setText(isArabic ? "جاري التكويد..." : "Encoding...");
 
-        // 2. التنفيذ في Background Thread
-        java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
-            com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(requireContext());
-            
-            com.example.uhf.api.MiraApiClient.ApiResponse response = client.encodeItem(
-                    epc,
-                    barcode,
-                    title,
-                    purityCode,
-                    grossWeight,
-                    grossWeight, // netWeight
-                    0.0,         // المصنعية
-                    0.0,         // الهامش
-                    isArabic ? "مجوهرات" : "Jewelry",
-                    isArabic ? "المعرض الرئيسي" : "Main Showroom"
-            );
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                // ✅ بناء JSON كامل للإرسال
+                JSONObject payload = new JSONObject();
+                payload.put("epc", epc);
+                payload.put("barcode", barcode);
+                payload.put("title", title);
+                payload.put("purity_code", purityCode);
+                payload.put("gross_weight", grossWeight);
+                payload.put("net_weight", grossWeight);
+                payload.put("making_per_gram", 0);
+                payload.put("profit_margin", 0);
+                payload.put("category", category);
+                payload.put("location", location);
 
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    binding.btnSaveIdentity.setEnabled(true);
+                MiraApiClient client = MiraApiClient.getInstance(requireContext());
+                MiraApiClient.ApiResponse response = client.encodeItem(payload);
 
-                    if (response.isSuccess) {
-                        if (getActivity() instanceof UHFMainActivity) {
-                            ((UHFMainActivity) getActivity()).playSound(1);
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        binding.btnSaveIdentity.setEnabled(true);
+                        binding.btnSaveIdentity.setText(isArabic ? "اعتماد الهوية وتسجيلها ✨" : "Approve & Register Identity ✨");
+
+                        if (response != null && response.isSuccess) {
+                            if (getActivity() instanceof UHFMainActivity) {
+                                ((UHFMainActivity) getActivity()).playSound(1);
+                            }
+                            Toast.makeText(getContext(),
+                                isArabic ? "✅ تمت المزامنة واعتُمدت الهوية الرقمية للقطعة بنجاح!" : "✅ Digital identity successfully synchronized!",
+                                Toast.LENGTH_LONG).show();
+                            resetFormForNextScan();
+                        } else {
+                            String errorMsg = response != null ? response.optString("message", response.error) : "Connection failed";
+                            if (errorMsg == null || errorMsg.isEmpty()) errorMsg = "Unknown error";
+                            Log.e(TAG, "Encode failed: " + errorMsg);
+                            Toast.makeText(getContext(),
+                                (isArabic ? "❌ فشل التكويد: " : "❌ Encoding failed: ") + errorMsg,
+                                Toast.LENGTH_LONG).show();
                         }
-
-                        Toast.makeText(getContext(), isArabic ? "تمت المزامنة واعتُمدت الهوية الرقمية للقطعة بنجاح! 💎" : "Digital identity successfully synchronized & approved! 💎", Toast.LENGTH_LONG).show();
-                        resetFormForNextScan();
-
-                    } else {
-                        Toast.makeText(getContext(), (isArabic ? "خطأ في التكويد: " : "Encoding error: ") + response.error, Toast.LENGTH_LONG).show();
-                    }
-                });
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Encode error: " + e.getMessage(), e);
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        binding.btnSaveIdentity.setEnabled(true);
+                        binding.btnSaveIdentity.setText(isArabic ? "اعتماد الهوية وتسجيلها ✨" : "Approve & Register Identity ✨");
+                        Toast.makeText(getContext(),
+                            (isArabic ? "❌ خطأ: " : "❌ Error: ") + e.getMessage(),
+                            Toast.LENGTH_LONG).show();
+                    });
+                }
             }
         });
+    }
+
+    private String getSelectedCategory(boolean isArabic) {
+        int checkedId = binding.chipGroupTypes.getCheckedChipId();
+        if (checkedId == binding.chipRing.getId()) return isArabic ? "خواتم" : "Rings";
+        if (checkedId == binding.chipSet.getId()) return isArabic ? "أطقم" : "Sets";
+        if (checkedId == binding.chipBracelet.getId()) return isArabic ? "أساور" : "Bracelets";
+        if (checkedId == binding.chipNecklace.getId()) return isArabic ? "عقود" : "Necklaces";
+        return isArabic ? "مجوهرات" : "Jewelry";
     }
 
     private void resetFormForNextScan() {
         binding.etEpc.setText("");
         binding.etTitle.setText("");
         binding.etGrossWeight.setText("");
+        if (binding.etBarcode != null) binding.etBarcode.setText("");
         binding.tvStatusBadge.setText("WAITING");
         binding.tvEstimatedGoldValue.setText("0.00 $");
-        
         binding.etEpc.requestFocus();
     }
 
-    /**
-     * 🏷️ جلب كود العيار المختار من الـ Chips
-     */
     private String getSelectedKaratCode() {
         int checkedId = binding.chipGroupKarat.getCheckedChipId();
         if (checkedId == binding.chip24K.getId()) return "24K";
         if (checkedId == binding.chip21K.getId()) return "21K";
         if (checkedId == binding.chip18K.getId()) return "18K";
         if (checkedId == binding.chip14K.getId()) return "14K";
-        return "21K"; // افتراضي
+        return "21K";
     }
 
     @Override
@@ -277,4 +280,4 @@ public class MiraIdentityStudioFragment extends Fragment {
         super.onDestroyView();
         binding = null;
     }
-}
+            }
