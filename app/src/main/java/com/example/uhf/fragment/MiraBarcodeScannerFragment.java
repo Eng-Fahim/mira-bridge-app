@@ -11,6 +11,7 @@ import android.util.Size;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -31,6 +32,7 @@ import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
+import com.example.uhf.manager.MiraOrgProfileManager;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.mlkit.vision.barcode.BarcodeScanner;
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions;
@@ -41,31 +43,47 @@ import com.google.mlkit.vision.common.InputImage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * MIRA Barcode Scanner Fragment
+ * 
+ * ماسح باركود احترافي يدعم:
+ * - GS1 DataMatrix, QR Code, EAN-13, Code-128
+ * - فلاش الكاميرا
+ * - خط مسح متحرك
+ * - دعم عربي/إنجليزي كامل
+ * - توحيد الهوية مع باقي التطبيق
+ */
 public class MiraBarcodeScannerFragment extends Fragment {
 
     private static final String TAG = "MiraBarcodeScanner";
     private static final int CAMERA_PERMISSION_CODE = 1001;
 
+    // ==================== UI ====================
     private PreviewView previewView;
-    private View scannerOverlay;
-    private View scanLine;
-    private TextView tvScanStatus;
-    private TextView tvScannedData;
+    private View scannerOverlay, scanLine;
+    private TextView tvScanStatus, tvScannedData;
+    private ImageButton btnClose, btnFlash;
 
+    // ==================== Camera ====================
     private ProcessCameraProvider cameraProvider;
     private Camera camera;
     private CameraControl cameraControl;
     private boolean isFlashOn = false;
-
     private ExecutorService cameraExecutor;
+
+    // ==================== Scanner ====================
     private BarcodeScanner barcodeScanner;
     private ToneGenerator toneGenerator;
-
     private boolean isScanning = true;
     private long lastScanTime = 0;
     private static final long SCAN_COOLDOWN_MS = 1500;
 
+    // ==================== Listeners & State ====================
     private OnBarcodeScannedListener barcodeListener;
+    private boolean isArabic;
+    private MiraOrgProfileManager orgProfile;
+
+    // ==================== Interface ====================
 
     public interface OnBarcodeScannedListener {
         void onBarcodeScanned(String barcodeData, String format);
@@ -75,7 +93,7 @@ public class MiraBarcodeScannerFragment extends Fragment {
         this.barcodeListener = listener;
     }
 
-    // ===================== Lifecycle =====================
+    // ==================== Lifecycle ====================
 
     @Nullable
     @Override
@@ -88,27 +106,30 @@ public class MiraBarcodeScannerFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        if (getContext() != null) {
+            orgProfile = MiraOrgProfileManager.getInstance(getContext());
+        }
+
+        // ربط العناصر - مطابقة للـ XML
         previewView = view.findViewById(R.id.previewView);
         scannerOverlay = view.findViewById(R.id.scannerOverlay);
         scanLine = view.findViewById(R.id.scanLine);
         tvScanStatus = view.findViewById(R.id.tvScanStatus);
         tvScannedData = view.findViewById(R.id.tvScannedData);
+        btnClose = view.findViewById(R.id.btnCloseScanner);
+        btnFlash = view.findViewById(R.id.btnToggleFlash);
 
-        // ✅ زر الإغلاق
-        View btnClose = view.findViewById(R.id.btnCloseScanner);
-        if (btnClose != null) {
-            btnClose.setOnClickListener(v -> closeScanner());
-        }
+        // تطبيق اللغة
+        applyLanguage();
 
-        // ✅ زر الفلاش
-        View btnFlash = view.findViewById(R.id.btnToggleFlash);
-        if (btnFlash != null) {
-            btnFlash.setOnClickListener(v -> toggleFlash());
-        }
+        // أزرار
+        if (btnClose != null) btnClose.setOnClickListener(v -> closeScanner());
+        if (btnFlash != null) btnFlash.setOnClickListener(v -> toggleFlash());
 
+        // تهيئة
         cameraExecutor = Executors.newSingleThreadExecutor();
         toneGenerator = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100);
-
         initBarcodeScanner();
 
         if (hasCameraPermission()) {
@@ -123,7 +144,7 @@ public class MiraBarcodeScannerFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // ✅ معالجة زر الرجوع للجهاز
+        // معالجة زر الرجوع
         if (getView() != null) {
             getView().setFocusableInTouchMode(true);
             getView().requestFocus();
@@ -138,29 +159,36 @@ public class MiraBarcodeScannerFragment extends Fragment {
         }
     }
 
-    // ===================== Barcode Scanner Init =====================
+    // ==================== Language ====================
+
+    private void applyLanguage() {
+        if (tvScanStatus != null) {
+            tvScanStatus.setText(isArabic ? "📷 جاهز للمسح..." : "📷 Ready to scan...");
+        }
+        if (btnFlash != null) {
+            btnFlash.setContentDescription(isArabic ? "فلاش" : "Flash");
+        }
+        if (btnClose != null) {
+            btnClose.setContentDescription(isArabic ? "إغلاق" : "Close");
+        }
+    }
+
+    // ==================== Barcode Scanner Init ====================
 
     private void initBarcodeScanner() {
         BarcodeScannerOptions options = new BarcodeScannerOptions.Builder()
                 .setBarcodeFormats(
-                        Barcode.FORMAT_DATA_MATRIX,
-                        Barcode.FORMAT_QR_CODE,
-                        Barcode.FORMAT_EAN_13,
-                        Barcode.FORMAT_EAN_8,
-                        Barcode.FORMAT_CODE_128,
-                        Barcode.FORMAT_CODE_39,
-                        Barcode.FORMAT_UPC_A,
-                        Barcode.FORMAT_UPC_E,
-                        Barcode.FORMAT_AZTEC,
-                        Barcode.FORMAT_PDF417,
+                        Barcode.FORMAT_DATA_MATRIX, Barcode.FORMAT_QR_CODE,
+                        Barcode.FORMAT_EAN_13, Barcode.FORMAT_EAN_8,
+                        Barcode.FORMAT_CODE_128, Barcode.FORMAT_CODE_39,
+                        Barcode.FORMAT_UPC_A, Barcode.FORMAT_UPC_E,
+                        Barcode.FORMAT_AZTEC, Barcode.FORMAT_PDF417,
                         Barcode.FORMAT_ALL_FORMATS
-                )
-                .build();
-
+                ).build();
         barcodeScanner = BarcodeScanning.getClient(options);
     }
 
-    // ===================== Camera =====================
+    // ==================== Camera ====================
 
     private boolean hasCameraPermission() {
         return ContextCompat.checkSelfPermission(requireContext(),
@@ -173,13 +201,10 @@ public class MiraBarcodeScannerFragment extends Fragment {
     }
 
     private void startCamera() {
-        ListenableFuture<ProcessCameraProvider> cameraProviderFuture =
-                ProcessCameraProvider.getInstance(requireContext());
-
-        cameraProviderFuture.addListener(() -> {
+        ListenableFuture<ProcessCameraProvider> future = ProcessCameraProvider.getInstance(requireContext());
+        future.addListener(() -> {
             try {
-                cameraProvider = cameraProviderFuture.get();
-
+                cameraProvider = future.get();
                 Preview preview = new Preview.Builder().build();
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
 
@@ -187,30 +212,24 @@ public class MiraBarcodeScannerFragment extends Fragment {
                         .setTargetResolution(new Size(1280, 720))
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build();
-
                 imageAnalysis.setAnalyzer(cameraExecutor, this::analyzeImage);
 
-                CameraSelector cameraSelector = new CameraSelector.Builder()
-                        .requireLensFacing(CameraSelector.LENS_FACING_BACK)
-                        .build();
+                CameraSelector selector = new CameraSelector.Builder()
+                        .requireLensFacing(CameraSelector.LENS_FACING_BACK).build();
 
                 cameraProvider.unbindAll();
-                camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis);
+                camera = cameraProvider.bindToLifecycle(this, selector, preview, imageAnalysis);
                 cameraControl = camera.getCameraControl();
-
             } catch (Exception e) {
-                Log.e(TAG, "Camera start error: " + e.getMessage());
+                Log.e(TAG, "Camera error: " + e.getMessage());
             }
         }, ContextCompat.getMainExecutor(requireContext()));
     }
 
-    // ===================== Image Analysis =====================
+    // ==================== Image Analysis ====================
 
     private void analyzeImage(@NonNull ImageProxy imageProxy) {
-        if (!isScanning) {
-            imageProxy.close();
-            return;
-        }
+        if (!isScanning) { imageProxy.close(); return; }
 
         @SuppressWarnings("UnsafeOptInUsageError")
         InputImage inputImage = InputImage.fromMediaImage(
@@ -230,99 +249,101 @@ public class MiraBarcodeScannerFragment extends Fragment {
                     imageProxy.close();
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Scan error: " + e.getMessage());
+                    Log.e(TAG, "Scan: " + e.getMessage());
                     imageProxy.close();
                 });
     }
 
-    // ===================== Barcode Detection =====================
+    // ==================== Detection ====================
 
     private void onBarcodeDetected(String data, int format) {
-        long currentTime = System.currentTimeMillis();
-        if (currentTime - lastScanTime < SCAN_COOLDOWN_MS) return;
-        lastScanTime = currentTime;
+        long now = System.currentTimeMillis();
+        if (now - lastScanTime < SCAN_COOLDOWN_MS) return;
+        lastScanTime = now;
 
         toneGenerator.startTone(ToneGenerator.TONE_PROP_ACK, 150);
-
         String formatName = getBarcodeFormatName(format);
-        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
 
-        if (getActivity() != null) {
-            getActivity().runOnUiThread(() -> {
+        safeRun(() -> {
+            if (tvScannedData != null) {
                 tvScannedData.setText(formatName + ": " + data);
                 tvScannedData.setVisibility(View.VISIBLE);
+            }
+            if (tvScanStatus != null) {
                 tvScanStatus.setText(isArabic ? "✅ تم المسح" : "✅ Scanned");
                 tvScanStatus.setTextColor(Color.parseColor("#4ADE80"));
-
-                tvScannedData.postDelayed(() -> {
-                    tvScannedData.setVisibility(View.GONE);
+            }
+            tvScannedData.postDelayed(() -> {
+                if (tvScannedData != null) tvScannedData.setVisibility(View.GONE);
+                if (tvScanStatus != null) {
                     tvScanStatus.setText(isArabic ? "📷 جاهز للمسح..." : "📷 Ready to scan...");
                     tvScanStatus.setTextColor(Color.parseColor("#38BDF8"));
-                }, 2000);
-            });
-        }
+                }
+            }, 2000);
+        });
 
-        if (barcodeListener != null) {
-            barcodeListener.onBarcodeScanned(data, formatName);
-        }
-
+        if (barcodeListener != null) barcodeListener.onBarcodeScanned(data, formatName);
         forwardToPOS(data);
-
-        Log.d(TAG, "Barcode detected [" + formatName + "]: " + data);
     }
 
     private void forwardToPOS(String data) {
         if (getActivity() instanceof UHFMainActivity) {
             UHFMainActivity activity = (UHFMainActivity) getActivity();
-            Fragment posFragment = activity.getSupportFragmentManager()
-                    .findFragmentByTag("POS Mode");
-            if (posFragment instanceof MiraPosFragment && posFragment.isVisible()) {
-                ((MiraPosFragment) posFragment).onBarcodeScanned(data);
+            Fragment pos = activity.getSupportFragmentManager().findFragmentByTag("POS Mode");
+            if (pos instanceof MiraPosFragment && pos.isVisible()) {
+                ((MiraPosFragment) pos).onBarcodeScanned(data);
             } else {
                 activity.onTagRead(data);
             }
         }
     }
 
-    // ===================== ✅ إغلاق الماسح =====================
+    // ==================== Close ====================
 
     private void closeScanner() {
         try {
             isScanning = false;
-            if (cameraControl != null) {
-                cameraControl.enableTorch(false);
-            }
-            if (cameraProvider != null) {
-                cameraProvider.unbindAll();
-            }
+            if (cameraControl != null) cameraControl.enableTorch(false);
+            if (cameraProvider != null) cameraProvider.unbindAll();
             if (getParentFragmentManager().getBackStackEntryCount() > 0) {
                 getParentFragmentManager().popBackStack();
             } else if (getActivity() != null) {
                 getActivity().onBackPressed();
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error closing scanner: " + e.getMessage());
-            if (getActivity() != null) {
-                getActivity().onBackPressed();
-            }
+            if (getActivity() != null) getActivity().onBackPressed();
         }
     }
 
-    // ===================== Animation =====================
+    // ==================== Animation ====================
 
     private void startScanAnimation() {
-        if (scanLine == null) return;
-        scanLine.animate()
-                .translationY(scannerOverlay.getHeight())
-                .setDuration(2000)
-                .withEndAction(() -> {
-                    scanLine.setTranslationY(0);
-                    if (isScanning) startScanAnimation();
-                })
-                .start();
+        if (scanLine == null || scannerOverlay == null) return;
+        scanLine.animate().translationY(scannerOverlay.getHeight()).setDuration(2000)
+            .withEndAction(() -> {
+                scanLine.setTranslationY(0);
+                if (isScanning) startScanAnimation();
+            }).start();
     }
 
-    // ===================== Utilities & Features =====================
+    // ==================== Flash ====================
+
+    public void toggleFlash() {
+        if (cameraControl != null) {
+            isFlashOn = !isFlashOn;
+            cameraControl.enableTorch(isFlashOn);
+            Toast.makeText(getContext(),
+                isFlashOn ? (isArabic ? "🔦 تم تشغيل الفلاش" : "🔦 Flash On")
+                          : (isArabic ? "🔌 تم إطفاء الفلاش" : "🔌 Flash Off"),
+                Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // ==================== Helpers ====================
+
+    private void safeRun(Runnable r) {
+        if (getActivity() != null) getActivity().runOnUiThread(r);
+    }
 
     private String getBarcodeFormatName(int format) {
         switch (format) {
@@ -342,26 +363,15 @@ public class MiraBarcodeScannerFragment extends Fragment {
 
     public void pauseScanning() { isScanning = false; }
     public void resumeScanning() { isScanning = true; lastScanTime = 0; }
-    
-    public void toggleFlash() {
-        if (cameraControl != null) {
-            isFlashOn = !isFlashOn;
-            cameraControl.enableTorch(isFlashOn);
-            boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
-            Toast.makeText(getContext(), isFlashOn ? (isArabic ? "🔦 تم تشغيل الفلاش" : "🔦 Flash On") : (isArabic ? "🔌 تم إطفاء الفلاش" : "🔌 Flash Off"), Toast.LENGTH_SHORT).show();
-        }
-    }
 
-    // ===================== Cleanup =====================
+    // ==================== Cleanup ====================
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (cameraControl != null) {
-            cameraControl.enableTorch(false);
-        }
+        if (cameraControl != null) cameraControl.enableTorch(false);
         if (cameraExecutor != null) cameraExecutor.shutdown();
         if (barcodeScanner != null) barcodeScanner.close();
         if (toneGenerator != null) toneGenerator.release();
     }
-}
+    }
