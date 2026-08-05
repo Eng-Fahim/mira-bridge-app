@@ -38,3 +38,5 @@ jobs:
       with:
         name: MIRA-Bridge-App
         path: "**/build/outputs/apk/**/*.apk"
+        retention-days: 3
+        compression-level: 9
