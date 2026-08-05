@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?attr/colorSurface"
+    android:layoutDirection="rtl">
+
+    <!-- شريط العنوان -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorPrimary"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="14dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📦 التحويلات بين الفروع"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnNewTransfer"
+            android:layout_width="wrap_content"
+            android:layout_height="38dp"
+            android:backgroundTint="@android:color/white"
+            android:text="+ تحويل جديد"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            app:cornerRadius="8dp" />
+    </LinearLayout>
+
+    <!-- فلاتر سريعة -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:background="?attr/colorSurfaceVariant">
+
+        <Button
+            android:id="@+id/btnFilterAll"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="3dp"
+            android:text="الكل"
+            android:textSize="11sp"
+            android:backgroundTint="?attr/colorPrimary"
+            android:textColor="?attr/colorOnPrimary" />
+
+        <Button
+            android:id="@+id/btnFilterPending"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="3dp"
+            android:text="معلقة"
+            android:textSize="11sp"
+            android:backgroundTint="?attr/colorSurface"
+            android:textColor="?attr/colorOnSurface" />
+
+        <Button
+            android:id="@+id/btnFilterInTransit"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="3dp"
+            android:text="بالطريق"
+            android:textSize="11sp"
+            android:backgroundTint="?attr/colorSurface"
+            android:textColor="?attr/colorOnSurface" />
+
+        <Button
+            android:id="@+id/btnFilterCompleted"
+            android:layout_width="0dp"
+            android:layout_height="34dp"
+            android:layout_weight="1"
+            android:layout_marginStart="3dp"
+            android:text="مكتملة"
+            android:textSize="11sp"
+            android:backgroundTint="?attr/colorSurface"
+            android:textColor="?attr/colorOnSurface" />
+    </LinearLayout>
+
+    <!-- قائمة التحويلات -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvTransfers"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="12dp"
+        android:clipToPadding="false" />
+
+    <!-- رسالة فارغة -->
+    <TextView
+        android:id="@+id/tvEmptyTransfers"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="لا توجد تحويلات"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="14sp"
+        android:visibility="gone" />
+</LinearLayout>
