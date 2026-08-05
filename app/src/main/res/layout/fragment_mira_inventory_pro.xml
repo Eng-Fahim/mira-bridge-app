@@ -479,11 +479,11 @@
                 app:cornerRadius="10dp" />
         </LinearLayout>
 
-        <!-- ==================== 7. مجموعة أزرار التحكم الثانوية ==================== -->
+        <!-- ==================== 7. مجموعة أزرار التحكم الثانوية وإدارة الأرشيف ==================== -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
+            android:layout_marginBottom="8dp"
             android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
@@ -514,6 +514,19 @@
                 android:textStyle="bold"
                 app:cornerRadius="10dp" />
         </LinearLayout>
+
+        <!-- زر تصفح أرشيف وتقارير الجرد -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnArchiveReports"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginBottom="12dp"
+            android:backgroundTint="?attr/colorSecondary"
+            android:text="📂 أرشيف وبحث تقارير الجرد السابقة"
+            android:textColor="?attr/colorOnSecondary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            app:cornerRadius="10dp" />
 
         <!-- ==================== 8. قائمة العناصر الممسوحة المباشرة ==================== -->
         <com.google.android.material.card.MaterialCardView
