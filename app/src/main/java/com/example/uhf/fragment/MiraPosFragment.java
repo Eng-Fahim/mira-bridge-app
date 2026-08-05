@@ -547,38 +547,25 @@ public class MiraPosFragment extends Fragment {
         }).start();
     }
 
-    private void showReceiptSafe(String responseJson) {
-        View rootView = getView();
-        if (rootView == null || !isAdded()) {
+        private void showReceiptSafe(String responseJson) {
+        if (!isAdded() || getActivity() == null) {
             showToast("✅ تم البيع بنجاح!");
             return;
         }
 
-        rootView.post(() -> {
-            try {
-                if (!isAdded() || isDetached() || getActivity() == null) return;
-
-                FragmentManager fm = getParentFragmentManager();
-                if (fm != null && !fm.isStateSaved() && !fm.isDestroyed()) {
-                    MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(responseJson);
-                    
-                    int containerId = (getView() != null && getView().getParent() != null) 
-                            ? ((View) getView().getParent()).getId() 
-                            : android.R.id.content;
-
-                    fm.beginTransaction()
-                      .replace(containerId, receipt)
-                      .addToBackStack("mira_receipt")
-                      .commitAllowingStateLoss();
+        if (getActivity() instanceof UHFMainActivity) {
+            getActivity().runOnUiThread(() -> {
+                if (isAdded() && getActivity() instanceof UHFMainActivity) {
+                    ((UHFMainActivity) getActivity()).openReceiptFragment(responseJson);
                 } else {
                     showToast("✅ تم البيع بنجاح!");
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "Receipt error prevented crash: " + e.getMessage());
-                showToast("✅ تم البيع بنجاح!");
-            }
-        });
+            });
+        } else {
+            showToast("✅ تم البيع بنجاح!");
+        }
     }
+
 
     private void saveSaleLocally(POSCheckoutDialog.POSCheckoutData data) {
         if (getContext() == null) return;
