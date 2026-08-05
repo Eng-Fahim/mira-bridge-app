@@ -1,13 +1,12 @@
 package com.example.uhf.fragment;
 
-import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.WebView;
 import android.widget.Button;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -27,13 +26,12 @@ public class MiraReceiptFragment extends Fragment {
     private static final String TAG = "MiraReceiptFragment";
     private static final String ARG_RECEIPT_JSON = "receipt_json";
 
-    private String receiptJsonStr = "";
+    private String receiptJsonStr = "{}";
 
-    // UI Elements
-    private TextView tvReceiptId, tvReceiptDate, tvCustomerName, tvCustomerPhone;
-    private TextView tvPaymentMethod, tvSubtotal, tvDiscount, tvFinalTotal;
-    private LinearLayout containerItems;
-    private Button btnCloseReceipt, btnPrintReceipt;
+    // UI Elements matching XML
+    private WebView webReceipt;
+    private TextView btnCloseReceipt;
+    private Button btnPrintReceipt, btnShareReceipt, btnSaveReceipt;
 
     public static MiraReceiptFragment newInstance(String jsonResponse) {
         MiraReceiptFragment fragment = new MiraReceiptFragment();
@@ -63,25 +61,18 @@ public class MiraReceiptFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         bindViews(view);
         setupListeners();
-        parseAndDisplayReceipt();
+        renderHtmlReceipt();
     }
 
     private void bindViews(View view) {
-        tvReceiptId = view.findViewById(R.id.tvReceiptId);
-        tvReceiptDate = view.findViewById(R.id.tvReceiptDate);
-        tvCustomerName = view.findViewById(R.id.tvReceiptCustomerName);
-        tvCustomerPhone = view.findViewById(R.id.tvReceiptCustomerPhone);
-        tvPaymentMethod = view.findViewById(R.id.tvReceiptPaymentMethod);
-        tvSubtotal = view.findViewById(R.id.tvReceiptSubtotal);
-        tvDiscount = view.findViewById(R.id.tvReceiptDiscount);
-        tvFinalTotal = view.findViewById(R.id.tvReceiptFinalTotal);
-        containerItems = view.findViewById(R.id.containerReceiptItems);
-        btnCloseReceipt = view.findViewById(R.id.btnCloseReceipt);
-        btnPrintReceipt = view.findViewById(R.id.btnPrintReceipt);
+        webReceipt = view.findViewById(R.id.webMiraReceipt);
+        btnCloseReceipt = view.findViewById(R.id.btnMiraCloseReceipt);
+        btnPrintReceipt = view.findViewById(R.id.btnMiraPrintReceipt);
+        btnShareReceipt = view.findViewById(R.id.btnMiraShareReceipt);
+        btnSaveReceipt = view.findViewById(R.id.btnMiraSaveReceipt);
     }
 
     private void setupListeners() {
-        // ⚡ معالجة خروج وآمن للـ Fragment لعدم التسبب في انهيار بالنافذة الخلفية
         if (btnCloseReceipt != null) {
             btnCloseReceipt.setOnClickListener(v -> closeFragment());
         }
@@ -93,66 +84,84 @@ public class MiraReceiptFragment extends Fragment {
                 }
             });
         }
+
+        if (btnShareReceipt != null) {
+            btnShareReceipt.setOnClickListener(v -> {
+                if (getContext() != null) {
+                    Toast.makeText(getContext(), "📤 مشاركة الإيصال...", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        if (btnSaveReceipt != null) {
+            btnSaveReceipt.setOnClickListener(v -> {
+                if (getContext() != null) {
+                    Toast.makeText(getContext(), "💾 تم حفظ الإيصال", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
     }
 
-    private void parseAndDisplayReceipt() {
+    private void renderHtmlReceipt() {
+        if (webReceipt == null) return;
+
+        StringBuilder html = new StringBuilder();
+        html.append("<html><head><style>")
+            .append("body { background-color: #0B0F17; color: #FFFFFF; font-family: sans-serif; padding: 15px; } ")
+            .append(".header { text-align: center; border-bottom: 1px solid #374151; padding-bottom: 10px; margin-bottom: 15px; } ")
+            .append(".row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; } ")
+            .append(".table { width: 100%; border-collapse: collapse; margin-top: 15px; } ")
+            .append(".table th, .table td { border-bottom: 1px solid #1F2937; padding: 8px; text-align: right; font-size: 13px; } ")
+            .append(".total { border-top: 2px dashed #4ADE80; font-weight: bold; color: #4ADE80; margin-top: 15px; padding-top: 10px; } ")
+            .append("</style></head><body>");
+
         try {
             JSONObject root = new JSONObject(receiptJsonStr);
-
-            // استخراج تفاصيل السند الأساسية
             String receiptId = root.optString("receipt_id", root.optString("transaction_id", "INV-" + System.currentTimeMillis() / 1000));
             String date = root.optString("created_at", root.optString("date", "الآن"));
 
-            if (tvReceiptId != null) tvReceiptId.setText("رقم الفاتورة: " + receiptId);
-            if (tvReceiptDate != null) tvReceiptDate.setText("التاريخ: " + date);
+            html.append("<div class='header'><h2>فاتورة مبيعات</h2><p>رقم: ").append(receiptId).append("<br>التاريخ: ").append(date).append("</p></div>");
 
-            // بيانات العميل والدفع
             JSONObject customer = root.optJSONObject("customer");
             if (customer != null) {
-                if (tvCustomerName != null) tvCustomerName.setText(customer.optString("name", "عميل عام"));
-                if (tvCustomerPhone != null) tvCustomerPhone.setText(customer.optString("phone", "-"));
-                if (tvPaymentMethod != null) tvPaymentMethod.setText(customer.optString("payment_method", "نقداً"));
+                html.append("<div class='row'><span>العميل:</span><span>").append(customer.optString("name", "عميل عام")).append("</span></div>");
+                html.append("<div class='row'><span>الهاتف:</span><span>").append(customer.optString("phone", "-")).append("</span></div>");
+                html.append("<div class='row'><span>طريقة الدفع:</span><span>").append(customer.optString("payment_method", "CASH")).append("</span></div>");
             }
 
-            // البيانات المالية
+            html.append("<table class='table'><thead><tr><th>القطعة</th><th>العيار/الوزن</th><th>المبلغ</th></tr></thead><tbody>");
+
+            JSONArray items = root.optJSONArray("items");
+            if (items != null) {
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject item = items.getJSONObject(i);
+                    html.append("<tr>")
+                        .append("<td>").append(item.optString("title", "قطعة ذهب")).append("</td>")
+                        .append("<td>").append(item.optString("karat", "21K")).append(" / ").append(String.format(Locale.US, "%.2fg", item.optDouble("weight", 0.0))).append("</td>")
+                        .append("<td>").append(String.format(Locale.US, "$%,.2f", item.optDouble("sale_price", 0.0))).append("</td>")
+                        .append("</tr>");
+                }
+            }
+            html.append("</tbody></table>");
+
             JSONObject payment = root.optJSONObject("payment");
             if (payment != null) {
                 double subtotal = payment.optDouble("subtotal", 0.0);
                 double discount = payment.optDouble("discount_percent", 0.0);
                 double finalAmount = payment.optDouble("final_amount", 0.0);
 
-                if (tvSubtotal != null) tvSubtotal.setText(String.format(Locale.US, "$%,.2f", subtotal));
-                if (tvDiscount != null) tvDiscount.setText(String.format(Locale.US, "%.1f%%", discount));
-                if (tvFinalTotal != null) tvFinalTotal.setText(String.format(Locale.US, "$%,.2f", finalAmount));
+                html.append("<div class='row' style='margin-top:15px;'><span>الإجمالي:</span><span>").append(String.format(Locale.US, "$%,.2f", subtotal)).append("</span></div>");
+                html.append("<div class='row'><span>الخصم:</span><span>").append(String.format(Locale.US, "%.1f%%", discount)).append("</span></div>");
+                html.append("<div class='row total'><span>الصافي النهائي:</span><span>").append(String.format(Locale.US, "$%,.2f", finalAmount)).append("</span></div>");
             }
 
-            // عرض العناصر في القائمة
-            JSONArray items = root.optJSONArray("items");
-            if (items != null && containerItems != null && getContext() != null) {
-                containerItems.removeAllViews();
-                for (int i = 0; i < items.length(); i++) {
-                    JSONObject item = items.getJSONObject(i);
-                    View itemView = LayoutInflater.from(getContext()).inflate(R.layout.item_receipt_row, containerItems, false);
-
-                    TextView tvTitle = itemView.findViewById(R.id.tvReceiptItemTitle);
-                    TextView tvDetails = itemView.findViewById(R.id.tvReceiptItemDetails);
-                    TextView tvPrice = itemView.findViewById(R.id.tvReceiptItemPrice);
-
-                    String title = item.optString("title", "قطعة ذهب");
-                    String karat = item.optString("karat", "21K");
-                    double weight = item.optDouble("weight", 0.0);
-                    double price = item.optDouble("sale_price", 0.0);
-
-                    if (tvTitle != null) tvTitle.setText(title);
-                    if (tvDetails != null) tvDetails.setText(String.format(Locale.US, "%s | %.2fg", karat, weight));
-                    if (tvPrice != null) tvPrice.setText(String.format(Locale.US, "$%,.2f", price));
-
-                    containerItems.addView(itemView);
-                }
-            }
         } catch (Exception e) {
-            Log.e(TAG, "Error parsing receipt JSON: " + e.getMessage());
+            Log.e(TAG, "Error generating HTML: " + e.getMessage());
+            html.append("<p style='color:#EF4444;'>خطأ في قراءة بيانات الفاتورة</p>");
         }
+
+        html.append("</body></html>");
+        webReceipt.loadDataWithBaseURL(null, html.toString(), "text/html", "UTF-8", null);
     }
 
     private void closeFragment() {
