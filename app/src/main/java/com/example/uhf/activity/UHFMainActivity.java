@@ -1,5 +1,5 @@
 package com.example.uhf.activity;
-import com.example.uhf.manager.MiraOrgProfileManager;
+
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -30,11 +30,13 @@ import com.example.uhf.fragment.BlockPermalockFragment;
 import com.example.uhf.fragment.BlockWriteFragment;
 import com.example.uhf.fragment.JewelryDashboardFragment;
 import com.example.uhf.fragment.MarginReadFragment;
+import com.example.uhf.fragment.MiraBranchPickerFragment;
 import com.example.uhf.fragment.MiraDashboardFragment;
 import com.example.uhf.fragment.MiraIdentityStudioFragment;
 import com.example.uhf.fragment.MiraInventoryProFragment;
 import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.fragment.MiraReceiptFragment;
+import com.example.uhf.fragment.MiraSalesHistoryFragment;
 import com.example.uhf.fragment.MiraSecureGateFragment;
 import com.example.uhf.fragment.ProtectedModeAndShortRangeModeFragment;
 import com.example.uhf.fragment.UHFKillFragment;
@@ -48,12 +50,13 @@ import com.example.uhf.fragment.UHFTagFlashFragment;
 import com.example.uhf.fragment.UHFTagLitFragment;
 import com.example.uhf.fragment.UHFUpgradeFragment;
 import com.example.uhf.fragment.UsersManagementFragment;
+import com.example.uhf.manager.MiraBranchesManager;
+import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.ExportExcelAsyncTask;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.UIHelper;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 import com.rscja.deviceapi.interfaces.ConnectionStatus;
-import com.example.uhf.fragment.MiraSalesHistoryFragment;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -69,6 +72,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private PlaySoundThread playSoundThread = null;
     public Fragment currentFragment;
     private SessionManager sessionManager;
+    private MiraBranchesManager branchesManager;
 
     private MiraPosFragment activePOSFragment = null;
 
@@ -77,7 +81,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         super.onCreate(savedInstanceState);
 
-        // 🌐 التحقق من اللغة الحالية وضبط اتجاه الواجهة بالكامل (RTL / LTR)
         boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         if (isArabic) {
             getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
@@ -91,6 +94,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             return;
         }
 
+        // 🏢 تهيئة مدير الفروع
+        branchesManager = MiraBranchesManager.getInstance(this);
+
         setContentView(R.layout.activity_main);
 
         com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
@@ -103,6 +109,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             if (getSupportActionBar() != null) {
                 MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
                 getSupportActionBar().setTitle(orgProfile.getOrgName() + " - " + displayName);
+
+                // 🏢 إظهار اسم الفرع النشط كعنوان فرعي
+                if (branchesManager.hasActiveBranch()) {
+                    getSupportActionBar().setSubtitle("📍 " + branchesManager.getActiveBranchDisplayName());
+                }
             }
         }
 
@@ -120,7 +131,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     public void setActivePOSFragment(MiraPosFragment fragment) {
         this.activePOSFragment = fragment;
-        Log.d(TAG, "Active POS Fragment: " + (fragment != null ? "SET" : "CLEARED"));
     }
 
     public boolean isReaderReady() {
@@ -146,16 +156,15 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
     }
-    
+
     // ============================================
-    // ✅ توحيد التبويبات وتوجيهها حسب لغة التطبيق
+    // ✅ تصفية التبويبات حسب الصلاحيات + دعم متعدد اللغات
     // ============================================
     protected void initViewPageData() {
         fm = getSupportFragmentManager();
         mTabHost = findViewById(android.R.id.tabhost);
         mTabHost.setup(this, fm, R.id.realtabcontent);
 
-        // ضبط اتجاه التبويبات ديناميكياً
         boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
             mTabHost.setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
@@ -170,24 +179,20 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         boolean isPosOperator = (role == SessionManager.Role.POS_OPERATOR);
         boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
 
-        // ============================================
-        // 🏠 1. لوحة التحكم الرئيسية (Dashboard)
-        // ============================================
+        // 🏠 لوحة التحكم
         mTabHost.addTab(
             mTabHost.newTabSpec("Dashboard").setIndicator(isArabic ? "🏠 الرئيسية" : "🏠 Dashboard"),
             MiraDashboardFragment.class, null
         );
 
-        // ============================================
-        // 💎 2. لوحة المجوهرات، ونقطة البيع، والسجل
-        // ============================================
+        // 💎 المجوهرات + POS + سجل المبيعات
         if (isAnyAdmin || isPosOperator) {
             mTabHost.addTab(
                 mTabHost.newTabSpec("JewelryDashboard").setIndicator(isArabic ? "💎 المجوهرات" : "💎 Jewelry"),
                 JewelryDashboardFragment.class, null
             );
             mTabHost.addTab(
-                mTabHost.newTabSpec("POS Mode").setIndicator(isArabic ? "🛒 نقطة البيع" : "🛒 POS"),
+                mTabHost.newTabSpec("POS Mode").setIndicator(isArabic ? "🛒 البيع" : "🛒 POS"),
                 MiraPosFragment.class, null
             );
             mTabHost.addTab(
@@ -196,20 +201,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             );
         }
 
-        // ============================================
-        // 📷 3. شاشة القراءة والمسح السريع
-        // ============================================
+        // 📷 المسح
         mTabHost.addTab(
             mTabHost.newTabSpec("Scan").setIndicator(isArabic ? "📷 المسح" : "📷 Scan"),
             UHFReadTagFragment.class, null
         );
 
-        // ============================================
-        // 🆔 4. استوديو التكويد، المخزون والرادار
-        // ============================================
+        // 🆔 التكويد + المخزون + الرادار
         if (isAnyAdmin || isInventoryMgr) {
             mTabHost.addTab(
-                mTabHost.newTabSpec("IdentityStudio").setIndicator(isArabic ? "🆔 التكويد" : "🆔 Identity"),
+                mTabHost.newTabSpec("IdentityStudio").setIndicator(isArabic ? "🆔 التكويد" : "🆔 ID"),
                 MiraIdentityStudioFragment.class, null
             );
             mTabHost.addTab(
@@ -222,9 +223,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             );
         }
 
-        // ============================================
-        // 🚪 5. البوابات الأمنية
-        // ============================================
+        // 🚪 البوابات
         if (isAnyAdmin || isGateSecurity) {
             mTabHost.addTab(
                 mTabHost.newTabSpec("SecureGate").setIndicator(isArabic ? "🚪 البوابات" : "🚪 Gate"),
@@ -232,9 +231,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             );
         }
 
-        // ============================================
-        // 👥 6. إدارة المستخدمين
-        // ============================================
+        // 👥 المستخدمين
         if (isAnyAdmin) {
             mTabHost.addTab(
                 mTabHost.newTabSpec("UsersManagement").setIndicator(isArabic ? "👥 المستخدمين" : "👥 Users"),
@@ -242,24 +239,37 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             );
         }
 
-        // ============================================
-        // ⚙️ 7. التبويبات المتقدمة والهندسية (System Admin فقط)
-        // ============================================
+        // ⚙️ الإعدادات المتقدمة (System Admin فقط)
         if (isSystemAdmin) {
             mTabHost.addTab(mTabHost.newTabSpec("Settings").setIndicator(isArabic ? "⚙️ الإعدادات" : "⚙️ Settings"), UHFSetFragment.class, null);
             mTabHost.addTab(mTabHost.newTabSpec("Location").setIndicator(isArabic ? "📍 المواقع" : "📍 Location"), UHFLocationFragment.class, null);
             mTabHost.addTab(mTabHost.newTabSpec("TagLit").setIndicator(isArabic ? "💡 إضاءة" : "💡 TagLit"), UHFTagLitFragment.class, null);
             mTabHost.addTab(mTabHost.newTabSpec("TagFlash").setIndicator(isArabic ? "⚡ فلاش" : "⚡ Flash"), UHFTagFlashFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("ReadWrite").setIndicator(isArabic ? "📝 كتابة" : "📝 Read/Write"), UHFReadWriteFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("ReadWrite").setIndicator(isArabic ? "📝 كتابة" : "📝 R/W"), UHFReadWriteFragment.class, null);
             mTabHost.addTab(mTabHost.newTabSpec("Lock").setIndicator(isArabic ? "🔒 قفل" : "🔒 Lock"), UHFLockFragment.class, null);
             mTabHost.addTab(mTabHost.newTabSpec("Kill").setIndicator(isArabic ? "🛑 إلغاء" : "🛑 Kill"), UHFKillFragment.class, null);
             mTabHost.addTab(mTabHost.newTabSpec("Protected-ShortRange").setIndicator(isArabic ? "🛡️ آمن" : "🛡️ Protected"), ProtectedModeAndShortRangeModeFragment.class, null);
             mTabHost.addTab(mTabHost.newTabSpec("MarginRead").setIndicator(isArabic ? "📊 الهامش" : "📊 Margin"), MarginReadFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("NxpUcodeDna").setIndicator(isArabic ? "🧬 بصمة DNA" : "🧬 DNA"), AuthenticateNxpUcodeDnaFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("BlockWrite").setIndicator(isArabic ? "📦 بلوك" : "📦 BlockWrite"), BlockWriteFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("BlockPermalock").setIndicator(isArabic ? "🔐 قفل دائم" : "🔐 Permalock"), BlockPermalockFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("NxpUcodeDna").setIndicator(isArabic ? "🧬 DNA" : "🧬 DNA"), AuthenticateNxpUcodeDnaFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("BlockWrite").setIndicator(isArabic ? "📦 بلوك" : "📦 Block"), BlockWriteFragment.class, null);
+            mTabHost.addTab(mTabHost.newTabSpec("BlockPermalock").setIndicator(isArabic ? "🔐 دائم" : "🔐 Permalock"), BlockPermalockFragment.class, null);
             mTabHost.addTab(mTabHost.newTabSpec("Upgrade").setIndicator(isArabic ? "⬆️ ترقية" : "⬆️ Upgrade"), UHFUpgradeFragment.class, null);
         }
+    }
+
+    // ============================================
+    // 🏢 منتقي الفرع
+    // ============================================
+    private void showBranchPicker() {
+        MiraBranchPickerFragment picker = new MiraBranchPickerFragment();
+        picker.setOnBranchSelectedListener((branchId, branchName, branchCode) -> {
+            if (getSupportActionBar() != null) {
+                getSupportActionBar().setSubtitle("📍 " + branchName);
+            }
+            branchesManager.setActiveBranch(branchId, branchName, branchCode, "", "");
+            Toast.makeText(this, "✅ " + branchName, Toast.LENGTH_SHORT).show();
+        });
+        picker.show(getSupportFragmentManager(), "branch_picker");
     }
 
     // ============================================
@@ -270,6 +280,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         int id = item.getItemId();
         if (id == R.id.action_logout) { showLogoutConfirmation(); return true; }
         if (id == R.id.action_profile) { showProfileDialog(); return true; }
+        if (id == R.id.action_branches) { showBranchPicker(); return true; }
         if (id == R.id.export) { exportData(); return true; }
         if (id == R.id.UHF_ver) { getUHFVersion(); return true; }
         if (id == R.id.speed) { startActivity(new Intent(this, TestActivity.class)); return true; }
@@ -280,8 +291,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         new androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle(isArabic ? "تسجيل الخروج" : "Sign Out")
-            .setMessage(isArabic ? "هل أنت متأكد أنك تريد تسجيل الخروج من نظام MIRA؟\n\nسيتم إنهاء جلستك الحالية." : "Are you sure you want to sign out of MIRA Enterprise?\n\nYour current session will be terminated.")
-            .setPositiveButton(isArabic ? "تسجيل الخروج" : "Sign Out", (d, w) -> { performLogout(); })
+            .setMessage(isArabic ? "هل أنت متأكد أنك تريد تسجيل الخروج؟" : "Are you sure you want to sign out?")
+            .setPositiveButton(isArabic ? "تسجيل الخروج" : "Sign Out", (d, w) -> performLogout())
             .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
             .setIcon(R.drawable.ic_logout)
             .show();
@@ -310,7 +321,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         String message = (isArabic ? "المستخدم: " : "User: ") + displayName + "\n"
                        + (isArabic ? "اسم المستخدم: " : "Username: ") + username + "\n"
                        + (isArabic ? "الصلاحية: " : "Role: ") + roleLabel + "\n"
-                       + (isArabic ? "البصمة الحيوية: " : "Biometric: ") + (biometricEnabled ? (isArabic ? "مفعلة" : "Enabled") : (isArabic ? "معطلة" : "Disabled")) + "\n"
+                       + (isArabic ? "البصمة: " : "Biometric: ") + (biometricEnabled ? (isArabic ? "مفعلة" : "Enabled") : (isArabic ? "معطلة" : "Disabled")) + "\n"
+                       + (isArabic ? "الفرع: " : "Branch: ") + branchesManager.getActiveBranchDisplayName() + "\n"
                        + (isArabic ? "الخادم: " : "Server: ") + serverUrl;
 
         new androidx.appcompat.app.AlertDialog.Builder(this)
@@ -324,6 +336,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     public void performLogout() {
         if (sessionManager != null) sessionManager.logout();
+        if (branchesManager != null) branchesManager.clear();
         navigateToLogin();
     }
 
@@ -375,24 +388,24 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         volumnRatio = audioCurrentVolume / audioMaxVolume;
         try { soundPool.play(soundMap.get(id), volumnRatio, volumnRatio, 1, 0, 1); } catch (Exception e) { e.printStackTrace(); }
     }
-    
+
     public void openReceiptFragment(String responseJson) {
-    try {
-        MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(responseJson);
-        FragmentManager fm = getSupportFragmentManager();
-        if (fm != null && !fm.isStateSaved() && !fm.isDestroyed()) {
-            fm.beginTransaction()
-              .replace(android.R.id.content, receipt)
-              .addToBackStack("mira_receipt")
-              .commitAllowingStateLoss();
-        } else {
+        try {
+            MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(responseJson);
+            FragmentManager fm = getSupportFragmentManager();
+            if (fm != null && !fm.isStateSaved() && !fm.isDestroyed()) {
+                fm.beginTransaction()
+                  .replace(android.R.id.content, receipt)
+                  .addToBackStack("mira_receipt")
+                  .commitAllowingStateLoss();
+            } else {
+                showToast("✅ تم البيع بنجاح!");
+            }
+        } catch (Exception e) {
+            Log.e("UHFMainActivity", "Error opening receipt: " + e.getMessage());
             showToast("✅ تم البيع بنجاح!");
         }
-    } catch (Exception e) {
-        Log.e("UHFMainActivity", "Error opening receipt: " + e.getMessage());
-        showToast("✅ تم البيع بنجاح!");
     }
-}
 
     private void checkReadWritePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -441,4 +454,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
         public void stopPlay() { isStop = true; synchronized (objectLock) { objectLock.notifyAll(); } }
     }
-}
+                }
