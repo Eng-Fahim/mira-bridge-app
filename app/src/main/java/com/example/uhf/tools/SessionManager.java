@@ -19,19 +19,21 @@ public class SessionManager {
     private static final String KEY_LAST_BIOMETRIC_DISPLAY_NAME = "lastBiometricDisplayName";
     private static final String KEY_LAST_BIOMETRIC_USER_ID = "lastBiometricUserId";
     private static final String KEY_LAST_BIOMETRIC_TOKEN = "lastBiometricToken";
+    private static final String KEY_LAST_BIOMETRIC_BRANCH_ID = "lastBiometricBranchId";
+    private static final String KEY_LAST_BIOMETRIC_BRANCH_NAME = "lastBiometricBranchName";
 
     private final SharedPreferences pref;
     private final SharedPreferences.Editor editor;
 
-    // ✅ هيكل الصلاحيات - مستويان للإدارة
+    // هيكل الصلاحيات
     public enum Role {
-        SYSTEM_ADMIN,    // 🔧 مهندس النظام - وصول كامل لكل شيء
-        ORG_ADMIN,       // 🏢 مدير الجهة - إدارة المستخدمين والمخزون
-        INVENTORY_MGR,   // 📊 مدير المخزون
-        POS_OPERATOR,    // 🛒 موظف مبيعات
-        SECURITY,        // 🔒 أمن
-        GATE_SECURITY,   // 🚪 أمن البوابات
-        AUDITOR          // 🔍 مدقق
+        SYSTEM_ADMIN,
+        ORG_ADMIN,
+        INVENTORY_MGR,
+        POS_OPERATOR,
+        SECURITY,
+        GATE_SECURITY,
+        AUDITOR
     }
 
     public SessionManager(Context context) {
@@ -58,61 +60,32 @@ public class SessionManager {
 
     public Role getUserRole() {
         String roleStr = pref.getString(KEY_USER_ROLE, "INVENTORY_MGR");
-        try {
-            return Role.valueOf(roleStr);
-        } catch (IllegalArgumentException e) {
-            return Role.INVENTORY_MGR;
-        }
+        try { return Role.valueOf(roleStr); }
+        catch (IllegalArgumentException e) { return Role.INVENTORY_MGR; }
     }
 
     public String getRoleString() {
         return pref.getString(KEY_USER_ROLE, "INVENTORY_MGR");
     }
 
-    public boolean isSystemAdmin() {
-        return "SYSTEM_ADMIN".equals(getRoleString());
-    }
-
-    public boolean isOrgAdminOrHigher() {
-        String role = getRoleString();
-        return "SYSTEM_ADMIN".equals(role) || "ORG_ADMIN".equals(role);
-    }
-
+    public boolean isSystemAdmin() { return "SYSTEM_ADMIN".equals(getRoleString()); }
     public boolean isAnyAdmin() {
         String role = getRoleString();
         return "SYSTEM_ADMIN".equals(role) || "ORG_ADMIN".equals(role);
     }
 
-    public String getUsername() {
-        return pref.getString(KEY_USERNAME, "");
-    }
-
-    public String getUserName() {
-        return pref.getString(KEY_USERNAME, "");
-    }
-
-    public String getAuthToken() {
-        return pref.getString(KEY_AUTH_TOKEN, "");
-    }
+    public String getUsername()   { return pref.getString(KEY_USERNAME, ""); }
+    public String getUserName()   { return pref.getString(KEY_USERNAME, ""); }
+    public String getAuthToken()  { return pref.getString(KEY_AUTH_TOKEN, ""); }
 
     // ==================== userId ====================
 
-    public void setUserId(int userId) {
-        editor.putInt(KEY_USER_ID, userId);
-        editor.apply();
-    }
-
-    public int getUserId() {
-        return pref.getInt(KEY_USER_ID, 0);
-    }
+    public void setUserId(int userId) { editor.putInt(KEY_USER_ID, userId); editor.apply(); }
+    public int getUserId()             { return pref.getInt(KEY_USER_ID, 0); }
 
     // ==================== displayName ====================
 
-    public void setDisplayName(String displayName) {
-        editor.putString(KEY_DISPLAY_NAME, displayName);
-        editor.apply();
-    }
-
+    public void setDisplayName(String displayName) { editor.putString(KEY_DISPLAY_NAME, displayName); editor.apply(); }
     public String getDisplayName() {
         String name = pref.getString(KEY_DISPLAY_NAME, "");
         return name.isEmpty() ? getUsername() : name;
@@ -120,29 +93,14 @@ public class SessionManager {
 
     // ==================== رابط الخادم ====================
 
-    public String getServerUrl() {
-        return pref.getString(KEY_SERVER_URL, "");
-    }
+    public String getServerUrl()             { return pref.getString(KEY_SERVER_URL, ""); }
+    public void setServerUrl(String url)     { editor.putString(KEY_SERVER_URL, url); editor.apply(); }
 
-    public void setServerUrl(String url) {
-        editor.putString(KEY_SERVER_URL, url);
-        editor.apply();
-    }
+    // ==================== البصمة - بيانات المستخدم ====================
 
-    // ==================== البصمة ====================
+    public void setBiometricEnabled(boolean enabled) { editor.putBoolean(KEY_BIOMETRIC_ENABLED, enabled); editor.apply(); }
+    public boolean isBiometricEnabled()              { return pref.getBoolean(KEY_BIOMETRIC_ENABLED, false); }
 
-    public void setBiometricEnabled(boolean enabled) {
-        editor.putBoolean(KEY_BIOMETRIC_ENABLED, enabled);
-        editor.apply();
-    }
-
-    public boolean isBiometricEnabled() {
-        return pref.getBoolean(KEY_BIOMETRIC_ENABLED, false);
-    }
-
-    /**
-     * ✅ حفظ بيانات كاملة للمستخدم لاستخدامها مع البصمة
-     */
     public void saveBiometricUser(String username, String role, String displayName, int userId, String token) {
         editor.putString(KEY_LAST_BIOMETRIC_USER, username);
         editor.putString(KEY_LAST_BIOMETRIC_ROLE, role);
@@ -152,25 +110,22 @@ public class SessionManager {
         editor.apply();
     }
 
-    public String getLastBiometricUser() {
-        return pref.getString(KEY_LAST_BIOMETRIC_USER, "");
+    public String getLastBiometricUser()        { return pref.getString(KEY_LAST_BIOMETRIC_USER, ""); }
+    public String getLastBiometricRole()        { return pref.getString(KEY_LAST_BIOMETRIC_ROLE, "INVENTORY_MGR"); }
+    public String getLastBiometricDisplayName() { return pref.getString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, ""); }
+    public int getLastBiometricUserId()         { return pref.getInt(KEY_LAST_BIOMETRIC_USER_ID, 0); }
+    public String getLastBiometricToken()       { return pref.getString(KEY_LAST_BIOMETRIC_TOKEN, ""); }
+
+    // ==================== البصمة - بيانات الفرع ====================
+
+    public void saveBiometricBranch(int branchId, String branchName) {
+        editor.putInt(KEY_LAST_BIOMETRIC_BRANCH_ID, branchId);
+        editor.putString(KEY_LAST_BIOMETRIC_BRANCH_NAME, branchName);
+        editor.apply();
     }
 
-    public String getLastBiometricRole() {
-        return pref.getString(KEY_LAST_BIOMETRIC_ROLE, "INVENTORY_MGR");
-    }
-
-    public String getLastBiometricDisplayName() {
-        return pref.getString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, "");
-    }
-
-    public int getLastBiometricUserId() {
-        return pref.getInt(KEY_LAST_BIOMETRIC_USER_ID, 0);
-    }
-
-    public String getLastBiometricToken() {
-        return pref.getString(KEY_LAST_BIOMETRIC_TOKEN, "");
-    }
+    public int getLastBiometricBranchId()       { return pref.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, 1); }
+    public String getLastBiometricBranchName()  { return pref.getString(KEY_LAST_BIOMETRIC_BRANCH_NAME, ""); }
 
     // ==================== تسجيل الخروج ====================
 
@@ -181,6 +136,8 @@ public class SessionManager {
         String lastDisplayName = pref.getString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, "");
         int lastUserId = pref.getInt(KEY_LAST_BIOMETRIC_USER_ID, 0);
         String lastToken = pref.getString(KEY_LAST_BIOMETRIC_TOKEN, "");
+        int lastBranchId = pref.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, 1);
+        String lastBranchName = pref.getString(KEY_LAST_BIOMETRIC_BRANCH_NAME, "");
 
         editor.clear();
 
@@ -191,12 +148,12 @@ public class SessionManager {
             editor.putString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, lastDisplayName);
             editor.putInt(KEY_LAST_BIOMETRIC_USER_ID, lastUserId);
             editor.putString(KEY_LAST_BIOMETRIC_TOKEN, lastToken);
+            editor.putInt(KEY_LAST_BIOMETRIC_BRANCH_ID, lastBranchId);
+            editor.putString(KEY_LAST_BIOMETRIC_BRANCH_NAME, lastBranchName);
         }
 
         editor.apply();
     }
 
-    public void logout() {
-        logoutUser();
-    }
+    public void logout() { logoutUser(); }
 }
