@@ -374,6 +374,24 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         volumnRatio = audioCurrentVolume / audioMaxVolume;
         try { soundPool.play(soundMap.get(id), volumnRatio, volumnRatio, 1, 0, 1); } catch (Exception e) { e.printStackTrace(); }
     }
+    
+    public void openReceiptFragment(String responseJson) {
+    try {
+        MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(responseJson);
+        FragmentManager fm = getSupportFragmentManager();
+        if (fm != null && !fm.isStateSaved() && !fm.isDestroyed()) {
+            fm.beginTransaction()
+              .replace(android.R.id.content, receipt)
+              .addToBackStack("mira_receipt")
+              .commitAllowingStateLoss();
+        } else {
+            showToast("✅ تم البيع بنجاح!");
+        }
+    } catch (Exception e) {
+        Log.e("UHFMainActivity", "Error opening receipt: " + e.getMessage());
+        showToast("✅ تم البيع بنجاح!");
+    }
+}
 
     private void checkReadWritePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
