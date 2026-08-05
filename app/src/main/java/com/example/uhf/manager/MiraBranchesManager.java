@@ -40,6 +40,15 @@ public class MiraBranchesManager {
         return instance;
     }
 
+    private static final String KEY_BRANCH_LOCKED = "branch_locked";
+
+public void setUserBranchLocked(boolean locked) {
+    prefs.edit().putBoolean(KEY_BRANCH_LOCKED, locked).apply();
+}
+
+public boolean isBranchLocked() {
+    return prefs.getBoolean(KEY_BRANCH_LOCKED, false);
+}
     // ==================== الفرع النشط ====================
 
     /**
