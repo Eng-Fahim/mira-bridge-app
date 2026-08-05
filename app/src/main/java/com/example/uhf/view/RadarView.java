@@ -16,6 +16,12 @@ import com.rscja.deviceapi.entity.RadarLocationEntity;
 
 import java.util.List;
 
+private int radarBorderColor = 0xFF38BDF8;
+
+public void setBorderColor(int color) {
+    this.radarBorderColor = color;
+    invalidate();
+}
 /**
  * 雷达扫描组件
  * 宽高始终相等且取宽高中的最小值
