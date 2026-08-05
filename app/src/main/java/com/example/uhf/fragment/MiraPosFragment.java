@@ -439,7 +439,7 @@ public class MiraPosFragment extends Fragment {
         return t;
     }
 
-    // ===================== Checkout =====================
+    // ===================== Checkout Fixed =====================
 
     private void processCheckoutAndStockUpdate() {
         if (cartList.isEmpty()) {
@@ -448,27 +448,35 @@ public class MiraPosFragment extends Fragment {
         }
         if (!isAdded() || getActivity() == null) return;
         UIHelper.hideKeyboard(getActivity());
+
         try {
             POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(getCartTotal(), cartList.size());
             dialog.setCheckoutListener(this::executeCheckout);
-            FragmentManager fm = getActivity().getSupportFragmentManager();
-            if (fm != null && !fm.isStateSaved()) {
+
+            // ⚡ استخدام ChildFragmentManager الآمن لمنع التعارض بالتبويبات
+            FragmentManager fm = getChildFragmentManager();
+            if (!fm.isStateSaved()) {
                 dialog.show(fm, "POSCheckoutDialog");
             }
         } catch (Exception e) {
-            showToast("خطأ: " + e.getMessage());
+            Log.e(TAG, "Show dialog error: " + e.getMessage());
+            showToast("خطأ في فتح النافذة: " + e.getMessage());
         }
     }
 
     private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
-        if (btnCheckout != null) {
-            btnCheckout.setEnabled(false);
-            btnCheckout.setAlpha(0.5f);
-        }
-        if (tvCartStatus != null) {
-            tvCartStatus.setText("جاري إتمام البيع...");
-            tvCartStatus.setTextColor(Color.parseColor("#F59E0B"));
-        }
+        if (!isAdded() || getActivity() == null) return;
+
+        getActivity().runOnUiThread(() -> {
+            if (btnCheckout != null) {
+                btnCheckout.setEnabled(false);
+                btnCheckout.setAlpha(0.5f);
+            }
+            if (tvCartStatus != null) {
+                tvCartStatus.setText("جاري إتمام البيع...");
+                tvCartStatus.setTextColor(Color.parseColor("#F59E0B"));
+            }
+        });
 
         new Thread(() -> {
             try {
@@ -507,9 +515,10 @@ public class MiraPosFragment extends Fragment {
 
                 MiraApiClient.ApiResponse response = client.checkout(payload);
 
-                if (isAdded() && getActivity() != null) {
+                // ⚡ الانتقال والتعامل مع النتائج داخل UI Thread أمنياً
+                if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
-                        if (!isAdded()) return;
+                        if (!isAdded() || getActivity() == null) return;
 
                         if (response != null && response.isSuccess) {
                             playAlertSound(1);
@@ -531,9 +540,9 @@ public class MiraPosFragment extends Fragment {
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Checkout error: " + e.getMessage());
-                if (isAdded() && getActivity() != null) {
+                if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
-                        if (!isAdded()) return;
+                        if (!isAdded() || getActivity() == null) return;
                         saveSaleLocally(data);
                         clearCart();
                         if (btnCheckout != null) {
@@ -548,21 +557,21 @@ public class MiraPosFragment extends Fragment {
     }
 
     private void showReceiptSafe(String responseJson) {
-        if (!isAdded() || getActivity() == null) {
-            showToast("✅ تم البيع بنجاح!");
-            return;
-        }
+        if (!isAdded() || getActivity() == null) return;
 
-        if (getActivity() instanceof UHFMainActivity) {
-            getActivity().runOnUiThread(() -> {
-                if (isAdded() && getActivity() instanceof UHFMainActivity) {
-                    ((UHFMainActivity) getActivity()).openReceiptFragment(responseJson);
-                } else {
-                    showToast("✅ تم البيع بنجاح!");
-                }
-            });
-        } else {
-            showToast("✅ تم البيع بنجاح!");
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).openReceiptFragment(responseJson);
+            } else {
+                MiraReceiptFragment receiptFragment = MiraReceiptFragment.newInstance(responseJson);
+                getParentFragmentManager().beginTransaction()
+                        .replace(R.id.frame_content, receiptFragment)
+                        .addToBackStack("receipt")
+                        .commitAllowingStateLoss();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error showing receipt: " + e.getMessage());
+            showToast("✅ تمت عملية البيع بنجاح");
         }
     }
 
