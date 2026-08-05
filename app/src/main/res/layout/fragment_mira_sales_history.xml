@@ -4,7 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#0B0F17"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:clickable="true"
+    android:focusable="true">
 
     <!-- Header -->
     <LinearLayout
@@ -25,6 +27,17 @@
             android:textSize="18sp"
             android:textStyle="bold" />
 
+        <!-- Refresh Button -->
+        <ImageView
+            android:id="@+id/btnMiraRefreshSales"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="8dp"
+            background="?attr/selectableItemBackgroundBorderless"
+            android:padding="6dp"
+            android:src="@android:drawable/ic_menu_rotate"
+            app:tint="#38BDF8" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -35,6 +48,37 @@
             android:textColor="#38BDF8"
             android:textSize="10sp"
             android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Search / Filter Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="12dp"
+        android:background="@drawable/bg_search_box"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@android:drawable/ic_menu_search"
+            app:tint="#64748B" />
+
+        <EditText
+            android:id="@+id/etMiraSearchSales"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:background="@android:color/transparent"
+            android:hint="ابحث برقم العملية أو اسم العميل..."
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#64748B"
+            android:textSize="14sp" />
     </LinearLayout>
 
     <!-- Empty State -->
@@ -56,7 +100,6 @@
         android:layout_height="match_parent"
         android:clipToPadding="false"
         android:paddingHorizontal="12dp"
-        android:paddingTop="8dp"
         android:paddingBottom="16dp" />
 
 </LinearLayout>
