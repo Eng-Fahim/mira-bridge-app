@@ -1,7 +1,6 @@
 package com.example.uhf.fragment;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
@@ -15,42 +14,52 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
+import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.engine.SmartScaleConnector;
+import com.example.uhf.manager.MiraBranchesManager;
+import com.example.uhf.manager.MiraOrgProfileManager;
 
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.Locale;
+import java.util.concurrent.Executors;
 
+/**
+ * UHF Read Tag Fragment - المسح والتحقق من RFID
+ * 
+ * المميزات:
+ * - مسح RFID UHF + كاميرا GS1
+ * - تحقق ثلاثي: RFID + GS1 + ميزان
+ * - ربط بالفرع النشط
+ * - بطاقة نتيجة احترافية
+ * - دعم عربي/إنجليزي كامل
+ */
 public class UHFReadTagFragment extends Fragment {
 
     private static final String TAG = "UHFReadTagFragment";
-    private static final String PREFS_NAME = "mira_settings";
 
-    // UI Elements
+    // ==================== UI Elements (مطابقة للـ XML) ====================
     private View cardMiraResult;
-    private TextView tvMiraProductName;
-    private TextView tvHeaderStatus;
-    private TextView tvPurityVal;
-    private TextView tvWeightVal;
-    private TextView tvValueVal;
-    private TextView tvSerialVal;
-    private TextView tvStatusBadge;
-
+    private TextView tvProductName, tvHeaderStatus, tvOnlineStatus;
+    private TextView tvPurityVal, tvWeightVal, tvValueVal;
+    private TextView tvSerialVal, tvStatusBadge;
     private EditText etGtinInput;
     private Button btnScan;
 
+    // ==================== Managers ====================
+    private MiraApiClient apiClient;
+    private MiraBranchesManager branchesManager;
+    private MiraOrgProfileManager orgProfile;
     private SmartScaleConnector scaleConnector;
     private double liveScaleWeight = 0.0;
+    private boolean isArabic;
+
+    // ==================== Lifecycle ====================
 
     @Nullable
     @Override
@@ -63,9 +72,19 @@ public class UHFReadTagFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        Context ctx = getContext();
+        if (ctx != null) {
+            apiClient = MiraApiClient.getInstance(ctx);
+            branchesManager = MiraBranchesManager.getInstance(ctx);
+            orgProfile = MiraOrgProfileManager.getInstance(ctx);
+        }
+        isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+
+        // ربط العناصر - مطابقة للـ XML
         cardMiraResult = view.findViewById(R.id.cardMiraResult);
-        tvMiraProductName = view.findViewById(R.id.tvProductName);
+        tvProductName = view.findViewById(R.id.tvProductName);
         tvHeaderStatus = view.findViewById(R.id.tvHeaderStatus);
+        tvOnlineStatus = view.findViewById(R.id.tvOnlineStatus);
         tvPurityVal = view.findViewById(R.id.tvPurityVal);
         tvWeightVal = view.findViewById(R.id.tvWeightVal);
         tvValueVal = view.findViewById(R.id.tvValueVal);
@@ -74,248 +93,210 @@ public class UHFReadTagFragment extends Fragment {
         etGtinInput = view.findViewById(R.id.etGtinInput);
         btnScan = view.findViewById(R.id.btnScan);
 
-        initSmartScale();
-        showMockVerificationResult();
+        // تطبيق اللغة والهوية
+        applyLanguage();
+        updateOnlineStatus(true);
 
+        // تهيئة الميزان
+        initSmartScale();
+
+        // زر المسح
         if (btnScan != null) {
             btnScan.setOnClickListener(v -> {
-                String inputCode = etGtinInput != null ? 
-                    etGtinInput.getText().toString().trim() : "";
-                if (!inputCode.isEmpty()) {
-                    handleScannedTag(inputCode);
+                String code = etGtinInput != null ? etGtinInput.getText().toString().trim() : "";
+                if (!code.isEmpty()) {
+                    handleScannedTag(code);
                 } else {
-                    Toast.makeText(getContext(), "Please enter or scan a valid EPC/GTIN", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(),
+                        isArabic ? "أدخل رمز EPC أو GTIN" : "Enter EPC or GTIN code",
+                        Toast.LENGTH_SHORT).show();
                 }
             });
         }
+
+        // عرض أولي
+        showInitialState();
     }
+
+    // ==================== Language ====================
+
+    private void applyLanguage() {
+        if (btnScan != null) btnScan.setText(isArabic ? "مسح" : "SCAN");
+        if (etGtinInput != null) {
+            etGtinInput.setHint(isArabic ? "أدخل EPC / GTIN..." : "Enter EPC / GTIN...");
+        }
+    }
+
+    private void updateOnlineStatus(boolean online) {
+        if (tvOnlineStatus != null) {
+            tvOnlineStatus.setText(online ? "● ONLINE" : "● OFFLINE");
+            tvOnlineStatus.setTextColor(online ? Color.parseColor("#22C55E") : Color.parseColor("#EF4444"));
+        }
+    }
+
+    private void showInitialState() {
+        if (cardMiraResult != null) cardMiraResult.setVisibility(View.VISIBLE);
+        if (tvProductName != null) tvProductName.setText(isArabic ? "جاهز للمسح..." : "Ready to scan...");
+        if (tvHeaderStatus != null) {
+            tvHeaderStatus.setText(isArabic ? "📡 في انتظار المسح" : "📡 Waiting for scan");
+            tvHeaderStatus.setTextColor(Color.parseColor("#38BDF8"));
+        }
+        if (tvPurityVal != null) tvPurityVal.setText("—");
+        if (tvWeightVal != null) tvWeightVal.setText("—");
+        if (tvValueVal != null) tvValueVal.setText("—");
+        if (tvSerialVal != null) tvSerialVal.setText("—");
+        if (tvStatusBadge != null) {
+            tvStatusBadge.setText(isArabic ? "جاهز" : "READY");
+            tvStatusBadge.setTextColor(Color.parseColor("#38BDF8"));
+        }
+    }
+
+    // ==================== Smart Scale ====================
 
     private void initSmartScale() {
         scaleConnector = new SmartScaleConnector();
         scaleConnector.setListener(new SmartScaleConnector.ScaleListener() {
-            @Override
-            public void onWeightReceived(double weightGrams) {
-                liveScaleWeight = weightGrams;
-                Log.d(TAG, "Scale Live Weight: " + weightGrams + "g");
+            @Override public void onWeightReceived(double w) {
+                liveScaleWeight = w;
+                Log.d(TAG, "Scale: " + w + "g");
             }
-            @Override
-            public void onScaleConnected(String deviceName) {
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() ->
-                        Toast.makeText(getContext(), "⚖️ Scale Connected: " + deviceName, Toast.LENGTH_SHORT).show());
-                }
+            @Override public void onScaleConnected(String n) {
+                safeRun(() -> Toast.makeText(getContext(),
+                    (isArabic ? "⚖️ تم توصيل الميزان: " : "⚖️ Scale connected: ") + n,
+                    Toast.LENGTH_SHORT).show());
             }
-            @Override
-            public void onScaleDisconnected() { liveScaleWeight = 0.0; }
-            @Override
-            public void onScaleError(String error) { Log.e(TAG, "Scale Error: " + error); }
+            @Override public void onScaleDisconnected() { liveScaleWeight = 0.0; }
+            @Override public void onScaleError(String e) { Log.e(TAG, "Scale error: " + e); }
         });
     }
 
+    // ==================== Tag Processing ====================
+
     /**
-     * 🎯 نقطة المعالجة الموحدة للوسم
-     * 1. يرسل إلى POS Mode عبر Activity
-     * 2. يرسل إلى خادم MIRA للتحقق
+     * نقطة المعالجة الموحدة للوسم
      */
     private void handleScannedTag(String epc) {
-        // ⚡ تمرير إلى POS Mode (إذا كان نشطاً)
+        // تمرير إلى POS Mode إذا كان نشطاً
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).onTagRead(epc);
         }
-        // 📡 إرسال إلى خادم MIRA
-        sendTagToMiraServer(epc, "-50");
+        // استعلام MIRA API
+        queryMiraItem(epc);
     }
 
-    public void sendTagToMiraServer(final String epc, final String rssi) {
-        SharedPreferences prefs = null;
-        if (getContext() != null) {
-            prefs = getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+    private void queryMiraItem(String epc) {
+        if (cardMiraResult != null) cardMiraResult.setVisibility(View.VISIBLE);
+        if (tvHeaderStatus != null) {
+            tvHeaderStatus.setText(isArabic ? "🔍 جاري الاستعلام..." : "🔍 Querying...");
+            tvHeaderStatus.setTextColor(Color.parseColor("#F59E0B"));
         }
 
-        final boolean showCard = prefs == null || 
-            prefs.getBoolean("show_mira_card", true);
-
-        if (getActivity() != null) {
-            getActivity().runOnUiThread(() -> {
-                if (showCard && cardMiraResult != null) {
-                    cardMiraResult.setVisibility(View.VISIBLE);
-                }
-            });
-        }
-
-        final SharedPreferences finalPrefs = prefs;
-
-        new Thread(() -> {
-            InputStream inputStream = null;
+        Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                String apiUrl = "https://ams.ibreg.org/wp-json/mira-gate/v1/authorize";
-                String apiKey = "mira_gate_test071234567890abcdefghijklmnop";
-                String gateId = "handheld_c72";
+                JSONObject extraParams = new JSONObject();
+                extraParams.put("branch_id", branchesManager.getActiveBranchId());
+                if (liveScaleWeight > 0) extraParams.put("scale_weight", liveScaleWeight);
 
-                if (finalPrefs != null) {
-                    apiUrl = finalPrefs.getString("mira_api_url", apiUrl);
-                    apiKey = finalPrefs.getString("mira_api_key", apiKey);
-                    gateId = finalPrefs.getString("mira_gate_id", gateId);
+                MiraApiClient.ApiResponse response = apiClient.authorize(epc, "scan", extraParams);
+
+                if (response != null && response.isSuccess && response.data != null) {
+                    safeRun(() -> updateUIWithMiraResponse(response.data, epc));
+                } else {
+                    safeRun(() -> showErrorResult(isArabic ? "قطعة غير مسجلة" : "Item not found"));
                 }
-
-                URL url = new URL(apiUrl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-                conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-                conn.setDoOutput(true);
-
-                JSONObject jsonParam = new JSONObject();
-                jsonParam.put("epc", epc);
-                jsonParam.put("gate_id", gateId);
-                if (rssi != null && !rssi.isEmpty()) {
-                    jsonParam.put("rssi", rssi);
-                }
-                if (liveScaleWeight > 0) {
-                    jsonParam.put("scale_weight", liveScaleWeight);
-                }
-
-                try (OutputStream os = conn.getOutputStream()) {
-                    byte[] input = jsonParam.toString().getBytes("utf-8");
-                    os.write(input, 0, input.length);
-                }
-
-                final int responseCode = conn.getResponseCode();
-                inputStream = (responseCode >= 200 && responseCode < 300) ? 
-                    conn.getInputStream() : conn.getErrorStream();
-
-                BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(inputStream, "utf-8"));
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    response.append(line.trim());
-                }
-
-                final String jsonResponseStr = response.toString();
-
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> 
-                        updateUIWithMiraResponse(jsonResponseStr, epc));
-                }
-
             } catch (Exception e) {
-                Log.e(TAG, "Server connection error: " + e.getMessage());
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> {
-                        if (tvHeaderStatus != null) {
-                            tvHeaderStatus.setText("CONNECTION ERROR");
-                            tvHeaderStatus.setTextColor(Color.parseColor("#EF4444"));
-                        }
-                    });
-                }
-            } finally {
-                if (inputStream != null) {
-                    try { inputStream.close(); } catch (Exception ignored) {}
-                }
+                Log.e(TAG, "Query error: " + e.getMessage());
+                safeRun(() -> showErrorResult(isArabic ? "خطأ في الاتصال" : "Connection error"));
             }
-        }).start();
+        });
     }
 
-    private void updateUIWithMiraResponse(String jsonResponseStr, String fallbackEpc) {
+    // ==================== UI Updates ====================
+
+    private void updateUIWithMiraResponse(JSONObject data, String fallbackEpc) {
         try {
-            JSONObject jsonObject = new JSONObject(jsonResponseStr);
-            JSONObject decision = jsonObject.optJSONObject("decision");
-            JSONObject item = jsonObject.optJSONObject("item");
-            JSONObject barcode = jsonObject.optJSONObject("barcode");
+            JSONObject decision = data.optJSONObject("decision");
+            JSONObject item = data.optJSONObject("item");
+            JSONObject barcode = data.optJSONObject("barcode");
 
-            boolean allowed = decision != null && 
-                decision.optBoolean("allowed", false);
-
-            String title = (item != null) ? 
-                item.optString("title", "Item Verified") : "Unknown Item";
-            String karat = (item != null) ? 
-                item.optString("karat", "N/A") : "N/A";
-            double expectedWeight = (item != null) ? 
-                item.optDouble("weight", 0.0) : 0.0;
-            double value = (item != null) ? 
-                item.optDouble("price", 0.0) : 0.0;
-            String statusStr = (item != null) ? 
-                item.optString("status", "VALID").toUpperCase() : "N/A";
-
-            String serialNo = fallbackEpc;
+            boolean allowed = decision != null && decision.optBoolean("allowed", false);
+            String title = item != null ? item.optString("title", isArabic ? "قطعة" : "Item") : (isArabic ? "قطعة" : "Item");
+            String karat = item != null ? item.optString("karat", "—") : "—";
+            double weight = item != null ? item.optDouble("weight", 0) : 0;
+            double price = item != null ? item.optDouble("price", item.optDouble("retail_price", 0)) : 0;
+            String status = item != null ? item.optString("status", "") : "";
+            String serial = fallbackEpc;
             if (barcode != null && !barcode.optString("serial_no", "").isEmpty()) {
-                serialNo = barcode.optString("serial_no");
+                serial = barcode.optString("serial_no");
             }
 
-            if (tvMiraProductName != null) tvMiraProductName.setText(title);
-            if (tvPurityVal != null) tvPurityVal.setText(karat.isEmpty() ? "N/A" : karat);
+            // تحديث العناصر
+            if (tvProductName != null) tvProductName.setText(title);
+            if (tvPurityVal != null) tvPurityVal.setText(karat);
             if (tvWeightVal != null) {
-                if (liveScaleWeight > 0 && expectedWeight > 0) {
-                    tvWeightVal.setText(String.format(Locale.US, "%.2fg (Scale: %.2fg)", expectedWeight, liveScaleWeight));
+                if (liveScaleWeight > 0 && weight > 0) {
+                    tvWeightVal.setText(String.format(Locale.US, "%.2f / %.2fg", weight, liveScaleWeight));
                 } else {
-                    tvWeightVal.setText(expectedWeight > 0 ? 
-                        String.format(Locale.US, "%.2fg", expectedWeight) : "0.00g");
+                    tvWeightVal.setText(weight > 0 ? String.format(Locale.US, "%.2fg", weight) : "—");
                 }
             }
-            if (tvValueVal != null) tvValueVal.setText(value > 0 ? 
-                String.format(Locale.US, "$%,.0f", value) : "$0");
-            if (tvSerialVal != null) tvSerialVal.setText("SN: " + serialNo);
-
-            boolean isGs1Valid = barcode != null && barcode.optBoolean("valid", true);
-            boolean isWeightMatch = true;
-            if (liveScaleWeight > 0 && expectedWeight > 0) {
-                isWeightMatch = Math.abs(liveScaleWeight - expectedWeight) <= 0.05;
+            if (tvValueVal != null) {
+                tvValueVal.setText(price > 0 ? String.format(Locale.US, "%,.0f YER", price) : "—");
             }
+            if (tvSerialVal != null) tvSerialVal.setText(serial);
+
+            // الحالة
+            boolean weightMatch = liveScaleWeight > 0 && weight > 0 &&
+                Math.abs(liveScaleWeight - weight) <= 0.05;
 
             if (tvHeaderStatus != null && tvStatusBadge != null) {
-                if (allowed && isGs1Valid && isWeightMatch) {
-                    if (liveScaleWeight > 0) {
-                        tvHeaderStatus.setText("✅✅✅ TRI-VERIFIED (100%) — MATCHED");
+                if (allowed && item != null) {
+                    if (weightMatch) {
+                        tvHeaderStatus.setText(isArabic ? "✅✅✅ مطابقة تامة" : "✅✅✅ Tri-Verified");
                         tvHeaderStatus.setTextColor(Color.parseColor("#4ADE80"));
-                        tvStatusBadge.setText("3X VERIFIED");
+                        tvStatusBadge.setText(isArabic ? "مطابق" : "VERIFIED");
                         tvStatusBadge.setTextColor(Color.parseColor("#4ADE80"));
                     } else {
-                        tvHeaderStatus.setText("✅✅ DOUBLE-VERIFIED (RFID + GS1)");
+                        tvHeaderStatus.setText(isArabic ? "✅✅ تم التحقق" : "✅✅ Verified");
                         tvHeaderStatus.setTextColor(Color.parseColor("#38BDF8"));
-                        tvStatusBadge.setText("2X VERIFIED");
+                        tvStatusBadge.setText(isArabic ? "تم التحقق" : "VERIFIED");
                         tvStatusBadge.setTextColor(Color.parseColor("#38BDF8"));
                     }
-                } else if (!isWeightMatch) {
-                    tvHeaderStatus.setText(String.format(Locale.US, 
-                        "🚨 WEIGHT MISMATCH! (Exp: %.2fg vs Act: %.2fg)", 
-                        expectedWeight, liveScaleWeight));
+                } else if (!weightMatch) {
+                    tvHeaderStatus.setText(isArabic ? "🚨 عدم تطابق الوزن!" : "🚨 Weight Mismatch!");
                     tvHeaderStatus.setTextColor(Color.parseColor("#EF4444"));
-                    tvStatusBadge.setText("WEIGHT ALERT");
+                    tvStatusBadge.setText(isArabic ? "تنبيه وزن" : "WEIGHT ALERT");
                     tvStatusBadge.setTextColor(Color.parseColor("#EF4444"));
                 } else {
-                    tvHeaderStatus.setText("☒ BLOCKED — UNAUTHORIZED");
+                    tvHeaderStatus.setText(isArabic ? "🚨 غير مصرح" : "🚨 Unauthorized");
                     tvHeaderStatus.setTextColor(Color.parseColor("#EF4444"));
-                    tvStatusBadge.setText(statusStr);
+                    tvStatusBadge.setText(status.toUpperCase());
                     tvStatusBadge.setTextColor(Color.parseColor("#EF4444"));
                 }
             }
+
         } catch (Exception e) {
-            Log.e(TAG, "JSON parse error: " + e.getMessage());
-            if (tvHeaderStatus != null) {
-                tvHeaderStatus.setText("INVALID RESPONSE FORMAT");
-                tvHeaderStatus.setTextColor(Color.parseColor("#F59E0B"));
-            }
+            Log.e(TAG, "UI update error: " + e.getMessage());
+            showErrorResult(isArabic ? "خطأ في البيانات" : "Data error");
         }
     }
 
-    private void showMockVerificationResult() {
-        if (cardMiraResult != null) cardMiraResult.setVisibility(View.VISIBLE);
-        if (tvMiraProductName != null) tvMiraProductName.setText("خاتم ذهب 21K");
-        if (tvPurityVal != null) tvPurityVal.setText("21K");
-        if (tvWeightVal != null) tvWeightVal.setText("10.00g (Scale: 10.00g)");
-        if (tvValueVal != null) tvValueVal.setText("$750");
-        if (tvSerialVal != null) tvSerialVal.setText("SN: 070045537109");
+    private void showErrorResult(String message) {
         if (tvHeaderStatus != null) {
-            tvHeaderStatus.setText("✅✅✅ TRI-VERIFIED (100%) — MATCHED");
-            tvHeaderStatus.setTextColor(Color.parseColor("#4ADE80"));
+            tvHeaderStatus.setText(message);
+            tvHeaderStatus.setTextColor(Color.parseColor("#EF4444"));
         }
         if (tvStatusBadge != null) {
-            tvStatusBadge.setText("3X VERIFIED");
-            tvStatusBadge.setTextColor(Color.parseColor("#4ADE80"));
+            tvStatusBadge.setText(isArabic ? "خطأ" : "ERROR");
+            tvStatusBadge.setTextColor(Color.parseColor("#EF4444"));
         }
+        updateOnlineStatus(false);
+    }
+
+    // ==================== Helpers ====================
+
+    private void safeRun(Runnable r) {
+        if (getActivity() != null) getActivity().runOnUiThread(r);
     }
 
     @Override
@@ -323,4 +304,4 @@ public class UHFReadTagFragment extends Fragment {
         super.onDestroy();
         if (scaleConnector != null) scaleConnector.disconnect();
     }
-                }
+}
