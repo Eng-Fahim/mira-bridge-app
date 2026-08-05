@@ -27,13 +27,14 @@ public class SessionManager {
 
     // هيكل الصلاحيات
     public enum Role {
-        SYSTEM_ADMIN,
-        ORG_ADMIN,
-        INVENTORY_MGR,
-        POS_OPERATOR,
-        SECURITY,
-        GATE_SECURITY,
-        AUDITOR
+    SYSTEM_ADMIN,    // 🔧 مهندس النظام
+    ORG_ADMIN,       // 🏢 مدير الجهة
+    BRANCH_MANAGER,  // 👤 مدير الفرع ← ✅ جديد
+    INVENTORY_MGR,   // 📊 مدير المخزون
+    POS_OPERATOR,    // 🛒 موظف مبيعات
+    SECURITY,        // 🔒 أمن
+    GATE_SECURITY,   // 🚪 أمن البوابات
+    AUDITOR          // 🔍 مدقق
     }
 
     public SessionManager(Context context) {
