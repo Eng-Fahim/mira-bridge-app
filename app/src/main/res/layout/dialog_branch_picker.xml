@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="?attr/colorSurface"
+    android:layoutDirection="rtl">
+
+    <!-- العنوان -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="16dp">
+
+        <ImageView
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_branch"
+            android:tint="?attr/colorPrimary"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/circle_primary_bg"
+            android:padding="8dp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvBranchPickerTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="اختيار الفرع"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="اختر الفرع النشط للعمل عليه"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- مؤشر التحميل -->
+    <ProgressBar
+        android:id="@+id/pbBranchesLoading"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_gravity="center"
+        android:indeterminateTint="?attr/colorPrimary"
+        android:layout_marginBottom="12dp" />
+
+    <!-- قائمة الفروع -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvBranches"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="400dp"
+        android:clipToPadding="false" />
+
+    <!-- رسالة الخطأ -->
+    <TextView
+        android:id="@+id/tvBranchError"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="#EF4444"
+        android:textSize="12sp"
+        android:gravity="center"
+        android:visibility="gone"
+        android:layout_marginTop="8dp" />
+
+    <!-- زر إدارة الفروع -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnManageBranches"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginTop="8dp"
+        android:text="🏢 إدارة الفروع"
+        android:textColor="?attr/colorPrimary"
+        android:textSize="13sp" />
+
+</LinearLayout>
