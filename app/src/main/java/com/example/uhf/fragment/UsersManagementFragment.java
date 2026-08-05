@@ -24,14 +24,14 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
-import com.google.android.material.card.MaterialCardView;
+import com.example.uhf.manager.MiraBranchesManager;
+import com.example.uhf.tools.SessionManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -51,17 +51,19 @@ public class UsersManagementFragment extends Fragment {
     private final List<UserData> userList = new ArrayList<>();
     private final List<UserData> filteredList = new ArrayList<>();
     private MiraApiClient apiClient;
+    private SessionManager sessionManager;
+    private MiraBranchesManager branchesManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private static final String[] ROLES = {
-    "SYSTEM_ADMIN", "ORG_ADMIN", "BRANCH_MANAGER", "INVENTORY_MGR",
-    "POS_OPERATOR", "SECURITY", "GATE_SECURITY", "AUDITOR"
-};
+        "SYSTEM_ADMIN", "ORG_ADMIN", "BRANCH_MANAGER", "INVENTORY_MGR",
+        "POS_OPERATOR", "SECURITY", "GATE_SECURITY", "AUDITOR"
+    };
 
-private static final String[] ROLES_AR = {
-    "مهندس النظام", "مدير الجهة", "مدير الفرع", "مدير المخزون",
-    "موظف مبيعات", "أمن", "أمن البوابات", "مدقق"
-};
+    private static final String[] ROLES_AR = {
+        "مهندس النظام", "مدير الجهة", "مدير الفرع", "مدير المخزون",
+        "موظف مبيعات", "أمن", "أمن البوابات", "مدقق"
+    };
 
     @Nullable
     @Override
@@ -83,6 +85,8 @@ private static final String[] ROLES_AR = {
         btnRefreshUsers = view.findViewById(R.id.btnRefreshUsers);
 
         apiClient = MiraApiClient.getInstance(requireContext());
+        sessionManager = new SessionManager(requireContext());
+        branchesManager = MiraBranchesManager.getInstance(requireContext());
 
         rvUsersList.setLayoutManager(new LinearLayoutManager(getContext()));
         adapter = new UsersAdapter(filteredList);
@@ -134,6 +138,7 @@ private static final String[] ROLES_AR = {
             user.status = u.optString("status", "active");
             user.lastLogin = u.optString("last_login");
             user.isOnline = u.optBoolean("is_online", false);
+            user.branchName = u.optString("branch_name", "");
             userList.add(user);
         }
 
@@ -171,7 +176,7 @@ private static final String[] ROLES_AR = {
     }
 
     // ============================================
-    // 🪜 حوار إضافة/تعديل مستخدم - مع Switch للتفعيل
+    // 🪜 حوار إضافة/تعديل مستخدم
     // ============================================
     private void showUserDialog(@Nullable UserData existingUser) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
@@ -184,7 +189,6 @@ private static final String[] ROLES_AR = {
 
         boolean isEdit = existingUser != null;
 
-        // ==================== عناصر الواجهة ====================
         TextView tvTitle = dialogView.findViewById(R.id.tvDialogTitle);
         TextView tvSubtitle = dialogView.findViewById(R.id.tvDialogSubtitle);
         EditText etDisplayName = dialogView.findViewById(R.id.etDisplayName);
@@ -210,38 +214,35 @@ private static final String[] ROLES_AR = {
         View vStrength4 = dialogView.findViewById(R.id.vStrength4);
         TextView tvStrengthLabel = dialogView.findViewById(R.id.tvStrengthLabel);
 
-        // ✅ عناصر Switch لكل صلاحية
         Switch swSystemAdmin = dialogView.findViewById(R.id.swSystemAdmin);
         Switch swOrgAdmin = dialogView.findViewById(R.id.swOrgAdmin);
+        Switch swBranchManager = dialogView.findViewById(R.id.swBranchManager);
         Switch swInventoryMgr = dialogView.findViewById(R.id.swInventoryMgr);
         Switch swPosOperator = dialogView.findViewById(R.id.swPosOperator);
         Switch swSecurity = dialogView.findViewById(R.id.swSecurity);
         Switch swGateSecurity = dialogView.findViewById(R.id.swGateSecurity);
         Switch swAuditor = dialogView.findViewById(R.id.swAuditor);
 
-        // ✅ عناصر RadioButton
         RadioButton rbSystemAdmin = dialogView.findViewById(R.id.rbSystemAdmin);
         RadioButton rbOrgAdmin = dialogView.findViewById(R.id.rbOrgAdmin);
+        RadioButton rbBranchManager = dialogView.findViewById(R.id.rbBranchManager);
         RadioButton rbInventoryMgr = dialogView.findViewById(R.id.rbInventoryMgr);
         RadioButton rbPosOperator = dialogView.findViewById(R.id.rbPosOperator);
         RadioButton rbSecurity = dialogView.findViewById(R.id.rbSecurity);
         RadioButton rbGateSecurity = dialogView.findViewById(R.id.rbGateSecurity);
         RadioButton rbAuditor = dialogView.findViewById(R.id.rbAuditor);
 
-        // ==================== إعداد الأقسام ====================
         String[] departments = {"المبيعات", "المخزون", "الإدارة", "الأمن", "التدقيق", "المشتريات", "خدمة العملاء"};
         ArrayAdapter<String> deptAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, departments);
         etDepartment.setAdapter(deptAdapter);
 
-        // ==================== العنوان ====================
         tvTitle.setText(isEdit ? "تعديل مستخدم" : "إضافة مستخدم جديد");
         tvSubtitle.setText(isEdit ? "تعديل بيانات المستخدم الحالي" : "أدخل بيانات المستخدم والصلاحية المطلوبة");
 
-        // ==================== ربط Switch مع RadioButton ====================
         CompoundButton.OnCheckedChangeListener switchListener = (buttonView, isChecked) -> {
-            // عند الضغط على Switch، حدد RadioButton المرتبط به
             if (buttonView == swSystemAdmin && isChecked) rbSystemAdmin.setChecked(true);
             else if (buttonView == swOrgAdmin && isChecked) rbOrgAdmin.setChecked(true);
+            else if (buttonView == swBranchManager && isChecked) rbBranchManager.setChecked(true);
             else if (buttonView == swInventoryMgr && isChecked) rbInventoryMgr.setChecked(true);
             else if (buttonView == swPosOperator && isChecked) rbPosOperator.setChecked(true);
             else if (buttonView == swSecurity && isChecked) rbSecurity.setChecked(true);
@@ -251,13 +252,13 @@ private static final String[] ROLES_AR = {
 
         if (swSystemAdmin != null) swSystemAdmin.setOnCheckedChangeListener(switchListener);
         if (swOrgAdmin != null) swOrgAdmin.setOnCheckedChangeListener(switchListener);
+        if (swBranchManager != null) swBranchManager.setOnCheckedChangeListener(switchListener);
         if (swInventoryMgr != null) swInventoryMgr.setOnCheckedChangeListener(switchListener);
         if (swPosOperator != null) swPosOperator.setOnCheckedChangeListener(switchListener);
         if (swSecurity != null) swSecurity.setOnCheckedChangeListener(switchListener);
         if (swGateSecurity != null) swGateSecurity.setOnCheckedChangeListener(switchListener);
         if (swAuditor != null) swAuditor.setOnCheckedChangeListener(switchListener);
 
-        // ==================== ملء البيانات في حالة التعديل ====================
         if (isEdit) {
             etDisplayName.setText(existingUser.displayName);
             etUsername.setText(existingUser.username);
@@ -268,19 +269,19 @@ private static final String[] ROLES_AR = {
                 etDepartment.setText(existingUser.department, false);
             }
 
-            // إيقاف جميع المفاتيح
             if (swSystemAdmin != null) swSystemAdmin.setChecked(false);
             if (swOrgAdmin != null) swOrgAdmin.setChecked(false);
+            if (swBranchManager != null) swBranchManager.setChecked(false);
             if (swInventoryMgr != null) swInventoryMgr.setChecked(false);
             if (swPosOperator != null) swPosOperator.setChecked(false);
             if (swSecurity != null) swSecurity.setChecked(false);
             if (swGateSecurity != null) swGateSecurity.setChecked(false);
             if (swAuditor != null) swAuditor.setChecked(false);
 
-            // تفعيل المفتاح المناسب
             switch (existingUser.role) {
                 case "SYSTEM_ADMIN": if (swSystemAdmin != null) swSystemAdmin.setChecked(true); if (rbSystemAdmin != null) rbSystemAdmin.setChecked(true); break;
                 case "ORG_ADMIN": if (swOrgAdmin != null) swOrgAdmin.setChecked(true); if (rbOrgAdmin != null) rbOrgAdmin.setChecked(true); break;
+                case "BRANCH_MANAGER": if (swBranchManager != null) swBranchManager.setChecked(true); if (rbBranchManager != null) rbBranchManager.setChecked(true); break;
                 case "INVENTORY_MGR": if (swInventoryMgr != null) swInventoryMgr.setChecked(true); if (rbInventoryMgr != null) rbInventoryMgr.setChecked(true); break;
                 case "POS_OPERATOR": if (swPosOperator != null) swPosOperator.setChecked(true); if (rbPosOperator != null) rbPosOperator.setChecked(true); break;
                 case "SECURITY": if (swSecurity != null) swSecurity.setChecked(true); if (rbSecurity != null) rbSecurity.setChecked(true); break;
@@ -288,7 +289,6 @@ private static final String[] ROLES_AR = {
                 case "AUDITOR": if (swAuditor != null) swAuditor.setChecked(true); if (rbAuditor != null) rbAuditor.setChecked(true); break;
             }
 
-            // في حالة التعديل: إظهار كل شيء دفعة واحدة
             layoutStep1.setVisibility(View.VISIBLE);
             layoutStep2.setVisibility(View.VISIBLE);
             if (stepsIndicator != null) stepsIndicator.setVisibility(View.GONE);
@@ -298,7 +298,6 @@ private static final String[] ROLES_AR = {
             if (btnPrevStep != null) btnPrevStep.setVisibility(View.GONE);
             btnSaveUser.setVisibility(View.VISIBLE);
         } else {
-            // إضافة جديد: إظهار الخطوة 1 فقط، تعيين مدير المخزون افتراضياً
             layoutStep1.setVisibility(View.VISIBLE);
             layoutStep2.setVisibility(View.GONE);
             if (stepsIndicator != null) stepsIndicator.setVisibility(View.VISIBLE);
@@ -309,7 +308,6 @@ private static final String[] ROLES_AR = {
             btnSaveUser.setVisibility(View.GONE);
         }
 
-        // ==================== مؤشر قوة كلمة المرور ====================
         etPassword.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
@@ -320,7 +318,6 @@ private static final String[] ROLES_AR = {
             }
         });
 
-        // ==================== زر التالي ====================
         if (btnNextStep != null) {
             btnNextStep.setOnClickListener(v -> {
                 String displayName = etDisplayName.getText().toString().trim();
@@ -343,7 +340,6 @@ private static final String[] ROLES_AR = {
             });
         }
 
-        // ==================== زر الرجوع ====================
         if (btnPrevStep != null) {
             btnPrevStep.setOnClickListener(v -> {
                 layoutStep1.setVisibility(View.VISIBLE);
@@ -357,10 +353,8 @@ private static final String[] ROLES_AR = {
             });
         }
 
-        // ==================== زر الإلغاء ====================
         if (btnCancel != null) btnCancel.setOnClickListener(v -> dialog.dismiss());
 
-        // ==================== زر الحفظ ====================
         btnSaveUser.setOnClickListener(v -> {
             String displayName = etDisplayName.getText().toString().trim();
             String username = etUsername.getText().toString().trim();
@@ -377,9 +371,8 @@ private static final String[] ROLES_AR = {
                 return;
             }
 
-            // ✅ استخراج الصلاحية المختارة (من RadioButton المرتبط بـ Switch المفعل)
-            String role = getSelectedRole(rgRole, swSystemAdmin, swOrgAdmin, swInventoryMgr,
-                swPosOperator, swSecurity, swGateSecurity, swAuditor);
+            String role = getSelectedRole(rgRole, swSystemAdmin, swOrgAdmin, swBranchManager,
+                swInventoryMgr, swPosOperator, swSecurity, swGateSecurity, swAuditor);
 
             saveUser(isEdit ? existingUser.id : 0, username, password, displayName, role, employeeId, department, isEdit);
             dialog.dismiss();
@@ -388,11 +381,7 @@ private static final String[] ROLES_AR = {
         dialog.show();
     }
 
-    /**
-     * ✅ استخراج الصلاحية المختارة من خلال Switch المفعل
-     */
     private String getSelectedRole(RadioGroup rgRole, Switch... switches) {
-        // إذا كان rgRole يحتوي على اختيار، استخدمه
         int selectedId = rgRole.getCheckedRadioButtonId();
         if (selectedId != -1) {
             View selectedView = rgRole.findViewById(selectedId);
@@ -400,10 +389,9 @@ private static final String[] ROLES_AR = {
                 return selectedView.getTag().toString();
             }
         }
-        return "INVENTORY_MGR"; // افتراضي
+        return "INVENTORY_MGR";
     }
 
-    // ==================== قوة كلمة المرور ====================
     private int getPasswordStrength(String password) {
         int score = 0;
         if (password.length() >= 4) score++;
@@ -438,6 +426,11 @@ private static final String[] ROLES_AR = {
                 payload.put("department", department);
                 if (!password.isEmpty()) payload.put("password", password);
                 if (isEdit) payload.put("user_id", userId);
+
+                // ✅ BRANCH_MANAGER يعيّن branch_id تلقائياً
+                if ("BRANCH_MANAGER".equals(sessionManager.getRoleString())) {
+                    payload.put("branch_id", branchesManager.getActiveBranchId());
+                }
             } catch (Exception ignored) {}
 
             MiraApiClient.ApiResponse response = isEdit
@@ -477,14 +470,12 @@ private static final String[] ROLES_AR = {
             .show();
     }
 
-    // ===================== User Data =====================
     static class UserData {
         int id;
-        String username, displayName, role, department, employeeId, status, lastLogin;
+        String username, displayName, role, department, employeeId, status, lastLogin, branchName;
         boolean isOnline;
     }
 
-    // ===================== Adapter =====================
     class UsersAdapter extends RecyclerView.Adapter<UsersAdapter.VH> {
         final List<UserData> list;
         UsersAdapter(List<UserData> list) { this.list = list; }
@@ -542,4 +533,4 @@ private static final String[] ROLES_AR = {
             }
         }
     }
-                }
+                                                                                                       }
