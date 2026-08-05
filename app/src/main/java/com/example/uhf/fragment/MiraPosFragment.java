@@ -547,7 +547,7 @@ public class MiraPosFragment extends Fragment {
         }).start();
     }
 
-        private void showReceiptSafe(String responseJson) {
+    private void showReceiptSafe(String responseJson) {
         if (!isAdded() || getActivity() == null) {
             showToast("✅ تم البيع بنجاح!");
             return;
@@ -565,7 +565,6 @@ public class MiraPosFragment extends Fragment {
             showToast("✅ تم البيع بنجاح!");
         }
     }
-
 
     private void saveSaleLocally(POSCheckoutDialog.POSCheckoutData data) {
         if (getContext() == null) return;
