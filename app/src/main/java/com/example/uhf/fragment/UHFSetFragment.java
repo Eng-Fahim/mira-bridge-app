@@ -1,11 +1,15 @@
-package com.example.uhf.fragment;
+نpackage com.example.uhf.fragment;
 
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.LocaleList;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -28,6 +32,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.os.LocaleListCompat;
 
 import com.example.uhf.BuildConfig;
 import com.example.uhf.R;
@@ -52,6 +57,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * MIRA Bridge Configuration Fragment
@@ -62,11 +68,17 @@ import java.util.List;
  * - إعدادات قارئ RFID الأصلية (محفوظة بالكامل)
  * - حفظ محلي + سحابي في MIRA ID Database
  * - تطبيق فوري للإعدادات على جميع أجزاء التطبيق
- * - دعم ديناميكي لتغيير اللغة (عربي / إنجليزي)
+ * - دعم ديناميكي ولحظي لتغيير اللغة (عربي / إنجليزي)
  */
 public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListener {
     private static final String TAG = "UHFSetFragment";
     private UHFMainActivity mContext;
+
+    // =============================================
+    // 🌐 إعدادات اللغة (App Language Settings)
+    // =============================================
+    private RadioGroup rgLanguage;
+    private RadioButton rbLangAr, rbLangEn;
 
     // =============================================
     // 🟢 إعدادات RFID الأصلية
@@ -196,6 +208,15 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
         View root = inflater.inflate(R.layout.fragment_uhf_set, container, false);
         ViewUtils.inject(this, root);
 
+        // 🌐 ربط عناصر اختيار اللغة
+        rgLanguage = root.findViewById(R.id.rgLanguage);
+        rbLangAr = root.findViewById(R.id.rbLangAr);
+        rbLangEn = root.findViewById(R.id.rbLangEn);
+
+        if (rgLanguage != null) {
+            setupLanguageSelector();
+        }
+
         // 🏢 ربط عناصر بيانات الجهة
         etOrgName = root.findViewById(R.id.etOrgName);
         etOrgSlogan = root.findViewById(R.id.etOrgSlogan);
@@ -267,6 +288,52 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
     }
 
     // =============================================
+    // 🌐 إدارة وتغيير اللغة لحظياً
+    // =============================================
+
+    private void setupLanguageSelector() {
+        String currentLang = getCurrentLanguage();
+        if ("ar".equalsIgnoreCase(currentLang)) {
+            if (rbLangAr != null) rbLangAr.setChecked(true);
+        } else {
+            if (rbLangEn != null) rbLangEn.setChecked(true);
+        }
+
+        rgLanguage.setOnCheckedChangeListener((group, checkedId) -> {
+            String selectedLang = (checkedId == R.id.rbLangAr) ? "ar" : "en";
+            if (!selectedLang.equalsIgnoreCase(getCurrentLanguage())) {
+                changeAppLanguage(selectedLang);
+            }
+        });
+    }
+
+    private String getCurrentLanguage() {
+        Locale currentLocale = AppCompatDelegate.getApplicationLocales().get(0);
+        if (currentLocale != null) {
+            return currentLocale.getLanguage();
+        }
+        return Locale.getDefault().getLanguage();
+    }
+
+    private void changeAppLanguage(String langCode) {
+        // 1. تطبيق اللغة عبر AndroidX AppCompatDelegate للعمل الفوري مع محاذاة RTL/LTR
+        LocaleListCompat appLocales = LocaleListCompat.forLanguageTags(langCode);
+        AppCompatDelegate.setApplicationLocales(appLocales);
+
+        // 2. حفظ الخيار محلياً
+        SharedPreferences prefs = mContext.getSharedPreferences("MIRA_BRIDGE_SETTINGS", Context.MODE_PRIVATE);
+        prefs.edit().putString("app_language", langCode).apply();
+
+        // 3. إعادة تحميل النشاط الرئيسي لتطبيق التغييرات لحظياً
+        mContext.runOnUiThread(() -> {
+            mContext.recreate();
+            Toast.makeText(mContext, 
+                "ar".equals(langCode) ? "تم تغيير اللغة إلى العربية" : "Language changed to English", 
+                Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    // =============================================
     // 🏢 بيانات الجهة - حفظ وتحميل
     // =============================================
 
@@ -282,7 +349,6 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
         editor.putString("org_website", etOrgWebsite.getText().toString().trim());
         editor.apply();
         
-        // تحديث الواجهة الرئيسية
         if (mContext != null && mContext.getSupportActionBar() != null) {
             String orgName = etOrgName.getText().toString().trim();
             if (!orgName.isEmpty()) {
@@ -290,10 +356,9 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
             }
         }
         
-        // حفظ في السحابة
         saveOrgProfileToCloud();
         
-        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        boolean isArabic = "ar".equals(getCurrentLanguage());
         if (tvOrgStatus != null) {
             tvOrgStatus.setText(isArabic ? "✅ تم حفظ بيانات الجهة بنجاح" : "✅ Org profile saved successfully");
             tvOrgStatus.setTextColor(Color.parseColor("#4CAF50"));
@@ -444,7 +509,6 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
             getFastInventory(false);
         }).start();
         
-        // 🟢 تحميل الإعدادات من السحابة
         loadSettingsFromCloud();
     }
 
@@ -471,7 +535,7 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
         settingsManager.saveSetting("working_mode", "mira_yemen");
         saveAllSettings();
         
-        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        boolean isArabic = "ar".equals(getCurrentLanguage());
         Toast.makeText(mContext, isArabic ? "🇾🇪 تم تطبيق نمط MIRA ID Yemen" : "🇾🇪 MIRA ID Yemen Mode Applied", Toast.LENGTH_SHORT).show();
     }
 
@@ -490,7 +554,7 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
         settingsManager.saveSetting("working_mode", "mira_standard");
         saveAllSettings();
         
-        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        boolean isArabic = "ar".equals(getCurrentLanguage());
         Toast.makeText(mContext, isArabic ? "🌍 تم تطبيق النمط العالمي" : "🌍 Global Standard Mode Applied", Toast.LENGTH_SHORT).show();
     }
 
@@ -505,7 +569,7 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
         settingsManager.saveSetting("working_mode", "rfid_only");
         saveAllSettings();
         
-        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        boolean isArabic = "ar".equals(getCurrentLanguage());
         Toast.makeText(mContext, isArabic ? "📡 نمط RFID فقط" : "📡 RFID Only Mode", Toast.LENGTH_SHORT).show();
     }
 
@@ -517,7 +581,7 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
         settingsManager.saveSetting("working_mode", "dev");
         saveAllSettings();
         
-        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        boolean isArabic = "ar".equals(getCurrentLanguage());
         Toast.makeText(mContext, isArabic ? "🛠️ نمط المطور" : "🛠️ Developer Mode", Toast.LENGTH_SHORT).show();
     }
 
@@ -555,7 +619,7 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
     // =============================================
 
     private void testMiraConnection() {
-        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        boolean isArabic = "ar".equals(getCurrentLanguage());
         tvMiraConnectionStatus.setText(isArabic ? "🟡 جاري الاختبار..." : "🟡 Testing connection...");
         tvMiraConnectionStatus.setTextColor(Color.parseColor("#FF9800"));
 
@@ -602,8 +666,6 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
                 while ((line = reader.readLine()) != null) {
                     response.append(line.trim());
                 }
-                
-                Log.d(TAG, "MIRA Test Response: " + code + " - " + response.toString());
 
                 mHandler.post(() -> {
                     if (code >= 200 && code < 300) {
@@ -679,12 +741,10 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
         if (cbParseGS1 != null) settingsManager.saveSetting("parse_gs1", cbParseGS1.isChecked());
         if (cbVibrateOnScan != null) settingsManager.saveSetting("vibrate_on_scan", cbVibrateOnScan.isChecked());
 
-        // حفظ سحابي
         saveSettingsToCloud();
 
-        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        boolean isArabic = "ar".equals(getCurrentLanguage());
         mContext.showToast(isArabic ? "✅ تم حفظ جميع الإعدادات" : "✅ All settings saved successfully");
-        Log.d(TAG, "MIRA Settings Saved: url=" + apiUrl + ", gate=" + gateId);
     }
 
     private void saveSettingsToCloud() {
@@ -850,7 +910,6 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
             if (settings.has("auto_query_mira")) 
                 cbAutoQueryMira.setChecked(settings.getBoolean("auto_query_mira"));
             
-            // 🟢 إعدادات المسح من السحابة
             if (settings.has("scan_mode")) setSelectedScanMode(settings.getString("scan_mode"));
             if (settings.has("auto_scan") && cbAutoScan != null) 
                 cbAutoScan.setChecked(settings.getBoolean("auto_scan"));
@@ -863,14 +922,13 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
             if (settings.has("vibrate_on_scan") && cbVibrateOnScan != null) 
                 cbVibrateOnScan.setChecked(settings.getBoolean("vibrate_on_scan"));
             
-            // إشعار مدير الإعدادات
             settingsManager.saveSetting("sound_on_scan", cbSoundOnScan.isChecked());
             settingsManager.saveSetting("show_mira_card", cbShowMiraCard.isChecked());
             settingsManager.saveSetting("radar_simulation", cbRadarSimulation.isChecked());
             settingsManager.saveSetting("auto_query_mira", cbAutoQueryMira.isChecked());
             settingsManager.saveSetting("scan_mode", getSelectedScanMode());
             
-            boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+            boolean isArabic = "ar".equals(getCurrentLanguage());
             Toast.makeText(mContext, isArabic ? "✅ تم تحميل الإعدادات من MIRA Cloud" : "✅ Settings loaded from MIRA Cloud", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             Log.e(TAG, "Apply settings error: " + e.getMessage());
@@ -878,7 +936,7 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
     }
 
     // =============================================
-    // 🟢 دوال RFID الأصلية (محفوظة بالكامل)
+    // 🟢 دوال RFID الأصلية
     // =============================================
 
     public class MyOnTouchListener implements AdapterView.OnItemSelectedListener {
@@ -899,7 +957,6 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
         public void onClick(View v) {
             String strMode = spFrequency.getSelectedItem().toString();
             int mode = getMode(strMode);
-            Log.d(TAG, "setFrequencyMode mode=" + mode);
             if (mContext != null && mContext.mReader != null && mContext.mReader.setFrequencyMode((byte) mode)) {
                 mContext.showToast(R.string.uhf_msg_set_frequency_succ);
             } else {
@@ -911,7 +968,6 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
     public void getFre(boolean showToast) {
         if (mContext == null || mContext.mReader == null) return;
         int mode = mContext.mReader.getFrequencyMode();
-        Log.e(TAG, "getFrequencyMode()=" + mode);
         mHandler.post(() -> {
             if (mode != -1) {
                 int count = spFrequency.getCount();
@@ -927,7 +983,6 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
     public void getLinkParams(boolean showToast) {
         if (mContext == null || mContext.mReader == null) return;
         int link = mContext.mReader.getRFLink();
-        Log.e(TAG, "getLinkParams()=" + link);
         mHandler.post(() -> {
             if (link == -1) {
                 if (showToast) mContext.showToast(R.string.uhf_msg_get_para_fail);
@@ -1019,7 +1074,6 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
     public void getPower(boolean showToast) {
         if (mContext == null || mContext.mReader == null) return;
         int iPower = mContext.mReader.getPower();
-        Log.i("UHFSetFragment", "OnClick_GetPower() iPower=" + iPower);
         mHandler.post(() -> {
             if (iPower > -1) {
                 int position = iPower - 1;
@@ -1035,7 +1089,6 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
     public void setPower() {
         if (mContext == null || mContext.mReader == null) return;
         int iPower = spPower.getSelectedItemPosition() + 1;
-        Log.i("UHFSetFragment", "OnClick_SetPower() iPower=" + iPower);
         if (mContext.mReader.setPower(iPower)) {
             mContext.showToast(R.string.uhf_msg_set_power_succ);
         } else {
@@ -1271,7 +1324,7 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
 
     @OnClick(R.id.btnFactoryReset)
     public void btnFactoryResetClick(View view) {
-        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        boolean isArabic = "ar".equals(getCurrentLanguage());
         String title = isArabic ? "⚠️ تأكيد إعادة الضبط" : "⚠️ Factory Reset Confirmation";
         String message = isArabic ? 
             "سيتم:\n• إعادة ضبط إعدادات القارئ\n• مسح إعدادات MIRA المحلية\n• استعادة الإعدادات الافتراضية\n\nهل أنت متأكد؟" :
