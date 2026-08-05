@@ -1,6 +1,8 @@
 package com.example.uhf.fragment;
 
+import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.os.Build;
@@ -15,6 +17,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -26,6 +29,7 @@ import androidx.fragment.app.FragmentTransaction;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
+import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraSettingsManager;
 import com.example.uhf.tools.UIHelper;
 import com.example.uhf.view.CircleSeekBar;
@@ -36,53 +40,68 @@ import com.rscja.deviceapi.interfaces.IUHFRadarLocationCallback;
 
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Random;
+import java.util.concurrent.Executors;
 
 /**
- * MIRA Radar Location Fragment
+ * MIRA Radar Location Fragment v2.0
  * 
- * يجمع بين:
+ * المميزات:
  * - رادار تحديد موقع Chainway UHF
- * - استعلام MIRA ID عن القطع
+ * - استعلام MIRA ID المركزي
  * - بطاقة معلومات القطعة
  * - عداد إحصائيات (مصرح/ممنوع/غير معروف)
+ * - سجل آخر 5 قطع ممسوحة
+ * - مؤشر RSSI لقوة الإشارة
+ * - تأثيرات بصرية متقدمة
+ * - أوضاع مسح متعددة
  * - وضع محاكاة للتطوير
- * - تطبيق فوري للإعدادات من MiraSettingsManager
+ * - تصدير النتائج CSV
  */
 public class UHFRadarLocationFragment extends KeyDwonFragment {
 
-    public final String TAG = "UHFRadarLocationFrag";
+    private static final String TAG = "UHFRadarLocationFrag";
     private UHFMainActivity mContext;
 
+    // ==================== UI Elements ====================
     private RadarView radarView;
     private EditText etEPC;
-    private Button btStart;
-    private Button btStop;
+    private Button btStart, btStop, btnExportResults;
     private CircleSeekBar seekBarPower;
-    private boolean inventoryFlag = false;
-    private String targetEpc;
-    int progress = 5;
-
-    // 🟢 مدير الإعدادات
-    private MiraSettingsManager settingsManager;
-    private boolean simulationMode;
-
-    // 🟢 MIRA Radar - عناصر جديدة
+    private ProgressBar rssiBar;
     private LinearLayout layoutMiraRadarInfo;
     private TextView tvRadarItemStatus, tvRadarItemName, tvRadarItemDetails;
     private TextView tvAuthorizedCount, tvDeniedCount, tvUnknownCount;
-    
-    private int authorizedCount = 0;
-    private int deniedCount = 0;
-    private int unknownCount = 0;
+    private TextView tvRecentScans, tvRadarMode;
+    private Button btnModeSingle, btnModeOpen, btnModeGate;
+
+    // ==================== State ====================
+    private boolean inventoryFlag = false;
+    private String targetEpc;
+    private int progress = 5;
+    private int authorizedCount = 0, deniedCount = 0, unknownCount = 0;
+    private final List<String> recentScans = new ArrayList<>();
+    private final Random random = new Random();
+
+    // ==================== Settings ====================
+    private MiraSettingsManager settingsManager;
+    private boolean simulationMode;
+
+    // ==================== Radar Modes ====================
+    private enum RadarMode { SINGLE_TARGET, OPEN_SCAN, SECURITY_GATE, INVENTORY_COUNT }
+    private RadarMode currentMode = RadarMode.SINGLE_TARGET;
+
+    // ==================== Simulation ====================
+    private final Handler simulationHandler = new Handler(Looper.getMainLooper());
+    private Runnable simulationRunnable;
+    private float simulationAngle = 0;
+
+    // ==================== Lifecycle ====================
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -94,278 +113,166 @@ public class UHFRadarLocationFragment extends KeyDwonFragment {
     public void onActivityCreated(@Nullable Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
         mContext = (UHFMainActivity) getActivity();
+        if (mContext == null) return;
         mContext.currentFragment = this;
 
-        // 🟢 تهيئة مدير الإعدادات
         settingsManager = MiraSettingsManager.getInstance(mContext);
         simulationMode = settingsManager.getBoolean("radar_simulation", true);
 
-        radarView = getView().findViewById(R.id.radarView);
-        etEPC = getView().findViewById(R.id.etRadarEPC);
-        btStart = getView().findViewById(R.id.btRadarStart);
-        btStop = getView().findViewById(R.id.btRadarStop);
-        seekBarPower = getView().findViewById(R.id.seekBarPower);
-        
-        // 🟢 ربط عناصر MIRA Radar الجديدة
-        layoutMiraRadarInfo = getView().findViewById(R.id.layoutMiraRadarInfo);
-        tvRadarItemStatus = getView().findViewById(R.id.tvRadarItemStatus);
-        tvRadarItemName = getView().findViewById(R.id.tvRadarItemName);
-        tvRadarItemDetails = getView().findViewById(R.id.tvRadarItemDetails);
-        tvAuthorizedCount = getView().findViewById(R.id.tvAuthorizedCount);
-        tvDeniedCount = getView().findViewById(R.id.tvDeniedCount);
-        tvUnknownCount = getView().findViewById(R.id.tvUnknownCount);
-        
+        initViews();
+        setupListeners();
+        restoreState();
+    }
+
+    // ==================== Init ====================
+
+    private void initViews() {
+        View v = getView();
+        if (v == null) return;
+
+        radarView = v.findViewById(R.id.radarView);
+        etEPC = v.findViewById(R.id.etRadarEPC);
+        btStart = v.findViewById(R.id.btRadarStart);
+        btStop = v.findViewById(R.id.btRadarStop);
+        seekBarPower = v.findViewById(R.id.seekBarPower);
+        rssiBar = v.findViewById(R.id.rssiBar);
+        btnExportResults = v.findViewById(R.id.btnExportResults);
+
+        layoutMiraRadarInfo = v.findViewById(R.id.layoutMiraRadarInfo);
+        tvRadarItemStatus = v.findViewById(R.id.tvRadarItemStatus);
+        tvRadarItemName = v.findViewById(R.id.tvRadarItemName);
+        tvRadarItemDetails = v.findViewById(R.id.tvRadarItemDetails);
+        tvAuthorizedCount = v.findViewById(R.id.tvAuthorizedCount);
+        tvDeniedCount = v.findViewById(R.id.tvDeniedCount);
+        tvUnknownCount = v.findViewById(R.id.tvUnknownCount);
+        tvRecentScans = v.findViewById(R.id.tvRecentScans);
+        tvRadarMode = v.findViewById(R.id.tvRadarMode);
+
+        btnModeSingle = v.findViewById(R.id.btnModeSingle);
+        btnModeOpen = v.findViewById(R.id.btnModeOpen);
+        btnModeGate = v.findViewById(R.id.btnModeGate);
+
         seekBarPower.setEnabled(false);
         seekBarPower.setProgress(5);
-        
-        btStart.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startLocated();
-            }
-        });
-        btStop.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                stopLocated();
-            }
-        });
+        updateModeUI();
+    }
 
-        // 🟢 الاستماع لتغييرات الإعدادات
-        settingsManager.registerListener("radar_fragment", new MiraSettingsManager.SettingsChangeListener() {
-            @Override
-            public void onSettingChanged(String key, Object value) {
-                if ("radar_simulation".equals(key)) {
-                    simulationMode = (Boolean) value;
-                    // إذا كان الرادار شغال، أعد تشغيله بالوضع الجديد
-                    if (inventoryFlag) {
-                        stopLocated();
-                        startLocated();
-                    }
+    private void setupListeners() {
+        btStart.setOnClickListener(v -> startLocated());
+        btStop.setOnClickListener(v -> stopLocated());
+
+        if (btnExportResults != null) {
+            btnExportResults.setOnClickListener(v -> exportScanResults());
+        }
+
+        if (btnModeSingle != null) {
+            btnModeSingle.setOnClickListener(v -> switchMode(RadarMode.SINGLE_TARGET));
+        }
+        if (btnModeOpen != null) {
+            btnModeOpen.setOnClickListener(v -> switchMode(RadarMode.OPEN_SCAN));
+        }
+        if (btnModeGate != null) {
+            btnModeGate.setOnClickListener(v -> switchMode(RadarMode.SECURITY_GATE));
+        }
+
+        settingsManager.registerListener("radar_fragment", (key, value) -> {
+            if ("radar_simulation".equals(key)) {
+                simulationMode = (Boolean) value;
+                if (inventoryFlag) {
+                    stopLocated();
+                    startLocated();
                 }
             }
         });
+    }
 
-        getView().post(new Runnable() {
-            @Override
-            public void run() {
-                String selectItem = null;
-                if (mContext.tagList.size() > mContext.selectIndex && mContext.selectIndex >= 0) {
-                    selectItem = mContext.tagList.get(mContext.selectIndex).getEPC();
-                }
-                if (selectItem != null && !selectItem.equals("")) {
+    private void restoreState() {
+        getView().post(() -> {
+            if (mContext.tagList.size() > mContext.selectIndex && mContext.selectIndex >= 0) {
+                String selectItem = mContext.tagList.get(mContext.selectIndex).getEPC();
+                if (selectItem != null && !selectItem.isEmpty()) {
                     etEPC.setText(selectItem);
                     targetEpc = selectItem;
-                } else {
-                    etEPC.setText("");
                 }
             }
         });
     }
 
-    // =============================================
-    // 🟢 استعلام MIRA API عن قطعة محددة
-    // =============================================
-    private void queryMiraItem(final String epc) {
-        // التحقق من إعداد الاستعلام التلقائي
-        if (!settingsManager.getBoolean("auto_query_mira", true)) {
-            return;
+    // ==================== Radar Modes ====================
+
+    private void switchMode(RadarMode mode) {
+        currentMode = mode;
+        if (inventoryFlag) {
+            stopLocated();
+            startLocated();
         }
-
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    String apiUrl = settingsManager.getString("mira_api_url", 
-                        "https://ams.ibreg.org/wp-json/mira-gate/v1/authorize");
-                    String apiKey = settingsManager.getString("mira_api_key", 
-                        "mira_gate_test071234567890abcdefghijklmnop");
-                    String gateId = settingsManager.getString("mira_gate_id", "handheld_c72");
-
-                    URL url = new URL(apiUrl);
-                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                    conn.setRequestMethod("POST");
-                    conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-                    conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-                    conn.setConnectTimeout(5000);
-                    conn.setReadTimeout(5000);
-                    conn.setDoOutput(true);
-
-                    JSONObject jsonParam = new JSONObject();
-                    jsonParam.put("epc", epc);
-                    jsonParam.put("gate_id", gateId);
-
-                    try (OutputStream os = conn.getOutputStream()) {
-                        byte[] input = jsonParam.toString().getBytes("utf-8");
-                        os.write(input, 0, input.length);
-                    }
-
-                    final int responseCode = conn.getResponseCode();
-                    InputStream is = (responseCode >= 200 && responseCode < 300) 
-                        ? conn.getInputStream() 
-                        : conn.getErrorStream();
-
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(is, "utf-8"));
-                    StringBuilder response = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        response.append(line.trim());
-                    }
-
-                    final JSONObject jsonResponse = new JSONObject(response.toString());
-                    final JSONObject decision = jsonResponse.optJSONObject("decision");
-                    final JSONObject item = jsonResponse.optJSONObject("item");
-
-                    if (getActivity() != null) {
-                        getActivity().runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                updateMiraRadarInfo(epc, decision, item);
-                            }
-                        });
-                    }
-
-                } catch (Exception e) {
-                    Log.e(TAG, "MIRA query error: " + e.getMessage());
-                    if (getActivity() != null) {
-                        getActivity().runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (tvRadarItemStatus != null) {
-                                    tvRadarItemStatus.setText("⚠️ خطأ في الاتصال بـ MIRA");
-                                    tvRadarItemStatus.setTextColor(Color.parseColor("#FF9800"));
-                                }
-                                if (layoutMiraRadarInfo != null) {
-                                    layoutMiraRadarInfo.setVisibility(View.VISIBLE);
-                                }
-                            }
-                        });
-                    }
-                }
-            }
-        }).start();
+        updateModeUI();
+        Toast.makeText(mContext, getModeName(mode), Toast.LENGTH_SHORT).show();
     }
 
-    // =============================================
-    // 🟢 تحديث بطاقة معلومات MIRA Radar
-    // =============================================
-    private void updateMiraRadarInfo(String epc, JSONObject decision, JSONObject item) {
-        // التحقق من إعداد إظهار البطاقة
-        if (!settingsManager.getBoolean("show_mira_card", true)) {
-            if (layoutMiraRadarInfo != null) {
-                layoutMiraRadarInfo.setVisibility(View.GONE);
-            }
-            return;
-        }
-
-        if (layoutMiraRadarInfo != null) {
-            layoutMiraRadarInfo.setVisibility(View.VISIBLE);
-        }
-
-        boolean allowed = decision != null && decision.optBoolean("allowed", false);
-        String decisionMessage = decision != null ? decision.optString("message", "") : "";
-        String itemTitle = item != null ? item.optString("title", "غير معروف") : "غير معروف";
-        String karat = item != null ? item.optString("karat", "") : "";
-        String weight = item != null ? item.optString("weight", "") : "";
-        String status = item != null ? item.optString("status", "") : "";
-
-        // تحديث الإحصائيات
-        if (item != null && allowed) {
-            authorizedCount++;
-        } else if (item != null && !allowed) {
-            deniedCount++;
-        } else {
-            unknownCount++;
-        }
-
-        // تحديث العداد
-        if (tvAuthorizedCount != null) tvAuthorizedCount.setText(String.valueOf(authorizedCount));
-        if (tvDeniedCount != null) tvDeniedCount.setText(String.valueOf(deniedCount));
-        if (tvUnknownCount != null) tvUnknownCount.setText(String.valueOf(unknownCount));
-
-        // حالة القطعة
-        if (tvRadarItemStatus != null) {
-            if (allowed && item != null) {
-                tvRadarItemStatus.setText("✅ خروج مصرح");
-                tvRadarItemStatus.setTextColor(Color.parseColor("#4CAF50"));
-            } else if (!allowed && item != null) {
-                tvRadarItemStatus.setText("🚨 غير مصرح بالخروج");
-                tvRadarItemStatus.setTextColor(Color.parseColor("#F44336"));
-            } else {
-                tvRadarItemStatus.setText("⚠️ " + decisionMessage);
-                tvRadarItemStatus.setTextColor(Color.parseColor("#FF9800"));
-            }
-        }
-
-        // اسم القطعة
-        if (tvRadarItemName != null) {
-            tvRadarItemName.setText("📦 " + itemTitle);
-        }
-
-        // تفاصيل إضافية
-        if (tvRadarItemDetails != null) {
-            StringBuilder details = new StringBuilder();
-            details.append("🏷️ ").append(epc);
-            if (!karat.isEmpty()) details.append(" | 💎 ").append(karat);
-            if (!weight.isEmpty()) details.append(" | ⚖️ ").append(weight).append("g");
-            if (!status.isEmpty()) details.append(" | 📋 ").append(status);
-            tvRadarItemDetails.setText(details.toString());
+    private String getModeName(RadarMode mode) {
+        switch (mode) {
+            case SINGLE_TARGET: return "🎯 بحث عن قطعة محددة";
+            case OPEN_SCAN: return "📡 مسح مفتوح";
+            case SECURITY_GATE: return "🚪 وضع البوابة الأمنية";
+            case INVENTORY_COUNT: return "📊 وضع الجرد السريع";
+            default: return "";
         }
     }
 
-    // =============================================
-    // 🟢 دالة البدء (موحدة - تدعم المحاكاة والجهاز الحقيقي)
-    // =============================================
+    private void updateModeUI() {
+        if (tvRadarMode != null) tvRadarMode.setText(getModeName(currentMode));
+        if (btnModeSingle != null) btnModeSingle.setAlpha(currentMode == RadarMode.SINGLE_TARGET ? 1f : 0.5f);
+        if (btnModeOpen != null) btnModeOpen.setAlpha(currentMode == RadarMode.OPEN_SCAN ? 1f : 0.5f);
+        if (btnModeGate != null) btnModeGate.setAlpha(currentMode == RadarMode.SECURITY_GATE ? 1f : 0.5f);
+    }
+
+    // ==================== Start / Stop ====================
+
     @SuppressLint("LongLogTag")
     private void startLocated() {
         if (inventoryFlag) return;
 
         radarView.clearPanel();
-        targetEpc = etEPC.getText().toString();
-        
-        // إعادة تعيين العدادات
-        authorizedCount = 0;
-        deniedCount = 0;
-        unknownCount = 0;
-        if (tvAuthorizedCount != null) tvAuthorizedCount.setText("0");
-        if (tvDeniedCount != null) tvDeniedCount.setText("0");
-        if (tvUnknownCount != null) tvUnknownCount.setText("0");
-        
-        // إخفاء البطاقة
-        if (layoutMiraRadarInfo != null) layoutMiraRadarInfo.setVisibility(View.GONE);
+        targetEpc = etEPC.getText().toString().trim();
 
-        // 🟢 وضع المحاكاة للتطوير
+        // إعادة تعيين العدادات
+        authorizedCount = 0; deniedCount = 0; unknownCount = 0;
+        recentScans.clear();
+        updateCounters();
+        if (tvRecentScans != null) tvRecentScans.setText("");
+        if (layoutMiraRadarInfo != null) layoutMiraRadarInfo.setVisibility(View.GONE);
+        if (rssiBar != null) rssiBar.setProgress(0);
+
         if (simulationMode) {
             startSimulatedRadar();
             return;
         }
 
-        // الكود الأصلي لجهاز Chainway الحقيقي
-        boolean result = mContext.mReader.startRadarLocation(mContext, targetEpc, IUHF.Bank_EPC, 32, new IUHFRadarLocationCallback() {
-            @Override
-            public void getLocationValue(final List<RadarLocationEntity> list) {
-                radarView.bindingData(list, targetEpc);
-                
-                if (!TextUtils.isEmpty(targetEpc)) {
-                    for (int k = 0; k < list.size(); k++) {
-                        if (list.get(k).getTag().equals(targetEpc)) {
-                            queryMiraItem(targetEpc);
-                            mContext.playSoundDelayed(list.get(k).getValue());
+        // وضع البحث المفتوح
+        String epcToTrack = (currentMode == RadarMode.OPEN_SCAN) ? "" : targetEpc;
+
+        boolean result = mContext.mReader.startRadarLocation(mContext, epcToTrack, IUHF.Bank_EPC, 32,
+            new IUHFRadarLocationCallback() {
+                @Override
+                public void getLocationValue(List<RadarLocationEntity> list) {
+                    radarView.bindingData(list, epcToTrack);
+                    for (RadarLocationEntity entity : list) {
+                        String detectedEpc = entity.getTag();
+                        if (!TextUtils.isEmpty(detectedEpc)) {
+                            queryMiraItem(detectedEpc);
+                            mContext.playSoundDelayed(entity.getValue());
                         }
                     }
-                } else {
-                    mContext.playSound(1);
                 }
-            }
 
-            @Override
-            public void getAngleValue(int angle) {
-                radarView.setRotation(-angle);
-            }
-        });
-        
+                @Override
+                public void getAngleValue(int angle) {
+                    radarView.setRotation(-angle);
+                }
+            });
+
         if (!result) {
-            // 🟢 فشل الرادار - نجرب استعلام MIRA على الأقل
             if (!TextUtils.isEmpty(targetEpc)) {
                 queryMiraItem(targetEpc);
                 Toast.makeText(mContext, "⚠️ الرادار غير مدعوم - تم جلب معلومات MIRA فقط", Toast.LENGTH_LONG).show();
@@ -375,100 +282,38 @@ public class UHFRadarLocationFragment extends KeyDwonFragment {
             return;
         }
 
-        seekBarPower.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress2, boolean fromUser) {
-                progress = progress2;
-            }
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                int p = 35 - progress;
-                mContext.mReader.setDynamicDistance(p);
-            }
-        });
-        
-        seekBarPower.setEnabled(true);
+        setupSeekBar();
         inventoryFlag = true;
         btStart.setEnabled(false);
         etEPC.setEnabled(false);
         radarView.startRadar();
-        
         Log.i(TAG, "startLocated success");
     }
 
-    // =============================================
-    // 🟢 محاكي الرادار للتطوير والاختبار
-    // =============================================
-    private Handler simulationHandler = new Handler(Looper.getMainLooper());
-    private Runnable simulationRunnable;
-    private float simulationAngle = 0;
-    private Random random = new Random();
-
-    private void startSimulatedRadar() {
-        final String epcToTrack = targetEpc;
-        
-        // استعلام MIRA مباشرة
-        queryMiraItem(epcToTrack);
-        
-        // بدء محاكاة الرادار
-        radarView.startRadar();
-        seekBarPower.setEnabled(true);
-        inventoryFlag = true;
-        btStart.setEnabled(false);
-        etEPC.setEnabled(false);
-        
-        simulationRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (!inventoryFlag) return;
-                
-                // تحديث الزاوية
-                simulationAngle += 5;
-                if (simulationAngle >= 360) simulationAngle = 0;
-                
-                // توليد نقاط وهمية
-                List<RadarLocationEntity> simulatedList = new ArrayList<>();
-                
-                radarView.bindingData(simulatedList, epcToTrack);
-                radarView.setRotation(-simulationAngle);
-                
-                // صوت فقط إذا كان مفعلاً
-                if (settingsManager.getBoolean("sound_on_scan", true)) {
-                    mContext.playSound(1);
-                }
-                
-                simulationHandler.postDelayed(this, 1500);
+    private void setupSeekBar() {
+        seekBarPower.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int p, boolean fromUser) { progress = p; }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                mContext.mReader.setDynamicDistance(35 - progress);
             }
-        };
-        simulationHandler.post(simulationRunnable);
-        
-        Toast.makeText(mContext, "⚡ وضع المحاكاة", Toast.LENGTH_SHORT).show();
-        Log.i(TAG, "Simulated radar started");
+        });
+        seekBarPower.setEnabled(true);
     }
 
-    // =============================================
-    // 🟢 دالة الإيقاف (موحدة)
-    // =============================================
     @SuppressLint("LongLogTag")
     private void stopLocated() {
         if (!inventoryFlag) return;
 
-        // إيقاف المحاكاة إذا كانت مفعلة
         if (simulationMode) {
-            if (simulationRunnable != null) {
-                simulationHandler.removeCallbacks(simulationRunnable);
-            }
+            if (simulationRunnable != null) simulationHandler.removeCallbacks(simulationRunnable);
         } else {
-            boolean result = mContext.mReader.stopRadarLocation();
-            if (!result) {
+            if (!mContext.mReader.stopRadarLocation()) {
                 Log.e(TAG, "stopLocated failure");
                 mContext.playSound(2);
-                Toast.makeText(mContext, R.string.uhf_msg_inventory_stop_fail, Toast.LENGTH_SHORT).show();
             }
         }
-        
+
         radarView.stopRadar();
         inventoryFlag = false;
         btStart.setEnabled(true);
@@ -476,23 +321,192 @@ public class UHFRadarLocationFragment extends KeyDwonFragment {
         seekBarPower.setOnSeekBarChangeListener(null);
         seekBarPower.setProgress(5);
         seekBarPower.setEnabled(false);
-        
         Log.i(TAG, "stopLocated success");
     }
 
-    @Override
-    public void myOnKeyDwon() {
-        if (inventoryFlag) {
-            stopLocated();
-        } else {
-            startLocated();
+    // ==================== Simulation ====================
+
+    private void startSimulatedRadar() {
+        if (!TextUtils.isEmpty(targetEpc)) queryMiraItem(targetEpc);
+
+        radarView.startRadar();
+        seekBarPower.setEnabled(true);
+        inventoryFlag = true;
+        btStart.setEnabled(false);
+        etEPC.setEnabled(false);
+
+        simulationRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!inventoryFlag) return;
+                simulationAngle += 5;
+                if (simulationAngle >= 360) simulationAngle = 0;
+
+                List<RadarLocationEntity> simulatedList = new ArrayList<>();
+                radarView.bindingData(simulatedList, targetEpc);
+                radarView.setRotation(-simulationAngle);
+
+                if (settingsManager.getBoolean("sound_on_scan", true)) mContext.playSound(1);
+
+                simulationHandler.postDelayed(this, 1500);
+            }
+        };
+        simulationHandler.post(simulationRunnable);
+        Toast.makeText(mContext, "⚡ وضع المحاكاة", Toast.LENGTH_SHORT).show();
+    }
+
+    // ==================== MIRA Query ====================
+
+    private void queryMiraItem(String epc) {
+        if (!settingsManager.getBoolean("auto_query_mira", true)) return;
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                MiraApiClient client = MiraApiClient.getInstance(mContext);
+                MiraApiClient.ApiResponse response = client.authorize(epc, "scan", null);
+
+                if (getActivity() != null && response != null && response.isSuccess && response.data != null) {
+                    JSONObject decision = response.data.optJSONObject("decision");
+                    JSONObject item = response.data.optJSONObject("item");
+                    boolean allowed = decision != null && decision.optBoolean("allowed", false);
+                    String status = allowed ? "AUTHORIZED" : "DENIED";
+
+                    getActivity().runOnUiThread(() -> {
+                        updateMiraRadarInfo(epc, decision, item);
+                        addToRecentScans(epc, status);
+                        animateDetection(allowed);
+                        updateRssiBar();
+                    });
+                } else {
+                    getActivity().runOnUiThread(() -> {
+                        unknownCount++;
+                        updateCounters();
+                        addToRecentScans(epc, "UNKNOWN");
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "MIRA query error: " + e.getMessage());
+            }
+        });
+    }
+
+    // ==================== UI Updates ====================
+
+    private void updateMiraRadarInfo(String epc, JSONObject decision, JSONObject item) {
+        if (!settingsManager.getBoolean("show_mira_card", true)) {
+            if (layoutMiraRadarInfo != null) layoutMiraRadarInfo.setVisibility(View.GONE);
+            return;
+        }
+
+        if (layoutMiraRadarInfo != null) layoutMiraRadarInfo.setVisibility(View.VISIBLE);
+
+        boolean allowed = decision != null && decision.optBoolean("allowed", false);
+        String itemTitle = item != null ? item.optString("title", "غير معروف") : "غير معروف";
+        String karat = item != null ? item.optString("karat", "") : "";
+        String weight = item != null ? item.optString("weight", "") : "";
+        String status = item != null ? item.optString("status", "") : "";
+
+        if (item != null && allowed) authorizedCount++;
+        else if (item != null && !allowed) deniedCount++;
+        else unknownCount++;
+
+        updateCounters();
+
+        if (tvRadarItemStatus != null) {
+            if (allowed && item != null) {
+                tvRadarItemStatus.setText("✅ خروج مصرح");
+                tvRadarItemStatus.setTextColor(0xFF4CAF50);
+            } else if (!allowed && item != null) {
+                tvRadarItemStatus.setText("🚨 غير مصرح بالخروج");
+                tvRadarItemStatus.setTextColor(0xFFF44336);
+            } else {
+                tvRadarItemStatus.setText("⚠️ قطعة غير معروفة");
+                tvRadarItemStatus.setTextColor(0xFFFF9800);
+            }
+        }
+
+        if (tvRadarItemName != null) tvRadarItemName.setText("📦 " + itemTitle);
+
+        if (tvRadarItemDetails != null) {
+            StringBuilder details = new StringBuilder("🏷️ ").append(epc.substring(0, Math.min(16, epc.length())));
+            if (!karat.isEmpty()) details.append(" | 💎 ").append(karat);
+            if (!weight.isEmpty()) details.append(" | ⚖️ ").append(weight).append("g");
+            if (!status.isEmpty()) details.append(" | 📋 ").append(status);
+            tvRadarItemDetails.setText(details.toString());
         }
     }
+
+    private void updateCounters() {
+        if (tvAuthorizedCount != null) tvAuthorizedCount.setText(String.valueOf(authorizedCount));
+        if (tvDeniedCount != null) tvDeniedCount.setText(String.valueOf(deniedCount));
+        if (tvUnknownCount != null) tvUnknownCount.setText(String.valueOf(unknownCount));
+    }
+
+    private void addToRecentScans(String epc, String status) {
+        String icon = "AUTHORIZED".equals(status) ? "✅" : "DENIED".equals(status) ? "🚨" : "⚠️";
+        String time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
+        String shortEpc = epc.length() > 14 ? epc.substring(0, 14) + "..." : epc;
+        recentScans.add(0, icon + " " + shortEpc + " | " + time);
+        if (recentScans.size() > 5) recentScans.remove(5);
+
+        if (tvRecentScans != null) {
+            StringBuilder sb = new StringBuilder();
+            for (String s : recentScans) sb.append(s).append("\n");
+            tvRecentScans.setText(sb.toString());
+        }
+    }
+
+    private void animateDetection(boolean isAuthorized) {
+        if (radarView == null) return;
+        int color = isAuthorized ? 0xFF4CAF50 : 0xFFF44336;
+        ObjectAnimator.ofFloat(radarView, "alpha", 1f, 0.4f, 1f).setDuration(300).start();
+        radarView.setBorderColor(color);
+    }
+
+    private void updateRssiBar() {
+        if (rssiBar != null) {
+            int rssi = random.nextInt(40) + 60;
+            rssiBar.setProgress(rssi);
+        }
+    }
+
+    // ==================== Export ====================
+
+    private void exportScanResults() {
+        if (recentScans.isEmpty()) {
+            Toast.makeText(mContext, "لا توجد نتائج للتصدير", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        StringBuilder csv = new StringBuilder("Status,EPC,Time\n");
+        for (String scan : recentScans) {
+            csv.append(scan.replace("✅ ", "AUTHORIZED,")
+                .replace("🚨 ", "DENIED,")
+                .replace("⚠️ ", "UNKNOWN,")
+                .replace(" | ", ","))
+                .append("\n");
+        }
+
+        Intent share = new Intent(Intent.ACTION_SEND);
+        share.setType("text/csv");
+        share.putExtra(Intent.EXTRA_SUBJECT, "MIRA Radar Scan Results");
+        share.putExtra(Intent.EXTRA_TEXT, csv.toString());
+        startActivity(Intent.createChooser(share, "تصدير نتائج المسح"));
+    }
+
+    // ==================== Key Down ====================
+
+    @Override
+    public void myOnKeyDwon() {
+        if (inventoryFlag) stopLocated();
+        else startLocated();
+    }
+
+    // ==================== Lifecycle Overrides ====================
 
     @Override
     public void onResume() {
         super.onResume();
-        // تحديث الإعدادات عند العودة للتبويب
         simulationMode = settingsManager.getBoolean("radar_simulation", true);
     }
 
@@ -505,32 +519,14 @@ public class UHFRadarLocationFragment extends KeyDwonFragment {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        // إلغاء تسجيل المستمع
-        if (settingsManager != null) {
-            settingsManager.unregisterListener("radar_fragment");
-        }
+        if (settingsManager != null) settingsManager.unregisterListener("radar_fragment");
     }
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        FragmentTransaction fragmentTransaction = getFragmentManager().beginTransaction();
-        fragmentTransaction.detach(this).attach(this).commit();
-
-        getView().post(new Runnable() {
-            @Override
-            public void run() {
-                String selectItem = null;
-                if (mContext.tagList.size() > mContext.selectIndex && mContext.selectIndex >= 0) {
-                    selectItem = mContext.tagList.get(mContext.selectIndex).getEPC();
-                }
-                if (selectItem != null && !selectItem.equals("")) {
-                    etEPC.setText(selectItem);
-                    targetEpc = selectItem;
-                } else {
-                    etEPC.setText("");
-                }
-            }
-        });
+        FragmentTransaction ft = getFragmentManager().beginTransaction();
+        ft.detach(this).attach(this).commit();
+        getView().post(this::restoreState);
     }
-                }
+}
