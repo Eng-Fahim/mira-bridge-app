@@ -1,5 +1,5 @@
 package com.example.uhf.fragment;
-
+import com.example.uhf.manager.MiraBranchesManager;
 import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -40,7 +40,7 @@ import java.util.List;
 import java.util.Locale;
 
 public class MiraInventoryProFragment extends KeyDwonFragment {
-
+private MiraBranchesManager branchesManager;
     private static final String TAG = "MiraInventoryPro";
 
     private TextView tvInventoryStatus, tvExpectedCount, tvScannedCount, tvVariance;
@@ -97,6 +97,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (getContext() != null) {
             apiClient = MiraApiClient.getInstance(getContext());
         }
+if (getContext() != null) {
+    apiClient = MiraApiClient.getInstance(getContext());
+    branchesManager = MiraBranchesManager.getInstance(getContext()); // ✅
+}
         bindViews(v);
         setupRecyclerView();
         setupClickListeners();
@@ -165,7 +169,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             int loadedPrevItems = 0;
             try {
                 boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
-                String showroom = isArabic ? "المعرض الرئيسي" : "Main Showroom";
+                // في loadLastSnapshot:
+String showroom = (isArabic ? "المعرض الرئيسي" : "Main Showroom") 
+                + " | branch:" + branchesManager.getActiveBranchId(); // ✅
                 MiraApiClient.ApiResponse response = apiClient.getLastSnapshot(showroom);
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONObject snapshotObj = response.data;
@@ -201,7 +207,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
         new Thread(() -> {
             try {
-                JSONObject extraParams = new JSONObject();
+JSONObject extraParams = new JSONObject();
+if (rssi != null) extraParams.put("rssi", rssi);
+extraParams.put("branch_id", branchesManager.getActiveBranchId()); // ✅
                 if (rssi != null) extraParams.put("rssi", rssi);
 
                 MiraApiClient.ApiResponse response = apiClient.authorize(epcOrGtin, "inventory", extraParams);
@@ -268,28 +276,31 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private void startSessionOnServer(boolean blind) {
-        if (apiClient == null) return;
-        new Thread(() -> {
-            try {
-                boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
-                MiraApiClient.ApiResponse response = apiClient.startInventorySession(isArabic ? "المعرض الرئيسي" : "Main Showroom", blind ? "blind" : "full");
-                if (response != null && response.isSuccess && response.data != null) {
-                    sessionId = response.data.optInt("session_id", 0);
-                    int serverExpected = response.data.optInt("expected_count", 0);
-                    if (serverExpected > 0) expectedCount = serverExpected;
-                }
-            } catch (Exception ignored) {}
-
-            if (isAdded() && getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    if (!isAdded()) return;
-                    if (expectedCount == 0) expectedCount = simulationGtins.length;
-                    if (tvExpectedCount != null) tvExpectedCount.setText(blind ? "???" : String.valueOf(expectedCount));
-                    startSimulation();
-                });
+    if (apiClient == null) return;
+    new Thread(() -> {
+        try {
+            boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+            String location = (isArabic ? "المعرض الرئيسي" : "Main Showroom") 
+                            + " | branch:" + branchesManager.getActiveBranchId(); // ✅
+            
+            MiraApiClient.ApiResponse response = apiClient.startInventorySession(location, blind ? "blind" : "full");
+            if (response != null && response.isSuccess && response.data != null) {
+                sessionId = response.data.optInt("session_id", 0);
+                int serverExpected = response.data.optInt("expected_count", 0);
+                if (serverExpected > 0) expectedCount = serverExpected;
             }
-        }).start();
-    }
+        } catch (Exception ignored) {}
+
+        if (isAdded() && getActivity() != null) {
+            getActivity().runOnUiThread(() -> {
+                if (!isAdded()) return;
+                if (expectedCount == 0) expectedCount = simulationGtins.length;
+                if (tvExpectedCount != null) tvExpectedCount.setText(blind ? "???" : String.valueOf(expectedCount));
+                startSimulation();
+            });
+        }
+    }).start();
+}
 
     private void startSimulation() {
         simulationIndex = 0;
@@ -310,18 +321,19 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private void closeSessionOnServer() {
-        if (apiClient == null) return;
-        new Thread(() -> {
-            try {
-                JSONObject payload = new JSONObject();
-                payload.put("session_id", sessionId);
-                payload.put("found_count", foundCount);
-                payload.put("expected_count", expectedCount);
-                payload.put("variance", varianceCount);
-                apiClient.closeInventorySession(payload);
-            } catch (Exception ignored) {}
-        }).start();
-    }
+    if (apiClient == null) return;
+    new Thread(() -> {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("session_id", sessionId);
+            payload.put("found_count", foundCount);
+            payload.put("expected_count", expectedCount);
+            payload.put("variance", varianceCount);
+            payload.put("branch_id", branchesManager.getActiveBranchId()); // ✅
+            apiClient.closeInventorySession(payload);
+        } catch (Exception ignored) {}
+    }).start();
+}
 
     private void createSnapshotOnServer() {
         if (scannedItems.isEmpty() || foundCount == 0 || apiClient == null) return;
