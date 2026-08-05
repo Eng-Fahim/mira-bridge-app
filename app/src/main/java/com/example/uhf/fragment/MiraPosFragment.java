@@ -487,6 +487,10 @@ public class MiraPosFragment extends Fragment {
                 payload.put("action", "COMPLETE_POS_SALE");
                 payload.put("gate_id", client.getGateId());
 
+if (getContext() != null) {
+                MiraBranchesManager bm = MiraBranchesManager.getInstance(getContext());
+                payload.put("branch_id", bm.getActiveBranchId());
+            }
                 JSONObject customer = new JSONObject();
                 customer.put("name", data.customerName);
                 customer.put("phone", data.customerPhone);
