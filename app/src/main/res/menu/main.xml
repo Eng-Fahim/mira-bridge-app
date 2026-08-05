@@ -43,6 +43,14 @@
             app:showAsAction="never"
             android:visible="false" />
 
+
+        <item
+    android:id="@+id/action_branches"
+    android:title="🏢 الفروع"
+    android:icon="@drawable/ic_branch"
+    app:showAsAction="ifRoom"
+    android:orderInCategory="15" />
+
     </group>
 
 </menu>
