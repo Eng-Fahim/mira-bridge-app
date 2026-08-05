@@ -87,17 +87,18 @@ public class MiraApiClient {
     public ApiResponse getCurrentUser() {
         return getWithAuth("/auth/me");
     }
-// جلب قائمة جلسات الجرد
-public ApiResponse getInventorySessionsList() {
-    // ضع الكود الخاص بطلب الـ GET لجلب القائمة من الخادم
-    return executeGetRequest("/api/inventory/sessions");
-}
 
-// جلب تفاصيل جلسة جرد معينة حسب الـ ID
-public ApiResponse getInventorySessionDetail(int sessionId) {
-    // ضع الكود الخاص بطلب الـ GET لجلب تفاصيل الجلسة
-    return executeGetRequest("/api/inventory/sessions/" + sessionId);
-}
+    // ===================== 📊 INVENTORY SESSIONS =====================
+
+    // جلب قائمة جلسات الجرد
+    public ApiResponse getInventorySessionsList() {
+        return getWithAuth("/inventory/sessions");
+    }
+
+    // جلب تفاصيل جلسة جرد معينة حسب الـ ID
+    public ApiResponse getInventorySessionDetail(int sessionId) {
+        return getWithAuth("/inventory/sessions/" + sessionId);
+    }
 
     public ApiResponse refreshToken(String oldToken) {
         JSONObject payload = new JSONObject();
@@ -134,15 +135,16 @@ public ApiResponse getInventorySessionDetail(int sessionId) {
         }
         return post("/auth/verify-biometric", payload);
     }
-// ===================== 🏢 ORGANIZATION PROFILE =====================
 
-public ApiResponse saveOrgProfile(JSONObject payload) {
-    return postWithAuth("/org-profile/save", payload);
-}
+    // ===================== 🏢 ORGANIZATION PROFILE =====================
 
-public ApiResponse getOrgProfile() {
-    return get("/org-profile/get");
-}
+    public ApiResponse saveOrgProfile(JSONObject payload) {
+        return postWithAuth("/org-profile/save", payload);
+    }
+
+    public ApiResponse getOrgProfile() {
+        return get("/org-profile/get");
+    }
     
     // ===================== 👥 USERS MANAGEMENT =====================
 
@@ -400,7 +402,6 @@ public ApiResponse getOrgProfile() {
             
             String token = getAuthToken();
             if (!token.isEmpty()) {
-                // إرسال التوكن بالصيغة القياسية والمخصصة معاً لضمان قبول السيرفر لها
                 conn.setRequestProperty("Authorization", "Bearer " + token);
                 conn.setRequestProperty("X-MIRA-Auth-Token", token);
             }
@@ -432,7 +433,6 @@ public ApiResponse getOrgProfile() {
             
             String token = getAuthToken();
             if (!token.isEmpty()) {
-                // إرسال التوكن بالصيغة القياسية والمخصصة معاً لضمان قبول السيرفر لها
                 conn.setRequestProperty("Authorization", "Bearer " + token);
                 conn.setRequestProperty("X-MIRA-Auth-Token", token);
             }
