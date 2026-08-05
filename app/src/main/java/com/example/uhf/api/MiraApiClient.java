@@ -87,6 +87,17 @@ public class MiraApiClient {
     public ApiResponse getCurrentUser() {
         return getWithAuth("/auth/me");
     }
+// جلب قائمة جلسات الجرد
+public ApiResponse getInventorySessionsList() {
+    // ضع الكود الخاص بطلب الـ GET لجلب القائمة من الخادم
+    return executeGetRequest("/api/inventory/sessions");
+}
+
+// جلب تفاصيل جلسة جرد معينة حسب الـ ID
+public ApiResponse getInventorySessionDetail(int sessionId) {
+    // ضع الكود الخاص بطلب الـ GET لجلب تفاصيل الجلسة
+    return executeGetRequest("/api/inventory/sessions/" + sessionId);
+}
 
     public ApiResponse refreshToken(String oldToken) {
         JSONObject payload = new JSONObject();
