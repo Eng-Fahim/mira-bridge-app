@@ -34,6 +34,7 @@ import com.example.uhf.fragment.MiraDashboardFragment;
 import com.example.uhf.fragment.MiraIdentityStudioFragment;
 import com.example.uhf.fragment.MiraInventoryProFragment;
 import com.example.uhf.fragment.MiraPosFragment;
+import com.example.uhf.fragment.MiraReceiptFragment;
 import com.example.uhf.fragment.MiraSecureGateFragment;
 import com.example.uhf.fragment.ProtectedModeAndShortRangeModeFragment;
 import com.example.uhf.fragment.UHFKillFragment;
