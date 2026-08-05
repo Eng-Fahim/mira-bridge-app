@@ -7,6 +7,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextClock;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -35,32 +36,35 @@ import java.util.concurrent.Executors;
  * 
  * يعرض إحصائيات الفرع النشط:
  * - إجمالي القطع والوزن والمباع اليوم
- * - كميات العيارات (24K, 21K, 18K)
+ * - كميات العيارات (24K, 21K, 18K) معروضة في خانات أسعار الذهب
  * - المبيعات (يوم/شهر/سنة) بالريال اليمني
- * - الوصول السريع لنقطة البيع والجرد والبوابات
+ * - الوصول السريع للبوابات والجرد
  * - دعم كامل للغة العربية والإنجليزية
  */
 public class MiraDashboardFragment extends Fragment {
 
     private static final String TAG = "MiraDashboard";
 
-    // ==================== UI Elements ====================
-    private TextView tvGreeting, tvDate, tvTime, tvLocation, tvLiveStatus;
+    // ==================== UI Elements (مطابقة لـ XML) ====================
+    private TextView tvGreeting, tvDate, tvLocation, tvLiveStatus;
+    private TextClock tcLiveTime;
     private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
     private TextView tvSalesToday, tvSalesMonth, tvSalesYear;
-    private TextView tvKarat24Qty, tvKarat21Qty, tvKarat18Qty;
-    private View cardScan, cardGate, cardRadar, cardSettings;
+    private TextView tvGoldPrice18, tvGoldPrice21, tvGoldPrice24;
+    private View btnGateSecurity, btnRfidAudit;
     private SwipeRefreshLayout swipeRefresh;
 
     // ==================== Managers ====================
     private ExecutorService executor;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final Handler clockHandler = new Handler(Looper.getMainLooper());
+    private final Handler dateHandler = new Handler(Looper.getMainLooper());
     private MiraApiClient apiClient;
     private SessionManager sessionManager;
     private MiraBranchesManager branchesManager;
 
     private boolean isArabic;
+
+    // ==================== Lifecycle ====================
 
     @Nullable
     @Override
@@ -83,76 +87,61 @@ public class MiraDashboardFragment extends Fragment {
         setupUserGreeting();
         setupNavigationListeners();
         setupSwipeToRefresh();
-        startClock();
+        updateDateDisplay();
         fetchDashboardData();
     }
 
     // ==================== Init Views ====================
 
     private void initViews(View v) {
-        // الهيدر
+        // الهيدر - مطابق للـ XML
         tvGreeting = v.findViewById(R.id.tvGreeting);
         tvDate = v.findViewById(R.id.tvDate);
-        tvTime = v.findViewById(R.id.tvTime);
+        tcLiveTime = v.findViewById(R.id.tcLiveTime);
         tvLocation = v.findViewById(R.id.tvLocation);
         tvLiveStatus = v.findViewById(R.id.tvLiveStatus);
 
-        // إحصائيات المخزون
+        // إحصائيات المخزون - مطابق للـ XML
         tvTotalItems = v.findViewById(R.id.tvTotalItems);
         tvTotalWeight = v.findViewById(R.id.tvTotalWeight);
         tvSoldToday = v.findViewById(R.id.tvSoldToday);
 
-        // المبيعات
+        // المبيعات - مطابق للـ XML
         tvSalesToday = v.findViewById(R.id.tvSalesToday);
         tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
         tvSalesYear = v.findViewById(R.id.tvSalesYear);
 
-        // كميات العيارات - نستخدم نفس عناصر gold price إن وجدت
-        tvKarat24Qty = v.findViewById(R.id.tvKarat24Qty);
-        tvKarat21Qty = v.findViewById(R.id.tvKarat21Qty);
-        tvKarat18Qty = v.findViewById(R.id.tvKarat18Qty);
+        // أسعار/كميات العيارات - نستخدم عناصر gold price الموجودة
+        tvGoldPrice18 = v.findViewById(R.id.tvGoldPrice18);
+        tvGoldPrice21 = v.findViewById(R.id.tvGoldPrice21);
+        tvGoldPrice24 = v.findViewById(R.id.tvGoldPrice24);
 
-        // إذا لم تكن موجودة، نستخدم عناصر gold price الموجودة
-        if (tvKarat24Qty == null) tvKarat24Qty = v.findViewById(R.id.tvGoldPrice24);
-        if (tvKarat21Qty == null) tvKarat21Qty = v.findViewById(R.id.tvGoldPrice21);
-        if (tvKarat18Qty == null) tvKarat18Qty = v.findViewById(R.id.tvGoldPrice18);
-
-        // أزرار الاختصارات
-        cardScan = v.findViewById(R.id.cardScan);
-        cardGate = v.findViewById(R.id.cardGate);
-        cardRadar = v.findViewById(R.id.cardRadar);
-        cardSettings = v.findViewById(R.id.cardSettings);
+        // أزرار العمليات - مطابق للـ XML
+        btnGateSecurity = v.findViewById(R.id.btnGateSecurity);
+        btnRfidAudit = v.findViewById(R.id.btnRfidAudit);
 
         // السحب للتحديث
         swipeRefresh = v.findViewById(R.id.swipeRefresh);
 
-        // تحديث التاريخ والموقع
-        updateLocationLabel();
+        // تحديث اسم الموقع
+        if (tvLocation != null) {
+            tvLocation.setText("📍 " + branchesManager.getActiveBranchDisplayName());
+        }
     }
 
-    // ==================== Clock ====================
+    // ==================== Date Update ====================
 
-    private void startClock() {
-        clockHandler.post(new Runnable() {
+    private void updateDateDisplay() {
+        dateHandler.post(new Runnable() {
             @Override
             public void run() {
                 if (!isAdded()) return;
                 Locale locale = isArabic ? new Locale("ar") : Locale.US;
-                SimpleDateFormat timeFmt = new SimpleDateFormat("HH:mm:ss", locale);
                 SimpleDateFormat dateFmt = new SimpleDateFormat("EEEE، d MMMM yyyy", locale);
-                Date now = new Date();
-                if (tvTime != null) tvTime.setText(timeFmt.format(now));
-                if (tvDate != null) tvDate.setText(dateFmt.format(now));
-                clockHandler.postDelayed(this, 1000);
+                if (tvDate != null) tvDate.setText(dateFmt.format(new Date()));
+                dateHandler.postDelayed(this, 60000); // تحديث كل دقيقة
             }
         });
-    }
-
-    private void updateLocationLabel() {
-        if (tvLocation != null) {
-            String branchName = branchesManager.getActiveBranchDisplayName();
-            tvLocation.setText("📍 " + branchName);
-        }
     }
 
     // ==================== Greeting ====================
@@ -177,24 +166,14 @@ public class MiraDashboardFragment extends Fragment {
     private void setupNavigationListeners() {
         if (getActivity() == null) return;
 
-        // cardScan ← الجرد والمسح (Inventory Pro)
-        if (cardScan != null) {
-            cardScan.setOnClickListener(v -> switchTab("Inventory Pro"));
+        // btnGateSecurity ← البوابات
+        if (btnGateSecurity != null) {
+            btnGateSecurity.setOnClickListener(v -> switchTab("SecureGate"));
         }
 
-        // cardGate ← البوابات (SecureGate)
-        if (cardGate != null) {
-            cardGate.setOnClickListener(v -> switchTab("SecureGate"));
-        }
-
-        // cardRadar ← الرادار (RadarLocation)
-        if (cardRadar != null) {
-            cardRadar.setOnClickListener(v -> switchTab("RadarLocation"));
-        }
-
-        // cardSettings ← الإعدادات (Settings) - فقط للمدراء
-        if (cardSettings != null) {
-            cardSettings.setOnClickListener(v -> switchTab("Settings"));
+        // btnRfidAudit ← الجرد السريع
+        if (btnRfidAudit != null) {
+            btnRfidAudit.setOnClickListener(v -> switchTab("Inventory Pro"));
         }
     }
 
@@ -211,7 +190,7 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    // ==================== Swipe to Refresh ====================
+    // ==================== Swipe ====================
 
     private void setupSwipeToRefresh() {
         if (swipeRefresh != null) {
@@ -219,7 +198,7 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    // ==================== API Call ====================
+    // ==================== API ====================
 
     private void fetchDashboardData() {
         if (executor == null || executor.isShutdown()) {
@@ -262,12 +241,12 @@ public class MiraDashboardFragment extends Fragment {
                 if (tvTotalItems != null) tvTotalItems.setText(formatNumber(totalItems));
                 if (tvTotalWeight != null) tvTotalWeight.setText(String.format(Locale.US, "%.1f g", totalWeight));
 
-                // كميات العيارات
+                // ✅ كميات العيارات في خانات أسعار الذهب
                 JSONObject weights = inventory.optJSONObject("weights");
                 if (weights != null) {
-                    setKaratText(tvKarat24Qty, weights.optInt("k24", 0));
-                    setKaratText(tvKarat21Qty, weights.optInt("k21", 0));
-                    setKaratText(tvKarat18Qty, weights.optInt("k18", 0));
+                    setKaratText(tvGoldPrice18, "18K", weights.optInt("k18", 0));
+                    setKaratText(tvGoldPrice21, "21K", weights.optInt("k21", 0));
+                    setKaratText(tvGoldPrice24, "24K", weights.optInt("k24", 0));
                 }
             }
 
@@ -296,13 +275,16 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    private void setKaratText(TextView tv, int count) {
+    /**
+     * ✅ عرض كمية القطع لكل عيار في خانة سعر الذهب
+     */
+    private void setKaratText(TextView tv, String karatLabel, int count) {
         if (tv == null) return;
         if (count > 0) {
-            tv.setText(count + " " + (isArabic ? "قطعة" : "pcs"));
+            tv.setText(karatLabel + " | " + count + " " + (isArabic ? "قطعة" : "pcs"));
             tv.setTextColor(0xFF1A237E);
         } else {
-            tv.setText("—");
+            tv.setText(karatLabel + " | —");
             tv.setTextColor(0xFF9CA3AF);
         }
     }
@@ -338,7 +320,7 @@ public class MiraDashboardFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         mainHandler.removeCallbacksAndMessages(null);
-        clockHandler.removeCallbacksAndMessages(null);
+        dateHandler.removeCallbacksAndMessages(null);
         if (executor != null && !executor.isShutdown()) executor.shutdown();
     }
 }
