@@ -3,11 +3,11 @@
 
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
 
-        <!-- 🔤 1. الخط الافتراضي العام -->
+        <!-- 🔤 الخطوط -->
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
 
-        <!-- 🔤 2. ربط أوزان Typography بخط Cairo -->
+        <!-- 🔤 أوزان Typography -->
         <item name="textAppearanceDisplayLarge">@style/AppTextAppearance</item>
         <item name="textAppearanceDisplayMedium">@style/AppTextAppearance</item>
         <item name="textAppearanceDisplaySmall">@style/AppTextAppearance</item>
@@ -24,7 +24,7 @@
         <item name="textAppearanceLabelMedium">@style/AppTextAppearance</item>
         <item name="textAppearanceLabelSmall">@style/AppTextAppearance</item>
 
-        <!-- 🔤 3. إجبار المكونات الأساسية على تبني الهوية والخط -->
+        <!-- 🔤 إجبار المكونات -->
         <item name="android:textViewStyle">@style/AppTextViewStyle</item>
         <item name="materialButtonStyle">@style/AppButtonStyle</item>
         <item name="buttonStyle">@style/AppButtonStyle</item>
@@ -32,35 +32,33 @@
         <item name="checkboxStyle">@style/AppCheckBoxStyle</item>
         <item name="tabStyle">@style/AppTabStyle</item>
 
-        <!-- 🎨 لوحة الألوان الفاخرة (Luxury Dark Gold Theme) -->
-        <item name="colorPrimary">#D4AF37</item> <!-- ذهبي فاخر -->
-        <item name="colorOnPrimary">#0B0B0C</item>
-        <item name="colorPrimaryContainer">#2A2413</item>
-        <item name="colorOnPrimaryContainer">#F4E8B1</item>
+        <!-- 🎨 لوحة الألوان الفاخرة للوضع الفاتح -->
+        <item name="colorPrimary">#D4AF37</item> <!-- الذهبي الفاخر -->
+        <item name="colorOnPrimary">#FFFFFF</item> <!-- نص أبيض فوق الزر الذهبي -->
+        <item name="colorPrimaryContainer">#FDF8E7</item>
+        <item name="colorOnPrimaryContainer">#2A2413</item>
         
         <item name="colorSecondary">#C5A059</item>
-        <item name="colorOnSecondary">#0B0B0C</item>
-        <item name="colorSecondaryContainer">#1E1C14</item>
-        <item name="colorOnSecondaryContainer">#E6D5A9</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">#F9F4E9</item>
+        <item name="colorOnSecondaryContainer">#1E1C14</item>
 
-        <!-- خلفية كربونية عميقة تريح العين -->
-        <item name="android:colorBackground">#0B0B0C</item>
-        <item name="colorOnBackground">#F3F4F6</item>
+        <!-- 🖼️ خلفية فاتحة تبرز البطاقة البيضاء -->
+        <item name="android:colorBackground">#F9FAFB</item> <!-- رمادي فاتح جداً -->
+        <item name="colorOnBackground">#111827</item> <!-- نصوص سوداء -->
         
-        <!-- الأسطح والبطاقات بتباين مدروس -->
-        <item name="colorSurface">#141416</item>
-        <item name="colorOnSurface">#F3F4F6</item>
-        <item name="colorSurfaceVariant">#1E1E22</item>
-        <item name="colorOnSurfaceVariant">#A1A1AA</item>
+        <!-- 🗂️ الأسطح والبطاقات -->
+        <item name="colorSurface">#FFFFFF</item> <!-- بطاقات بيضاء ناصعة -->
+        <item name="colorOnSurface">#111827</item>
+        <item name="colorSurfaceVariant">#F3F4F6</item>
+        <item name="colorOnSurfaceVariant">#4B5563</item>
         
-        <!-- الحدود والإطارات -->
-        <item name="colorOutline">#2D2D35</item>
-        <item name="colorOutlineVariant">#23232A</item>
+        <!-- 🔲 الحدود والإطارات -->
+        <item name="colorOutline">#E5E7EB</item>
+        <item name="colorOutlineVariant">#D1D5DB</item>
     </style>
 
-    <!-- ============================================ -->
-    <!-- 🔤 قواعد وأنماط الخطوط والأوزان -->
-    <!-- ============================================ -->
+    <!-- الأنماط المساعدة -->
     <style name="AppTextAppearance" parent="TextAppearance.Material3.BodyMedium">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
