@@ -26,7 +26,7 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.dialog.POSCheckoutDialog;
 import com.example.uhf.engine.SmartScaleConnector;
 import com.example.uhf.tools.UIHelper;
-
+import com.example.uhf.manager.MiraBranchesManager;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
