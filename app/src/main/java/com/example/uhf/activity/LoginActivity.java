@@ -95,7 +95,7 @@ public class LoginActivity extends AppCompatActivity {
         tvAppVersion = findViewById(R.id.tvAppVersion);
         tvBrandName = findViewById(R.id.tvBrandName);
         tvBrandSubtitle = findViewById(R.id.tvBrandSubtitle);
-        tvBrandDescription = findViewById(R.id.tvBrandDescription);
+       // tvBrandDescription = findViewById(R.id.tvBrandDescription);
         tvSignInTitle = findViewById(R.id.tvSignInTitle);
         tvSignInSubtitle = findViewById(R.id.tvSignInSubtitle);
         ivAppLogo = findViewById(R.id.ivAppLogo);
