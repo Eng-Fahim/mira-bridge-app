@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?attr/colorSurface"
+    android:layoutDirection="rtl">
+
+    <!-- شريط العنوان -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorPrimary"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📦 تفاصيل التحويل"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvDetailTransferNumber"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="#TRF-001"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="12sp"
+            android:alpha="0.8" />
+    </LinearLayout>
+
+    <!-- معلومات التحويل -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:background="?attr/colorSurfaceVariant">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/tvDetailFromBranch"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="🏢 الفرع الرئيسي"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" ➡️ "
+                android:textSize="22sp"
+                android:layout_marginHorizontal="12dp" />
+
+            <TextView
+                android:id="@+id/tvDetailToBranch"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="🏢 فرع عدن"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- حالة + إحصائيات -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+                <TextView android:id="@+id/tvDetailItemCount" android:text="0" android:textSize="18sp" android:textStyle="bold" />
+                <TextView android:text="قطعة" android:textSize="10sp" android:textColor="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+                <TextView android:id="@+id/tvDetailScannedCount" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#22C55E" />
+                <TextView android:text="تم مسحها" android:textSize="10sp" android:textColor="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+                <TextView android:id="@+id/tvDetailStatus" android:text="معلق" android:textSize="14sp" android:textStyle="bold" android:textColor="#F59E0B" />
+                <TextView android:text="الحالة" android:textSize="10sp" android:textColor="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- حقل المسح السريع -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:background="#1B2838">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📡"
+            android:textSize="18sp"
+            android:layout_gravity="center"
+            android:layout_marginEnd="6dp" />
+
+        <EditText
+            android:id="@+id/etScanEPC"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:hint="امسح RFID أو أدخل EPC..."
+            android:textColor="#FFFFFF"
+            android:textColorHint="#78909C"
+            android:background="@drawable/edittext_border"
+            android:paddingHorizontal="10dp"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/btnManualScan"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="6dp"
+            android:text="🔍"
+            android:textSize="16sp"
+            android:backgroundTint="?attr/colorPrimary" />
+    </LinearLayout>
+
+    <!-- شريط تقدم المسح -->
+    <ProgressBar
+        android:id="@+id/progressScan"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:progressTint="#22C55E"
+        android:progressBackgroundTint="#333" />
+
+    <!-- قائمة القطع -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvTransferItems"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="8dp"
+        android:clipToPadding="false" />
+
+    <!-- أزرار الإجراءات -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:background="?attr/colorSurfaceVariant">
+
+        <Button
+            android:id="@+id/btnRejectTransfer"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:text="❌ رفض"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#EF4444"
+            android:textStyle="bold"
+            app:cornerRadius="10dp" />
+
+        <Button
+            android:id="@+id/btnApproveTransfer"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="2"
+            android:layout_marginHorizontal="4dp"
+            android:text="✅ اعتماد"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#3B82F6"
+            android:textStyle="bold"
+            app:cornerRadius="10dp" />
+
+        <Button
+            android:id="@+id/btnReceiveTransfer"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="2"
+            android:layout_marginStart="4dp"
+            android:text="📥 استلام"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#22C55E"
+            android:textStyle="bold"
+            app:cornerRadius="10dp" />
+    </LinearLayout>
+</LinearLayout>
