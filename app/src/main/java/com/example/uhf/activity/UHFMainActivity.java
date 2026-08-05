@@ -182,7 +182,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         // في initViewPageData، أضف
         boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
-        boolean isAnyAdmin = isSystemAdmin || isOrgAdmin;
+        
         boolean isManager = isAnyAdmin || isBranchManager; // ✅ مدير بأي مستوى
 
         // 🏠 لوحة التحكم
@@ -460,4 +460,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
         public void stopPlay() { isStop = true; synchronized (objectLock) { objectLock.notifyAll(); } }
     }
-                }
+            }
