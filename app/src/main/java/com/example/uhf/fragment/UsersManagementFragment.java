@@ -54,13 +54,14 @@ public class UsersManagementFragment extends Fragment {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private static final String[] ROLES = {
-        "SYSTEM_ADMIN", "ORG_ADMIN", "INVENTORY_MGR",
-        "POS_OPERATOR", "SECURITY", "GATE_SECURITY", "AUDITOR"
-    };
-    private static final String[] ROLES_AR = {
-        "مهندس النظام", "مدير الجهة", "مدير المخزون",
-        "موظف مبيعات", "أمن", "أمن البوابات", "مدقق"
-    };
+    "SYSTEM_ADMIN", "ORG_ADMIN", "BRANCH_MANAGER", "INVENTORY_MGR",
+    "POS_OPERATOR", "SECURITY", "GATE_SECURITY", "AUDITOR"
+};
+
+private static final String[] ROLES_AR = {
+    "مهندس النظام", "مدير الجهة", "مدير الفرع", "مدير المخزون",
+    "موظف مبيعات", "أمن", "أمن البوابات", "مدقق"
+};
 
     @Nullable
     @Override
