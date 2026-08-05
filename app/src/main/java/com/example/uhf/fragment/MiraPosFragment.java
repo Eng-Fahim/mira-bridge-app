@@ -213,7 +213,7 @@ public class MiraPosFragment extends Fragment {
         });
         
         View view = getView();
-        if (view != null && view.getParent() != null) {
+        if (view != null && view.getParent() instanceof View) {
             int cid = ((View) view.getParent()).getId();
             getParentFragmentManager().beginTransaction().replace(cid, sf).addToBackStack("barcode_scanner").commit();
         } else {
@@ -564,10 +564,19 @@ public class MiraPosFragment extends Fragment {
                 ((UHFMainActivity) getActivity()).openReceiptFragment(responseJson);
             } else {
                 MiraReceiptFragment receiptFragment = MiraReceiptFragment.newInstance(responseJson);
-                getParentFragmentManager().beginTransaction()
-                        .replace(R.id.frame_content, receiptFragment)
-                        .addToBackStack("receipt")
-                        .commitAllowingStateLoss();
+                View view = getView();
+                if (view != null && view.getParent() instanceof View) {
+                    int containerId = ((View) view.getParent()).getId();
+                    getParentFragmentManager().beginTransaction()
+                            .replace(containerId, receiptFragment)
+                            .addToBackStack("receipt")
+                            .commitAllowingStateLoss();
+                } else {
+                    getParentFragmentManager().beginTransaction()
+                            .replace(android.R.id.content, receiptFragment)
+                            .addToBackStack("receipt")
+                            .commitAllowingStateLoss();
+                }
             }
         } catch (Exception e) {
             Log.e(TAG, "Error showing receipt: " + e.getMessage());
