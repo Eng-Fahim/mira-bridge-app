@@ -38,6 +38,7 @@ import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.fragment.MiraReceiptFragment;
 import com.example.uhf.fragment.MiraSalesHistoryFragment;
 import com.example.uhf.fragment.MiraSecureGateFragment;
+import com.example.uhf.fragment.MiraTransferFragment;
 import com.example.uhf.fragment.ProtectedModeAndShortRangeModeFragment;
 import com.example.uhf.fragment.UHFKillFragment;
 import com.example.uhf.fragment.UHFLocationFragment;
@@ -50,7 +51,6 @@ import com.example.uhf.fragment.UHFTagFlashFragment;
 import com.example.uhf.fragment.UHFTagLitFragment;
 import com.example.uhf.fragment.UHFUpgradeFragment;
 import com.example.uhf.fragment.UsersManagementFragment;
-import com.example.uhf.fragment.MiraTransferFragment;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.ExportExcelAsyncTask;
@@ -95,7 +95,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             return;
         }
 
-        // 🏢 تهيئة مدير الفروع
         branchesManager = MiraBranchesManager.getInstance(this);
 
         setContentView(R.layout.activity_main);
@@ -111,7 +110,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
                 getSupportActionBar().setTitle(orgProfile.getOrgName() + " - " + displayName);
 
-                // 🏢 إظهار اسم الفرع النشط كعنوان فرعي
                 if (branchesManager.hasActiveBranch()) {
                     getSupportActionBar().setSubtitle("📍 " + branchesManager.getActiveBranchDisplayName());
                 }
@@ -130,16 +128,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         Log.d(TAG, "UI Mode / Configuration changed. Adapting themes dynamically.");
     }
 
-    public void setActivePOSFragment(MiraPosFragment fragment) {
-        this.activePOSFragment = fragment;
-    }
+    public void setActivePOSFragment(MiraPosFragment fragment) { this.activePOSFragment = fragment; }
 
     public boolean isReaderReady() {
         try {
             return mReader != null && mReader.getConnectStatus() == ConnectionStatus.CONNECTED;
-        } catch (Exception e) {
-            return false;
-        }
+        } catch (Exception e) { return false; }
     }
 
     public void onTagRead(String epc) {
@@ -158,9 +152,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    // ============================================
-    // ✅ تصفية التبويبات حسب الصلاحيات + دعم متعدد اللغات
-    // ============================================
     protected void initViewPageData() {
         fm = getSupportFragmentManager();
         mTabHost = findViewById(android.R.id.tabhost);
@@ -175,24 +166,21 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
         boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
+        boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
         boolean isAnyAdmin = isSystemAdmin || isOrgAdmin;
+        boolean isManager = isAnyAdmin || isBranchManager;
         boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
         boolean isPosOperator = (role == SessionManager.Role.POS_OPERATOR);
         boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
 
-        // في initViewPageData، أضف
-        boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
-        
-        boolean isManager = isAnyAdmin || isBranchManager; // ✅ مدير بأي مستوى
-
-        // 🏠 لوحة التحكم
+        // 🏠 لوحة التحكم - للجميع
         mTabHost.addTab(
             mTabHost.newTabSpec("Dashboard").setIndicator(isArabic ? "🏠 الرئيسية" : "🏠 Dashboard"),
             MiraDashboardFragment.class, null
         );
 
         // 💎 المجوهرات + POS + سجل المبيعات
-        if (isAnyAdmin || isPosOperator) {
+        if (isManager || isPosOperator) {
             mTabHost.addTab(
                 mTabHost.newTabSpec("JewelryDashboard").setIndicator(isArabic ? "💎 المجوهرات" : "💎 Jewelry"),
                 JewelryDashboardFragment.class, null
@@ -207,14 +195,14 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             );
         }
 
-        // 📷 المسح
+        // 📷 المسح - للجميع
         mTabHost.addTab(
             mTabHost.newTabSpec("Scan").setIndicator(isArabic ? "📷 المسح" : "📷 Scan"),
             UHFReadTagFragment.class, null
         );
 
         // 🆔 التكويد + المخزون + الرادار
-        if (isAnyAdmin || isInventoryMgr) {
+        if (isManager || isInventoryMgr) {
             mTabHost.addTab(
                 mTabHost.newTabSpec("IdentityStudio").setIndicator(isArabic ? "🆔 التكويد" : "🆔 ID"),
                 MiraIdentityStudioFragment.class, null
@@ -230,7 +218,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
 
         // 🚪 البوابات
-        if (isAnyAdmin || isGateSecurity) {
+        if (isManager || isGateSecurity) {
             mTabHost.addTab(
                 mTabHost.newTabSpec("SecureGate").setIndicator(isArabic ? "🚪 البوابات" : "🚪 Gate"),
                 MiraSecureGateFragment.class, null
@@ -238,14 +226,22 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
 
         // 👥 المستخدمين
-        if (isAnyAdmin) {
+        if (isManager) {
             mTabHost.addTab(
                 mTabHost.newTabSpec("UsersManagement").setIndicator(isArabic ? "👥 المستخدمين" : "👥 Users"),
                 UsersManagementFragment.class, null
             );
         }
 
-        // ⚙️ الإعدادات المتقدمة (System Admin فقط)
+        // 📦 التحويلات
+        if (isManager || isInventoryMgr) {
+            mTabHost.addTab(
+                mTabHost.newTabSpec("Transfers").setIndicator(isArabic ? "📦 التحويلات" : "📦 Transfers"),
+                MiraTransferFragment.class, null
+            );
+        }
+
+        // ⚙️ الإعدادات المتقدمة - SYSTEM_ADMIN فقط
         if (isSystemAdmin) {
             mTabHost.addTab(mTabHost.newTabSpec("Settings").setIndicator(isArabic ? "⚙️ الإعدادات" : "⚙️ Settings"), UHFSetFragment.class, null);
             mTabHost.addTab(mTabHost.newTabSpec("Location").setIndicator(isArabic ? "📍 المواقع" : "📍 Location"), UHFLocationFragment.class, null);
@@ -263,10 +259,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    // ============================================
-    // 🏢 منتقي الفرع
-    // ============================================
     private void showBranchPicker() {
+        // ✅ فقط SYSTEM_ADMIN و ORG_ADMIN يمكنهم تغيير الفرع
+        if (branchesManager.isBranchLocked() && !sessionManager.isAnyAdmin()) {
+            Toast.makeText(this, "الفرع محدد من قبل النظام ولا يمكن تغييره", Toast.LENGTH_LONG).show();
+            return;
+        }
+
         MiraBranchPickerFragment picker = new MiraBranchPickerFragment();
         picker.setOnBranchSelectedListener((branchId, branchName, branchCode) -> {
             if (getSupportActionBar() != null) {
@@ -278,9 +277,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         picker.show(getSupportFragmentManager(), "branch_picker");
     }
 
-    // ============================================
-    // القائمة
-    // ============================================
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
@@ -314,14 +310,15 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         String roleLabel;
         switch (role) {
-            case "SYSTEM_ADMIN":  roleLabel = "🔧 System Administrator"; break;
-            case "ORG_ADMIN":     roleLabel = "🏢 Organization Admin"; break;
-            case "INVENTORY_MGR": roleLabel = "📊 Inventory Manager"; break;
-            case "POS_OPERATOR":  roleLabel = "🛒 POS Operator"; break;
-            case "SECURITY":      roleLabel = "🔒 Security"; break;
-            case "GATE_SECURITY": roleLabel = "🚪 Gate Security"; break;
-            case "AUDITOR":       roleLabel = "🔍 Auditor"; break;
-            default:              roleLabel = role;
+            case "SYSTEM_ADMIN":   roleLabel = "🔧 System Administrator"; break;
+            case "ORG_ADMIN":      roleLabel = "🏢 Organization Admin"; break;
+            case "BRANCH_MANAGER": roleLabel = "👤 Branch Manager"; break;
+            case "INVENTORY_MGR":  roleLabel = "📊 Inventory Manager"; break;
+            case "POS_OPERATOR":   roleLabel = "🛒 POS Operator"; break;
+            case "SECURITY":       roleLabel = "🔒 Security"; break;
+            case "GATE_SECURITY":  roleLabel = "🚪 Gate Security"; break;
+            case "AUDITOR":        roleLabel = "🔍 Auditor"; break;
+            default:               roleLabel = role;
         }
 
         String message = (isArabic ? "المستخدم: " : "User: ") + displayName + "\n"
@@ -460,4 +457,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
         public void stopPlay() { isStop = true; synchronized (objectLock) { objectLock.notifyAll(); } }
     }
-            }
+                }
