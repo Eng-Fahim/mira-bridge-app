@@ -28,7 +28,6 @@ public class MiraAccountingViewModel extends AndroidViewModel {
 
     public MiraAccountingViewModel(@NonNull Application application) {
         super(application);
-        // الحصول على النواة باستخدام التطبيق للحصول على الـ Context
         this.apiClient = MiraApiClient.getInstance(application);
     }
 
@@ -36,12 +35,10 @@ public class MiraAccountingViewModel extends AndroidViewModel {
     public LiveData<Boolean> getIsLoading() { return isLoading; }
     public LiveData<String> getErrorMessage() { return errorMessage; }
 
-    // دالة طلب القيود اليومية من السيرفر
     public void fetchJournalEntries() {
         isLoading.setValue(true);
 
         executorService.execute(() -> {
-            // استدعاء الـ API المعرف في MiraApiClient
             MiraApiClient.ApiResponse response = apiClient.getJournalEntries(null);
 
             if (response.isSuccess) {
@@ -56,7 +53,6 @@ public class MiraAccountingViewModel extends AndroidViewModel {
         });
     }
 
-    // تحويل JSON القادم من السيرفر إلى القائمة المطلوب عرضها
     private List<MiraAccountingItem> parseJournalEntries(JSONObject data) {
         List<MiraAccountingItem> list = new ArrayList<>();
         if (data == null) return list;
@@ -70,13 +66,22 @@ public class MiraAccountingViewModel extends AndroidViewModel {
             if (entriesArray != null) {
                 for (int i = 0; i < entriesArray.length(); i++) {
                     JSONObject obj = entriesArray.getJSONObject(i);
-                    // قم بتعديل المسميات هنا بناءً على الـ JSON القادم من السيرفر لديك
-                    String id = obj.optString("id", "");
+                    
+                    String id = obj.optString("id", String.valueOf(i + 1));
                     String title = obj.optString("description", obj.optString("title", "قيد محاسبي"));
-                    double amount = obj.optDouble("amount", 0.0);
+                    String amount = obj.optString("amount", "0.00");
                     String date = obj.optString("created_at", obj.optString("date", ""));
+                    String status = obj.optString("status", "مكتمل");
 
-                    list.add(new MiraAccountingItem(id, title, amount, date));
+                    // استخدام الكونستركتور المطابق لـ MiraAccountingItem
+                    list.add(new MiraAccountingItem(
+                            MiraAccountingItem.ItemType.JOURNAL_ENTRY, // أو النوع المعرف داخل Enum الكلاس
+                            id,
+                            title,
+                            amount,
+                            date,
+                            status
+                    ));
                 }
             }
         } catch (Exception e) {
