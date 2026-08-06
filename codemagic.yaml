@@ -6,6 +6,8 @@ workflows:
       vars:
         PACKAGE_NAME: "com.mira.jewelry.enterprise"
     scripts:
+      - name: Grant gradlew permission
+        script: chmod +x gradlew
       - name: Build debug APK
         script: |
           ./gradlew :app:assembleDebug
