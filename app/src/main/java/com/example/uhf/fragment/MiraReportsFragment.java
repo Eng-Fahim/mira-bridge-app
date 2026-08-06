@@ -13,7 +13,10 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -22,10 +25,10 @@ import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 
-import com.example.rfid.R;
-import com.example.rfid.api.ApiClient;
-import com.example.rfid.api.ApiService;
-import com.example.rfid.utils.LocaleHelper;
+import com.example.uhf.R;
+import com.example.uhf.api.ApiClient;
+import com.example.uhf.api.ApiService;
+import com.example.uhf.utils.LocaleHelper;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -36,7 +39,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.Locale;
 
 import retrofit2.Call;
@@ -48,13 +50,10 @@ public class MiraReportsFragment extends Fragment {
     private static final String TAG = "MiraReportsFragment";
 
     private WebView webView;
-    private Button btnInventoryReport;
-    private Button btnDiscrepanciesReport;
-    private Button btnAuditLogsReport;
-    private Button btnDateFrom;
-    private Button btnDateTo;
-    private Button btnExportExcel;
-    private TextView tvReportTitle;
+    private Spinner spReportType, spBranchFilter;
+    private Button btnDateFrom, btnDateTo, btnApplyFilter;
+    private Button btnPrintReport, btnShareReport, btnExportPDF, btnExportExcel;
+    private TextView tvReportTitle, tvDateRange;
 
     private String currentReportType = "inventory_detail";
     private String dateFrom = "";
@@ -72,29 +71,36 @@ public class MiraReportsFragment extends Fragment {
 
         initViews(view);
         setupWebView();
+        setupSpinners();
         setupListeners();
 
-        // تعيين التاريخ الافتراضي (آخر 30 يوماً)
         setDefaultDates();
-
-        // تحميل التقرير الافتراضي
         loadReport(currentReportType);
 
         return view;
     }
 
     private void initViews(View view) {
-        webView = view.findViewById(R.id.web_view_report);
-        btnInventoryReport = view.findViewById(R.id.btn_report_inventory);
-        btnDiscrepanciesReport = view.findViewById(R.id.btn_report_discrepancies);
-        btnAuditLogsReport = view.findViewById(R.id.btn_report_audit);
-        btnDateFrom = view.findViewById(R.id.btn_date_from);
-        btnDateTo = view.findViewById(R.id.btn_date_to);
-        btnExportExcel = view.findViewById(R.id.btn_export_excel);
-        tvReportTitle = view.findViewById(R.id.tv_report_title);
+        // الربط بالـ IDs الصحيحة المطابقة لـ XML
+        webView = view.findViewById(R.id.webReport);
+        spReportType = view.findViewById(R.id.spReportType);
+        spBranchFilter = view.findViewById(R.id.spBranchFilter);
+        
+        btnDateFrom = view.findViewById(R.id.btnDateFrom);
+        btnDateTo = view.findViewById(R.id.btnDateTo);
+        btnApplyFilter = view.findViewById(R.id.btnApplyFilter);
+
+        btnPrintReport = view.findViewById(R.id.btnPrintReport);
+        btnShareReport = view.findViewById(R.id.btnShareReport);
+        btnExportPDF = view.findViewById(R.id.btnExportPDF);
+        btnExportExcel = view.findViewById(R.id.btnExportExcel);
+
+        tvReportTitle = view.findViewById(R.id.tvReportTitle);
+        tvDateRange = view.findViewById(R.id.tvDateRange);
     }
 
     private void setupWebView() {
+        if (webView == null) return;
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -103,37 +109,50 @@ public class MiraReportsFragment extends Fragment {
         settings.setDisplayZoomControls(false);
 
         webView.addJavascriptInterface(new WebAppInterface(), "AndroidInterface");
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
-            }
-        });
+        webView.setWebViewClient(new WebViewClient());
+    }
+
+    private void setupSpinners() {
+        if (spReportType != null) {
+            String[] reports = isArabic ?
+                    new String[]{"تقرير تفاصيل المخزون", "تقرير الفروقات والتجاوزات", "تقرير سجل التدقيق"} :
+                    new String[]{"Inventory Detail", "Discrepancies Report", "Audit Logs"};
+
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, reports);
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spReportType.setAdapter(adapter);
+
+            spReportType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    switch (position) {
+                        case 0:
+                            currentReportType = "inventory_detail";
+                            break;
+                        case 1:
+                            currentReportType = "discrepancies";
+                            break;
+                        case 2:
+                            currentReportType = "audit_logs";
+                            break;
+                    }
+                }
+
+                @Override public void onNothingSelected(AdapterView<?> parent) {}
+            });
+        }
     }
 
     private void setupListeners() {
-        btnInventoryReport.setOnClickListener(v -> {
-            currentReportType = "inventory_detail";
-            updateTitle(isArabic ? "تقرير تفاصيل المخزون" : "Inventory Detail Report");
-            loadReport(currentReportType);
-        });
+        if (btnDateFrom != null) btnDateFrom.setOnClickListener(v -> showDatePicker(true));
+        if (btnDateTo != null) btnDateTo.setOnClickListener(v -> showDatePicker(false));
+        
+        if (btnApplyFilter != null) {
+            btnApplyFilter.setOnClickListener(v -> loadReport(currentReportType));
+        }
 
-        btnDiscrepanciesReport.setOnClickListener(v -> {
-            currentReportType = "discrepancies";
-            updateTitle(isArabic ? "تقرير الفروقات والتجاوزات" : "Discrepancies Report");
-            loadReport(currentReportType);
-        });
-
-        btnAuditLogsReport.setOnClickListener(v -> {
-            currentReportType = "audit_logs";
-            updateTitle(isArabic ? "تقرير سجل التدقيق" : "Audit Logs Report");
-            loadReport(currentReportType);
-        });
-
-        btnDateFrom.setOnClickListener(v -> showDatePicker(true));
-        btnDateTo.setOnClickListener(v -> showDatePicker(false));
-
-        btnExportExcel.setOnClickListener(v -> exportExcel());
+        if (btnExportExcel != null) btnExportExcel.setOnClickListener(v -> exportExcel());
+        if (btnShareReport != null) btnShareReport.setOnClickListener(v -> exportExcel());
     }
 
     private void setDefaultDates() {
@@ -144,8 +163,9 @@ public class MiraReportsFragment extends Fragment {
         cal.add(Calendar.DAY_OF_MONTH, -30);
         dateFrom = sdf.format(cal.getTime());
 
-        btnDateFrom.setText(dateFrom);
-        btnDateTo.setText(dateTo);
+        if (btnDateFrom != null) btnDateFrom.setText(dateFrom);
+        if (btnDateTo != null) btnDateTo.setText(dateTo);
+        if (tvDateRange != null) tvDateRange.setText(dateFrom + " - " + dateTo);
     }
 
     private void showDatePicker(boolean isFrom) {
@@ -156,24 +176,18 @@ public class MiraReportsFragment extends Fragment {
                     String selected = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
                     if (isFrom) {
                         dateFrom = selected;
-                        btnDateFrom.setText(dateFrom);
+                        if (btnDateFrom != null) btnDateFrom.setText(dateFrom);
                     } else {
                         dateTo = selected;
-                        btnDateTo.setText(dateTo);
+                        if (btnDateTo != null) btnDateTo.setText(dateTo);
                     }
-                    loadReport(currentReportType);
+                    if (tvDateRange != null) tvDateRange.setText(dateFrom + " - " + dateTo);
                 },
                 cal.get(Calendar.YEAR),
                 cal.get(Calendar.MONTH),
                 cal.get(Calendar.DAY_OF_MONTH)
         );
         dialog.show();
-    }
-
-    private void updateTitle(String title) {
-        if (tvReportTitle != null) {
-            tvReportTitle.setText(title);
-        }
     }
 
     private void loadReport(String type) {
@@ -207,6 +221,7 @@ public class MiraReportsFragment extends Fragment {
     }
 
     private void showLoadingHtml() {
+        if (webView == null) return;
         String dir = isArabic ? "rtl" : "ltr";
         String loadingText = isArabic ? "جاري تحميل التقرير..." : "Loading report...";
         String html = "<html><body dir='" + dir + "' style='font-family:sans-serif; text-align:center; padding-top:50px;'>" +
@@ -215,6 +230,7 @@ public class MiraReportsFragment extends Fragment {
     }
 
     private void showErrorHtml(String message) {
+        if (webView == null) return;
         String dir = isArabic ? "rtl" : "ltr";
         String html = "<html><body dir='" + dir + "' style='font-family:sans-serif; text-align:center; padding-top:50px; color:red;'>" +
                 "<h3>" + message + "</h3></body></html>";
@@ -222,6 +238,7 @@ public class MiraReportsFragment extends Fragment {
     }
 
     private void renderReportHtml(String type, JSONObject data) {
+        if (webView == null) return;
         StringBuilder html = new StringBuilder();
         String dir = isArabic ? "rtl" : "ltr";
 
@@ -271,7 +288,6 @@ public class MiraReportsFragment extends Fragment {
         double k21 = w != null ? w.optDouble("k21", 0.0) : 0.0;
         double k18 = w != null ? w.optDouble("k18", 0.0) : 0.0;
 
-        // التأكد من وجود أوزان حقيقية لمنع تجمد Chart.js بقيم صفريّة
         boolean hasData = (k24 + k22 + k21 + k18) > 0;
 
         StringBuilder script = new StringBuilder();
@@ -381,32 +397,6 @@ public class MiraReportsFragment extends Fragment {
                 csv.append("22K,").append(w != null ? w.optDouble("k22", 0.0) : 0.0).append("\n");
                 csv.append("21K,").append(w != null ? w.optDouble("k21", 0.0) : 0.0).append("\n");
                 csv.append("18K,").append(w != null ? w.optDouble("k18", 0.0) : 0.0).append("\n");
-            } else if ("discrepancies".equals(currentReportType)) {
-                JSONArray disc = lastReportData.optJSONArray("discrepancies");
-                csv.append("EPC,Status,Location\n");
-                if (disc != null) {
-                    for (int i = 0; i < disc.length(); i++) {
-                        JSONObject item = disc.optJSONObject(i);
-                        if (item != null) {
-                            csv.append(item.optString("epc", "")).append(",")
-                               .append(item.optString("status", "")).append(",")
-                               .append(item.optString("location", "")).append("\n");
-                        }
-                    }
-                }
-            } else if ("audit_logs".equals(currentReportType)) {
-                JSONArray logs = lastReportData.optJSONArray("logs");
-                csv.append("Timestamp,User,Action\n");
-                if (logs != null) {
-                    for (int i = 0; i < logs.length(); i++) {
-                        JSONObject item = logs.optJSONObject(i);
-                        if (item != null) {
-                            csv.append(item.optString("timestamp", "")).append(",")
-                               .append(item.optString("user", "")).append(",")
-                               .append(item.optString("action", "")).append("\n");
-                        }
-                    }
-                }
             }
 
             File exportDir = new File(requireContext().getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "MiraReports");
