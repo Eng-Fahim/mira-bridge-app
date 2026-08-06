@@ -1,4 +1,4 @@
-name: Build MIRA Bridge APK
+name: Build MIRA Jewel APK
 
 on:
   push:
@@ -39,5 +39,5 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         tag_name: build-${{ github.run_number }}
-        name: MIRA Bridge Build #${{ github.run_number }}
+        name: MIRA Jewel Build #${{ github.run_number }}
         files: app/build/outputs/apk/debug/*.apk
