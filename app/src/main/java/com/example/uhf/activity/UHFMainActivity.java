@@ -30,6 +30,7 @@ import com.example.uhf.fragment.BlockPermalockFragment;
 import com.example.uhf.fragment.BlockWriteFragment;
 import com.example.uhf.fragment.JewelryDashboardFragment;
 import com.example.uhf.fragment.MarginReadFragment;
+import com.example.uhf.fragment.MiraAccountingFragment; // تم التأكيد على هذا
 import com.example.uhf.fragment.MiraBranchPickerFragment;
 import com.example.uhf.fragment.MiraDashboardFragment;
 import com.example.uhf.fragment.MiraIdentityStudioFragment;
@@ -39,6 +40,7 @@ import com.example.uhf.fragment.MiraReceiptFragment;
 import com.example.uhf.fragment.MiraSalesHistoryFragment;
 import com.example.uhf.fragment.MiraSecureGateFragment;
 import com.example.uhf.fragment.MiraTransferFragment;
+import com.example.uhf.fragment.MiraReportsFragment;
 import com.example.uhf.fragment.ProtectedModeAndShortRangeModeFragment;
 import com.example.uhf.fragment.UHFKillFragment;
 import com.example.uhf.fragment.UHFLocationFragment;
@@ -59,9 +61,6 @@ import com.example.uhf.tools.UIHelper;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 import com.rscja.deviceapi.interfaces.ConnectionStatus;
 
-//التقارير
-import com.example.uhf.fragment.MiraReportsFragment;
-import com.example.uhf.model.MiraJournalEntry;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -243,15 +242,14 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 MiraReportsFragment.class, null
             );
         }
-// داخل initViewPageData() في UHFMainActivity.java
 
-// 📊 الإدارة المحاسبية والقيود - للمدراء والمحاسبين
-if (isManager || role == SessionManager.Role.AUDITOR) {
-    mTabHost.addTab(
-        mTabHost.newTabSpec("Accounting").setIndicator(isArabic ? "💰 المحاسبة" : "💰 Accounting"),
-        MiraAccountingFragment.class, null
-    );
-}
+        // 💰 الإدارة المحاسبية والقيود - للمدراء والمحاسبين
+        if (isManager || role == SessionManager.Role.AUDITOR) {
+            mTabHost.addTab(
+                mTabHost.newTabSpec("Accounting").setIndicator(isArabic ? "💰 المحاسبة" : "💰 Accounting"),
+                MiraAccountingFragment.class, null
+            );
+        }
 
         // 📦 التحويلات
         if (isManager || isInventoryMgr) {
@@ -280,7 +278,6 @@ if (isManager || role == SessionManager.Role.AUDITOR) {
     }
 
     private void showBranchPicker() {
-        // ✅ فقط SYSTEM_ADMIN و ORG_ADMIN يمكنهم تغيير الفرع
         if (branchesManager.isBranchLocked() && !sessionManager.isAnyAdmin()) {
             Toast.makeText(this, "الفرع محدد من قبل النظام ولا يمكن تغييره", Toast.LENGTH_LONG).show();
             return;
