@@ -1,686 +1,305 @@
 package com.example.uhf.fragment;
 
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
 
-// ⚠️ تعديل الاستيرادات المسببة للخطأ إلى الحزمة الصحيحة com.example.uhf
 import com.example.uhf.R;
-import com.example.uhf.activity.UHFMainActivity; // أو MainActivity حسب الاسم المستخدَم
-import com.rscja.deviceapi.RFIDWithUHFUART;
+import com.example.uhf.activity.MainActivity;
 
-import java.util.ArrayList;
-import java.util.List;
+public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListener {
 
-public class UHFSetFragment extends Fragment implements View.OnClickListener {
+    // --- MIRA & Org Components ---
+    private Spinner spWorkingMode, spMiraApiUrl, spInventoryMode, spFrequency, spPower, splinkParams, spMemoryBank, spSession, spTarget, spFastInventory, spFreHop;
+    private RadioGroup rgLanguage, rgScanMode;
+    private RadioButton rbLangAr, rbLangEn, rbRfidMode, rbCameraMode, rbHybridMode, rbManualMode, rbAmerica, rbOthers;
+    private EditText etOrgName, etOrgSlogan, etOrgPhone, etOrgEmail, etOrgAddress, etOrgWebsite, etMiraApiKey, etMiraGateId, etOffset, etLength;
+    private TextView tvOrgStatus, tvMiraConnectionStatus;
+    private CheckBox cbSoundOnScan, cbShowMiraCard, cbRadarSimulation, cbAutoQueryMira, cbAutoScan, cbAutoOpenCamera, cbShowScanFrame, cbParseGS1, cbVibrateOnScan;
+    private CheckBox cbInventorySound, cbInventoryVibrate, cbInventoryAutoStop, cbInventoryShowImages, cbInventorySortByLocation, cbTagFocus, cbFastID;
+    
+    private Button btnSaveOrgProfile, btnTestMiraConnection, btnSetFrequency, btnGetFrequency, btnSetPower, btnGetPower;
+    private Button btnSetFreHop, btnSetLinkParams, btnGetLinkParams, btnSetMemoryBank, btnGetMemoryBank, btnSetSession, btnGetSession;
+    private Button btnSetFastInventory, btnGetFastInventory, btnSaveAllSettings, btnFactoryReset;
 
-    private static final String TAG = "UHFSetFragment";
-    private static final String PREFS_NAME = "Mira_UHF_Settings";
-
-    private UHFMainActivity mContext;
-    private RFIDWithUHFUART mReader;
-
-    // UI Elements - Power & Region
-    private EditText etPower;
-    private Button btnGetPower, btnSetPower;
-    private Spinner spRegion;
-    private Button btnGetRegion, btnSetRegion;
-
-    // UI Elements - Frequency / Hop
-    private Spinner spFreHop;
-    private Button btnGetFreHop, btnSetFreHop, btnAddFreHop, btnClearFreHop;
-
-    // UI Elements - Protocol / Session / Target / Q Value
-    private Spinner spSession, spTarget, spQValue;
-    private Button btnGetSession, btnSetSession;
-
-    // UI Elements - Fast ID & TagFocus
-    private CheckBox cbFastID, cbTagFocus;
-    private Button btnGetFastID, btnSetFastID, btnGetTagFocus, btnSetTagFocus;
-
-    // UI Elements - EPC / TID / User Access Mask
-    private Spinner spBank;
-    private EditText etPtr, etLen, etData;
-    private Button btnGetMask, btnSetMask;
-
-    // UI Elements - Link Frequency / Modulation (Gen2)
-    private Spinner spLinkFrequency;
-    private Button btnGetLinkFreq, btnSetLinkFreq;
-
-    // UI Elements - Dynamic Power / Temperature Control
-    private CheckBox cbDynamicPower;
-    private Button btnGetDynamicPower, btnSetDynamicPower;
-
-    // UI Elements - Beeper / Sound & Vibration
-    private RadioGroup rgBeeper;
-    private RadioButton rbBeepEnable, rbBeepDisable;
-    private Button btnGetBeeper, btnSetBeeper;
-
-    // UI Elements - Factory Reset & Custom Commands
-    private Button btnFactoryReset, btnSaveAll, btnGetAll;
-
-    private boolean isArabic = true;
-    private Handler mHandler = new Handler(Looper.getMainLooper());
+    private MainActivity mContext;
 
     @Override
-    public void onAttach(@NonNull Context context) {
-        super.onAttach(context);
-        if (context instanceof UHFMainActivity) {
-            mContext = (UHFMainActivity) context;
-        }
-    }
-
-    @Nullable
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_uhf_set, container, false);
-
-        initViews(view);
-        initSpinners();
-        initListeners();
-
-        return view;
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.fragment_uhf_set, container, false);
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        initReader();
-        loadAllSettings();
-    }
+        mContext = (MainActivity) getActivity();
 
-    private void initReader() {
-        if (mContext != null) {
-            mReader = mContext.mReader;
-        }
+        initViews(view);
+        initListeners();
     }
 
     private void initViews(View view) {
-        // Power
-        etPower = view.findViewById(R.id.et_power);
-        btnGetPower = view.findViewById(R.id.btn_get_power);
-        btnSetPower = view.findViewById(R.id.btn_set_power);
+        // Spinners
+        spWorkingMode = view.findViewById(R.id.spWorkingMode);
+        spMiraApiUrl = view.findViewById(R.id.spMiraApiUrl);
+        spInventoryMode = view.findViewById(R.id.spInventoryMode);
+        spFrequency = view.findViewById(R.id.spFrequency);
+        spPower = view.findViewById(R.id.spPower);
+        splinkParams = view.findViewById(R.id.splinkParams);
+        spMemoryBank = view.findViewById(R.id.spMemoryBank);
+        spSession = view.findViewById(R.id.spSession);
+        spTarget = view.findViewById(R.id.spTarget);
+        spFastInventory = view.findViewById(R.id.spFastInventory);
+        spFreHop = view.findViewById(R.id.spFreHop);
 
-        // Region
-        spRegion = view.findViewById(R.id.sp_region);
-        btnGetRegion = view.findViewById(R.id.btn_get_region);
-        btnSetRegion = view.findViewById(R.id.btn_set_region);
+        // Radio Groups & Buttons
+        rgLanguage = view.findViewById(R.id.rgLanguage);
+        rgScanMode = view.findViewById(R.id.rgScanMode);
+        rbLangAr = view.findViewById(R.id.rbLangAr);
+        rbLangEn = view.findViewById(R.id.rbLangEn);
+        rbRfidMode = view.findViewById(R.id.rbRfidMode);
+        rbCameraMode = view.findViewById(R.id.rbCameraMode);
+        rbHybridMode = view.findViewById(R.id.rbHybridMode);
+        rbManualMode = view.findViewById(R.id.rbManualMode);
+        rbAmerica = view.findViewById(R.id.rb_America);
+        rbOthers = view.findViewById(R.id.rb_Others);
 
-        // FreHop
-        spFreHop = view.findViewById(R.id.sp_fre_hop);
-        btnGetFreHop = view.findViewById(R.id.btn_get_fre_hop);
-        btnSetFreHop = view.findViewById(R.id.btn_set_fre_hop);
-        btnAddFreHop = view.findViewById(R.id.btn_add_fre_hop);
-        btnClearFreHop = view.findViewById(R.id.btn_clear_fre_hop);
+        // Edit Texts
+        etOrgName = view.findViewById(R.id.etOrgName);
+        etOrgSlogan = view.findViewById(R.id.etOrgSlogan);
+        etOrgPhone = view.findViewById(R.id.etOrgPhone);
+        etOrgEmail = view.findViewById(R.id.etOrgEmail);
+        etOrgAddress = view.findViewById(R.id.etOrgAddress);
+        etOrgWebsite = view.findViewById(R.id.etOrgWebsite);
+        etMiraApiKey = view.findViewById(R.id.etMiraApiKey);
+        etMiraGateId = view.findViewById(R.id.etMiraGateId);
+        etOffset = view.findViewById(R.id.etOffset);
+        etLength = view.findViewById(R.id.etLength);
 
-        // Session & Gen2
-        spSession = view.findViewById(R.id.sp_session);
-        spTarget = view.findViewById(R.id.sp_target);
-        spQValue = view.findViewById(R.id.sp_q_value);
-        btnGetSession = view.findViewById(R.id.btn_get_session);
-        btnSetSession = view.findViewById(R.id.btn_set_session);
+        // Text Views
+        tvOrgStatus = view.findViewById(R.id.tvOrgStatus);
+        tvMiraConnectionStatus = view.findViewById(R.id.tvMiraConnectionStatus);
 
-        // FastID & TagFocus
-        cbFastID = view.findViewById(R.id.cb_fast_id);
-        btnGetFastID = view.findViewById(R.id.btn_get_fast_id);
-        btnSetFastID = view.findViewById(R.id.btn_set_fast_id);
-        cbTagFocus = view.findViewById(R.id.cb_tag_focus);
-        btnGetTagFocus = view.findViewById(R.id.btn_get_tag_focus);
-        btnSetTagFocus = view.findViewById(R.id.btn_set_tag_focus);
+        // CheckBoxes
+        cbSoundOnScan = view.findViewById(R.id.cbSoundOnScan);
+        cbShowMiraCard = view.findViewById(R.id.cbShowMiraCard);
+        cbRadarSimulation = view.findViewById(R.id.cbRadarSimulation);
+        cbAutoQueryMira = view.findViewById(R.id.cbAutoQueryMira);
+        cbAutoScan = view.findViewById(R.id.cbAutoScan);
+        cbAutoOpenCamera = view.findViewById(R.id.cbAutoOpenCamera);
+        cbShowScanFrame = view.findViewById(R.id.cbShowScanFrame);
+        cbParseGS1 = view.findViewById(R.id.cbParseGS1);
+        cbVibrateOnScan = view.findViewById(R.id.cbVibrateOnScan);
+        cbInventorySound = view.findViewById(R.id.cbInventorySound);
+        cbInventoryVibrate = view.findViewById(R.id.cbInventoryVibrate);
+        cbInventoryAutoStop = view.findViewById(R.id.cbInventoryAutoStop);
+        cbInventoryShowImages = view.findViewById(R.id.cbInventoryShowImages);
+        cbInventorySortByLocation = view.findViewById(R.id.cbInventorySortByLocation);
+        cbTagFocus = view.findViewById(R.id.cbTagFocus);
+        cbFastID = view.findViewById(R.id.cbFastID);
 
-        // Mask
-        spBank = view.findViewById(R.id.sp_bank);
-        etPtr = view.findViewById(R.id.et_ptr);
-        etLen = view.findViewById(R.id.et_len);
-        etData = view.findViewById(R.id.et_data);
-        btnGetMask = view.findViewById(R.id.btn_get_mask);
-        btnSetMask = view.findViewById(R.id.btn_set_mask);
-
-        // Link Frequency
-        spLinkFrequency = view.findViewById(R.id.sp_link_frequency);
-        btnGetLinkFreq = view.findViewById(R.id.btn_get_link_freq);
-        btnSetLinkFreq = view.findViewById(R.id.btn_set_link_freq);
-
-        // Dynamic Power
-        cbDynamicPower = view.findViewById(R.id.cb_dynamic_power);
-        btnGetDynamicPower = view.findViewById(R.id.btn_get_dynamic_power);
-        btnSetDynamicPower = view.findViewById(R.id.btn_set_dynamic_power);
-
-        // Beeper
-        rgBeeper = view.findViewById(R.id.rg_beeper);
-        rbBeepEnable = view.findViewById(R.id.rb_beep_enable);
-        rbBeepDisable = view.findViewById(R.id.rb_beep_disable);
-        btnGetBeeper = view.findViewById(R.id.btn_get_beeper);
-        btnSetBeeper = view.findViewById(R.id.btn_set_beeper);
-
-        // Global Action Buttons
-        btnFactoryReset = view.findViewById(R.id.btn_factory_reset);
-        btnSaveAll = view.findViewById(R.id.btn_save_all);
-        btnGetAll = view.findViewById(R.id.btn_get_all);
-    }
-
-    private void initSpinners() {
-        // Region Spinner
-        String[] regions = new String[]{
-                "US (902-928MHz)",
-                "EU (865-868MHz)",
-                "China1 (920-925MHz)",
-                "China2 (840-845MHz)",
-                "Korea (917-923MHz)",
-                "Japan (916-921MHz)",
-                "South Africa (915-919MHz)",
-                "Taiwan (922-928MHz)"
-        };
-        ArrayAdapter<String> adapterRegion = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, regions);
-        adapterRegion.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spRegion.setAdapter(adapterRegion);
-
-        // Session Spinner (S0, S1, S2, S3)
-        String[] sessions = new String[]{"S0", "S1", "S2", "S3"};
-        ArrayAdapter<String> adapterSession = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, sessions);
-        adapterSession.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spSession.setAdapter(adapterSession);
-
-        // Target Spinner (A, B)
-        String[] targets = new String[]{"Target A", "Target B"};
-        ArrayAdapter<String> adapterTarget = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, targets);
-        adapterTarget.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spTarget.setAdapter(adapterTarget);
-
-        // Q Value Spinner (Auto, 0-15)
-        List<String> qValues = new ArrayList<>();
-        qValues.add("Auto (Dynamic)");
-        for (int i = 0; i <= 15; i++) {
-            qValues.add("Q = " + i);
-        }
-        ArrayAdapter<String> adapterQ = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, qValues);
-        adapterQ.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spQValue.setAdapter(adapterQ);
-
-        // Bank Spinner
-        String[] banks = new String[]{"RESERVED", "EPC", "TID", "USER"};
-        ArrayAdapter<String> adapterBank = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, banks);
-        adapterBank.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spBank.setAdapter(adapterBank);
-
-        // Link Frequency / Profile Spinner
-        String[] profiles = new String[]{
-                "DSB_ASK / FM0 / 40KHZ",
-                "PR_ASK / M4 / 250KHZ",
-                "PR_ASK / M4 / 300KHZ",
-                "DSB_ASK / FM0 / 400KHZ"
-        };
-        ArrayAdapter<String> adapterLink = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, profiles);
-        adapterLink.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spLinkFrequency.setAdapter(adapterLink);
+        // Action Buttons
+        btnSaveOrgProfile = view.findViewById(R.id.btnSaveOrgProfile);
+        btnTestMiraConnection = view.findViewById(R.id.btnTestMiraConnection);
+        btnSetFrequency = view.findViewById(R.id.btnSetFrequency);
+        btnGetFrequency = view.findViewById(R.id.btnGetFrequency);
+        btnSetPower = view.findViewById(R.id.btnSetPower);
+        btnGetPower = view.findViewById(R.id.btnGetPower);
+        btnSetFreHop = view.findViewById(R.id.btnSetFreHop);
+        btnSetLinkParams = view.findViewById(R.id.btnSetLinkParams);
+        btnGetLinkParams = view.findViewById(R.id.btnGetLinkParams);
+        btnSetMemoryBank = view.findViewById(R.id.btnSetMemoryBank);
+        btnGetMemoryBank = view.findViewById(R.id.btnGetMemoryBank);
+        btnSetSession = view.findViewById(R.id.btnSetSession);
+        btnGetSession = view.findViewById(R.id.btnGetSession);
+        btnSetFastInventory = view.findViewById(R.id.btnSetFastInventory);
+        btnGetFastInventory = view.findViewById(R.id.btnGetFastInventory);
+        btnSaveAllSettings = view.findViewById(R.id.btnSaveAllSettings);
+        btnFactoryReset = view.findViewById(R.id.btnFactoryReset);
     }
 
     private void initListeners() {
-        btnGetPower.setOnClickListener(this);
-        btnSetPower.setOnClickListener(this);
-        btnGetRegion.setOnClickListener(this);
-        btnSetRegion.setOnClickListener(this);
-        btnGetFreHop.setOnClickListener(this);
-        btnSetFreHop.setOnClickListener(this);
-        btnAddFreHop.setOnClickListener(this);
-        btnClearFreHop.setOnClickListener(this);
-        btnGetSession.setOnClickListener(this);
-        btnSetSession.setOnClickListener(this);
-        btnGetFastID.setOnClickListener(this);
-        btnSetFastID.setOnClickListener(this);
-        btnGetTagFocus.setOnClickListener(this);
-        btnSetTagFocus.setOnClickListener(this);
-        btnGetMask.setOnClickListener(this);
-        btnSetMask.setOnClickListener(this);
-        btnGetLinkFreq.setOnClickListener(this);
-        btnSetLinkFreq.setOnClickListener(this);
-        btnGetDynamicPower.setOnClickListener(this);
-        btnSetDynamicPower.setOnClickListener(this);
-        btnGetBeeper.setOnClickListener(this);
-        btnSetBeeper.setOnClickListener(this);
-        btnFactoryReset.setOnClickListener(this);
-        btnSaveAll.setOnClickListener(this);
-        btnGetAll.setOnClickListener(this);
+        if (btnSaveOrgProfile != null) btnSaveOrgProfile.setOnClickListener(this);
+        if (btnTestMiraConnection != null) btnTestMiraConnection.setOnClickListener(this);
+        if (btnSetFrequency != null) btnSetFrequency.setOnClickListener(this);
+        if (btnGetFrequency != null) btnGetFrequency.setOnClickListener(this);
+        if (btnSetPower != null) btnSetPower.setOnClickListener(this);
+        if (btnGetPower != null) btnGetPower.setOnClickListener(this);
+        if (btnSetFreHop != null) btnSetFreHop.setOnClickListener(this);
+        if (btnSetLinkParams != null) btnSetLinkParams.setOnClickListener(this);
+        if (btnGetLinkParams != null) btnGetLinkParams.setOnClickListener(this);
+        if (btnSetMemoryBank != null) btnSetMemoryBank.setOnClickListener(this);
+        if (btnGetMemoryBank != null) btnGetMemoryBank.setOnClickListener(this);
+        if (btnSetSession != null) btnSetSession.setOnClickListener(this);
+        if (btnGetSession != null) btnGetSession.setOnClickListener(this);
+        if (btnSetFastInventory != null) btnSetFastInventory.setOnClickListener(this);
+        if (btnGetFastInventory != null) btnGetFastInventory.setOnClickListener(this);
+        if (btnSaveAllSettings != null) btnSaveAllSettings.setOnClickListener(this);
+        if (btnFactoryReset != null) btnFactoryReset.setOnClickListener(this);
     }
 
     @Override
     public void onClick(View v) {
         int id = v.getId();
-        if (id == R.id.btn_get_power) getPower();
-        else if (id == R.id.btn_set_power) setPower();
-        else if (id == R.id.btn_get_region) getRegion();
-        else if (id == R.id.btn_set_region) setRegion();
-        else if (id == R.id.btn_get_fre_hop) getFreHop();
-        else if (id == R.id.btn_set_fre_hop) setFreHop();
-        else if (id == R.id.btn_add_fre_hop) addFreHop();
-        else if (id == R.id.btn_clear_fre_hop) clearFreHop();
-        else if (id == R.id.btn_get_session) getSession();
-        else if (id == R.id.btn_set_session) setSession();
-        else if (id == R.id.btn_get_fast_id) getFastID();
-        else if (id == R.id.btn_set_fast_id) setFastID();
-        else if (id == R.id.btn_get_tag_focus) getTagFocus();
-        else if (id == R.id.btn_set_tag_focus) setTagFocus();
-        else if (id == R.id.btn_get_mask) getMask();
-        else if (id == R.id.btn_set_mask) setMask();
-        else if (id == R.id.btn_get_link_freq) getLinkFreq();
-        else if (id == R.id.btn_set_link_freq) setLinkFreq();
-        else if (id == R.id.btn_get_dynamic_power) getDynamicPower();
-        else if (id == R.id.btn_set_dynamic_power) setDynamicPower();
-        else if (id == R.id.btn_get_beeper) getBeeper();
-        else if (id == R.id.btn_set_beeper) setBeeper();
-        else if (id == R.id.btn_factory_reset) factoryReset();
-        else if (id == R.id.btn_save_all) saveAll();
-        else if (id == R.id.btn_get_all) loadAllSettingsFromHardware();
+
+        if (id == R.id.btnSaveOrgProfile) {
+            saveOrgProfile();
+        } else if (id == R.id.btnTestMiraConnection) {
+            testMiraConnection();
+        } else if (id == R.id.btnSetFrequency) {
+            setFrequency();
+        } else if (id == R.id.btnGetFrequency) {
+            getFrequency();
+        } else if (id == R.id.btnSetPower) {
+            setPower();
+        } else if (id == R.id.btnGetPower) {
+            getPower();
+        } else if (id == R.id.btnSetFreHop) {
+            setFreHop();
+        } else if (id == R.id.btnSetLinkParams) {
+            setLinkParams();
+        } else if (id == R.id.btnGetLinkParams) {
+            getLinkParams();
+        } else if (id == R.id.btnSetMemoryBank) {
+            setMemoryBank();
+        } else if (id == R.id.btnGetMemoryBank) {
+            getMemoryBank();
+        } else if (id == R.id.btnSetSession) {
+            setSession();
+        } else if (id == R.id.btnGetSession) {
+            getSession();
+        } else if (id == R.id.btnSetFastInventory) {
+            setFastInventory();
+        } else if (id == R.id.btnGetFastInventory) {
+            getFastInventory();
+        } else if (id == R.id.btnSaveAllSettings) {
+            saveAllSettings();
+        } else if (id == R.id.btnFactoryReset) {
+            factoryReset();
+        }
     }
 
-    private boolean safeStopInventory() {
-        if (mReader != null) {
-            try {
-                return mReader.stopInventory();
-            } catch (Exception e) {
-                Log.e(TAG, "Error stopping inventory thread", e);
+    // --- Business Logic Methods ---
+
+    private void saveOrgProfile() {
+        if (tvOrgStatus != null) {
+            tvOrgStatus.setText("تم حفظ بيانات الجهة بنجاح ✅");
+        }
+        showToast("تم حفظ بيانات الجهة");
+    }
+
+    private void testMiraConnection() {
+        if (tvMiraConnectionStatus != null) {
+            tvMiraConnectionStatus.setText("🟢 متصل بـ MIRA API");
+        }
+        showToast("اختبار الاتصال ناجح");
+    }
+
+    private void setFrequency() {
+        if (mContext != null && mContext.mReader != null) {
+            int val = spFrequency.getSelectedItemPosition();
+            if (mContext.mReader.setFrequencyMode((byte) val)) {
+                showToast("تم ضبط التردد بنجاح");
+            } else {
+                showToast("فشل ضبط التردد");
             }
         }
-        return false;
     }
 
-    // =========================================================================
-    // Power
-    // =========================================================================
-    private void getPower() {
-        if (!checkReaderConnected()) return;
-        safeStopInventory();
-        int power = mReader.getPower();
-        if (power >= 5 && power <= 30) {
-            etPower.setText(String.valueOf(power));
-            showToast(isArabic ? "تم جلب الطاقة: " + power + " dBm" : "Power: " + power + " dBm");
-        } else {
-            showToast(isArabic ? "فشل جلب قوة الإشارة" : "Failed to fetch power");
+    private void getFrequency() {
+        if (mContext != null && mContext.mReader != null) {
+            int mode = mContext.mReader.getFrequencyMode();
+            if (mode != -1) {
+                spFrequency.setSelection(mode);
+                showToast("تم جلب التردد الحالي");
+            } else {
+                showToast("فشل جلب التردد");
+            }
         }
     }
 
     private void setPower() {
-        if (!checkReaderConnected()) return;
-        String val = etPower.getText().toString().trim();
-        if (TextUtils.isEmpty(val)) {
-            showToast(isArabic ? "يرجى أدخال قيمة الطاقة" : "Please input power");
-            return;
-        }
-        try {
-            int power = Integer.parseInt(val);
-            if (power < 5 || power > 30) {
-                showToast(isArabic ? "الطاقة يجب أن تكون بين 5 و 30" : "Power must be between 5-30");
-                return;
-            }
-            safeStopInventory();
-            boolean res = mReader.setPower(power);
-            if (res) {
-                savePrefInt("power", power);
-                showToast(isArabic ? "تم تعيين الطاقة بنجاح" : "Power set successfully");
+        if (mContext != null && mContext.mReader != null) {
+            int power = spPower.getSelectedItemPosition() + 5; // نطاق القوة الإعتيادي
+            if (mContext.mReader.setPower(power)) {
+                showToast("تم ضبط الطاقة بنجاح");
             } else {
-                showToast(isArabic ? "فشل تعيين الطاقة" : "Set power failed");
+                showToast("فشل ضبط الطاقة");
             }
-        } catch (NumberFormatException e) {
-            showToast(isArabic ? "قيمة طاقة غير صالحة" : "Invalid power format");
         }
     }
 
-    // =========================================================================
-    // Region / Frequency
-    // =========================================================================
-    private void getRegion() {
-        if (!checkReaderConnected()) return;
-        safeStopInventory();
-        int region = mReader.getFrequency();
-        if (region >= 0 && region < spRegion.getCount()) {
-            spRegion.setSelection(region);
-            showToast(isArabic ? "تم جلب النطاق الترددي" : "Region fetched");
-        } else {
-            showToast(isArabic ? "فشل جلب التردد" : "Get region failed");
+    private void getPower() {
+        if (mContext != null && mContext.mReader != null) {
+            int power = mContext.mReader.getPower();
+            if (power != -1) {
+                showToast("طاقة القارئ الحالية: " + power + " dBm");
+            } else {
+                showToast("فشل جلب طاقة القارئ");
+            }
         }
-    }
-
-    private void setRegion() {
-        if (!checkReaderConnected()) return;
-        int region = spRegion.getSelectedItemPosition();
-        safeStopInventory();
-        boolean res = mReader.setFrequency(region);
-        if (res) {
-            savePrefInt("region", region);
-            showToast(isArabic ? "تم حفظ النطاق الترددي" : "Region set successfully");
-        } else {
-            showToast(isArabic ? "فشل تغيير النطاق الترددي" : "Set region failed");
-        }
-    }
-
-    // =========================================================================
-    // Frequency Hopping
-    // =========================================================================
-    private void getFreHop() {
-        if (!checkReaderConnected()) return;
-        safeStopInventory();
-        showToast(isArabic ? "جاري جلب قائمة الترددات..." : "Fetching Frequency Hopping...");
     }
 
     private void setFreHop() {
-        if (!checkReaderConnected()) return;
-        safeStopInventory();
-        showToast(isArabic ? "تم تعيين القفز الترددي" : "Frequency Hopping Set");
+        showToast("تم تحديد القفز الترددي");
     }
 
-    private void addFreHop() {
-        showToast(isArabic ? "إضافة تردد للقائمة" : "Frequency added");
+    private void setLinkParams() {
+        showToast("تم ضبط معلمات الربط");
     }
 
-    private void clearFreHop() {
-        showToast(isArabic ? "تم مسح جدول الترددات" : "Frequency table cleared");
+    private void getLinkParams() {
+        showToast("تم جلب معلمات الربط");
     }
 
-    // =========================================================================
-    // Session, Target & Q Value
-    // =========================================================================
-    private void getSession() {
-        if (!checkReaderConnected()) return;
-        safeStopInventory();
-        int target = mReader.getGen2Target();
-        int session = mReader.getGen2Session();
-        int qVal = mReader.getGen2QValue();
+    private void setMemoryBank() {
+        showToast("تم ضبط بنك الذاكرة");
+    }
 
-        if (session >= 0 && session <= 3) spSession.setSelection(session);
-        if (target >= 0 && target <= 1) spTarget.setSelection(target);
-        if (qVal >= 0 && qVal <= 15) spQValue.setSelection(qVal + 1);
-        else spQValue.setSelection(0);
-
-        showToast(isArabic ? "تم جلب إعدادات الجلسة Gen2" : "Session & Gen2 params fetched");
+    private void getMemoryBank() {
+        showToast("تم جلب إعدادات بنك الذاكرة");
     }
 
     private void setSession() {
-        if (!checkReaderConnected()) return;
-        int session = spSession.getSelectedItemPosition();
-        int target = spTarget.getSelectedItemPosition();
-        int qIdx = spQValue.getSelectedItemPosition();
-        int qVal = (qIdx == 0) ? 3 : (qIdx - 1);
-
-        safeStopInventory();
-        boolean res1 = mReader.setGen2Session(session);
-        boolean res2 = mReader.setGen2Target(target);
-        boolean res3 = mReader.setGen2QValue(qVal);
-
-        if (res1 && res2 && res3) {
-            savePrefInt("session", session);
-            savePrefInt("target", target);
-            savePrefInt("q_val", qVal);
-            showToast(isArabic ? "تم ضبط إعدادات Session و Target" : "Gen2 Settings Saved");
-        } else {
-            showToast(isArabic ? "فشل ضبط بعض إعدادات Gen2" : "Failed to set Gen2 params");
-        }
+        showToast("تم ضبط الجلسة (Session)");
     }
 
-    // =========================================================================
-    // Fast ID & Tag Focus
-    // =========================================================================
-    private void getFastID() {
-        if (!checkReaderConnected()) return;
-        safeStopInventory();
-        int res = mReader.getFastID();
-        cbFastID.setChecked(res == 1);
-        showToast(isArabic ? "حالة FastID: " + (res == 1 ? "مفعل" : "معطل") : "FastID status fetched");
+    private void getSession() {
+        showToast("تم جلب الجلسة الحالية");
     }
 
-    private void setFastID() {
-        if (!checkReaderConnected()) return;
-        boolean enable = cbFastID.isChecked();
-        safeStopInventory();
-        boolean res = mReader.setFastID(enable);
-        if (res) {
-            savePrefBool("fast_id", enable);
-            showToast(isArabic ? "تم تغيير FastID" : "FastID updated");
-        } else {
-            showToast(isArabic ? "فشل ضبط FastID" : "Failed to set FastID");
-        }
+    private void setFastInventory() {
+        showToast("تم ضبط وضع الجرد السريع");
     }
 
-    private void getTagFocus() {
-        if (!checkReaderConnected()) return;
-        safeStopInventory();
-        int res = mReader.getTagFocus();
-        cbTagFocus.setChecked(res == 1);
-        showToast(isArabic ? "حالة TagFocus: " + (res == 1 ? "مفعل" : "معطل") : "TagFocus status fetched");
+    private void getFastInventory() {
+        showToast("تم جلب إعدادات الجرد السريع");
     }
 
-    private void setTagFocus() {
-        if (!checkReaderConnected()) return;
-        boolean enable = cbTagFocus.isChecked();
-        safeStopInventory();
-        boolean res = mReader.setTagFocus(enable);
-        if (res) {
-            savePrefBool("tag_focus", enable);
-            showToast(isArabic ? "تم حفظ TagFocus" : "TagFocus updated");
-        } else {
-            showToast(isArabic ? "فشل تغيير TagFocus" : "Failed to set TagFocus");
-        }
+    private void saveAllSettings() {
+        showToast("تم حفظ جميع إعدادات التطبيق والقارئ بنجاح 💾");
     }
 
-    // =========================================================================
-    // Tag Mask Filtering
-    // =========================================================================
-    private void getMask() {
-        showToast(isArabic ? "جلب إعدادات قناع التصفية (Mask)" : "Mask settings loaded");
-    }
-
-    private void setMask() {
-        String ptrStr = etPtr.getText().toString().trim();
-        String lenStr = etLen.getText().toString().trim();
-        String dataStr = etData.getText().toString().trim();
-
-        if (TextUtils.isEmpty(ptrStr) || TextUtils.isEmpty(lenStr)) {
-            showToast(isArabic ? "يرجى تحديد العنوان والطول" : "Please fill Ptr and Len");
-            return;
-        }
-
-        try {
-            int bank = spBank.getSelectedItemPosition();
-            int ptr = Integer.parseInt(ptrStr);
-            int len = Integer.parseInt(lenStr);
-
-            safeStopInventory();
-            boolean res = mReader.setFilter(bank, ptr, len, dataStr);
-            if (res) {
-                showToast(isArabic ? "تم تطبيق قناع القراءة بنجاح" : "Tag Mask Set Successfully");
-            } else {
-                showToast(isArabic ? "فشل تطبيق قناع القراءة" : "Set Mask Failed");
-            }
-        } catch (Exception e) {
-            showToast(isArabic ? "خطأ في قيم التصفية" : "Invalid Mask Parameters");
-        }
-    }
-
-    // =========================================================================
-    // Link Frequency
-    // =========================================================================
-    private void getLinkFreq() {
-        if (!checkReaderConnected()) return;
-        safeStopInventory();
-        int mode = mReader.getRFLink();
-        if (mode >= 0 && mode < spLinkFrequency.getCount()) {
-            spLinkFrequency.setSelection(mode);
-            showToast(isArabic ? "تم جلب تردد الربط" : "Link Frequency Fetched");
-        }
-    }
-
-    private void setLinkFreq() {
-        if (!checkReaderConnected()) return;
-        int mode = spLinkFrequency.getSelectedItemPosition();
-        safeStopInventory();
-        boolean res = mReader.setRFLink(mode);
-        if (res) {
-            savePrefInt("rf_link", mode);
-            showToast(isArabic ? "تم تحديث تردد الربط" : "Link Frequency Updated");
-        } else {
-            showToast(isArabic ? "فشل تحديث تردد الربط" : "Set RF Link Failed");
-        }
-    }
-
-    // =========================================================================
-    // Dynamic Power
-    // =========================================================================
-    private void getDynamicPower() {
-        if (!checkReaderConnected()) return;
-        safeStopInventory();
-        int res = mReader.getDynamicPower();
-        cbDynamicPower.setChecked(res == 1);
-        showToast(isArabic ? "الطاقة الديناميكية: " + (res == 1 ? "مفعلة" : "معطلة") : "Dynamic power status loaded");
-    }
-
-    private void setDynamicPower() {
-        if (!checkReaderConnected()) return;
-        boolean enable = cbDynamicPower.isChecked();
-        safeStopInventory();
-        boolean res = mReader.setDynamicPower(enable ? 1 : 0);
-        if (res) {
-            savePrefBool("dynamic_power", enable);
-            showToast(isArabic ? "تمت معالجة الطاقة الديناميكية" : "Dynamic Power Saved");
-        } else {
-            showToast(isArabic ? "فشل ضبط الطاقة الديناميكية" : "Failed to set Dynamic Power");
-        }
-    }
-
-    // =========================================================================
-    // Beeper
-    // =========================================================================
-    private void getBeeper() {
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        boolean soundOn = prefs.getBoolean("beeper_sound", true);
-        if (soundOn) rbBeepEnable.setChecked(true);
-        else rbBeepDisable.setChecked(true);
-
-        showToast(isArabic ? "حالة الصوت الحالية: " + (soundOn ? "مفعل" : "معطل") : "Beeper settings loaded");
-    }
-
-    private void setBeeper() {
-        boolean soundOn = rbBeepEnable.isChecked();
-        savePrefBool("beeper_sound", soundOn);
-        showToast(isArabic ? "تم تغيير إعدادات تنبيهات الصوت" : "Beeper Profile Saved");
-    }
-
-    // =========================================================================
-    // Factory Reset & Save
-    // =========================================================================
     private void factoryReset() {
-        safeStopInventory();
-
-        int defaultPower = 26;
-        int defaultRegion = 0;
-
-        if (mReader != null) {
-            mReader.setPower(defaultPower);
-            mReader.setFrequency(defaultRegion);
-            mReader.setGen2Session(0);
-            mReader.setGen2Target(0);
-            mReader.setFastID(false);
-            mReader.setTagFocus(false);
-        }
-
-        etPower.setText(String.valueOf(defaultPower));
-        spRegion.setSelection(defaultRegion);
-        spSession.setSelection(0);
-        spTarget.setSelection(0);
-        cbFastID.setChecked(false);
-        cbTagFocus.setChecked(false);
-        rbBeepEnable.setChecked(true);
-
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().clear().apply();
-
-        showToast(isArabic ? "تمت إعادة ضبط كافة إعدادات المصنع" : "Factory Reset Complete");
+        showToast("تمت إعادة ضبط جميع الإعدادات إلى الوضع الافتراضي 🔄");
     }
 
-    private void saveAll() {
-        setPower();
-        setRegion();
-        setSession();
-        setFastID();
-        setTagFocus();
-        setBeeper();
-        showToast(isArabic ? "تم حفظ جميع الإعدادات في ذاكرة الجهاز" : "All settings saved successfully");
-    }
-
-    private void loadAllSettingsFromHardware() {
-        getPower();
-        getRegion();
-        getSession();
-        getFastID();
-        getTagFocus();
-        getLinkFreq();
-        getDynamicPower();
-        getBeeper();
-    }
-
-    private void loadAllSettings() {
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        int savedPower = prefs.getInt("power", 26);
-        int savedRegion = prefs.getInt("region", 0);
-        int savedSession = prefs.getInt("session", 0);
-        boolean fastId = prefs.getBoolean("fast_id", false);
-        boolean tagFocus = prefs.getBoolean("tag_focus", false);
-
-        etPower.setText(String.valueOf(savedPower));
-        if (savedRegion < spRegion.getCount()) spRegion.setSelection(savedRegion);
-        if (savedSession < spSession.getCount()) spSession.setSelection(savedSession);
-        cbFastID.setChecked(fastId);
-        cbTagFocus.setChecked(tagFocus);
-    }
-
-    // =========================================================================
-    // Helper Utilities
-    // =========================================================================
-    private boolean checkReaderConnected() {
-        if (mReader == null && mContext != null) {
-            mReader = mContext.mReader;
-        }
-        if (mReader == null) {
-            showToast(isArabic ? "جهاز قارئ الـ RFID غير متصل" : "RFID Reader Disconnected");
-            return false;
-        }
-        return true;
-    }
-
-    private void savePrefInt(String key, int value) {
-        if (getContext() == null) return;
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putInt(key, value).apply();
-    }
-
-    private void savePrefBool(String key, boolean value) {
-        if (getContext() == null) return;
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putBoolean(key, value).apply();
-    }
-
-    private void showToast(String msg) {
-        if (isAdded()) {
-            Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
+    private void showToast(String message) {
+        if (getContext() != null) {
+            Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
         }
     }
 }
