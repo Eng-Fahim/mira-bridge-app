@@ -84,12 +84,21 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         super.onCreate(savedInstanceState);
 
-        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
-        if (isArabic) {
-            getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        } else {
-            getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-        }
+        try {
+            boolean isArabic = false;
+            if (AppCompatDelegate.getApplicationLocales() != null &&
+                AppCompatDelegate.getApplicationLocales().toLanguageTags() != null) {
+                isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+            } else {
+                isArabic = getResources().getConfiguration().locale.getLanguage().equals("ar");
+            }
+
+            if (isArabic) {
+                getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            } else {
+                getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+            }
+        } catch (Exception ignored) {}
 
         sessionManager = new SessionManager(this);
         if (!sessionManager.isLoggedIn()) {
@@ -163,7 +172,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         mTabHost = findViewById(android.R.id.tabhost);
         mTabHost.setup(this, fm, R.id.realtabcontent);
 
-        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        boolean isArabic = true;
+        try {
+            isArabic = getResources().getConfiguration().locale.getLanguage().equals("ar");
+        } catch (Exception ignored) {}
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
             mTabHost.setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
         }
@@ -180,104 +193,80 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
 
         // 🏠 لوحة التحكم - للجميع
-        mTabHost.addTab(
-            mTabHost.newTabSpec("Dashboard").setIndicator(isArabic ? "🏠 الرئيسية" : "🏠 Dashboard"),
-            MiraDashboardFragment.class, null
-        );
+        safeAddTab("Dashboard", isArabic ? "🏠 الرئيسية" : "🏠 Dashboard", MiraDashboardFragment.class);
 
         // 💎 المجوهرات + POS + سجل المبيعات
         if (isManager || isPosOperator) {
-            mTabHost.addTab(
-                mTabHost.newTabSpec("JewelryDashboard").setIndicator(isArabic ? "💎 المجوهرات" : "💎 Jewelry"),
-                JewelryDashboardFragment.class, null
-            );
-            mTabHost.addTab(
-                mTabHost.newTabSpec("POS Mode").setIndicator(isArabic ? "🛒 البيع" : "🛒 POS"),
-                MiraPosFragment.class, null
-            );
-            mTabHost.addTab(
-                mTabHost.newTabSpec("SalesHistory").setIndicator(isArabic ? "📜 المبيعات" : "📜 Sales"),
-                MiraSalesHistoryFragment.class, null
-            );
+            safeAddTab("JewelryDashboard", isArabic ? "💎 المجوهرات" : "💎 Jewelry", JewelryDashboardFragment.class);
+            safeAddTab("POS Mode", isArabic ? "🛒 البيع" : "🛒 POS", MiraPosFragment.class);
+            safeAddTab("SalesHistory", isArabic ? "📜 المبيعات" : "📜 Sales", MiraSalesHistoryFragment.class);
         }
 
         // 📷 المسح - للجميع
-        mTabHost.addTab(
-            mTabHost.newTabSpec("Scan").setIndicator(isArabic ? "📷 المسح" : "📷 Scan"),
-            UHFReadTagFragment.class, null
-        );
+        safeAddTab("Scan", isArabic ? "📷 المسح" : "📷 Scan", UHFReadTagFragment.class);
 
         // 🆔 التكويد + المخزون + الرادار
         if (isManager || isInventoryMgr) {
-            mTabHost.addTab(
-                mTabHost.newTabSpec("IdentityStudio").setIndicator(isArabic ? "🆔 التكويد" : "🆔 ID"),
-                MiraIdentityStudioFragment.class, null
-            );
-            mTabHost.addTab(
-                mTabHost.newTabSpec("Inventory Pro").setIndicator(isArabic ? "📊 المخزون" : "📊 Inventory"),
-                MiraInventoryProFragment.class, null
-            );
-            mTabHost.addTab(
-                mTabHost.newTabSpec("RadarLocation").setIndicator(isArabic ? "🎯 الرادار" : "🎯 Radar"),
-                UHFRadarLocationFragment.class, null
-            );
+            safeAddTab("IdentityStudio", isArabic ? "🆔 التكويد" : "🆔 ID", MiraIdentityStudioFragment.class);
+            safeAddTab("Inventory Pro", isArabic ? "📊 المخزون" : "📊 Inventory", MiraInventoryProFragment.class);
+            safeAddTab("RadarLocation", isArabic ? "🎯 الرادار" : "🎯 Radar", UHFRadarLocationFragment.class);
         }
 
         // 🚪 البوابات
         if (isManager || isGateSecurity) {
-            mTabHost.addTab(
-                mTabHost.newTabSpec("SecureGate").setIndicator(isArabic ? "🚪 البوابات" : "🚪 Gate"),
-                MiraSecureGateFragment.class, null
-            );
+            safeAddTab("SecureGate", isArabic ? "🚪 البوابات" : "🚪 Gate", MiraSecureGateFragment.class);
         }
 
         // 👥 المستخدمين
         if (isManager) {
-            mTabHost.addTab(
-                mTabHost.newTabSpec("UsersManagement").setIndicator(isArabic ? "👥 المستخدمين" : "👥 Users"),
-                UsersManagementFragment.class, null
-            );
+            safeAddTab("UsersManagement", isArabic ? "👥 المستخدمين" : "👥 Users", UsersManagementFragment.class);
         }
 
         // 📈 التقارير
         if (isManager) {
-            mTabHost.addTab(
-                mTabHost.newTabSpec("Reports").setIndicator(isArabic ? "📈 التقارير" : "📈 Reports"),
-                MiraReportsFragment.class, null
-            );
+            safeAddTab("Reports", isArabic ? "📈 التقارير" : "📈 Reports", MiraReportsFragment.class);
         }
 
         // 💰 الإدارة المحاسبية والقيود - للمدراء والمحاسبين
         if (isManager || role == SessionManager.Role.AUDITOR) {
-            mTabHost.addTab(
-                mTabHost.newTabSpec("Accounting").setIndicator(isArabic ? "💰 المحاسبة" : "💰 Accounting"),
-                MiraAccountingFragment.class, null
-            );
+            safeAddTab("Accounting", isArabic ? "💰 المحاسبة" : "💰 Accounting", MiraAccountingFragment.class);
         }
 
         // 📦 التحويلات
         if (isManager || isInventoryMgr) {
-            mTabHost.addTab(
-                mTabHost.newTabSpec("Transfers").setIndicator(isArabic ? "📦 التحويلات" : "📦 Transfers"),
-                MiraTransferFragment.class, null
-            );
+            safeAddTab("Transfers", isArabic ? "📦 التحويلات" : "📦 Transfers", MiraTransferFragment.class);
         }
 
         // ⚙️ الإعدادات المتقدمة - SYSTEM_ADMIN فقط
         if (isSystemAdmin) {
-            mTabHost.addTab(mTabHost.newTabSpec("Settings").setIndicator(isArabic ? "⚙️ الإعدادات" : "⚙️ Settings"), UHFSetFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("Location").setIndicator(isArabic ? "📍 المواقع" : "📍 Location"), UHFLocationFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("TagLit").setIndicator(isArabic ? "💡 إضاءة" : "💡 TagLit"), UHFTagLitFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("TagFlash").setIndicator(isArabic ? "⚡ فلاش" : "⚡ Flash"), UHFTagFlashFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("ReadWrite").setIndicator(isArabic ? "📝 كتابة" : "📝 R/W"), UHFReadWriteFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("Lock").setIndicator(isArabic ? "🔒 قفل" : "🔒 Lock"), UHFLockFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("Kill").setIndicator(isArabic ? "🛑 إلغاء" : "🛑 Kill"), UHFKillFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("Protected-ShortRange").setIndicator(isArabic ? "🛡️ آمن" : "🛡️ Protected"), ProtectedModeAndShortRangeModeFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("MarginRead").setIndicator(isArabic ? "📊 الهامش" : "📊 Margin"), MarginReadFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("NxpUcodeDna").setIndicator(isArabic ? "🧬 DNA" : "🧬 DNA"), AuthenticateNxpUcodeDnaFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("BlockWrite").setIndicator(isArabic ? "📦 بلوك" : "📦 Block"), BlockWriteFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("BlockPermalock").setIndicator(isArabic ? "🔐 دائم" : "🔐 Permalock"), BlockPermalockFragment.class, null);
-            mTabHost.addTab(mTabHost.newTabSpec("Upgrade").setIndicator(isArabic ? "⬆️ ترقية" : "⬆️ Upgrade"), UHFUpgradeFragment.class, null);
+            safeAddTab("Settings", isArabic ? "⚙️ الإعدادات" : "⚙️ Settings", UHFSetFragment.class);
+            safeAddTab("Location", isArabic ? "📍 المواقع" : "📍 Location", UHFLocationFragment.class);
+            safeAddTab("TagLit", isArabic ? "💡 إضاءة" : "💡 TagLit", UHFTagLitFragment.class);
+            safeAddTab("TagFlash", isArabic ? "⚡ فلاش" : "⚡ Flash", UHFTagFlashFragment.class);
+            safeAddTab("ReadWrite", isArabic ? "📝 كتابة" : "📝 R/W", UHFReadWriteFragment.class);
+            safeAddTab("Lock", isArabic ? "🔒 قفل" : "🔒 Lock", UHFLockFragment.class);
+            safeAddTab("Kill", isArabic ? "🛑 إلغاء" : "🛑 Kill", UHFKillFragment.class);
+            safeAddTab("Protected-ShortRange", isArabic ? "🛡️ آمن" : "🛡️ Protected", ProtectedModeAndShortRangeModeFragment.class);
+            safeAddTab("MarginRead", isArabic ? "📊 الهامش" : "📊 Margin", MarginReadFragment.class);
+            safeAddTab("NxpUcodeDna", isArabic ? "🧬 DNA" : "🧬 DNA", AuthenticateNxpUcodeDnaFragment.class);
+            safeAddTab("BlockWrite", isArabic ? "📦 بلوك" : "📦 Block", BlockWriteFragment.class);
+            safeAddTab("BlockPermalock", isArabic ? "🔐 دائم" : "🔐 Permalock", BlockPermalockFragment.class);
+            safeAddTab("Upgrade", isArabic ? "⬆️ ترقية" : "⬆️ Upgrade", UHFUpgradeFragment.class);
+        }
+    }
+
+    // دالة إضافة آمنة تمنع الانهيار الكامل في حال وجود Class متضارب
+    private void safeAddTab(String tag, String label, Class<?> clazz) {
+        try {
+            if (Fragment.class.isAssignableFrom(clazz)) {
+                @SuppressWarnings("unchecked")
+                Class<? extends Fragment> fragmentClass = (Class<? extends Fragment>) clazz;
+                mTabHost.addTab(mTabHost.newTabSpec(tag).setIndicator(label), fragmentClass, null);
+            } else {
+                Log.e(TAG, "Class " + clazz.getName() + " is NOT a valid androidx.fragment.app.Fragment!");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to add tab: " + tag + " -> " + e.getMessage());
         }
     }
 
@@ -311,7 +300,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void showLogoutConfirmation() {
-        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        boolean isArabic = true;
+        try { isArabic = getResources().getConfiguration().locale.getLanguage().equals("ar"); } catch (Exception ignored) {}
         new androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle(isArabic ? "تسجيل الخروج" : "Sign Out")
             .setMessage(isArabic ? "هل أنت متأكد أنك تريد تسجيل الخروج؟" : "Are you sure you want to sign out?")
@@ -322,7 +312,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void showProfileDialog() {
-        boolean isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        boolean isArabic = true;
+        try { isArabic = getResources().getConfiguration().locale.getLanguage().equals("ar"); } catch (Exception ignored) {}
         String username = sessionManager.getUsername();
         String displayName = sessionManager.getDisplayName();
         String role = sessionManager.getRoleString();
@@ -430,7 +421,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(responseJson);
             FragmentManager fm = getSupportFragmentManager();
             if (fm != null && !fm.isStateSaved() && !fm.isDestroyed()) {
-                // إصلاح الحاوية: التبديل داخل R.id.realtabcontent لحماية هرمية التبويبات والـ Toolbar
                 fm.beginTransaction()
                   .replace(R.id.realtabcontent, receipt)
                   .addToBackStack("mira_receipt")
