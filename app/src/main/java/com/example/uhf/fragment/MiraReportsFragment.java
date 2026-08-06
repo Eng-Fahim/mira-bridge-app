@@ -1,4 +1,4 @@
-package com.mira.rfid.ui.reports;
+package com.example.uhf.fragment;
 
 import android.app.DatePickerDialog;
 import android.content.Intent;
@@ -22,10 +22,10 @@ import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 
-import com.mira.rfid.R;
-import com.mira.rfid.api.ApiClient;
-import com.mira.rfid.api.ApiService;
-import com.mira.rfid.utils.LocaleHelper;
+import com.example.rfid.R;
+import com.example.rfid.api.ApiClient;
+import com.example.rfid.api.ApiService;
+import com.example.rfid.utils.LocaleHelper;
 
 import org.json.JSONArray;
 import org.json.JSONException;
