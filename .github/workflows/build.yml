@@ -1,4 +1,4 @@
-Name: Build MIRA Bridge APK
+name: Build MIRA Bridge APK
 
 on:
   push:
