@@ -41,7 +41,7 @@ public class MiraAccountingFragment extends Fragment {
     private RecyclerView rvAccountingData;
     private ProgressBar pbAccountingLoading;
 
-    // 2. الـ Adapter والمجموعات الخاصة بالبيانات
+    // 2. المحولات والبيانات (Adapters & Data Structures)
     private MiraAccountingAdapter accountingAdapter;
     private final List<MiraAccountingItem> currentList = new ArrayList<>();
     private MiraAccountingItem.ItemType activeType = MiraAccountingItem.ItemType.JOURNAL_ENTRY;
@@ -55,30 +55,35 @@ public class MiraAccountingFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        
+        // التحقق من اتجاه اللغة لتخصيص النصوص تلقائياً
         isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
 
-        // ربط العناصر وإعداد القائمة
+        // تهيئة الربط وتجهيز عناصر الواجهة
         initViews(view);
 
-        // إعداد أزرار الأحداث والبحث
+        // ضبط أحداث التبويبات وأزرار التحكم والبحث
         setupAccountingOverview(view);
     }
 
+    /**
+     * ربط العناصر البرمجية بمكونات واجهة المستخدم XML
+     */
     private void initViews(View view) {
-        // العناوين والإحصائيات
+        // العناوين الإحصائية والأقسام الرئيسية
         tvAccountingTitle = view.findViewById(R.id.tvAccountingTitle);
         tvActiveBranch = view.findViewById(R.id.tvActiveBranch);
         tvTodayRevenue = view.findViewById(R.id.tvTodayRevenue);
         tvTotalJournalVolume = view.findViewById(R.id.tvTotalJournalVolume);
         tvBalanceStatus = view.findViewById(R.id.tvBalanceStatus);
 
-        // التبويبات والأزرار
+        // أزرار التبويبات والإجراءات
         btnTabJournal = view.findViewById(R.id.btnTabJournal);
         btnTabChartOfAccounts = view.findViewById(R.id.btnTabChartOfAccounts);
         btnTabTrialBalance = view.findViewById(R.id.btnTabTrialBalance);
         btnCreateManualEntry = view.findViewById(R.id.btnCreateManualEntry);
 
-        // ترويسة الجدول والبحث
+        // عناوين الأعمدة والبحث
         thCol1 = view.findViewById(R.id.thCol1);
         thCol2 = view.findViewById(R.id.thCol2);
         thCol3 = view.findViewById(R.id.thCol3);
@@ -86,17 +91,18 @@ public class MiraAccountingFragment extends Fragment {
         etSearchAccounting = view.findViewById(R.id.etSearchAccounting);
         btnRefreshAccounting = view.findViewById(R.id.btnRefreshAccounting);
 
-        // القائمة ومؤشرات التحميل
+        // القائمة ومؤشرات الحالة
         rvAccountingData = view.findViewById(R.id.rvAccountingData);
         pbAccountingLoading = view.findViewById(R.id.pbAccountingLoading);
         tvEmptyData = view.findViewById(R.id.tvEmptyData);
 
-        // إعداد ה- RecyclerView والـ Adapter
+        // إعداد RecyclerView والمجيب (Adapter)
         if (rvAccountingData != null) {
             rvAccountingData.setLayoutManager(new LinearLayoutManager(getContext()));
             accountingAdapter = new MiraAccountingAdapter();
             rvAccountingData.setAdapter(accountingAdapter);
 
+            // معالجة النقر على العناصر داخل القائمة
             accountingAdapter.setOnItemClickListener(item -> {
                 String msg = (isArabic ? "تم اختيار: " : "Selected: ") + item.getCol2Text();
                 Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
@@ -104,9 +110,12 @@ public class MiraAccountingFragment extends Fragment {
         }
     }
 
+    /**
+     * إعداد المستمعات للأزرار وحقول النماذج والتبويبات
+     */
     private void setupAccountingOverview(View view) {
 
-        // 🟢 تبويب 1: القيود اليومية (Journal Entries)
+        // 🟢 التبويب الأول: القيود اليومية (Journal Entries)
         btnTabJournal.setOnClickListener(v -> {
             activeType = MiraAccountingItem.ItemType.JOURNAL_ENTRY;
             highlightTab(btnTabJournal);
@@ -120,7 +129,7 @@ public class MiraAccountingFragment extends Fragment {
             loadJournalEntries();
         });
 
-        // 🟢 تبويب 2: دليل الحسابات (Chart of Accounts)
+        // 🟢 التبويب الثاني: دليل الحسابات (Chart of Accounts)
         btnTabChartOfAccounts.setOnClickListener(v -> {
             activeType = MiraAccountingItem.ItemType.CHART_OF_ACCOUNT;
             highlightTab(btnTabChartOfAccounts);
@@ -134,7 +143,7 @@ public class MiraAccountingFragment extends Fragment {
             loadChartOfAccounts();
         });
 
-        // 🟢 تبويب 3: ميزان المراجعة (Trial Balance)
+        // 🟢 التبويب الثالث: ميزان المراجعة (Trial Balance)
         btnTabTrialBalance.setOnClickListener(v -> {
             activeType = MiraAccountingItem.ItemType.TRIAL_BALANCE;
             highlightTab(btnTabTrialBalance);
@@ -148,31 +157,36 @@ public class MiraAccountingFragment extends Fragment {
             loadTrialBalance();
         });
 
-        // زر إنشاء قيد يدوي
+        // زر إنشاء قيد يدوي جديد
         if (btnCreateManualEntry != null) {
             btnCreateManualEntry.setOnClickListener(v -> {
                 Toast.makeText(getContext(), isArabic ? "فتح شاشة إضافة قيد محاسبي..." : "Opening manual entry editor...", Toast.LENGTH_SHORT).show();
             });
         }
 
-        // زر تحديث البيانات
-        btnRefreshAccounting.setOnClickListener(v -> refreshData());
+        // زر التحديث المباشر
+        if (btnRefreshAccounting != null) {
+            btnRefreshAccounting.setOnClickListener(v -> refreshData());
+        }
 
-        // ميزة الفلترة والبحث المباشر عند الكتابة
-        etSearchAccounting.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                filterData(s.toString());
-            }
-            @Override public void afterTextChanged(Editable s) {}
-        });
+        // تفعيل الفلترة المباشرة أثناء الكتابة في مربع البحث
+        if (etSearchAccounting != null) {
+            etSearchAccounting.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    filterData(s.toString());
+                }
+                @Override public void afterTextChanged(Editable s) {}
+            });
+        }
 
-        // تحميل القيود اليومية افتراضياً عند فتح الواجهة
+        // تحميل القيود افتراضياً عند فتح الشاشة
         btnTabJournal.performClick();
     }
 
-    // 🎨 تغيير لون التبويب النشط
+    // 🎨 تظليل التبويب النشط
     private void highlightTab(Button activeBtn) {
+        if (activeBtn == null) return;
         activeBtn.setBackgroundColor(Color.parseColor("#2980B9"));
         activeBtn.setTextColor(Color.WHITE);
     }
@@ -180,18 +194,19 @@ public class MiraAccountingFragment extends Fragment {
     // 🎨 إعادة تعيين ألوان التبويبات غير النشطة
     private void resetTabStyle(Button... inactiveBtns) {
         for (Button btn : inactiveBtns) {
-            btn.setBackgroundColor(Color.parseColor("#BDC3C7"));
-            btn.setTextColor(Color.parseColor("#2C3E50"));
+            if (btn != null) {
+                btn.setBackgroundColor(Color.parseColor("#BDC3C7"));
+                btn.setTextColor(Color.parseColor("#2C3E50"));
+            }
         }
     }
 
-    // --- دوال جلب البيانات وإدارتها ---
+    // --- دوال جلب البيانات وتحديث العرض ---
 
     private void loadJournalEntries() {
         showLoading(true);
         currentList.clear();
 
-        // بيانات نموذجية - استبدلها بدعوة الـ API في النطاق الفعلي
         currentList.add(new MiraAccountingItem(
                 MiraAccountingItem.ItemType.JOURNAL_ENTRY,
                 "JV-2026-101", "مبيعات طقم ذهب - فاتورة #4092", "450,000", "0.00"
@@ -245,15 +260,16 @@ public class MiraAccountingFragment extends Fragment {
     }
 
     private void filterData(String query) {
-        if (query.trim().isEmpty()) {
+        if (query == null || query.trim().isEmpty()) {
             renderData(currentList);
             return;
         }
 
         List<MiraAccountingItem> filtered = new ArrayList<>();
+        String lowerQuery = query.toLowerCase().trim();
         for (MiraAccountingItem item : currentList) {
-            if (item.getCol1Text().toLowerCase().contains(query.toLowerCase()) ||
-                item.getCol2Text().toLowerCase().contains(query.toLowerCase())) {
+            if ((item.getCol1Text() != null && item.getCol1Text().toLowerCase().contains(lowerQuery)) ||
+                (item.getCol2Text() != null && item.getCol2Text().toLowerCase().contains(lowerQuery))) {
                 filtered.add(item);
             }
         }
@@ -262,7 +278,7 @@ public class MiraAccountingFragment extends Fragment {
 
     private void renderData(List<MiraAccountingItem> items) {
         showLoading(false);
-        if (items.isEmpty()) {
+        if (items == null || items.isEmpty()) {
             if (tvEmptyData != null) tvEmptyData.setVisibility(View.VISIBLE);
             if (rvAccountingData != null) rvAccountingData.setVisibility(View.GONE);
         } else {
@@ -291,5 +307,13 @@ public class MiraAccountingFragment extends Fragment {
             loadTrialBalance();
         }
         Toast.makeText(getContext(), isArabic ? "تم تحديث البيانات" : "Data refreshed", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        // تنظيف المراجع لتفادي حدوث تسريب في الذاكرة (Memory Leak)
+        rvAccountingData = null;
+        accountingAdapter = null;
     }
 }
