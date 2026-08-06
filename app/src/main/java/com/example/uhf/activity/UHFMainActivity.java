@@ -59,6 +59,8 @@ import com.example.uhf.tools.UIHelper;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 import com.rscja.deviceapi.interfaces.ConnectionStatus;
 
+//التقارير
+import com.example.uhf.fragment.MiraReportsFragment;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -232,7 +234,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 UsersManagementFragment.class, null
             );
         }
-
+if (isManager) {
+            mTabHost.addTab(
+                mTabHost.newTabSpec("Reports").setIndicator(isArabic ? "📈 التقارير" : "📈 Reports"),
+                MiraReportsFragment.class, null
+            );
         // 📦 التحويلات
         if (isManager || isInventoryMgr) {
             mTabHost.addTab(
