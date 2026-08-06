@@ -190,6 +190,52 @@
                     android:imeOptions="actionNext" />
             </com.google.android.material.textfield.TextInputLayout>
 
+            <!-- متطلبات كلمة المرور -->
+            <TextView
+                android:id="@+id/tvPasswordRequirements"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="كلمة المرور يجب أن تكون 6 أحرف على الأقل"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp"
+                android:layout_marginStart="4dp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- أزرار توليد ونسخ واقتراح اسم المستخدم -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="10dp">
+
+                <ImageButton
+                    android:id="@+id/btnGeneratePassword"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:background="?attr/colorSurfaceVariant"
+                    android:src="@android:drawable/ic_menu_manage"
+                    android:contentDescription="توليد كلمة مرور" />
+
+                <ImageButton
+                    android:id="@+id/btnCopyPassword"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="8dp"
+                    android:background="?attr/colorSurfaceVariant"
+                    android:src="@android:drawable/ic_menu_copy"
+                    android:contentDescription="نسخ كلمة المرور" />
+
+                <ImageButton
+                    android:id="@+id/btnSuggestUsername"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="8dp"
+                    android:background="?attr/colorSurfaceVariant"
+                    android:src="@android:drawable/ic_menu_my_calendar"
+                    android:contentDescription="اقتراح اسم مستخدم" />
+            </LinearLayout>
+
             <!-- شريط قوة كلمة المرور -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -350,41 +396,42 @@
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- 👤 مدير الفرع -->
-<com.google.android.material.card.MaterialCardView
-    android:id="@+id/cardBranchManager"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
-    app:cardCornerRadius="10dp"
-    app:cardElevation="0dp"
-    app:strokeWidth="1dp"
-    app:strokeColor="?attr/colorOutline">
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardBranchManager"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    app:cardCornerRadius="10dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="1dp"
+                    app:strokeColor="?attr/colorOutline">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:padding="12dp">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:padding="12dp">
 
-        <RadioButton
-            android:id="@+id/rbBranchManager"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="👤 مدير الفرع"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:tag="BRANCH_MANAGER"
-            android:buttonTint="?attr/colorPrimary" />
+                        <RadioButton
+                            android:id="@+id/rbBranchManager"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="👤 مدير الفرع"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:tag="BRANCH_MANAGER"
+                            android:buttonTint="?attr/colorPrimary" />
 
-        <Switch
-            android:id="@+id/swBranchManager"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:checked="true" />
-    </LinearLayout>
-</com.google.android.material.card.MaterialCardView>
+                        <Switch
+                            android:id="@+id/swBranchManager"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
                 <!-- 📊 مدير المخزون -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardInventoryMgr"
