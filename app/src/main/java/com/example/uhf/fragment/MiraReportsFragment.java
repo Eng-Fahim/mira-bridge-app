@@ -25,10 +25,10 @@ import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 
-import com.example.uhf.R;
-import com.example.uhf.api.ApiClient;
-import com.example.uhf.api.ApiService;
-import com.example.uhf.utils.LocaleHelper;
+import com.example.rfid.R;
+import com.example.rfid.api.MiraApiClient;
+import com.example.rfid.api.ApiService;
+import com.example.rfid.utils.LocaleHelper;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -67,7 +67,11 @@ public class MiraReportsFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_mira_reports, container, false);
 
-        isArabic = LocaleHelper.isArabic(requireContext());
+        try {
+            isArabic = LocaleHelper.isArabic(requireContext());
+        } catch (Exception e) {
+            isArabic = Locale.getDefault().getLanguage().equals("ar");
+        }
 
         initViews(view);
         setupWebView();
@@ -81,7 +85,6 @@ public class MiraReportsFragment extends Fragment {
     }
 
     private void initViews(View view) {
-        // الربط بالـ IDs الصحيحة المطابقة لـ XML
         webView = view.findViewById(R.id.webReport);
         spReportType = view.findViewById(R.id.spReportType);
         spBranchFilter = view.findViewById(R.id.spBranchFilter);
@@ -193,31 +196,37 @@ public class MiraReportsFragment extends Fragment {
     private void loadReport(String type) {
         showLoadingHtml();
 
-        ApiService api = ApiClient.getClient(requireContext()).create(ApiService.class);
-        Call<String> call = api.getReportData(type, dateFrom, dateTo);
+        try {
+            // الاستدعاء باستخدام MiraApiClient بدلاً من ApiClient
+            ApiService api = MiraApiClient.getInstance(requireContext()).getApi();
+            Call<String> call = api.getReportData(type, dateFrom, dateTo);
 
-        call.enqueue(new Callback<String>() {
-            @Override
-            public void onResponse(@NonNull Call<String> call, @NonNull Response<String> response) {
-                if (response.isSuccessful() && response.body() != null) {
-                    try {
-                        lastReportData = new JSONObject(response.body());
-                        renderReportHtml(type, lastReportData);
-                    } catch (JSONException e) {
-                        Log.e(TAG, "JSON parsing error", e);
-                        showErrorHtml(isArabic ? "خطأ في معالجة البيانات" : "Data Parsing Error");
+            call.enqueue(new Callback<String>() {
+                @Override
+                public void onResponse(@NonNull Call<String> call, @NonNull Response<String> response) {
+                    if (response.isSuccessful() && response.body() != null) {
+                        try {
+                            lastReportData = new JSONObject(response.body());
+                            renderReportHtml(type, lastReportData);
+                        } catch (JSONException e) {
+                            Log.e(TAG, "JSON parsing error", e);
+                            showErrorHtml(isArabic ? "خطأ في معالجة البيانات" : "Data Parsing Error");
+                        }
+                    } else {
+                        showErrorHtml(isArabic ? "فشل في جلب البيانات من الخادم" : "Failed to fetch data from server");
                     }
-                } else {
-                    showErrorHtml(isArabic ? "فشل في جلب البيانات من الخادم" : "Failed to fetch data from server");
                 }
-            }
 
-            @Override
-            public void onFailure(@NonNull Call<String> call, @NonNull Throwable t) {
-                Log.e(TAG, "Network request failed", t);
-                showErrorHtml(isArabic ? "خطأ في الاتصال بالشبكة" : "Network Error");
-            }
-        });
+                @Override
+                public void onFailure(@NonNull Call<String> call, @NonNull Throwable t) {
+                    Log.e(TAG, "Network request failed", t);
+                    showErrorHtml(isArabic ? "خطأ في الاتصال بالشبكة" : "Network Error");
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "MiraApiClient initialization failed", e);
+            showErrorHtml(isArabic ? "تعذر الاتصال بمركز الخدمات" : "Service Client Error");
+        }
     }
 
     private void showLoadingHtml() {
