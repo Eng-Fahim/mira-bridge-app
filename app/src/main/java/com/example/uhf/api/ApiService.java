@@ -1,5 +1,4 @@
-package com.example.uhf.com.example.uhf.api;
-
+package com.example.uhf.api;
 import com.example.uhf.model.MiraAccountingItem;
 import java.util.List;
 import retrofit2.Call;
