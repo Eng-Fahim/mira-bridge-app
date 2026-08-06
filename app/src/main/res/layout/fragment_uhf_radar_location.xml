@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:layout_marginHorizontal="5dp"
-    android:background="#0D1B2A">
+    android:background="?android:attr/colorBackground">
 
     <!-- ========== أزرار الأوضاع ========== -->
     <LinearLayout
@@ -15,7 +15,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:padding="6dp"
-        android:background="#152030"
+        android:background="?attr/colorSurfaceVariant"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -28,8 +28,8 @@
             android:layout_marginEnd="3dp"
             android:text="🎯 محدد"
             android:textSize="11sp"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#1A237E"
+            android:textColor="?attr/colorOnPrimary"
+            android:backgroundTint="?attr/colorPrimary"
             android:alpha="1.0" />
 
         <Button
@@ -40,8 +40,8 @@
             android:layout_marginHorizontal="3dp"
             android:text="📡 مفتوح"
             android:textSize="11sp"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#37474F"
+            android:textColor="?attr/colorOnSurface"
+            android:backgroundTint="?attr/colorSurfaceVariant"
             android:alpha="0.6" />
 
         <Button
@@ -52,8 +52,8 @@
             android:layout_marginStart="3dp"
             android:text="🚪 بوابة"
             android:textSize="11sp"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#37474F"
+            android:textColor="?attr/colorOnSurface"
+            android:backgroundTint="?attr/colorSurfaceVariant"
             android:alpha="0.6" />
     </LinearLayout>
 
@@ -64,7 +64,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:padding="8dp"
-        android:background="#1B2838"
+        android:background="?attr/colorSurface"
         app:layout_constraintTop_toBottomOf="@id/layoutModes"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
@@ -73,7 +73,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="🎯 EPC: "
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="14sp"
             android:layout_gravity="center" />
 
@@ -82,9 +82,11 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#78909C"
-            android:hint="أدخل EPC للتتبع" />
+            android:textColor="?attr/colorOnSurface"
+            android:textColorHint="?attr/colorOnSurfaceVariant"
+            android:hint="أدخل EPC للتتبع"
+            android:background="@null"
+            android:padding="8dp" />
 
         <Button
             android:id="@+id/btnExportResults"
@@ -93,8 +95,8 @@
             android:layout_marginStart="6dp"
             android:text="📤"
             android:textSize="14sp"
-            android:backgroundTint="#37474F"
-            android:textColor="#FFFFFF" />
+            android:backgroundTint="?attr/colorSurfaceVariant"
+            android:textColor="?attr/colorOnSurface" />
     </LinearLayout>
 
     <!-- ========== مؤشر RSSI ========== -->
@@ -104,7 +106,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:padding="6dp"
-        android:background="#1B2838"
+        android:background="?attr/colorSurface"
         android:gravity="center_vertical"
         app:layout_constraintTop_toBottomOf="@id/epcLayout"
         app:layout_constraintStart_toStartOf="parent"
@@ -125,15 +127,15 @@
             android:layout_weight="1"
             android:max="100"
             android:progress="0"
-            android:progressTint="#4CAF50"
-            android:background="#263238" />
+            android:progressTint="?attr/colorPrimary"
+            android:progressBackgroundTint="?attr/colorSurfaceVariant" />
 
         <TextView
             android:id="@+id/tvRadarMode"
             android:layout_width="80dp"
             android:layout_height="wrap_content"
             android:text="🎯 بحث عن قطعة"
-            android:textColor="#C8E6C9"
+            android:textColor="?attr/colorPrimary"
             android:textSize="10sp"
             android:gravity="end"
             android:layout_marginStart="6dp" />
@@ -155,7 +157,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="#1A237E"
+        android:background="?attr/colorPrimary"
         android:padding="8dp"
         android:visibility="gone"
         app:layout_constraintBottom_toTopOf="@id/layoutRecent"
@@ -181,7 +183,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="حالة القطعة"
-                android:textColor="#FFFFFF"
+                android:textColor="?attr/colorOnPrimary"
                 android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -191,7 +193,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="📦 اسم القطعة"
-            android:textColor="#B0BEC5"
+            android:textColor="?attr/colorOnPrimary"
+            android:alpha="0.85"
             android:textSize="12sp"
             android:layout_marginTop="3dp" />
 
@@ -200,7 +203,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="🏷️ التفاصيل"
-            android:textColor="#78909C"
+            android:textColor="?attr/colorOnPrimary"
+            android:alpha="0.7"
             android:textSize="10sp"
             android:layout_marginTop="2dp" />
     </LinearLayout>
@@ -212,7 +216,7 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="4dp"
-        android:background="#152030"
+        android:background="?attr/colorSurface"
         app:layout_constraintBottom_toTopOf="@id/layoutStats"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -221,7 +225,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="📋 سجل العمليات:"
-            android:textColor="#90CAF9"
+            android:textColor="?attr/colorPrimary"
             android:textSize="10sp"
             android:textStyle="bold"
             android:layout_marginBottom="1dp" />
@@ -231,7 +235,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text=""
-            android:textColor="#78909C"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="9sp"
             android:maxLines="3" />
     </LinearLayout>
@@ -244,7 +248,7 @@
         android:orientation="horizontal"
         android:padding="4dp"
         android:gravity="center"
-        android:background="#152030"
+        android:background="?attr/colorSurfaceVariant"
         app:layout_constraintBottom_toTopOf="@id/_llSearchRange"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -261,14 +265,14 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#4CAF50"
+                android:textColor="#22C55E"
                 android:textSize="18sp"
                 android:textStyle="bold" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="✅ مصرح"
-                android:textColor="#81C784"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="9sp" />
         </LinearLayout>
 
@@ -284,14 +288,14 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#F44336"
+                android:textColor="#EF4444"
                 android:textSize="18sp"
                 android:textStyle="bold" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="🚨 ممنوع"
-                android:textColor="#EF9A9A"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="9sp" />
         </LinearLayout>
 
@@ -307,14 +311,14 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#FF9800"
+                android:textColor="#F59E0B"
                 android:textSize="18sp"
                 android:textStyle="bold" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="⚠️ غير معروف"
-                android:textColor="#FFCC80"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="9sp" />
         </LinearLayout>
     </LinearLayout>
@@ -326,7 +330,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:paddingHorizontal="8dp"
-        android:background="#1B2838"
+        android:background="?attr/colorSurface"
         app:layout_constraintBottom_toTopOf="@id/tvSearchRange">
 
         <TextView
@@ -334,7 +338,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:text="+"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="20sp"
             android:textStyle="bold" />
 
@@ -355,7 +359,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:text="-"
-            android:textColor="#FFFFFF"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="20sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -367,11 +371,11 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:text="@string/searchRange"
-        android:textColor="#90CAF9"
+        android:textColor="?attr/colorPrimary"
         android:textSize="14sp"
         android:textStyle="bold"
         android:padding="4dp"
-        android:background="#1B2838"
+        android:background="?attr/colorSurfaceVariant"
         app:layout_constraintBottom_toTopOf="@id/llButton" />
 
     <!-- ========== أزرار التحكم ========== -->
@@ -394,8 +398,8 @@
             android:layout_weight="1"
             android:layout_marginEnd="4dp"
             android:text="@string/start_location"
-            android:background="#1A73E8"
-            android:textColor="#FFFFFF"
+            android:backgroundTint="?attr/colorPrimary"
+            android:textColor="?attr/colorOnPrimary"
             android:textStyle="bold" />
 
         <Button
@@ -405,8 +409,9 @@
             android:layout_weight="1"
             android:layout_marginStart="4dp"
             android:text="@string/stop_location"
-            android:background="#F44336"
-            android:textColor="#FFFFFF"
+            android:backgroundTint="?attr/colorError"
+            android:textColor="?attr/colorOnError"
             android:textStyle="bold" />
     </LinearLayout>
+
 </androidx.constraintlayout.widget.ConstraintLayout>
