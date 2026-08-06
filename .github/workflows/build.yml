@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout repository
@@ -33,10 +35,9 @@ jobs:
     - name: Build Debug APK
       run: ./gradlew :app:assembleDebug --stacktrace
 
-    - name: Direct APK Upload
-      run: |
-        APK_PATH=$(find . -type f -name "*.apk" | head -n 1)
-        echo "================================================="
-        echo "Uploading APK: $APK_PATH"
-        curl https://bashupload.com/ -T "$APK_PATH"
-        echo "================================================="
+    - name: Create GitHub Release & Upload APK
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: build-${{ github.run_number }}
+        name: MIRA Bridge Build #${{ github.run_number }}
+        files: app/build/outputs/apk/debug/UHF-serial_v1.4.6.apk
