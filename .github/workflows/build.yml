@@ -1,4 +1,4 @@
-name: Build MIRA Bridge APK
+Name: Build MIRA Bridge APK
 
 on:
   push:
@@ -40,4 +40,4 @@ jobs:
       with:
         tag_name: build-${{ github.run_number }}
         name: MIRA Bridge Build #${{ github.run_number }}
-        files: app/build/outputs/apk/debug/UHF-serial_v1.4.6.apk
+        files: app/build/outputs/apk/debug/*.apk
