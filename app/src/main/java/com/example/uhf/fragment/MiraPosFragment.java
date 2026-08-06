@@ -329,57 +329,97 @@ public class MiraPosFragment extends Fragment {
         } catch (Exception e) { showToast(isArabic ? "خطأ" : "Error: " + e.getMessage()); }
     }
 
-    private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
-        if (!isAdded()) return;
-        safeRun(() -> { if (btnCheckout != null) { btnCheckout.setEnabled(false); btnCheckout.setAlpha(0.5f); } if (tvCartStatus != null) tvCartStatus.setText(isArabic ? "جاري البيع..." : "Processing..."); });
+    // داخل MiraPosFragment.java - تعديل دالة executeCheckout
 
-        new Thread(() -> {
-            try {
-                Context ctx = getContext(); if (ctx == null) return;
-                MiraApiClient client = MiraApiClient.getInstance(ctx);
-                JSONObject payload = new JSONObject();
-                payload.put("action", "COMPLETE_POS_SALE");
-                payload.put("gate_id", client.getGateId());
-                payload.put("branch_id", branchesManager.getActiveBranchId());
+private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
+    if (!isAdded()) return;
+    safeRun(() -> { 
+        if (btnCheckout != null) { btnCheckout.setEnabled(false); btnCheckout.setAlpha(0.5f); } 
+        if (tvCartStatus != null) tvCartStatus.setText(isArabic ? "جاري الترحيل المحاسبي والبيع..." : "Processing & Journaling..."); 
+    });
 
-                JSONObject customer = new JSONObject();
-                customer.put("name", data.customerName); customer.put("phone", data.customerPhone); customer.put("payment_method", data.paymentMethod);
-                payload.put("customer", customer);
+    new Thread(() -> {
+        try {
+            Context ctx = getContext(); if (ctx == null) return;
+            MiraApiClient client = MiraApiClient.getInstance(ctx);
+            JSONObject payload = new JSONObject();
+            payload.put("action", "COMPLETE_POS_SALE");
+            payload.put("gate_id", client.getGateId());
+            payload.put("branch_id", branchesManager.getActiveBranchId());
 
-                JSONArray itemsArr = new JSONArray();
-                for (CartItem item : cartList) {
-                    JSONObject obj = new JSONObject();
-                    obj.put("epc", item.epc); obj.put("serial_no", item.serialNo); obj.put("title", item.name);
-                    obj.put("karat", item.karat); obj.put("weight", item.weight); obj.put("sale_price", item.price); obj.put("new_status", "SOLD");
-                    itemsArr.put(obj);
-                }
-                payload.put("items", itemsArr);
+            // بيانات العميل
+            JSONObject customer = new JSONObject();
+            customer.put("name", data.customerName); 
+            customer.put("phone", data.customerPhone); 
+            customer.put("payment_method", data.paymentMethod);
+            payload.put("customer", customer);
 
-                JSONObject payment = new JSONObject();
-                payment.put("subtotal", getCartTotal()); payment.put("discount_percent", data.discount); payment.put("final_amount", data.finalAmount);
-                payload.put("payment", payment);
-
-                MiraApiClient.ApiResponse response = client.checkout(payload);
-
-                safeRun(() -> {
-                    if (response != null && response.isSuccess) {
-                        playAlertSound(1);
-                        String json = response.data != null ? response.data.toString() : "{}";
-                        clearCart();
-                        if (getActivity() instanceof UHFMainActivity) ((UHFMainActivity) getActivity()).openReceiptFragment(json);
-                        else showToast(isArabic ? "✅ تم البيع" : "✅ Sale complete");
-                    } else {
-                        if (tvCartStatus != null) { tvCartStatus.setText("❌ " + (response != null ? response.code : "")); tvCartStatus.setTextColor(Color.RED); }
-                        if (btnCheckout != null) { btnCheckout.setEnabled(true); btnCheckout.setAlpha(1f); }
-                        showToast(isArabic ? "❌ فشل البيع" : "❌ Failed");
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Checkout: " + e.getMessage());
-                safeRun(() -> { saveSaleLocally(data); clearCart(); if (btnCheckout != null) { btnCheckout.setEnabled(true); btnCheckout.setAlpha(1f); } showToast(isArabic ? "💾 حفظ محلي" : "💾 Saved locally"); });
+            // أصناف الفاتورة
+            JSONArray itemsArr = new JSONArray();
+            for (CartItem item : cartList) {
+                JSONObject obj = new JSONObject();
+                obj.put("epc", item.epc); 
+                obj.put("serial_no", item.serialNo); 
+                obj.put("title", item.name);
+                obj.put("karat", item.karat); 
+                obj.put("weight", item.weight); 
+                obj.put("sale_price", item.price); 
+                obj.put("new_status", "SOLD");
+                itemsArr.put(obj);
             }
-        }).start();
-    }
+            payload.put("items", itemsArr);
+
+            // التفاصيل المالية والمحاسبية
+            JSONObject payment = new JSONObject();
+            payment.put("subtotal", getCartTotal()); 
+            payment.put("discount_percent", data.discount); 
+            payment.put("final_amount", data.finalAmount);
+            
+            // 🟢 ربط الحسابات المحاسبية التلقائية حسب طريقة الدفع
+            String targetAccountCode;
+            switch (data.paymentMethod.toUpperCase()) {
+                case "CARD":
+                case "NET":
+                    targetAccountCode = "110201"; // حـ/ البنك - نقاط البيع
+                    break;
+                case "CREDIT":
+                    targetAccountCode = "110301"; // حـ/ الذمم المدنية - العملاء
+                    break;
+                case "CASH":
+                default:
+                    targetAccountCode = "110101"; // حـ/ الصندوق الرئيسي/الفرع
+                    break;
+            }
+            payment.put("account_code", targetAccountCode);
+            payload.put("payment", payment);
+
+            MiraApiClient.ApiResponse response = client.checkout(payload);
+
+            safeRun(() -> {
+                if (response != null && response.isSuccess) {
+                    playAlertSound(1);
+                    String json = response.data != null ? response.data.toString() : "{}";
+                    clearCart();
+                    if (getActivity() instanceof UHFMainActivity) ((UHFMainActivity) getActivity()).openReceiptFragment(json);
+                    else showToast(isArabic ? "✅ تم البيع والترحيل المحاسبي" : "✅ Sale & Accounting posted");
+                } else {
+                    if (tvCartStatus != null) { tvCartStatus.setText("❌ " + (response != null ? response.code : "")); tvCartStatus.setTextColor(Color.RED); }
+                    if (btnCheckout != null) { btnCheckout.setEnabled(true); btnCheckout.setAlpha(1f); }
+                    showToast(isArabic ? "❌ فشل البيع" : "❌ Failed");
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Checkout Error: " + e.getMessage());
+            safeRun(() -> { 
+                saveSaleLocally(data); 
+                clearCart(); 
+                if (btnCheckout != null) { btnCheckout.setEnabled(true); btnCheckout.setAlpha(1f); } 
+                showToast(isArabic ? "💾 تم الحفظ محلياً للترحيل لاحقاً" : "💾 Saved locally for later posting"); 
+            });
+        }
+    }).start();
+}
+
 
     private void saveSaleLocally(POSCheckoutDialog.POSCheckoutData data) {
         if (getContext() == null) return;
