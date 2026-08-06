@@ -100,16 +100,34 @@ public class MiraReportsFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         
-        isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
-        apiClient = MiraApiClient.getInstance(requireContext());
-        branchesManager = MiraBranchesManager.getInstance(requireContext());
-        orgProfile = MiraOrgProfileManager.getInstance(requireContext());
+        Context context = getContext();
+        if (context == null) return;
+
+        // طريقة فحص اللغة الآمنة لتفادي الانهيار Crash
+        checkLanguage(context);
+
+        apiClient = MiraApiClient.getInstance(context);
+        branchesManager = MiraBranchesManager.getInstance(context);
+        orgProfile = MiraOrgProfileManager.getInstance(context);
         
         initViews(view);
         setupReportTypes();
         setupFilters();
         setupActionButtons();
         loadReport(currentReportType);
+    }
+
+    private void checkLanguage(Context context) {
+        try {
+            String tags = AppCompatDelegate.getApplicationLocales().toLanguageTags();
+            if (tags != null && !tags.isEmpty()) {
+                isArabic = tags.contains("ar");
+            } else {
+                isArabic = context.getResources().getConfiguration().locale.getLanguage().equals("ar");
+            }
+        } catch (Exception e) {
+            isArabic = true; // الافتراضي
+        }
     }
 
     private void initViews(View v) {
@@ -126,8 +144,10 @@ public class MiraReportsFragment extends Fragment {
         btnExportPDF = v.findViewById(R.id.btnExportPDF);
         btnExportExcel = v.findViewById(R.id.btnExportExcel);
         
-        webReport.getSettings().setJavaScriptEnabled(true);
-        webReport.getSettings().setDomStorageEnabled(true);
+        if (webReport != null) {
+            webReport.getSettings().setJavaScriptEnabled(true);
+            webReport.getSettings().setDomStorageEnabled(true);
+        }
         
         if (btnApplyFilter != null) btnApplyFilter.setText(isArabic ? "تطبيق" : "Apply");
         if (btnPrint != null) btnPrint.setText(isArabic ? "🖨️ طباعة" : "🖨️ Print");
@@ -137,6 +157,7 @@ public class MiraReportsFragment extends Fragment {
     }
 
     private void setupReportTypes() {
+        if (getContext() == null || spReportType == null) return;
         List<String> names = new ArrayList<>();
         for (String[] type : REPORT_TYPES) {
             names.add(isArabic ? type[1] : type[2]);
@@ -157,9 +178,10 @@ public class MiraReportsFragment extends Fragment {
 
     private void setupFilters() {
         Executors.newSingleThreadExecutor().execute(() -> {
+            if (apiClient == null) return;
             MiraApiClient.ApiResponse response = apiClient.getBranches();
             mainHandler.post(() -> {
-                if (getContext() == null) return;
+                if (!isAdded() || getContext() == null || spBranchFilter == null) return;
                 List<String> branchNames = new ArrayList<>();
                 branchIdsList.clear();
                 
@@ -186,7 +208,9 @@ public class MiraReportsFragment extends Fragment {
                 
                 spBranchFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                     @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                        selectedBranchId = branchIdsList.get(position);
+                        if (position < branchIdsList.size()) {
+                            selectedBranchId = branchIdsList.get(position);
+                        }
                     }
                     @Override public void onNothingSelected(AdapterView<?> parent) {}
                 });
@@ -208,6 +232,7 @@ public class MiraReportsFragment extends Fragment {
     }
 
     private void showDatePicker(boolean isFrom) {
+        if (!isAdded() || getContext() == null) return;
         Calendar cal = Calendar.getInstance();
         DatePickerDialog dialog = new DatePickerDialog(requireContext(),
             (view, year, month, day) -> {
@@ -245,29 +270,35 @@ public class MiraReportsFragment extends Fragment {
 
     private void loadReport(String type) {
         currentReportType = type;
-        tvReportTitle.setText(isArabic ? "⏳ جاري التحميل..." : "⏳ Loading...");
+        if (tvReportTitle != null) tvReportTitle.setText(isArabic ? "⏳ جاري التحميل..." : "⏳ Loading...");
 
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 MiraApiClient.ApiResponse response = fetchReportData(type);
-                if (response != null && response.isSuccess && response.data != null) {
-                    currentReportData = response.data;
-                    String html = buildReportHtml(type, response.data);
-                    currentReportHtml = html;
-                    mainHandler.post(() -> {
+                mainHandler.post(() -> {
+                    if (!isAdded() || webReport == null) return;
+                    if (response != null && response.isSuccess && response.data != null) {
+                        currentReportData = response.data;
+                        String html = buildReportHtml(type, response.data);
+                        currentReportHtml = html;
                         webReport.loadDataWithBaseURL("https://cdn.jsdelivr.net", html, "text/html", "UTF-8", null);
                         updateReportTitle(type);
-                    });
-                } else {
-                    mainHandler.post(() -> webReport.loadData(getErrorHtml(), "text/html", "UTF-8"));
-                }
+                    } else {
+                        webReport.loadData(getErrorHtml(), "text/html", "UTF-8");
+                    }
+                });
             } catch (Exception e) {
-                mainHandler.post(() -> webReport.loadData(getErrorHtml(), "text/html", "UTF-8"));
+                mainHandler.post(() -> {
+                    if (isAdded() && webReport != null) {
+                        webReport.loadData(getErrorHtml(), "text/html", "UTF-8");
+                    }
+                });
             }
         });
     }
 
     private MiraApiClient.ApiResponse fetchReportData(String type) {
+        if (apiClient == null) return null;
         switch (type) {
             case "inventory_detail":
             case "inventory_karat":
@@ -294,6 +325,7 @@ public class MiraReportsFragment extends Fragment {
     }
 
     private void updateReportTitle(String type) {
+        if (tvReportTitle == null) return;
         for (String[] t : REPORT_TYPES) {
             if (t[0].equals(type)) {
                 tvReportTitle.setText(isArabic ? t[1] : t[2]);
@@ -306,8 +338,15 @@ public class MiraReportsFragment extends Fragment {
 
     private String buildReportHtml(String type, JSONObject data) {
         String dir = isArabic ? "rtl" : "ltr";
-        String orgName = orgProfile.getOrgName();
-        String branchName = selectedBranchId > 0 ? spBranchFilter.getSelectedItem().toString() : branchesManager.getActiveBranchDisplayName();
+        String orgName = orgProfile != null ? orgProfile.getOrgName() : "MIRA";
+        
+        String branchName = "";
+        if (selectedBranchId > 0 && spBranchFilter != null && spBranchFilter.getSelectedItem() != null) {
+            branchName = spBranchFilter.getSelectedItem().toString();
+        } else if (branchesManager != null) {
+            branchName = branchesManager.getActiveBranchDisplayName();
+        }
+
         String dateStr = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date());
 
         StringBuilder html = new StringBuilder();
@@ -399,7 +438,7 @@ public class MiraReportsFragment extends Fragment {
     // ==================== Report Renderers ====================
 
     private String buildInventoryDetailReport(JSONObject data) {
-        JSONObject inv = data.optJSONObject("inventory");
+        JSONObject inv = data != null ? data.optJSONObject("inventory") : null;
         int totalItems = inv != null ? inv.optInt("total_items", 0) : 0;
         double totalWeight = inv != null ? inv.optDouble("total_weight", 0) : 0;
         JSONObject w = inv != null ? inv.optJSONObject("weights") : null;
@@ -430,7 +469,7 @@ public class MiraReportsFragment extends Fragment {
     }
 
     private String buildSalesReport(JSONObject data) {
-        JSONObject sales = data.optJSONObject("sales");
+        JSONObject sales = data != null ? data.optJSONObject("sales") : null;
         String today = sales != null ? sales.optString("today", "$0") : "$0";
         String month = sales != null ? sales.optString("month", "$0") : "$0";
         String year = sales != null ? sales.optString("year", "$0") : "$0";
@@ -470,7 +509,7 @@ public class MiraReportsFragment extends Fragment {
     }
 
     private String buildTransfersDetailReport(JSONObject data) {
-        JSONArray transfers = data.optJSONArray("transfers");
+        JSONArray transfers = data != null ? data.optJSONArray("transfers") : null;
         StringBuilder rows = new StringBuilder();
         if (transfers != null) {
             for (int i = 0; i < transfers.length(); i++) {
@@ -495,7 +534,7 @@ public class MiraReportsFragment extends Fragment {
     }
 
     private String buildUsersDetailReport(JSONObject data) {
-        JSONArray users = data.optJSONArray("users");
+        JSONArray users = data != null ? data.optJSONArray("users") : null;
         StringBuilder rows = new StringBuilder();
         if (users != null) {
             for (int i = 0; i < users.length(); i++) {
@@ -509,7 +548,7 @@ public class MiraReportsFragment extends Fragment {
     }
 
     private String buildGatesDetailReport(JSONObject data) {
-        JSONObject gates = data.optJSONObject("gates");
+        JSONObject gates = data != null ? data.optJSONObject("gates") : null;
         int active = gates != null ? gates.optInt("active", 0) : 0;
         int alarms = gates != null ? gates.optInt("alarms_today", 0) : 0;
         return "<div class='summary-cards'>" +
@@ -529,26 +568,35 @@ public class MiraReportsFragment extends Fragment {
     // ==================== Export & Share Operations ====================
 
     private void printReport() {
-        if (getContext() == null) return;
-        PrintManager pm = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
-        PrintDocumentAdapter adapter = webReport.createPrintDocumentAdapter("MIRA_Report_" + currentReportType);
-        pm.print("MIRA Report - " + currentReportType, adapter, new PrintAttributes.Builder().build());
+        if (!isAdded() || getContext() == null || webReport == null) return;
+        try {
+            PrintManager pm = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
+            if (pm != null) {
+                PrintDocumentAdapter adapter = webReport.createPrintDocumentAdapter("MIRA_Report_" + currentReportType);
+                pm.print("MIRA Report - " + currentReportType, adapter, new PrintAttributes.Builder().build());
+            }
+        } catch (Exception ignored) {}
     }
 
     private void shareReport() {
-        Intent share = new Intent(Intent.ACTION_SEND);
-        share.setType("text/html");
-        share.putExtra(Intent.EXTRA_SUBJECT, "MIRA Report - " + currentReportType);
-        share.putExtra(Intent.EXTRA_TEXT, currentReportHtml);
-        startActivity(Intent.createChooser(share, isArabic ? "مشاركة التقرير" : "Share Report"));
+        if (!isAdded() || getContext() == null) return;
+        try {
+            Intent share = new Intent(Intent.ACTION_SEND);
+            share.setType("text/html");
+            share.putExtra(Intent.EXTRA_SUBJECT, "MIRA Report - " + currentReportType);
+            share.putExtra(Intent.EXTRA_TEXT, currentReportHtml);
+            startActivity(Intent.createChooser(share, isArabic ? "مشاركة التقرير" : "Share Report"));
+        } catch (Exception ignored) {}
     }
 
     private void exportPDF() {
+        if (!isAdded() || getContext() == null) return;
         Toast.makeText(getContext(), isArabic ? "📄 جاري إعداد أمر الطباعة إلى PDF..." : "📄 Preparing PDF output...", Toast.LENGTH_SHORT).show();
-        printReport(); // الطباعة المباشرة تمكن المستخدم من الحفظ كـ PDF بخيارات أندرويد القياسية
+        printReport();
     }
 
     private void exportExcel() {
+        if (!isAdded() || getContext() == null) return;
         try {
             File path = requireContext().getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS);
             if (path != null && !path.exists()) path.mkdirs();
