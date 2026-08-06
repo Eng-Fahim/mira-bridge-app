@@ -61,6 +61,7 @@ import com.rscja.deviceapi.interfaces.ConnectionStatus;
 
 //التقارير
 import com.example.uhf.fragment.MiraReportsFragment;
+import com.example.uhf.model.MiraJournalEntry;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -242,6 +243,15 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 MiraReportsFragment.class, null
             );
         }
+// داخل initViewPageData() في UHFMainActivity.java
+
+// 📊 الإدارة المحاسبية والقيود - للمدراء والمحاسبين
+if (isManager || role == SessionManager.Role.AUDITOR) {
+    mTabHost.addTab(
+        mTabHost.newTabSpec("Accounting").setIndicator(isArabic ? "💰 المحاسبة" : "💰 Accounting"),
+        MiraAccountingFragment.class, null
+    );
+}
 
         // 📦 التحويلات
         if (isManager || isInventoryMgr) {
