@@ -30,17 +30,17 @@ import com.example.uhf.fragment.BlockPermalockFragment;
 import com.example.uhf.fragment.BlockWriteFragment;
 import com.example.uhf.fragment.JewelryDashboardFragment;
 import com.example.uhf.fragment.MarginReadFragment;
-import com.example.uhf.fragment.MiraAccountingFragment; // تم التأكيد على هذا
+import com.example.uhf.fragment.MiraAccountingFragment;
 import com.example.uhf.fragment.MiraBranchPickerFragment;
 import com.example.uhf.fragment.MiraDashboardFragment;
 import com.example.uhf.fragment.MiraIdentityStudioFragment;
 import com.example.uhf.fragment.MiraInventoryProFragment;
 import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.fragment.MiraReceiptFragment;
+import com.example.uhf.fragment.MiraReportsFragment;
 import com.example.uhf.fragment.MiraSalesHistoryFragment;
 import com.example.uhf.fragment.MiraSecureGateFragment;
 import com.example.uhf.fragment.MiraTransferFragment;
-import com.example.uhf.fragment.MiraReportsFragment;
 import com.example.uhf.fragment.ProtectedModeAndShortRangeModeFragment;
 import com.example.uhf.fragment.UHFKillFragment;
 import com.example.uhf.fragment.UHFLocationFragment;
@@ -130,12 +130,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         Log.d(TAG, "UI Mode / Configuration changed. Adapting themes dynamically.");
     }
 
-    public void setActivePOSFragment(MiraPosFragment fragment) { this.activePOSFragment = fragment; }
+    public void setActivePOSFragment(MiraPosFragment fragment) { 
+        this.activePOSFragment = fragment; 
+    }
 
     public boolean isReaderReady() {
         try {
             return mReader != null && mReader.getConnectStatus() == ConnectionStatus.CONNECTED;
-        } catch (Exception e) { return false; }
+        } catch (Exception e) { 
+            return false; 
+        }
     }
 
     public void onTagRead(String epc) {
@@ -371,7 +375,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     @Override
     protected void onDestroy() {
         Log.e(TAG, "onDestroy()");
-        if (playSoundThread != null) playSoundThread.stopPlay();
+        if (playSoundThread != null) {
+            playSoundThread.stopPlay();
+            playSoundThread = null;
+        }
         releaseSoundPool();
         if (mReader != null) mReader.free();
         super.onDestroy();
@@ -399,14 +406,23 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         playSoundThread.start();
     }
 
-    private void releaseSoundPool() { if (soundPool != null) { soundPool.release(); soundPool = null; } }
+    private void releaseSoundPool() { 
+        if (soundPool != null) { 
+            soundPool.release(); 
+            soundPool = null; 
+        } 
+    }
 
     public void playSound(int id) {
         if (soundPool == null) return;
         float audioMaxVolume = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
         float audioCurrentVolume = am.getStreamVolume(AudioManager.STREAM_MUSIC);
         volumnRatio = audioCurrentVolume / audioMaxVolume;
-        try { soundPool.play(soundMap.get(id), volumnRatio, volumnRatio, 1, 0, 1); } catch (Exception e) { e.printStackTrace(); }
+        try { 
+            soundPool.play(soundMap.get(id), volumnRatio, volumnRatio, 1, 0, 1); 
+        } catch (Exception e) { 
+            e.printStackTrace(); 
+        }
     }
 
     public void openReceiptFragment(String responseJson) {
@@ -414,8 +430,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(responseJson);
             FragmentManager fm = getSupportFragmentManager();
             if (fm != null && !fm.isStateSaved() && !fm.isDestroyed()) {
+                // إصلاح الحاوية: التبديل داخل R.id.realtabcontent لحماية هرمية التبويبات والـ Toolbar
                 fm.beginTransaction()
-                  .replace(android.R.id.content, receipt)
+                  .replace(R.id.realtabcontent, receipt)
                   .addToBackStack("mira_receipt")
                   .commitAllowingStateLoss();
             } else {
@@ -446,11 +463,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private Toast toast;
     public void showToast(String text) { if (toast != null) toast.cancel(); toast = Toast.makeText(this, text, Toast.LENGTH_SHORT); toast.show(); }
     public void showToast(int resId) { showToast(getString(resId)); }
-    public void playSoundDelayed(int speed) { playSoundThread.play(speed); }
+    public void playSoundDelayed(int speed) { if (playSoundThread != null) playSoundThread.play(speed); }
 
     private final Object objectLock = new Object();
     private class PlaySoundThread extends Thread {
-        private boolean isStop = false;
+        private volatile boolean isStop = false;
         int interval = 500;
         long lastPlayTime = SystemClock.elapsedRealtime();
         @Override public void run() {
@@ -463,7 +480,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                         else SystemClock.sleep(1);
                     }
                 }
-                if (SystemClock.elapsedRealtime() - lastPlayTime < 500) playSound(1);
+                if (!isStop && SystemClock.elapsedRealtime() - lastPlayTime < 500) {
+                    playSound(1);
+                }
             }
         }
         public void play(int speed) {
