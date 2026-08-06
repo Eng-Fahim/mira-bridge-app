@@ -234,11 +234,15 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 UsersManagementFragment.class, null
             );
         }
-if (isManager) {
+
+        // 📈 التقارير
+        if (isManager) {
             mTabHost.addTab(
                 mTabHost.newTabSpec("Reports").setIndicator(isArabic ? "📈 التقارير" : "📈 Reports"),
                 MiraReportsFragment.class, null
             );
+        }
+
         // 📦 التحويلات
         if (isManager || isInventoryMgr) {
             mTabHost.addTab(
@@ -463,4 +467,4 @@ if (isManager) {
         }
         public void stopPlay() { isStop = true; synchronized (objectLock) { objectLock.notifyAll(); } }
     }
-                
+}
