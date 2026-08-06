@@ -381,6 +381,176 @@ public class MiraApiClient {
         return post("/deactivate", payload);
     }
 
+    // ===================== 🏢 BRANCHES MANAGEMENT =====================
+
+    /**
+     * جلب قائمة الفروع
+     */
+    public ApiResponse getBranches() {
+        return getWithAuth("/branches");
+    }
+
+    /**
+     * جلب تفاصيل فرع محدد
+     */
+    public ApiResponse getBranch(int branchId) {
+        return getWithAuth("/branches/" + branchId);
+    }
+
+    /**
+     * إنشاء فرع جديد
+     */
+    public ApiResponse createBranch(JSONObject payload) {
+        return postWithAuth("/branches", payload);
+    }
+
+    /**
+     * تحديث بيانات فرع
+     */
+    public ApiResponse updateBranch(int branchId, JSONObject payload) {
+        return postWithAuth("/branches/" + branchId, payload);
+    }
+
+    /**
+     * جلب مخزون فرع
+     */
+    public ApiResponse getBranchInventory(int branchId) {
+        return getWithAuth("/branches/" + branchId + "/inventory");
+    }
+
+    /**
+     * جلب مستخدمي فرع
+     */
+    public ApiResponse getBranchUsers(int branchId) {
+        return getWithAuth("/branches/" + branchId + "/users");
+    }
+
+    /**
+     * جلب إعدادات فرع
+     */
+    public ApiResponse getBranchSettings(int branchId) {
+        return getWithAuth("/branches/" + branchId + "/settings");
+    }
+
+    /**
+     * حفظ إعدادات فرع
+     */
+    public ApiResponse saveBranchSettings(int branchId, JSONObject settings) {
+        return postWithAuth("/branches/" + branchId + "/settings", settings);
+    }
+
+    // ===================== 📦 TRANSFERS =====================
+
+    /**
+     * جلب قائمة التحويلات
+     */
+    public ApiResponse getTransfers(int branchId, String status) {
+        String url = "/transfers?branch_id=" + branchId;
+        if (status != null && !status.isEmpty()) {
+            url += "&status=" + status;
+        }
+        return getWithAuth(url);
+    }
+
+    /**
+     * إنشاء تحويل جديد
+     */
+    public ApiResponse createTransfer(JSONObject payload) {
+        return postWithAuth("/transfers", payload);
+    }
+
+    /**
+     * جلب تفاصيل تحويل
+     */
+    public ApiResponse getTransfer(int transferId) {
+        return getWithAuth("/transfers/" + transferId);
+    }
+
+    /**
+     * اعتماد تحويل
+     */
+    public ApiResponse approveTransfer(int transferId) {
+        return postWithAuth("/transfers/" + transferId + "/approve", null);
+    }
+
+    /**
+     * استلام تحويل
+     */
+    public ApiResponse receiveTransfer(int transferId) {
+        return postWithAuth("/transfers/" + transferId + "/receive", null);
+    }
+
+    /**
+     * مسح قطعة في تحويل
+     */
+    public ApiResponse scanTransferItem(int transferId, String epc) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("epc", epc);
+        } catch (Exception ignored) {}
+        return postWithAuth("/transfers/" + transferId + "/scan", payload);
+    }
+
+    public ApiResponse updateTransfer(int transferId, JSONObject payload) {
+        return postWithAuth("/transfers/" + transferId, payload);
+    }
+
+    // ===================== 💰 ACCOUNTING & FINANCIAL API =====================
+
+    /**
+     * جلب قائمة القيود اليومية (Journal Entries)
+     */
+    public ApiResponse getJournalEntries(String branchId) {
+        String url = "/accounting/journal-entries";
+        if (branchId != null && !branchId.isEmpty()) {
+            url += "?branch_id=" + branchId;
+        }
+        return getWithAuth(url);
+    }
+
+    /**
+     * جلب تفاصيل قيد محاسبي محدد
+     */
+    public ApiResponse getJournalEntryDetail(String entryId) {
+        return getWithAuth("/accounting/journal-entries/" + entryId);
+    }
+
+    /**
+     * إنشاء قيد محاسبي جديد
+     */
+    public ApiResponse createJournalEntry(JSONObject payload) {
+        return postWithAuth("/accounting/journal-entries/create", payload);
+    }
+
+    /**
+     * جلب دليل / شجرة الحسابات (Chart of Accounts)
+     */
+    public ApiResponse getChartOfAccounts() {
+        return getWithAuth("/accounting/chart-of-accounts");
+    }
+
+    /**
+     * جلب ميزان المراجعة (Trial Balance)
+     */
+    public ApiResponse getTrialBalance(String branchId) {
+        String url = "/accounting/trial-balance";
+        if (branchId != null && !branchId.isEmpty()) {
+            url += "?branch_id=" + branchId;
+        }
+        return getWithAuth(url);
+    }
+
+    /**
+     * جلب ملخص الإحصائيات المحاسبية للفرع
+     */
+    public ApiResponse getAccountingSummary(String branchId) {
+        String url = "/accounting/summary";
+        if (branchId != null && !branchId.isEmpty()) {
+            url += "?branch_id=" + branchId;
+        }
+        return getWithAuth(url);
+    }
+
     // ===================== CORE HTTP METHODS =====================
 
     private String getAuthToken() {
@@ -540,120 +710,6 @@ public class MiraApiClient {
         } catch (Exception ignored) {}
 
         return new ApiResponse(responseCode, json, null);
-    }
-
-    // ===================== 🏢 BRANCHES MANAGEMENT =====================
-
-/**
- * جلب قائمة الفروع
- */
-public ApiResponse getBranches() {
-    return getWithAuth("/branches");
-}
-
-/**
- * جلب تفاصيل فرع محدد
- */
-public ApiResponse getBranch(int branchId) {
-    return getWithAuth("/branches/" + branchId);
-}
-
-/**
- * إنشاء فرع جديد
- */
-public ApiResponse createBranch(JSONObject payload) {
-    return postWithAuth("/branches", payload);
-}
-
-/**
- * تحديث بيانات فرع
- */
-public ApiResponse updateBranch(int branchId, JSONObject payload) {
-    return postWithAuth("/branches/" + branchId, payload);
-}
-
-/**
- * جلب مخزون فرع
- */
-public ApiResponse getBranchInventory(int branchId) {
-    return getWithAuth("/branches/" + branchId + "/inventory");
-}
-
-/**
- * جلب مستخدمي فرع
- */
-public ApiResponse getBranchUsers(int branchId) {
-    return getWithAuth("/branches/" + branchId + "/users");
-}
-
-/**
- * جلب إعدادات فرع
- */
-public ApiResponse getBranchSettings(int branchId) {
-    return getWithAuth("/branches/" + branchId + "/settings");
-}
-
-/**
- * حفظ إعدادات فرع
- */
-public ApiResponse saveBranchSettings(int branchId, JSONObject settings) {
-    return postWithAuth("/branches/" + branchId + "/settings", settings);
-}
-
-// ===================== 📦 TRANSFERS =====================
-
-/**
- * جلب قائمة التحويلات
- */
-public ApiResponse getTransfers(int branchId, String status) {
-    String url = "/transfers?branch_id=" + branchId;
-    if (status != null && !status.isEmpty()) {
-        url += "&status=" + status;
-    }
-    return getWithAuth(url);
-}
-
-/**
- * إنشاء تحويل جديد
- */
-public ApiResponse createTransfer(JSONObject payload) {
-    return postWithAuth("/transfers", payload);
-}
-
-/**
- * جلب تفاصيل تحويل
- */
-public ApiResponse getTransfer(int transferId) {
-    return getWithAuth("/transfers/" + transferId);
-}
-
-/**
- * اعتماد تحويل
- */
-public ApiResponse approveTransfer(int transferId) {
-    return postWithAuth("/transfers/" + transferId + "/approve", null);
-}
-
-/**
- * استلام تحويل
- */
-public ApiResponse receiveTransfer(int transferId) {
-    return postWithAuth("/transfers/" + transferId + "/receive", null);
-}
-
-/**
- * مسح قطعة في تحويل
- */
-public ApiResponse scanTransferItem(int transferId, String epc) {
-    JSONObject payload = new JSONObject();
-    try {
-        payload.put("epc", epc);
-    } catch (Exception ignored) {}
-    return postWithAuth("/transfers/" + transferId + "/scan", payload);
-}
-
-    public ApiResponse updateTransfer(int transferId, JSONObject payload) {
-    return postWithAuth("/transfers/" + transferId, payload);
     }
 
     // ===================== GETTERS =====================
