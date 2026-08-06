@@ -218,13 +218,14 @@
                     android:contentDescription="توليد كلمة مرور" />
 
                 <ImageButton
-                    android:id="@+id/btnCopyPassword"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:layout_marginStart="8dp"
-                    android:background="?attr/colorSurfaceVariant"
-                    android:src="@android:drawable/ic_menu_copy"
-                    android:contentDescription="نسخ كلمة المرور" />
+    android:id="@+id/btnCopyPassword"
+    android:layout_width="38dp"
+    android:layout_height="38dp"
+    android:layout_marginStart="8dp"
+    android:background="?attr/colorSurfaceVariant"
+    android:src="@drawable/ic_menu_copy"
+    android:contentDescription="نسخ كلمة المرور" />
+
 
                 <ImageButton
                     android:id="@+id/btnSuggestUsername"
