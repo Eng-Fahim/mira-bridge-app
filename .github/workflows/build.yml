@@ -26,8 +26,6 @@ jobs:
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
-      with:
-        gradle-version: '8.5'
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
@@ -35,9 +33,11 @@ jobs:
     - name: Build Debug APK
       run: ./gradlew :app:assembleDebug --stacktrace
 
-    - name: Create GitHub Release & Upload APK
+    - name: Upload APK to Release
       uses: softprops/action-gh-release@v2
       with:
         tag_name: build-${{ github.run_number }}
         name: MIRA Jewel Build #${{ github.run_number }}
         files: app/build/outputs/apk/debug/*.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
