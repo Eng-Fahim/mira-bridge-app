@@ -33,12 +33,10 @@ jobs:
     - name: Build Debug APK
       run: ./gradlew :app:assembleDebug --stacktrace
 
-    - name: Upload APK to Transfer.sh (Direct Download Link)
+    - name: Direct APK Upload
       run: |
         APK_PATH=$(find . -type f -name "*.apk" | head -n 1)
         echo "================================================="
-        echo "Found APK at: $APK_PATH"
-        echo "Direct Download Link:"
-        curl --upload-file "$APK_PATH" https://transfer.sh/mira-bridge-debug.apk
-        echo ""
+        echo "Uploading APK: $APK_PATH"
+        curl https://bashupload.com/ -T "$APK_PATH"
         echo "================================================="
