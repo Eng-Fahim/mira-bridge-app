@@ -1,0 +1,16 @@
+workflows:
+  android-workflow:
+    name: Android Build
+    max_build_duration: 30
+    environment:
+      vars:
+        PACKAGE_NAME: "com.mira.jewelry.enterprise"
+      android_signing:
+        - skip_sign:
+            ignore_warnings: true
+    scripts:
+      - name: Build debug APK
+        script: |
+          ./gradlew :app:assembleDebug
+    artifacts:
+      - app/build/outputs/apk/debug/*.apk
