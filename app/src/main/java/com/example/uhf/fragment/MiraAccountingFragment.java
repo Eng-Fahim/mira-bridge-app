@@ -308,7 +308,7 @@ public class MiraAccountingFragment extends Fragment {
         public MiraAccountingViewModel() {
             // تهيئة عميل Retrofit مدمج للاستعلام المباشر من API
             Retrofit retrofit = new Retrofit.Builder()
-                    .baseUrl("https://api.mira-technology.com/") // استبدل الرابط برابط سيرفرك
+                    .baseUrl("https://api.mira-technology.com/")
                     .addConverterFactory(GsonConverterFactory.create())
                     .build();
 
@@ -323,23 +323,21 @@ public class MiraAccountingFragment extends Fragment {
             isLoading.setValue(true);
             
             // طلب بيانات قيود اليومية من السيرفر
-            apiService.getJournalEntries().enqueue(new Callback<List<MiraAccountingItem>>() {
+            apiService.getJournalEntries().enqueue(new retrofit2.Callback<List<MiraAccountingItem>>() {
                 @Override
-                public void onResponse(Call<List<MiraAccountingItem>> call, Response<List<MiraAccountingItem>> response) {
+                public void onResponse(retrofit2.Call<List<MiraAccountingItem>> call, retrofit2.Response<List<MiraAccountingItem>> response) {
                     isLoading.setValue(false);
                     if (response.isSuccessful() && response.body() != null) {
                         rawList = response.body();
                         itemsLiveData.setValue(rawList);
                     } else {
-                        // بيانات تجريبية مؤقتة كخيار احتياطي (Mock Fallback) في حال عدم توفر اتصال السيرفر
                         loadMockJournalEntries();
                     }
                 }
 
                 @Override
-                public void onFailure(Call<List<MiraAccountingItem>> call, Throwable t) {
+                public void onFailure(retrofit2.Call<List<MiraAccountingItem>> call, Throwable t) {
                     isLoading.setValue(false);
-                    // جلب بيانات احتياطية افتراضية في حالة عدم وجود شبكة
                     loadMockJournalEntries();
                 }
             });
@@ -347,9 +345,9 @@ public class MiraAccountingFragment extends Fragment {
 
         public void fetchChartOfAccounts() {
             isLoading.setValue(true);
-            apiService.getChartOfAccounts().enqueue(new Callback<List<MiraAccountingItem>>() {
+            apiService.getChartOfAccounts().enqueue(new retrofit2.Callback<List<MiraAccountingItem>>() {
                 @Override
-                public void onResponse(Call<List<MiraAccountingItem>> call, Response<List<MiraAccountingItem>> response) {
+                public void onResponse(retrofit2.Call<List<MiraAccountingItem>> call, retrofit2.Response<List<MiraAccountingItem>> response) {
                     isLoading.setValue(false);
                     if (response.isSuccessful() && response.body() != null) {
                         rawList = response.body();
@@ -360,7 +358,7 @@ public class MiraAccountingFragment extends Fragment {
                 }
 
                 @Override
-                public void onFailure(Call<List<MiraAccountingItem>> call, Throwable t) {
+                public void onFailure(retrofit2.Call<List<MiraAccountingItem>> call, Throwable t) {
                     isLoading.setValue(false);
                     loadMockChartOfAccounts();
                 }
@@ -369,9 +367,9 @@ public class MiraAccountingFragment extends Fragment {
 
         public void fetchTrialBalance() {
             isLoading.setValue(true);
-            apiService.getTrialBalance().enqueue(new Callback<List<MiraAccountingItem>>() {
+            apiService.getTrialBalance().enqueue(new retrofit2.Callback<List<MiraAccountingItem>>() {
                 @Override
-                public void onResponse(Call<List<MiraAccountingItem>> call, Response<List<MiraAccountingItem>> response) {
+                public void onResponse(retrofit2.Call<List<MiraAccountingItem>> call, retrofit2.Response<List<MiraAccountingItem>> response) {
                     isLoading.setValue(false);
                     if (response.isSuccessful() && response.body() != null) {
                         rawList = response.body();
@@ -382,7 +380,7 @@ public class MiraAccountingFragment extends Fragment {
                 }
 
                 @Override
-                public void onFailure(Call<List<MiraAccountingItem>> call, Throwable t) {
+                public void onFailure(retrofit2.Call<List<MiraAccountingItem>> call, Throwable t) {
                     isLoading.setValue(false);
                     loadMockTrialBalance();
                 }
@@ -440,12 +438,12 @@ public class MiraAccountingFragment extends Fragment {
 
     public interface AccountingApiService {
         @GET("accounting/journal-entries")
-        Call<List<MiraAccountingItem>> getJournalEntries();
+        retrofit2.Call<List<MiraAccountingItem>> getJournalEntries();
 
         @GET("accounting/chart-of-accounts")
-        Call<List<MiraAccountingItem>> getChartOfAccounts();
+        retrofit2.Call<List<MiraAccountingItem>> getChartOfAccounts();
 
         @GET("accounting/trial-balance")
-        Call<List<MiraAccountingItem>> getTrialBalance();
+        retrofit2.Call<List<MiraAccountingItem>> getTrialBalance();
     }
 }
