@@ -3,8 +3,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0B0F17"
-    android:orientation="vertical">
+    android:background="?android:attr/colorBackground"
+    android:orientation="vertical"
+    android:layoutDirection="rtl">
 
     <!-- Header / Status Bar Container -->
     <LinearLayout
@@ -13,14 +14,15 @@
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="16dp"
-        android:paddingVertical="12dp">
+        android:paddingVertical="12dp"
+        android:background="?attr/colorPrimary">
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="MIRA Bridge™ v2.4"
-            android:textColor="#FFFFFF"
+            android:text="MIRA Scan™"
+            android:textColor="?attr/colorOnPrimary"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -37,21 +39,20 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Navigation Tabs (Scan, Locator, Radar, Settings) -->
+    <!-- Navigation Tabs -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="40dp"
-        android:background="#111827"
+        android:background="?attr/colorSurfaceVariant"
         android:orientation="horizontal">
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:background="@drawable/bg_tab_active"
             android:gravity="center"
             android:text="Scan"
-            android:textColor="#38BDF8"
+            android:textColor="?attr/colorPrimary"
             android:textSize="13sp"
             android:textStyle="bold" />
 
@@ -61,7 +62,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="Locator"
-            android:textColor="#64748B"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="13sp" />
 
         <TextView
@@ -70,7 +71,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="Radar"
-            android:textColor="#64748B"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="13sp" />
 
         <TextView
@@ -79,7 +80,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="Settings"
-            android:textColor="#64748B"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="13sp" />
     </LinearLayout>
 
@@ -98,9 +99,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="100dp"
                 android:layout_marginBottom="12dp"
-                app:cardBackgroundColor="#0F172A"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="12dp"
-                app:cardElevation="0dp">
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="?attr/colorOutline">
 
                 <RelativeLayout
                     android:layout_width="match_parent"
@@ -112,7 +115,7 @@
                         android:layout_height="2dp"
                         android:layout_centerInParent="true"
                         android:layout_marginHorizontal="24dp"
-                        android:background="#EF4444" />
+                        android:background="?attr/colorError" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -121,7 +124,7 @@
                         android:layout_centerHorizontal="true"
                         android:layout_marginBottom="8dp"
                         android:text="AUTO-DISCOVERY SCANNER"
-                        android:textColor="#475569"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp"
                         android:textStyle="bold" />
                 </RelativeLayout>
@@ -134,7 +137,7 @@
                 android:layout_marginBottom="12dp"
                 android:gravity="center"
                 android:text="📡  🏷️  🔲  🔳\nHYBRID ENGINE ACTIVE"
-                android:textColor="#94A3B8"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="10sp"
                 android:textStyle="bold" />
 
@@ -151,10 +154,11 @@
                     android:layout_height="44dp"
                     android:layout_marginEnd="8dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_dark_input"
+                    android:background="?attr/colorSurfaceVariant"
                     android:paddingHorizontal="12dp"
-                    android:text="MIRA-26000101"
-                    android:textColor="#FACE15"
+                    android:hint="MIRA-26000101"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textColorHint="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp"
                     android:textStyle="bold" />
 
@@ -162,9 +166,9 @@
                     android:id="@+id/btnScan"
                     android:layout_width="90dp"
                     android:layout_height="44dp"
-                    android:background="@drawable/bg_blue_btn"
+                    android:backgroundTint="?attr/colorPrimary"
                     android:text="SCAN"
-                    android:textColor="#FFFFFF"
+                    android:textColor="?attr/colorOnPrimary"
                     android:textSize="13sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -174,20 +178,22 @@
                 android:id="@+id/cardMiraResult"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="#111827"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="12dp"
-                app:cardElevation="0dp">
+                app:cardElevation="2dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="?attr/colorOutline">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
-                    <!-- Green Status Header -->
+                    <!-- Status Header -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="@drawable/bg_passed_header"
+                        android:background="?attr/colorPrimary"
                         android:gravity="center"
                         android:paddingVertical="8dp">
 
@@ -196,7 +202,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="✓ PASSED — AUTHORIZED DISPATCH"
-                            android:textColor="#4ADE80"
+                            android:textColor="?attr/colorOnPrimary"
                             android:textSize="12sp"
                             android:textStyle="bold" />
                     </LinearLayout>
@@ -214,24 +220,24 @@
                             android:layout_height="wrap_content"
                             android:gravity="center"
                             android:text="21K Gold Ring with Diamond"
-                            android:textColor="#FFFFFF"
+                            android:textColor="?attr/colorOnSurface"
                             android:textSize="14sp"
                             android:textStyle="bold" />
 
-                        <!-- Metric Grid Boxes (Purity, Weight, Value) -->
+                        <!-- Metric Grid Boxes -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
                             android:orientation="horizontal">
 
-                            <!-- Box 1 -->
+                            <!-- Purity -->
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_marginEnd="4dp"
                                 android:layout_weight="1"
-                                android:background="@drawable/bg_metric_box"
+                                android:background="?attr/colorSurfaceVariant"
                                 android:gravity="center"
                                 android:orientation="vertical"
                                 android:padding="8dp">
@@ -240,7 +246,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="PURITY"
-                                    android:textColor="#64748B"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
                                     android:textSize="9sp" />
 
                                 <TextView
@@ -248,18 +254,18 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="21K"
-                                    android:textColor="#FFFFFF"
+                                    android:textColor="?attr/colorOnSurface"
                                     android:textSize="13sp"
                                     android:textStyle="bold" />
                             </LinearLayout>
 
-                            <!-- Box 2 -->
+                            <!-- Weight -->
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_marginHorizontal="2dp"
                                 android:layout_weight="1"
-                                android:background="@drawable/bg_metric_box"
+                                android:background="?attr/colorSurfaceVariant"
                                 android:gravity="center"
                                 android:orientation="vertical"
                                 android:padding="8dp">
@@ -268,7 +274,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="WEIGHT"
-                                    android:textColor="#64748B"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
                                     android:textSize="9sp" />
 
                                 <TextView
@@ -276,18 +282,18 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="5.20g"
-                                    android:textColor="#FFFFFF"
+                                    android:textColor="?attr/colorOnSurface"
                                     android:textSize="13sp"
                                     android:textStyle="bold" />
                             </LinearLayout>
 
-                            <!-- Box 3 -->
+                            <!-- Value -->
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="4dp"
                                 android:layout_weight="1"
-                                android:background="@drawable/bg_metric_box"
+                                android:background="?attr/colorSurfaceVariant"
                                 android:gravity="center"
                                 android:orientation="vertical"
                                 android:padding="8dp">
@@ -296,7 +302,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="VALUE"
-                                    android:textColor="#64748B"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
                                     android:textSize="9sp" />
 
                                 <TextView
@@ -304,7 +310,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="$1,200"
-                                    android:textColor="#FACE15"
+                                    android:textColor="?attr/colorPrimary"
                                     android:textSize="13sp"
                                     android:textStyle="bold" />
                             </LinearLayout>
@@ -321,7 +327,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="SN: MIRA-26000101"
-                                android:textColor="#64748B"
+                                android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="10sp" />
 
                             <TextView
