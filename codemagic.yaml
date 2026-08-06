@@ -5,9 +5,6 @@ workflows:
     environment:
       vars:
         PACKAGE_NAME: "com.mira.jewelry.enterprise"
-      android_signing:
-        - skip_sign:
-            ignore_warnings: true
     scripts:
       - name: Build debug APK
         script: |
