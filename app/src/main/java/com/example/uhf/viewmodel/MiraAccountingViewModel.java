@@ -67,20 +67,19 @@ public class MiraAccountingViewModel extends AndroidViewModel {
                 for (int i = 0; i < entriesArray.length(); i++) {
                     JSONObject obj = entriesArray.getJSONObject(i);
                     
-                    String id = obj.optString("id", String.valueOf(i + 1));
-                    String title = obj.optString("description", obj.optString("title", "قيد محاسبي"));
-                    String amount = obj.optString("amount", "0.00");
+                    String entryNo = obj.optString("id", String.valueOf(i + 1));
+                    String description = obj.optString("description", obj.optString("title", "قيد محاسبي"));
+                    String debit = obj.optString("debit", "0.00");
+                    String credit = obj.optString("credit", "0.00");
                     String date = obj.optString("created_at", obj.optString("date", ""));
-                    String status = obj.optString("status", "مكتمل");
 
-                    // استخدام الكونستركتور المطابق لـ MiraAccountingItem
                     list.add(new MiraAccountingItem(
-                            MiraAccountingItem.ItemType.JOURNAL_ENTRY, // أو النوع المعرف داخل Enum الكلاس
-                            id,
-                            title,
-                            amount,
-                            date,
-                            status
+                            MiraAccountingItem.ItemType.JOURNAL_ENTRY,
+                            entryNo,
+                            description,
+                            debit,
+                            credit,
+                            date
                     ));
                 }
             }
