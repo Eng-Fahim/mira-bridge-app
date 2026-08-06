@@ -555,7 +555,7 @@ public class MiraReportsFragment extends Fragment {
             File file = new File(path, "MIRA_Report_" + currentReportType + ".csv");
 
             FileOutputStream fos = new FileOutputStream(file);
-            OutputStreamWriter writer = new OutputStreamWriter(fos, StandardCharsets.UTF-8);
+            OutputStreamWriter writer = new OutputStreamWriter(fos, StandardCharsets.UTF_8);
             writer.write("\uFEFF"); // BOM for Excel UTF-8 support
 
             writer.write(isArabic ? "تقرير MIRA,التاريخ: " + new Date().toString() + "\n\n" : "MIRA Report,Date: " + new Date().toString() + "\n\n");
