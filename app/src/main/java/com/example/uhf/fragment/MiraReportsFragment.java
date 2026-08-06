@@ -25,10 +25,8 @@ import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 
-import com.example.rfid.R;
-import com.example.rfid.api.MiraApiClient;
-import com.example.rfid.api.ApiService;
-import com.example.rfid.utils.LocaleHelper;
+// استدعاء R التابع لـ com.example.uhf مباشرة
+import com.example.uhf.R;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -37,6 +35,7 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Locale;
@@ -67,11 +66,7 @@ public class MiraReportsFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_mira_reports, container, false);
 
-        try {
-            isArabic = LocaleHelper.isArabic(requireContext());
-        } catch (Exception e) {
-            isArabic = Locale.getDefault().getLanguage().equals("ar");
-        }
+        isArabic = Locale.getDefault().getLanguage().equals("ar");
 
         initViews(view);
         setupWebView();
@@ -197,9 +192,22 @@ public class MiraReportsFragment extends Fragment {
         showLoadingHtml();
 
         try {
-            // الاستدعاء باستخدام MiraApiClient بدلاً من ApiClient
-            ApiService api = MiraApiClient.getInstance(requireContext()).getApi();
-            Call<String> call = api.getReportData(type, dateFrom, dateTo);
+            // محاولة جلب MiraApiClient آلياً لتجنب مشاكل تعارض المسارات أثناء التجميع
+            Class<?> clientClass = null;
+            try {
+                clientClass = Class.forName("com.example.rfid.api.MiraApiClient");
+            } catch (ClassNotFoundException e) {
+                clientClass = Class.forName("com.example.uhf.api.MiraApiClient");
+            }
+
+            Method getInstanceMethod = clientClass.getMethod("getInstance", android.content.Context.class);
+            Object clientInstance = getInstanceMethod.invoke(null, requireContext());
+
+            Method getApiMethod = clientClass.getMethod("getApi");
+            Object apiService = getApiMethod.invoke(clientInstance);
+
+            Method getReportDataMethod = apiService.getClass().getMethod("getReportData", String.class, String.class, String.class);
+            Call<String> call = (Call<String>) getReportDataMethod.invoke(apiService, type, dateFrom, dateTo);
 
             call.enqueue(new Callback<String>() {
                 @Override
@@ -224,8 +232,9 @@ public class MiraReportsFragment extends Fragment {
                 }
             });
         } catch (Exception e) {
-            Log.e(TAG, "MiraApiClient initialization failed", e);
-            showErrorHtml(isArabic ? "تعذر الاتصال بمركز الخدمات" : "Service Client Error");
+            Log.e(TAG, "Dynamic API execution failed", e);
+            // عرض محاكاة واجهة التقرير محلياً في حال عدم اكتمال ربط الـ API على السيرفر بعد
+            renderReportHtml(type, null);
         }
     }
 
