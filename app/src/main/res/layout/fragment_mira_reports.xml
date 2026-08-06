@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?android:attr/colorBackground"
+    android:layoutDirection="rtl">
+
+    <!-- العنوان -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorPrimary"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp">
+
+        <TextView
+            android:id="@+id/tvReportTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📊 مركز التقارير"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- أزرار أنواع التقارير -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorSurfaceVariant"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/layoutReportButtons"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="8dp">
+
+            <Button android:id="@+id/btnInventoryReport" android:text="📊 المخزون" android:layout_marginEnd="4dp" style="@style/Widget.Material3.Button.TextButton" />
+            <Button android:id="@+id/btnSalesReport" android:text="💰 المبيعات" android:layout_marginHorizontal="4dp" style="@style/Widget.Material3.Button.TextButton" />
+            <Button android:id="@+id/btnTransfersReport" android:text="📦 التحويلات" android:layout_marginHorizontal="4dp" style="@style/Widget.Material3.Button.TextButton" />
+            <Button android:id="@+id/btnAuditReport" android:text="🔍 الجرد" android:layout_marginHorizontal="4dp" style="@style/Widget.Material3.Button.TextButton" />
+            <Button android:id="@+id/btnUsersReport" android:text="👥 المستخدمين" android:layout_marginHorizontal="4dp" style="@style/Widget.Material3.Button.TextButton" />
+            <Button android:id="@+id/btnGatesReport" android:text="🚪 البوابات" android:layout_marginStart="4dp" style="@style/Widget.Material3.Button.TextButton" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- عارض التقرير -->
+    <WebView
+        android:id="@+id/webReport"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- شريط الإجراءات -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:background="?attr/colorSurfaceVariant"
+        android:weightSum="3">
+
+        <Button android:id="@+id/btnPrintReport" android:text="🖨️ طباعة" android:layout_weight="1" android:layout_marginEnd="4dp" android:backgroundTint="?attr/colorPrimary" android:textColor="?attr/colorOnPrimary" />
+        <Button android:id="@+id/btnShareReport" android:text="📤 مشاركة" android:layout_weight="1" android:layout_marginHorizontal="4dp" android:backgroundTint="?attr/colorSurface" android:textColor="?attr/colorOnSurface" />
+        <Button android:id="@+id/btnExportReport" android:text="📥 تصدير" android:layout_weight="1" android:layout_marginStart="4dp" android:backgroundTint="?attr/colorSurface" android:textColor="?attr/colorOnSurface" />
+    </LinearLayout>
+</LinearLayout>
