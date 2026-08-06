@@ -26,30 +26,82 @@
             android:textColor="?attr/colorOnPrimary"
             android:textSize="16sp"
             android:textStyle="bold" />
-    </LinearLayout>
 
-    <!-- أزرار أنواع التقارير -->
-    <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="?attr/colorSurfaceVariant"
-        android:scrollbars="none">
-
-        <LinearLayout
-            android:id="@+id/layoutReportButtons"
+        <TextView
+            android:id="@+id/tvDateRange"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="8dp">
+            android:text="كل التواريخ"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="10sp"
+            android:alpha="0.8" />
+    </LinearLayout>
 
-            <Button android:id="@+id/btnInventoryReport" android:text="📊 المخزون" android:layout_marginEnd="4dp" style="@style/Widget.Material3.Button.TextButton" />
-            <Button android:id="@+id/btnSalesReport" android:text="💰 المبيعات" android:layout_marginHorizontal="4dp" style="@style/Widget.Material3.Button.TextButton" />
-            <Button android:id="@+id/btnTransfersReport" android:text="📦 التحويلات" android:layout_marginHorizontal="4dp" style="@style/Widget.Material3.Button.TextButton" />
-            <Button android:id="@+id/btnAuditReport" android:text="🔍 الجرد" android:layout_marginHorizontal="4dp" style="@style/Widget.Material3.Button.TextButton" />
-            <Button android:id="@+id/btnUsersReport" android:text="👥 المستخدمين" android:layout_marginHorizontal="4dp" style="@style/Widget.Material3.Button.TextButton" />
-            <Button android:id="@+id/btnGatesReport" android:text="🚪 البوابات" android:layout_marginStart="4dp" style="@style/Widget.Material3.Button.TextButton" />
+    <!-- اختيار التقرير -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="10dp"
+        android:background="?attr/colorSurfaceVariant">
+
+        <Spinner
+            android:id="@+id/spReportType"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:background="?attr/colorSurface"
+            android:paddingHorizontal="12dp" />
+
+        <!-- الفلاتر -->
+        <LinearLayout
+            android:id="@+id/layoutReportFilters"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+
+            <Spinner
+                android:id="@+id/spBranchFilter"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="2"
+                android:layout_marginEnd="4dp"
+                android:background="?attr/colorSurface" />
+
+            <Button
+                android:id="@+id/btnDateFrom"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="2dp"
+                android:text="من"
+                android:textSize="11sp"
+                android:backgroundTint="?attr/colorSurface"
+                android:textColor="?attr/colorOnSurface" />
+
+            <Button
+                android:id="@+id/btnDateTo"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="2dp"
+                android:text="إلى"
+                android:textSize="11sp"
+                android:backgroundTint="?attr/colorSurface"
+                android:textColor="?attr/colorOnSurface" />
+
+            <Button
+                android:id="@+id/btnApplyFilter"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="تطبيق"
+                android:textSize="11sp"
+                android:backgroundTint="?attr/colorPrimary"
+                android:textColor="?attr/colorOnPrimary" />
         </LinearLayout>
-    </HorizontalScrollView>
+    </LinearLayout>
 
     <!-- عارض التقرير -->
     <WebView
@@ -58,17 +110,19 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <!-- شريط الإجراءات -->
+    <!-- أزرار الإجراءات -->
     <LinearLayout
+        android:id="@+id/layoutReportActions"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="10dp"
+        android:padding="8dp"
         android:background="?attr/colorSurfaceVariant"
-        android:weightSum="3">
+        android:weightSum="4">
 
-        <Button android:id="@+id/btnPrintReport" android:text="🖨️ طباعة" android:layout_weight="1" android:layout_marginEnd="4dp" android:backgroundTint="?attr/colorPrimary" android:textColor="?attr/colorOnPrimary" />
-        <Button android:id="@+id/btnShareReport" android:text="📤 مشاركة" android:layout_weight="1" android:layout_marginHorizontal="4dp" android:backgroundTint="?attr/colorSurface" android:textColor="?attr/colorOnSurface" />
-        <Button android:id="@+id/btnExportReport" android:text="📥 تصدير" android:layout_weight="1" android:layout_marginStart="4dp" android:backgroundTint="?attr/colorSurface" android:textColor="?attr/colorOnSurface" />
+        <Button android:id="@+id/btnPrintReport" android:text="🖨️ طباعة" android:layout_weight="1" android:layout_marginEnd="3dp" android:textSize="11sp" android:backgroundTint="?attr/colorPrimary" android:textColor="?attr/colorOnPrimary" />
+        <Button android:id="@+id/btnShareReport" android:text="📤 مشاركة" android:layout_weight="1" android:layout_marginHorizontal="3dp" android:textSize="11sp" android:backgroundTint="?attr/colorSurface" android:textColor="?attr/colorOnSurface" />
+        <Button android:id="@+id/btnExportPDF" android:text="📄 PDF" android:layout_weight="1" android:layout_marginHorizontal="3dp" android:textSize="11sp" android:backgroundTint="?attr/colorSurface" android:textColor="?attr/colorOnSurface" />
+        <Button android:id="@+id/btnExportExcel" android:text="📊 Excel" android:layout_weight="1" android:layout_marginStart="3dp" android:textSize="11sp" android:backgroundTint="?attr/colorSurface" android:textColor="?attr/colorOnSurface" />
     </LinearLayout>
 </LinearLayout>
