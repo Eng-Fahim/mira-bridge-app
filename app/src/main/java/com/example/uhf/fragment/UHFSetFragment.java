@@ -18,7 +18,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.example.uhf.R;
-import com.example.uhf.activity.MainActivity;
+import com.example.uhf.activity.UHFMainActivity;
 
 public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListener {
 
@@ -34,8 +34,8 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
     private Button btnSaveOrgProfile, btnTestMiraConnection, btnSetFrequency, btnGetFrequency, btnSetPower, btnGetPower;
     private Button btnSetFreHop, btnSetLinkParams, btnGetLinkParams, btnSetMemoryBank, btnGetMemoryBank, btnSetSession, btnGetSession;
     private Button btnSetFastInventory, btnGetFastInventory, btnSaveAllSettings, btnFactoryReset;
+    private UHFMainActivity mContext;
 
-    private MainActivity mContext;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -45,7 +45,8 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        mContext = (MainActivity) getActivity();
+        
+        mContext = (UHFMainActivity) getActivity();
 
         initViews(view);
         initListeners();
