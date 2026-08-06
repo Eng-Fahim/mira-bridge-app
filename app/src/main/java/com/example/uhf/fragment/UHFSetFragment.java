@@ -24,9 +24,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
-import com.mira.rfid.MainActivity;
-import com.mira.rfid.R;
-import com.mira.rfid.utils.LocaleHelper;
+// ⚠️ تعديل الاستيرادات المسببة للخطأ إلى الحزمة الصحيحة com.example.uhf
+import com.example.uhf.R;
+import com.example.uhf.activity.UHFMainActivity; // أو MainActivity حسب الاسم المستخدَم
 import com.rscja.deviceapi.RFIDWithUHFUART;
 
 import java.util.ArrayList;
@@ -37,7 +37,7 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
     private static final String TAG = "UHFSetFragment";
     private static final String PREFS_NAME = "Mira_UHF_Settings";
 
-    private MainActivity mContext;
+    private UHFMainActivity mContext;
     private RFIDWithUHFUART mReader;
 
     // UI Elements - Power & Region
@@ -85,8 +85,8 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
     @Override
     public void onAttach(@NonNull Context context) {
         super.onAttach(context);
-        if (context instanceof MainActivity) {
-            mContext = (MainActivity) context;
+        if (context instanceof UHFMainActivity) {
+            mContext = (UHFMainActivity) context;
         }
     }
 
@@ -95,8 +95,6 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_uhf_set, container, false);
-
-        isArabic = LocaleHelper.isArabic(requireContext());
 
         initViews(view);
         initSpinners();
@@ -296,9 +294,6 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
         else if (id == R.id.btn_get_all) loadAllSettingsFromHardware();
     }
 
-    /**
-     * إيقاف القارئ بأمان تام قبل أي حوار للـ Hardware لتفادي تجمد الواجهة (Thread Lock)
-     */
     private boolean safeStopInventory() {
         if (mReader != null) {
             try {
@@ -311,7 +306,7 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
     }
 
     // =========================================================================
-    // 1. Power (قدرة إشارة الهوائي)
+    // Power
     // =========================================================================
     private void getPower() {
         if (!checkReaderConnected()) return;
@@ -352,7 +347,7 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
     }
 
     // =========================================================================
-    // 2. Region / Frequency
+    // Region / Frequency
     // =========================================================================
     private void getRegion() {
         if (!checkReaderConnected()) return;
@@ -380,7 +375,7 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
     }
 
     // =========================================================================
-    // 3. Frequency Hopping
+    // Frequency Hopping
     // =========================================================================
     private void getFreHop() {
         if (!checkReaderConnected()) return;
@@ -403,7 +398,7 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
     }
 
     // =========================================================================
-    // 4. Session, Target & Q Value
+    // Session, Target & Q Value
     // =========================================================================
     private void getSession() {
         if (!checkReaderConnected()) return;
@@ -425,7 +420,7 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
         int session = spSession.getSelectedItemPosition();
         int target = spTarget.getSelectedItemPosition();
         int qIdx = spQValue.getSelectedItemPosition();
-        int qVal = (qIdx == 0) ? 3 : (qIdx - 1); // 3 Default if auto
+        int qVal = (qIdx == 0) ? 3 : (qIdx - 1);
 
         safeStopInventory();
         boolean res1 = mReader.setGen2Session(session);
@@ -443,7 +438,7 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
     }
 
     // =========================================================================
-    // 5. Fast ID & Tag Focus
+    // Fast ID & Tag Focus
     // =========================================================================
     private void getFastID() {
         if (!checkReaderConnected()) return;
@@ -488,7 +483,7 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
     }
 
     // =========================================================================
-    // 6. Tag Mask Filtering
+    // Tag Mask Filtering
     // =========================================================================
     private void getMask() {
         showToast(isArabic ? "جلب إعدادات قناع التصفية (Mask)" : "Mask settings loaded");
@@ -522,7 +517,7 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
     }
 
     // =========================================================================
-    // 7. Link Frequency
+    // Link Frequency
     // =========================================================================
     private void getLinkFreq() {
         if (!checkReaderConnected()) return;
@@ -548,7 +543,7 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
     }
 
     // =========================================================================
-    // 8. Dynamic Power
+    // Dynamic Power
     // =========================================================================
     private void getDynamicPower() {
         if (!checkReaderConnected()) return;
@@ -572,7 +567,7 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
     }
 
     // =========================================================================
-    // 9. Beeper & Audio Profiles
+    // Beeper
     // =========================================================================
     private void getBeeper() {
         SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -590,13 +585,13 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
     }
 
     // =========================================================================
-    // 10. Global Load, Save & Factory Reset
+    // Factory Reset & Save
     // =========================================================================
     private void factoryReset() {
         safeStopInventory();
 
-        int defaultPower = 26; // Ideal value for Jewelry Tagging
-        int defaultRegion = 0; // US
+        int defaultPower = 26;
+        int defaultRegion = 0;
 
         if (mReader != null) {
             mReader.setPower(defaultPower);
@@ -658,7 +653,7 @@ public class UHFSetFragment extends Fragment implements View.OnClickListener {
     }
 
     // =========================================================================
-    // Helper Utilities & Storage
+    // Helper Utilities
     // =========================================================================
     private boolean checkReaderConnected() {
         if (mReader == null && mContext != null) {
