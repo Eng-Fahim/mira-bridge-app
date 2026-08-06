@@ -113,7 +113,31 @@ public class MiraSettingsManager {
     public long getLong(String key, long defaultValue) {
         return prefs.getLong(key, defaultValue);
     }
+
+        // =============================================
+    // 🟢 دوال عامة لاسترجاع الإعدادات (متوافقة مع getSetting)
+    // =============================================
     
+    public String getSetting(String key, String defaultValue) {
+        return getString(key, defaultValue);
+    }
+
+    public boolean getSetting(String key, boolean defaultValue) {
+        return getBoolean(key, defaultValue);
+    }
+
+    public int getSetting(String key, int defaultValue) {
+        return getInt(key, defaultValue);
+    }
+
+    public float getSetting(String key, float defaultValue) {
+        return getFloat(key, defaultValue);
+    }
+
+    public long getSetting(String key, long defaultValue) {
+        return getLong(key, defaultValue);
+    }
+
     // =============================================
     // 🟢 إدارة المستمعين (Listeners)
     // =============================================
