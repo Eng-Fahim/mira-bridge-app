@@ -25,7 +25,7 @@ public class MiraAccountingViewModel extends ViewModel {
     // دالة طلب القيود اليومية من السيرفر
     public void fetchJournalEntries() {
         isLoading.setValue(true);
-        ApiClient.getApiService().getJournalEntries().enqueue(new Callback<List<MiraAccountingItem>>() {
+        MiraApiClient.getApiService().getJournalEntries().enqueue(new Callback<List<MiraAccountingItem>>() {
             @Override
             public void onResponse(Call<List<MiraAccountingItem>> call, Response<List<MiraAccountingItem>> response) {
                 isLoading.setValue(false);
