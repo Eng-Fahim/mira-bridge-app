@@ -158,11 +158,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
         if (mTabHost != null) {
             String currentTabTag = mTabHost.getCurrentTabTag();
-            Fragment fragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
-            if (fragment instanceof MiraIdentityStudioFragment && fragment.isVisible()) {
-                ((MiraIdentityStudioFragment) fragment).onRfidScanned(epc);
-            } else if (fragment instanceof MiraPosFragment && fragment.isVisible()) {
-                ((MiraPosFragment) fragment).onRingScanned(epc);
+            if (currentTabTag != null) {
+                Fragment fragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
+                if (fragment instanceof MiraIdentityStudioFragment && fragment.isVisible()) {
+                    ((MiraIdentityStudioFragment) fragment).onRfidScanned(epc);
+                } else if (fragment instanceof MiraPosFragment && fragment.isVisible()) {
+                    ((MiraPosFragment) fragment).onRingScanned(epc);
+                }
             }
         }
     }
@@ -180,6 +182,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
             mTabHost.setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
         }
+
+        mTabHost.setOnTabChangedListener(null);
 
         SessionManager.Role role = sessionManager.getUserRole();
 
@@ -253,9 +257,17 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             safeAddTab("BlockPermalock", isArabic ? "🔐 دائم" : "🔐 Permalock", BlockPermalockFragment.class);
             safeAddTab("Upgrade", isArabic ? "⬆️ ترقية" : "⬆️ Upgrade", UHFUpgradeFragment.class);
         }
+
+        mTabHost.setOnTabChangedListener(tabId -> {
+            try {
+                Log.d(TAG, "Switched to tab: " + tabId);
+            } catch (Exception e) {
+                Log.e(TAG, "Tab switch error: " + e.getMessage());
+                Toast.makeText(UHFMainActivity.this, "خطأ في تحميل التبويب: " + tabId, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
-    // دالة إضافة آمنة تمنع الانهيار الكامل في حال وجود Class متضارب
     private void safeAddTab(String tag, String label, Class<?> clazz) {
         try {
             if (Fragment.class.isAssignableFrom(clazz)) {
