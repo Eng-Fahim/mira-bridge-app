@@ -1,5 +1,5 @@
 package com.example.uhf.fragment;
-
+import android.content.Intent;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
