@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="?attr/colorSurface">
+
+    <TextView
+        android:id="@+id/tvBranchTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🏢 اختر الفرع"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="12dp" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvBranches"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="400dp" />
+
+    <TextView
+        android:id="@+id/tvBranchEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="لا توجد فروع متاحة"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:padding="24dp"
+        android:visibility="gone" />
+</LinearLayout>
