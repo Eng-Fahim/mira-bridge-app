@@ -103,7 +103,33 @@
             android:text="English 🇬🇧" />
     </RadioGroup>
 </LinearLayout>
+<!-- ✅ شعار الجهة -->
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:layout_marginBottom="12dp">
 
+    <ImageView
+        android:id="@+id/ivOrgLogo"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:src="@drawable/ic_luxury_mira_logo"
+        android:background="?attr/colorSurfaceVariant"
+        android:padding="12dp"
+        android:contentDescription="شعار الجهة" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnPickLogo"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="36dp"
+        android:layout_marginTop="4dp"
+        android:text="📷 تغيير الشعار"
+        android:textColor="?attr/colorPrimary"
+        android:textSize="11sp" />
+</LinearLayout>
 <!-- ============================================ -->
 <!-- 🏢 بيانات الجهة (Organization Profile) -->
 <!-- ============================================ -->
