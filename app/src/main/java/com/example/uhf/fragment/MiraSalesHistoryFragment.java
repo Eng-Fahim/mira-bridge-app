@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -37,11 +38,13 @@ import java.util.concurrent.Executors;
 
 public class MiraSalesHistoryFragment extends Fragment {
 
+    private static final String TAG = "MiraSalesHistory";
+
     private RecyclerView rvSales;
     private TextView tvEmpty;
     private EditText etSearch;
     private ImageView btnRefresh;
-    
+
     private MiraSalesAdapter adapter;
     private final List<MiraSaleItem> saleList = new ArrayList<>();
     private final List<MiraSaleItem> filteredList = new ArrayList<>();
@@ -62,67 +65,119 @@ public class MiraSalesHistoryFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
-        apiClient = MiraApiClient.getInstance(requireContext());
-        branchesManager = MiraBranchesManager.getInstance(requireContext());
+        
+        if (getContext() != null) {
+            apiClient = MiraApiClient.getInstance(getContext());
+            branchesManager = MiraBranchesManager.getInstance(getContext());
+        }
 
         rvSales = view.findViewById(R.id.rvMiraSalesHistory);
         tvEmpty = view.findViewById(R.id.tvMiraEmptySales);
         etSearch = view.findViewById(R.id.etMiraSearchSales);
         btnRefresh = view.findViewById(R.id.btnMiraRefreshSales);
 
-        rvSales.setLayoutManager(new LinearLayoutManager(getContext()));
-        adapter = new MiraSalesAdapter(filteredList, this::openReceipt, isArabic);
-        rvSales.setAdapter(adapter);
+        if (rvSales != null) {
+            rvSales.setLayoutManager(new LinearLayoutManager(getContext()));
+            adapter = new MiraSalesAdapter(filteredList, this::openReceipt, isArabic);
+            rvSales.setAdapter(adapter);
+        }
 
-        btnRefresh.setOnClickListener(v -> loadSalesHistory());
+        if (btnRefresh != null) {
+            btnRefresh.setOnClickListener(v -> loadSalesHistory());
+        }
 
-        etSearch.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { filterSales(s.toString()); }
-            @Override public void afterTextChanged(Editable s) {}
-        });
+        if (etSearch != null) {
+            etSearch.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) { filterSales(s.toString()); }
+                @Override public void afterTextChanged(Editable s) {}
+            });
+        }
 
         loadSalesHistory();
     }
 
     private void loadSalesHistory() {
-        if (tvEmpty != null) tvEmpty.setVisibility(View.GONE);
+        if (!isAdded()) return;
+
+        if (tvEmpty != null) {
+            tvEmpty.setVisibility(View.VISIBLE);
+            tvEmpty.setText(isArabic ? "جاري تحميل المبيعات..." : "Loading sales...");
+        }
 
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
+                if (apiClient == null && getContext() != null) {
+                    apiClient = MiraApiClient.getInstance(getContext());
+                }
+
+                if (apiClient == null) {
+                    mainHandler.post(() -> showEmptyState(isArabic ? "⚠️ خطأ في تهيئة النظام" : "⚠️ System initialization error"));
+                    return;
+                }
+
                 MiraApiClient.ApiResponse response = apiClient.getSalesHistory();
 
                 if (response != null && response.isSuccess && response.data != null) {
-                    JSONArray sales = response.data.optJSONArray("sales");
+                    JSONArray sales = null;
+
+                    // مرونة في قراءة مصفوفة المبيعات بجميع احتمالات رد الـ REST API
+                    if (response.data.has("sales")) {
+                        sales = response.data.optJSONArray("sales");
+                    } else if (response.data.has("data")) {
+                        Object dataObj = response.data.opt("data");
+                        if (dataObj instanceof JSONArray) {
+                            sales = (JSONArray) dataObj;
+                        } else if (dataObj instanceof JSONObject) {
+                            sales = ((JSONObject) dataObj).optJSONArray("sales");
+                        }
+                    }
+
                     List<MiraSaleItem> items = new ArrayList<>();
 
-                    if (sales != null) {
+                    if (sales != null && sales.length() > 0) {
                         for (int i = 0; i < sales.length(); i++) {
                             JSONObject sale = sales.optJSONObject(i);
                             if (sale == null) continue;
 
                             MiraSaleItem item = new MiraSaleItem();
-                            item.saleId = sale.optString("sale_id", sale.optString("id", "—"));
-                            item.customerName = sale.optString("customer_name", isArabic ? "عميل" : "Customer");
-                            item.amount = sale.optDouble("final_amount", 0);
-                            item.itemCount = sale.optInt("item_count", sale.optInt("total_items", 0));
-                            item.paymentMethod = sale.optString("payment_method", "");
-                            item.date = sale.optString("created_at", "");
+                            item.saleId = sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")));
+                            item.customerName = sale.optString("customer_name", sale.optString("client_name", isArabic ? "عميل" : "Customer"));
+                            item.amount = sale.optDouble("final_amount", sale.optDouble("total_amount", sale.optDouble("amount", 0)));
+                            item.itemCount = sale.optInt("item_count", sale.optInt("total_items", sale.optInt("count", 0)));
+                            item.paymentMethod = sale.optString("payment_method", sale.optString("pay_type", "CASH"));
+                            item.date = sale.optString("created_at", sale.optString("date", ""));
                             item.rawJson = sale.toString();
                             items.add(item);
                         }
                     }
 
                     mainHandler.post(() -> {
+                        if (!isAdded()) return;
                         saleList.clear();
                         saleList.addAll(items);
-                        filterSales(etSearch.getText().toString());
+                        
+                        String currentQuery = etSearch != null ? etSearch.getText().toString() : "";
+                        filterSales(currentQuery);
+
+                        if (saleList.isEmpty()) {
+                            showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
+                        }
                     });
                 } else {
-                    mainHandler.post(() -> showEmptyState(isArabic ? "⚠️ تعذر تحميل المبيعات" : "⚠️ Failed to load sales"));
+                    String errorMsg = (response != null && response.error != null) ? response.error : "";
+                    Log.e(TAG, "Sales load failed code: " + (response != null ? response.code : -1) + ", error: " + errorMsg);
+                    mainHandler.post(() -> {
+                        if (!isAdded()) return;
+                        showEmptyState(isArabic ? "⚠️ تعذر تحميل المبيعات (" + (response != null ? response.code : "Error") + ")" : "⚠️ Failed to load sales");
+                    });
                 }
             } catch (Exception e) {
-                mainHandler.post(() -> showEmptyState(isArabic ? "⚠️ خطأ في التحميل" : "⚠️ Load error"));
+                Log.e(TAG, "Exception loading sales", e);
+                mainHandler.post(() -> {
+                    if (!isAdded()) return;
+                    showEmptyState(isArabic ? "⚠️ خطأ في الاتصال بالخادم" : "⚠️ Connection error");
+                });
             }
         });
     }
@@ -134,15 +189,18 @@ public class MiraSalesHistoryFragment extends Fragment {
         } else {
             String q = query.toLowerCase(Locale.ROOT);
             for (MiraSaleItem item : saleList) {
-                if (item.customerName.toLowerCase(Locale.ROOT).contains(q) || item.saleId.toLowerCase(Locale.ROOT).contains(q)) {
+                if ((item.customerName != null && item.customerName.toLowerCase(Locale.ROOT).contains(q)) || 
+                    (item.saleId != null && item.saleId.toLowerCase(Locale.ROOT).contains(q))) {
                     filteredList.add(item);
                 }
             }
         }
-        adapter.notifyDataSetChanged();
+        if (adapter != null) {
+            adapter.notifyDataSetChanged();
+        }
         if (tvEmpty != null) {
             tvEmpty.setVisibility(filteredList.isEmpty() ? View.VISIBLE : View.GONE);
-            if (filteredList.isEmpty()) {
+            if (filteredList.isEmpty() && !saleList.isEmpty()) {
                 tvEmpty.setText(isArabic ? "📭 لا توجد نتائج مطابقة" : "📭 No matching results");
             }
         }
@@ -159,7 +217,7 @@ public class MiraSalesHistoryFragment extends Fragment {
         try {
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).openReceiptFragment(sale.rawJson);
-            } else {
+            } else if (isAdded()) {
                 MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(sale.rawJson);
                 getParentFragmentManager().beginTransaction()
                     .replace(android.R.id.content, receipt)
@@ -167,7 +225,9 @@ public class MiraSalesHistoryFragment extends Fragment {
                     .commit();
             }
         } catch (Exception e) {
-            Toast.makeText(getContext(), isArabic ? "خطأ في فتح الإيصال" : "Error opening receipt", Toast.LENGTH_SHORT).show();
+            if (getContext() != null) {
+                Toast.makeText(getContext(), isArabic ? "خطأ في فتح الإيصال" : "Error opening receipt", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
