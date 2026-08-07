@@ -123,6 +123,8 @@
     <string name="online">● ONLINE</string>
     <string name="offline">● OFFLINE</string>
     <string name="pieces">قطعة</string>
+    <string name="greeting_default">مرحباً بك...</string>
+<string name="location_default">المعرض الرئيسي — الفرع الإقليمي</string>
     
     <!-- DeviceListActivity -->
     <string name="scanning">جاري البحث...</string>
