@@ -125,7 +125,56 @@
     <string name="pieces">قطعة</string>
     <string name="greeting_default">مرحباً بك...</string>
 <string name="location_default">المعرض الرئيسي — الفرع الإقليمي</string>
-    
+
+
+    <!-- Identity Studio Strings -->
+<string name="step_title">الخطوة 1 من 4: الربط والتصنيف</string>
+<string name="hint_epc">رمز الشريحة (EPC / GTIN)...</string>
+<string name="hint_title">عنوان ووصف القطعة</string>
+<string name="btn_save_identity">اعتماد الموزون وتصدير MIRA ID</string>
+<string name="btn_add_photos">📷 التقاط / إرفاق صور القطعة</string>
+<string name="no_photos">لم يتم إرفاق صور بعد</string>
+<string name="estimated_value_currency">ريال</string>
+<string name="classify_item">تصنيف القطعة</string>
+<string name="ring">💍 خاتم</string>
+<string name="set">💎 طقم</string>
+<string name="bracelet">📿 سوار</string>
+<string name="necklace">📐 عقد</string>
+<string name="metal_specs">مواصفات المعدن والوزن</string>
+<string name="metal_type">معدن القطعة:</string>
+<string name="yellow_gold">🟡 ذهب أصفر</string>
+<string name="white_gold">⚪ ذهب أبيض</string>
+<string name="rose_gold">🔴 ذهب وردي</string>
+<string name="karat">العيار:</string>
+<string name="gross_weight_label">الوزن القائم (جرام)</string>
+<string name="estimated_gold_value">القيمة التقديرية للذهب الخام:</string>
+<string name="stones_title">الأحجار والتطعيم</string>
+<string name="has_stones">هل القطعة مرصعة بأحجار / زركون؟</string>
+<string name="stone_type_hint">نوع الأحجار (مثال: ألماس، زركون، ياقوت...)</string>
+<string name="stone_weight_hint">وزن الأحجار (قيراط)</string>
+<string name="stone_count_hint">عدد الأحجار</string>
+<string name="stone_value_hint">القيمة الإضافية للأحجار ($)</string>
+<string name="photos_title">صور القطعة والاعتماد النهائي</string>
+<string name="bound">BOUND</string>
+<string name="waiting">WAITING</string>
+<string name="encoding">جاري التكويد...</string>
+<string name="camera_permission">صلاحية الكاميرا مطلوبة لالتقاط الصور</string>
+<string name="photo_captured">✅ تم التقاط الصورة بنجاح</string>
+<string name="no_camera">❌ لا يوجد تطبيق كاميرا متاح</string>
+<string name="rfid_required">يرجى مسح أو كتابة رمز RFID أولاً</string>
+<string name="title_required">يرجى كتابة عنوان القطعة</string>
+<string name="weight_required">يرجى تحديد وزن القطعة</string>
+<string name="invalid_weight">وزن غير صالح</string>
+<string name="encode_success">✅ تم تكويد القطعة وربطها بنجاح!</string>
+<string name="encode_failed">❌ فشل التكويد:</string>
+<string name="encode_error">❌ خطأ:</string>
+<string name="photos_attached">تم إرفاق (%d) صور</string>
+<string name="main_showroom">المعرض الرئيسي</string>
+<string name="category_jewelry">مجوهرات</string>
+<string name="category_rings">خواتم</string>
+<string name="category_sets">أطقم</string>
+<string name="category_bracelets">أساور</string>
+<string name="category_necklaces">عقود</string>
     <!-- DeviceListActivity -->
     <string name="scanning">جاري البحث...</string>
     <string name="select_device">حدد جهازاً</string>
