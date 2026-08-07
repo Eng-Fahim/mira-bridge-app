@@ -1,118 +1,112 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.swiperefreshlayout.widget.SwipeRefreshLayout 
+<FrameLayout 
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/swipeRefresh"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <FrameLayout
+    <!-- Shimmer Loading Placeholder -->
+    <LinearLayout
+        android:id="@+id/shimmerLayout"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="visible"
+        android:background="?android:attr/colorBackground">
 
-        <!-- ========== Shimmer Loading Placeholder ========== -->
-        <LinearLayout
-            android:id="@+id/shimmerLayout"
+        <View
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:padding="16dp"
-            android:visibility="visible">
+            android:layout_height="60dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/shimmer_background" />
 
-            <!-- Shimmer Header -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="180dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/shimmer_background" />
+
+        <View
+            android:layout_width="150dp"
+            android:layout_height="20dp"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/shimmer_background" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="90dp"
+            android:layout_marginBottom="16dp"
+            android:orientation="horizontal">
+
             <View
-                android:layout_width="match_parent"
-                android:layout_height="60dp"
-                android:layout_marginBottom="16dp"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
                 android:background="@drawable/shimmer_background" />
 
-            <!-- Shimmer Main Card -->
             <View
-                android:layout_width="match_parent"
-                android:layout_height="180dp"
-                android:layout_marginBottom="16dp"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginHorizontal="4dp"
+                android:layout_weight="1"
                 android:background="@drawable/shimmer_background" />
 
-            <!-- Shimmer Section Title -->
             <View
-                android:layout_width="150dp"
-                android:layout_height="20dp"
-                android:layout_marginBottom="12dp"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
                 android:background="@drawable/shimmer_background" />
-
-            <!-- Shimmer 3 Small Cards Row -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="90dp"
-                android:layout_marginBottom="16dp"
-                android:orientation="horizontal">
-
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginEnd="4dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/shimmer_background" />
-
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginHorizontal="4dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/shimmer_background" />
-
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="4dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/shimmer_background" />
-            </LinearLayout>
-
-            <!-- Shimmer Sales Card -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="70dp"
-                android:layout_marginBottom="16dp"
-                android:background="@drawable/shimmer_background" />
-
-            <!-- Shimmer Section Title -->
-            <View
-                android:layout_width="180dp"
-                android:layout_height="20dp"
-                android:layout_marginBottom="12dp"
-                android:background="@drawable/shimmer_background" />
-
-            <!-- Shimmer 2 Large Buttons Row -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="100dp"
-                android:orientation="horizontal">
-
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginEnd="6dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/shimmer_background" />
-
-                <View
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="6dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/shimmer_background" />
-            </LinearLayout>
         </LinearLayout>
 
-        <!-- ========== المحتوى الرئيسي (مخفي أثناء التحميل) ========== -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="70dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/shimmer_background" />
+
+        <View
+            android:layout_width="180dp"
+            android:layout_height="20dp"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/shimmer_background" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="100dp"
+            android:orientation="horizontal">
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/shimmer_background" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/shimmer_background" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- المحتوى الرئيسي مع SwipeRefresh -->
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefresh"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone">
+
         <androidx.core.widget.NestedScrollView
             android:id="@+id/mainContent"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="?android:attr/colorBackground"
-            android:fillViewport="true"
-            android:visibility="gone">
+            android:fillViewport="true">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -120,7 +114,7 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <!-- ================= 1. الهيدر ================= -->
+                <!-- Header -->
                 <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -159,13 +153,13 @@
                         android:background="?attr/colorSurfaceVariant"
                         android:paddingHorizontal="12dp"
                         android:paddingVertical="6dp"
-                        android:text="@string/online"
+                        android:text="● ONLINE"
                         android:textColor="?attr/colorPrimary"
                         android:textSize="11sp"
                         android:textStyle="bold" />
                 </RelativeLayout>
 
-                <!-- ================= 2. كرت الترحيب والساعة وبورصة الذهب ================= -->
+                <!-- Greeting Card -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -197,7 +191,7 @@
                                     android:id="@+id/tvGreeting"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="@string/greeting_default"
+                                    android:text="مرحباً بك..."
                                     android:textAlignment="viewStart"
                                     android:textColor="?attr/colorOnSurface"
                                     android:textSize="18sp"
@@ -208,7 +202,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="4dp"
-                                    android:text="@string/location_default"
+                                    android:text="المعرض الرئيسي"
                                     android:textAlignment="viewStart"
                                     android:textColor="?attr/colorOnSurfaceVariant"
                                     android:textSize="12sp" />
@@ -247,7 +241,7 @@
                             android:layout_height="1dp"
                             android:background="?attr/colorOutlineVariant" />
 
-                        <!-- أسعار الذهب اللحظية -->
+                        <!-- Gold Prices -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -256,7 +250,6 @@
                             android:paddingVertical="12dp"
                             android:weightSum="3">
 
-                            <!-- عيار 18 -->
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
@@ -267,7 +260,7 @@
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="@string/karat_18"
+                                    android:text="عيار 18"
                                     android:textColor="?attr/colorOnSurfaceVariant"
                                     android:textSize="11sp" />
 
@@ -287,7 +280,6 @@
                                 android:layout_height="match_parent"
                                 android:background="?attr/colorOutlineVariant" />
 
-                            <!-- عيار 21 -->
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
@@ -298,7 +290,7 @@
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="@string/karat_21"
+                                    android:text="عيار 21"
                                     android:textColor="?attr/colorOnSurfaceVariant"
                                     android:textSize="11sp" />
 
@@ -318,7 +310,6 @@
                                 android:layout_height="match_parent"
                                 android:background="?attr/colorOutlineVariant" />
 
-                            <!-- عيار 24 -->
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
@@ -329,7 +320,7 @@
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="@string/karat_24"
+                                    android:text="عيار 24"
                                     android:textColor="?attr/colorOnSurfaceVariant"
                                     android:textSize="11sp" />
 
@@ -347,12 +338,12 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- ================= 3. قسم المخزون والكتلة ================= -->
+                <!-- Inventory Section -->
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="10dp"
-                    android:text="@string/precious_inventory"
+                    android:text="المخزون الثمين والكتلة"
                     android:textAlignment="viewStart"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp"
@@ -365,7 +356,6 @@
                     android:orientation="horizontal"
                     android:weightSum="3">
 
-                    <!-- قطع مباعة (اليوم) -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="90dp"
@@ -387,7 +377,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="@string/sold_today"
+                                android:text="قطع مباعة"
                                 android:textAlignment="center"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="10sp" />
@@ -404,7 +394,6 @@
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- الوزن الكلي -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="90dp"
@@ -426,7 +415,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="@string/total_weight"
+                                android:text="الوزن الكلي"
                                 android:textAlignment="center"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="10sp" />
@@ -443,7 +432,6 @@
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- إجمالي القطع -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="90dp"
@@ -465,7 +453,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="@string/total_items"
+                                android:text="إجمالي القطع"
                                 android:textAlignment="center"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="10sp" />
@@ -483,7 +471,7 @@
                     </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
 
-                <!-- ================= 4. كرت ملخص المبيعات ================= -->
+                <!-- Sales Summary -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -501,7 +489,6 @@
                         android:paddingVertical="14dp"
                         android:weightSum="3">
 
-                        <!-- مبيعات اليوم -->
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -512,7 +499,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="@string/sales_today"
+                                android:text="مبيعات اليوم"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="11sp" />
 
@@ -532,7 +519,6 @@
                             android:layout_height="match_parent"
                             android:background="?attr/colorOutlineVariant" />
 
-                        <!-- مبيعات الشهر -->
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -543,7 +529,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="@string/sales_month"
+                                android:text="مبيعات الشهر"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="11sp" />
 
@@ -563,7 +549,6 @@
                             android:layout_height="match_parent"
                             android:background="?attr/colorOutlineVariant" />
 
-                        <!-- مبيعات السنة -->
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -574,7 +559,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="@string/sales_year"
+                                android:text="مبيعات السنة"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="11sp" />
 
@@ -591,12 +576,12 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- ================= 5. قسم العمليات الميدانية والمراقبة ================= -->
+                <!-- Operations Section -->
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="10dp"
-                    android:text="@string/field_operations"
+                    android:text="العمليات الميدانية والمراقبة"
                     android:textAlignment="viewStart"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp"
@@ -609,7 +594,6 @@
                     android:orientation="horizontal"
                     android:weightSum="2">
 
-                    <!-- رقابة بوابات الحماية -->
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/btnGateSecurity"
                         android:layout_width="0dp"
@@ -641,14 +625,13 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="8dp"
-                                android:text="@string/gate_security"
+                                android:text="رقابة بوابات الحماية"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="12sp"
                                 android:textStyle="bold" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- الجرد السريع بالـ RFID -->
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/btnRfidAudit"
                         android:layout_width="0dp"
@@ -680,7 +663,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="8dp"
-                                android:text="@string/rfid_audit"
+                                android:text="الجرد السريع بالـ RFID"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="12sp"
                                 android:textStyle="bold" />
@@ -689,5 +672,5 @@
                 </LinearLayout>
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
-    </FrameLayout>
-</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+</FrameLayout>
