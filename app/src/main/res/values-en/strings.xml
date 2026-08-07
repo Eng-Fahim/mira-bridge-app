@@ -4,6 +4,25 @@
     <string name="menu_profile">My Profile</string>
     <string name="menu_logout">Sign Out</string>
 
+
+    <!-- DASHBOARD-->
+    <string name="precious_inventory">Precious Inventory &amp; Mass</string>
+<string name="sold_today">Sold Today</string>
+<string name="total_weight">Total Weight</string>
+<string name="total_items">Total Items</string>
+<string name="sales_today">Today\'s Sales</string>
+<string name="sales_month">Monthly Sales</string>
+<string name="sales_year">Yearly Sales</string>
+<string name="field_operations">Field Operations &amp; Monitoring</string>
+<string name="gate_security">Gate Security Control</string>
+<string name="rfid_audit">RFID Quick Audit</string>
+<string name="karat_18">18K</string>
+<string name="karat_21">21K</string>
+<string name="karat_24">24K</string>
+<string name="updating">● Updating...</string>
+<string name="online">● ONLINE</string>
+<string name="offline">● OFFLINE</string>
+<string name="pieces">pcs</string>
     <!-- App -->
     <string name="app_name">MIRA Jewelry Enterprise™</string>
     <string name="action_settings">Settings</string>
