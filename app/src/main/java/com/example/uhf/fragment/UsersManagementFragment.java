@@ -1017,7 +1017,7 @@ public class UsersManagementFragment extends Fragment {
                 tvRole = v.findViewById(R.id.tvRowRole);
                 tvDepartment = v.findViewById(R.id.tvRowDepartment);
                 tvStatus = v.findViewById(R.id.tvRowStatus);
-                tvBranchName = v.findViewById(R.id.tvRowBranchName);
+                //tvBranchName = v.findViewById(R.id.tvRowBranchName);
                 vStatusDot = v.findViewById(R.id.vStatusDot);
                 btnEdit = v.findViewById(R.id.btnRowEdit);
                 btnDelete = v.findViewById(R.id.btnRowDelete);
