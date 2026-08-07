@@ -345,7 +345,8 @@ public class MiraReportsFragment extends Fragment {
             out.write(csv.toString().getBytes());
             out.close();
 
-            Uri uri = FileProvider.getUriForFile(requireContext(), requireContext().getPackageName() + ".fileprovider", file);
+            Uri uri = FileProvider.getUriForFile(requireContext(), 
+            requireContext().getPackageName() + ".fileprovider", file);
             Intent intent = new Intent(Intent.ACTION_SEND);
             intent.setType("text/csv");
             intent.putExtra(Intent.EXTRA_STREAM, uri);
