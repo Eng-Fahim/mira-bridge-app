@@ -1,12 +1,10 @@
 package com.example.uhf.fragment;
 
-import android.app.Dialog;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -91,8 +89,7 @@ public class MiraBranchPickerFragment extends BottomSheetDialogFragment {
 
     private void parseBranches(JSONObject data) {
         branchList.clear();
-        JSONArray branches = data.optJSONArray("data");
-        if (branches == null) branches = data.optJSONArray("branches");
+        JSONArray branches = data.optJSONArray("branches");
 
         if (branches != null) {
             for (int i = 0; i < branches.length(); i++) {
@@ -100,13 +97,13 @@ public class MiraBranchPickerFragment extends BottomSheetDialogFragment {
                 if (b == null) continue;
                 BranchItem item = new BranchItem();
                 item.id = b.optInt("id");
-                item.name = b.optString("name", "فرع " + (i + 1));
-                item.code = b.optString("code", "");
+                item.name = b.optString("branch_name", "فرع " + (i + 1));
+                item.code = b.optString("branch_code", "");
                 item.address = b.optString("address", "");
                 item.phone = b.optString("phone", "");
                 item.isActive = b.optString("status", "active").equals("active");
-                item.itemCount = b.optInt("item_count", 0);
-                item.employeeCount = b.optInt("employee_count", 0);
+                item.itemCount = b.optInt("inventory_count", 0);
+                item.employeeCount = b.optInt("user_count", 0);
                 branchList.add(item);
             }
         }
@@ -138,8 +135,7 @@ public class MiraBranchPickerFragment extends BottomSheetDialogFragment {
 
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            return new VH(LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_branch, parent, false));
+            return new VH(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_branch, parent, false));
         }
 
         @Override
