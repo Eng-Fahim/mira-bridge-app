@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0B0F17"
+    android:background="?android:attr/colorBackground"
     android:orientation="vertical"
     android:clickable="true"
     android:focusable="true">
@@ -12,7 +12,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#111827"
+        android:background="?attr/colorSurfaceVariant"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="16dp"
@@ -22,12 +22,11 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="📊 سجل المبيعات"
-            android:textColor="#FFFFFF"
+            android:text="@string/sales_title"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="18sp"
             android:textStyle="bold" />
 
-        <!-- Refresh Button -->
         <ImageView
             android:id="@+id/btnMiraRefreshSales"
             android:layout_width="32dp"
@@ -36,7 +35,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:padding="6dp"
             android:src="@android:drawable/ic_menu_rotate"
-            app:tint="#38BDF8" />
+            app:tint="?attr/colorPrimary" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -45,17 +44,17 @@
             android:paddingHorizontal="10dp"
             android:paddingVertical="4dp"
             android:text="MIRA Sales"
-            android:textColor="#38BDF8"
+            android:textColor="?attr/colorPrimary"
             android:textSize="10sp"
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Search / Filter Bar -->
+    <!-- Search Bar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="12dp"
-        android:background="@drawable/bg_search_box"
+        android:background="?attr/colorSurfaceVariant"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="12dp"
@@ -65,7 +64,7 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:src="@android:drawable/ic_menu_search"
-            app:tint="#64748B" />
+            app:tint="?attr/colorOnSurfaceVariant" />
 
         <EditText
             android:id="@+id/etMiraSearchSales"
@@ -73,11 +72,11 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:background="@android:color/transparent"
-            android:hint="ابحث برقم العملية أو اسم العميل..."
+            android:hint="@string/sales_search_hint"
             android:imeOptions="actionSearch"
             android:inputType="text"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#64748B"
+            android:textColor="?attr/colorOnSurface"
+            android:textColorHint="?attr/colorOnSurfaceVariant"
             android:textSize="14sp" />
     </LinearLayout>
 
@@ -88,8 +87,8 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="80dp"
         android:gravity="center"
-        android:text="📭 لا توجد عمليات بيع حتى الآن"
-        android:textColor="#64748B"
+        android:text="@string/sales_empty"
+        android:textColor="?attr/colorOnSurfaceVariant"
         android:textSize="16sp"
         android:visibility="gone" />
 
