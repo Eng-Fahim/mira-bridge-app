@@ -25,6 +25,7 @@ import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTabHost;
 import com.example.uhf.fragment.MiraBranchesManagementFragment;
 import com.example.uhf.R;
+import com.example.uhf.fragment.MiraReportsProFragment;
 import com.example.uhf.fragment.AuthenticateNxpUcodeDnaFragment;
 import com.example.uhf.fragment.BlockPermalockFragment;
 import com.example.uhf.fragment.BlockWriteFragment;
@@ -233,9 +234,10 @@ if (isManager) {
         }
 
         // 📈 التقارير
-        if (isManager) {
-            safeAddTab("Reports", isArabic ? "📈 التقارير" : "📈 Reports", MiraReportsFragment.class);
-        }
+        // 📊 التقارير الشاملة - للمدراء
+if (isManager) {
+    safeAddTab("ReportsPro", "📊 التقارير", MiraReportsProFragment.class);
+}
 
         // 💰 الإدارة المحاسبية والقيود - للمدراء والمحاسبين
         if (isManager || role == SessionManager.Role.AUDITOR) {
