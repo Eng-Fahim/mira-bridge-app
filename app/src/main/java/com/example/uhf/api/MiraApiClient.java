@@ -637,6 +637,28 @@ public class MiraApiClient {
         }
     }
 
+    // ✅ PUT with Auth
+    private ApiResponse putWithAuth(String endpoint, JSONObject payload) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(apiUrl + endpoint);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("PUT");
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
+            String token = getAuthToken();
+            if (!token.isEmpty()) conn.setRequestProperty("X-MIRA-Auth-Token", token);
+            conn.setConnectTimeout(15000); conn.setReadTimeout(15000); conn.setDoOutput(true);
+            if (payload != null) {
+                String jsonString = payload.toString();
+                try (OutputStream os = conn.getOutputStream()) { os.write(jsonString.getBytes("utf-8")); }
+            }
+            return buildResponse(conn);
+        } catch (Exception e) { return new ApiResponse(-1, null, e.getMessage()); }
+        finally { if (conn != null) conn.disconnect(); }
+    }
+
+
     private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
         int responseCode = conn.getResponseCode();
         InputStream is = (responseCode >= 200 && responseCode < 300) ?
