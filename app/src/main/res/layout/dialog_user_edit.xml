@@ -1,150 +1,74 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:fillViewport="true"
-    android:scrollbars="none">
+    android:layout_height="wrap_content">
 
-    <LinearLayout
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="20dp"
-    android:background="?attr/colorSurface">  <!-- ✅ أضف هذه الخلفية -->
-        
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fillViewport="true"
+        android:scrollbars="none">
 
-        <!-- العنوان مع أيقونة -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="20dp">
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:background="?attr/colorSurface">
 
-            <ImageView
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:src="@drawable/ic_person_outline"
-                android:tint="?attr/colorPrimary"
-                android:layout_marginEnd="12dp"
-                android:background="@drawable/circle_primary_bg"
-                android:padding="8dp" />
-
+            <!-- العنوان -->
             <LinearLayout
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="20dp">
 
-                <TextView
-                    android:id="@+id/tvDialogTitle"
-                    android:layout_width="wrap_content"
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@drawable/ic_person_outline"
+                    android:tint="?attr/colorPrimary"
+                    android:layout_marginEnd="12dp"
+                    android:background="@drawable/circle_primary_bg"
+                    android:padding="8dp" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="إضافة مستخدم جديد"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="17sp"
-                    android:textStyle="bold" />
+                    android:layout_weight="1"
+                    android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/tvDialogSubtitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="أدخل بيانات المستخدم والصلاحية المطلوبة"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="12sp"
-                    android:layout_marginTop="2dp" />
-            </LinearLayout>
-        </LinearLayout>
+                    <TextView
+                        android:id="@+id/tvDialogTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="إضافة مستخدم جديد"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
 
-        <!-- ⚡ شريط التقدم (خطوات) -->
-        <LinearLayout
-            android:id="@+id/stepsIndicator"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:layout_marginBottom="20dp">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/tvStep1"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:gravity="center"
-                    android:text="1"
-                    android:textColor="@android:color/white"
-                    android:textSize="13sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/circle_primary"
-                    android:layout_marginBottom="4dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="البيانات"
-                    android:textColor="?attr/colorPrimary"
-                    android:textSize="11sp" />
+                    <TextView
+                        android:id="@+id/tvDialogSubtitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="أدخل بيانات المستخدم والصلاحية"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="12sp"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
             </LinearLayout>
 
-            <View
-                android:id="@+id/vStepLine1"
-                android:layout_width="40dp"
-                android:layout_height="2dp"
-                android:background="?attr/colorPrimary"
-                android:layout_marginBottom="16dp" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/tvStep2"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:gravity="center"
-                    android:text="2"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="13sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/circle_outline"
-                    android:layout_marginBottom="4dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="الصلاحية"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="11sp" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- ==================== الخطوة 1: البيانات الأساسية ==================== -->
-        <LinearLayout
-            android:id="@+id/layoutStep1"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
+            <!-- الاسم الكامل -->
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="10dp"
+                android:layout_marginBottom="12dp"
                 android:hint="الاسم الكامل *"
                 app:startIconDrawable="@drawable/ic_person_outline"
                 app:startIconTint="?attr/colorPrimary"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                app:counterEnabled="true"
-                app:counterMaxLength="50">
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etDisplayName"
@@ -155,26 +79,43 @@
                     android:imeOptions="actionNext" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <com.google.android.material.textfield.TextInputLayout
+            <!-- اسم المستخدم -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="10dp"
-                android:hint="اسم المستخدم *"
-                app:startIconDrawable="@drawable/ic_user"
-                app:startIconTint="?attr/colorPrimary"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                app:counterEnabled="true"
-                app:counterMaxLength="30">
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etUsername"
-                    android:layout_width="match_parent"
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:inputType="text"
-                    android:textSize="14sp"
-                    android:imeOptions="actionNext" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_weight="1"
+                    android:hint="اسم المستخدم *"
+                    app:startIconDrawable="@drawable/ic_user"
+                    app:startIconTint="?attr/colorPrimary"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etUsername"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text"
+                        android:textSize="14sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <ImageButton
+                    android:id="@+id/btnSuggestUsername"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="6dp"
+                    android:background="?attr/colorSurfaceVariant"
+                    android:src="@android:drawable/ic_menu_my_calendar"
+                    android:tint="?attr/colorPrimary"
+                    android:contentDescription="اقتراح" />
+            </LinearLayout>
+
+            <!-- كلمة المرور -->
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -188,78 +129,69 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="textPassword"
-                    android:textSize="14sp"
-                    android:imeOptions="actionNext" />
+                    android:textSize="14sp" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- متطلبات كلمة المرور -->
-            <TextView
-                android:id="@+id/tvPasswordRequirements"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="كلمة المرور يجب أن تكون 6 أحرف على الأقل"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp"
-                android:layout_marginStart="4dp"
-                android:layout_marginBottom="8dp" />
-
-            <!-- أزرار توليد ونسخ واقتراح اسم المستخدم -->
+            <!-- أزرار كلمة المرور -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="10dp">
+                android:layout_marginBottom="4dp">
 
                 <ImageButton
                     android:id="@+id/btnGeneratePassword"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
                     android:background="?attr/colorSurfaceVariant"
                     android:src="@android:drawable/ic_menu_manage"
-                    android:contentDescription="توليد كلمة مرور" />
+                    android:tint="?attr/colorPrimary"
+                    android:contentDescription="توليد" />
 
                 <ImageButton
-    android:id="@+id/btnCopyPassword"
-    android:layout_width="38dp"
-    android:layout_height="38dp"
-    android:layout_marginStart="8dp"
-    android:background="?attr/colorSurfaceVariant"
-    android:src="@drawable/ic_menu_copy"
-    android:contentDescription="نسخ كلمة المرور" />
-
-
-                <ImageButton
-                    android:id="@+id/btnSuggestUsername"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:layout_marginStart="8dp"
+                    android:id="@+id/btnCopyPassword"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="6dp"
                     android:background="?attr/colorSurfaceVariant"
-                    android:src="@android:drawable/ic_menu_my_calendar"
-                    android:contentDescription="اقتراح اسم مستخدم" />
+                    android:src="@drawable/ic_menu_copy"
+                    android:tint="?attr/colorPrimary"
+                    android:contentDescription="نسخ" />
+
+                <TextView
+                    android:id="@+id/tvPasswordRequirements"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="كلمة المرور يجب أن تكون 8 أحرف"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="10sp"
+                    android:layout_marginStart="8dp" />
             </LinearLayout>
 
-            <!-- شريط قوة كلمة المرور -->
+            <!-- قوة كلمة المرور -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginBottom="10dp"
+                android:layout_marginBottom="12dp"
                 android:gravity="center_vertical">
 
-                <View android:id="@+id/vStrength1" android:layout_width="0dp" android:layout_height="3dp" android:layout_weight="1" android:layout_marginEnd="3dp" android:background="?attr/colorOutline" />
-                <View android:id="@+id/vStrength2" android:layout_width="0dp" android:layout_height="3dp" android:layout_weight="1" android:layout_marginHorizontal="3dp" android:background="?attr/colorOutline" />
-                <View android:id="@+id/vStrength3" android:layout_width="0dp" android:layout_height="3dp" android:layout_weight="1" android:layout_marginHorizontal="3dp" android:background="?attr/colorOutline" />
-                <View android:id="@+id/vStrength4" android:layout_width="0dp" android:layout_height="3dp" android:layout_weight="1" android:layout_marginStart="3dp" android:background="?attr/colorOutline" />
-                <TextView android:id="@+id/tvStrengthLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="" android:textSize="10sp" />
+                <View android:id="@+id/vStrength1" android:layout_width="0dp" android:layout_height="4dp" android:layout_weight="1" android:layout_marginEnd="3dp" android:background="?attr/colorOutline" />
+                <View android:id="@+id/vStrength2" android:layout_width="0dp" android:layout_height="4dp" android:layout_weight="1" android:layout_marginHorizontal="3dp" android:background="?attr/colorOutline" />
+                <View android:id="@+id/vStrength3" android:layout_width="0dp" android:layout_height="4dp" android:layout_weight="1" android:layout_marginHorizontal="3dp" android:background="?attr/colorOutline" />
+                <View android:id="@+id/vStrength4" android:layout_width="0dp" android:layout_height="4dp" android:layout_weight="1" android:layout_marginStart="3dp" android:background="?attr/colorOutline" />
+                <TextView android:id="@+id/tvStrengthLabel" android:layout_width="50dp" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="" android:textSize="10sp" android:gravity="center" />
             </LinearLayout>
 
+            <!-- رقم الموظف (تلقائي) -->
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="10dp"
-                android:hint="رقم الموظف"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:layout_marginBottom="12dp"
+                android:hint="رقم الموظف (تلقائي)"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                app:startIconDrawable="@android:drawable/ic_menu_sort_alphabetically">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etEmployeeId"
@@ -267,385 +199,72 @@
                     android:layout_height="wrap_content"
                     android:inputType="text"
                     android:textSize="14sp"
-                    android:imeOptions="actionNext" />
+                    android:focusable="false"
+                    android:clickable="false" />
             </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- اختيار الفرع (Dropdown أنيق) -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:hint="الفرع *"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                app:startIconDrawable="@android:drawable/ic_menu_compass"
+                app:startIconTint="?attr/colorPrimary">
+
+                <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                    android:id="@+id/etBranch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="none"
+                    android:textSize="14sp"
+                    android:focusable="false"
+                    android:cursorVisible="false" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- اختيار الصلاحية (مبسط) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="الصلاحية *"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
 
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:hint="القسم"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                android:layout_marginBottom="20dp"
+                android:hint="اختر الصلاحية"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                app:startIconDrawable="@android:drawable/ic_menu_myplaces"
+                app:startIconTint="?attr/colorPrimary">
 
                 <com.google.android.material.textfield.MaterialAutoCompleteTextView
-                    android:id="@+id/etDepartment"
+                    android:id="@+id/etRole"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="text"
+                    android:inputType="none"
                     android:textSize="14sp"
-                    android:imeOptions="actionDone" />
+                    android:focusable="false"
+                    android:cursorVisible="false" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <Button
-                android:id="@+id/btnNextStep"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="التالي: اختيار الصلاحية ←"
-                android:textColor="?attr/colorOnPrimary"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:backgroundTint="?attr/colorPrimary"
-                app:cornerRadius="12dp" />
-        </LinearLayout>
-
-        <!-- ==================== الخطوة 2: اختيار الصلاحية ==================== -->
-        <LinearLayout
-            android:id="@+id/layoutStep2"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="اختر صلاحية المستخدم"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="12dp" />
-
-            <RadioGroup
-                android:id="@+id/rgRole"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
-                <!-- 🔧 مهندس النظام -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardSystemAdmin"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    app:cardCornerRadius="10dp"
-                    app:cardElevation="0dp"
-                    app:strokeWidth="1dp"
-                    app:strokeColor="?attr/colorOutline">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="12dp">
-
-                        <RadioButton
-                            android:id="@+id/rbSystemAdmin"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="🔧 مهندس النظام"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:tag="SYSTEM_ADMIN"
-                            android:buttonTint="?attr/colorPrimary" />
-
-                        <Switch
-                            android:id="@+id/swSystemAdmin"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:checked="true"
-                            android:thumbTint="?attr/colorPrimary"
-                            android:trackTint="?attr/colorSurfaceVariant" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- 🏢 مدير الجهة -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardOrgAdmin"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    app:cardCornerRadius="10dp"
-                    app:cardElevation="0dp"
-                    app:strokeWidth="1dp"
-                    app:strokeColor="?attr/colorOutline">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="12dp">
-
-                        <RadioButton
-                            android:id="@+id/rbOrgAdmin"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="🏢 مدير الجهة"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:tag="ORG_ADMIN"
-                            android:buttonTint="?attr/colorPrimary" />
-
-                        <Switch
-                            android:id="@+id/swOrgAdmin"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:checked="true"
-                            android:thumbTint="?attr/colorPrimary"
-                            android:trackTint="?attr/colorSurfaceVariant" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- 👤 مدير الفرع -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardBranchManager"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    app:cardCornerRadius="10dp"
-                    app:cardElevation="0dp"
-                    app:strokeWidth="1dp"
-                    app:strokeColor="?attr/colorOutline">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="12dp">
-
-                        <RadioButton
-                            android:id="@+id/rbBranchManager"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="👤 مدير الفرع"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:tag="BRANCH_MANAGER"
-                            android:buttonTint="?attr/colorPrimary" />
-
-                        <Switch
-                            android:id="@+id/swBranchManager"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:checked="true" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- 📊 مدير المخزون -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardInventoryMgr"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    app:cardCornerRadius="10dp"
-                    app:cardElevation="0dp"
-                    app:strokeWidth="1dp"
-                    app:strokeColor="?attr/colorOutline">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="12dp">
-
-                        <RadioButton
-                            android:id="@+id/rbInventoryMgr"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="📊 مدير المخزون"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:tag="INVENTORY_MGR"
-                            android:checked="true"
-                            android:buttonTint="?attr/colorPrimary" />
-
-                        <Switch
-                            android:id="@+id/swInventoryMgr"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:checked="true"
-                            android:thumbTint="?attr/colorPrimary"
-                            android:trackTint="?attr/colorSurfaceVariant" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- 🛒 موظف مبيعات -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardPosOperator"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    app:cardCornerRadius="10dp"
-                    app:cardElevation="0dp"
-                    app:strokeWidth="1dp"
-                    app:strokeColor="?attr/colorOutline">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="12dp">
-
-                        <RadioButton
-                            android:id="@+id/rbPosOperator"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="🛒 موظف مبيعات"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:tag="POS_OPERATOR"
-                            android:buttonTint="?attr/colorPrimary" />
-
-                        <Switch
-                            android:id="@+id/swPosOperator"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:checked="true"
-                            android:thumbTint="?attr/colorPrimary"
-                            android:trackTint="?attr/colorSurfaceVariant" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- 🔒 أمن -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardSecurity"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    app:cardCornerRadius="10dp"
-                    app:cardElevation="0dp"
-                    app:strokeWidth="1dp"
-                    app:strokeColor="?attr/colorOutline">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="12dp">
-
-                        <RadioButton
-                            android:id="@+id/rbSecurity"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="🔒 أمن"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:tag="SECURITY"
-                            android:buttonTint="?attr/colorPrimary" />
-
-                        <Switch
-                            android:id="@+id/swSecurity"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:checked="true"
-                            android:thumbTint="?attr/colorPrimary"
-                            android:trackTint="?attr/colorSurfaceVariant" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- 🚪 أمن البوابات -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardGateSecurity"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    app:cardCornerRadius="10dp"
-                    app:cardElevation="0dp"
-                    app:strokeWidth="1dp"
-                    app:strokeColor="?attr/colorOutline">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="12dp">
-
-                        <RadioButton
-                            android:id="@+id/rbGateSecurity"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="🚪 أمن البوابات"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:tag="GATE_SECURITY"
-                            android:buttonTint="?attr/colorPrimary" />
-
-                        <Switch
-                            android:id="@+id/swGateSecurity"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:checked="true"
-                            android:thumbTint="?attr/colorPrimary"
-                            android:trackTint="?attr/colorSurfaceVariant" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- 🔍 مدقق -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardAuditor"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:cardCornerRadius="10dp"
-                    app:cardElevation="0dp"
-                    app:strokeWidth="1dp"
-                    app:strokeColor="?attr/colorOutline">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="12dp">
-
-                        <RadioButton
-                            android:id="@+id/rbAuditor"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="🔍 مدقق"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            android:tag="AUDITOR"
-                            android:buttonTint="?attr/colorPrimary" />
-
-                        <Switch
-                            android:id="@+id/swAuditor"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:checked="true"
-                            android:thumbTint="?attr/colorPrimary"
-                            android:trackTint="?attr/colorSurfaceVariant" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-            </RadioGroup>
-
-            <!-- أزرار الخطوة 2 -->
+            <!-- أزرار الحفظ والإلغاء -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="16dp">
+                android:orientation="horizontal">
 
                 <Button
-                    android:id="@+id/btnPrevStep"
+                    android:id="@+id/btnCancelUser"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    android:text="→ رجوع"
+                    android:layout_marginEnd="8dp"
+                    android:text="إلغاء"
                     android:textColor="?attr/colorOnSurface"
                     android:textSize="14sp"
                     android:backgroundTint="?attr/colorSurfaceVariant"
@@ -656,7 +275,7 @@
                     android:layout_width="0dp"
                     android:layout_height="48dp"
                     android:layout_weight="2"
-                    android:layout_marginStart="6dp"
+                    android:layout_marginStart="8dp"
                     android:text="حفظ المستخدم ✅"
                     android:textColor="?attr/colorOnPrimary"
                     android:textSize="14sp"
@@ -666,25 +285,34 @@
             </LinearLayout>
 
         </LinearLayout>
+    </ScrollView>
 
-        <!-- أزرار الإلغاء (الخطوة 1) -->
-        <LinearLayout
-            android:id="@+id/layoutButtons1"
-            android:layout_width="match_parent"
+    <!-- Loading Overlay -->
+    <LinearLayout
+        android:id="@+id/loadingOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:background="#AA000000"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ProgressBar
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:indeterminateTint="?attr/colorPrimary"
+            android:indeterminate="true" />
+
+        <TextView
+            android:id="@+id/tvLoadingText"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="end"
-            android:visibility="gone">
-
-            <Button
-                android:id="@+id/btnCancelUser"
-                android:layout_width="wrap_content"
-                android:layout_height="44dp"
-                android:backgroundTint="?attr/colorSurfaceVariant"
-                android:text="إلغاء"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="13sp" />
-        </LinearLayout>
-
+            android:layout_marginTop="12dp"
+            android:text="جاري الحفظ..."
+            android:textColor="@android:color/white"
+            android:textSize="14sp" />
     </LinearLayout>
-</ScrollView>
+
+</FrameLayout>
