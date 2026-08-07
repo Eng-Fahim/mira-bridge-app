@@ -102,7 +102,6 @@
         android:visibility="gone">
 
         <androidx.core.widget.NestedScrollView
-            android:id="@+id/mainContent"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="?android:attr/colorBackground"
@@ -153,7 +152,7 @@
                         android:background="?attr/colorSurfaceVariant"
                         android:paddingHorizontal="12dp"
                         android:paddingVertical="6dp"
-                        android:text="● ONLINE"
+                        android:text="@string/online"
                         android:textColor="?attr/colorPrimary"
                         android:textSize="11sp"
                         android:textStyle="bold" />
@@ -191,7 +190,7 @@
                                     android:id="@+id/tvGreeting"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="مرحباً بك..."
+                                    android:text="@string/greeting_default"
                                     android:textAlignment="viewStart"
                                     android:textColor="?attr/colorOnSurface"
                                     android:textSize="18sp"
@@ -202,7 +201,7 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="4dp"
-                                    android:text="المعرض الرئيسي"
+                                    android:text="@string/location_default"
                                     android:textAlignment="viewStart"
                                     android:textColor="?attr/colorOnSurfaceVariant"
                                     android:textSize="12sp" />
@@ -260,7 +259,7 @@
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="عيار 18"
+                                    android:text="@string/karat_18"
                                     android:textColor="?attr/colorOnSurfaceVariant"
                                     android:textSize="11sp" />
 
@@ -290,7 +289,7 @@
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="عيار 21"
+                                    android:text="@string/karat_21"
                                     android:textColor="?attr/colorOnSurfaceVariant"
                                     android:textSize="11sp" />
 
@@ -320,7 +319,7 @@
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="عيار 24"
+                                    android:text="@string/karat_24"
                                     android:textColor="?attr/colorOnSurfaceVariant"
                                     android:textSize="11sp" />
 
@@ -343,7 +342,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="10dp"
-                    android:text="المخزون الثمين والكتلة"
+                    android:text="@string/precious_inventory"
                     android:textAlignment="viewStart"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp"
@@ -377,7 +376,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="قطع مباعة"
+                                android:text="@string/sold_today"
                                 android:textAlignment="center"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="10sp" />
@@ -415,7 +414,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="الوزن الكلي"
+                                android:text="@string/total_weight"
                                 android:textAlignment="center"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="10sp" />
@@ -453,7 +452,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="إجمالي القطع"
+                                android:text="@string/total_items"
                                 android:textAlignment="center"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="10sp" />
@@ -499,7 +498,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="مبيعات اليوم"
+                                android:text="@string/sales_today"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="11sp" />
 
@@ -529,7 +528,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="مبيعات الشهر"
+                                android:text="@string/sales_month"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="11sp" />
 
@@ -559,7 +558,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="مبيعات السنة"
+                                android:text="@string/sales_year"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="11sp" />
 
@@ -581,7 +580,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="10dp"
-                    android:text="العمليات الميدانية والمراقبة"
+                    android:text="@string/field_operations"
                     android:textAlignment="viewStart"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp"
@@ -625,7 +624,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="8dp"
-                                android:text="رقابة بوابات الحماية"
+                                android:text="@string/gate_security"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="12sp"
                                 android:textStyle="bold" />
@@ -663,7 +662,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="8dp"
-                                android:text="الجرد السريع بالـ RFID"
+                                android:text="@string/rfid_audit"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="12sp"
                                 android:textStyle="bold" />
