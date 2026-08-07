@@ -1,6 +1,12 @@
 package com.example.uhf.fragment;
 
+import android.Manifest;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -9,11 +15,15 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 
+import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.databinding.FragmentMiraIdentityStudioBinding;
@@ -23,39 +33,35 @@ import com.google.android.material.chip.Chip;
 
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Executors;
 
-/**
- * MIRA Identity Studio Fragment - تكويد القطع وربطها بالباركود
- * 
- * المميزات:
- * - مسح RFID أو إدخال يدوي لـ EPC
- * - تصنيف القطعة (خاتم، طقم، سوار، عقد)
- * - تحديد العيار والوزن
- * - حساب القيمة التقديرية
- * - إدخال تفاصيل الأحجار
- * - ربط مع أول باركود متاح تلقائياً
- * - دعم عربي/إنجليزي كامل
- * - ربط بالفرع النشط
- */
 public class MiraIdentityStudioFragment extends Fragment {
 
     private static final String TAG = "MiraIdentityStudio";
 
-    // ==================== Binding & Managers ====================
     private FragmentMiraIdentityStudioBinding binding;
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
     private boolean isArabic;
 
-    // ==================== Data ====================
     private final Map<String, String[]> typeSuggestions = new HashMap<>();
-
-    // ==================== Lifecycle ====================
+    
+    // متغيرات الصور
+    private String currentPhotoPath;
+    private final List<String> photoPaths = new ArrayList<>();
+    private ActivityResultLauncher<Uri> takePhotoLauncher;
+    private ActivityResultLauncher<String> requestPermissionLauncher;
+    private Uri photoUri;
 
     @Nullable
     @Override
@@ -74,34 +80,146 @@ public class MiraIdentityStudioFragment extends Fragment {
             branchesManager = MiraBranchesManager.getInstance(getContext());
             orgProfile = MiraOrgProfileManager.getInstance(getContext());
         }
-        isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
+        isArabic = Locale.getDefault().getLanguage().equals("ar");
 
         initSuggestionsData();
+        setupPhotoLaunchers();
         applyLanguage();
         setupListeners();
+    }
+
+    // ==================== Photo Launchers ====================
+
+    private void setupPhotoLaunchers() {
+        // طلب صلاحية الكاميرا
+        requestPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(),
+            isGranted -> {
+                if (isGranted) {
+                    openCamera();
+                } else {
+                    Toast.makeText(getContext(),
+                        isArabic ? "صلاحية الكاميرا مطلوبة لالتقاط الصور" : "Camera permission is required to take photos",
+                        Toast.LENGTH_SHORT).show();
+                }
+            }
+        );
+
+        // استقبال الصورة بعد الالتقاط
+        takePhotoLauncher = registerForActivityResult(
+            new ActivityResultContracts.TakePicture(),
+            success -> {
+                if (success && currentPhotoPath != null) {
+                    photoPaths.add(currentPhotoPath);
+                    updatePhotosCount();
+                    Toast.makeText(getContext(),
+                        isArabic ? "✅ تم التقاط الصورة بنجاح" : "✅ Photo captured successfully",
+                        Toast.LENGTH_SHORT).show();
+                }
+            }
+        );
+    }
+
+    private void checkCameraPermissionAndTakePhoto() {
+        if (getContext() == null) return;
+        
+        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED) {
+            openCamera();
+        } else {
+            requestPermissionLauncher.launch(Manifest.permission.CAMERA);
+        }
+    }
+
+    private void openCamera() {
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        
+        // التأكد من وجود تطبيق كاميرا
+        if (takePictureIntent.resolveActivity(getContext().getPackageManager()) != null) {
+            File photoFile = null;
+            try {
+                photoFile = createImageFile();
+            } catch (IOException ex) {
+                Log.e(TAG, "Error creating image file: " + ex.getMessage());
+                Toast.makeText(getContext(),
+                    isArabic ? "❌ خطأ في إنشاء ملف الصورة" : "❌ Error creating image file",
+                    Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (photoFile != null) {
+                try {
+                    photoUri = FileProvider.getUriForFile(getContext(),
+                        getContext().getApplicationContext().getPackageName() + ".fileprovider",
+                        photoFile);
+                    takePhotoLauncher.launch(photoUri);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error launching camera: " + e.getMessage());
+                    // محاولة بدون FileProvider كحل بديل
+                    photoUri = Uri.fromFile(photoFile);
+                    takePhotoLauncher.launch(photoUri);
+                }
+            }
+        } else {
+            Toast.makeText(getContext(),
+                isArabic ? "❌ لا يوجد تطبيق كاميرا متاح" : "❌ No camera app available",
+                Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private File createImageFile() throws IOException {
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+        String imageFileName = "MIRA_" + timeStamp + "_";
+        File storageDir = getContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        File image = File.createTempFile(imageFileName, ".jpg", storageDir);
+        currentPhotoPath = image.getAbsolutePath();
+        return image;
+    }
+
+    private void updatePhotosCount() {
+        int count = photoPaths.size();
+        if (binding.tvPhotosCount != null) {
+            if (count == 0) {
+                binding.tvPhotosCount.setText(isArabic ? "لم يتم إرفاق صور بعد" : "No photos attached yet");
+            } else {
+                binding.tvPhotosCount.setText(isArabic ? 
+                    "تم إرفاق (" + count + ") صور" : 
+                    "Attached (" + count + ") photos");
+            }
+        }
     }
 
     // ==================== Language ====================
 
     private void applyLanguage() {
         if (binding == null) return;
+        
+        // استخدم النصوص من موارد strings.xml
         if (isArabic) {
-            if (binding.tvStepTitle != null) binding.tvStepTitle.setText("الخطوة 1 من 4: الربط والتصنيف");
-            if (binding.etEpc != null) binding.etEpc.setHint("رمز الشريحة (EPC / GTIN)...");
-            if (binding.etTitle != null) binding.etTitle.setHint("عنوان ووصف القطعة");
-            if (binding.btnSaveIdentity != null) binding.btnSaveIdentity.setText("اعتماد الموزون وتصدير MIRA ID");
-            if (binding.btnAddPhotos != null) binding.btnAddPhotos.setText("📷 التقاط / إرفاق صور القطعة");
-            if (binding.tvPhotosCount != null) binding.tvPhotosCount.setText("لم يتم إرفاق صور بعد");
-            if (binding.tvEstimatedGoldValue != null) binding.tvEstimatedGoldValue.setText("0.00 ريال");
+            setArabicTexts();
         } else {
-            if (binding.tvStepTitle != null) binding.tvStepTitle.setText("Step 1 of 4: Bind & Classify");
-            if (binding.etEpc != null) binding.etEpc.setHint("EPC / GTIN Code...");
-            if (binding.etTitle != null) binding.etTitle.setHint("Item Title & Description");
-            if (binding.btnSaveIdentity != null) binding.btnSaveIdentity.setText("Approve & Export MIRA ID");
-            if (binding.btnAddPhotos != null) binding.btnAddPhotos.setText("📷 Capture / Attach Photos");
-            if (binding.tvPhotosCount != null) binding.tvPhotosCount.setText("No photos attached yet");
-            if (binding.tvEstimatedGoldValue != null) binding.tvEstimatedGoldValue.setText("0.00 YER");
+            setEnglishTexts();
         }
+    }
+
+    private void setArabicTexts() {
+        binding.tvStepTitle.setText("الخطوة 1 من 4: الربط والتصنيف");
+        binding.etEpc.setHint("رمز الشريحة (EPC / GTIN)...");
+        binding.etTitle.setHint("عنوان ووصف القطعة");
+        binding.btnSaveIdentity.setText("اعتماد الموزون وتصدير MIRA ID");
+        binding.btnAddPhotos.setText("📷 التقاط / إرفاق صور القطعة");
+        binding.tvPhotosCount.setText("لم يتم إرفاق صور بعد");
+        binding.tvEstimatedGoldValue.setText("0.00 ريال");
+    }
+
+    private void setEnglishTexts() {
+        binding.tvStepTitle.setText("Step 1 of 4: Bind & Classify");
+        binding.etEpc.setHint("EPC / GTIN Code...");
+        binding.etTitle.setHint("Item Title & Description");
+        binding.btnSaveIdentity.setText("Approve & Export MIRA ID");
+        binding.btnAddPhotos.setText("📷 Capture / Attach Photos");
+        binding.tvPhotosCount.setText("No photos attached yet");
+        binding.tvEstimatedGoldValue.setText("0.00 YER");
     }
 
     // ==================== Suggestions ====================
@@ -123,7 +241,6 @@ public class MiraIdentityStudioFragment extends Fragment {
     // ==================== Listeners ====================
 
     private void setupListeners() {
-        // EPC
         binding.etEpc.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -132,12 +249,10 @@ public class MiraIdentityStudioFragment extends Fragment {
             @Override public void afterTextChanged(Editable s) {}
         });
 
-        // الأحجار
         binding.switchHasStones.setOnCheckedChangeListener((buttonView, isChecked) -> {
             binding.layoutStonesDetails.setVisibility(isChecked ? View.VISIBLE : View.GONE);
         });
 
-        // الوزن
         binding.etGrossWeight.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -146,10 +261,8 @@ public class MiraIdentityStudioFragment extends Fragment {
             @Override public void afterTextChanged(Editable s) {}
         });
 
-        // العيار
         binding.chipGroupKarat.setOnCheckedStateChangeListener((group, checkedIds) -> calculateEstimatedGoldValue());
 
-        // التصنيف
         binding.chipGroupTypes.setOnCheckedStateChangeListener((group, checkedIds) -> {
             if (checkedIds.isEmpty()) return;
             int id = checkedIds.get(0);
@@ -159,15 +272,9 @@ public class MiraIdentityStudioFragment extends Fragment {
             else if (id == binding.chipNecklace.getId()) populateSuggestions("necklaces");
         });
 
-        // الصور
-        binding.btnAddPhotos.setOnClickListener(v -> {
-            Toast.makeText(getContext(),
-                isArabic ? "سيتم فتح كاميرا الجهاز لالتقاط صورة القطعة..." : "Opening camera to capture item photo...",
-                Toast.LENGTH_SHORT).show();
-            binding.tvPhotosCount.setText(isArabic ? "تم التقاط (1) صورة للقطعة" : "Captured (1) photo");
-        });
+        // ✅ زر الصور - تم الإصلاح
+        binding.btnAddPhotos.setOnClickListener(v -> checkCameraPermissionAndTakePhoto());
 
-        // حفظ
         binding.btnSaveIdentity.setOnClickListener(v -> finalizeItemIdentity());
     }
 
@@ -235,7 +342,6 @@ public class MiraIdentityStudioFragment extends Fragment {
         String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
         String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
 
-        // التحقق من الحقول
         if (epc.isEmpty()) {
             Toast.makeText(getContext(), isArabic ? "يرجى مسح أو كتابة رمز RFID أولاً" : "Please scan or enter RFID first", Toast.LENGTH_SHORT).show();
             return;
@@ -257,7 +363,6 @@ public class MiraIdentityStudioFragment extends Fragment {
             return;
         }
 
-        // جمع بيانات الأحجار
         String stoneType = binding.etStoneType.getText() != null ? binding.etStoneType.getText().toString().trim() : "";
         double stoneWeight = 0;
         int stoneCount = 0;
@@ -282,7 +387,6 @@ public class MiraIdentityStudioFragment extends Fragment {
         String category = getSelectedCategory();
         String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
 
-        // ✅ تعطيل الزر
         binding.btnSaveIdentity.setEnabled(false);
         binding.btnSaveIdentity.setText(isArabic ? "جاري التكويد..." : "Encoding...");
 
@@ -308,8 +412,6 @@ public class MiraIdentityStudioFragment extends Fragment {
                 payload.put("location", location);
                 payload.put("branch_id", branchesManager.getActiveBranchId());
 
-                Log.d(TAG, "Encode payload: " + payload.toString());
-
                 MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
 
                 safeRun(() -> {
@@ -329,14 +431,12 @@ public class MiraIdentityStudioFragment extends Fragment {
                             if (errorMsg.isEmpty()) errorMsg = response.error;
                             if (errorMsg == null || errorMsg.isEmpty()) errorMsg = "HTTP " + response.code;
                         }
-                        Log.e(TAG, "Encode failed [" + (response != null ? response.code : "null") + "]: " + errorMsg);
                         Toast.makeText(getContext(),
                             (isArabic ? "❌ فشل التكويد: " : "❌ Encoding failed: ") + errorMsg,
                             Toast.LENGTH_LONG).show();
                     }
                 });
             } catch (Exception e) {
-                Log.e(TAG, "Encode error: " + e.getMessage(), e);
                 safeRun(() -> {
                     binding.btnSaveIdentity.setEnabled(true);
                     binding.btnSaveIdentity.setText(isArabic ? "اعتماد الموزون وتصدير MIRA ID" : "Approve & Export MIRA ID");
@@ -380,6 +480,10 @@ public class MiraIdentityStudioFragment extends Fragment {
         binding.tvEstimatedGoldValue.setText(isArabic ? "0.00 ريال" : "0.00 YER");
         binding.switchHasStones.setChecked(false);
         binding.etEpc.requestFocus();
+        
+        // إعادة تعيين الصور
+        photoPaths.clear();
+        updatePhotosCount();
     }
 
     private String getSelectedKaratCode() {
@@ -396,4 +500,4 @@ public class MiraIdentityStudioFragment extends Fragment {
         super.onDestroyView();
         binding = null;
     }
-                }
+            }
