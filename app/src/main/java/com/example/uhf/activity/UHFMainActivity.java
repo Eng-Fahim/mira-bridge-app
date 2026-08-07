@@ -221,6 +221,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             safeAddTab("SecureGate", isArabic ? "🚪 البوابات" : "🚪 Gate", MiraSecureGateFragment.class);
         }
 
+        // 🏢 إدارة الفروع - للمدراء فقط
+if (isManager) {
+    safeAddTab("BranchesManagement", isArabic ? "🏢 الفروع" : "🏢 Branches", 
+        MiraBranchesManagementFragment.class);
+}
+
         // 👥 المستخدمين
         if (isManager) {
             safeAddTab("UsersManagement", isArabic ? "👥 المستخدمين" : "👥 Users", UsersManagementFragment.class);
