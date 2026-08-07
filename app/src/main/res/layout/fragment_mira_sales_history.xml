@@ -33,7 +33,7 @@
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:layout_marginEnd="8dp"
-            background="?attr/selectableItemBackgroundBorderless"
+            android:background="?attr/selectableItemBackgroundBorderless"
             android:padding="6dp"
             android:src="@android:drawable/ic_menu_rotate"
             app:tint="#38BDF8" />
