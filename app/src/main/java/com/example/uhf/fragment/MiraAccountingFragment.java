@@ -238,44 +238,46 @@ public class MiraAccountingFragment extends Fragment {
         public LiveData<AccountingStats> getStatsLiveData() { return statsLiveData; }
 
         public void fetchJournalEntries() {
-            isLoading.setValue(true);
-            Executors.newSingleThreadExecutor().execute(() -> {
-                try {
-                    MiraApiClient client = MiraApiClient.getInstance(null);
-                    MiraApiClient.ApiResponse response = client.getJournalEntries();
-                    processResponse(response, MiraAccountingItem.ItemType.JOURNAL_ENTRY);
-                } catch (Exception e) {
-                    loadMockJournalEntries();
-                }
-            });
+    isLoading.setValue(true);
+    Executors.newSingleThreadExecutor().execute(() -> {
+        try {
+            MiraApiClient client = MiraApiClient.getInstance(null);
+            // ✅ أرسل null أو branchId
+            MiraApiClient.ApiResponse response = client.getJournalEntries(null);
+            processResponse(response, MiraAccountingItem.ItemType.JOURNAL_ENTRY);
+        } catch (Exception e) {
+            loadMockJournalEntries();
         }
+    });
+}
 
-        public void fetchChartOfAccounts() {
-            isLoading.setValue(true);
-            Executors.newSingleThreadExecutor().execute(() -> {
-                try {
-                    MiraApiClient client = MiraApiClient.getInstance(null);
-                    MiraApiClient.ApiResponse response = client.getChartOfAccounts();
-                    processResponse(response, MiraAccountingItem.ItemType.CHART_OF_ACCOUNT);
-                } catch (Exception e) {
-                    loadMockChartOfAccounts();
-                }
-            });
+public void fetchChartOfAccounts() {
+    isLoading.setValue(true);
+    Executors.newSingleThreadExecutor().execute(() -> {
+        try {
+            MiraApiClient client = MiraApiClient.getInstance(null);
+            // ✅ دالة بدون معاملات موجودة
+            MiraApiClient.ApiResponse response = client.getChartOfAccounts();
+            processResponse(response, MiraAccountingItem.ItemType.CHART_OF_ACCOUNT);
+        } catch (Exception e) {
+            loadMockChartOfAccounts();
         }
+    });
+}
 
-        public void fetchTrialBalance() {
-            isLoading.setValue(true);
-            Executors.newSingleThreadExecutor().execute(() -> {
-                try {
-                    MiraApiClient client = MiraApiClient.getInstance(null);
-                    MiraApiClient.ApiResponse response = client.getTrialBalance();
-                    processResponse(response, MiraAccountingItem.ItemType.TRIAL_BALANCE);
-                } catch (Exception e) {
-                    loadMockTrialBalance();
-                }
-            });
+public void fetchTrialBalance() {
+    isLoading.setValue(true);
+    Executors.newSingleThreadExecutor().execute(() -> {
+        try {
+            MiraApiClient client = MiraApiClient.getInstance(null);
+            // ✅ أرسل null
+            MiraApiClient.ApiResponse response = client.getTrialBalance(null);
+            processResponse(response, MiraAccountingItem.ItemType.TRIAL_BALANCE);
+        } catch (Exception e) {
+            loadMockTrialBalance();
         }
-
+    });
+}
         private void processResponse(MiraApiClient.ApiResponse response, MiraAccountingItem.ItemType type) {
             List<MiraAccountingItem> items = new ArrayList<>();
             double totalDebit = 0, totalCredit = 0, revenue = 0;
@@ -386,4 +388,4 @@ public class MiraAccountingFragment extends Fragment {
             this.balanced = balanced;
         }
     }
-}
+    }
