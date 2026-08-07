@@ -230,17 +230,17 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void setKaratWithCount(TextView tv, String label, int count) {
-        if (tv == null) return;
-        String piecesText = isArabic ? "قطعة" : "pcs";
-        if (count > 0) {
-            tv.setText(label + " | " + count + " " + piecesText);
-            // استخدام لون من الثيم بدلاً من الأزرق الثابت
-            tv.setTextColor(getResources().getColor(R.color.primary_text, requireActivity().getTheme()));
-        } else {
-            tv.setText(label + " | —");
-            tv.setTextColor(getResources().getColor(R.color.text_secondary, requireActivity().getTheme()));
-        }
+    if (tv == null) return;
+    String piecesText = isArabic ? "قطعة" : "pcs";
+    if (count > 0) {
+        tv.setText(label + " | " + count + " " + piecesText);
+        // استخدام لون متوافق مع الثيم
+        tv.setTextColor(getResources().getColor(R.color.karat_text, requireActivity().getTheme()));
+    } else {
+        tv.setText(label + " | —");
+        tv.setTextColor(getResources().getColor(R.color.karat_text_empty, requireActivity().getTheme()));
     }
+}
 
     private String cleanAmount(String amount) {
         if (amount == null || amount.isEmpty() || amount.equals("$0") || amount.equals("0")) return "—";
