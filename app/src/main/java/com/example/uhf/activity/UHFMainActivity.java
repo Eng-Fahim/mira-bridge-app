@@ -134,11 +134,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     // ==================== قائمة الخيارات مع زر تغيير اللغة ====================
     
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.main_menu, menu);
-        return true;
-    }
+   @Override
+public boolean onCreateOptionsMenu(Menu menu) {
+    getMenuInflater().inflate(R.menu.main, menu);  // استخدم main.xml الموجود
+    return true;
+}
 
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
