@@ -100,7 +100,7 @@ public class MiraDashboardFragment extends Fragment {
         swipeRefresh = v.findViewById(R.id.swipeRefresh);
 
         if (swipeRefresh != null) {
-            swipeRefresh.setOnRefreshListener(() -> fetchData());
+            swipeRefresh.setOnRefreshListener(this::fetchData);
         }
     }
 
@@ -136,16 +136,6 @@ public class MiraDashboardFragment extends Fragment {
             if (tvLocation != null) {
                 tvLocation.setText("📍 " + branchesManager.getActiveBranchDisplayName());
             }
-
-            if (getActivity() instanceof UHFMainActivity) {
-                UHFMainActivity a = (UHFMainActivity) getActivity();
-                if (a.getSupportActionBar() != null) {
-                    String orgName = orgProfile.getOrgName();
-                    String userName = sessionManager.getDisplayName();
-                    if (userName == null || userName.isEmpty()) userName = sessionManager.getUsername();
-                    a.getSupportActionBar().setTitle(orgName + " - " + userName);
-                }
-            }
         } catch (Exception e) {
             Log.e(TAG, "updateHeader error: " + e.getMessage());
         }
@@ -154,7 +144,7 @@ public class MiraDashboardFragment extends Fragment {
     private void fetchData() {
         try {
             if (tvLiveStatus != null) {
-                tvLiveStatus.setText(isArabic ? "● جاري التحديث..." : "● Updating...");
+                tvLiveStatus.setText(getString(R.string.updating));
                 tvLiveStatus.setTextColor(0xFFF59E0B);
             }
 
@@ -185,7 +175,6 @@ public class MiraDashboardFragment extends Fragment {
         } catch (Exception e) {
             Log.e(TAG, "fetchData error: " + e.getMessage());
             showShimmer(false);
-            showOffline();
         }
     }
 
@@ -213,7 +202,7 @@ public class MiraDashboardFragment extends Fragment {
             }
 
             if (tvLiveStatus != null) {
-                tvLiveStatus.setText("● ONLINE");
+                tvLiveStatus.setText(getString(R.string.online));
                 tvLiveStatus.setTextColor(0xFF16A34A);
             }
         } catch (Exception e) {
@@ -223,13 +212,11 @@ public class MiraDashboardFragment extends Fragment {
 
     private void setKarat(TextView tv, String label, int count) {
         if (tv == null) return;
-        String piecesText = isArabic ? "قطعة" : "pcs";
+        String piecesText = getString(R.string.pieces);
         if (count > 0) {
             tv.setText(label + " | " + count + " " + piecesText);
-            tv.setTextColor(0xFF1A237E);
         } else {
             tv.setText(label + " | —");
-            tv.setTextColor(0xFF9CA3AF);
         }
     }
 
@@ -252,7 +239,7 @@ public class MiraDashboardFragment extends Fragment {
     private void showOffline() {
         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
         if (tvLiveStatus != null) {
-            tvLiveStatus.setText("● OFFLINE");
+            tvLiveStatus.setText(getString(R.string.offline));
             tvLiveStatus.setTextColor(0xFFDC2626);
         }
     }
@@ -273,4 +260,4 @@ public class MiraDashboardFragment extends Fragment {
         super.onDestroyView();
         mainHandler.removeCallbacksAndMessages(null);
     }
-                           }
+}
