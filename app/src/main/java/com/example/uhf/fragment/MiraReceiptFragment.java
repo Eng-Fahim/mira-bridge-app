@@ -172,20 +172,61 @@ public class MiraReceiptFragment extends Fragment {
     // ==================== 💾 حفظ كـ PDF ====================
 
     private void saveReceiptAsPDF() {
-        try {
-            File pdfFile = generatePDF();
-            if (pdfFile != null) {
-                Toast.makeText(getContext(), 
-                    (isArabic ? "✅ تم الحفظ: " : "✅ Saved: ") + pdfFile.getName(), 
-                    Toast.LENGTH_LONG).show();
-            } else {
-                Toast.makeText(getContext(), isArabic ? "❌ فشل الحفظ" : "❌ Save failed", Toast.LENGTH_SHORT).show();
+    // استبدل دالة shareReceiptAsPDF:
+
+private void shareReceiptAsPDF() {
+    try {
+        // ✅ انتظر تحميل WebView بالكامل ثم شارك
+        webReceipt.postDelayed(() -> {
+            try {
+                File pdfFile = generatePDF();
+                if (pdfFile == null) {
+                    shareAsText();
+                    return;
+                }
+
+                Uri uri = FileProvider.getUriForFile(requireContext(),
+                    requireContext().getPackageName() + ".fileprovider", pdfFile);
+
+                Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                shareIntent.setType("application/pdf");
+                shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+                shareIntent.putExtra(Intent.EXTRA_SUBJECT, orgName + " - " + (isArabic ? "إيصال بيع" : "Sales Receipt"));
+                shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(Intent.createChooser(shareIntent, isArabic ? "مشاركة الإيصال" : "Share Receipt"));
+            } catch (Exception e) {
+                shareAsText();
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Save error: " + e.getMessage());
-            Toast.makeText(getContext(), isArabic ? "❌ خطأ في الحفظ" : "❌ Save error", Toast.LENGTH_SHORT).show();
-        }
+        }, 500); // انتظر 500ms ليكتمل تحميل WebView
+    } catch (Exception e) {
+        shareAsText();
     }
+}
+
+// أضف هذه الدالة لتصدير WebView كـ Bitmap بشكل أفضل:
+private Bitmap captureWebView() {
+    if (webReceipt == null) return null;
+    try {
+        // تمكين القياس
+        webReceipt.measure(
+            View.MeasureSpec.makeMeasureSpec(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        );
+        webReceipt.layout(0, 0, webReceipt.getMeasuredWidth(), webReceipt.getMeasuredHeight());
+        webReceipt.setDrawingCacheEnabled(true);
+        webReceipt.buildDrawingCache();
+        
+        Bitmap bitmap = Bitmap.createBitmap(webReceipt.getMeasuredWidth(),
+            webReceipt.getMeasuredHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        webReceipt.draw(canvas);
+        
+        webReceipt.setDrawingCacheEnabled(false);
+        return bitmap;
+    } catch (Exception e) {
+        return null;
+    }
+}
 
     // ==================== 🏗️ إنشاء PDF ====================
 
