@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
+    <!-- المسارات الموجودة مسبقاً -->
     <external-files-path name="documents" path="Documents/" />
     <external-files-path name="mira_reports" path="Documents/MiraReports/" />
     <cache-path name="cache" path="/" />
+    
+    <!-- ✅ مسارات جديدة للصور والكاميرا -->
+    <external-files-path name="images" path="Pictures/" />
+    <external-files-path name="photos" path="." />
+    <files-path name="internal_images" path="Pictures/" />
 </paths>
