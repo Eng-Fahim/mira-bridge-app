@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?android:attr/colorBackground"
+    android:layoutDirection="rtl">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorPrimary"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="14dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📊 مركز التقارير الشاملة"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnExportAll"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:backgroundTint="@android:color/white"
+            android:text="📤 تصدير"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            app:cornerRadius="8dp" />
+    </LinearLayout>
+
+    <!-- قائمة التقارير -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvReportsList"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="12dp"
+        android:clipToPadding="false" />
+
+</LinearLayout>
