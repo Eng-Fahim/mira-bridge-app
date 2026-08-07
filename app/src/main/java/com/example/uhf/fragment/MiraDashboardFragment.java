@@ -7,6 +7,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -39,6 +40,10 @@ public class MiraDashboardFragment extends Fragment {
     private TextView tvKarat24, tvKarat21, tvKarat18;
     private View btnGate, btnInventory;
     private SwipeRefreshLayout swipeRefresh;
+    
+    // Shimmer loading views
+    private View shimmerLayout;
+    private LinearLayout mainContent;
 
     private MiraApiClient apiClient;
     private SessionManager sessionManager;
@@ -67,7 +72,11 @@ public class MiraDashboardFragment extends Fragment {
         initViews(view);
         setupListeners();
         updateHeader();
+        showShimmerLoading();
         fetchData();
+        
+        // إعادة تحميل البيانات عند تغيير الفرع
+        branchesManager.addOnBranchChangeListener(this::onBranchChanged);
     }
 
     private void initViews(View v) {
@@ -90,6 +99,9 @@ public class MiraDashboardFragment extends Fragment {
 
         btnGate = v.findViewById(R.id.btnGateSecurity);
         btnInventory = v.findViewById(R.id.btnRfidAudit);
+        
+        shimmerLayout = v.findViewById(R.id.shimmerLayout);
+        mainContent = v.findViewById(R.id.mainContent);
 
         swipeRefresh = v.findViewById(R.id.swipeRefresh);
         if (swipeRefresh != null) swipeRefresh.setOnRefreshListener(this::fetchData);
@@ -100,10 +112,27 @@ public class MiraDashboardFragment extends Fragment {
         if (btnInventory != null) btnInventory.setOnClickListener(v -> switchTab("Inventory Pro"));
     }
 
+    private void onBranchChanged() {
+        updateHeader();
+        showShimmerLoading();
+        fetchData();
+    }
+
+    private void showShimmerLoading() {
+        if (shimmerLayout != null) shimmerLayout.setVisibility(View.VISIBLE);
+        if (mainContent != null) mainContent.setVisibility(View.GONE);
+    }
+
+    private void hideShimmerLoading() {
+        if (shimmerLayout != null) shimmerLayout.setVisibility(View.GONE);
+        if (mainContent != null) mainContent.setVisibility(View.VISIBLE);
+    }
+
     private void updateHeader() {
         if (tvDate != null) {
             Locale loc = isArabic ? new Locale("ar") : Locale.US;
-            tvDate.setText(new SimpleDateFormat("EEEE، d MMMM yyyy", loc).format(new Date()));
+            String pattern = isArabic ? "EEEE، d MMMM yyyy" : "EEEE, MMMM d, yyyy";
+            tvDate.setText(new SimpleDateFormat(pattern, loc).format(new Date()));
         }
 
         if (tvGreeting != null) {
@@ -138,6 +167,7 @@ public class MiraDashboardFragment extends Fragment {
             try {
                 MiraApiClient.ApiResponse response = apiClient.getDashboardFull();
                 mainHandler.post(() -> {
+                    hideShimmerLoading();
                     if (response != null && response.isSuccess && response.data != null) {
                         processData(response.data);
                     } else {
@@ -147,6 +177,7 @@ public class MiraDashboardFragment extends Fragment {
                 });
             } catch (Exception e) {
                 mainHandler.post(() -> {
+                    hideShimmerLoading();
                     showOffline();
                     if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                 });
@@ -163,9 +194,14 @@ public class MiraDashboardFragment extends Fragment {
 
                 JSONObject w = inv.optJSONObject("weights");
                 if (w != null) {
-                    setKarat(tvKarat24, "24K", w.optInt("k24", 0));
-                    setKarat(tvKarat21, "21K", w.optInt("k21", 0));
-                    setKarat(tvKarat18, "18K", w.optInt("k18", 0));
+                    // عرض العيارات مع العدد - ترتيب ديناميكي حسب الكمية
+                    int k24 = w.optInt("k24", 0);
+                    int k21 = w.optInt("k21", 0);
+                    int k18 = w.optInt("k18", 0);
+                    
+                    setKaratWithCount(tvKarat24, "24K", k24);
+                    setKaratWithCount(tvKarat21, "21K", k21);
+                    setKaratWithCount(tvKarat18, "18K", k18);
                 }
             }
 
@@ -193,14 +229,16 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    private void setKarat(TextView tv, String label, int count) {
+    private void setKaratWithCount(TextView tv, String label, int count) {
         if (tv == null) return;
+        String piecesText = isArabic ? "قطعة" : "pcs";
         if (count > 0) {
-            tv.setText(label + " | " + count + " " + (isArabic ? "قطعة" : "pcs"));
-            tv.setTextColor(0xFF1A237E);
+            tv.setText(label + " | " + count + " " + piecesText);
+            // استخدام لون من الثيم بدلاً من الأزرق الثابت
+            tv.setTextColor(getResources().getColor(R.color.primary_text, requireActivity().getTheme()));
         } else {
             tv.setText(label + " | —");
-            tv.setTextColor(0xFF9CA3AF);
+            tv.setTextColor(getResources().getColor(R.color.text_secondary, requireActivity().getTheme()));
         }
     }
 
@@ -243,5 +281,8 @@ public class MiraDashboardFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         mainHandler.removeCallbacksAndMessages(null);
+        if (branchesManager != null) {
+            branchesManager.removeOnBranchChangeListener(this::onBranchChanged);
+        }
     }
 }
