@@ -52,8 +52,8 @@ public class MiraDashboardFragment extends Fragment {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isArabic;
     
-    // لتتبع تغيير الفرع
-    private String lastActiveBranchId = "";
+    // لتتبع تغيير الفرع - استخدم int بدلاً من String
+    private int lastActiveBranchId = -1;
 
     @Nullable
     @Override
@@ -118,8 +118,8 @@ public class MiraDashboardFragment extends Fragment {
     public void onResume() {
         super.onResume();
         // التحقق من تغيير الفرع عند العودة للصفحة
-        String currentBranchId = branchesManager.getActiveBranchId();
-        if (currentBranchId != null && !currentBranchId.equals(lastActiveBranchId)) {
+        int currentBranchId = branchesManager.getActiveBranchId();
+        if (currentBranchId != lastActiveBranchId) {
             lastActiveBranchId = currentBranchId;
             updateHeader();
             showShimmerLoading();
@@ -249,7 +249,7 @@ public class MiraDashboardFragment extends Fragment {
         String piecesText = isArabic ? "قطعة" : "pcs";
         if (count > 0) {
             tv.setText(label + " | " + count + " " + piecesText);
-            // استخدام لون متوافق مع الثيم بدلاً من الأزرق الثابت
+            // استخدام لون متوافق مع الثيم
             tv.setTextColor(getResources().getColor(R.color.primary_text, requireActivity().getTheme()));
         } else {
             tv.setText(label + " | —");
