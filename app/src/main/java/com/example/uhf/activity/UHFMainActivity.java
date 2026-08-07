@@ -84,6 +84,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     
     // متغير لتتبع اللغة الحالية
     private boolean isArabic = true;
+    
+    // متغير لتتبع آخر فرع نشط - لتحديث الصفحات عند التغيير
+    private int lastActiveBranchId = -1;
+
+    // ==================== دورة الحياة ====================
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -106,24 +111,14 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
 
         branchesManager = MiraBranchesManager.getInstance(this);
+        lastActiveBranchId = branchesManager.getActiveBranchId();
 
         setContentView(R.layout.activity_main);
 
         com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
             setSupportActionBar(toolbar);
-            String displayName = sessionManager.getDisplayName();
-            if (displayName == null || displayName.isEmpty()) {
-                displayName = sessionManager.getUsername();
-            }
-            if (getSupportActionBar() != null) {
-                MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
-                getSupportActionBar().setTitle(orgProfile.getOrgName() + " - " + displayName);
-
-                if (branchesManager.hasActiveBranch()) {
-                    getSupportActionBar().setSubtitle("📍 " + branchesManager.getActiveBranchDisplayName());
-                }
-            }
+            updateToolbarTitle();
         }
 
         checkReadWritePermission();
@@ -132,17 +127,53 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         initViewPageData();
     }
 
-    // ==================== قائمة الخيارات مع زر تغيير اللغة ====================
-    
-   @Override
-public boolean onCreateOptionsMenu(Menu menu) {
-    getMenuInflater().inflate(R.menu.main, menu);  // استخدم main.xml الموجود
-    return true;
-}
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // التحقق من تغيير الفرع عند العودة للنشاط
+        checkBranchChange();
+    }
+
+    /**
+     * التحقق من تغيير الفرع وتحديث الواجهات إذا تغير
+     */
+    private void checkBranchChange() {
+        int currentBranchId = branchesManager.getActiveBranchId();
+        if (currentBranchId != lastActiveBranchId) {
+            lastActiveBranchId = currentBranchId;
+            updateToolbarTitle();
+            refreshCurrentTab();
+        }
+    }
+
+    /**
+     * تحديث عنوان شريط الأدوات
+     */
+    private void updateToolbarTitle() {
+        if (getSupportActionBar() != null) {
+            String displayName = sessionManager.getDisplayName();
+            if (displayName == null || displayName.isEmpty()) {
+                displayName = sessionManager.getUsername();
+            }
+            MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
+            getSupportActionBar().setTitle(orgProfile.getOrgName() + " - " + displayName);
+
+            if (branchesManager.hasActiveBranch()) {
+                getSupportActionBar().setSubtitle("📍 " + branchesManager.getActiveBranchDisplayName());
+            }
+        }
+    }
+
+    // ==================== قائمة الخيارات ====================
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main, menu);
+        return true;
+    }
 
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
-        // تحديث نص زر اللغة حسب اللغة الحالية
         MenuItem langItem = menu.findItem(R.id.action_change_language);
         if (langItem != null) {
             if (isArabic) {
@@ -161,23 +192,55 @@ public boolean onCreateOptionsMenu(Menu menu) {
         invalidateOptionsMenu();
     }
 
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
+
+        if (id == R.id.action_change_language) {
+            toggleLanguage();
+            return true;
+        }
+        if (id == R.id.action_logout) {
+            showLogoutConfirmation();
+            return true;
+        }
+        if (id == R.id.action_profile) {
+            showProfileDialog();
+            return true;
+        }
+        if (id == R.id.action_branches) {
+            showBranchPicker();
+            return true;
+        }
+        if (id == R.id.export) {
+            exportData();
+            return true;
+        }
+        if (id == R.id.UHF_ver) {
+            getUHFVersion();
+            return true;
+        }
+        if (id == R.id.speed) {
+            startActivity(new Intent(this, TestActivity.class));
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
     // ==================== تغيير اللغة ====================
 
     private void toggleLanguage() {
         isArabic = !isArabic;
-        
-        // حفظ اللغة الجديدة
+
         getSharedPreferences("app_settings", MODE_PRIVATE)
             .edit()
             .putString("language", isArabic ? "ar" : "en")
             .apply();
-        
-        // تطبيق اللغة الجديدة
+
         applyLanguage();
     }
 
     private void applyLanguage() {
-        // تغيير لغة التطبيق
         LocaleListCompat appLocale;
         if (isArabic) {
             appLocale = LocaleListCompat.forLanguageTags("ar");
@@ -185,29 +248,83 @@ public boolean onCreateOptionsMenu(Menu menu) {
             appLocale = LocaleListCompat.forLanguageTags("en");
         }
         AppCompatDelegate.setApplicationLocales(appLocale);
-        
-        // تحديث اتجاه الشاشة
+
         if (isArabic) {
             getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         } else {
             getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         }
-        
-        // إعادة إنشاء النشاط لتطبيق التغييرات على جميع الأجزاء
+
         recreate();
+    }
+
+    // ==================== اختيار الفرع ====================
+
+    private void showBranchPicker() {
+        if (branchesManager.isBranchLocked() && !sessionManager.isAnyAdmin()) {
+            Toast.makeText(this,
+                isArabic ? "الفرع محدد من قبل النظام ولا يمكن تغييره" : "Branch is locked by system and cannot be changed",
+                Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        MiraBranchPickerFragment picker = new MiraBranchPickerFragment();
+        picker.setOnBranchSelectedListener((branchId, branchName, branchCode) -> {
+            // تحديث العنوان
+            if (getSupportActionBar() != null) {
+                getSupportActionBar().setSubtitle("📍 " + branchName);
+            }
+
+            // حفظ الفرع النشط
+            branchesManager.setActiveBranch(branchId, branchName, branchCode, "", "");
+            lastActiveBranchId = branchId;
+
+            // تحديث التبويب الحالي ليعكس بيانات الفرع الجديد
+            refreshCurrentTab();
+
+            // رسالة تأكيد
+            Toast.makeText(this,
+                (isArabic ? "✅ تم التبديل إلى: " : "✅ Switched to: ") + branchName,
+                Toast.LENGTH_SHORT).show();
+        });
+        picker.show(getSupportFragmentManager(), "branch_picker");
+    }
+
+    /**
+     * تحديث التبويب الحالي بعد تغيير الفرع
+     * يقوم بإعادة تحميل الفragment النشط
+     */
+    private void refreshCurrentTab() {
+        try {
+            String currentTabTag = mTabHost.getCurrentTabTag();
+            if (currentTabTag == null) return;
+
+            Fragment currentFragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
+            if (currentFragment != null && currentFragment.isAdded()) {
+                getSupportFragmentManager()
+                    .beginTransaction()
+                    .detach(currentFragment)
+                    .attach(currentFragment)
+                    .commitAllowingStateLoss();
+                
+                Log.d(TAG, "Refreshed tab: " + currentTabTag + " for branch: " + branchesManager.getActiveBranchId());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error refreshing tab: " + e.getMessage());
+        }
     }
 
     // ==================== POS Fragment ====================
 
-    public void setActivePOSFragment(MiraPosFragment fragment) { 
-        this.activePOSFragment = fragment; 
+    public void setActivePOSFragment(MiraPosFragment fragment) {
+        this.activePOSFragment = fragment;
     }
 
     public boolean isReaderReady() {
         try {
             return mReader != null && mReader.getConnectStatus() == ConnectionStatus.CONNECTED;
-        } catch (Exception e) { 
-            return false; 
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -280,7 +397,7 @@ public boolean onCreateOptionsMenu(Menu menu) {
 
         // 🏢 إدارة الفروع - للمدراء فقط
         if (isManager) {
-            safeAddTab("BranchesManagement", isArabic ? "🏢 الفروع" : "🏢 Branches", 
+            safeAddTab("BranchesManagement", isArabic ? "🏢 الفروع" : "🏢 Branches",
                 MiraBranchesManagementFragment.class);
         }
 
@@ -324,6 +441,11 @@ public boolean onCreateOptionsMenu(Menu menu) {
         mTabHost.setOnTabChangedListener(tabId -> {
             try {
                 Log.d(TAG, "Switched to tab: " + tabId);
+                // تحديث التبويب عند التبديل إليه
+                Fragment fragment = getSupportFragmentManager().findFragmentByTag(tabId);
+                if (fragment != null) {
+                    currentFragment = fragment;
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Tab switch error: " + e.getMessage());
                 Toast.makeText(UHFMainActivity.this, "خطأ في تحميل التبويب: " + tabId, Toast.LENGTH_SHORT).show();
@@ -345,62 +467,6 @@ public boolean onCreateOptionsMenu(Menu menu) {
         }
     }
 
-    // ==================== اختيار الفرع ====================
-
-    private void showBranchPicker() {
-        if (branchesManager.isBranchLocked() && !sessionManager.isAnyAdmin()) {
-            Toast.makeText(this, "الفرع محدد من قبل النظام ولا يمكن تغييره", Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        MiraBranchPickerFragment picker = new MiraBranchPickerFragment();
-        picker.setOnBranchSelectedListener((branchId, branchName, branchCode) -> {
-            if (getSupportActionBar() != null) {
-                getSupportActionBar().setSubtitle("📍 " + branchName);
-            }
-            branchesManager.setActiveBranch(branchId, branchName, branchCode, "", "");
-            Toast.makeText(this, "✅ " + branchName, Toast.LENGTH_SHORT).show();
-        });
-        picker.show(getSupportFragmentManager(), "branch_picker");
-    }
-
-    // ==================== خيارات القائمة ====================
-
-    @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        int id = item.getItemId();
-        
-        if (id == R.id.action_change_language) {
-            toggleLanguage();
-            return true;
-        }
-        if (id == R.id.action_logout) {
-            showLogoutConfirmation();
-            return true;
-        }
-        if (id == R.id.action_profile) {
-            showProfileDialog();
-            return true;
-        }
-        if (id == R.id.action_branches) {
-            showBranchPicker();
-            return true;
-        }
-        if (id == R.id.export) {
-            exportData();
-            return true;
-        }
-        if (id == R.id.UHF_ver) {
-            getUHFVersion();
-            return true;
-        }
-        if (id == R.id.speed) {
-            startActivity(new Intent(this, TestActivity.class));
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
     // ==================== تسجيل الخروج ====================
 
     private void showLogoutConfirmation() {
@@ -408,7 +474,7 @@ public boolean onCreateOptionsMenu(Menu menu) {
         try {
             isArabicLocal = getResources().getConfiguration().locale.getLanguage().equals("ar");
         } catch (Exception ignored) {}
-        
+
         new androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle(isArabicLocal ? "تسجيل الخروج" : "Sign Out")
             .setMessage(isArabicLocal ? "هل أنت متأكد أنك تريد تسجيل الخروج؟" : "Are you sure you want to sign out?")
@@ -425,7 +491,7 @@ public boolean onCreateOptionsMenu(Menu menu) {
         try {
             isArabicLocal = getResources().getConfiguration().locale.getLanguage().equals("ar");
         } catch (Exception ignored) {}
-        
+
         String username = sessionManager.getUsername();
         String displayName = sessionManager.getDisplayName();
         String role = sessionManager.getRoleString();
@@ -662,4 +728,4 @@ public boolean onCreateOptionsMenu(Menu menu) {
             }
         }
     }
-        }
+            }
