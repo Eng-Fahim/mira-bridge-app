@@ -34,9 +34,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.text.DecimalFormat;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Executors;
@@ -55,7 +53,6 @@ public class MiraAccountingFragment extends Fragment {
     private MiraAccountingViewModel viewModel;
     private MiraAccountingItem.ItemType activeType = MiraAccountingItem.ItemType.JOURNAL_ENTRY;
     private final DecimalFormat currencyFormat = new DecimalFormat("#,##0.00");
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Nullable
     @Override
@@ -70,7 +67,7 @@ public class MiraAccountingFragment extends Fragment {
         isArabic = Locale.getDefault().getLanguage().equals("ar");
         initViews(view);
         initViewModel();
-        setupListeners(view);
+        setupListeners();
         btnTabJournal.performClick();
     }
 
@@ -98,9 +95,7 @@ public class MiraAccountingFragment extends Fragment {
             rvAccountingData.setLayoutManager(new LinearLayoutManager(getContext()));
             accountingAdapter = new MiraAccountingAdapter();
             rvAccountingData.setAdapter(accountingAdapter);
-            accountingAdapter.setOnItemClickListener(item -> {
-                showItemDetail(item);
-            });
+            accountingAdapter.setOnItemClickListener(item -> showItemDetail(item));
         }
     }
 
@@ -110,21 +105,31 @@ public class MiraAccountingFragment extends Fragment {
         viewModel.getIsLoading().observe(getViewLifecycleOwner(), this::showLoading);
         viewModel.getStatsLiveData().observe(getViewLifecycleOwner(), this::updateStats);
         viewModel.getErrorMessage().observe(getViewLifecycleOwner(), error -> {
-            if (error != null && !error.isEmpty()) Toast.makeText(getContext(), error, Toast.LENGTH_SHORT).show();
+            if (error != null && !error.isEmpty())
+                Toast.makeText(getContext(), error, Toast.LENGTH_SHORT).show();
         });
     }
 
-    private void setupListeners(View view) {
-        btnTabJournal.setOnClickListener(v -> switchTab(MiraAccountingItem.ItemType.JOURNAL_ENTRY, btnTabJournal, btnTabChartOfAccounts, btnTabTrialBalance));
-        btnTabChartOfAccounts.setOnClickListener(v -> switchTab(MiraAccountingItem.ItemType.CHART_OF_ACCOUNT, btnTabChartOfAccounts, btnTabJournal, btnTabTrialBalance));
-        btnTabTrialBalance.setOnClickListener(v -> switchTab(MiraAccountingItem.ItemType.TRIAL_BALANCE, btnTabTrialBalance, btnTabJournal, btnTabChartOfAccounts));
-        btnCreateManualEntry.setOnClickListener(v -> Toast.makeText(getContext(), ar("فتح محرر القيد اليدوي...", "Opening manual entry..."), Toast.LENGTH_SHORT).show());
+    private void setupListeners() {
+        btnTabJournal.setOnClickListener(v -> switchTab(MiraAccountingItem.ItemType.JOURNAL_ENTRY,
+                btnTabJournal, btnTabChartOfAccounts, btnTabTrialBalance));
+        btnTabChartOfAccounts.setOnClickListener(v -> switchTab(MiraAccountingItem.ItemType.CHART_OF_ACCOUNT,
+                btnTabChartOfAccounts, btnTabJournal, btnTabTrialBalance));
+        btnTabTrialBalance.setOnClickListener(v -> switchTab(MiraAccountingItem.ItemType.TRIAL_BALANCE,
+                btnTabTrialBalance, btnTabJournal, btnTabChartOfAccounts));
+
+        btnCreateManualEntry.setOnClickListener(v ->
+                Toast.makeText(getContext(), ar("فتح محرر القيد اليدوي...", "Opening manual entry..."),
+                        Toast.LENGTH_SHORT).show());
+
         btnRefreshAccounting.setOnClickListener(v -> refreshData());
 
         if (etSearchAccounting != null) {
             etSearchAccounting.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) { viewModel.filterData(s.toString()); }
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    viewModel.filterData(s.toString());
+                }
                 @Override public void afterTextChanged(Editable s) {}
             });
         }
@@ -134,7 +139,10 @@ public class MiraAccountingFragment extends Fragment {
         activeType = type;
         active.setBackgroundColor(0xFF2980B9);
         active.setTextColor(0xFFFFFFFF);
-        for (Button b : inactives) { b.setBackgroundColor(0xFFBDC3C7); b.setTextColor(0xFF2C3E50); }
+        for (Button b : inactives) {
+            b.setBackgroundColor(0xFFBDC3C7);
+            b.setTextColor(0xFF2C3E50);
+        }
 
         switch (type) {
             case JOURNAL_ENTRY:
@@ -146,7 +154,7 @@ public class MiraAccountingFragment extends Fragment {
                 break;
             case CHART_OF_ACCOUNT:
                 thCol1.setText(ar("رمز الحساب", "Code"));
-                thCol2.setText(ar("اسم الحساب", "Account Name"));
+                thCol2.setText(ar("اسم الحساب", "Account"));
                 thCol3.setText(ar("النوع", "Type"));
                 thCol4.setText(ar("الرصيد", "Balance"));
                 viewModel.fetchChartOfAccounts();
@@ -173,14 +181,18 @@ public class MiraAccountingFragment extends Fragment {
     }
 
     private void showLoading(boolean isLoading) {
-        if (pbAccountingLoading != null) pbAccountingLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+        if (pbAccountingLoading != null)
+            pbAccountingLoading.setVisibility(isLoading ? View.VISIBLE : View.GONE);
     }
 
     private void updateStats(AccountingStats stats) {
-        if (tvTodayRevenue != null) tvTodayRevenue.setText(currencyFormat.format(stats.todayRevenue) + " YER");
-        if (tvTotalJournalVolume != null) tvTotalJournalVolume.setText(currencyFormat.format(stats.journalVolume) + " YER");
+        if (stats == null) return;
+        if (tvTodayRevenue != null)
+            tvTodayRevenue.setText(currencyFormat.format(stats.todayRevenue) + " YER");
+        if (tvTotalJournalVolume != null)
+            tvTotalJournalVolume.setText(currencyFormat.format(stats.journalVolume) + " YER");
         if (tvBalanceStatus != null) {
-            tvBalanceStatus.setText(stats.balanced ? (ar("متوازن ✓", "Balanced ✓")) : (ar("غير متوازن ⚠", "Unbalanced ⚠")));
+            tvBalanceStatus.setText(stats.balanced ? ar("متوازن ✓", "Balanced ✓") : ar("غير متوازن ⚠", "Unbalanced ⚠"));
             tvBalanceStatus.setTextColor(stats.balanced ? 0xFF2ECC71 : 0xFFE74C3C);
         }
     }
@@ -200,9 +212,16 @@ public class MiraAccountingFragment extends Fragment {
         Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
     }
 
-    private String ar(String arabic, String english) { return isArabic ? arabic : english; }
+    private String ar(String arabic, String english) {
+        return isArabic ? arabic : english;
+    }
 
-    @Override public void onDestroyView() { super.onDestroyView(); rvAccountingData = null; accountingAdapter = null; }
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        rvAccountingData = null;
+        accountingAdapter = null;
+    }
 
     // ==================== ViewModel ====================
 
@@ -223,7 +242,7 @@ public class MiraAccountingFragment extends Fragment {
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
                     MiraApiClient client = MiraApiClient.getInstance(null);
-                    MiraApiClient.ApiResponse response = client.get("/accounting/journal-entries");
+                    MiraApiClient.ApiResponse response = client.getJournalEntries();
                     processResponse(response, MiraAccountingItem.ItemType.JOURNAL_ENTRY);
                 } catch (Exception e) {
                     loadMockJournalEntries();
@@ -236,7 +255,7 @@ public class MiraAccountingFragment extends Fragment {
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
                     MiraApiClient client = MiraApiClient.getInstance(null);
-                    MiraApiClient.ApiResponse response = client.get("/accounting/chart-of-accounts");
+                    MiraApiClient.ApiResponse response = client.getChartOfAccounts();
                     processResponse(response, MiraAccountingItem.ItemType.CHART_OF_ACCOUNT);
                 } catch (Exception e) {
                     loadMockChartOfAccounts();
@@ -249,7 +268,7 @@ public class MiraAccountingFragment extends Fragment {
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
                     MiraApiClient client = MiraApiClient.getInstance(null);
-                    MiraApiClient.ApiResponse response = client.get("/accounting/trial-balance");
+                    MiraApiClient.ApiResponse response = client.getTrialBalance();
                     processResponse(response, MiraAccountingItem.ItemType.TRIAL_BALANCE);
                 } catch (Exception e) {
                     loadMockTrialBalance();
@@ -272,10 +291,10 @@ public class MiraAccountingFragment extends Fragment {
                             JSONObject obj = data.optJSONObject(i);
                             if (obj == null) continue;
                             items.add(new MiraAccountingItem(type,
-                                obj.optString("code", obj.optString("entry_no", obj.optString("id", "-"))),
-                                obj.optString("description", obj.optString("name", obj.optString("title", "-"))),
-                                obj.optString("debit", obj.optString("type", "0")),
-                                obj.optString("credit", obj.optString("balance", "0"))));
+                                    obj.optString("code", obj.optString("entry_no", obj.optString("id", "-"))),
+                                    obj.optString("description", obj.optString("name", obj.optString("title", "-"))),
+                                    obj.optString("debit", obj.optString("type", "0")),
+                                    obj.optString("credit", obj.optString("balance", "0"))));
                             totalDebit += obj.optDouble("debit", 0);
                             totalCredit += obj.optDouble("credit", 0);
                             revenue += obj.optDouble("revenue", obj.optDouble("amount", 0));
@@ -294,18 +313,22 @@ public class MiraAccountingFragment extends Fragment {
 
             rawList = items;
             itemsLiveData.postValue(items);
-            statsLiveData.postValue(new AccountingStats(revenue, totalDebit + totalCredit, Math.abs(totalDebit - totalCredit) < 0.01));
+            statsLiveData.postValue(new AccountingStats(revenue, totalDebit + totalCredit,
+                    Math.abs(totalDebit - totalCredit) < 0.01));
             isLoading.postValue(false);
         }
 
         public void filterData(String query) {
             if (rawList == null) return;
-            if (query == null || query.trim().isEmpty()) { itemsLiveData.setValue(rawList); return; }
+            if (query == null || query.trim().isEmpty()) {
+                itemsLiveData.setValue(rawList);
+                return;
+            }
             String q = query.toLowerCase().trim();
             List<MiraAccountingItem> filtered = new ArrayList<>();
             for (MiraAccountingItem item : rawList) {
                 if ((item.getCol1Text() != null && item.getCol1Text().toLowerCase().contains(q)) ||
-                    (item.getCol2Text() != null && item.getCol2Text().toLowerCase().contains(q))) {
+                        (item.getCol2Text() != null && item.getCol2Text().toLowerCase().contains(q))) {
                     filtered.add(item);
                 }
             }
@@ -314,9 +337,12 @@ public class MiraAccountingFragment extends Fragment {
 
         private void loadMockJournalEntries() {
             rawList.clear();
-            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.JOURNAL_ENTRY, "JV-2026-101", "مبيعات طقم ذهب - فاتورة #4092", "450,000", "0.00"));
-            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.JOURNAL_ENTRY, "JV-2026-102", "قبول توريد صندوق - فرع صنعاء", "0.00", "450,000"));
-            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.JOURNAL_ENTRY, "JV-2026-103", "رسوم صياغة وتلميع قطع مجوهرات", "25,000", "0.00"));
+            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.JOURNAL_ENTRY,
+                    "JV-2026-101", "مبيعات طقم ذهب - فاتورة #4092", "450,000", "0.00"));
+            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.JOURNAL_ENTRY,
+                    "JV-2026-102", "توريد صندوق - فرع صنعاء", "0.00", "450,000"));
+            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.JOURNAL_ENTRY,
+                    "JV-2026-103", "رسوم صياغة وتلميع", "25,000", "0.00"));
             itemsLiveData.postValue(rawList);
             statsLiveData.postValue(new AccountingStats(450000, 925000, true));
             isLoading.postValue(false);
@@ -324,9 +350,12 @@ public class MiraAccountingFragment extends Fragment {
 
         private void loadMockChartOfAccounts() {
             rawList.clear();
-            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.CHART_OF_ACCOUNT, "110101", "الصندوق الرئيسي", "أصول متداولة", "12,450,000"));
-            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.CHART_OF_ACCOUNT, "110201", "مخزون الذهب (عيار 21)", "أصول متداولة", "85,200,000"));
-            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.CHART_OF_ACCOUNT, "410101", "إيرادات مبيعات المجوهرات", "إيرادات", "4,250,000"));
+            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.CHART_OF_ACCOUNT,
+                    "110101", "الصندوق الرئيسي", "أصول متداولة", "12,450,000"));
+            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.CHART_OF_ACCOUNT,
+                    "110201", "مخزون الذهب (عيار 21)", "أصول متداولة", "85,200,000"));
+            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.CHART_OF_ACCOUNT,
+                    "410101", "إيرادات مبيعات المجوهرات", "إيرادات", "4,250,000"));
             itemsLiveData.postValue(rawList);
             statsLiveData.postValue(new AccountingStats(4250000, 101900000, true));
             isLoading.postValue(false);
@@ -334,19 +363,27 @@ public class MiraAccountingFragment extends Fragment {
 
         private void loadMockTrialBalance() {
             rawList.clear();
-            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.TRIAL_BALANCE, "1101", "حسابات النقدية", "15,000,000", "2,550,000"));
-            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.TRIAL_BALANCE, "1102", "مخزون البضائع", "85,200,000", "0.00"));
+            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.TRIAL_BALANCE,
+                    "1101", "حسابات النقدية", "15,000,000", "2,550,000"));
+            rawList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.TRIAL_BALANCE,
+                    "1102", "مخزون البضائع", "85,200,000", "0.00"));
             itemsLiveData.postValue(rawList);
             statsLiveData.postValue(new AccountingStats(0, 102750000, false));
             isLoading.postValue(false);
         }
     }
 
+    // ==================== Stats Model ====================
+
     public static class AccountingStats {
-        public double todayRevenue, journalVolume;
+        public double todayRevenue;
+        public double journalVolume;
         public boolean balanced;
+
         public AccountingStats(double todayRevenue, double journalVolume, boolean balanced) {
-            this.todayRevenue = todayRevenue; this.journalVolume = journalVolume; this.balanced = balanced;
+            this.todayRevenue = todayRevenue;
+            this.journalVolume = journalVolume;
+            this.balanced = balanced;
         }
     }
-                }
+}
