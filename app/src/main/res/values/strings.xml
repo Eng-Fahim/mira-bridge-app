@@ -104,6 +104,26 @@
     <string name="fontGrayScaleRange">(1~8)</string>
     <string name="PrintContent"> أهلاً بك! \n</string>
 
+
+    <!-- DASHBOARD -->
+    <string name="precious_inventory">المخزون الثمين والكتلة</string>
+    <string name="sold_today">قطع مباعة (اليوم)</string>
+    <string name="total_weight">الوزن الكلي</string>
+    <string name="total_items">إجمالي القطع</string>
+    <string name="sales_today">مبيعات اليوم</string>
+    <string name="sales_month">مبيعات الشهر</string>
+    <string name="sales_year">مبيعات السنة</string>
+    <string name="field_operations">العمليات الميدانية والمراقبة</string>
+    <string name="gate_security">رقابة بوابات الحماية</string>
+    <string name="rfid_audit">الجرد السريع بالـ RFID</string>
+    <string name="karat_18">عيار 18</string>
+    <string name="karat_21">عيار 21</string>
+    <string name="karat_24">عيار 24</string>
+    <string name="updating">● جاري التحديث...</string>
+    <string name="online">● ONLINE</string>
+    <string name="offline">● OFFLINE</string>
+    <string name="pieces">قطعة</string>
+    
     <!-- DeviceListActivity -->
     <string name="scanning">جاري البحث...</string>
     <string name="select_device">حدد جهازاً</string>
