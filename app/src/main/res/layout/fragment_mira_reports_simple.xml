@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?android:attr/colorBackground"
+    android:layoutDirection="rtl">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorPrimary"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📊 مركز التقارير"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvDateRange"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- Filters -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="8dp"
+        android:background="?attr/colorSurfaceVariant">
+
+        <Spinner
+            android:id="@+id/spReportType"
+            android:layout_width="match_parent"
+            android:layout_height="42dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="6dp">
+
+            <Button android:id="@+id/btnDateFrom" android:text="من" android:layout_weight="1" android:layout_marginEnd="2dp" android:textSize="11sp" />
+            <Button android:id="@+id/btnDateTo" android:text="إلى" android:layout_weight="1" android:layout_marginHorizontal="2dp" android:textSize="11sp" />
+            <Button android:id="@+id/btnApplyFilter" android:text="تطبيق" android:layout_weight="1" android:layout_marginStart="2dp" android:textSize="11sp" android:backgroundTint="?attr/colorPrimary" android:textColor="?attr/colorOnPrimary" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Stats Cards -->
+    <LinearLayout
+        android:id="@+id/statsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:weightSum="3" />
+
+    <!-- WebView Report -->
+    <WebView
+        android:id="@+id/webReport"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+</LinearLayout>
