@@ -75,7 +75,9 @@
 
     <string name="yid_msg_scan_cancel">تم إلغاء المسح</string>
     <string name="yid_msg_scan_timeout">انتهت مهلة المسح</string>
-
+<string name="sales_title">سجل المبيعات</string>
+<string name="sales_search_hint">ابحث برقم العملية أو اسم العميل...</string>
+<string name="sales_empty">لا توجد عمليات بيع حتى الآن</string>
     <string name="yid_msg_scan_error">خطأ في الباركود</string>
     <string name="title_scan_count">الإجمالي</string>
     <string name="title_succ_count">الناجحة</string>
