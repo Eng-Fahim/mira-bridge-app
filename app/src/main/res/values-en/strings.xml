@@ -47,7 +47,55 @@
     <string name="title_stop">Stop</string>
     <string name="title_activity_settings">Settings</string>
     <string name="action_set">Settings</string>
-    
+
+    <!-- Identity Studio Strings -->
+<string name="step_title">Step 1 of 4: Bind &amp; Classify</string>
+<string name="hint_epc">EPC / GTIN Code...</string>
+<string name="hint_title">Item Title &amp; Description</string>
+<string name="btn_save_identity">Approve &amp; Export MIRA ID</string>
+<string name="btn_add_photos">📷 Capture / Attach Photos</string>
+<string name="no_photos">No photos attached yet</string>
+<string name="estimated_value_currency">YER</string>
+<string name="classify_item">Classify Item</string>
+<string name="ring">💍 Ring</string>
+<string name="set">💎 Set</string>
+<string name="bracelet">📿 Bracelet</string>
+<string name="necklace">📐 Necklace</string>
+<string name="metal_specs">Metal Specifications &amp; Weight</string>
+<string name="metal_type">Metal Type:</string>
+<string name="yellow_gold">🟡 Yellow Gold</string>
+<string name="white_gold">⚪ White Gold</string>
+<string name="rose_gold">🔴 Rose Gold</string>
+<string name="karat">Karat:</string>
+<string name="gross_weight_label">Gross Weight (grams)</string>
+<string name="estimated_gold_value">Estimated Raw Gold Value:</string>
+<string name="stones_title">Stones &amp; Inlays</string>
+<string name="has_stones">Is the item set with stones / zircon?</string>
+<string name="stone_type_hint">Stone Type (e.g. Diamond, Zircon, Ruby...)</string>
+<string name="stone_weight_hint">Stone Weight (carat)</string>
+<string name="stone_count_hint">Stone Count</string>
+<string name="stone_value_hint">Additional Stone Value ($)</string>
+<string name="photos_title">Item Photos &amp; Final Approval</string>
+<string name="bound">BOUND</string>
+<string name="waiting">WAITING</string>
+<string name="encoding">Encoding...</string>
+<string name="camera_permission">Camera permission is required to take photos</string>
+<string name="photo_captured">✅ Photo captured successfully</string>
+<string name="no_camera">❌ No camera app available</string>
+<string name="rfid_required">Please scan or enter RFID first</string>
+<string name="title_required">Please enter item title</string>
+<string name="weight_required">Please specify item weight</string>
+<string name="invalid_weight">Invalid weight</string>
+<string name="encode_success">✅ Item encoded &amp; linked successfully!</string>
+<string name="encode_failed">❌ Encoding failed:</string>
+<string name="encode_error">❌ Error:</string>
+<string name="photos_attached">Attached (%d) photos</string>
+<string name="main_showroom">Main Showroom</string>
+<string name="category_jewelry">Jewelry</string>
+<string name="category_rings">Rings</string>
+<string name="category_sets">Sets</string>
+<string name="category_bracelets">Bracelets</string>
+<string name="category_necklaces">Necklaces</string>
     <!-- Network Messages -->
     <string name="msg_network_none">Network unavailable</string>
     <string name="msg_network_ok">Network connected</string>
