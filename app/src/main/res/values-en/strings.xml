@@ -6,6 +6,8 @@
 
 
     <!-- DASHBOARD-->
+    <string name="greeting_default">Welcome...</string>
+<string name="location_default">Main Showroom — Regional Branch</string>
     <string name="precious_inventory">Precious Inventory &amp; Mass</string>
 <string name="sold_today">Sold Today</string>
 <string name="total_weight">Total Weight</string>
