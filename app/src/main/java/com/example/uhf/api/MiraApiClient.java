@@ -88,18 +88,6 @@ public class MiraApiClient {
         return getWithAuth("/auth/me");
     }
 
-    // ===================== 📊 INVENTORY SESSIONS =====================
-
-    // جلب قائمة جلسات الجرد
-    public ApiResponse getInventorySessionsList() {
-        return getWithAuth("/inventory/sessions");
-    }
-
-    // جلب تفاصيل جلسة جرد معينة حسب الـ ID
-    public ApiResponse getInventorySessionDetail(int sessionId) {
-        return getWithAuth("/inventory/sessions/" + sessionId);
-    }
-
     public ApiResponse refreshToken(String oldToken) {
         JSONObject payload = new JSONObject();
         try {
@@ -111,20 +99,6 @@ public class MiraApiClient {
         return postWithAuth("/auth/refresh-token", payload);
     }
 
-   // ===================== 📊 ACCOUNTING =====================
-
-public ApiResponse getJournalEntries() {
-    return get("/accounting/journal-entries");
-}
-
-public ApiResponse getChartOfAccounts() {
-    return get("/accounting/chart-of-accounts");
-}
-
-public ApiResponse getTrialBalance() {
-    return get("/accounting/trial-balance");
-}
-    
     public ApiResponse registerBiometric(String token, String deviceId, String publicKey) {
         JSONObject payload = new JSONObject();
         try {
@@ -212,13 +186,25 @@ public ApiResponse getTrialBalance() {
     // ===================== 🛒 POS =====================
 
     public ApiResponse checkout(JSONObject payload) {
-        return post("/pos/checkout", payload);
+        return postWithAuth("/pos/checkout", payload);
+    }
+
+    public ApiResponse processRefund(String epc, String serialNo, String reason) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("epc", epc != null ? epc : "");
+            payload.put("serial_no", serialNo != null ? serialNo : "");
+            payload.put("reason", reason != null ? reason : "مرتجع مبيعات");
+            payload.put("gate_id", gateId);
+        } catch (Exception e) {
+            Log.e(TAG, "Error building refund payload: " + e.getMessage());
+        }
+        return postWithAuth("/pos/refund", payload);
     }
 
     public ApiResponse getSalesHistory() {
-    return getWithAuth("/pos/sales");
-}
-
+        return getWithAuth("/pos/sales");
+    }
 
     // ===================== 🏷️ ITEM DETAIL =====================
 
@@ -243,6 +229,14 @@ public ApiResponse getTrialBalance() {
     }
 
     // ===================== 📊 INVENTORY =====================
+
+    public ApiResponse getInventorySessionsList() {
+        return getWithAuth("/inventory/sessions");
+    }
+
+    public ApiResponse getInventorySessionDetail(int sessionId) {
+        return getWithAuth("/inventory/sessions/" + sessionId);
+    }
 
     public ApiResponse startInventorySession(String location, String type) {
         JSONObject payload = new JSONObject();
@@ -398,67 +392,40 @@ public ApiResponse getTrialBalance() {
 
     // ===================== 🏢 BRANCHES MANAGEMENT =====================
 
-    /**
-     * جلب قائمة الفروع
-     */
     public ApiResponse getBranches() {
         return getWithAuth("/branches");
     }
 
-    /**
-     * جلب تفاصيل فرع محدد
-     */
     public ApiResponse getBranch(int branchId) {
         return getWithAuth("/branches/" + branchId);
     }
 
-    /**
-     * إنشاء فرع جديد
-     */
     public ApiResponse createBranch(JSONObject payload) {
         return postWithAuth("/branches", payload);
     }
 
-    /**
-     * تحديث بيانات فرع
-     */
     public ApiResponse updateBranch(int branchId, JSONObject payload) {
         return postWithAuth("/branches/" + branchId, payload);
     }
 
-    /**
-     * جلب مخزون فرع
-     */
     public ApiResponse getBranchInventory(int branchId) {
         return getWithAuth("/branches/" + branchId + "/inventory");
     }
 
-    /**
-     * جلب مستخدمي فرع
-     */
     public ApiResponse getBranchUsers(int branchId) {
         return getWithAuth("/branches/" + branchId + "/users");
     }
 
-    /**
-     * جلب إعدادات فرع
-     */
     public ApiResponse getBranchSettings(int branchId) {
         return getWithAuth("/branches/" + branchId + "/settings");
     }
 
-    /**
-     * حفظ إعدادات فرع
-     */
     public ApiResponse saveBranchSettings(int branchId, JSONObject settings) {
         return postWithAuth("/branches/" + branchId + "/settings", settings);
     }
 
     // ===================== 📦 TRANSFERS =====================
 
-    /**
-     * جلب قائمة التحويلات
-     */
     public ApiResponse getTransfers(int branchId, String status) {
         String url = "/transfers?branch_id=" + branchId;
         if (status != null && !status.isEmpty()) {
@@ -467,37 +434,22 @@ public ApiResponse getTrialBalance() {
         return getWithAuth(url);
     }
 
-    /**
-     * إنشاء تحويل جديد
-     */
     public ApiResponse createTransfer(JSONObject payload) {
         return postWithAuth("/transfers", payload);
     }
 
-    /**
-     * جلب تفاصيل تحويل
-     */
     public ApiResponse getTransfer(int transferId) {
         return getWithAuth("/transfers/" + transferId);
     }
 
-    /**
-     * اعتماد تحويل
-     */
     public ApiResponse approveTransfer(int transferId) {
-        return postWithAuth("/transfers/" + transferId + "/approve", null);
+        return postWithAuth("/transfers/" + transferId + "/approve", new JSONObject());
     }
 
-    /**
-     * استلام تحويل
-     */
     public ApiResponse receiveTransfer(int transferId) {
-        return postWithAuth("/transfers/" + transferId + "/receive", null);
+        return postWithAuth("/transfers/" + transferId + "/receive", new JSONObject());
     }
 
-    /**
-     * مسح قطعة في تحويل
-     */
     public ApiResponse scanTransferItem(int transferId, String epc) {
         JSONObject payload = new JSONObject();
         try {
@@ -512,9 +464,6 @@ public ApiResponse getTrialBalance() {
 
     // ===================== 💰 ACCOUNTING & FINANCIAL API =====================
 
-    /**
-     * جلب قائمة القيود اليومية (Journal Entries)
-     */
     public ApiResponse getJournalEntries(String branchId) {
         String url = "/accounting/journal-entries";
         if (branchId != null && !branchId.isEmpty()) {
@@ -523,30 +472,18 @@ public ApiResponse getTrialBalance() {
         return getWithAuth(url);
     }
 
-    /**
-     * جلب تفاصيل قيد محاسبي محدد
-     */
     public ApiResponse getJournalEntryDetail(String entryId) {
         return getWithAuth("/accounting/journal-entries/" + entryId);
     }
 
-    /**
-     * إنشاء قيد محاسبي جديد
-     */
     public ApiResponse createJournalEntry(JSONObject payload) {
         return postWithAuth("/accounting/journal-entries/create", payload);
     }
 
-    /**
-     * جلب دليل / شجرة الحسابات (Chart of Accounts)
-     */
     public ApiResponse getChartOfAccounts() {
         return getWithAuth("/accounting/chart-of-accounts");
     }
 
-    /**
-     * جلب ميزان المراجعة (Trial Balance)
-     */
     public ApiResponse getTrialBalance(String branchId) {
         String url = "/accounting/trial-balance";
         if (branchId != null && !branchId.isEmpty()) {
@@ -555,9 +492,6 @@ public ApiResponse getTrialBalance() {
         return getWithAuth(url);
     }
 
-    /**
-     * جلب ملخص الإحصائيات المحاسبية للفرع
-     */
     public ApiResponse getAccountingSummary(String branchId) {
         String url = "/accounting/summary";
         if (branchId != null && !branchId.isEmpty()) {
