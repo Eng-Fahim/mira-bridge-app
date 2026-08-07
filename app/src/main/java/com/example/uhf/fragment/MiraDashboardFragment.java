@@ -51,6 +51,9 @@ public class MiraDashboardFragment extends Fragment {
     private MiraOrgProfileManager orgProfile;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isArabic;
+    
+    // لتتبع تغيير الفرع
+    private String lastActiveBranchId = "";
 
     @Nullable
     @Override
@@ -72,11 +75,7 @@ public class MiraDashboardFragment extends Fragment {
         initViews(view);
         setupListeners();
         updateHeader();
-        showShimmerLoading();
-        fetchData();
-        
-        // إعادة تحميل البيانات عند تغيير الفرع
-        branchesManager.addOnBranchChangeListener(this::onBranchChanged);
+        loadData();
     }
 
     private void initViews(View v) {
@@ -104,7 +103,10 @@ public class MiraDashboardFragment extends Fragment {
         mainContent = v.findViewById(R.id.mainContent);
 
         swipeRefresh = v.findViewById(R.id.swipeRefresh);
-        if (swipeRefresh != null) swipeRefresh.setOnRefreshListener(this::fetchData);
+        if (swipeRefresh != null) swipeRefresh.setOnRefreshListener(() -> {
+            showShimmerLoading();
+            fetchData();
+        });
     }
 
     private void setupListeners() {
@@ -112,8 +114,22 @@ public class MiraDashboardFragment extends Fragment {
         if (btnInventory != null) btnInventory.setOnClickListener(v -> switchTab("Inventory Pro"));
     }
 
-    private void onBranchChanged() {
-        updateHeader();
+    @Override
+    public void onResume() {
+        super.onResume();
+        // التحقق من تغيير الفرع عند العودة للصفحة
+        String currentBranchId = branchesManager.getActiveBranchId();
+        if (currentBranchId != null && !currentBranchId.equals(lastActiveBranchId)) {
+            lastActiveBranchId = currentBranchId;
+            updateHeader();
+            showShimmerLoading();
+            fetchData();
+        }
+    }
+
+    private void loadData() {
+        // تحميل البيانات لأول مرة
+        lastActiveBranchId = branchesManager.getActiveBranchId();
         showShimmerLoading();
         fetchData();
     }
@@ -194,7 +210,6 @@ public class MiraDashboardFragment extends Fragment {
 
                 JSONObject w = inv.optJSONObject("weights");
                 if (w != null) {
-                    // عرض العيارات مع العدد - ترتيب ديناميكي حسب الكمية
                     int k24 = w.optInt("k24", 0);
                     int k21 = w.optInt("k21", 0);
                     int k18 = w.optInt("k18", 0);
@@ -230,17 +245,17 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void setKaratWithCount(TextView tv, String label, int count) {
-    if (tv == null) return;
-    String piecesText = isArabic ? "قطعة" : "pcs";
-    if (count > 0) {
-        tv.setText(label + " | " + count + " " + piecesText);
-        // استخدام لون متوافق مع الثيم
-        tv.setTextColor(getResources().getColor(R.color.karat_text, requireActivity().getTheme()));
-    } else {
-        tv.setText(label + " | —");
-        tv.setTextColor(getResources().getColor(R.color.karat_text_empty, requireActivity().getTheme()));
+        if (tv == null) return;
+        String piecesText = isArabic ? "قطعة" : "pcs";
+        if (count > 0) {
+            tv.setText(label + " | " + count + " " + piecesText);
+            // استخدام لون متوافق مع الثيم بدلاً من الأزرق الثابت
+            tv.setTextColor(getResources().getColor(R.color.primary_text, requireActivity().getTheme()));
+        } else {
+            tv.setText(label + " | —");
+            tv.setTextColor(getResources().getColor(R.color.text_secondary, requireActivity().getTheme()));
+        }
     }
-}
 
     private String cleanAmount(String amount) {
         if (amount == null || amount.isEmpty() || amount.equals("$0") || amount.equals("0")) return "—";
@@ -281,8 +296,5 @@ public class MiraDashboardFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         mainHandler.removeCallbacksAndMessages(null);
-        if (branchesManager != null) {
-            branchesManager.removeOnBranchChangeListener(this::onBranchChanged);
-        }
     }
 }
