@@ -102,5 +102,39 @@
         <item>#888888</item>
     </string-array>
 
+<!-- ========== ألوان جديدة للداشبورد - الوضع الفاتح ========== -->
 
+<!-- ألوان النصوص الرئيسية (تظهر داكنة على الخلفية الفاتحة) -->
+<color name="primary_text">#FF1A1A1A</color>
+<color name="primary_text_variant">#FF2C2C2C</color>
+
+<!-- ألوان النصوص الثانوية -->
+<color name="text_secondary">#FF6B7280</color>
+<color name="text_secondary_variant">#FF9CA3AF</color>
+
+<!-- ألوان الخلفيات -->
+<color name="background_dark">#FFF5F5F5</color>
+<color name="background_card">#FFFFFFFF</color>
+<color name="background_card_variant">#FFF8F9FA</color>
+
+<!-- ألوان التمييز والتأثيرات -->
+<color name="accent_color">#FF1A237E</color>
+<color name="accent_color_variant">#FF283593</color>
+
+<!-- ألوان Shimmer Loading للوضع الفاتح -->
+<color name="shimmer_color">#FFE0E0E0</color>
+<color name="shimmer_highlight">#FFF0F0F0</color>
+
+<!-- ألوان الكروت والعناصر -->
+<color name="card_background">#FFFFFFFF</color>
+<color name="card_stroke">#FFE5E7EB</color>
+
+<!-- ألوان الحالات -->
+<color name="status_online">#FF16A34A</color>
+<color name="status_offline">#FFDC2626</color>
+<color name="status_updating">#FFF59E0B</color>
+
+<!-- ألوان العيارات -->
+<color name="karat_text">#FF1A1A1A</color>
+<color name="karat_text_empty">#FF9CA3AF</color>
 </resources>
