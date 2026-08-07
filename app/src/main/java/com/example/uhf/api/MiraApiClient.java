@@ -111,6 +111,20 @@ public class MiraApiClient {
         return postWithAuth("/auth/refresh-token", payload);
     }
 
+   // ===================== 📊 ACCOUNTING =====================
+
+public ApiResponse getJournalEntries() {
+    return get("/accounting/journal-entries");
+}
+
+public ApiResponse getChartOfAccounts() {
+    return get("/accounting/chart-of-accounts");
+}
+
+public ApiResponse getTrialBalance() {
+    return get("/accounting/trial-balance");
+}
+    
     public ApiResponse registerBiometric(String token, String deviceId, String publicKey) {
         JSONObject payload = new JSONObject();
         try {
