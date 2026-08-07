@@ -2,13 +2,29 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <!-- 🌐 تغيير اللغة -->
+    <item
+        android:id="@+id/action_change_language"
+        android:title="English"
+        android:icon="@android:drawable/ic_menu_sort_alphabetically"
+        app:showAsAction="ifRoom"
+        android:orderInCategory="5" />
+
+    <!-- 🏢 الفروع -->
+    <item
+        android:id="@+id/action_branches"
+        android:title="🏢 الفروع"
+        android:icon="@drawable/ic_branch"
+        app:showAsAction="ifRoom"
+        android:orderInCategory="15" />
+
     <!-- 👤 الملف الشخصي -->
     <item
         android:id="@+id/action_profile"
         android:title="Profile"
         android:icon="@drawable/ic_person_outline"
         app:showAsAction="ifRoom"
-        android:orderInCategory="10" />
+        android:orderInCategory="20" />
 
     <!-- 🚪 تسجيل الخروج -->
     <item
@@ -16,8 +32,9 @@
         android:title="Sign Out"
         android:icon="@drawable/ic_logout"
         app:showAsAction="ifRoom"
-        android:orderInCategory="20" />
+        android:orderInCategory="30" />
 
+    <!-- ⚙️ مجموعة متقدمة -->
     <group android:id="@+id/group_advanced"
         android:orderInCategory="100">
 
@@ -35,21 +52,13 @@
             android:icon="@drawable/ic_info"
             app:showAsAction="never" />
 
-        <!-- ⚡ اختبار السرعة (مخفي) -->
+        <!-- ⚡ اختبار السرعة -->
         <item
             android:id="@+id/speed"
             android:title="Speed Test"
             android:icon="@drawable/ic_speed"
             app:showAsAction="never"
             android:visible="false" />
-
-
-        <item
-    android:id="@+id/action_branches"
-    android:title="🏢 الفروع"
-    android:icon="@drawable/ic_branch"
-    app:showAsAction="ifRoom"
-    android:orderInCategory="15" />
 
     </group>
 
