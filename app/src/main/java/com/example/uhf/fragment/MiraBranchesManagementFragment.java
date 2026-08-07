@@ -178,33 +178,36 @@ public class MiraBranchesManagementFragment extends Fragment {
     }
 
     private void saveBranch(int id, String name, String code, String phone, String address, String city, boolean active) {
-        new Thread(() -> {
-            try {
-                JSONObject payload = new JSONObject();
-                payload.put("name", name);
-                payload.put("code", code);
-                payload.put("phone", phone);
-                payload.put("address", address);
-                payload.put("city", city);
-                payload.put("status", active ? "active" : "inactive");
+    new Thread(() -> {
+        try {
+            JSONObject payload = new JSONObject();
+            // ✅ استخدم الأسماء الصحيحة التي يتوقعها السيرفر
+            payload.put("branch_name", name);
+            payload.put("branch_code", code);
+            payload.put("phone", phone);
+            payload.put("address", address);
+            payload.put("city", city);
+            payload.put("status", active ? "active" : "inactive");
+            payload.put("branch_name_ar", name); // نفس الاسم العربي
 
-                MiraApiClient client = MiraApiClient.getInstance(getContext());
-                MiraApiClient.ApiResponse response = (id > 0) 
-                    ? client.updateBranch(id, payload) 
-                    : client.createBranch(payload);
+            MiraApiClient client = MiraApiClient.getInstance(getContext());
+            MiraApiClient.ApiResponse response = (id > 0) 
+                ? client.updateBranch(id, payload) 
+                : client.createBranch(payload);
 
-                mainHandler.post(() -> {
-                    if (response != null && response.isSuccess) {
-                        Toast.makeText(getContext(), id > 0 ? "✅ تم التعديل" : "✅ تمت الإضافة", Toast.LENGTH_SHORT).show();
-                        loadBranchesFromAPI();
-                    } else {
-                        Toast.makeText(getContext(), "❌ فشل الحفظ", Toast.LENGTH_SHORT).show();
-                    }
-                });
-            } catch (Exception e) {
-                mainHandler.post(() -> Toast.makeText(getContext(), "❌ خطأ: " + e.getMessage(), Toast.LENGTH_SHORT).show());
-            }
-        }).start();
+            mainHandler.post(() -> {
+                if (response != null && response.isSuccess) {
+                    Toast.makeText(getContext(), id > 0 ? "✅ تم التعديل" : "✅ تمت الإضافة", Toast.LENGTH_SHORT).show();
+                    loadBranchesFromAPI();
+                } else {
+                    String err = response != null ? response.optString("message", "فشل") : "فشل الاتصال";
+                    Toast.makeText(getContext(), "❌ " + err, Toast.LENGTH_SHORT).show();
+                }
+            });
+        } catch (Exception e) {
+            mainHandler.post(() -> Toast.makeText(getContext(), "❌ خطأ: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+        }
+    }).start();
     }
 
     private void deleteBranch(int id, String name) {
