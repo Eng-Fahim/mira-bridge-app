@@ -10,7 +10,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -27,6 +26,7 @@ import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
+import com.example.uhf.api.MiraApiClient;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -35,14 +35,9 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Locale;
-
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
 
 public class MiraReportsFragment extends Fragment {
 
@@ -76,7 +71,6 @@ public class MiraReportsFragment extends Fragment {
         setupWebView();
         setupSpinners();
         setupListeners();
-
         setDefaultDates();
 
         return view;
@@ -85,7 +79,6 @@ public class MiraReportsFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        // تحميل التقرير بعد استقرار إنشاء عناصر الواجهة لتفادي الانهيار عند فتح التبويب
         view.post(() -> {
             if (isAdded() && getContext() != null) {
                 loadReport(currentReportType);
@@ -97,85 +90,68 @@ public class MiraReportsFragment extends Fragment {
         webView = view.findViewById(R.id.webReport);
         spReportType = view.findViewById(R.id.spReportType);
         spBranchFilter = view.findViewById(R.id.spBranchFilter);
-        
         btnDateFrom = view.findViewById(R.id.btnDateFrom);
         btnDateTo = view.findViewById(R.id.btnDateTo);
         btnApplyFilter = view.findViewById(R.id.btnApplyFilter);
-
         btnPrintReport = view.findViewById(R.id.btnPrintReport);
         btnShareReport = view.findViewById(R.id.btnShareReport);
         btnExportPDF = view.findViewById(R.id.btnExportPDF);
         btnExportExcel = view.findViewById(R.id.btnExportExcel);
-
         tvReportTitle = view.findViewById(R.id.tvReportTitle);
         tvDateRange = view.findViewById(R.id.tvDateRange);
     }
 
     private void setupWebView() {
         if (webView == null) return;
-        try {
-            WebSettings settings = webView.getSettings();
-            settings.setJavaScriptEnabled(true);
-            settings.setDomStorageEnabled(true);
-            settings.setAllowFileAccess(true);
-            settings.setBuiltInZoomControls(true);
-            settings.setDisplayZoomControls(false);
-
-            webView.addJavascriptInterface(new WebAppInterface(), "AndroidInterface");
-            webView.setWebViewClient(new WebViewClient());
-        } catch (Exception e) {
-            Log.e(TAG, "WebView setup failed", e);
-        }
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(true);
+        settings.setBuiltInZoomControls(true);
+        settings.setDisplayZoomControls(false);
+        webView.setWebViewClient(new WebViewClient());
     }
 
     private void setupSpinners() {
-        if (spReportType != null && isAdded() && getContext() != null) {
-            String[] reports = isArabic ?
-                    new String[]{"تقرير تفاصيل المخزون", "تقرير الفروقات والتجاوزات", "تقرير سجل التدقيق"} :
-                    new String[]{"Inventory Detail", "Discrepancies Report", "Audit Logs"};
+        if (spReportType == null || !isAdded() || getContext() == null) return;
 
-            ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, reports);
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            spReportType.setAdapter(adapter);
+        String[] reports = isArabic
+            ? new String[]{"تقرير المخزون", "تقرير الفروقات", "سجل التدقيق"}
+            : new String[]{"Inventory Report", "Discrepancies", "Audit Logs"};
 
-            spReportType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                    switch (position) {
-                        case 0:
-                            currentReportType = "inventory_detail";
-                            break;
-                        case 1:
-                            currentReportType = "discrepancies";
-                            break;
-                        case 2:
-                            currentReportType = "audit_logs";
-                            break;
-                    }
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+            android.R.layout.simple_spinner_item, reports);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spReportType.setAdapter(adapter);
+
+        spReportType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                switch (position) {
+                    case 0: currentReportType = "inventory_detail"; break;
+                    case 1: currentReportType = "discrepancies"; break;
+                    case 2: currentReportType = "audit_logs"; break;
                 }
-
-                @Override public void onNothingSelected(AdapterView<?> parent) {}
-            });
-        }
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
     }
 
     private void setupListeners() {
         if (btnDateFrom != null) btnDateFrom.setOnClickListener(v -> showDatePicker(true));
         if (btnDateTo != null) btnDateTo.setOnClickListener(v -> showDatePicker(false));
-        
-        if (btnApplyFilter != null) {
-            btnApplyFilter.setOnClickListener(v -> loadReport(currentReportType));
-        }
-
+        if (btnApplyFilter != null) btnApplyFilter.setOnClickListener(v -> loadReport(currentReportType));
         if (btnExportExcel != null) btnExportExcel.setOnClickListener(v -> exportExcel());
         if (btnShareReport != null) btnShareReport.setOnClickListener(v -> exportExcel());
+        if (btnPrintReport != null) btnPrintReport.setOnClickListener(v -> printReport());
+        if (btnExportPDF != null) btnExportPDF.setOnClickListener(v -> exportPDF());
     }
 
     private void setDefaultDates() {
         Calendar cal = Calendar.getInstance();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
         dateTo = sdf.format(cal.getTime());
-
         cal.add(Calendar.DAY_OF_MONTH, -30);
         dateFrom = sdf.format(cal.getTime());
 
@@ -186,189 +162,117 @@ public class MiraReportsFragment extends Fragment {
 
     private void showDatePicker(boolean isFrom) {
         if (!isAdded() || getContext() == null) return;
-        
+
         Calendar cal = Calendar.getInstance();
-        DatePickerDialog dialog = new DatePickerDialog(
-                requireContext(),
-                (view, year, month, dayOfMonth) -> {
-                    String selected = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
-                    if (isFrom) {
-                        dateFrom = selected;
-                        if (btnDateFrom != null) btnDateFrom.setText(dateFrom);
-                    } else {
-                        dateTo = selected;
-                        if (btnDateTo != null) btnDateTo.setText(dateTo);
-                    }
-                    if (tvDateRange != null) tvDateRange.setText(dateFrom + " - " + dateTo);
-                },
-                cal.get(Calendar.YEAR),
-                cal.get(Calendar.MONTH),
-                cal.get(Calendar.DAY_OF_MONTH)
-        );
-        dialog.show();
+        new DatePickerDialog(requireContext(),
+            (view, year, month, dayOfMonth) -> {
+                String selected = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
+                if (isFrom) {
+                    dateFrom = selected;
+                    if (btnDateFrom != null) btnDateFrom.setText(dateFrom);
+                } else {
+                    dateTo = selected;
+                    if (btnDateTo != null) btnDateTo.setText(dateTo);
+                }
+                if (tvDateRange != null) tvDateRange.setText(dateFrom + " - " + dateTo);
+            },
+            cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)
+        ).show();
     }
+
+    // ==================== ✅ تحميل التقرير مباشرة ====================
 
     private void loadReport(String type) {
         if (!isAdded() || getContext() == null) return;
-        
+
         showLoadingHtml();
 
-        try {
-            Context ctx = getContext();
-            Class<?> clientClass = null;
-            
+        new Thread(() -> {
             try {
-                clientClass = Class.forName("com.example.rfid.api.MiraApiClient");
-            } catch (ClassNotFoundException e) {
-                try {
-                    clientClass = Class.forName("com.example.uhf.api.MiraApiClient");
-                } catch (ClassNotFoundException ex) {
-                    Log.w(TAG, "MiraApiClient class not found in packages.");
-                }
-            }
+                MiraApiClient client = MiraApiClient.getInstance(getContext());
+                MiraApiClient.ApiResponse response = client.getDashboardFull();
 
-            if (clientClass != null && ctx != null) {
-                Method getInstanceMethod = clientClass.getMethod("getInstance", Context.class);
-                Object clientInstance = getInstanceMethod.invoke(null, ctx);
-
-                Method getApiMethod = clientClass.getMethod("getApi");
-                Object apiService = getApiMethod.invoke(clientInstance);
-
-                Method getReportDataMethod = apiService.getClass().getMethod("getReportData", String.class, String.class, String.class);
-                Call<String> call = (Call<String>) getReportDataMethod.invoke(apiService, type, dateFrom, dateTo);
-
-                call.enqueue(new Callback<String>() {
-                    @Override
-                    public void onResponse(@NonNull Call<String> call, @NonNull Response<String> response) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
                         if (!isAdded()) return;
-                        if (response.isSuccessful() && response.body() != null) {
-                            try {
-                                lastReportData = new JSONObject(response.body());
-                                renderReportHtml(type, lastReportData);
-                            } catch (JSONException e) {
-                                Log.e(TAG, "JSON parsing error", e);
-                                showErrorHtml(isArabic ? "خطأ في معالجة البيانات" : "Data Parsing Error");
-                            }
+                        if (response != null && response.isSuccess && response.data != null) {
+                            lastReportData = response.data;
+                            renderReportHtml(type, response.data);
                         } else {
                             renderReportHtml(type, null);
                         }
-                    }
-
-                    @Override
-                    public void onFailure(@NonNull Call<String> call, @NonNull Throwable t) {
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Report load error: " + e.getMessage());
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
                         if (!isAdded()) return;
-                        Log.e(TAG, "Network request failed", t);
                         renderReportHtml(type, null);
-                    }
-                });
-            } else {
-                renderReportHtml(type, null);
+                    });
+                }
             }
-        } catch (Throwable e) {
-            Log.e(TAG, "Dynamic API execution error", e);
-            renderReportHtml(type, null);
-        }
+        }).start();
     }
+
+    // ==================== HTML ====================
 
     private void showLoadingHtml() {
         if (webView == null) return;
-        String dir = isArabic ? "rtl" : "ltr";
-        String loadingText = isArabic ? "جاري تحميل التقرير..." : "Loading report...";
-        String html = "<html><body dir='" + dir + "' style='font-family:sans-serif; text-align:center; padding-top:50px;'>" +
-                "<h3>" + loadingText + "</h3></body></html>";
-        webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
-    }
-
-    private void showErrorHtml(String message) {
-        if (webView == null) return;
-        String dir = isArabic ? "rtl" : "ltr";
-        String html = "<html><body dir='" + dir + "' style='font-family:sans-serif; text-align:center; padding-top:50px; color:red;'>" +
-                "<h3>" + message + "</h3></body></html>";
-        webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+        String text = isArabic ? "جاري تحميل التقرير..." : "Loading report...";
+        webView.loadDataWithBaseURL(null, "<html><body style='text-align:center;padding-top:50px;font-family:sans-serif;'><h3>" + text + "</h3></body></html>", "text/html", "UTF-8", null);
     }
 
     private void renderReportHtml(String type, JSONObject data) {
         if (webView == null) return;
-        StringBuilder html = new StringBuilder();
-        String dir = isArabic ? "rtl" : "ltr";
 
-        html.append("<!DOCTYPE html><html><head><meta charset='UTF-8'>")
-                .append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
-                .append("<script src='https://cdn.jsdelivr.net/npm/chart.js'></script>")
-                .append("<style>")
-                .append("body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 15px; direction: ").append(dir).append("; text-align: ").append(isArabic ? "right" : "left").append("; background-color: #f8f9fa; color: #333; }")
-                .append(".summary-cards { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }")
-                .append(".card { flex: 1; min-width: 120px; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-top: 4px solid #007bff; text-align: center; }")
-                .append(".card.highlight { border-top-color: #28a745; }")
-                .append(".card h4 { margin: 0 0 5px 0; color: #6c757d; font-size: 13px; }")
-                .append(".card .val { font-size: 20px; font-weight: bold; color: #212529; }")
-                .append("table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 15px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }")
-                .append("th, td { padding: 10px 12px; border-bottom: 1px solid #dee2e6; font-size: 13px; }")
-                .append("th { background-color: #f1f3f5; font-weight: 600; text-align: inherit; }")
-                .append(".chart-container { position: relative; height: 220px; margin: 20px 0; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }")
-                .append("</style></head><body>");
+        String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+            + "<style>"
+            + "body{font-family:sans-serif;margin:12px;background:#f5f5f5;color:#333}"
+            + ".card{background:#fff;padding:14px;border-radius:10px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.1);text-align:center}"
+            + ".card h4{color:#666;font-size:12px;margin:0 0 4px}.card .val{font-size:22px;font-weight:bold;color:#1A237E}"
+            + "table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;margin-top:10px}"
+            + "th{background:#1A237E;color:#fff;padding:10px;font-size:12px}"
+            + "td{padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;text-align:center}"
+            + "</style></head><body dir='" + (isArabic ? "rtl" : "ltr") + "'>";
 
         switch (type) {
             case "inventory_detail":
-                html.append(buildInventoryDetailReport(data));
+                html += buildInventoryReport(data);
                 break;
             case "discrepancies":
-                html.append(buildDiscrepanciesReport(data));
+                html += buildDiscrepanciesReport(data);
                 break;
             case "audit_logs":
-                html.append(buildAuditLogsReport(data));
+                html += buildAuditReport(data);
                 break;
             default:
-                html.append("<p>Report not found</p>");
-                break;
+                html += "<p>" + (isArabic ? "نوع التقرير غير معروف" : "Unknown report type") + "</p>";
         }
 
-        html.append("</body></html>");
-        webView.loadDataWithBaseURL(null, html.toString(), "text/html", "UTF-8", null);
+        html += "</body></html>";
+        webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
     }
 
-    private String buildInventoryDetailReport(JSONObject data) {
+    private String buildInventoryReport(JSONObject data) {
         JSONObject inv = data != null ? data.optJSONObject("inventory") : null;
-        int totalItems = inv != null ? inv.optInt("total_items", 0) : 0;
-        double totalWeight = inv != null ? inv.optDouble("total_weight", 0.0) : 0.0;
+        int total = inv != null ? inv.optInt("total_items", 0) : 0;
+        double weight = inv != null ? inv.optDouble("total_weight", 0) : 0;
 
         JSONObject w = inv != null ? inv.optJSONObject("weights") : null;
-        double k24 = w != null ? w.optDouble("k24", 0.0) : 0.0;
-        double k22 = w != null ? w.optDouble("k22", 0.0) : 0.0;
-        double k21 = w != null ? w.optDouble("k21", 0.0) : 0.0;
-        double k18 = w != null ? w.optDouble("k18", 0.0) : 0.0;
+        double k24 = w != null ? w.optDouble("k24", 0) : 0;
+        double k22 = w != null ? w.optDouble("k22", 0) : 0;
+        double k21 = w != null ? w.optDouble("k21", 0) : 0;
+        double k18 = w != null ? w.optDouble("k18", 0) : 0;
 
-        boolean hasData = (k24 + k22 + k21 + k18) > 0;
-
-        StringBuilder script = new StringBuilder();
-        if (hasData) {
-            script.append("<div class='chart-container'><canvas id='karatChart'></canvas></div>")
-                  .append("<script>")
-                  .append("if (typeof Chart !== 'undefined') {")
-                  .append("  try {")
-                  .append("    new Chart(document.getElementById('karatChart'), {")
-                  .append("      type: 'doughnut',")
-                  .append("      data: {")
-                  .append("        labels: ['24K', '22K', '21K', '18K'],")
-                  .append("        datasets: [{ data: [").append(k24).append(",").append(k22).append(",").append(k21).append(",").append(k18).append("], backgroundColor: ['#FFD700','#FFC107','#FFB300','#FFA000'] }]")
-                  .append("      },")
-                  .append("      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }")
-                  .append("    });")
-                  .append("  } catch(e) { console.log('Chart render error:', e); }")
-                  .append("}")
-                  .append("</script>");
-        }
-
-        return "<div class='summary-cards'>" +
-                buildSummaryCard("", String.valueOf(totalItems), isArabic ? "إجمالي القطع" : "Total Items") +
-                buildSummaryCard("highlight", String.format(Locale.US, "%.2f g", totalWeight), isArabic ? "الوزن الإجمالي" : "Total Weight") +
-                "</div>" +
-                script.toString() +
-                "<table><tr><th>" + (isArabic ? "العيار" : "Karat") + "</th><th>" + (isArabic ? "الوزن (جرام)" : "Weight (g)") + "</th></tr>" +
-                "<tr><td>24K</td><td>" + String.format(Locale.US, "%.2f", k24) + "</td></tr>" +
-                "<tr><td>22K</td><td>" + String.format(Locale.US, "%.2f", k22) + "</td></tr>" +
-                "<tr><td>21K</td><td>" + String.format(Locale.US, "%.2f", k21) + "</td></tr>" +
-                "<tr><td>18K</td><td>" + String.format(Locale.US, "%.2f", k18) + "</td></tr></table>";
+        return "<div class='card'><h4>" + ar("إجمالي القطع", "Total Items") + "</h4><div class='val'>" + total + "</div></div>"
+            + "<div class='card'><h4>" + ar("الوزن الإجمالي", "Total Weight") + "</h4><div class='val'>" + String.format(Locale.US, "%.1f g", weight) + "</div></div>"
+            + "<table><tr><th>" + ar("العيار", "Karat") + "</th><th>" + ar("الوزن", "Weight") + "</th></tr>"
+            + "<tr><td>24K</td><td>" + String.format("%.1f", k24) + " g</td></tr>"
+            + "<tr><td>22K</td><td>" + String.format("%.1f", k22) + " g</td></tr>"
+            + "<tr><td>21K</td><td>" + String.format("%.1f", k21) + " g</td></tr>"
+            + "<tr><td>18K</td><td>" + String.format("%.1f", k18) + " g</td></tr>"
+            + "</table>";
     }
 
     private String buildDiscrepanciesReport(JSONObject data) {
@@ -379,24 +283,19 @@ public class MiraReportsFragment extends Fragment {
             for (int i = 0; i < disc.length(); i++) {
                 JSONObject item = disc.optJSONObject(i);
                 if (item != null) {
-                    rows.append("<tr>")
-                            .append("<td>").append(item.optString("epc", "-")).append("</td>")
-                            .append("<td>").append(item.optString("status", "-")).append("</td>")
-                            .append("<td>").append(item.optString("location", "-")).append("</td>")
-                            .append("</tr>");
+                    rows.append("<tr><td>").append(item.optString("epc", "-")).append("</td>")
+                        .append("<td>").append(item.optString("status", "-")).append("</td>")
+                        .append("<td>").append(item.optString("location", "-")).append("</td></tr>");
                 }
             }
         } else {
-            rows.append("<tr><td colspan='3' style='text-align:center;'>")
-                .append(isArabic ? "لا توجد فروقات مسجلة" : "No discrepancies found")
-                .append("</td></tr>");
+            rows.append("<tr><td colspan='3'>").append(ar("لا توجد فروقات", "No discrepancies")).append("</td></tr>");
         }
 
-        return "<table><tr><th>EPC</th><th>" + (isArabic ? "الحالة" : "Status") + "</th><th>" + (isArabic ? "الموقع" : "Location") + "</th></tr>" +
-                rows.toString() + "</table>";
+        return "<table><tr><th>EPC</th><th>" + ar("الحالة", "Status") + "</th><th>" + ar("الموقع", "Location") + "</th></tr>" + rows + "</table>";
     }
 
-    private String buildAuditLogsReport(JSONObject data) {
+    private String buildAuditReport(JSONObject data) {
         JSONArray logs = data != null ? data.optJSONArray("logs") : null;
         StringBuilder rows = new StringBuilder();
 
@@ -404,81 +303,67 @@ public class MiraReportsFragment extends Fragment {
             for (int i = 0; i < logs.length(); i++) {
                 JSONObject item = logs.optJSONObject(i);
                 if (item != null) {
-                    rows.append("<tr>")
-                            .append("<td>").append(item.optString("timestamp", "-")).append("</td>")
-                            .append("<td>").append(item.optString("user", "-")).append("</td>")
-                            .append("<td>").append(item.optString("action", "-")).append("</td>")
-                            .append("</tr>");
+                    rows.append("<tr><td>").append(item.optString("timestamp", "-")).append("</td>")
+                        .append("<td>").append(item.optString("user", "-")).append("</td>")
+                        .append("<td>").append(item.optString("action", "-")).append("</td></tr>");
                 }
             }
         } else {
-            rows.append("<tr><td colspan='3' style='text-align:center;'>")
-                .append(isArabic ? "لا توجد سجلات تدقيق" : "No audit logs found")
-                .append("</td></tr>");
+            rows.append("<tr><td colspan='3'>").append(ar("لا توجد سجلات", "No logs")).append("</td></tr>");
         }
 
-        return "<table><tr><th>" + (isArabic ? "الوقت" : "Timestamp") + "</th><th>" + (isArabic ? "المستخدم" : "User") + "</th><th>" + (isArabic ? "الحدث" : "Action") + "</th></tr>" +
-                rows.toString() + "</table>";
+        return "<table><tr><th>" + ar("الوقت", "Time") + "</th><th>" + ar("المستخدم", "User") + "</th><th>" + ar("الحدث", "Action") + "</th></tr>" + rows + "</table>";
     }
 
-    private String buildSummaryCard(String cssClass, String value, String title) {
-        return "<div class='card " + cssClass + "'>" +
-                "<h4>" + title + "</h4>" +
-                "<div>" + value + "</div>" +
-                "</div>";
+    private String ar(String arabic, String english) {
+        return isArabic ? arabic : english;
     }
+
+    // ==================== تصدير ====================
 
     private void exportExcel() {
         if (!isAdded() || getContext() == null) return;
-
         if (lastReportData == null) {
-            Toast.makeText(requireContext(), isArabic ? "لا توجد بيانات لتصديرها" : "No data available to export", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), ar("لا توجد بيانات", "No data"), Toast.LENGTH_SHORT).show();
             return;
         }
 
         try {
             StringBuilder csv = new StringBuilder();
-            csv.append("Report Type,").append(currentReportType).append("\n");
-            csv.append("Date From,").append(dateFrom).append(",Date To,").append(dateTo).append("\n\n");
+            csv.append("Karat,Weight (g)\n");
+            JSONObject w = lastReportData.optJSONObject("inventory") != null
+                ? lastReportData.optJSONObject("inventory").optJSONObject("weights") : null;
+            csv.append("24K,").append(w != null ? w.optDouble("k24", 0) : 0).append("\n");
+            csv.append("22K,").append(w != null ? w.optDouble("k22", 0) : 0).append("\n");
+            csv.append("21K,").append(w != null ? w.optDouble("k21", 0) : 0).append("\n");
+            csv.append("18K,").append(w != null ? w.optDouble("k18", 0) : 0).append("\n");
 
-            if ("inventory_detail".equals(currentReportType)) {
-                JSONObject inv = lastReportData.optJSONObject("inventory");
-                JSONObject w = inv != null ? inv.optJSONObject("weights") : null;
-                csv.append("Karat,Weight (g)\n");
-                csv.append("24K,").append(w != null ? w.optDouble("k24", 0.0) : 0.0).append("\n");
-                csv.append("22K,").append(w != null ? w.optDouble("k22", 0.0) : 0.0).append("\n");
-                csv.append("21K,").append(w != null ? w.optDouble("k21", 0.0) : 0.0).append("\n");
-                csv.append("18K,").append(w != null ? w.optDouble("k18", 0.0) : 0.0).append("\n");
-            }
-
-            File exportDir = new File(requireContext().getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "MiraReports");
-            if (!exportDir.exists()) {
-                exportDir.mkdirs();
-            }
-
-            String filename = "Mira_Report_" + System.currentTimeMillis() + ".csv";
-            File file = new File(exportDir, filename);
+            File dir = new File(requireContext().getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "MiraReports");
+            if (!dir.exists()) dir.mkdirs();
+            File file = new File(dir, "Mira_Report_" + System.currentTimeMillis() + ".csv");
             FileOutputStream out = new FileOutputStream(file);
             out.write(csv.toString().getBytes());
             out.close();
 
-            Uri fileUri = FileProvider.getUriForFile(requireContext(), requireContext().getPackageName() + ".fileprovider", file);
+            Uri uri = FileProvider.getUriForFile(requireContext(), requireContext().getPackageName() + ".fileprovider", file);
             Intent intent = new Intent(Intent.ACTION_SEND);
             intent.setType("text/csv");
-            intent.putExtra(Intent.EXTRA_STREAM, fileUri);
+            intent.putExtra(Intent.EXTRA_STREAM, uri);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(Intent.createChooser(intent, isArabic ? "مشاركة التقرير عبر" : "Share report via"));
-
+            startActivity(Intent.createChooser(intent, ar("مشاركة التقرير", "Share report")));
         } catch (IOException e) {
-            Log.e(TAG, "Export CSV error", e);
-            Toast.makeText(requireContext(), isArabic ? "فشل تصدير الملف" : "Failed to export file", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), ar("فشل التصدير", "Export failed"), Toast.LENGTH_SHORT).show();
         }
     }
 
-    private class WebAppInterface {
-        @JavascriptInterface
-        public void onReportItemClick(String id) {
-            Log.d(TAG, "Report item clicked: " + id);
+    private void printReport() {
+        if (webView != null) {
+            webView.loadUrl("javascript:window.print();");
         }
+    }
+
+    private void exportPDF() {
+        Toast.makeText(getContext(), ar("جاري التصدير...", "Exporting..."), Toast.LENGTH_SHORT).show();
+        printReport();
     }
 }
