@@ -1,5 +1,122 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary_text">@color/primary_text_dark</color>
-    <color name="text_secondary">@color/text_secondary_dark</color>
+
+    <!-- الألوان الأساسية للوضع الليلي -->
+    <color name="lfile_colorPrimary">#92B4F4</color>
+    <color name="white">#FFFFFF</color>
+    <color name="white1">#1E1E1E</color>
+    <color name="black">#FFFFFF</color>
+    <color name="black1">#E0E0E0</color>
+    <color name="gray">#A0A0A0</color>
+    <color name="gray1">#2C2C2C</color>
+    <color name="gray2">#505050</color>
+    <color name="gray3">#1A1A1A</color>
+    <color name="red">#FF4444</color>
+    <color name="red1">#FF6B6B</color>
+    <color name="red2">#FF5252</color>
+    <color name="red3">#33FF0000</color>
+    <color name="red4">#88FF0000</color>
+    <color name="red5">#AAFF0000</color>
+    <color name="gold">#FFD700</color>
+    <color name="yellow">#FFFF00</color>
+    <color name="green">#4CAF50</color>
+    <color name="green1">#33008000</color>
+    <color name="green2">#88008000</color>
+    <color name="green3">#AA008000</color>
+    <color name="blue">#6B9FFF</color>
+    <color name="blue1">#4FC3F7</color>
+    <color name="blue2">#4DD0E1</color>
+    <color name="lightblue">#4DABFF</color>
+    <color name="lightblue1">#5A8FD4</color>
+    <color name="lightblue2">#6B9FD4</color>
+    <color name="lightblue3">#2A3F5F</color>
+    <color name="lightblue4">#1A2A3F</color>
+    <color name="purple">#B388FF</color>
+    <color name="pink">#FF80AB</color>
+    <color name="orange">#FFB74D</color>
+    <color name="lemonyellow">#3A3A2A</color>
+    <color name="graywhite">#1E1E1E</color>
+    <color name="grayslate">#9E9E9E</color>
+    <color name="full_transparent">#00000000</color>
+    <color name="half_transparent">#AAFFFFFF</color>
+
+    <color name="listitem_black">#FFFFFFFF</color>
+    <color name="listitem_gray">#6B6B6B</color>
+
+    <color name="deep_gray">#E0E0E0</color>
+    <color name="text_gray">#999999</color>
+
+    <color name="red_qian">#FF8A80</color>
+
+    <color name="sliding_menu_back">#FF1C1C1E</color>
+    <color name="sliding_menu_title_text_color">#FF999999</color>
+    <color name="sliding_menu_item_text_color">#FFB1B1B1</color>
+    <color name="sliding_menu_item_text_color_pressed">#FFFFFFFF</color>
+    <color name="sliding_menu_item_pressed">#FF39393B</color>
+    <color name="sliding_menu_item">#00000000</color>
+
+    <!-- zxing start -->
+    <color name="contents_text">#FFFFFFFF</color>
+    <color name="encode_view">#FF000000</color>
+    <color name="help_button_view">#FF333333</color>
+    <color name="help_view">#FFBFBFBF</color>
+    <color name="possible_result_points">#C0FFFF00</color>
+    <color name="result_image_border">#FFFFFFFF</color>
+    <color name="result_minor_text">#FF3F3F3F</color>
+    <color name="result_points">#C000FF00</color>
+    <color name="result_text">#FFFFFFFF</color>
+    <color name="result_view">#B0000000</color>
+    <color name="sbc_header_text">#FF7F7F7F</color>
+    <color name="sbc_header_view">#FF000000</color>
+    <color name="sbc_list_item">#FF000F1F</color>
+    <color name="sbc_layout_view">#FF000000</color>
+    <color name="sbc_page_number_text">#FFFFFFFF</color>
+    <color name="sbc_snippet_text">#FFB4B4B4</color>
+    <color name="share_text">#FFFFFFFF</color>
+    <color name="status_text">#FFFFFFFF</color>
+    <color name="transparent">#00000000</color>
+    <color name="viewfinder_frame">#FFFFFFFF</color>
+    <color name="viewfinder_laser">#FFFF0000</color>
+    <color name="viewfinder_mask">#60000000</color>
+    <color name="primary">#5C6BC0</color>
+    <color name="on_surface_variant">#C4C6D0</color>
+    <color name="outline">#44474E</color>
+    <!-- zxing end -->
+
+    <!-- ========== ألوان جديدة للداشبورد ========== -->
+    
+    <!-- ألوان النصوص الرئيسية (تظهر فاتحة على الخلفية الداكنة) -->
+    <color name="primary_text">#FFFFFFFF</color>
+    <color name="primary_text_variant">#FFE0E0E0</color>
+    
+    <!-- ألوان النصوص الثانوية -->
+    <color name="text_secondary">#FFB0B0B0</color>
+    <color name="text_secondary_variant">#FF8A8A8A</color>
+    
+    <!-- ألوان الخلفيات -->
+    <color name="background_dark">#FF121212</color>
+    <color name="background_card">#FF1E1E1E</color>
+    <color name="background_card_variant">#FF252525</color>
+    
+    <!-- ألوان التمييز والتأثيرات -->
+    <color name="accent_color">#FF6B9FFF</color>
+    <color name="accent_color_variant">#FF4DABFF</color>
+    
+    <!-- ألوان Shimmer Loading للوضع الليلي -->
+    <color name="shimmer_color">#FF2A2A2A</color>
+    <color name="shimmer_highlight">#FF3A3A3A</color>
+    
+    <!-- ألوان الكروت والعناصر -->
+    <color name="card_background">#FF1E1E1E</color>
+    <color name="card_stroke">#FF333333</color>
+    
+    <!-- ألوان الحالات -->
+    <color name="status_online">#FF4CAF50</color>
+    <color name="status_offline">#FFEF5350</color>
+    <color name="status_updating">#FFFFB74D</color>
+    
+    <!-- ألوان العيارات -->
+    <color name="karat_text">#FFE0E0E0</color>
+    <color name="karat_text_empty">#FF6B6B6B</color>
+
 </resources>
