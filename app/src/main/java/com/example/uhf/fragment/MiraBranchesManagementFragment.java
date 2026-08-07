@@ -20,6 +20,7 @@ import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.manager.MiraBranchesManager;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 
 import org.json.JSONArray;
@@ -32,6 +33,7 @@ public class MiraBranchesManagementFragment extends Fragment {
     private TextView tvTotalBranches, tvActiveBranches, tvTotalItems;
     private Button btnAddBranch;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private MiraBranchesManager branchesManager;
 
     @Nullable
     @Override
@@ -43,6 +45,8 @@ public class MiraBranchesManagementFragment extends Fragment {
         tvActiveBranches = view.findViewById(R.id.tvActiveBranches);
         tvTotalItems = view.findViewById(R.id.tvTotalItems);
         btnAddBranch = view.findViewById(R.id.btnAddBranchSimple);
+
+        branchesManager = MiraBranchesManager.getInstance(requireContext());
 
         btnAddBranch.setOnClickListener(v -> showBranchDialog(null));
         loadDefaultBranches();
@@ -95,6 +99,14 @@ public class MiraBranchesManagementFragment extends Fragment {
         updateStats();
     }
 
+    private int getActiveBranchId() {
+        try {
+            return branchesManager.getActiveBranchId();
+        } catch (Exception e) {
+            return 1;
+        }
+    }
+
     private void addBranchCard(int id, String name, String code, String address, String phone, boolean active, int items) {
         View card = LayoutInflater.from(getContext()).inflate(R.layout.item_branch, branchesContainer, false);
         
@@ -104,16 +116,48 @@ public class MiraBranchesManagementFragment extends Fragment {
         TextView tvAddress = card.findViewById(R.id.tvBranchAddress);
         View vStatus = card.findViewById(R.id.vBranchStatus);
 
-        if (tvName != null) tvName.setText(name);
+        // تمييز الفرع النشط حالياً
+        int activeBranchId = getActiveBranchId();
+        String prefix = (id == activeBranchId) ? "✅ " : "";
+        
+        if (tvName != null) tvName.setText(prefix + name);
         if (tvCode != null) tvCode.setText("🏷️ " + code);
         if (tvDetails != null) tvDetails.setText("📦 " + items + " قطعة | 📞 " + phone);
         if (tvAddress != null) tvAddress.setText(address.isEmpty() ? "" : "📍 " + address);
         if (vStatus != null) vStatus.setBackgroundResource(active ? R.drawable.circle_green : R.drawable.circle_red);
 
         card.setOnClickListener(v -> showBranchDialog(new BranchData(id, name, code, phone, address, "", active, items)));
-        card.setOnLongClickListener(v -> { deleteBranch(id, name); return true; });
+        card.setOnLongClickListener(v -> {
+            showBranchActions(id, name, code);
+            return true;
+        });
 
         branchesContainer.addView(card);
+    }
+
+    private void showBranchActions(int id, String name, String code) {
+        if (!isAdded() || getContext() == null) return;
+        
+        String[] actions = {"تعيين كفرع نشط", "تعديل", "حذف"};
+        
+        new AlertDialog.Builder(requireContext())
+            .setTitle(name)
+            .setItems(actions, (dialog, which) -> {
+                switch (which) {
+                    case 0:
+                        branchesManager.setActiveBranch(id, name, code, "", "");
+                        Toast.makeText(getContext(), "✅ تم تعيين " + name + " كفرع نشط", Toast.LENGTH_SHORT).show();
+                        loadBranchesFromAPI();
+                        break;
+                    case 1:
+                        showBranchDialog(new BranchData(id, name, code, "", "", "", true, 0));
+                        break;
+                    case 2:
+                        deleteBranch(id, name);
+                        break;
+                }
+            })
+            .show();
     }
 
     private void showBranchDialog(@Nullable BranchData existing) {
@@ -238,83 +282,19 @@ public class MiraBranchesManagementFragment extends Fragment {
         if (tvTotalItems != null) tvTotalItems.setText(String.valueOf(1270 + 340 + 180));
     }
 
-    // ✅ دالة للحصول على الفرع النشط من MiraBranchesManager
-private int getActiveBranchId() {
-    try {
-        return com.example.uhf.manager.MiraBranchesManager.getInstance(requireContext()).getActiveBranchId();
-    } catch (Exception e) {
-        return 1; // افتراضي: الفرع الرئيسي
-    }
-}
-
-// ✅ تحديث addBranchCard لتمييز الفرع النشط
-private void addBranchCard(int id, String name, String code, String address, String phone, boolean active, int items) {
-    View card = LayoutInflater.from(getContext()).inflate(R.layout.item_branch, branchesContainer, false);
-    
-    TextView tvName = card.findViewById(R.id.tvBranchName);
-    TextView tvCode = card.findViewById(R.id.tvBranchCode);
-    TextView tvDetails = card.findViewById(R.id.tvBranchDetails);
-    TextView tvAddress = card.findViewById(R.id.tvBranchAddress);
-    View vStatus = card.findViewById(R.id.vBranchStatus);
-
-    // ✅ تمييز الفرع النشط حالياً
-    int activeBranchId = getActiveBranchId();
-    String prefix = (id == activeBranchId) ? "✅ " : "";
-    
-    if (tvName != null) tvName.setText(prefix + name);
-    if (tvCode != null) tvCode.setText("🏷️ " + code);
-    if (tvDetails != null) tvDetails.setText("📦 " + items + " قطعة | 📞 " + phone);
-    if (tvAddress != null) tvAddress.setText(address.isEmpty() ? "" : "📍 " + address);
-    if (vStatus != null) vStatus.setBackgroundResource(active ? R.drawable.circle_green : R.drawable.circle_red);
-
-    // ✅ إضافة خيار "تعيين كفرع نشط" عند الضغط المطول
-    card.setOnClickListener(v -> showBranchDialog(new BranchData(id, name, code, phone, address, "", active, items)));
-    card.setOnLongClickListener(v -> {
-        showBranchActions(id, name, code);
-        return true;
-    });
-
-    branchesContainer.addView(card);
-}
-
-// ✅ إضافة قائمة إجراءات للفرع
-private void showBranchActions(int id, String name, String code) {
-    if (!isAdded() || getContext() == null) return;
-    
-    String[] actions = {"تعيين كفرع نشط", "تعديل", "حذف"};
-    
-    new AlertDialog.Builder(requireContext())
-        .setTitle(name)
-        .setItems(actions, (dialog, which) -> {
-            switch (which) {
-                case 0:
-                    // تعيين كفرع نشط
-                    com.example.uhf.manager.MiraBranchesManager.getInstance(requireContext())
-                        .setActiveBranch(id, name, code, "", "");
-                    Toast.makeText(getContext(), "✅ تم تعيين " + name + " كفرع نشط", Toast.LENGTH_SHORT).show();
-                    // إعادة تحميل العرض
-                    loadBranchesFromAPI();
-                    break;
-                case 1:
-                    // تعديل
-                    showBranchDialog(new BranchData(id, name, code, "", "", "", true, 0));
-                    break;
-                case 2:
-                    // حذف
-                    deleteBranch(id, name);
-                    break;
-            }
-        })
-        .show();
-}
-
     static class BranchData {
         int id, itemCount;
         String name, code, phone, address, city;
         boolean isActive;
         BranchData(int id, String name, String code, String phone, String address, String city, boolean active, int items) {
-            this.id = id; this.name = name; this.code = code; this.phone = phone;
-            this.address = address; this.city = city; this.isActive = active; this.itemCount = items;
+            this.id = id;
+            this.name = name;
+            this.code = code;
+            this.phone = phone;
+            this.address = address;
+            this.city = city;
+            this.isActive = active;
+            this.itemCount = items;
         }
     }
 }
