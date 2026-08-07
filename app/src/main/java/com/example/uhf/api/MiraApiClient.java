@@ -202,8 +202,9 @@ public class MiraApiClient {
     }
 
     public ApiResponse getSalesHistory() {
-        return get("/pos/sales");
-    }
+    return getWithAuth("/pos/sales");
+}
+
 
     // ===================== 🏷️ ITEM DETAIL =====================
 
