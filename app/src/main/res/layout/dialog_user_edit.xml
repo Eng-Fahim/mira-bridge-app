@@ -17,7 +17,7 @@
             android:padding="20dp"
             android:background="?attr/colorSurface">
 
-            <!-- العنوان -->
+            <!-- العنوان مع أيقونة -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -53,235 +53,371 @@
                         android:id="@+id/tvDialogSubtitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="أدخل بيانات المستخدم والصلاحية"
+                        android:text="أدخل بيانات المستخدم والصلاحية المطلوبة"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="12sp"
                         android:layout_marginTop="2dp" />
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- الاسم الكامل -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:hint="الاسم الكامل *"
-                app:startIconDrawable="@drawable/ic_person_outline"
-                app:startIconTint="?attr/colorPrimary"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etDisplayName"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="textPersonName"
-                    android:textSize="14sp"
-                    android:imeOptions="actionNext" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- اسم المستخدم -->
+            <!-- شريط التقدم (خطوات) -->
             <LinearLayout
+                android:id="@+id/stepsIndicator"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="12dp">
+                android:gravity="center"
+                android:layout_marginBottom="20dp">
 
-                <com.google.android.material.textfield.TextInputLayout
+                <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:hint="اسم المستخدم *"
-                    app:startIconDrawable="@drawable/ic_user"
-                    app:startIconTint="?attr/colorPrimary"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                    android:gravity="center"
+                    android:orientation="vertical">
 
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etUsername"
-                        android:layout_width="match_parent"
+                    <TextView
+                        android:id="@+id/tvStep1"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:gravity="center"
+                        android:text="1"
+                        android:textColor="@android:color/white"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:background="@drawable/circle_primary"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:inputType="text"
-                        android:textSize="14sp" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:text="البيانات"
+                        android:textColor="?attr/colorPrimary"
+                        android:textSize="11sp" />
+                </LinearLayout>
 
-                <ImageButton
-                    android:id="@+id/btnSuggestUsername"
+                <View
+                    android:id="@+id/vStepLine1"
                     android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:layout_marginStart="6dp"
-                    android:background="?attr/colorSurfaceVariant"
-                    android:src="@android:drawable/ic_menu_my_calendar"
-                    android:tint="?attr/colorPrimary"
-                    android:contentDescription="اقتراح" />
+                    android:layout_height="2dp"
+                    android:background="?attr/colorPrimary"
+                    android:layout_marginBottom="16dp" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tvStep2"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:gravity="center"
+                        android:text="2"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:background="@drawable/circle_outline"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="الصلاحية والفرع"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="11sp" />
+                </LinearLayout>
             </LinearLayout>
 
-            <!-- كلمة المرور -->
-            <com.google.android.material.textfield.TextInputLayout
+            <!-- ==================== الخطوة 1: البيانات الأساسية ==================== -->
+            <LinearLayout
+                android:id="@+id/layoutStep1"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="4dp"
-                android:hint="كلمة المرور *"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                app:endIconMode="password_toggle">
+                android:orientation="vertical">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etPassword"
+                <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="textPassword"
-                    android:textSize="14sp" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_marginBottom="10dp"
+                    android:hint="الاسم الكامل *"
+                    app:startIconDrawable="@drawable/ic_person_outline"
+                    app:startIconTint="?attr/colorPrimary"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    app:counterEnabled="true"
+                    app:counterMaxLength="50">
 
-            <!-- أزرار كلمة المرور -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="4dp">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etDisplayName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPersonName"
+                        android:textSize="14sp"
+                        android:imeOptions="actionNext" />
+                </com.google.android.material.textfield.TextInputLayout>
 
-                <ImageButton
-                    android:id="@+id/btnGeneratePassword"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:background="?attr/colorSurfaceVariant"
-                    android:src="@android:drawable/ic_menu_manage"
-                    android:tint="?attr/colorPrimary"
-                    android:contentDescription="توليد" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="10dp">
 
-                <ImageButton
-                    android:id="@+id/btnCopyPassword"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:layout_marginStart="6dp"
-                    android:background="?attr/colorSurfaceVariant"
-                    android:src="@drawable/ic_menu_copy"
-                    android:tint="?attr/colorPrimary"
-                    android:contentDescription="نسخ" />
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="اسم المستخدم *"
+                        app:startIconDrawable="@drawable/ic_user"
+                        app:startIconTint="?attr/colorPrimary"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        app:counterEnabled="true"
+                        app:counterMaxLength="30">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etUsername"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="text"
+                            android:textSize="14sp"
+                            android:imeOptions="actionNext" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <ImageButton
+                        android:id="@+id/btnSuggestUsername"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_marginStart="6dp"
+                        android:background="?attr/colorSurfaceVariant"
+                        android:src="@android:drawable/ic_menu_my_calendar"
+                        android:tint="?attr/colorPrimary"
+                        android:contentDescription="اقتراح اسم مستخدم" />
+                </LinearLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:hint="كلمة المرور *"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    app:endIconMode="password_toggle">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etPassword"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPassword"
+                        android:textSize="14sp"
+                        android:imeOptions="actionNext" />
+                </com.google.android.material.textfield.TextInputLayout>
 
                 <TextView
                     android:id="@+id/tvPasswordRequirements"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="كلمة المرور يجب أن تكون 8 أحرف"
+                    android:text="كلمة المرور يجب أن تكون 6 أحرف على الأقل"
                     android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="10sp"
-                    android:layout_marginStart="8dp" />
-            </LinearLayout>
+                    android:textSize="11sp"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginBottom="8dp" />
 
-            <!-- قوة كلمة المرور -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="12dp"
-                android:gravity="center_vertical">
-
-                <View android:id="@+id/vStrength1" android:layout_width="0dp" android:layout_height="4dp" android:layout_weight="1" android:layout_marginEnd="3dp" android:background="?attr/colorOutline" />
-                <View android:id="@+id/vStrength2" android:layout_width="0dp" android:layout_height="4dp" android:layout_weight="1" android:layout_marginHorizontal="3dp" android:background="?attr/colorOutline" />
-                <View android:id="@+id/vStrength3" android:layout_width="0dp" android:layout_height="4dp" android:layout_weight="1" android:layout_marginHorizontal="3dp" android:background="?attr/colorOutline" />
-                <View android:id="@+id/vStrength4" android:layout_width="0dp" android:layout_height="4dp" android:layout_weight="1" android:layout_marginStart="3dp" android:background="?attr/colorOutline" />
-                <TextView android:id="@+id/tvStrengthLabel" android:layout_width="50dp" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="" android:textSize="10sp" android:gravity="center" />
-            </LinearLayout>
-
-            <!-- رقم الموظف (تلقائي) -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:hint="رقم الموظف (تلقائي)"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                app:startIconDrawable="@android:drawable/ic_menu_sort_alphabetically">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etEmployeeId"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="text"
-                    android:textSize="14sp"
-                    android:focusable="false"
-                    android:clickable="false" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="10dp">
 
-            <!-- اختيار الفرع (Dropdown أنيق) -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:hint="الفرع *"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                app:startIconDrawable="@android:drawable/ic_menu_compass"
-                app:startIconTint="?attr/colorPrimary">
+                    <ImageButton
+                        android:id="@+id/btnGeneratePassword"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="?attr/colorSurfaceVariant"
+                        android:src="@android:drawable/ic_menu_manage"
+                        android:tint="?attr/colorPrimary"
+                        android:contentDescription="توليد كلمة مرور" />
 
-                <com.google.android.material.textfield.MaterialAutoCompleteTextView
-                    android:id="@+id/etBranch"
+                    <ImageButton
+                        android:id="@+id/btnCopyPassword"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:layout_marginStart="8dp"
+                        android:background="?attr/colorSurfaceVariant"
+                        android:src="@drawable/ic_menu_copy"
+                        android:tint="?attr/colorPrimary"
+                        android:contentDescription="نسخ كلمة المرور" />
+
+                    <TextView
+                        android:id="@+id/tvStrengthLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text=""
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="none"
-                    android:textSize="14sp"
-                    android:focusable="false"
-                    android:cursorVisible="false" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="12dp"
+                    android:gravity="center_vertical">
 
-            <!-- اختيار الصلاحية (مبسط) -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="الصلاحية *"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="8dp" />
+                    <View android:id="@+id/vStrength1" android:layout_width="0dp" android:layout_height="4dp" android:layout_weight="1" android:layout_marginEnd="3dp" android:background="?attr/colorOutline" />
+                    <View android:id="@+id/vStrength2" android:layout_width="0dp" android:layout_height="4dp" android:layout_weight="1" android:layout_marginHorizontal="3dp" android:background="?attr/colorOutline" />
+                    <View android:id="@+id/vStrength3" android:layout_width="0dp" android:layout_height="4dp" android:layout_weight="1" android:layout_marginHorizontal="3dp" android:background="?attr/colorOutline" />
+                    <View android:id="@+id/vStrength4" android:layout_width="0dp" android:layout_height="4dp" android:layout_weight="1" android:layout_marginStart="3dp" android:background="?attr/colorOutline" />
+                </LinearLayout>
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="20dp"
-                android:hint="اختر الصلاحية"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                app:startIconDrawable="@android:drawable/ic_menu_myplaces"
-                app:startIconTint="?attr/colorPrimary">
-
-                <com.google.android.material.textfield.MaterialAutoCompleteTextView
-                    android:id="@+id/etRole"
+                <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="none"
-                    android:textSize="14sp"
-                    android:focusable="false"
-                    android:cursorVisible="false" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_marginBottom="16dp"
+                    android:hint="رقم الموظف (تلقائي)"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    app:startIconDrawable="@android:drawable/ic_menu_sort_alphabetically"
+                    app:startIconTint="?attr/colorPrimary">
 
-            <!-- أزرار الحفظ والإلغاء -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etEmployeeId"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text"
+                        android:textSize="14sp"
+                        android:focusable="false"
+                        android:clickable="false" />
+                </com.google.android.material.textfield.TextInputLayout>
 
                 <Button
-                    android:id="@+id/btnCancelUser"
-                    android:layout_width="0dp"
+                    android:id="@+id/btnNextStep"
+                    android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
-                    android:text="إلغاء"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="14sp"
-                    android:backgroundTint="?attr/colorSurfaceVariant"
-                    app:cornerRadius="12dp" />
-
-                <Button
-                    android:id="@+id/btnSaveUser"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="2"
-                    android:layout_marginStart="8dp"
-                    android:text="حفظ المستخدم ✅"
+                    android:text="التالي: الصلاحية والفرع ←"
                     android:textColor="?attr/colorOnPrimary"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:backgroundTint="?attr/colorPrimary"
                     app:cornerRadius="12dp" />
+            </LinearLayout>
+
+            <!-- ==================== الخطوة 2: الصلاحية والفرع ==================== -->
+            <LinearLayout
+                android:id="@+id/layoutStep2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="اختر الفرع"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:hint="الفرع *"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    app:startIconDrawable="@android:drawable/ic_menu_compass"
+                    app:startIconTint="?attr/colorPrimary">
+
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                        android:id="@+id/etBranch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="none"
+                        android:textSize="14sp"
+                        android:focusable="false"
+                        android:cursorVisible="false" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="اختر صلاحية المستخدم"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:hint="الصلاحية *"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    app:startIconDrawable="@android:drawable/ic_menu_myplaces"
+                    app:startIconTint="?attr/colorPrimary">
+
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                        android:id="@+id/etRole"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="none"
+                        android:textSize="14sp"
+                        android:focusable="false"
+                        android:cursorVisible="false" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <Button
+                        android:id="@+id/btnPrevStep"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="6dp"
+                        android:text="→ رجوع"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp"
+                        android:backgroundTint="?attr/colorSurfaceVariant"
+                        app:cornerRadius="12dp" />
+
+                    <Button
+                        android:id="@+id/btnSaveUser"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="2"
+                        android:layout_marginStart="6dp"
+                        android:text="حفظ المستخدم ✅"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:backgroundTint="?attr/colorPrimary"
+                        app:cornerRadius="12dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- أزرار الإلغاء (للتعديل) -->
+            <LinearLayout
+                android:id="@+id/layoutButtons1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="end"
+                android:visibility="gone">
+
+                <Button
+                    android:id="@+id/btnCancelUser"
+                    android:layout_width="wrap_content"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="8dp"
+                    android:backgroundTint="?attr/colorSurfaceVariant"
+                    android:text="إلغاء"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="13sp" />
             </LinearLayout>
 
         </LinearLayout>
