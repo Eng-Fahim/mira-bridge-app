@@ -1,6 +1,7 @@
 package com.example.uhf.fragment;
 
 import android.app.DatePickerDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -25,7 +26,6 @@ import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 
-// استدعاء R التابع لـ com.example.uhf مباشرة
 import com.example.uhf.R;
 
 import org.json.JSONArray;
@@ -66,7 +66,11 @@ public class MiraReportsFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_mira_reports, container, false);
 
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
+        try {
+            isArabic = Locale.getDefault().getLanguage().equals("ar");
+        } catch (Exception e) {
+            isArabic = true;
+        }
 
         initViews(view);
         setupWebView();
@@ -74,9 +78,19 @@ public class MiraReportsFragment extends Fragment {
         setupListeners();
 
         setDefaultDates();
-        loadReport(currentReportType);
 
         return view;
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        // تحميل التقرير بعد استقرار إنشاء عناصر الواجهة لتفادي الانهيار عند فتح التبويب
+        view.post(() -> {
+            if (isAdded() && getContext() != null) {
+                loadReport(currentReportType);
+            }
+        });
     }
 
     private void initViews(View view) {
@@ -99,19 +113,23 @@ public class MiraReportsFragment extends Fragment {
 
     private void setupWebView() {
         if (webView == null) return;
-        WebSettings settings = webView.getSettings();
-        settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(true);
-        settings.setAllowFileAccess(true);
-        settings.setBuiltInZoomControls(true);
-        settings.setDisplayZoomControls(false);
+        try {
+            WebSettings settings = webView.getSettings();
+            settings.setJavaScriptEnabled(true);
+            settings.setDomStorageEnabled(true);
+            settings.setAllowFileAccess(true);
+            settings.setBuiltInZoomControls(true);
+            settings.setDisplayZoomControls(false);
 
-        webView.addJavascriptInterface(new WebAppInterface(), "AndroidInterface");
-        webView.setWebViewClient(new WebViewClient());
+            webView.addJavascriptInterface(new WebAppInterface(), "AndroidInterface");
+            webView.setWebViewClient(new WebViewClient());
+        } catch (Exception e) {
+            Log.e(TAG, "WebView setup failed", e);
+        }
     }
 
     private void setupSpinners() {
-        if (spReportType != null) {
+        if (spReportType != null && isAdded() && getContext() != null) {
             String[] reports = isArabic ?
                     new String[]{"تقرير تفاصيل المخزون", "تقرير الفروقات والتجاوزات", "تقرير سجل التدقيق"} :
                     new String[]{"Inventory Detail", "Discrepancies Report", "Audit Logs"};
@@ -167,6 +185,8 @@ public class MiraReportsFragment extends Fragment {
     }
 
     private void showDatePicker(boolean isFrom) {
+        if (!isAdded() || getContext() == null) return;
+        
         Calendar cal = Calendar.getInstance();
         DatePickerDialog dialog = new DatePickerDialog(
                 requireContext(),
@@ -189,51 +209,63 @@ public class MiraReportsFragment extends Fragment {
     }
 
     private void loadReport(String type) {
+        if (!isAdded() || getContext() == null) return;
+        
         showLoadingHtml();
 
         try {
-            // محاولة جلب MiraApiClient آلياً لتجنب مشاكل تعارض المسارات أثناء التجميع
+            Context ctx = getContext();
             Class<?> clientClass = null;
+            
             try {
                 clientClass = Class.forName("com.example.rfid.api.MiraApiClient");
             } catch (ClassNotFoundException e) {
-                clientClass = Class.forName("com.example.uhf.api.MiraApiClient");
+                try {
+                    clientClass = Class.forName("com.example.uhf.api.MiraApiClient");
+                } catch (ClassNotFoundException ex) {
+                    Log.w(TAG, "MiraApiClient class not found in packages.");
+                }
             }
 
-            Method getInstanceMethod = clientClass.getMethod("getInstance", android.content.Context.class);
-            Object clientInstance = getInstanceMethod.invoke(null, requireContext());
+            if (clientClass != null && ctx != null) {
+                Method getInstanceMethod = clientClass.getMethod("getInstance", Context.class);
+                Object clientInstance = getInstanceMethod.invoke(null, ctx);
 
-            Method getApiMethod = clientClass.getMethod("getApi");
-            Object apiService = getApiMethod.invoke(clientInstance);
+                Method getApiMethod = clientClass.getMethod("getApi");
+                Object apiService = getApiMethod.invoke(clientInstance);
 
-            Method getReportDataMethod = apiService.getClass().getMethod("getReportData", String.class, String.class, String.class);
-            Call<String> call = (Call<String>) getReportDataMethod.invoke(apiService, type, dateFrom, dateTo);
+                Method getReportDataMethod = apiService.getClass().getMethod("getReportData", String.class, String.class, String.class);
+                Call<String> call = (Call<String>) getReportDataMethod.invoke(apiService, type, dateFrom, dateTo);
 
-            call.enqueue(new Callback<String>() {
-                @Override
-                public void onResponse(@NonNull Call<String> call, @NonNull Response<String> response) {
-                    if (response.isSuccessful() && response.body() != null) {
-                        try {
-                            lastReportData = new JSONObject(response.body());
-                            renderReportHtml(type, lastReportData);
-                        } catch (JSONException e) {
-                            Log.e(TAG, "JSON parsing error", e);
-                            showErrorHtml(isArabic ? "خطأ في معالجة البيانات" : "Data Parsing Error");
+                call.enqueue(new Callback<String>() {
+                    @Override
+                    public void onResponse(@NonNull Call<String> call, @NonNull Response<String> response) {
+                        if (!isAdded()) return;
+                        if (response.isSuccessful() && response.body() != null) {
+                            try {
+                                lastReportData = new JSONObject(response.body());
+                                renderReportHtml(type, lastReportData);
+                            } catch (JSONException e) {
+                                Log.e(TAG, "JSON parsing error", e);
+                                showErrorHtml(isArabic ? "خطأ في معالجة البيانات" : "Data Parsing Error");
+                            }
+                        } else {
+                            renderReportHtml(type, null);
                         }
-                    } else {
-                        showErrorHtml(isArabic ? "فشل في جلب البيانات من الخادم" : "Failed to fetch data from server");
                     }
-                }
 
-                @Override
-                public void onFailure(@NonNull Call<String> call, @NonNull Throwable t) {
-                    Log.e(TAG, "Network request failed", t);
-                    showErrorHtml(isArabic ? "خطأ في الاتصال بالشبكة" : "Network Error");
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Dynamic API execution failed", e);
-            // عرض محاكاة واجهة التقرير محلياً في حال عدم اكتمال ربط الـ API على السيرفر بعد
+                    @Override
+                    public void onFailure(@NonNull Call<String> call, @NonNull Throwable t) {
+                        if (!isAdded()) return;
+                        Log.e(TAG, "Network request failed", t);
+                        renderReportHtml(type, null);
+                    }
+                });
+            } else {
+                renderReportHtml(type, null);
+            }
+        } catch (Throwable e) {
+            Log.e(TAG, "Dynamic API execution error", e);
             renderReportHtml(type, null);
         }
     }
@@ -392,11 +424,13 @@ public class MiraReportsFragment extends Fragment {
     private String buildSummaryCard(String cssClass, String value, String title) {
         return "<div class='card " + cssClass + "'>" +
                 "<h4>" + title + "</h4>" +
-                "<div class='val'>" + value + "</div>" +
+                "<div>" + value + "</div>" +
                 "</div>";
     }
 
     private void exportExcel() {
+        if (!isAdded() || getContext() == null) return;
+
         if (lastReportData == null) {
             Toast.makeText(requireContext(), isArabic ? "لا توجد بيانات لتصديرها" : "No data available to export", Toast.LENGTH_SHORT).show();
             return;
