@@ -23,7 +23,7 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTabHost;
-
+import androidx.fragment.app.MiraBranchesManagementFragment;
 import com.example.uhf.R;
 import com.example.uhf.fragment.AuthenticateNxpUcodeDnaFragment;
 import com.example.uhf.fragment.BlockPermalockFragment;
