@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?android:attr/colorBackground"
+    android:layoutDirection="rtl">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorPrimary"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="14dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🏢 إدارة الفروع"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnAddBranch"
+            android:layout_width="wrap_content"
+            android:layout_height="38dp"
+            android:backgroundTint="@android:color/white"
+            android:text="+ إضافة فرع"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            app:cornerRadius="8dp" />
+    </LinearLayout>
+
+    <!-- Stats Summary -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:background="?attr/colorSurfaceVariant">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+            <TextView android:id="@+id/tvTotalBranches" android:text="0" android:textColor="?attr/colorOnSurface" android:textSize="22sp" android:textStyle="bold"/>
+            <TextView android:text="فرع" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="11sp"/>
+        </LinearLayout>
+
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="?attr/colorOutline"/>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+            <TextView android:id="@+id/tvActiveBranches" android:text="0" android:textColor="#22C55E" android:textSize="22sp" android:textStyle="bold"/>
+            <TextView android:text="نشط" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="11sp"/>
+        </LinearLayout>
+
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="?attr/colorOutline"/>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+            <TextView android:id="@+id/tvTotalItems" android:text="0" android:textColor="#3B82F6" android:textSize="22sp" android:textStyle="bold"/>
+            <TextView android:text="قطعة" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="11sp"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Branches List -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvBranchesList"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="12dp"
+        android:clipToPadding="false" />
+
+    <!-- Empty State -->
+    <TextView
+        android:id="@+id/tvEmptyBranches"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="لا توجد فروع مضافة بعد"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:padding="40dp"
+        android:visibility="gone" />
+
+</LinearLayout>
