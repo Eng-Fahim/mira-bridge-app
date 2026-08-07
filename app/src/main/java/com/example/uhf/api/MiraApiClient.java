@@ -421,6 +421,9 @@ public class MiraApiClient {
     }
 
     public ApiResponse saveBranchSettings(int branchId, JSONObject settings) {
+    Log.d(TAG, "URL: " + (id > 0 ? "/branches/" + id : "/branches"));
+Log.d(TAG, "Method: " + (id > 0 ? "PUT" : "POST"));
+Log.d(TAG, "Payload: " + payload.toString());
         return postWithAuth("/branches/" + branchId + "/settings", settings);
     }
 
