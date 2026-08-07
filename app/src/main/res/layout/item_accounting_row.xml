@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_accounting_row"
+    android:orientation="horizontal"
+    android:paddingVertical="10dp"
+    android:paddingHorizontal="8dp"
+    android:layout_marginHorizontal="4dp"
+    android:layout_marginVertical="2dp"
+    android:gravity="center_vertical">
+
+    <TextView
+        android:id="@+id/tvRowCol1"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1.2"
+        android:gravity="center"
+        android:textColor="#2C3E50"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        tools:text="JV-2026-101" />
+
+    <TextView
+        android:id="@+id/tvRowCol2"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="2"
+        android:gravity="start|center_vertical"
+        android:paddingStart="8dp"
+        android:textColor="#34495E"
+        android:textSize="12sp"
+        tools:text="مبيعات طقم ذهب" />
+
+    <TextView
+        android:id="@+id/tvRowCol3"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1.2"
+        android:gravity="center"
+        android:textColor="#27AE60"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        tools:text="450,000" />
+
+    <TextView
+        android:id="@+id/tvRowCol4"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1.2"
+        android:gravity="center"
+        android:textColor="#C0392B"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        tools:text="0.00" />
+</LinearLayout>
