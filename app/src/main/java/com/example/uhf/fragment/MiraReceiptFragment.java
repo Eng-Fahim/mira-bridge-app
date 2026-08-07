@@ -63,9 +63,7 @@ public class MiraReceiptFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (getArguments() != null) {
-            receiptJsonStr = getArguments().getString(ARG_RECEIPT_JSON, "{}");
-        }
+        if (getArguments() != null) receiptJsonStr = getArguments().getString(ARG_RECEIPT_JSON, "{}");
         isArabic = Locale.getDefault().getLanguage().equals("ar");
         if (getContext() != null) {
             orgProfile = MiraOrgProfileManager.getInstance(getContext());
@@ -95,7 +93,6 @@ public class MiraReceiptFragment extends Fragment {
         btnPrintReceipt = view.findViewById(R.id.btnMiraPrintReceipt);
         btnShareReceipt = view.findViewById(R.id.btnMiraShareReceipt);
         btnSaveReceipt = view.findViewById(R.id.btnMiraSaveReceipt);
-
         if (webReceipt != null) {
             webReceipt.getSettings().setJavaScriptEnabled(true);
             webReceipt.setWebViewClient(new WebViewClient());
@@ -116,157 +113,78 @@ public class MiraReceiptFragment extends Fragment {
     }
 
     // ==================== 🖨️ طباعة ====================
-
     private void printReceipt() {
         if (getContext() == null || webReceipt == null) return;
-
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
-            PrintManager printManager = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
-            String jobName = orgName + " - " + (isArabic ? "إيصال" : "Receipt");
-            PrintDocumentAdapter printAdapter = webReceipt.createPrintDocumentAdapter(jobName);
-            printManager.print(jobName, printAdapter, new PrintAttributes.Builder().build());
-            Toast.makeText(getContext(), isArabic ? "🖨️ تم فتح نافذة الطباعة" : "🖨️ Print dialog opened", Toast.LENGTH_SHORT).show();
-        } else {
-            Toast.makeText(getContext(), isArabic ? "الطباعة غير مدعومة" : "Print not supported", Toast.LENGTH_SHORT).show();
+            PrintManager pm = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
+            PrintDocumentAdapter adapter = webReceipt.createPrintDocumentAdapter(orgName);
+            pm.print(orgName, adapter, new PrintAttributes.Builder().build());
+            Toast.makeText(getContext(), isArabic ? "🖨️ تم فتح الطباعة" : "🖨️ Print opened", Toast.LENGTH_SHORT).show();
         }
     }
 
-    // ==================== 📤 مشاركة كـ PDF ====================
-
+    // ==================== 📤 مشاركة PDF ====================
     private void shareReceiptAsPDF() {
-        try {
-            File pdfFile = generatePDF();
-            if (pdfFile == null) {
-                Toast.makeText(getContext(), isArabic ? "فشل إنشاء الملف" : "File creation failed", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            Uri uri = FileProvider.getUriForFile(requireContext(),
-                requireContext().getPackageName() + ".fileprovider", pdfFile);
-
-            Intent shareIntent = new Intent(Intent.ACTION_SEND);
-            shareIntent.setType("application/pdf");
-            shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
-            shareIntent.putExtra(Intent.EXTRA_SUBJECT, orgName + " - " + (isArabic ? "إيصال بيع" : "Sales Receipt"));
-            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(Intent.createChooser(shareIntent, isArabic ? "مشاركة الإيصال" : "Share Receipt"));
-        } catch (Exception e) {
-            Log.e(TAG, "Share error: " + e.getMessage());
-            // fallback: مشاركة نصية
-            shareAsText();
-        }
+        webReceipt.postDelayed(() -> {
+            try {
+                File pdf = generatePDF();
+                if (pdf == null) { shareAsText(); return; }
+                Uri uri = FileProvider.getUriForFile(requireContext(), requireContext().getPackageName() + ".fileprovider", pdf);
+                Intent intent = new Intent(Intent.ACTION_SEND);
+                intent.setType("application/pdf");
+                intent.putExtra(Intent.EXTRA_STREAM, uri);
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(Intent.createChooser(intent, isArabic ? "مشاركة الإيصال" : "Share Receipt"));
+            } catch (Exception e) { shareAsText(); }
+        }, 500);
     }
 
     private void shareAsText() {
         try {
             Intent intent = new Intent(Intent.ACTION_SEND);
             intent.setType("text/plain");
-            intent.putExtra(Intent.EXTRA_SUBJECT, orgName + " - " + (isArabic ? "إيصال بيع" : "Sales Receipt"));
-            intent.putExtra(Intent.EXTRA_TEXT, receiptJsonStr);
-            startActivity(Intent.createChooser(intent, isArabic ? "مشاركة الإيصال" : "Share Receipt"));
+            intent.putExtra(Intent.EXTRA_TEXT, orgName + " - " + receiptJsonStr);
+            startActivity(Intent.createChooser(intent, isArabic ? "مشاركة" : "Share"));
+        } catch (Exception ignored) {}
+    }
+
+    // ==================== 💾 حفظ PDF ====================
+    private void saveReceiptAsPDF() {
+        try {
+            File pdf = generatePDF();
+            if (pdf != null) {
+                Toast.makeText(getContext(), (isArabic ? "✅ تم الحفظ: " : "✅ Saved: ") + pdf.getName(), Toast.LENGTH_LONG).show();
+            }
         } catch (Exception e) {
-            Toast.makeText(getContext(), isArabic ? "خطأ في المشاركة" : "Share error", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), isArabic ? "❌ فشل الحفظ" : "❌ Save failed", Toast.LENGTH_SHORT).show();
         }
     }
 
-    // ==================== 💾 حفظ كـ PDF ====================
-
-    private void saveReceiptAsPDF() {
-    // استبدل دالة shareReceiptAsPDF:
-
-private void shareReceiptAsPDF() {
-    try {
-        // ✅ انتظر تحميل WebView بالكامل ثم شارك
-        webReceipt.postDelayed(() -> {
-            try {
-                File pdfFile = generatePDF();
-                if (pdfFile == null) {
-                    shareAsText();
-                    return;
-                }
-
-                Uri uri = FileProvider.getUriForFile(requireContext(),
-                    requireContext().getPackageName() + ".fileprovider", pdfFile);
-
-                Intent shareIntent = new Intent(Intent.ACTION_SEND);
-                shareIntent.setType("application/pdf");
-                shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
-                shareIntent.putExtra(Intent.EXTRA_SUBJECT, orgName + " - " + (isArabic ? "إيصال بيع" : "Sales Receipt"));
-                shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                startActivity(Intent.createChooser(shareIntent, isArabic ? "مشاركة الإيصال" : "Share Receipt"));
-            } catch (Exception e) {
-                shareAsText();
-            }
-        }, 500); // انتظر 500ms ليكتمل تحميل WebView
-    } catch (Exception e) {
-        shareAsText();
-    }
-}
-
-// أضف هذه الدالة لتصدير WebView كـ Bitmap بشكل أفضل:
-private Bitmap captureWebView() {
-    if (webReceipt == null) return null;
-    try {
-        // تمكين القياس
-        webReceipt.measure(
-            View.MeasureSpec.makeMeasureSpec(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED),
-            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-        );
-        webReceipt.layout(0, 0, webReceipt.getMeasuredWidth(), webReceipt.getMeasuredHeight());
-        webReceipt.setDrawingCacheEnabled(true);
-        webReceipt.buildDrawingCache();
-        
-        Bitmap bitmap = Bitmap.createBitmap(webReceipt.getMeasuredWidth(),
-            webReceipt.getMeasuredHeight(), Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        webReceipt.draw(canvas);
-        
-        webReceipt.setDrawingCacheEnabled(false);
-        return bitmap;
-    } catch (Exception e) {
-        return null;
-    }
-}
-
-    // ==================== 🏗️ إنشاء PDF ====================
-
+    // ==================== 🏗️ generatePDF ====================
     private File generatePDF() {
         try {
-            // 1. Capture WebView as Bitmap
             Bitmap bitmap = captureWebView();
             if (bitmap == null) return null;
 
-            // 2. Create PDF
-            PdfDocument document = new PdfDocument();
-            int pageWidth = 595; // A4 width
-            int pageHeight = bitmap.getHeight() * pageWidth / bitmap.getWidth() + 40;
-
-            PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create();
-            PdfDocument.Page page = document.startPage(pageInfo);
+            PdfDocument doc = new PdfDocument();
+            int w = 595, h = bitmap.getHeight() * w / bitmap.getWidth() + 40;
+            PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(w, h, 1).create();
+            PdfDocument.Page page = doc.startPage(info);
             Canvas canvas = page.getCanvas();
+            canvas.drawBitmap(Bitmap.createScaledBitmap(bitmap, w - 40, h - 40, true), 20, 20, null);
+            doc.finishPage(page);
 
-            // Scale bitmap to fit
-            Bitmap scaledBitmap = Bitmap.createScaledBitmap(bitmap, pageWidth - 40, pageHeight - 40, true);
-            canvas.drawBitmap(scaledBitmap, 20, 20, null);
-
-            document.finishPage(page);
-
-            // 3. Save to Downloads
-            String fileName = orgName.replaceAll("\\s+", "_") + "_Receipt_" 
-                + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date()) + ".pdf";
+            String fn = orgName.replaceAll("\\s+", "_") + "_Receipt_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date()) + ".pdf";
             File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "MIRA_Receipts");
             if (!dir.exists()) dir.mkdirs();
-            File file = new File(dir, fileName);
-
+            File file = new File(dir, fn);
             FileOutputStream fos = new FileOutputStream(file);
-            document.writeTo(fos);
-            document.close();
+            doc.writeTo(fos);
+            doc.close();
             fos.close();
-
             return file;
-
         } catch (Exception e) {
-            Log.e(TAG, "PDF generation error: " + e.getMessage());
+            Log.e(TAG, "PDF error: " + e.getMessage());
             return null;
         }
     }
@@ -274,102 +192,81 @@ private Bitmap captureWebView() {
     private Bitmap captureWebView() {
         if (webReceipt == null) return null;
         try {
-            Bitmap bitmap = Bitmap.createBitmap(webReceipt.getWidth(), webReceipt.getHeight(), Bitmap.Config.ARGB_8888);
-            Canvas canvas = new Canvas(bitmap);
-            webReceipt.draw(canvas);
-            return bitmap;
-        } catch (Exception e) {
-            return null;
-        }
+            webReceipt.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+            webReceipt.layout(0, 0, webReceipt.getMeasuredWidth(), webReceipt.getMeasuredHeight());
+            Bitmap b = Bitmap.createBitmap(webReceipt.getMeasuredWidth(), webReceipt.getMeasuredHeight(), Bitmap.Config.ARGB_8888);
+            webReceipt.draw(new Canvas(b));
+            return b;
+        } catch (Exception e) { return null; }
     }
 
     // ==================== HTML ====================
-
     private void renderHtmlReceipt() {
         if (webReceipt == null) return;
-
-        String orgSlogan = orgProfile != null ? orgProfile.getOrgSlogan() : "";
-        String orgPhone = orgProfile != null ? orgProfile.getOrgPhone() : "";
-        String orgAddress = orgProfile != null ? orgProfile.getOrgAddress() : "";
+        String slogan = orgProfile != null ? orgProfile.getOrgSlogan() : "";
+        String phone = orgProfile != null ? orgProfile.getOrgPhone() : "";
+        String address = orgProfile != null ? orgProfile.getOrgAddress() : "";
         String dir = isArabic ? "rtl" : "ltr";
 
-        StringBuilder html = new StringBuilder();
-        html.append("<!DOCTYPE html><html dir='").append(dir).append("'><head><meta charset='UTF-8'><style>")
-            .append("body{background:#fff;color:#1a1a1a;font-family:sans-serif;padding:14px;max-width:380px;margin:auto}")
-            .append(".org-name{font-size:20px;font-weight:bold;color:#1A237E;text-align:center;margin-bottom:2px}")
-            .append(".org-slogan{font-size:11px;color:#666;text-align:center;margin-bottom:4px}")
-            .append(".org-contact{font-size:10px;color:#888;text-align:center;line-height:1.5;margin-bottom:12px}")
-            .append(".divider{border-top:2px solid #C5A059;margin:10px 0}")
-            .append(".check{text-align:center;font-size:40px;color:#22C55E;margin:8px 0}")
-            .append(".success{text-align:center;font-weight:bold;font-size:15px;color:#22C55E;margin-bottom:10px}")
-            .append(".row{display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px}")
-            .append(".label{color:#666}.value{font-weight:bold}")
-            .append("table{width:100%;border-collapse:collapse;margin:10px 0;font-size:11px}")
-            .append("th{background:#f5f5f5;padding:5px;border-bottom:1px solid #ddd;font-size:10px}")
-            .append("td{padding:5px;border-bottom:1px solid #eee;text-align:center;font-size:10px}")
-            .append(".total-box{background:#1A237E;color:#fff;padding:10px;border-radius:6px;text-align:center;margin-top:10px}")
-            .append(".total-amount{font-size:22px;font-weight:bold}")
-            .append(".footer{text-align:center;margin-top:14px;font-size:9px;color:#888;line-height:1.5}")
-            .append("</style></head><body>")
-
-            .append("<div class='org-name'>").append(orgName).append("</div>")
-            .append("<div class='org-slogan'>").append(orgSlogan).append("</div>")
-            .append("<div class='org-contact'>");
-        if (!orgPhone.isEmpty()) html.append("📞 ").append(orgPhone).append(" &nbsp; ");
-        if (!orgAddress.isEmpty()) html.append("📍 ").append(orgAddress);
-        html.append("</div><div class='divider'></div>")
-            .append("<div class='check'>✓</div>")
-            .append("<div class='success'>").append(isArabic ? "تم البيع بنجاح" : "Sale Completed").append("</div>");
+        StringBuilder h = new StringBuilder();
+        h.append("<!DOCTYPE html><html dir='").append(dir).append("'><head><meta charset='UTF-8'><style>")
+         .append("body{font-family:sans-serif;padding:12px;max-width:380px;margin:auto;background:#fff;color:#1a1a1a}")
+         .append(".org-name{font-size:20px;font-weight:bold;color:#1A237E;text-align:center}")
+         .append(".org-slogan{font-size:11px;color:#666;text-align:center}")
+         .append(".org-contact{font-size:10px;color:#888;text-align:center;margin-bottom:10px}")
+         .append(".divider{border-top:2px solid #C5A059;margin:10px 0}")
+         .append(".check{text-align:center;font-size:36px;color:#22C55E}")
+         .append(".success{text-align:center;font-weight:bold;color:#22C55E;margin-bottom:8px}")
+         .append(".row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px}")
+         .append(".label{color:#666}.value{font-weight:bold}")
+         .append("table{width:100%;border-collapse:collapse;margin:10px 0;font-size:11px}")
+         .append("th{background:#f5f5f5;padding:5px;border-bottom:1px solid #ddd}")
+         .append("td{padding:5px;border-bottom:1px solid #eee;text-align:center}")
+         .append(".total-box{background:#1A237E;color:#fff;padding:10px;border-radius:6px;text-align:center;margin-top:10px}")
+         .append(".total{font-size:22px;font-weight:bold}")
+         .append(".footer{text-align:center;margin-top:14px;font-size:9px;color:#888}")
+         .append("</style></head><body>")
+         .append("<div class='org-name'>").append(orgName).append("</div>")
+         .append("<div class='org-slogan'>").append(slogan).append("</div>")
+         .append("<div class='org-contact'>");
+        if (!phone.isEmpty()) h.append("📞 ").append(phone).append(" ");
+        if (!address.isEmpty()) h.append("📍 ").append(address);
+        h.append("</div><div class='divider'></div>")
+         .append("<div class='check'>✓</div>")
+         .append("<div class='success'>").append(isArabic ? "تم البيع بنجاح" : "Sale Completed").append("</div>");
 
         try {
-            JSONObject root = new JSONObject(receiptJsonStr);
-            JSONObject transaction = root.optJSONObject("transaction");
-            if (transaction == null) transaction = root;
+            JSONObject t = new JSONObject(receiptJsonStr).optJSONObject("transaction");
+            if (t == null) t = new JSONObject(receiptJsonStr);
+            h.append("<div class='row'><span class='label'>").append(isArabic ? "رقم العملية" : "Receipt #").append("</span><span class='value'>#").append(t.optString("sale_id", "—")).append("</span></div>");
+            h.append("<div class='row'><span class='label'>").append(isArabic ? "التاريخ" : "Date").append("</span><span class='value'>").append(t.optString("timestamp", new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date()))).append("</span></div>");
+            h.append("<div class='row'><span class='label'>").append(isArabic ? "العميل" : "Customer").append("</span><span class='value'>").append(t.optString("customer_name", "—")).append("</span></div>");
 
-            String saleId = transaction.optString("sale_id", "—");
-            String date = transaction.optString("timestamp", new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date()));
-            String customer = transaction.optString("customer_name", isArabic ? "عميل" : "Customer");
-            double finalAmount = transaction.optDouble("final_amount", transaction.optDouble("subtotal", 0));
-
-            html.append("<div class='row'><span class='label'>").append(isArabic ? "رقم العملية" : "Receipt #").append("</span><span class='value'>#").append(saleId).append("</span></div>");
-            html.append("<div class='row'><span class='label'>").append(isArabic ? "التاريخ" : "Date").append("</span><span class='value'>").append(date).append("</span></div>");
-            html.append("<div class='row'><span class='label'>").append(isArabic ? "العميل" : "Customer").append("</span><span class='value'>").append(customer).append("</span></div>");
-
-            JSONArray items = transaction.optJSONArray("items");
+            JSONArray items = t.optJSONArray("items");
             if (items != null && items.length() > 0) {
-                html.append("<table><tr><th>#</th><th>").append(isArabic ? "القطعة" : "Item").append("</th><th>").append(isArabic ? "العيار" : "Karat").append("</th><th>").append(isArabic ? "السعر" : "Price").append("</th></tr>");
+                h.append("<table><tr><th>#</th><th>").append(isArabic ? "القطعة" : "Item").append("</th><th>").append(isArabic ? "العيار" : "Karat").append("</th><th>").append(isArabic ? "السعر" : "Price").append("</th></tr>");
                 for (int i = 0; i < items.length(); i++) {
-                    JSONObject item = items.optJSONObject(i);
-                    if (item == null) continue;
-                    html.append("<tr><td>").append(i + 1).append("</td>")
-                        .append("<td>").append(item.optString("title", "—")).append("</td>")
-                        .append("<td>").append(item.optString("karat", "—")).append("</td>")
-                        .append("<td>").append(String.format(Locale.US, "%,.0f", item.optDouble("price", 0))).append("</td></tr>");
+                    JSONObject it = items.optJSONObject(i);
+                    if (it == null) continue;
+                    h.append("<tr><td>").append(i + 1).append("</td><td>").append(it.optString("title", "—")).append("</td><td>").append(it.optString("karat", "—")).append("</td><td>").append(String.format(Locale.US, "%,.0f", it.optDouble("price", 0))).append("</td></tr>");
                 }
-                html.append("</table>");
+                h.append("</table>");
             }
 
-            html.append("<div class='total-box'>")
-                .append("<div style='font-size:10px;opacity:0.8'>").append(isArabic ? "المبلغ النهائي" : "Final Amount").append("</div>")
-                .append("<div class='total-amount'>").append(String.format(Locale.US, "%,.0f YER", finalAmount)).append("</div>")
-                .append("</div>");
-
+            double amt = t.optDouble("final_amount", t.optDouble("subtotal", 0));
+            h.append("<div class='total-box'><div style='font-size:10px;opacity:0.8'>").append(isArabic ? "المبلغ النهائي" : "Final Amount").append("</div><div class='total'>").append(String.format(Locale.US, "%,.0f YER", amt)).append("</div></div>");
         } catch (Exception e) {
-            html.append("<p style='color:#EF4444;text-align:center'>").append(isArabic ? "خطأ في البيانات" : "Data error").append("</p>");
+            h.append("<p style='color:red;text-align:center'>").append(isArabic ? "خطأ في البيانات" : "Data error").append("</p>");
         }
 
-        html.append("<div class='footer'>").append(orgName).append("<br>MIRA Jewelry System<br>© 2026</div>");
-        html.append("</body></html>");
-
-        webReceipt.loadDataWithBaseURL(null, html.toString(), "text/html", "UTF-8", null);
+        h.append("<div class='footer'>").append(orgName).append("<br>MIRA Jewelry System © 2026</div></body></html>");
+        webReceipt.loadDataWithBaseURL(null, h.toString(), "text/html", "UTF-8", null);
     }
 
     private void closeFragment() {
         if (!isAdded()) return;
-        if (getParentFragmentManager() != null && getParentFragmentManager().getBackStackEntryCount() > 0) {
+        if (getParentFragmentManager() != null && getParentFragmentManager().getBackStackEntryCount() > 0)
             getParentFragmentManager().popBackStack();
-        } else if (getActivity() != null) {
-            getActivity().onBackPressed();
-        }
+        else if (getActivity() != null) getActivity().onBackPressed();
     }
 }
