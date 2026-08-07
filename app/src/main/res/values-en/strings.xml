@@ -70,7 +70,9 @@
     <string name="hello_world">Hello World!</string>
     <string name="title_ping_packet_size">Packet Size</string>
     <string name="ping_title">Ping Tool %s</string>
-    
+    <string name="sales_title">Sales History</string>
+<string name="sales_search_hint">Search by transaction ID or customer...</string>
+<string name="sales_empty">No sales yet</string>
     <!-- Barcode 1D / 2D -->
     <string name="yid_title">1D Barcode Tool</string>
     <string name="erd_title">2D Barcode Tool</string>
