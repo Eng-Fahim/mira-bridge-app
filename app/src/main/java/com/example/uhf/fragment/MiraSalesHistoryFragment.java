@@ -13,7 +13,7 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
-
+import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatDelegate;
@@ -40,6 +40,7 @@ public class MiraSalesHistoryFragment extends Fragment {
 
     private static final String TAG = "MiraSalesHistory";
 
+   
     private RecyclerView rvSales;
     private TextView tvEmpty;
     private EditText etSearch;
@@ -53,7 +54,13 @@ public class MiraSalesHistoryFragment extends Fragment {
     private MiraBranchesManager branchesManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isArabic;
+private boolean isArabic() {
+    return getResources().getConfiguration().getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
+}
 
+private String ar(String arabic, String english) {
+    return isArabic() ? arabic : english;
+}
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
