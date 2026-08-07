@@ -36,8 +36,8 @@ public class MiraDashboardFragment extends Fragment {
     private TextView tvGreeting, tvDate, tvLocation, tvLiveStatus;
     private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
     private TextView tvSalesToday, tvSalesMonth, tvSalesYear;
-    private TextView tvKarat24, tvKarat22, tvKarat21, tvKarat18;
-    private View btnGate, btnInventory, btnPOS;
+    private TextView tvKarat24, tvKarat21, tvKarat18;
+    private View btnGate, btnInventory;
     private SwipeRefreshLayout swipeRefresh;
 
     private MiraApiClient apiClient;
@@ -84,15 +84,12 @@ public class MiraDashboardFragment extends Fragment {
         tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
         tvSalesYear = v.findViewById(R.id.tvSalesYear);
 
-        // عناصر العيارات - استخدم أي IDs موجودة في XML
         tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
-        tvKarat22 = v.findViewById(R.id.tvGoldPrice22);
         tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
         tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
 
         btnGate = v.findViewById(R.id.btnGateSecurity);
         btnInventory = v.findViewById(R.id.btnRfidAudit);
-        btnPOS = v.findViewById(R.id.btnPOS);
 
         swipeRefresh = v.findViewById(R.id.swipeRefresh);
         if (swipeRefresh != null) swipeRefresh.setOnRefreshListener(this::fetchData);
@@ -101,17 +98,14 @@ public class MiraDashboardFragment extends Fragment {
     private void setupListeners() {
         if (btnGate != null) btnGate.setOnClickListener(v -> switchTab("SecureGate"));
         if (btnInventory != null) btnInventory.setOnClickListener(v -> switchTab("Inventory Pro"));
-        if (btnPOS != null) btnPOS.setOnClickListener(v -> switchTab("POS Mode"));
     }
 
     private void updateHeader() {
-        // تاريخ
         if (tvDate != null) {
             Locale loc = isArabic ? new Locale("ar") : Locale.US;
             tvDate.setText(new SimpleDateFormat("EEEE، d MMMM yyyy", loc).format(new Date()));
         }
 
-        // ترحيب
         if (tvGreeting != null) {
             String name = sessionManager.getDisplayName();
             if (name == null || name.isEmpty()) name = sessionManager.getUsername();
@@ -119,12 +113,10 @@ public class MiraDashboardFragment extends Fragment {
             tvGreeting.setText(isArabic ? "مرحباً، " + name : "Welcome, " + name);
         }
 
-        // ✅ الفرع النشط
         if (tvLocation != null) {
             tvLocation.setText("📍 " + branchesManager.getActiveBranchDisplayName());
         }
 
-        // ✅ اسم الجهة في الـ ActionBar
         if (getActivity() instanceof UHFMainActivity) {
             UHFMainActivity a = (UHFMainActivity) getActivity();
             if (a.getSupportActionBar() != null) {
@@ -172,7 +164,6 @@ public class MiraDashboardFragment extends Fragment {
                 JSONObject w = inv.optJSONObject("weights");
                 if (w != null) {
                     setKarat(tvKarat24, "24K", w.optInt("k24", 0));
-                    setKarat(tvKarat22, "22K", w.optInt("k22", 0));
                     setKarat(tvKarat21, "21K", w.optInt("k21", 0));
                     setKarat(tvKarat18, "18K", w.optInt("k18", 0));
                 }
@@ -180,11 +171,9 @@ public class MiraDashboardFragment extends Fragment {
 
             JSONObject sales = data.optJSONObject("sales");
             if (sales != null) {
-                // ✅ قراءة المبيعات من الحقول الصحيحة
                 int countToday = sales.optInt("count_today", 0);
                 setText(tvSoldToday, String.valueOf(countToday));
 
-                // المبالغ - قد تكون نصية مع علامة $
                 String todayStr = sales.optString("today", "0");
                 String monthStr = sales.optString("month", "0");
                 String yearStr = sales.optString("year", "0");
@@ -217,7 +206,6 @@ public class MiraDashboardFragment extends Fragment {
 
     private String cleanAmount(String amount) {
         if (amount == null || amount.isEmpty() || amount.equals("$0") || amount.equals("0")) return "—";
-        // إزالة $ وإضافة YER
         String cleaned = amount.replace("$", "").replace(",", "").trim();
         try {
             double val = Double.parseDouble(cleaned);
