@@ -20,7 +20,9 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -57,25 +59,24 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MiraUHFReadTagFragment extends Fragment {
     private static final String TAG = "MiraUHFInventory";
     private static final String PREFS_NAME = "mira_inventory_session";
+    private static final int REQUEST_CAMERA_SCAN = 49374;
+    private static final int REQUEST_CAMERA_FALLBACK = 49375;
 
-    // Threading
     private final ExecutorService queryExecutor = Executors.newFixedThreadPool(4);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Handler timerHandler = new Handler(Looper.getMainLooper());
+    private final Handler readerCheckHandler = new Handler(Looper.getMainLooper());
 
-    // Data
     private final List<ScannedTag> recentTags = Collections.synchronizedList(new ArrayList<>());
     private final List<String> scannedEPCs = Collections.synchronizedList(new ArrayList<>());
     private final List<ScannedTag> filteredTags = Collections.synchronizedList(new ArrayList<>());
 
-    // Reconciliation Engine
     private final ConcurrentHashMap<String, ExpectedItem> expectedItemsMap = new ConcurrentHashMap<>();
     private final AtomicInteger expectedTotal = new AtomicInteger(0);
     private final AtomicInteger foundCount = new AtomicInteger(0);
     private final AtomicInteger missingCount = new AtomicInteger(0);
     private final AtomicInteger unexpectedCount = new AtomicInteger(0);
 
-    // State
     private boolean isScanning = false;
     private boolean isPaused = false;
     private long startTime = 0;
@@ -88,37 +89,36 @@ public class MiraUHFReadTagFragment extends Fragment {
     private String currentZoneId = null;
     private String currentFilter = "all";
     private String lastScreenshotPath = null;
+    private boolean isReaderConnected = false;
 
-    // Managers
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
     private boolean isArabic;
 
-    // Sound
     private SoundPool soundPool;
-    private int soundMatch, soundUnmatch, soundError;
+    private int soundMatch, soundUnmatch;
     private boolean soundLoaded = false;
 
-    // UI
     private View rootLayout;
     private TextView tvTotalScanned, tvUniqueTags, tvScanRate, tvElapsed, tvBranchName;
     private TextView tvLastTagEPC, tvLastTagTitle, tvLastTagKarat, tvLastTagWeight, tvLastTagStatus;
     private TextView tvExpectedTotal, tvFoundCount, tvMissingCount, tvUnexpectedCount;
     private TextView tvReconciliationResult;
+    private TextView tvReaderStatus;
     private TextView tabFilterAll, tabFilterFound, tabFilterMissing, tabFilterUnexpected;
     private CardView cardLastTag;
     private ProgressBar pbScanProgress;
     private RecyclerView rvRecentTags;
     private Button btnStartInventory, btnPauseInventory, btnStopInventory, btnClearInventory;
     private Button btnExportInventory, btnExportMissing, btnScreenshot, btnFinalizeAudit, btnSelectZone;
+    private Button btnScanCamera, btnHelpGuide;
     private AppCompatSpinner spinnerZone;
-    private LinearLayoutManager layoutZoneSelector, layoutFilterTabs;
-
+    private View layoutZoneSelector, layoutFilterTabs;
     private RecentTagsAdapter recentAdapter;
-    private Runnable timerRunnable;
+    private Runnable timerRunnable, readerCheckRunnable;
 
-    // ==================== Data Classes ====================
+    // ==================== DATA CLASSES ====================
 
     public static class ExpectedItem {
         public String epc, title, karat;
@@ -133,7 +133,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         boolean isExpected;
     }
 
-    // ==================== Lifecycle ====================
+    // ==================== LIFECYCLE ====================
 
     @Nullable
     @Override
@@ -142,9 +142,9 @@ public class MiraUHFReadTagFragment extends Fragment {
         try {
             return inflater.inflate(R.layout.fragment_mira_uhf_readtag, container, false);
         } catch (Exception e) {
-            Log.e(TAG, "❌ inflate: " + e.getMessage());
+            Log.e(TAG, "onCreateView error: " + e.getMessage());
             if (getContext() != null) {
-                Toast.makeText(getContext(), "خطأ: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                Toast.makeText(getContext(), "Error loading layout: " + e.getMessage(), Toast.LENGTH_LONG).show();
             }
             return new View(getContext());
         }
@@ -153,49 +153,48 @@ public class MiraUHFReadTagFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        Context ctx = getContext();
-        if (ctx != null) {
-            apiClient = MiraApiClient.getInstance(ctx);
-            branchesManager = MiraBranchesManager.getInstance(ctx);
-            orgProfile = MiraOrgProfileManager.getInstance(ctx);
-        }
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
-        sessionId = "INV-" + System.currentTimeMillis();
+        try {
+            Context ctx = getContext();
+            if (ctx != null) {
+                apiClient = MiraApiClient.getInstance(ctx);
+                branchesManager = MiraBranchesManager.getInstance(ctx);
+                orgProfile = MiraOrgProfileManager.getInstance(ctx);
+            }
+            isArabic = Locale.getDefault().getLanguage().equals("ar");
+            sessionId = "INV-" + System.currentTimeMillis();
 
-        initSoundPool();
-        if (!initViews(view)) return;
-        setupRecyclerView();
-        setupListeners();
-        setupZoneSpinner();
-        setupFilterTabs();
-        updateBranchDisplay();
-        restoreSessionIfExists();
+            initSoundPool();
+            if (!initViews(view)) return;
+            setupRecyclerView();
+            setupListeners();
+            setupZoneSpinner();
+            setupFilterTabs();
+            updateBranchDisplay();
+            startReaderMonitoring();
+            restoreSessionIfExists();
+        } catch (Exception e) {
+            Log.e(TAG, "onViewCreated error: " + e.getMessage());
+        }
     }
 
-    // ==================== Sound ====================
+    // ==================== SOUND ====================
 
     private void initSoundPool() {
         try {
             AudioAttributes attrs = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build();
-            soundPool = new SoundPool.Builder()
-                .setMaxStreams(3)
-                .setAudioAttributes(attrs)
-                .build();
-
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build();
+            soundPool = new SoundPool.Builder().setMaxStreams(3).setAudioAttributes(attrs).build();
             soundPool.setOnLoadCompleteListener((pool, sampleId, status) -> {
                 if (status == 0) soundLoaded = true;
             });
-
             if (getContext() != null) {
                 soundMatch = soundPool.load(getContext(), R.raw.barcodebeep, 1);
                 soundUnmatch = soundPool.load(getContext(), R.raw.serror, 2);
-                soundError = soundPool.load(getContext(), R.raw.serror, 3);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Sound init: " + e.getMessage());
+            Log.e(TAG, "Sound init error: " + e.getMessage());
         }
     }
 
@@ -205,11 +204,11 @@ public class MiraUHFReadTagFragment extends Fragment {
                 soundPool.play(soundId, 0.5f, 0.5f, 1, 0, 1f);
             }
         } catch (Exception e) {
-            Log.e(TAG, "playSound: " + e.getMessage());
+            Log.e(TAG, "playSound error: " + e.getMessage());
         }
     }
 
-    // ==================== Init ====================
+    // ==================== INIT ====================
 
     private boolean initViews(View v) {
         try {
@@ -229,6 +228,7 @@ public class MiraUHFReadTagFragment extends Fragment {
             tvMissingCount = v.findViewById(R.id.tvMissingCount);
             tvUnexpectedCount = v.findViewById(R.id.tvUnexpectedCount);
             tvReconciliationResult = v.findViewById(R.id.tvReconciliationResult);
+            tvReaderStatus = v.findViewById(R.id.tvReaderStatus);
             cardLastTag = v.findViewById(R.id.cardLastTag);
             pbScanProgress = v.findViewById(R.id.pbScanProgress);
             rvRecentTags = v.findViewById(R.id.rvRecentTags);
@@ -241,6 +241,8 @@ public class MiraUHFReadTagFragment extends Fragment {
             btnScreenshot = v.findViewById(R.id.btnScreenshot);
             btnFinalizeAudit = v.findViewById(R.id.btnFinalizeAudit);
             btnSelectZone = v.findViewById(R.id.btnSelectZone);
+            btnScanCamera = v.findViewById(R.id.btnScanCamera);
+            btnHelpGuide = v.findViewById(R.id.btnHelpGuide);
             spinnerZone = v.findViewById(R.id.spinnerZone);
             layoutZoneSelector = v.findViewById(R.id.layoutZoneSelector);
             layoutFilterTabs = v.findViewById(R.id.layoutFilterTabs);
@@ -250,13 +252,13 @@ public class MiraUHFReadTagFragment extends Fragment {
             tabFilterUnexpected = v.findViewById(R.id.tabFilterUnexpected);
 
             if (tvTotalScanned == null || rvRecentTags == null || btnStartInventory == null) {
-                Log.e(TAG, "❌ Critical views null");
+                Log.e(TAG, "Critical views are null");
                 return false;
             }
             resetUI();
             return true;
         } catch (Exception e) {
-            Log.e(TAG, "❌ initViews: " + e.getMessage());
+            Log.e(TAG, "initViews error: " + e.getMessage());
             return false;
         }
     }
@@ -268,7 +270,7 @@ public class MiraUHFReadTagFragment extends Fragment {
             recentAdapter = new RecentTagsAdapter(filteredTags);
             rvRecentTags.setAdapter(recentAdapter);
         } catch (Exception e) {
-            Log.e(TAG, "❌ RecyclerView: " + e.getMessage());
+            Log.e(TAG, "setupRecyclerView error: " + e.getMessage());
         }
     }
 
@@ -282,6 +284,8 @@ public class MiraUHFReadTagFragment extends Fragment {
         if (btnScreenshot != null) btnScreenshot.setOnClickListener(v -> takeScreenshot());
         if (btnFinalizeAudit != null) btnFinalizeAudit.setOnClickListener(v -> finalizeAudit());
         if (btnSelectZone != null) btnSelectZone.setOnClickListener(v -> selectZone());
+        if (btnScanCamera != null) btnScanCamera.setOnClickListener(v -> startCameraScan());
+        if (btnHelpGuide != null) btnHelpGuide.setOnClickListener(v -> showHelpGuide());
     }
 
     private void setupZoneSpinner() {
@@ -296,9 +300,8 @@ public class MiraUHFReadTagFragment extends Fragment {
         zones.add(ar("صينية 2", "Tray 2"));
         zones.add(ar("صينية 3", "Tray 3"));
         zones.add(ar("الخزنة", "Safe"));
-
         ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(),
-            android.R.layout.simple_spinner_item, zones);
+                android.R.layout.simple_spinner_item, zones);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerZone.setAdapter(adapter);
     }
@@ -320,7 +323,6 @@ public class MiraUHFReadTagFragment extends Fragment {
         if (tabFilterAll == null) return;
         tabFilterAll.setBackgroundColor(currentFilter.equals("all") ? Color.parseColor("#FDF8E7") : Color.TRANSPARENT);
         tabFilterAll.setTextColor(currentFilter.equals("all") ? Color.parseColor("#D4AF37") : Color.parseColor("#4B5563"));
-
         if (tabFilterFound != null) {
             tabFilterFound.setBackgroundColor(currentFilter.equals("found") ? Color.parseColor("#DCFCE7") : Color.TRANSPARENT);
             tabFilterFound.setTextColor(currentFilter.equals("found") ? Color.parseColor("#16A34A") : Color.parseColor("#4B5563"));
@@ -341,15 +343,12 @@ public class MiraUHFReadTagFragment extends Fragment {
             for (ScannedTag t : recentTags) {
                 switch (currentFilter) {
                     case "found":
-                        if (t.isExpected && t.status != null && t.status.equals("✓")) filteredTags.add(t);
+                        if (t.isExpected && "✓".equals(t.status)) filteredTags.add(t);
                         break;
                     case "missing":
                         if (!t.isExpected) break;
-                        boolean found = false;
-                        for (ExpectedItem ei : expectedItemsMap.values()) {
-                            if (ei.epc.equals(t.epc) && ei.isFound) { found = true; break; }
-                        }
-                        if (!found) filteredTags.add(t);
+                        ExpectedItem ei = expectedItemsMap.get(t.epc);
+                        if (ei != null && !ei.isFound) filteredTags.add(t);
                         break;
                     case "unexpected":
                         if (!t.isExpected) filteredTags.add(t);
@@ -368,11 +367,203 @@ public class MiraUHFReadTagFragment extends Fragment {
                 tvBranchName.setText("📍 " + branchesManager.getActiveBranchDisplayName());
             }
         } catch (Exception e) {
-            Log.e(TAG, "❌ branch: " + e.getMessage());
+            Log.e(TAG, "updateBranchDisplay error: " + e.getMessage());
         }
     }
 
-    // ==================== Zone Selection ====================
+    // ==================== READER MONITORING ====================
+
+    private void startReaderMonitoring() {
+        readerCheckRunnable = new Runnable() {
+            @Override
+            public void run() {
+                checkReaderStatus();
+                readerCheckHandler.postDelayed(this, 2000);
+            }
+        };
+        readerCheckHandler.post(readerCheckRunnable);
+    }
+
+    private void checkReaderStatus() {
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                UHFMainActivity activity = (UHFMainActivity) getActivity();
+                boolean wasConnected = isReaderConnected;
+                isReaderConnected = activity.isReaderReady();
+                if (tvReaderStatus != null) {
+                    if (isReaderConnected) {
+                        tvReaderStatus.setText(ar("🟢 القارئ متصل", "🟢 Reader Connected"));
+                        tvReaderStatus.setTextColor(Color.parseColor("#16A34A"));
+                    } else {
+                        tvReaderStatus.setText(ar("🔴 القارئ غير متصل", "🔴 Reader Disconnected"));
+                        tvReaderStatus.setTextColor(Color.parseColor("#DC2626"));
+                    }
+                }
+                if (!wasConnected && isReaderConnected && isScanning && !isPaused) {
+                    if (getActivity() instanceof UHFMainActivity) {
+                        ((UHFMainActivity) getActivity()).loopFlag = true;
+                    }
+                    mainHandler.post(() -> {
+                        if (getContext() != null) {
+                            Toast.makeText(getContext(),
+                                    ar("✅ تم تفعيل القارئ تلقائياً", "✅ Reader auto-activated"),
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "checkReaderStatus error: " + e.getMessage());
+        }
+    }
+
+    // ==================== CAMERA SCANNER ====================
+
+    private void startCameraScan() {
+        try {
+            Intent intent = new Intent("com.google.zxing.client.android.SCAN");
+            intent.putExtra("SCAN_MODE", "QR_CODE_MODE,DATA_MATRIX_MODE,PRODUCT_MODE");
+            intent.putExtra("PROMPT_MESSAGE", ar("وجه الكاميرا نحو الباركود", "Point camera at barcode"));
+            if (intent.resolveActivity(requireActivity().getPackageManager()) != null) {
+                startActivityForResult(intent, REQUEST_CAMERA_SCAN);
+            } else {
+                showManualEntryDialog();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "startCameraScan error: " + e.getMessage());
+            showManualEntryDialog();
+        }
+    }
+
+    private void showManualEntryDialog() {
+        if (getContext() == null) return;
+        EditText input = new EditText(getContext());
+        input.setHint(ar("أدخل EPC / GTIN / QR", "Enter EPC / GTIN / QR"));
+        input.setTextColor(Color.parseColor("#111827"));
+        input.setHintTextColor(Color.parseColor("#9CA3AF"));
+        input.setPadding(32, 16, 32, 16);
+        input.setSingleLine(true);
+        new androidx.appcompat.app.AlertDialog.Builder(getContext())
+                .setTitle(ar("إدخال يدوي", "Manual Entry"))
+                .setMessage(ar("أدخل رمز EPC أو GTIN أو DataMatrix:", "Enter EPC, GTIN, or DataMatrix code:"))
+                .setView(input)
+                .setPositiveButton(ar("مسح", "Scan"), (d, w) -> {
+                    String code = input.getText().toString().trim();
+                    if (!code.isEmpty()) processManualEntry(code);
+                })
+                .setNegativeButton(ar("إلغاء", "Cancel"), null)
+                .show();
+    }
+
+    private void processManualEntry(String code) {
+        if (code == null || code.isEmpty()) return;
+        String epc = code;
+        if (code.startsWith("01") && code.length() >= 16) {
+            epc = code.substring(2, 16);
+        } else if (code.contains("\u001d")) {
+            String[] parts = code.split("\u001d");
+            for (String part : parts) {
+                if (part.startsWith("01") && part.length() >= 16) {
+                    epc = part.substring(2, 16);
+                    break;
+                }
+            }
+        }
+        if (epc.length() > 50) epc = epc.substring(0, 50);
+        if (getContext() != null) {
+            Toast.makeText(getContext(), ar("🔍 معالجة: " + epc, "🔍 Processing: " + epc), Toast.LENGTH_SHORT).show();
+        }
+        onTagScanned(epc, "CAMERA");
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_CAMERA_SCAN && resultCode == android.app.Activity.RESULT_OK && data != null) {
+            String barcode = data.getStringExtra("SCAN_RESULT");
+            if (barcode != null && !barcode.isEmpty()) {
+                processManualEntry(barcode);
+            }
+        }
+    }
+
+    // ==================== HELP GUIDE ====================
+
+    private void showHelpGuide() {
+        if (getContext() == null) return;
+        String guide = ar(
+                "📖 دليل استخدام الجرد:\n\n" +
+                        "1️⃣ توصيل القارئ:\n" +
+                        "   • شغّل قارئ C5\n" +
+                        "   • انتظر 🟢 القارئ متصل\n" +
+                        "   • المسافة المثلى: 30-50 سم\n\n" +
+                        "2️⃣ بدء الجرد:\n" +
+                        "   • اضغط ▶ بدء\n" +
+                        "   • انتظر تحميل المخزون\n" +
+                        "   • وجّه القارئ نحو القطع\n\n" +
+                        "3️⃣ أثناء المسح:\n" +
+                        "   • ✅ = قطعة مطابقة\n" +
+                        "   • ⚠️ = قطعة غير مسجلة\n" +
+                        "   • ⏸ لتعليق الجلسة\n\n" +
+                        "4️⃣ مسح بالكاميرا:\n" +
+                        "   • اضغط 📷 لمسح GS1/QR\n" +
+                        "   • أو أدخل الرمز يدوياً\n\n" +
+                        "5️⃣ إنهاء الجرد:\n" +
+                        "   • اضغط ⏹ إيقاف\n" +
+                        "   • راجع النتائج\n" +
+                        "   • ✅ اعتماد الجرد\n\n" +
+                        "🛟 الدعم: support@mira.tech",
+
+                "📖 Inventory Guide:\n\n" +
+                        "1️⃣ Connect Reader:\n" +
+                        "   • Turn on C5 Reader\n" +
+                        "   • Wait for 🟢 Connected\n" +
+                        "   • Range: 30-50 cm\n\n" +
+                        "2️⃣ Start:\n" +
+                        "   • Press ▶ Start\n" +
+                        "   • Wait for items to load\n" +
+                        "   • Point reader at items\n\n" +
+                        "3️⃣ During Scan:\n" +
+                        "   • ✅ = Matched\n" +
+                        "   • ⚠️ = Unregistered\n" +
+                        "   • ⏸ to pause\n\n" +
+                        "4️⃣ Camera Scan:\n" +
+                        "   • Press 📷 for GS1/QR\n" +
+                        "   • Or enter code manually\n\n" +
+                        "5️⃣ Finish:\n" +
+                        "   • Press ⏹ Stop\n" +
+                        "   • Review results\n" +
+                        "   • ✅ Finalize audit\n\n" +
+                        "🛟 Support: support@mira.tech");
+
+        TextView textView = new TextView(getContext());
+        textView.setText(guide);
+        textView.setTextSize(13);
+        textView.setTextColor(Color.parseColor("#111827"));
+        textView.setPadding(32, 16, 32, 16);
+        textView.setTextIsSelectable(true);
+        textView.setLineSpacing(4, 1);
+        ScrollView scrollView = new ScrollView(getContext());
+        scrollView.addView(textView);
+
+        new androidx.appcompat.app.AlertDialog.Builder(getContext())
+                .setTitle(ar("📖 دليل المساعدة", "📖 Help Guide"))
+                .setView(scrollView)
+                .setPositiveButton(ar("إغلاق", "Close"), null)
+                .setNeutralButton(ar("📧 طلب دعم", "📧 Support"), (d, w) -> {
+                    try {
+                        Intent emailIntent = new Intent(Intent.ACTION_SENDTO);
+                        emailIntent.setData(Uri.parse("mailto:support@mira.tech"));
+                        emailIntent.putExtra(Intent.EXTRA_SUBJECT, "MIRA Inventory Support");
+                        startActivity(emailIntent);
+                    } catch (Exception e) {
+                        Toast.makeText(getContext(), ar("لا يوجد تطبيق بريد", "No email app"), Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .show();
+    }
+
+    // ==================== ZONE SELECTION ====================
 
     private void selectZone() {
         if (spinnerZone == null) return;
@@ -383,7 +574,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         } else {
             currentZoneId = "zone_" + pos;
             Toast.makeText(getContext(), ar("تم تحديد: " + spinnerZone.getSelectedItem().toString(),
-                "Selected: " + spinnerZone.getSelectedItem().toString()), Toast.LENGTH_SHORT).show();
+                    "Selected: " + spinnerZone.getSelectedItem().toString()), Toast.LENGTH_SHORT).show();
         }
         if (isScanning) {
             clearInventory();
@@ -391,7 +582,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         }
     }
 
-    // ==================== Session Persistence ====================
+    // ==================== SESSION PERSISTENCE ====================
 
     private void saveSessionState() {
         try {
@@ -408,8 +599,6 @@ public class MiraUHFReadTagFragment extends Fragment {
             editor.putInt("unexpectedCount", unexpectedCount.get());
             editor.putInt("expectedTotal", expectedTotal.get());
             editor.putString("currentZoneId", currentZoneId);
-            
-            // Save found items
             JSONArray foundArr = new JSONArray();
             for (ExpectedItem item : expectedItemsMap.values()) {
                 if (item.isFound) {
@@ -423,7 +612,7 @@ public class MiraUHFReadTagFragment extends Fragment {
             editor.putBoolean("hasSession", true);
             editor.apply();
         } catch (Exception e) {
-            Log.e(TAG, "saveSession: " + e.getMessage());
+            Log.e(TAG, "saveSessionState error: " + e.getMessage());
         }
     }
 
@@ -432,16 +621,15 @@ public class MiraUHFReadTagFragment extends Fragment {
             if (getContext() == null) return;
             SharedPreferences prefs = getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             if (!prefs.getBoolean("hasSession", false)) return;
-
             new androidx.appcompat.app.AlertDialog.Builder(getContext())
-                .setTitle(ar("جلسة جرد سابقة", "Previous Session"))
-                .setMessage(ar("توجد جلسة جرد لم تكتمل. هل تريد استئنافها؟", 
-                    "An incomplete session exists. Resume?"))
-                .setPositiveButton(ar("استئناف", "Resume"), (d, w) -> resumeSession(prefs))
-                .setNegativeButton(ar("جلسة جديدة", "New Session"), (d, w) -> clearSessionData())
-                .show();
+                    .setTitle(ar("جلسة جرد سابقة", "Previous Session"))
+                    .setMessage(ar("توجد جلسة جرد لم تكتمل. هل تريد استئنافها؟",
+                            "An incomplete session exists. Resume?"))
+                    .setPositiveButton(ar("استئناف", "Resume"), (d, w) -> resumeSession(prefs))
+                    .setNegativeButton(ar("جلسة جديدة", "New Session"), (d, w) -> clearSessionData())
+                    .show();
         } catch (Exception e) {
-            Log.e(TAG, "restoreSession: " + e.getMessage());
+            Log.e(TAG, "restoreSessionIfExists error: " + e.getMessage());
         }
     }
 
@@ -457,7 +645,6 @@ public class MiraUHFReadTagFragment extends Fragment {
             unexpectedCount.set(prefs.getInt("unexpectedCount", 0));
             expectedTotal.set(prefs.getInt("expectedTotal", 0));
             currentZoneId = prefs.getString("currentZoneId", null);
-
             loadExpectedInventory(() -> {
                 try {
                     String foundItemsJson = prefs.getString("foundItems", "[]");
@@ -472,40 +659,36 @@ public class MiraUHFReadTagFragment extends Fragment {
                         }
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "resume foundItems: " + e.getMessage());
+                    Log.e(TAG, "resumeSession parse error: " + e.getMessage());
                 }
-
                 isScanning = true;
                 isPaused = false;
                 if (getActivity() instanceof UHFMainActivity) {
                     ((UHFMainActivity) getActivity()).loopFlag = true;
                 }
-
                 updateUIForScanning();
                 startTimer();
                 updateUI();
                 updateReconciliationCounters();
                 updateReconciliationResult();
-
                 Toast.makeText(getContext(), ar("✅ تم استئناف الجلسة", "✅ Session resumed"), Toast.LENGTH_SHORT).show();
             });
         } catch (Exception e) {
-            Log.e(TAG, "resumeSession: " + e.getMessage());
+            Log.e(TAG, "resumeSession error: " + e.getMessage());
         }
     }
 
     private void clearSessionData() {
         try {
             if (getContext() != null) {
-                getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                    .edit().clear().apply();
+                getContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().apply();
             }
         } catch (Exception e) {
-            Log.e(TAG, "clearSession: " + e.getMessage());
+            Log.e(TAG, "clearSessionData error: " + e.getMessage());
         }
     }
 
-    // ==================== Inventory Control ====================
+    // ==================== INVENTORY CONTROL ====================
 
     private void startInventory() {
         loadExpectedInventory(() -> {
@@ -520,48 +703,56 @@ public class MiraUHFReadTagFragment extends Fragment {
             scannedEPCs.clear();
             filteredTags.clear();
             sessionId = "INV-" + System.currentTimeMillis();
-
             if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
             updateUIForScanning();
+            checkReaderStatus();
+            if (!isReaderConnected && getContext() != null) {
+                Toast.makeText(getContext(),
+                        ar("⚠️ القارئ غير متصل - يمكنك المسح بالكاميرا 📷 أو انتظار الاتصال",
+                                "⚠️ Reader offline - Use camera 📷 or wait for connection"),
+                        Toast.LENGTH_LONG).show();
+            }
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).loopFlag = true;
             }
-
             startTimer();
             updateUI();
             updateReconciliationCounters();
-
             if (layoutZoneSelector != null) layoutZoneSelector.setVisibility(View.VISIBLE);
             if (layoutFilterTabs != null) layoutFilterTabs.setVisibility(View.VISIBLE);
-
-            Toast.makeText(getContext(), ar("🔍 بدء الجرد...", "🔍 Inventory Started..."), Toast.LENGTH_SHORT).show();
+            if (getContext() != null) {
+                Toast.makeText(getContext(), ar("🔍 بدء الجرد...", "🔍 Inventory Started..."), Toast.LENGTH_SHORT).show();
+            }
         });
     }
 
     private void togglePause() {
         if (!isScanning) return;
-
         if (isPaused) {
-            // Resume
             isPaused = false;
             totalPausedDuration += (System.currentTimeMillis() - pauseStartTime);
-            if (btnPauseInventory != null) btnPauseInventory.setText("⏸ تعليق");
+            if (btnPauseInventory != null) btnPauseInventory.setText(ar("⏸ تعليق", "⏸ Pause"));
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).loopFlag = true;
             }
             startTimer();
-            Toast.makeText(getContext(), ar("▶ تم الاستئناف", "▶ Resumed"), Toast.LENGTH_SHORT).show();
+            if (getContext() != null) {
+                Toast.makeText(getContext(), ar("▶ تم الاستئناف", "▶ Resumed"), Toast.LENGTH_SHORT).show();
+            }
         } else {
-            // Pause
             isPaused = true;
             pauseStartTime = System.currentTimeMillis();
-            if (btnPauseInventory != null) btnPauseInventory.setText("▶ استئناف");
+            if (btnPauseInventory != null) btnPauseInventory.setText(ar("▶ استئناف", "▶ Resume"));
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).loopFlag = false;
             }
             stopTimer();
             saveSessionState();
-            Toast.makeText(getContext(), ar("⏸ تم التعليق - الجلسة محفوظة", "⏸ Paused - Session saved"), Toast.LENGTH_SHORT).show();
+            if (getContext() != null) {
+                Toast.makeText(getContext(),
+                        ar("⏸ تم التعليق - الجلسة محفوظة", "⏸ Paused - Session saved"),
+                        Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
@@ -571,20 +762,21 @@ public class MiraUHFReadTagFragment extends Fragment {
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).loopFlag = false;
         }
-
         updateUIForStopped();
         stopTimer();
         updateUI();
         updateReconciliationResult();
         saveSessionState();
-
         long elapsed = (System.currentTimeMillis() - startTime - totalPausedDuration) / 1000;
+        if (elapsed < 0) elapsed = 0;
         String msg = ar(
-            "✅ " + totalScanned.get() + " مسح | " + foundCount.get() + " مطابق | " + missingCount.get() + " ناقص | " + unexpectedCount.get() + " زائد",
-            "✅ " + totalScanned.get() + " scans | " + foundCount.get() + " found | " + missingCount.get() + " missing | " + unexpectedCount.get() + " extra");
-
-        Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
-
+                "✅ " + totalScanned.get() + " مسح | " + foundCount.get() + " مطابق | " +
+                        missingCount.get() + " ناقص | " + unexpectedCount.get() + " زائد",
+                "✅ " + totalScanned.get() + " scans | " + foundCount.get() + " found | " +
+                        missingCount.get() + " missing | " + unexpectedCount.get() + " extra");
+        if (getContext() != null) {
+            Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
+        }
         if (btnFinalizeAudit != null) btnFinalizeAudit.setVisibility(View.VISIBLE);
     }
 
@@ -606,37 +798,35 @@ public class MiraUHFReadTagFragment extends Fragment {
         if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
         clearSessionData();
         resetUI();
-
         if (layoutZoneSelector != null) layoutZoneSelector.setVisibility(View.GONE);
         if (layoutFilterTabs != null) layoutFilterTabs.setVisibility(View.GONE);
-
-        Toast.makeText(getContext(), ar("🗑️ تم مسح الجرد", "🗑️ Cleared"), Toast.LENGTH_SHORT).show();
+        if (getContext() != null) {
+            Toast.makeText(getContext(), ar("🗑️ تم مسح الجرد", "🗑️ Cleared"), Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void finalizeAudit() {
         if (getContext() == null) return;
-
         new androidx.appcompat.app.AlertDialog.Builder(getContext())
-            .setTitle(ar("اعتماد الجرد", "Finalize Audit"))
-            .setMessage(ar(
-                "سيتم إرسال تقرير العجز إلى الخادم وتحديث حالة القطع المفقودة.\n\n" +
-                "المطابق: " + foundCount.get() + "\n" +
-                "الناقص: " + missingCount.get() + "\n" +
-                "الزائد: " + unexpectedCount.get() + "\n\n" +
-                "هل تريد المتابعة؟",
-                "Missing items will be reported and status updated.\n\n" +
-                "Found: " + foundCount.get() + "\n" +
-                "Missing: " + missingCount.get() + "\n" +
-                "Extra: " + unexpectedCount.get() + "\n\n" +
-                "Proceed?"))
-            .setPositiveButton(ar("اعتماد", "Finalize"), (d, w) -> submitReconciliation())
-            .setNegativeButton(ar("إلغاء", "Cancel"), null)
-            .show();
+                .setTitle(ar("اعتماد الجرد", "Finalize Audit"))
+                .setMessage(ar(
+                        "سيتم إرسال تقرير العجز إلى الخادم.\n\n" +
+                                "المطابق: " + foundCount.get() + "\n" +
+                                "الناقص: " + missingCount.get() + "\n" +
+                                "الزائد: " + unexpectedCount.get() + "\n\n" +
+                                "هل تريد المتابعة؟",
+                        "Missing items will be reported.\n\n" +
+                                "Found: " + foundCount.get() + "\n" +
+                                "Missing: " + missingCount.get() + "\n" +
+                                "Extra: " + unexpectedCount.get() + "\n\n" +
+                                "Proceed?"))
+                .setPositiveButton(ar("اعتماد", "Finalize"), (d, w) -> submitReconciliation())
+                .setNegativeButton(ar("إلغاء", "Cancel"), null)
+                .show();
     }
 
     private void submitReconciliation() {
         if (pbScanProgress != null) pbScanProgress.setVisibility(View.VISIBLE);
-
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 JSONObject payload = new JSONObject();
@@ -647,60 +837,56 @@ public class MiraUHFReadTagFragment extends Fragment {
                 payload.put("unexpected_count", unexpectedCount.get());
                 payload.put("total_scanned", totalScanned.get());
                 payload.put("zone_id", currentZoneId != null ? currentZoneId : "");
-
-                // Missing EPCs
                 JSONArray missingArr = new JSONArray();
                 for (ExpectedItem item : expectedItemsMap.values()) {
-                    if (!item.isFound) {
-                        missingArr.put(item.epc);
-                    }
+                    if (!item.isFound) missingArr.put(item.epc);
                 }
                 payload.put("missing_epcs", missingArr);
-
-                // Unexpected EPCs
                 JSONArray unexpectedArr = new JSONArray();
                 synchronized (recentTags) {
                     for (ScannedTag t : recentTags) {
-                        if (!t.isExpected && !expectedItemsMap.containsKey(t.epc)) {
-                            unexpectedArr.put(t.epc);
-                        }
+                        if (!t.isExpected) unexpectedArr.put(t.epc);
                     }
                 }
                 payload.put("unexpected_epcs", unexpectedArr);
-
                 MiraApiClient.ApiResponse response = apiClient.reconcileInventory(payload);
-
                 mainHandler.post(() -> {
                     if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
                     if (response != null && response.isSuccess) {
-                        Toast.makeText(getContext(),
-                            ar("✅ تم اعتماد الجرد بنجاح", "✅ Audit finalized successfully"),
-                            Toast.LENGTH_LONG).show();
+                        if (getContext() != null) {
+                            Toast.makeText(getContext(),
+                                    ar("✅ تم اعتماد الجرد بنجاح", "✅ Audit finalized successfully"),
+                                    Toast.LENGTH_LONG).show();
+                        }
                         if (btnFinalizeAudit != null) btnFinalizeAudit.setVisibility(View.GONE);
                         clearSessionData();
                     } else {
-                        Toast.makeText(getContext(),
-                            ar("❌ فشل الاعتماد", "❌ Finalize failed"),
-                            Toast.LENGTH_LONG).show();
+                        if (getContext() != null) {
+                            Toast.makeText(getContext(),
+                                    ar("❌ فشل الاعتماد", "❌ Finalize failed"),
+                                    Toast.LENGTH_LONG).show();
+                        }
                     }
                 });
             } catch (Exception e) {
-                Log.e(TAG, "submitReconciliation: " + e.getMessage());
+                Log.e(TAG, "submitReconciliation error: " + e.getMessage());
                 mainHandler.post(() -> {
                     if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
-                    Toast.makeText(getContext(),
-                        ar("❌ خطأ: " + e.getMessage(), "❌ Error: " + e.getMessage()),
-                        Toast.LENGTH_LONG).show();
+                    if (getContext() != null) {
+                        Toast.makeText(getContext(),
+                                ar("❌ خطأ: " + e.getMessage(), "❌ Error: " + e.getMessage()),
+                                Toast.LENGTH_LONG).show();
+                    }
                 });
             }
         });
     }
 
-    // ==================== UI State ====================
+    // ==================== UI STATE ====================
 
     private void updateUIForScanning() {
         if (btnStartInventory != null) { btnStartInventory.setEnabled(false); btnStartInventory.setAlpha(0.5f); }
-        if (btnPauseInventory != null) { btnPauseInventory.setVisibility(View.VISIBLE); btnPauseInventory.setText("⏸ تعليق"); }
+        if (btnPauseInventory != null) { btnPauseInventory.setVisibility(View.VISIBLE); btnPauseInventory.setText(ar("⏸ تعليق", "⏸ Pause")); }
         if (btnStopInventory != null) { btnStopInventory.setEnabled(true); btnStopInventory.setAlpha(1f); }
         if (btnClearInventory != null) btnClearInventory.setEnabled(false);
         if (pbScanProgress != null) pbScanProgress.setVisibility(View.VISIBLE);
@@ -724,14 +910,15 @@ public class MiraUHFReadTagFragment extends Fragment {
         if (tvFoundCount != null) tvFoundCount.setText("0");
         if (tvMissingCount != null) tvMissingCount.setText("0");
         if (tvUnexpectedCount != null) tvUnexpectedCount.setText("0");
-        if (tvReconciliationResult != null) tvReconciliationResult.setText(ar("في انتظار بدء الجرد...", "Awaiting inventory start..."));
-        if (tvReconciliationResult != null) tvReconciliationResult.setTextColor(Color.parseColor("#111827"));
+        if (tvReconciliationResult != null) {
+            tvReconciliationResult.setText(ar("في انتظار بدء الجرد...", "Awaiting inventory start..."));
+            tvReconciliationResult.setTextColor(Color.parseColor("#111827"));
+        }
         if (tvLastTagEPC != null) tvLastTagEPC.setText("—");
         if (tvLastTagTitle != null) tvLastTagTitle.setText(ar("في انتظار المسح...", "Awaiting scan..."));
         if (tvLastTagKarat != null) tvLastTagKarat.setText("—");
         if (tvLastTagWeight != null) tvLastTagWeight.setText("—");
-        if (tvLastTagStatus != null) tvLastTagStatus.setText("⚪");
-        if (tvLastTagStatus != null) tvLastTagStatus.setTextColor(Color.parseColor("#9CA3AF"));
+        if (tvLastTagStatus != null) { tvLastTagStatus.setText("⚪"); tvLastTagStatus.setTextColor(Color.parseColor("#9CA3AF")); }
         if (btnStopInventory != null) { btnStopInventory.setEnabled(false); btnStopInventory.setAlpha(0.5f); }
         if (btnClearInventory != null) btnClearInventory.setEnabled(false);
         if (btnPauseInventory != null) btnPauseInventory.setVisibility(View.GONE);
@@ -747,20 +934,17 @@ public class MiraUHFReadTagFragment extends Fragment {
         else stopInventory();
     }
 
-    // ==================== Reconciliation Engine ====================
+    // ==================== RECONCILIATION ENGINE ====================
 
     private void loadExpectedInventory(Runnable onReady) {
         if (pbScanProgress != null) pbScanProgress.setVisibility(View.VISIBLE);
-
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 int branchId = branchesManager.getActiveBranchId();
                 MiraApiClient.ApiResponse response = apiClient.getBranchExpectedInventory(branchId);
-
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray array = response.data.optJSONArray("items");
                     expectedItemsMap.clear();
-
                     if (array != null) {
                         for (int i = 0; i < array.length(); i++) {
                             JSONObject obj = array.getJSONObject(i);
@@ -769,24 +953,21 @@ public class MiraUHFReadTagFragment extends Fragment {
                             item.title = obj.optString("title", "");
                             item.karat = obj.optString("karat", "");
                             item.weight = obj.optDouble("weight", 0);
-                            item.isFound = false;
                             expectedItemsMap.put(item.epc, item);
                         }
                     }
-
                     expectedTotal.set(expectedItemsMap.size());
                     missingCount.set(expectedItemsMap.size());
                     foundCount.set(0);
                     unexpectedCount.set(0);
                 }
-
                 mainHandler.post(() -> {
                     if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
                     updateReconciliationCounters();
                     if (onReady != null) onReady.run();
                 });
             } catch (Exception e) {
-                Log.e(TAG, "loadExpected: " + e.getMessage());
+                Log.e(TAG, "loadExpectedInventory error: " + e.getMessage());
                 mainHandler.post(() -> {
                     if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
                     if (onReady != null) onReady.run();
@@ -797,20 +978,16 @@ public class MiraUHFReadTagFragment extends Fragment {
 
     public void onTagScanned(String epc, String rssi) {
         if (!isScanning || isPaused || epc == null || epc.isEmpty()) return;
-
         if (scannedEPCs.contains(epc)) {
             totalScanned.incrementAndGet();
             mainHandler.post(this::updateUI);
             return;
         }
-
         scannedEPCs.add(epc);
         totalScanned.incrementAndGet();
         uniqueTags.incrementAndGet();
-
         String currentTime = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
         boolean isExpected = expectedItemsMap.containsKey(epc);
-
         ScannedTag tag = new ScannedTag();
         tag.epc = epc;
         tag.rssi = rssi != null ? rssi : "—";
@@ -830,7 +1007,7 @@ public class MiraUHFReadTagFragment extends Fragment {
                 tag.weight = String.format(Locale.US, "%.2fg", item.weight);
                 mainHandler.post(() -> {
                     updateLastTagDisplay(epc, item.title, item.karat,
-                        String.format(Locale.US, "%.2fg", item.weight), "✅");
+                            String.format(Locale.US, "%.2fg", item.weight), "✅");
                     playSound(soundMatch);
                 });
             } else {
@@ -851,11 +1028,10 @@ public class MiraUHFReadTagFragment extends Fragment {
             recentTags.add(0, tag);
             if (recentTags.size() > 1000) recentTags.remove(recentTags.size() - 1);
         }
-
         mainHandler.post(() -> {
             updateFilteredList();
             if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
-            if (rvRecentTags != null && currentFilter.equals("all")) rvRecentTags.scrollToPosition(0);
+            if (rvRecentTags != null && "all".equals(currentFilter)) rvRecentTags.scrollToPosition(0);
             updateReconciliationCounters();
             updateUI();
         });
@@ -868,7 +1044,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         if (tvLastTagWeight != null) tvLastTagWeight.setText(weight);
         if (tvLastTagStatus != null) {
             tvLastTagStatus.setText(statusIcon);
-            tvLastTagStatus.setTextColor(statusIcon.equals("✅") ? Color.parseColor("#22C55E") : Color.parseColor("#F59E0B"));
+            tvLastTagStatus.setTextColor("✅".equals(statusIcon) ? Color.parseColor("#22C55E") : Color.parseColor("#F59E0B"));
         }
         if (cardLastTag != null) cardLastTag.setVisibility(View.VISIBLE);
     }
@@ -886,7 +1062,6 @@ public class MiraUHFReadTagFragment extends Fragment {
         int missing = missingCount.get();
         int unexpected = unexpectedCount.get();
         int total = expectedTotal.get();
-
         if (total == 0) {
             tvReconciliationResult.setText(ar("لا يوجد مخزون متوقع للمقارنة", "No expected inventory"));
             tvReconciliationResult.setTextColor(Color.parseColor("#F59E0B"));
@@ -901,12 +1076,12 @@ public class MiraUHFReadTagFragment extends Fragment {
             tvReconciliationResult.setTextColor(Color.parseColor("#F59E0B"));
         } else {
             tvReconciliationResult.setText(ar("🚨 نقص: " + missing + " | زيادة: " + unexpected,
-                "🚨 Missing: " + missing + " | Extra: " + unexpected));
+                    "🚨 Missing: " + missing + " | Extra: " + unexpected));
             tvReconciliationResult.setTextColor(Color.parseColor("#DC2626"));
         }
     }
 
-    // ==================== Export ====================
+    // ==================== EXPORT ====================
 
     private void exportFullReport() {
         StringBuilder sb = buildReportHeader();
@@ -916,9 +1091,9 @@ public class MiraUHFReadTagFragment extends Fragment {
             for (ScannedTag t : recentTags) {
                 i++;
                 sb.append(i).append(",").append(csv(t.epc)).append(",").append(csv(t.title)).append(",")
-                    .append(csv(t.karat)).append(",").append(csv(t.weight)).append(",")
-                    .append(t.isExpected ? "Found" : "Extra").append(",")
-                    .append(csv(t.timestamp)).append(",").append(csv(t.rssi)).append("\n");
+                        .append(csv(t.karat)).append(",").append(csv(t.weight)).append(",")
+                        .append(t.isExpected ? "Found" : "Extra").append(",")
+                        .append(csv(t.timestamp)).append(",").append(csv(t.rssi)).append("\n");
             }
         }
         shareCsv(sb, "MIRA_Full_" + sessionId + ".csv");
@@ -931,7 +1106,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         for (ExpectedItem item : expectedItemsMap.values()) {
             if (!item.isFound) {
                 sb.append(csv(item.epc)).append(",").append(csv(item.title)).append(",")
-                    .append(csv(item.karat)).append(",").append(item.weight).append(",MISSING\n");
+                        .append(csv(item.karat)).append(",").append(item.weight).append(",MISSING\n");
             }
         }
         shareCsv(sb, "MIRA_Missing_" + sessionId + ".csv");
@@ -963,7 +1138,7 @@ public class MiraUHFReadTagFragment extends Fragment {
             intent.putExtra(Intent.EXTRA_TEXT, sb.toString());
             startActivity(Intent.createChooser(intent, ar("تصدير", "Export")));
         } catch (Exception e) {
-            Log.e(TAG, "shareCsv: " + e.getMessage());
+            Log.e(TAG, "shareCsv error: " + e.getMessage());
         }
     }
 
@@ -973,7 +1148,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         return s;
     }
 
-    // ==================== Screenshot ====================
+    // ==================== SCREENSHOT ====================
 
     private void takeScreenshot() {
         try {
@@ -981,13 +1156,11 @@ public class MiraUHFReadTagFragment extends Fragment {
             rootLayout.setDrawingCacheEnabled(true);
             Bitmap bitmap = Bitmap.createBitmap(rootLayout.getDrawingCache());
             rootLayout.setDrawingCacheEnabled(false);
-
             if (bitmap == null) {
                 bitmap = Bitmap.createBitmap(rootLayout.getWidth(), rootLayout.getHeight(), Bitmap.Config.ARGB_8888);
                 Canvas canvas = new Canvas(bitmap);
                 rootLayout.draw(canvas);
             }
-
             String filename = "MIRA_SS_" + sessionId + "_" + System.currentTimeMillis() + ".png";
             File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
             if (!dir.exists()) dir.mkdirs();
@@ -996,28 +1169,28 @@ public class MiraUHFReadTagFragment extends Fragment {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
             fos.flush();
             fos.close();
-
             String oldPath = lastScreenshotPath;
             lastScreenshotPath = file.getAbsolutePath();
-
             String msg = ar("📸 تم الحفظ: " + filename, "📸 Saved: " + filename);
             if (oldPath != null) {
                 msg += ar("\nاللقطة السابقة محفوظة للمقارنة", "\nPrevious screenshot saved for comparison");
             }
-            Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
-
+            if (getContext() != null) {
+                Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
+            }
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(Uri.fromFile(file), "image/png");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivity(Intent.createChooser(intent, ar("فتح اللقطة", "Open Screenshot")));
-
         } catch (Exception e) {
-            Log.e(TAG, "screenshot: " + e.getMessage());
-            Toast.makeText(getContext(), ar("فشل اللقطة", "Screenshot failed"), Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "takeScreenshot error: " + e.getMessage());
+            if (getContext() != null) {
+                Toast.makeText(getContext(), ar("فشل اللقطة", "Screenshot failed"), Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
-    // ==================== Timer ====================
+    // ==================== TIMER ====================
 
     private void startTimer() {
         stopTimer();
@@ -1054,9 +1227,11 @@ public class MiraUHFReadTagFragment extends Fragment {
         if (tvUniqueTags != null) tvUniqueTags.setText(String.valueOf(uniqueTags.get()));
     }
 
-    private String ar(String arabic, String english) { return isArabic ? arabic : english; }
+    private String ar(String arabic, String english) {
+        return isArabic ? arabic : english;
+    }
 
-    // ==================== Cleanup ====================
+    // ==================== CLEANUP ====================
 
     @Override
     public void onDestroyView() {
@@ -1064,6 +1239,9 @@ public class MiraUHFReadTagFragment extends Fragment {
         stopTimer();
         timerHandler.removeCallbacksAndMessages(null);
         mainHandler.removeCallbacksAndMessages(null);
+        if (readerCheckHandler != null && readerCheckRunnable != null) {
+            readerCheckHandler.removeCallbacks(readerCheckRunnable);
+        }
         if (isScanning) saveSessionState();
         if (soundPool != null) {
             soundPool.release();
@@ -1077,7 +1255,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         if (queryExecutor != null && !queryExecutor.isShutdown()) queryExecutor.shutdownNow();
     }
 
-    // ==================== Adapter ====================
+    // ==================== ADAPTER ====================
 
     class RecentTagsAdapter extends RecyclerView.Adapter<RecentTagsAdapter.VH> {
         final List<ScannedTag> list;
