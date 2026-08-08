@@ -37,7 +37,7 @@
                 android:orientation="horizontal"
                 android:visibility="gone">
 
-                <Spinner
+                <androidx.appcompat.widget.AppCompatSpinner
                     android:id="@+id/spinnerZone"
                     android:layout_width="0dp"
                     android:layout_height="40dp"
@@ -50,9 +50,9 @@
                     android:layout_height="40dp"
                     android:layout_marginStart="8dp"
                     android:text="تحديد"
+                    android:textColor="?attr/colorOnPrimary"
                     android:textSize="12sp"
-                    app:backgroundTint="?attr/colorPrimary"
-                    android:textColor="?attr/colorOnPrimary" />
+                    app:backgroundTint="?attr/colorPrimary" />
             </LinearLayout>
 
             <!-- Reader Status -->
@@ -61,9 +61,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
+                android:background="?attr/colorSurface"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:background="?attr/colorSurface"
                 android:padding="12dp">
 
                 <TextView
@@ -91,8 +91,8 @@
                 app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="14dp"
                 app:cardElevation="0dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutlineVariant">
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -107,12 +107,14 @@
                         android:layout_weight="1"
                         android:gravity="center"
                         android:orientation="vertical">
+
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/total"
                             android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="11sp" />
+
                         <TextView
                             android:id="@+id/tvTotalScanned"
                             android:layout_width="wrap_content"
@@ -135,12 +137,14 @@
                         android:layout_weight="1"
                         android:gravity="center"
                         android:orientation="vertical">
+
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/unique"
                             android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="11sp" />
+
                         <TextView
                             android:id="@+id/tvUniqueTags"
                             android:layout_width="wrap_content"
@@ -163,12 +167,14 @@
                         android:layout_weight="1"
                         android:gravity="center"
                         android:orientation="vertical">
+
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/speed"
                             android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="11sp" />
+
                         <TextView
                             android:id="@+id/tvScanRate"
                             android:layout_width="wrap_content"
@@ -191,12 +197,14 @@
                         android:layout_weight="1"
                         android:gravity="center"
                         android:orientation="vertical">
+
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/time"
                             android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="11sp" />
+
                         <TextView
                             android:id="@+id/tvElapsed"
                             android:layout_width="wrap_content"
@@ -218,8 +226,8 @@
                 app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="14dp"
                 app:cardElevation="0dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutlineVariant">
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -234,9 +242,22 @@
                         android:layout_weight="1"
                         android:gravity="center"
                         android:orientation="vertical">
-                        <TextView android:id="@+id/tvExpectedTotal" android:text="0"
-                            android:textColor="?attr/colorOnSurface" android:textSize="14sp" android:textStyle="bold" />
-                        <TextView android:text="المتوقع" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="9sp" />
+
+                        <TextView
+                            android:id="@+id/tvExpectedTotal"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="المتوقع"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="9sp" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -245,9 +266,22 @@
                         android:layout_weight="1"
                         android:gravity="center"
                         android:orientation="vertical">
-                        <TextView android:id="@+id/tvFoundCount" android:text="0"
-                            android:textColor="#16A34A" android:textSize="14sp" android:textStyle="bold" />
-                        <TextView android:text="✓ مطابق" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="9sp" />
+
+                        <TextView
+                            android:id="@+id/tvFoundCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textColor="#16A34A"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="✓ مطابق"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="9sp" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -256,9 +290,22 @@
                         android:layout_weight="1"
                         android:gravity="center"
                         android:orientation="vertical">
-                        <TextView android:id="@+id/tvMissingCount" android:text="0"
-                            android:textColor="#DC2626" android:textSize="14sp" android:textStyle="bold" />
-                        <TextView android:text="✗ ناقص" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="9sp" />
+
+                        <TextView
+                            android:id="@+id/tvMissingCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textColor="#DC2626"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="✗ ناقص"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="9sp" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -267,9 +314,22 @@
                         android:layout_weight="1"
                         android:gravity="center"
                         android:orientation="vertical">
-                        <TextView android:id="@+id/tvUnexpectedCount" android:text="0"
-                            android:textColor="#F59E0B" android:textSize="14sp" android:textStyle="bold" />
-                        <TextView android:text="⚠ زائد" android:textColor="?attr/colorOnSurfaceVariant" android:textSize="9sp" />
+
+                        <TextView
+                            android:id="@+id/tvUnexpectedCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textColor="#F59E0B"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="⚠ زائد"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="9sp" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -305,8 +365,8 @@
                 app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="14dp"
                 app:cardElevation="0dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutlineVariant">
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -438,8 +498,8 @@
                 app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="14dp"
                 app:cardElevation="0dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutlineVariant">
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/rvRecentTags"
@@ -456,11 +516,11 @@
                 android:layout_height="54dp"
                 android:layout_marginBottom="8dp"
                 android:text="@string/start_inventory"
+                android:textColor="?attr/colorOnPrimary"
                 android:textSize="15sp"
                 android:textStyle="bold"
-                app:cornerRadius="12dp"
                 app:backgroundTint="?attr/colorPrimary"
-                android:textColor="?attr/colorOnPrimary"
+                app:cornerRadius="12dp"
                 app:icon="@drawable/ic_search"
                 app:iconGravity="textStart"
                 app:iconPadding="8dp" />
@@ -472,11 +532,11 @@
                 android:layout_height="48dp"
                 android:layout_marginBottom="6dp"
                 android:text="⏸ تعليق"
+                android:textColor="#FFFFFF"
                 android:textSize="13sp"
                 android:visibility="gone"
-                app:cornerRadius="10dp"
                 app:backgroundTint="#F59E0B"
-                android:textColor="#FFFFFF" />
+                app:cornerRadius="10dp" />
 
             <!-- Row: Stop + Clear -->
             <LinearLayout
@@ -490,27 +550,27 @@
                     android:id="@+id/btnStopInventory"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
-                    android:layout_weight="1"
                     android:layout_marginEnd="4dp"
-                    android:text="⏹ إيقاف"
-                    android:textSize="13sp"
+                    android:layout_weight="1"
                     android:enabled="false"
-                    app:cornerRadius="10dp"
+                    android:text="⏹ إيقاف"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
                     app:backgroundTint="#DC2626"
-                    android:textColor="#FFFFFF" />
+                    app:cornerRadius="10dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnClearInventory"
                     android:layout_width="0dp"
                     android:layout_height="48dp"
-                    android:layout_weight="1"
                     android:layout_marginStart="4dp"
-                    android:text="🗑️ مسح"
-                    android:textSize="13sp"
+                    android:layout_weight="1"
                     android:enabled="false"
-                    app:cornerRadius="10dp"
+                    android:text="🗑️ مسح"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="13sp"
                     app:backgroundTint="?attr/colorSurfaceVariant"
-                    android:textColor="?attr/colorOnSurface" />
+                    app:cornerRadius="10dp" />
             </LinearLayout>
 
             <!-- Row: Simulate + Camera + Help -->
@@ -526,8 +586,8 @@
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="42dp"
-                    android:layout_weight="1"
                     android:layout_marginEnd="3dp"
+                    android:layout_weight="1"
                     android:text="@string/simulate_scan"
                     android:textSize="11sp"
                     app:cornerRadius="10dp"
@@ -538,8 +598,8 @@
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="42dp"
-                    android:layout_weight="1"
                     android:layout_marginHorizontal="3dp"
+                    android:layout_weight="1"
                     android:text="@string/camera_manual"
                     android:textSize="11sp"
                     app:cornerRadius="10dp"
@@ -550,8 +610,8 @@
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="42dp"
-                    android:layout_weight="1"
                     android:layout_marginStart="3dp"
+                    android:layout_weight="1"
                     android:text="@string/instructions"
                     android:textSize="11sp"
                     app:cornerRadius="10dp"
@@ -571,8 +631,8 @@
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="42dp"
-                    android:layout_weight="1"
                     android:layout_marginEnd="3dp"
+                    android:layout_weight="1"
                     android:text="@string/print_inventory"
                     android:textSize="11sp"
                     app:cornerRadius="10dp"
@@ -583,8 +643,8 @@
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="42dp"
-                    android:layout_weight="1"
                     android:layout_marginHorizontal="3dp"
+                    android:layout_weight="1"
                     android:text="@string/print_missing"
                     android:textSize="11sp"
                     app:cornerRadius="10dp"
@@ -595,8 +655,8 @@
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="42dp"
-                    android:layout_weight="1"
                     android:layout_marginStart="3dp"
+                    android:layout_weight="1"
                     android:text="@string/screenshot"
                     android:textSize="11sp"
                     app:cornerRadius="10dp"
@@ -609,12 +669,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:text="✅ إنهاء واعتماد الجرد"
+                android:textColor="#FFFFFF"
                 android:textSize="13sp"
                 android:textStyle="bold"
                 android:visibility="gone"
-                app:cornerRadius="10dp"
                 app:backgroundTint="#16A34A"
-                android:textColor="#FFFFFF" />
+                app:cornerRadius="10dp" />
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
