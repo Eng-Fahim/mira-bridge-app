@@ -137,4 +137,16 @@
 <!-- ألوان العيارات -->
 <color name="karat_text">#FF1A1A1A</color>
 <color name="karat_text_empty">#FF9CA3AF</color>
+
+<!-- ألوان إضافية للثيم -->
+<color name="colorBackground">#FFF5F5F5</color>
+<color name="colorPrimary">#FF1A237E</color>
+<color name="colorOnPrimary">#FFFFFFFF</color>
+<color name="colorSurface">#FFFFFFFF</color>
+<color name="colorSurfaceVariant">#FFF1F5F9</color>
+<color name="colorOnSurface">#FF1E293B</color>
+<color name="colorOnSurfaceVariant">#FF64748B</color>
+<color name="colorOutline">#FFE2E8F0</color>
+<color name="colorOutlineVariant">#FF94A3B8</color>
+<color name="colorWhite">#FFFFFFFF</color>
 </resources>
