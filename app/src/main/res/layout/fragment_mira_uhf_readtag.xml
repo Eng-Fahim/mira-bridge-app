@@ -36,65 +36,103 @@
             android:alpha="0.85" />
     </LinearLayout>
 
-    <!-- Stats -->
+    <!-- مسح Stats -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="12dp"
+        android:padding="10dp"
         android:background="#F3F4F6"
         android:weightSum="4">
 
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
+            android:layout_width="0dp" android:layout_weight="1"
+            android:gravity="center" android:orientation="vertical">
             <TextView android:id="@+id/tvTotalScanned" android:text="0"
-                android:textSize="24sp" android:textStyle="bold"
-                android:textColor="#111827" />
-            <TextView android:text="المسوحات" android:textSize="10sp"
-                android:textColor="#4B5563" />
+                android:textSize="22sp" android:textStyle="bold" android:textColor="#111827" />
+            <TextView android:text="المسوحات" android:textSize="10sp" android:textColor="#4B5563" />
         </LinearLayout>
 
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
+            android:layout_width="0dp" android:layout_weight="1"
+            android:gravity="center" android:orientation="vertical">
             <TextView android:id="@+id/tvUniqueTags" android:text="0"
-                android:textSize="24sp" android:textStyle="bold"
-                android:textColor="#D4AF37" />
-            <TextView android:text="فريدة" android:textSize="10sp"
-                android:textColor="#4B5563" />
+                android:textSize="22sp" android:textStyle="bold" android:textColor="#D4AF37" />
+            <TextView android:text="فريدة" android:textSize="10sp" android:textColor="#4B5563" />
         </LinearLayout>
 
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
+            android:layout_width="0dp" android:layout_weight="1"
+            android:gravity="center" android:orientation="vertical">
             <TextView android:id="@+id/tvScanRate" android:text="0/s"
-                android:textSize="24sp" android:textStyle="bold"
-                android:textColor="#16A34A" />
-            <TextView android:text="معدل" android:textSize="10sp"
-                android:textColor="#4B5563" />
+                android:textSize="22sp" android:textStyle="bold" android:textColor="#16A34A" />
+            <TextView android:text="معدل" android:textSize="10sp" android:textColor="#4B5563" />
         </LinearLayout>
 
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
+            android:layout_width="0dp" android:layout_weight="1"
+            android:gravity="center" android:orientation="vertical">
             <TextView android:id="@+id/tvElapsed" android:text="00:00"
-                android:textSize="24sp" android:textStyle="bold"
-                android:textColor="#111827" />
-            <TextView android:text="الوقت" android:textSize="10sp"
-                android:textColor="#4B5563" />
+                android:textSize="22sp" android:textStyle="bold" android:textColor="#111827" />
+            <TextView android:text="الوقت" android:textSize="10sp" android:textColor="#4B5563" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Progress -->
+    <!-- Reconciliation Dashboard -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:background="#FFFFFF"
+        android:weightSum="4">
+
+        <LinearLayout
+            android:layout_width="0dp" android:layout_weight="1"
+            android:gravity="center" android:orientation="vertical">
+            <TextView android:id="@+id/tvExpectedTotal" android:text="0"
+                android:textSize="18sp" android:textStyle="bold" android:textColor="#111827" />
+            <TextView android:text="المتوقع" android:textSize="9sp" android:textColor="#4B5563" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp" android:layout_weight="1"
+            android:gravity="center" android:orientation="vertical">
+            <TextView android:id="@+id/tvFoundCount" android:text="0"
+                android:textSize="18sp" android:textStyle="bold" android:textColor="#16A34A" />
+            <TextView android:text="✓ مطابق" android:textSize="9sp" android:textColor="#4B5563" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp" android:layout_weight="1"
+            android:gravity="center" android:orientation="vertical">
+            <TextView android:id="@+id/tvMissingCount" android:text="0"
+                android:textSize="18sp" android:textStyle="bold" android:textColor="#DC2626" />
+            <TextView android:text="✗ ناقص" android:textSize="9sp" android:textColor="#4B5563" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp" android:layout_weight="1"
+            android:gravity="center" android:orientation="vertical">
+            <TextView android:id="@+id/tvUnexpectedCount" android:text="0"
+                android:textSize="18sp" android:textStyle="bold" android:textColor="#F59E0B" />
+            <TextView android:text="⚠ زائد" android:textSize="9sp" android:textColor="#4B5563" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- نتيجة المطابقة -->
+    <TextView
+        android:id="@+id/tvReconciliationResult"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:padding="6dp"
+        android:text="في انتظار بدء الجرد..."
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:textColor="#111827"
+        android:background="#FFFFFF" />
+
     <ProgressBar
         android:id="@+id/pbScanProgress"
         style="?android:attr/progressBarStyleHorizontal"
@@ -109,7 +147,7 @@
         android:id="@+id/cardLastTag"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="8dp"
+        android:layout_margin="6dp"
         app:cardBackgroundColor="#FFFFFF"
         app:cardCornerRadius="12dp"
         app:cardElevation="2dp">
@@ -118,32 +156,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="14dp">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="القطعة الحالية"
-                android:textSize="10sp"
-                android:textColor="#4B5563"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvLastTagEPC"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="—"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:textColor="#9CA3AF"
-                android:layout_marginTop="2dp"
-                android:fontFamily="monospace" />
+            android:padding="12dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="8dp"
                 android:gravity="center_vertical">
 
                 <TextView
@@ -152,7 +170,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="في انتظار المسح..."
-                    android:textSize="15sp"
+                    android:textSize="14sp"
                     android:textStyle="bold"
                     android:textColor="#111827" />
 
@@ -161,58 +179,89 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="⚪"
-                    android:textSize="24sp"
-                    android:layout_marginStart="10dp" />
+                    android:textSize="22sp"
+                    android:layout_marginStart="8dp" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvLastTagEPC"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="—"
+                android:textSize="11sp"
+                android:textColor="#9CA3AF"
+                android:layout_marginTop="4dp"
+                android:fontFamily="monospace" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="6dp">
+                android:layout_marginTop="4dp">
 
                 <TextView android:id="@+id/tvLastTagKarat" android:text="—"
-                    android:textSize="13sp" android:textColor="#D4AF37" android:textStyle="bold" />
-                <TextView android:text="  •  " android:textColor="#9CA3AF" android:textSize="13sp" />
+                    android:textSize="12sp" android:textColor="#D4AF37" android:textStyle="bold" />
+                <TextView android:text="  •  " android:textColor="#9CA3AF" android:textSize="12sp" />
                 <TextView android:id="@+id/tvLastTagWeight" android:text="—"
-                    android:textSize="13sp" android:textColor="#4B5563" />
+                    android:textSize="12sp" android:textColor="#4B5563" />
             </LinearLayout>
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <!-- Buttons -->
+    <!-- Buttons Row 1 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingHorizontal="8dp"
-        android:paddingVertical="6dp">
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="4dp">
 
         <Button android:id="@+id/btnStartInventory"
             android:text="▶ بدء"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
-            android:layout_marginEnd="2dp" android:textSize="13sp" android:textStyle="bold"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
+            android:layout_marginEnd="2dp" android:textSize="12sp" android:textStyle="bold"
             android:backgroundTint="#D4AF37" android:textColor="#FFFFFF" />
 
         <Button android:id="@+id/btnStopInventory"
             android:text="⏹ إيقاف"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
-            android:layout_marginHorizontal="2dp" android:textSize="13sp" android:textStyle="bold"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
+            android:layout_marginHorizontal="2dp" android:textSize="12sp" android:textStyle="bold"
             android:enabled="false"
             android:backgroundTint="#DC2626" android:textColor="#FFFFFF" />
 
         <Button android:id="@+id/btnClearInventory"
             android:text="🗑️ مسح"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
-            android:layout_marginHorizontal="2dp" android:textSize="13sp"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
+            android:layout_marginHorizontal="2dp" android:textSize="12sp"
             android:enabled="false"
-            android:backgroundTint="#D1D5DB" android:textColor="#FFFFFF" />
+            android:backgroundTint="#94A3B8" android:textColor="#FFFFFF" />
+    </LinearLayout>
+
+    <!-- Buttons Row 2 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="2dp">
 
         <Button android:id="@+id/btnExportInventory"
             android:text="📤 تصدير"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
-            android:layout_marginStart="2dp" android:textSize="13sp"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
+            android:layout_marginEnd="2dp" android:textSize="12sp"
             android:backgroundTint="#16A34A" android:textColor="#FFFFFF" />
+
+        <Button android:id="@+id/btnExportMissing"
+            android:text="📋 النواقص"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
+            android:layout_marginHorizontal="2dp" android:textSize="12sp"
+            android:backgroundTint="#DC2626" android:textColor="#FFFFFF" />
+
+        <Button android:id="@+id/btnScreenshot"
+            android:text="📸 لقطة"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
+            android:layout_marginStart="2dp" android:textSize="12sp"
+            android:backgroundTint="#8B5CF6" android:textColor="#FFFFFF" />
     </LinearLayout>
 
     <!-- List -->
@@ -221,7 +270,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:padding="8dp"
+        android:padding="6dp"
         android:clipToPadding="false" />
 
 </LinearLayout>
