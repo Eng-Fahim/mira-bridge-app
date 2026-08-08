@@ -395,7 +395,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
 
         // 📷 المسح - للجميع
-        safeAddTab("Scan", isArabic ? "📷 المسح" : "📷 Scan", UHFReadTagFragment.class);
+       /* safeAddTab("Scan", isArabic ? "📷 المسح" : "📷 Scan", UHFReadTagFragment.class);*/
+       safeAddTab("Scan", isArabic ? "📡 الجرد" : "📡 Inventory", MiraUHFReadTagFragment.class);
 
         // 🆔 التكويد + المخزون + الرادار
         if (isManager || isInventoryMgr) {
