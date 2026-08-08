@@ -24,7 +24,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
-import androidx.fragment.app.Fragment;
+import androidx.fragment.app.DialogFragment; // تم التحويل إلى DialogFragment
 
 import com.example.uhf.R;
 import com.example.uhf.manager.MiraOrgProfileManager;
@@ -38,7 +38,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-public class MiraReceiptFragment extends Fragment {
+public class MiraReceiptFragment extends DialogFragment {
 
     private static final String TAG = "MiraReceiptFragment";
     private static final String ARG_RECEIPT_JSON = "receipt_json";
@@ -63,6 +63,8 @@ public class MiraReceiptFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // تعيين النمط ليكون نافذة منبثقة ملء الشاشة تقريباً
+        setStyle(DialogFragment.STYLE_NORMAL, android.R.style.Theme_Material_Light_Dialog_MinWidth);
         if (getArguments() != null) receiptJsonStr = getArguments().getString(ARG_RECEIPT_JSON, "{}");
         isArabic = Locale.getDefault().getLanguage().equals("ar");
         if (getContext() != null) {
@@ -265,8 +267,6 @@ public class MiraReceiptFragment extends Fragment {
 
     private void closeFragment() {
         if (!isAdded()) return;
-        if (getParentFragmentManager() != null && getParentFragmentManager().getBackStackEntryCount() > 0)
-            getParentFragmentManager().popBackStack();
-        else if (getActivity() != null) getActivity().onBackPressed();
+        dismissAllowingStateLoss(); // إغلاق الـ Dialog بشكل آمن
     }
 }
