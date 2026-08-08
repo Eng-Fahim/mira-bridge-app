@@ -426,24 +426,71 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void showAuditReportDialog(TransferData t, List<String> matched, List<String> missing, List<String> unexpected) {
-        boolean hasDiscrepancy = !missing.isEmpty() || !unexpected.isEmpty();
+    boolean hasDiscrepancy = !missing.isEmpty() || !unexpected.isEmpty();
 
-        String message = String.format(Locale.getDefault(),
-            "%s: %d\n%s: %d\n%s: %d",
-            ar("القطع المطابقة", "Matched"), matched.size(),
-            ar("القطع المفقودة (عجز)", "Missing"), missing.size(),
-            ar("قطع زائدة (غير مدرجة)", "Unexpected"), unexpected.size()
-        );
+    AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+    View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_signature_receipt, null);
+    builder.setView(dialogView);
 
-        new AlertDialog.Builder(requireContext())
-            .setTitle(hasDiscrepancy ? ar("⚠️ يوجد اختلاف في العهدة!", "⚠️ Discrepancy Detected!") : ar("✅ الشحنة مطابقة بالكامل", "✅ Perfect Match"))
-            .setMessage(message)
-            .setPositiveButton(ar("تأكيد وحفظ التقرير", "Confirm & Finalize"), (dialog, which) -> {
-                submitTransferReceiptWithAudit(t, matched, missing, unexpected);
-            })
-            .setNegativeButton(ar("إعادة المسح", "Rescan"), null)
-            .show();
-    }
+    TextView tvSummary = dialogView.findViewById(R.id.tvAuditSummary);
+    com.example.uhf.view.SignatureView signatureView = dialogView.findViewById(R.id.signatureView);
+    Button btnClear = dialogView.findViewById(R.id.btnClearSignature);
+    Button btnConfirm = dialogView.findViewById(R.id.btnConfirmReceipt);
+
+    String summaryText = String.format(Locale.getDefault(),
+        "%s\n• %s: %d\n• %s: %d\n• %s: %d",
+        hasDiscrepancy ? ar("⚠️ يوجد اختلاف في العهدة!", "⚠️ Discrepancy Detected!") : ar("✅ الشحنة مطابقة بالكامل", "✅ Perfect Match"),
+        ar("القطع المطابقة", "Matched"), matched.size(),
+        ar("القطع المفقودة (عجز)", "Missing"), missing.size(),
+        ar("قطع زائدة (غير مدرجة)", "Unexpected"), unexpected.size()
+    );
+    tvSummary.setText(summaryText);
+
+    AlertDialog dialog = builder.create();
+
+    btnClear.setOnClickListener(v -> signatureView.clear());
+
+    btnConfirm.setOnClickListener(v -> {
+        if (!signatureView.isSigned()) {
+            Toast.makeText(getContext(), ar("يرجى توقيع المستلم قبل الاعتماد النهائي", "Please sign before submitting"), Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String signatureBase64 = signatureView.getSignatureBase64();
+        dialog.dismiss();
+        
+        // إرسال البيانات مع التوقيع
+        submitTransferReceiptWithAudit(t, matched, missing, unexpected, signatureBase64);
+    });
+
+    dialog.show();
+}
+
+private void submitTransferReceiptWithAudit(TransferData t, List<String> matched, List<String> missing, List<String> unexpected, String signatureBase64) {
+    executor.execute(() -> {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("transfer_id", t.id);
+            payload.put("matched_epcs", new JSONArray(matched));
+            payload.put("missing_epcs", new JSONArray(missing));
+            payload.put("unexpected_epcs", new JSONArray(unexpected));
+            payload.put("signature_base64", signatureBase64); // إرفاق التوقيع الرقمي
+
+            MiraApiClient.ApiResponse response = apiClient.receiveTransferWithAudit(payload);
+            mainHandler.post(() -> {
+                if (response != null && response.isSuccess) {
+                    String pdfUrl = response.data != null ? response.data.optString("pdf_url") : "";
+                    Toast.makeText(getContext(), ar("✅ تم الاستلام وتوليد سند التحويل", "✅ Completed & PDF Generated"), Toast.LENGTH_SHORT).show();
+                    loadTransfers();
+                } else {
+                    Toast.makeText(getContext(), ar("❌ خطأ في تأكيد الاستلام", "❌ Submission Failed"), Toast.LENGTH_SHORT).show();
+                }
+            });
+        } catch (Exception e) {
+            mainHandler.post(() -> Toast.makeText(getContext(), e.getMessage(), Toast.LENGTH_SHORT).show());
+        }
+    });
+}
 
     private void submitTransferReceiptWithAudit(TransferData t, List<String> matched, List<String> missing, List<String> unexpected) {
         executor.execute(() -> {
