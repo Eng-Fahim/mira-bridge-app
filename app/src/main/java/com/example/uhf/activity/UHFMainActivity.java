@@ -85,41 +85,61 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private int lastActiveBranchId = -1;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-        super.onCreate(savedInstanceState);
+protected void onCreate(Bundle savedInstanceState) {
+    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+    super.onCreate(savedInstanceState);
 
-        try {
-            isArabic = getResources().getConfiguration().locale.getLanguage().equals("ar");
-            if (isArabic) {
-                getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-            } else {
-                getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-            }
-        } catch (Exception ignored) {}
-
-        sessionManager = new SessionManager(this);
-        if (!sessionManager.isLoggedIn()) {
-            navigateToLogin();
-            return;
+    try {
+        isArabic = getResources().getConfiguration().locale.getLanguage().equals("ar");
+        if (isArabic) {
+            getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        } else {
+            getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         }
+    } catch (Exception ignored) {}
 
-        branchesManager = MiraBranchesManager.getInstance(this);
-        lastActiveBranchId = branchesManager.getActiveBranchId();
-
-        setContentView(R.layout.activity_main);
-
-        com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
-        if (toolbar != null) {
-            setSupportActionBar(toolbar);
-            updateToolbarTitle();
-        }
-
-        checkReadWritePermission();
-        initSound();
-        initUHF();
-        initViewPageData();
+    sessionManager = new SessionManager(this);
+    if (!sessionManager.isLoggedIn()) {
+        navigateToLogin();
+        return;
     }
+
+    branchesManager = MiraBranchesManager.getInstance(this);
+    lastActiveBranchId = branchesManager.getActiveBranchId();
+
+    setContentView(R.layout.activity_main);
+
+    com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
+    if (toolbar != null) {
+        setSupportActionBar(toolbar);
+        updateToolbarTitle();
+    }
+
+    checkReadWritePermission();
+    initSound();
+    initUHF();
+    initViewPageData();
+
+    // تسجيل معالج زر العودة لحماية عملية الجرد النشطة
+    getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+        @Override
+        public void handleOnBackPressed() {
+            // استرجاع الـ Fragment الحالي (تأكد من معرف الـ Container لديك)
+            Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.main_container);
+            
+            if (currentFragment instanceof MiraUHFReadTagFragment) {
+                if (((MiraUHFReadTagFragment) currentFragment).onBackPressed()) {
+                    return; // تم التعامل مع زر العودة داخل الـ Fragment وإظهار تنبيه الجرد النشط
+                }
+            }
+            
+            // في حال لم يكن الجرد نشطاً أو كنا في Fragment آخر، نفذ العودة الطبيعية
+            setEnabled(false);
+            getOnBackPressedDispatcher().onBackPressed();
+        }
+    });
+}
+
 
     /**
      * معالجة ضغطة زر الـ Hardware الخارجي للجهاز لتبويب الجرد المباشر
