@@ -5,7 +5,7 @@
     android:orientation="horizontal"
     android:padding="8dp"
     android:gravity="center_vertical"
-    android:background="#FFFFFF">
+    android:background="@drawable/bg_tag_row_new">
 
     <TextView
         android:id="@+id/tvTagStatus"
