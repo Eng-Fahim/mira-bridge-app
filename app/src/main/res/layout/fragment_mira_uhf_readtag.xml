@@ -9,7 +9,7 @@
     android:layoutDirection="rtl"
     android:padding="16dp">
 
-    <!-- 1. Header Bar -->
+    <!-- 1. الشريط العلوي -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardHeader"
         android:layout_width="0dp"
@@ -44,7 +44,7 @@
                 android:id="@+id/tvReaderStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="🟡 المسح اليدوي متاح"
+                android:text="🟡 جاهز للمسح"
                 android:textColor="#D4AF37"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -52,7 +52,7 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- 2. Metrics 2x2 Grid -->
+    <!-- 2. شبكة الإحصائيات (عدادات الجرد) -->
     <LinearLayout
         android:id="@+id/layoutMetrics"
         android:layout_width="0dp"
@@ -130,7 +130,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="المسحوض حالياً"
+                        android:text="الممسوح حالياً"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
@@ -249,7 +249,7 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- 3. Reconciliation Summary Card -->
+    <!-- 3. كارت ملخص المطابقة -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardReconciliation"
         android:layout_width="0dp"
@@ -330,27 +330,71 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- 4. Scanning Progress Indicator -->
-    <ProgressBar
-        android:id="@+id/pbScanProgress"
-        style="?android:attr/progressBarStyleHorizontal"
+    <!-- 4. تبويبات الفلترة -->
+    <LinearLayout
+        android:id="@+id/layoutFilterTabs"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:orientation="horizontal"
         android:layout_marginTop="8dp"
-        android:indeterminate="true"
-        android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/cardReconciliation"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintEnd_toEndOf="parent">
 
-    <!-- 5. Main Scan Controls -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabFilterAll"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="الكل"
+            android:textSize="11sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabFilterMatched"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="مطابق"
+            android:textSize="11sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabFilterFound"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="معثور عليه"
+            android:textSize="11sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabFilterMissing"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="مفقود"
+            android:textSize="11sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/tabFilterUnexpected"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="غير متوقع"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- 5. أزرار التحكم بالمسح -->
     <LinearLayout
         android:id="@+id/layoutMainControls"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:layout_marginTop="8dp"
-        app:layout_constraintTop_toBottomOf="@id/pbScanProgress"
+        app:layout_constraintTop_toBottomOf="@id/layoutFilterTabs"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
@@ -362,8 +406,7 @@
             android:text="بدء القراءة RFID"
             android:textSize="14sp"
             android:textStyle="bold"
-            app:cornerRadius="10dp"
-            app:icon="@android:drawable/ic_menu_camera" />
+            app:cornerRadius="10dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnManualScan"
@@ -378,7 +421,25 @@
 
     </LinearLayout>
 
-    <!-- 6. Last Scanned Tag Info -->
+    <!-- 6. عناصر الإجراءات الضمنية (Dummy Views لضمان توفر كافة الـ IDs المطلوبة للجافا) -->
+    <View android:id="@+id/btnScanCamera" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <View android:id="@+id/btnHelpGuide" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <View android:id="@+id/btnSimulateScan" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <View android:id="@+id/btnExportInventory" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <View android:id="@+id/btnExportMissing" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <View android:id="@+id/btnScreenshot" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <View android:id="@+id/btnFinalizeAudit" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <View android:id="@+id/btnSelectZone" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
+
+    <Spinner
+        android:id="@+id/spinnerZone"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- 7. آخر قطعة تم قراءتها -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardLastTag"
         android:layout_width="0dp"
@@ -426,103 +487,7 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- 7. Zone Selector Header -->
-    <LinearLayout
-        android:id="@+id/layoutZoneSelector"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginTop="8dp"
-        app:layout_constraintTop_toBottomOf="@id/cardLastTag"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="المنطقة المالية:"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-        <Spinner
-            android:id="@+id/spinnerZones"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp" />
-
-    </LinearLayout>
-
-    <!-- 8. Filter Tabs -->
-    <LinearLayout
-        android:id="@+id/layoutFilterTabs"
-        android:layout_width="0dp"
-        android:layout_height="36dp"
-        android:orientation="horizontal"
-        android:layout_marginTop="8dp"
-        app:layout_constraintTop_toBottomOf="@id/layoutZoneSelector"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnFilterAll"
-            style="@style/Widget.Material3.Button.TonalButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:text="الكل"
-            android:textSize="10sp"
-            android:padding="0dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnFilterMatched"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_marginStart="2dp"
-            android:text="مطابق"
-            android:textSize="10sp"
-            android:padding="0dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnFilterMissing"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_marginStart="2dp"
-            android:text="عجز"
-            android:textSize="10sp"
-            android:padding="0dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnFilterSurplus"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_marginStart="2dp"
-            android:text="زيادة"
-            android:textSize="10sp"
-            android:padding="0dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnFilterDisplaced"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_marginStart="2dp"
-            android:text="منقول"
-            android:textSize="10sp"
-            android:padding="0dp" />
-
-    </LinearLayout>
-
-    <!-- 9. Scanned Tags List (Dynamic height using 0dp to fill available vertical space) -->
+    <!-- 8. القائمة (RecyclerView) -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvRecentTags"
         android:layout_width="0dp"
@@ -530,49 +495,12 @@
         android:layout_marginTop="8dp"
         android:layout_marginBottom="8dp"
         android:clipToPadding="false"
-        app:layout_constraintTop_toBottomOf="@id/layoutFilterTabs"
-        app:layout_constraintBottom_toTopOf="@id/layoutSecondaryActions"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        tools:listitem="@layout/item_scanned_tag" />
-
-    <!-- 10. Secondary Actions (Export & Clear) -->
-    <LinearLayout
-        android:id="@+id/layoutSecondaryActions"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/cardLastTag"
         app:layout_constraintBottom_toTopOf="@id/layoutBottomActions"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toEndOf="parent" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnExportReport"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="تصدير تقرير الجرد"
-            android:textSize="12sp"
-            app:cornerRadius="8dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnClearScan"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:text="مسح الجلسة"
-            android:textColor="#C62828"
-            app:strokeColor="#C62828"
-            android:textSize="12sp"
-            app:cornerRadius="8dp" />
-
-    </LinearLayout>
-
-    <!-- 11. Bottom Action Buttons (Fixed at Bottom) -->
+    <!-- 9. الأزرار الثابتة في الأسفل -->
     <LinearLayout
         android:id="@+id/layoutBottomActions"
         android:layout_width="0dp"
@@ -583,12 +511,14 @@
         app:layout_constraintEnd_toEndOf="parent">
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnSaveDraft"
+            android:id="@+id/btnClearScan"
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
-            android:text="حفظ كمسودة"
+            android:text="مسح الجلسة"
+            android:textColor="#C62828"
+            app:strokeColor="#C62828"
             android:textSize="13sp"
             app:cornerRadius="10dp" />
 
