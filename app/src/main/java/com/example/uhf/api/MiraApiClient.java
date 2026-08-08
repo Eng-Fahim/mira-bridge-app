@@ -100,6 +100,36 @@ public class MiraApiClient {
         return postWithAuth("/auth/refresh-token", payload);
     }
 
+    public ApiResponse receiveTransferWithAudit(JSONObject payload) {
+    try {
+        String url = baseUrl + "/mira/v2/transfer/receive-audit";
+        
+        RequestBody body = RequestBody.create(
+            payload.toString(), 
+            MediaType.parse("application/json; charset=utf-8")
+        );
+
+        Request request = new Request.Builder()
+            .url(url)
+            .post(body)
+            .addHeader("Authorization", "Bearer " + authToken)
+            .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (response.body() != null) {
+                String responseData = response.body().string();
+                JSONObject json = new JSONObject(responseData);
+                boolean success = json.optBoolean("success", false);
+                return new ApiResponse(success, json);
+            }
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+    return new ApiResponse(false, null);
+}
+
+
     public ApiResponse registerBiometric(String token, String deviceId, String publicKey) {
         JSONObject payload = new JSONObject();
         try {
