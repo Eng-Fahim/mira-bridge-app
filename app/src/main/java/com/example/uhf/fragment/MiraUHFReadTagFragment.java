@@ -1,4 +1,5 @@
 package com.example.uhf.fragment;
+import com.example.uhf.fragment.KeyDwonFragment;
 
 import android.content.Context;
 import android.content.Intent;
@@ -18,7 +19,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
-import androidx.fragment.app.Fragment;
+
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -57,6 +58,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MiraUHFReadTagFragment extends KeyDwonFragment {
     private static final String TAG = "MiraUHFInventory";
 
+    
     // ==================== Stats Dashboard ====================
     private TextView tvTotalScanned, tvUniqueTags, tvScanRate, tvElapsed, tvBranchName;
 
@@ -93,6 +95,15 @@ public class MiraUHFReadTagFragment extends KeyDwonFragment {
 
     // ==================== Lifecycle ====================
 
+    @Override
+public void myOnKeyDwon() {
+    // زر المسح الضوئي على الجهاز
+    if (!isScanning) {
+        startInventory();
+    } else {
+        stopInventory();
+    }
+}
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
