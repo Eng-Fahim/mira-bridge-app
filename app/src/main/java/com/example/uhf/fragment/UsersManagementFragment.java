@@ -669,28 +669,28 @@ public class UsersManagementFragment extends Fragment {
 
         // ========== إعداد قائمة الصلاحيات (المسموحة فقط) ==========
         List<String> roleNames = new ArrayList<>();
-        String[] allowedRoles = getAllowedRoles();
+String[] allowedRoles = getAllowedRoles();
 
-        for (String roleCode : allowedRoles) {
-            for (int i = 0; i < ROLES.length; i++) {
-                if (ROLES[i].equals(roleCode)) {
-                    roleNames.add(ROLE_ICONS[i] + " " + (isArabic ? ROLES_AR[i] : ROLES_EN[i]));
-                    break;
-                }
-            }
+for (String roleCode : allowedRoles) {
+    for (int i = 0; i < ROLES.length; i++) {
+        if (ROLES[i].equals(roleCode)) {
+            // ✅ أضف الكود بين قوسين ليتم استخراجه لاحقاً
+            roleNames.add(ROLE_ICONS[i] + " " + (isArabic ? ROLES_AR[i] : ROLES_EN[i]) + " (" + roleCode + ")");
+            break;
         }
+    }
+}
 
-        ArrayAdapter<String> roleAdapter = new ArrayAdapter<>(
-            requireContext(), android.R.layout.simple_dropdown_item_1line, roleNames);
-        if (etRole != null) {
-            etRole.setAdapter(roleAdapter);
-            if (!roleNames.isEmpty()) {
-                // اختيار افتراضي: العنصر قبل الأخير (عادة مدير المخزون)
-                int defaultIndex = Math.max(0, roleNames.size() - 2);
-                etRole.setText(roleNames.get(defaultIndex), false);
-            }
-            etRole.setOnClickListener(v -> etRole.showDropDown());
-        }
+ArrayAdapter<String> roleAdapter = new ArrayAdapter<>(
+    requireContext(), android.R.layout.simple_dropdown_item_1line, roleNames);
+if (etRole != null) {
+    etRole.setAdapter(roleAdapter);
+    if (!roleNames.isEmpty()) {
+        int defaultIndex = Math.max(0, roleNames.size() - 2);
+        etRole.setText(roleNames.get(defaultIndex), false);
+    }
+    etRole.setOnClickListener(v -> etRole.showDropDown());
+}
 
         // ========== رقم موظف تلقائي ==========
         String branchCode = branchesManager.getActiveBranchCode();
@@ -1174,4 +1174,4 @@ public class UsersManagementFragment extends Fragment {
             }
         }
     }
-                                              }
+                    }
