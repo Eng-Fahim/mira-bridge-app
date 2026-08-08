@@ -6,7 +6,6 @@
     android:orientation="vertical"
     android:background="?android:attr/colorBackground">
 
-    <!-- Header Section -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -32,7 +31,6 @@
             android:alpha="0.85" />
     </LinearLayout>
 
-    <!-- Metrics Bar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -119,17 +117,14 @@
         android:visibility="gone"
         android:indeterminateTint="?attr/colorPrimary" />
 
-    <!-- Current Tag Card -->
-    <com.google.android.material.card.MaterialCardView
+    <androidx.cardview.widget.CardView
         android:id="@+id/cardLastTag"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="8dp"
         app:cardCornerRadius="14dp"
         app:cardElevation="2dp"
-        app:cardBackgroundColor="?attr/colorSurface"
-        app:strokeColor="?attr/colorOutline"
-        app:strokeWidth="1dp">
+        app:cardBackgroundColor="?attr/colorSurface">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -171,7 +166,6 @@
                     android:id="@+id/tvLastTagStatus"
                     android:text="⚪"
                     android:textSize="24sp"
-                    android:layout_marginEnd="10dp"
                     android:layout_marginStart="10dp" />
             </LinearLayout>
 
@@ -198,9 +192,8 @@
                     android:textColor="?attr/colorOnSurface" />
             </LinearLayout>
         </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
+    </androidx.cardview.widget.CardView>
 
-    <!-- Action Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -208,7 +201,7 @@
         android:paddingHorizontal="8dp"
         android:paddingVertical="6dp">
 
-        <com.google.android.material.button.MaterialButton 
+        <Button 
             android:id="@+id/btnStartInventory"
             android:text="@string/btn_start_inventory"
             android:layout_width="0dp" 
@@ -218,10 +211,10 @@
             android:layout_marginStart="2dp"
             android:textSize="13sp" 
             android:textStyle="bold"
-            app:backgroundTint="?attr/colorPrimary" 
+            android:backgroundTint="?attr/colorPrimary" 
             android:textColor="?attr/colorOnPrimary" />
 
-        <com.google.android.material.button.MaterialButton 
+        <Button 
             android:id="@+id/btnStopInventory"
             android:text="@string/btn_stop_inventory"
             android:layout_width="0dp" 
@@ -232,10 +225,10 @@
             android:textSize="13sp" 
             android:textStyle="bold"
             android:enabled="false" 
-            app:backgroundTint="@color/status_offline" 
+            android:backgroundTint="@color/status_offline" 
             android:textColor="#FFFFFF" />
 
-        <com.google.android.material.button.MaterialButton 
+        <Button 
             android:id="@+id/btnClearInventory"
             android:text="@string/btn_clear_inventory"
             android:layout_width="0dp" 
@@ -245,10 +238,10 @@
             android:layout_marginStart="2dp"
             android:textSize="13sp"
             android:enabled="false"
-            app:backgroundTint="?attr/colorOutlineVariant" 
+            android:backgroundTint="?attr/colorOutlineVariant" 
             android:textColor="?attr/colorOnSurfaceVariant" />
 
-        <com.google.android.material.button.MaterialButton 
+        <Button 
             android:id="@+id/btnExportInventory"
             android:text="@string/btn_export_inventory"
             android:layout_width="0dp" 
@@ -257,11 +250,10 @@
             android:layout_marginEnd="2dp"
             android:layout_marginStart="2dp"
             android:textSize="13sp"
-            app:backgroundTint="@color/status_online" 
+            android:backgroundTint="@color/status_online" 
             android:textColor="#FFFFFF" />
     </LinearLayout>
 
-    <!-- Recent Tags List -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvRecentTags"
         android:layout_width="match_parent"
