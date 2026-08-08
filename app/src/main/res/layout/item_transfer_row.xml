@@ -3,11 +3,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
-    app:cardBackgroundColor="?attr/colorSurfaceVariant"
+    android:layout_marginBottom="10dp"
     app:cardCornerRadius="12dp"
-    app:cardElevation="1dp"
-    android:layoutDirection="rtl">
+    app:cardElevation="2dp"
+    app:cardBackgroundColor="?attr/colorSurface"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -15,7 +17,7 @@
         android:orientation="vertical"
         android:padding="14dp">
 
-        <!-- رقم التحويل والحالة -->
+        <!-- الصف العلوي: رقم + حالة -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -27,7 +29,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="#TRF-20240001-ABCD"
+                android:text="TRF-20260808-AB12"
                 android:textColor="?attr/colorOnSurface"
                 android:textSize="14sp"
                 android:textStyle="bold" />
@@ -36,72 +38,95 @@
                 android:id="@+id/tvTransferStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:background="@drawable/badge_background"
-                android:paddingHorizontal="8dp"
-                android:paddingVertical="3dp"
+                android:background="?attr/colorPrimaryContainer"
+                android:textColor="?attr/colorOnPrimaryContainer"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
                 android:text="معلق"
-                android:textColor="#FFFFFF"
-                android:textSize="10sp" />
-        </LinearLayout>
-
-        <!-- مسار التحويل -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="6dp"
-            android:gravity="center_vertical">
-
-            <TextView
-                android:id="@+id/tvFromBranch"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🏢 الفرع الرئيسي"
-                android:textColor="?attr/colorPrimary"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text=" → "
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="14sp"
-                android:layout_marginHorizontal="6dp" />
-
-            <TextView
-                android:id="@+id/tvToBranch"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🏢 فرع عدن"
-                android:textColor="?attr/colorSecondary"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-
-        <!-- تفاصيل إضافية -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="4dp">
-
-            <TextView
-                android:id="@+id/tvTransferDetails"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="12 قطعة • 45.2g"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp" />
 
             <TextView
                 android:id="@+id/tvTransferDate"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="2024-01-15"
+                android:text="2026-08-08"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="10sp" />
+                android:textSize="10sp"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
+
+        <!-- من ← إلى -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="6dp">
+
+            <TextView
+                android:id="@+id/tvFromBranch"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🏢 الفرع الرئيسي"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="12sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="→"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="16sp"
+                android:layout_marginHorizontal="8dp" />
+
+            <TextView
+                android:id="@+id/tvToBranch"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🏢 فرع عدن"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="12sp"
+                android:gravity="end" />
+        </LinearLayout>
+
+        <!-- التفاصيل -->
+        <TextView
+            android:id="@+id/tvTransferDetails"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="5 قطع • 125.5g"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="11sp" />
+
+        <!-- أزرار الإجراءات -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            android:gravity="end">
+
+            <Button
+                android:id="@+id/btnTransferAction2"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:layout_marginEnd="6dp"
+                android:text="📷 مسح"
+                android:textSize="10sp"
+                android:visibility="gone"
+                style="@style/Widget.Material3.Button.TextButton" />
+
+            <Button
+                android:id="@+id/btnTransferAction1"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:text="✅ اعتماد"
+                android:textSize="10sp"
+                android:visibility="gone"
+                style="@style/Widget.Material3.Button.TonalButton" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
