@@ -3,13 +3,12 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="20dp"
-    android:layoutDirection="rtl">
+    android:padding="20dp">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="📷 مسح قطع RFID"
+        android:text="مسح وتدقيق العهدة (RFID)"
         android:textColor="?attr/colorOnSurface"
         android:textSize="16sp"
         android:textStyle="bold"
@@ -26,29 +25,31 @@
             android:layout_width="0dp"
             android:layout_height="44dp"
             android:layout_weight="1"
-            android:hint="أدخل EPC..."
-            android:textSize="13sp"
-            android:layout_marginEnd="8dp" />
+            android:hint="رمز القطعة / EPC..."
+            android:textSize="12sp"
+            android:inputType="text"
+            android:paddingHorizontal="10dp"
+            android:background="?attr/colorSurfaceContainer" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnScanEpc"
             android:layout_width="wrap_content"
             android:layout_height="44dp"
-            android:text="مسح"
-            android:textSize="12sp" />
+            android:text="إضافة"
+            android:layout_marginStart="8dp" />
     </LinearLayout>
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="200dp"
-        android:background="?attr/colorSurfaceVariant"
-        android:padding="8dp">
+        android:layout_height="180dp"
+        android:background="?attr/colorSurfaceContainerLow"
+        android:padding="10dp">
 
         <TextView
             android:id="@+id/tvScannedItems"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="القطع الممسوحة:"
+            android:text="سجل القطع المطابقة:"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp" />
     </ScrollView>
