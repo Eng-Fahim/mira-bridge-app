@@ -114,16 +114,18 @@ public class MiraUHFReadTagFragment extends Fragment {
     private View layoutZoneSelector, layoutFilterTabs;
     private RecentTagsAdapter recentAdapter;
     private Runnable timerRunnable, readerCheckRunnable;
-/**
+
+    /**
  * تم إضافة هذه الدالة ليتم استدعاؤها من UHFMainActivity عند الضغط على زر المسح الجانبي للجهاز
  */
 public void onKeyDownTrigger() {
-    if (isInventoryRunning) {
+    if (isScanning) {
         stopInventory();
     } else {
         startInventory();
     }
 }
+
 
     public static class ExpectedItem {
         public String epc, title, karat;
