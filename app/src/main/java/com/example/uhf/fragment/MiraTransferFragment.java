@@ -311,7 +311,49 @@ public class MiraTransferFragment extends Fragment {
 
         dialog.show();
     }
+// مجموعة لحفظ الأكواد الممسوحة لحظياً ومنع التكرار
+private final Set<String> scannedEpcSet = new HashSet<>();
 
+/**
+ * يتم استدعاء هذه الدالة عند التقاط أي Tag بواسطة جهاز الـ RFID المحمول
+ */
+public void onRfidTagScanned(String epc) {
+    if (epc == null || epc.trim().isEmpty()) return;
+    
+    final String cleanEpc = epc.trim().toUpperCase();
+
+    mainHandler.post(() -> {
+        // التحقق من عدم تكرار القطعة في الجلسة الحالية
+        if (scannedEpcSet.contains(cleanEpc)) {
+            return; 
+        }
+
+        scannedEpcSet.add(cleanEpc);
+        
+        // إصدار صوت تنبيه (Beep) لإشعارات المستخدم بنجاح القراءة
+        playScanBeepSound();
+
+        // تحديث الواجهة فوراً
+        if (tvScannedCount != null) {
+            tvScannedCount.setText(String.format(Locale.getDefault(), "%s: %d", 
+                ar("القطع الممسوحة", "Scanned Items"), scannedEpcSet.size()));
+        }
+
+        if (scannedItemsAdapter != null) {
+            scannedItemsAdapter.addItem(cleanEpc);
+        }
+    });
+}
+
+private void playScanBeepSound() {
+    try {
+        android.media.ToneGenerator toneGen = new android.media.ToneGenerator(
+            android.media.AudioManager.STREAM_MUSIC, 100);
+        toneGen.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 150);
+    } catch (Exception ignored) {}
+}
+
+    
     private void showScanItemsDialogForTransfer(TransferData t) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View dv = LayoutInflater.from(getContext()).inflate(R.layout.dialog_scan_transfer, null);
