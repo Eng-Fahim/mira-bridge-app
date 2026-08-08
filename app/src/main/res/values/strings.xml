@@ -1636,6 +1636,21 @@
     <string name="title_stop_read_card">يرجى إيقاف قراءة الشرائح!</string>
 
     <string name="tv_fast_inventory">الجرد السريع</string>
+
+<string name="simulation_mode_available">وضع المحاكاة / الكاميرا متاح</string>
+<string name="total">الإجمالي</string>
+<string name="unique">فريد</string>
+<string name="speed">السرعة</string>
+<string name="time">الوقت</string>
+<string name="ready_to_scan">جاهز للمسح</string>
+<string name="start_inventory">بدء الجرد</string>
+<string name="camera_manual">كاميرا/يدوي</string>
+<string name="simulate_scan">محاكاة المسح</string>
+<string name="instructions">تعليمات</string>
+<string name="print_inventory">طباعة الجرد</string>
+<string name="print_missing">طباعة النواقص</string>
+<string name="screenshot">لقطة شاشة</string>
+
     
     <!-- ============Inventory الجرد ======////-->
       <string name="app_title_inventory">📡 جرد MIRA RFID</string>
