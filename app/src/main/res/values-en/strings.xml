@@ -1434,6 +1434,21 @@
     <string name="title_stop_read_card">Please stop reading tags!</string>
     <string name="tv_fast_inventory">Fast Inventory</string>
     
+    
+    <string name="app_title_inventory">📡 MIRA RFID Inventory</string>
+    <string name="branch_label">📍 Branch</string>
+    <string name="metric_total_scans">Scans</string>
+    <string name="metric_unique_tags">Unique</string>
+    <string name="metric_scan_rate">Rate</string>
+    <string name="metric_time">Time</string>
+    <string name="current_tag_header">CURRENT TAG</string>
+    <string name="awaiting_scan">Awaiting scan...</string>
+    <string name="btn_start_inventory">▶ Start</string>
+    <string name="btn_stop_inventory">⏹ Stop</string>
+    <string name="btn_clear_inventory">🗑️ Clear</string>
+    <string name="btn_export_inventory">📤 Export</string>
+
+
     <!-- MIRA Bridge - About & Branding -->
     <string name="about_title">About MIRA Bridge</string>
     <string name="about_version">Version 1.3.0</string>
