@@ -7,8 +7,10 @@ import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -25,9 +27,7 @@ import com.example.uhf.manager.MiraBranchesManager;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Executors;
@@ -38,7 +38,6 @@ public class MiraTransferFragment extends Fragment {
     private TextView tvEmpty, tvTransferCount;
     private Button btnNewTransfer, btnScanItems;
     private Button btnFilterAll, btnFilterDraft, btnFilterPending, btnFilterInTransit, btnFilterCompleted;
-    private View transferDetailCard;
 
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
@@ -47,6 +46,13 @@ public class MiraTransferFragment extends Fragment {
     private String currentFilter = "";
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isArabic;
+
+    private final TransferClickHandler handler = new TransferClickHandler() {
+        @Override
+        public void onClick(TransferData t) { onTransferClick(t); }
+        @Override
+        public void onAction(TransferData t, String action) { onTransferAction(t, action); }
+    };
 
     @Nullable
     @Override
@@ -75,7 +81,7 @@ public class MiraTransferFragment extends Fragment {
         btnFilterCompleted = view.findViewById(R.id.btnFilterCompleted);
 
         rvTransfers.setLayoutManager(new LinearLayoutManager(getContext()));
-        adapter = new TransferAdapter(transferList, this::onTransferClick, this::onTransferAction);
+        adapter = new TransferAdapter(transferList, handler);
         rvTransfers.setAdapter(adapter);
 
         btnNewTransfer.setOnClickListener(v -> showNewTransferDialog());
@@ -148,21 +154,14 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void onTransferClick(TransferData t) {
-        // فتح تفاصيل التحويل
         showTransferActions(t);
     }
 
     private void onTransferAction(TransferData t, String action) {
         switch (action) {
-            case "approve":
-                approveTransfer(t);
-                break;
-            case "receive":
-                receiveTransfer(t);
-                break;
-            case "scan":
-                showScanItemsDialogForTransfer(t);
-                break;
+            case "approve": approveTransfer(t); break;
+            case "receive": receiveTransfer(t); break;
+            case "scan": showScanItemsDialogForTransfer(t); break;
         }
     }
 
@@ -180,13 +179,9 @@ public class MiraTransferFragment extends Fragment {
             .setTitle(t.transferNumber + " - " + t.fromBranch + " → " + t.toBranch)
             .setItems(actions, (d, w) -> {
                 String selected = actions[w];
-                if (selected.contains("اعتماد") || selected.contains("Approve")) {
-                    approveTransfer(t);
-                } else if (selected.contains("استلام") || selected.contains("Receive")) {
-                    receiveTransfer(t);
-                } else if (selected.contains("مسح") || selected.contains("Scan")) {
-                    showScanItemsDialogForTransfer(t);
-                }
+                if (selected.contains("اعتماد") || selected.contains("Approve")) approveTransfer(t);
+                else if (selected.contains("استلام") || selected.contains("Receive")) receiveTransfer(t);
+                else if (selected.contains("مسح") || selected.contains("Scan")) showScanItemsDialogForTransfer(t);
             })
             .setNegativeButton(ar("إلغاء", "Cancel"), null)
             .show();
@@ -238,11 +233,9 @@ public class MiraTransferFragment extends Fragment {
         Button btnCancel = dv.findViewById(R.id.btnCancelTransfer);
         Button btnCreate = dv.findViewById(R.id.btnCreateTransfer);
 
-        // عرض الفرع الحالي
         tvFromBranch.setText("🏢 " + branchesManager.getActiveBranchDisplayName());
         final int fromBranchId = branchesManager.getActiveBranchId();
 
-        // تحميل الفروع المتاحة للتحويل إليها
         List<String> branchNames = new ArrayList<>();
         List<Integer> branchIds = new ArrayList<>();
 
@@ -319,7 +312,6 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void showScanItemsDialogForTransfer(TransferData t) {
-        // فتح واجهة مسح القطع للتحويل
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View dv = LayoutInflater.from(getContext()).inflate(R.layout.dialog_scan_transfer, null);
         builder.setView(dv);
@@ -409,7 +401,6 @@ public class MiraTransferFragment extends Fragment {
 
             h.itemView.setOnClickListener(v -> handler.onClick(t));
 
-            // أزرار الإجراءات
             if ("pending".equals(t.status)) {
                 h.btnAction1.setVisibility(View.VISIBLE);
                 h.btnAction1.setText(ar("✅ اعتماد", "✅ Approve"));
