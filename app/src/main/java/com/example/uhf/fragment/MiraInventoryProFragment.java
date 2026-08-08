@@ -139,7 +139,18 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         loadInventorySettings();
         loadLastSnapshot();
     }
+    /**
+ * تحديث واجهة POS بناءً على الفرع المختار
+ */
+private void updateForBranch(int branchId) {
+    if (tvCartStatus != null) {
+        String branchName = MiraBranchesManager.getInstance(getContext()).getActiveBranchDisplayName();
+        tvCartStatus.setText("📍 " + branchName + " | جاهز لمسح القطع");
+    }
     
+    // إعادة تعيين السلة عند تغيير الفرع
+    clearCart();
+}
    @Override
 public void onResume() {
     super.onResume();
