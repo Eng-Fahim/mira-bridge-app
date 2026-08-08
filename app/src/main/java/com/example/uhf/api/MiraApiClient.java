@@ -103,37 +103,16 @@ public class MiraApiClient {
         return postWithAuth("/auth/refresh-token", payload);
     }
 
+        // ===================== 📦 TRANSFERS AUDIT & DETAILS =====================
+
     public ApiResponse receiveTransferWithAudit(JSONObject payload) {
-    try {
-        String url = baseUrl + "/mira/v2/transfer/receive-audit";
-        
-        RequestBody body = RequestBody.create(
-            payload.toString(), 
-            MediaType.parse("application/json; charset=utf-8")
-        );
-
-        Request request = new Request.Builder()
-            .url(url)
-            .post(body)
-            .addHeader("Authorization", "Bearer " + authToken)
-            .build();
-
-        // استخدام okHttpClient المنسق مع تعريف الـ ApiResponse بالشكل الصحيح
-        try (Response response = okHttpClient.newCall(request).execute()) {
-            int statusCode = response.code();
-            if (response.body() != null) {
-                String responseData = response.body().string();
-                JSONObject json = new JSONObject(responseData);
-                String message = json.optString("message", "");
-                return new ApiResponse(statusCode, json, message);
-            }
-            return new ApiResponse(statusCode, null, "Empty response body");
-        }
-    } catch (Exception e) {
-        e.printStackTrace();
-        return new ApiResponse(500, null, e.getMessage());
+        return postWithAuth("/transfers/receive-audit", payload);
     }
-}
+
+    public ApiResponse getTransferDetails(int transferId) {
+        return getWithAuth("/transfers/" + transferId);
+    }
+
 public ApiResponse getTransferDetails(int transferId) {
     try {
         String url = baseUrl + "/mira/v2/transfer/" + transferId;
