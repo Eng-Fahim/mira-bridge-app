@@ -54,9 +54,13 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MiraUHFReadTagFragment extends Fragment {
@@ -71,6 +75,8 @@ public class MiraUHFReadTagFragment extends Fragment {
 
     private final List<ScannedTag> recentTags = Collections.synchronizedList(new ArrayList<>());
     private final List<String> scannedEPCs = Collections.synchronizedList(new ArrayList<>());
+    private final Set<String> scannedEPCSet = ConcurrentHashMap.newKeySet(); // O(1) fast lookup
+    private final ConcurrentLinkedQueue<ScannedTag> batchQueue = new ConcurrentLinkedQueue<>();
     private final List<ScannedTag> filteredTags = Collections.synchronizedList(new ArrayList<>());
 
     private final ConcurrentHashMap<String, ExpectedItem> expectedItemsMap = new ConcurrentHashMap<>();
@@ -91,6 +97,8 @@ public class MiraUHFReadTagFragment extends Fragment {
     private String sessionId;
     private String currentFilter = "all";
     private boolean isReaderConnected = false;
+
+    private ScheduledExecutorService batchScheduler;
 
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
@@ -231,7 +239,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         btnSelectZone = v.findViewById(R.id.btnSelectZone);
         btnScanCamera = v.findViewById(R.id.btnScanCamera);
         btnHelpGuide = v.findViewById(R.id.btnHelpGuide);
-        btnSimulateScan = v.findViewById(R.id.btnSimulateScan); // زر محاكاة المسح
+        btnSimulateScan = v.findViewById(R.id.btnSimulateScan);
         spinnerZone = v.findViewById(R.id.spinnerZone);
         layoutZoneSelector = v.findViewById(R.id.layoutZoneSelector);
         layoutFilterTabs = v.findViewById(R.id.layoutFilterTabs);
@@ -434,6 +442,8 @@ public class MiraUHFReadTagFragment extends Fragment {
         uniqueTags.set(0);
         recentTags.clear();
         scannedEPCs.clear();
+        scannedEPCSet.clear();
+        batchQueue.clear();
         filteredTags.clear();
         sessionId = "INV-" + System.currentTimeMillis();
 
@@ -444,11 +454,47 @@ public class MiraUHFReadTagFragment extends Fragment {
             ((UHFMainActivity) getActivity()).loopFlag = true;
         }
 
+        startBatchScheduler();
         startTimer();
         if (layoutZoneSelector != null) layoutZoneSelector.setVisibility(View.VISIBLE);
         if (layoutFilterTabs != null) layoutFilterTabs.setVisibility(View.VISIBLE);
 
         loadExpectedInventory(postAction);
+    }
+
+    private void startBatchScheduler() {
+        stopBatchScheduler();
+        batchScheduler = Executors.newSingleThreadScheduledExecutor();
+        batchScheduler.scheduleWithFixedDelay(this::flushBatch, 500, 500, TimeUnit.MILLISECONDS);
+    }
+
+    private void stopBatchScheduler() {
+        if (batchScheduler != null && !batchScheduler.isShutdown()) {
+            batchScheduler.shutdown();
+        }
+        flushBatch();
+    }
+
+    private synchronized void flushBatch() {
+        if (batchQueue.isEmpty()) return;
+
+        List<ScannedTag> batch = new ArrayList<>();
+        ScannedTag tag;
+        while ((tag = batchQueue.poll()) != null && batch.size() < 100) {
+            batch.add(tag);
+        }
+
+        if (!batch.isEmpty()) {
+            synchronized (recentTags) {
+                recentTags.addAll(0, batch);
+            }
+            mainHandler.post(() -> {
+                updateFilteredList();
+                updateReconciliationCounters();
+                updateReconciliationResult();
+                updateUI();
+            });
+        }
     }
 
     private void toggleSimulation() {
@@ -512,6 +558,8 @@ public class MiraUHFReadTagFragment extends Fragment {
         isScanning = false;
         isPaused = false;
         stopSimulation();
+        stopBatchScheduler();
+
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).loopFlag = false;
         }
@@ -524,6 +572,7 @@ public class MiraUHFReadTagFragment extends Fragment {
 
     private void clearInventory() {
         stopSimulation();
+        stopBatchScheduler();
         totalScanned.set(0);
         uniqueTags.set(0);
         foundCount.set(0);
@@ -532,6 +581,8 @@ public class MiraUHFReadTagFragment extends Fragment {
         expectedTotal.set(0);
         recentTags.clear();
         scannedEPCs.clear();
+        scannedEPCSet.clear();
+        batchQueue.clear();
         filteredTags.clear();
         expectedItemsMap.clear();
         if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
@@ -564,7 +615,6 @@ public class MiraUHFReadTagFragment extends Fragment {
                         }
                     }
                 } else {
-                    // بيانات متوقعة افتراضية لتسهيل المحاكاة والاختبار بدون سيرفر
                     for (int i = 1; i <= 10; i++) {
                         ExpectedItem item = new ExpectedItem();
                         item.epc = "E2801170000000000000000" + i;
@@ -592,26 +642,29 @@ public class MiraUHFReadTagFragment extends Fragment {
     public void onTagScanned(String epc, String rssi) {
         if (!isScanning || isPaused || epc == null || epc.isEmpty()) return;
 
-        if (scannedEPCs.contains(epc)) {
+        String cleanEpc = epc.trim();
+
+        // O(1) In-Memory Deduplication
+        if (!scannedEPCSet.add(cleanEpc)) {
             totalScanned.incrementAndGet();
             mainHandler.post(this::updateUI);
             return;
         }
 
-        scannedEPCs.add(epc);
+        scannedEPCs.add(cleanEpc);
         totalScanned.incrementAndGet();
         uniqueTags.incrementAndGet();
 
         String currentTime = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
-        boolean isExpected = expectedItemsMap.containsKey(epc);
+        boolean isExpected = expectedItemsMap.containsKey(cleanEpc);
         ScannedTag tag = new ScannedTag();
-        tag.epc = epc;
+        tag.epc = cleanEpc;
         tag.rssi = rssi != null ? rssi : "—";
         tag.timestamp = currentTime;
         tag.isExpected = isExpected;
 
         if (isExpected) {
-            ExpectedItem item = expectedItemsMap.get(epc);
+            ExpectedItem item = expectedItemsMap.get(cleanEpc);
             if (item != null && !item.isFound) {
                 item.isFound = true;
                 item.scanTime = currentTime;
@@ -623,7 +676,7 @@ public class MiraUHFReadTagFragment extends Fragment {
                 tag.weight = String.format(Locale.US, "%.2fg", item.weight);
 
                 mainHandler.post(() -> {
-                    updateLastTagDisplay(epc, item.title, item.karat, String.format(Locale.US, "%.2fg", item.weight), "✅");
+                    updateLastTagDisplay(cleanEpc, item.title, item.karat, String.format(Locale.US, "%.2fg", item.weight), "✅");
                     playSound(soundMatch);
                 });
             }
@@ -635,21 +688,15 @@ public class MiraUHFReadTagFragment extends Fragment {
             tag.weight = "—";
 
             mainHandler.post(() -> {
-                updateLastTagDisplay(epc, ar("غير مسجلة", "Unregistered"), "—", "—", "⚠️");
+                updateLastTagDisplay(cleanEpc, ar("غير مسجلة", "Unregistered"), "—", "—", "⚠️");
                 playSound(soundUnmatch);
             });
         }
 
-        synchronized (recentTags) {
-            recentTags.add(0, tag);
+        batchQueue.add(tag);
+        if (batchQueue.size() >= 100) {
+            flushBatch();
         }
-
-        mainHandler.post(() -> {
-            updateFilteredList();
-            updateReconciliationCounters();
-            updateReconciliationResult();
-            updateUI();
-        });
     }
 
     private void updateLastTagDisplay(String epc, String title, String karat, String weight, String statusIcon) {
@@ -738,6 +785,32 @@ public class MiraUHFReadTagFragment extends Fragment {
 
     private void finalizeAudit() {
         Toast.makeText(getContext(), ar("تم اعتماد وترحيل فروقات الجرد بنجاح", "Audit finalized successfully"), Toast.LENGTH_SHORT).show();
+    }
+
+    // --- منع زر العودة والتأكيد قبل الخروج ---
+    public boolean onBackPressed() {
+        if (isScanning || isSimulating) {
+            showExitConfirmationDialog();
+            return true;
+        }
+        return false;
+    }
+
+    private void showExitConfirmationDialog() {
+        if (getContext() == null) return;
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle(ar("تنبيه: الجرد قيد التشغيل", "Warning: Scan in Progress"))
+                .setMessage(ar("هناك عملية جرد نشطة حالياً. الخروج الآن سيؤدي إلى إيقاف العملية. هل أنت متأكد؟", "An active scan is currently running. Exiting now will stop it. Are you sure?"))
+                .setPositiveButton(ar("إيقاف والخروج", "Stop & Exit"), (dialog, which) -> {
+                    stopInventory();
+                    if (getActivity() != null) {
+                        getActivity().getOnBackPressedDispatcher().onBackPressed();
+                    }
+                })
+                .setNegativeButton(ar("متابعة الجرد", "Continue Scan"), null)
+                .setCancelable(false)
+                .show();
     }
 
     // --- الطباعة وحفظ التقرير ---
@@ -837,6 +910,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         super.onDestroyView();
         stopTimer();
         stopSimulation();
+        stopBatchScheduler();
         if (soundPool != null) soundPool.release();
     }
 
