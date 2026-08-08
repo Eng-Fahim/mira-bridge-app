@@ -7,7 +7,7 @@
     android:orientation="vertical"
     android:background="#F9FAFB"
     android:padding="12dp"
-    android:layout_direction="rtl">
+    android:layoutDirection="rtl">
 
     <!-- شريط الحالة وعرض الفرع والقارئ -->
     <LinearLayout
