@@ -27,6 +27,7 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTabHost;
 
+import androidx.activity.OnBackPressedCallback;
 import com.example.uhf.R;
 import com.example.uhf.fragment.AuthenticateNxpUcodeDnaFragment;
 import com.example.uhf.fragment.BlockPermalockFragment;
@@ -119,26 +120,37 @@ protected void onCreate(Bundle savedInstanceState) {
     initSound();
     initUHF();
     initViewPageData();
+// تسجيل معالج زر العودة لحماية عملية الجرد النشطة
+getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+    @Override
+    public void handleOnBackPressed() {
+        // 1. تحقق أولاً إذا كان هناك Stack تنقل خلفي (مثل شاشة الفاتورة)
+        if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+            getSupportFragmentManager().popBackStack();
+            return;
+        }
 
-    // تسجيل معالج زر العودة لحماية عملية الجرد النشطة
-    getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
-        @Override
-        public void handleOnBackPressed() {
-            // استرجاع الـ Fragment الحالي (تأكد من معرف الـ Container لديك)
-            Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.main_container);
-            
-            if (currentFragment instanceof MiraUHFReadTagFragment) {
-                if (((MiraUHFReadTagFragment) currentFragment).onBackPressed()) {
-                    return; // تم التعامل مع زر العودة داخل الـ Fragment وإظهار تنبيه الجرد النشط
+        // 2. الوصول للـ Fragment الحالي النشط داخل الـ TabHost باستخدام الـ Tag
+        if (mTabHost != null) {
+            String currentTabTag = mTabHost.getCurrentTabTag();
+            if (currentTabTag != null) {
+                Fragment activeFragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
+                
+                // 3. التفتيش هل الـ Fragment هو واجهة الجرد
+                if (activeFragment instanceof MiraUHFReadTagFragment && activeFragment.isVisible()) {
+                    if (((MiraUHFReadTagFragment) activeFragment).onBackPressed()) {
+                        // تم معالجة الضغطة وإظهار التنبيه (منع العودة)
+                        return; 
+                    }
                 }
             }
-            
-            // في حال لم يكن الجرد نشطاً أو كنا في Fragment آخر، نفذ العودة الطبيعية
-            setEnabled(false);
-            getOnBackPressedDispatcher().onBackPressed();
         }
-    });
-}
+
+        // 4. في حال لم نكن في شاشة جرد نشطة، اغلق النشاط أو نفذ العودة الافتراضية
+        setEnabled(false);
+        getOnBackPressedDispatcher().onBackPressed();
+    }
+});
 
 
     /**
@@ -539,21 +551,15 @@ protected void onCreate(Bundle savedInstanceState) {
     }
 
     public void openReceiptFragment(String responseJson) {
-        try {
-            MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(responseJson);
-            FragmentManager fm = getSupportFragmentManager();
-            if (fm != null && !fm.isStateSaved() && !fm.isDestroyed()) {
-                fm.beginTransaction()
-                  .replace(R.id.realtabcontent, receipt)
-                  .addToBackStack("mira_receipt")
-                  .commitAllowingStateLoss();
-            } else {
-                showToast("✅ تم البيع بنجاح!");
-            }
-        } catch (Exception e) {
-            showToast("✅ تم البيع بنجاح!");
-        }
+    try {
+        MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(responseJson);
+        // فتحها كـ Dialog لمنع تخريب الـ Tabs
+        receipt.show(getSupportFragmentManager(), "mira_receipt");
+    } catch (Exception e) {
+        showToast("✅ تم البيع بنجاح!");
     }
+}
+
 
     private void checkReadWritePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
