@@ -103,24 +103,18 @@ public class MiraPosFragment extends Fragment {
         updateCartSummary();
     }
 
-   @Override
+@Override
 public void onResume() {
     super.onResume();
     
-    // 1. تسجيل كمستقبل RFID (الوظيفة الأصلية)
     if (getActivity() instanceof UHFMainActivity)
         ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
     
-    // 2. ✅ تحديث البيانات حسب الفرع النشط (جديد)
-    MiraBranchesManager bm = MiraBranchesManager.getInstance(requireContext());
-    int branchId = bm.hasActiveBranch() ? bm.getActiveBranchId() : 0;
-    
-    // تحديث واجهة POS بناءً على الفرع
-    if (branchId > 0) {
-        updateForBranch(branchId);
+    // ✅ عرض الفرع النشط
+    if (branchesManager.hasActiveBranch() && tvCartStatus != null) {
+        tvCartStatus.setText("📍 " + branchesManager.getActiveBranchDisplayName() + " | " + (isArabic ? "جاهز" : "Ready"));
     }
 }
-
     @Override public void onPause() {
         super.onPause();
         if (getActivity() instanceof UHFMainActivity)
@@ -496,4 +490,4 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
             }
         }
     }
-        }
+    }
