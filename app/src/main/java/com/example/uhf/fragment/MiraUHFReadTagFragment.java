@@ -7,7 +7,6 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.media.AudioAttributes;
 import android.media.SoundPool;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -106,7 +105,7 @@ public class MiraUHFReadTagFragment extends Fragment {
     private boolean isArabic;
 
     private SoundPool soundPool;
-    private int soundMatch, soundUnmatch;
+    private int soundMatch = 0, soundUnmatch = 0;
     private boolean soundLoaded = false;
 
     private View rootLayout;
@@ -187,8 +186,11 @@ public class MiraUHFReadTagFragment extends Fragment {
                 if (status == 0) soundLoaded = true;
             });
             if (getContext() != null) {
-                soundMatch = soundPool.load(getContext(), R.raw.barcodebeep, 1);
-                soundUnmatch = soundPool.load(getContext(), R.raw.serror, 2);
+                int matchRes = getResources().getIdentifier("barcodebeep", "raw", getContext().getPackageName());
+                int unmatchRes = getResources().getIdentifier("serror", "raw", getContext().getPackageName());
+
+                if (matchRes != 0) soundMatch = soundPool.load(getContext(), matchRes, 1);
+                if (unmatchRes != 0) soundUnmatch = soundPool.load(getContext(), unmatchRes, 1);
             }
         } catch (Exception e) {
             Log.e(TAG, "Sound init error: " + e.getMessage());
@@ -196,6 +198,7 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     private void playSound(int soundId) {
+        if (soundId == 0) return;
         mainHandler.post(() -> {
             try {
                 if (soundPool != null && soundLoaded) {
@@ -319,24 +322,24 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     private void updateFilteredList() {
+        List<ScannedTag> temp = new ArrayList<>();
         synchronized (recentTags) {
-            filteredTags.clear();
             for (ScannedTag t : recentTags) {
                 switch (currentFilter) {
                     case "found":
-                        if (t.isExpected) filteredTags.add(t);
-                        break;
-                    case "missing":
+                        if (t.isExpected) temp.add(t);
                         break;
                     case "unexpected":
-                        if (!t.isExpected) filteredTags.add(t);
+                        if (!t.isExpected) temp.add(t);
                         break;
                     default:
-                        filteredTags.add(t);
+                        temp.add(t);
                 }
             }
         }
         mainHandler.post(() -> {
+            filteredTags.clear();
+            filteredTags.addAll(temp);
             if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
         });
     }
@@ -787,7 +790,6 @@ public class MiraUHFReadTagFragment extends Fragment {
         Toast.makeText(getContext(), ar("تم اعتماد وترحيل فروقات الجرد بنجاح", "Audit finalized successfully"), Toast.LENGTH_SHORT).show();
     }
 
-    // --- منع زر العودة والتأكيد قبل الخروج ---
     public boolean onBackPressed() {
         if (isScanning || isSimulating) {
             showExitConfirmationDialog();
@@ -813,7 +815,6 @@ public class MiraUHFReadTagFragment extends Fragment {
                 .show();
     }
 
-    // --- الطباعة وحفظ التقرير ---
     private void printReport(boolean onlyMissing) {
         if (getContext() == null) return;
         StringBuilder html = new StringBuilder();
@@ -847,7 +848,6 @@ public class MiraUHFReadTagFragment extends Fragment {
         }
     }
 
-    // --- التقاط لقطة شاشة وتخزينها ---
     private void takeScreenshot() {
         if (rootLayout == null || getContext() == null) return;
         try {
@@ -911,7 +911,18 @@ public class MiraUHFReadTagFragment extends Fragment {
         stopTimer();
         stopSimulation();
         stopBatchScheduler();
-        if (soundPool != null) soundPool.release();
+
+        if (readerCheckHandler != null && readerCheckRunnable != null) {
+            readerCheckHandler.removeCallbacks(readerCheckRunnable);
+        }
+        if (simulationHandler != null && simulationRunnable != null) {
+            simulationHandler.removeCallbacks(simulationRunnable);
+        }
+
+        if (soundPool != null) {
+            soundPool.release();
+            soundPool = null;
+        }
     }
 
     class RecentTagsAdapter extends RecyclerView.Adapter<RecentTagsAdapter.VH> {
