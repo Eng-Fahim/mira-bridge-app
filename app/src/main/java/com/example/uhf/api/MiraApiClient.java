@@ -175,13 +175,32 @@ public class MiraApiClient {
 
     // ===================== 📊 DASHBOARD =====================
 
+       // ===================== 📊 DASHBOARD =====================
+
     public ApiResponse getDashboardSummary() {
-        return get("/dashboard/summary");
+        return getWithAuth("/dashboard/summary");
     }
 
-    public ApiResponse getDashboardFull() {
-        return get("/dashboard/full");
+    /**
+     * جلب بيانات الداشبورد كاملة مفلترة حسب الفرع النشط
+     * @param branchId معرف الفرع المراد عرض بياناته (إذا كان > 0 يتم إرساله للـ API)
+     */
+    public ApiResponse getDashboardFull(int branchId) {
+        String endpoint = "/dashboard/full";
+        if (branchId > 0) {
+            endpoint += "?branch_id=" + branchId;
+        }
+        return getWithAuth(endpoint); // 👈 التعديل هنا: استخدام getWithAuth بدلاً من get
     }
+
+    /**
+     * Overload للتوافق السابق (جلب بيانات الداشبورد دون تحديد فرع معين)
+     */
+    public ApiResponse getDashboardFull() {
+        return getDashboardFull(0);
+    }
+
+
 
     // ===================== 🛒 POS =====================
 
