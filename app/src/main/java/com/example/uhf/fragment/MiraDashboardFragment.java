@@ -39,6 +39,7 @@ public class MiraDashboardFragment extends Fragment {
     private TextView tvKarat24, tvKarat21, tvKarat18;
     private View btnGate, btnInventory;
     private SwipeRefreshLayout swipeRefresh;
+    private View shimmerLayout;
 
     private MiraApiClient apiClient;
     private SessionManager sessionManager;
@@ -58,24 +59,20 @@ public class MiraDashboardFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        apiClient = MiraApiClient.getInstance(requireContext());
-        sessionManager = new SessionManager(requireContext());
-        branchesManager = MiraBranchesManager.getInstance(requireContext());
-        orgProfile = MiraOrgProfileManager.getInstance(requireContext());
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
+        try {
+            apiClient = MiraApiClient.getInstance(requireContext());
+            sessionManager = new SessionManager(requireContext());
+            branchesManager = MiraBranchesManager.getInstance(requireContext());
+            orgProfile = MiraOrgProfileManager.getInstance(requireContext());
+            isArabic = Locale.getDefault().getLanguage().equals("ar");
 
-        initViews(view);
-        setupListeners();
-        updateHeader();
-        fetchData();
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        // ✅ تحديث البيانات عند العودة (ربما تغير الفرع)
-        updateHeader();
-        fetchData();
+            initViews(view);
+            setupListeners();
+            updateHeader();
+            fetchData();
+        } catch (Exception e) {
+            Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
+        }
     }
 
     private void initViews(View v) {
@@ -98,9 +95,13 @@ public class MiraDashboardFragment extends Fragment {
 
         btnGate = v.findViewById(R.id.btnGateSecurity);
         btnInventory = v.findViewById(R.id.btnRfidAudit);
-
+        
+        shimmerLayout = v.findViewById(R.id.shimmerLayout);
         swipeRefresh = v.findViewById(R.id.swipeRefresh);
-        if (swipeRefresh != null) swipeRefresh.setOnRefreshListener(this::fetchData);
+
+        if (swipeRefresh != null) {
+            swipeRefresh.setOnRefreshListener(this::fetchData);
+        }
     }
 
     private void setupListeners() {
@@ -108,76 +109,73 @@ public class MiraDashboardFragment extends Fragment {
         if (btnInventory != null) btnInventory.setOnClickListener(v -> switchTab("Inventory Pro"));
     }
 
+    private void showShimmer(boolean show) {
+        if (shimmerLayout != null) {
+            shimmerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+        if (swipeRefresh != null) {
+            swipeRefresh.setVisibility(show ? View.GONE : View.VISIBLE);
+        }
+    }
+
     private void updateHeader() {
-        if (tvDate != null) {
-            Locale loc = isArabic ? new Locale("ar") : Locale.US;
-            tvDate.setText(new SimpleDateFormat("EEEE، d MMMM yyyy", loc).format(new Date()));
-        }
+        try {
+            if (tvDate != null) {
+                Locale loc = isArabic ? new Locale("ar") : Locale.US;
+                String pattern = isArabic ? "EEEE، d MMMM yyyy" : "EEEE, MMMM d, yyyy";
+                tvDate.setText(new SimpleDateFormat(pattern, loc).format(new Date()));
+            }
 
-        if (tvGreeting != null) {
-            String name = sessionManager.getDisplayName();
-            if (name == null || name.isEmpty()) name = sessionManager.getUsername();
-            if (name == null) name = isArabic ? "المستخدم" : "User";
-            tvGreeting.setText(isArabic ? "مرحباً، " + name : "Welcome, " + name);
-        }
+            if (tvGreeting != null) {
+                String name = sessionManager.getDisplayName();
+                if (name == null || name.isEmpty()) name = sessionManager.getUsername();
+                if (name == null) name = isArabic ? "المستخدم" : "User";
+                tvGreeting.setText(isArabic ? "مرحباً، " + name : "Welcome, " + name);
+            }
 
-        // ✅ عرض الفرع النشط أو "كل الفروع"
-        if (tvLocation != null) {
-            if (branchesManager.hasActiveBranch()) {
+            if (tvLocation != null) {
                 tvLocation.setText("📍 " + branchesManager.getActiveBranchDisplayName());
-            } else {
-                tvLocation.setText("📍 " + (isArabic ? "كل الفروع" : "All Branches"));
             }
-        }
-
-        // ✅ تحديث عنوان الشاشة الرئيسية
-        if (getActivity() instanceof UHFMainActivity) {
-            UHFMainActivity a = (UHFMainActivity) getActivity();
-            if (a.getSupportActionBar() != null) {
-                String orgName = orgProfile.getOrgName();
-                String branchTitle = branchesManager.hasActiveBranch() 
-                    ? branchesManager.getActiveBranchDisplayName() 
-                    : (isArabic ? "كل الفروع" : "All Branches");
-                String userName = sessionManager.getDisplayName();
-                if (userName == null || userName.isEmpty()) userName = sessionManager.getUsername();
-                a.getSupportActionBar().setTitle(branchTitle + " - " + orgName);
-                a.getSupportActionBar().setSubtitle("👤 " + userName);
-            }
+        } catch (Exception e) {
+            Log.e(TAG, "updateHeader error: " + e.getMessage());
         }
     }
 
     private void fetchData() {
-        if (tvLiveStatus != null) {
-            tvLiveStatus.setText(isArabic ? "● جاري التحديث..." : "● Updating...");
-            tvLiveStatus.setTextColor(0xFFF59E0B);
-        }
-
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                // ✅ إرسال branch_id إذا كان هناك فرع نشط
-                MiraApiClient.ApiResponse response;
-                if (branchesManager.hasActiveBranch()) {
-                    int branchId = branchesManager.getActiveBranchId();
-                    response = apiClient.getDashboardFull(); // أو أضف بارامتر branch_id
-                } else {
-                    response = apiClient.getDashboardFull();
-                }
-
-                mainHandler.post(() -> {
-                    if (response != null && response.isSuccess && response.data != null) {
-                        processData(response.data);
-                    } else {
-                        showOffline();
-                    }
-                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                });
-            } catch (Exception e) {
-                mainHandler.post(() -> {
-                    showOffline();
-                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                });
+        try {
+            if (tvLiveStatus != null) {
+                tvLiveStatus.setText(getString(R.string.updating));
+                tvLiveStatus.setTextColor(0xFFF59E0B);
             }
-        });
+
+            Executors.newSingleThreadExecutor().execute(() -> {
+                try {
+                    MiraApiClient.ApiResponse response = apiClient.getDashboardFull();
+                    mainHandler.post(() -> {
+                        try {
+                            showShimmer(false);
+                            if (response != null && response.isSuccess && response.data != null) {
+                                processData(response.data);
+                            } else {
+                                showOffline();
+                            }
+                            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                        } catch (Exception e) {
+                            Log.e(TAG, "post error: " + e.getMessage());
+                        }
+                    });
+                } catch (Exception e) {
+                    mainHandler.post(() -> {
+                        showShimmer(false);
+                        showOffline();
+                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                    });
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "fetchData error: " + e.getMessage());
+            showShimmer(false);
+        }
     }
 
     private void processData(JSONObject data) {
@@ -204,7 +202,7 @@ public class MiraDashboardFragment extends Fragment {
             }
 
             if (tvLiveStatus != null) {
-                tvLiveStatus.setText(isArabic ? "● ONLINE" : "● ONLINE");
+                tvLiveStatus.setText(getString(R.string.online));
                 tvLiveStatus.setTextColor(0xFF16A34A);
             }
         } catch (Exception e) {
@@ -214,12 +212,11 @@ public class MiraDashboardFragment extends Fragment {
 
     private void setKarat(TextView tv, String label, int count) {
         if (tv == null) return;
+        String piecesText = getString(R.string.pieces);
         if (count > 0) {
-            tv.setText(label + " | " + count + " " + (isArabic ? "قطعة" : "pcs"));
-            tv.setTextColor(0xFF1A237E);
+            tv.setText(label + " | " + count + " " + piecesText);
         } else {
             tv.setText(label + " | —");
-            tv.setTextColor(0xFF9CA3AF);
         }
     }
 
@@ -230,15 +227,19 @@ public class MiraDashboardFragment extends Fragment {
             double val = Double.parseDouble(cleaned);
             if (val == 0) return "—";
             return String.format(Locale.US, "%,.0f YER", val);
-        } catch (Exception e) { return amount; }
+        } catch (Exception e) {
+            return amount;
+        }
     }
 
-    private void setText(TextView tv, String text) { if (tv != null) tv.setText(text); }
+    private void setText(TextView tv, String text) {
+        if (tv != null) tv.setText(text);
+    }
 
     private void showOffline() {
         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
         if (tvLiveStatus != null) {
-            tvLiveStatus.setText(isArabic ? "● OFFLINE" : "● OFFLINE");
+            tvLiveStatus.setText(getString(R.string.offline));
             tvLiveStatus.setTextColor(0xFFDC2626);
         }
     }
