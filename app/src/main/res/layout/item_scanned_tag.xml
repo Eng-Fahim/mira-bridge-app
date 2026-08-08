@@ -1,47 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:padding="8dp"
-    android:gravity="center_vertical"
-    android:background="@drawable/bg_tag_row_new">
-
-    <TextView
-        android:id="@+id/tvTagStatus"
-        android:text=""
-        android:textSize="14sp"
-        android:layout_marginEnd="8dp"
-        android:minWidth="24dp" />
+    android:layout_marginBottom="6dp"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="1dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="?attr/colorOutlineVariant">
 
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:gravity="center_vertical">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvEpc"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="E2801191A00000000000"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:id="@+id/tvDetails"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="الوزن: 12.5 جم | العدد: 1"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/tvTagEPC"
-            android:text="—"
-            android:textSize="10sp"
-            android:textColor="#666666" />
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="مطابق"
+            android:textColor="#2E7D32"
+            android:textSize="11sp"
+            android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/tvTagTitle"
-            android:text="—"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:textColor="#000000" />
-
-        <TextView
-            android:id="@+id/tvTagDetails"
-            android:text=""
-            android:textSize="10sp"
-            android:textColor="#888888" />
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/tvTagTime"
-        android:text=""
-        android:textSize="9sp"
-        android:textColor="#999999" />
-</LinearLayout>
+</com.google.android.material.card.MaterialCardView>
