@@ -826,61 +826,69 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     private void submitReconciliation() {
-        if (pbScanProgress != null) pbScanProgress.setVisibility(View.VISIBLE);
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                JSONObject payload = new JSONObject();
-                payload.put("session_id", sessionId);
-                payload.put("branch_id", branchesManager.getActiveBranchId());
-                payload.put("found_count", foundCount.get());
-                payload.put("missing_count", missingCount.get());
-                payload.put("unexpected_count", unexpectedCount.get());
-                payload.put("total_scanned", totalScanned.get());
-                payload.put("zone_id", currentZoneId != null ? currentZoneId : "");
-                JSONArray missingArr = new JSONArray();
-                for (ExpectedItem item : expectedItemsMap.values()) {
-                    if (!item.isFound) missingArr.put(item.epc);
+    if (pbScanProgress != null) pbScanProgress.setVisibility(View.VISIBLE);
+    Executors.newSingleThreadExecutor().execute(() -> {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("session_id", sessionId);
+            payload.put("branch_id", branchesManager.getActiveBranchId());
+            payload.put("found_count", foundCount.get());
+            payload.put("missing_count", missingCount.get());
+            payload.put("unexpected_count", unexpectedCount.get());
+            payload.put("total_scanned", totalScanned.get());
+            payload.put("zone_id", currentZoneId != null ? currentZoneId : "");
+            
+            // Missing EPCs
+            JSONArray missingArr = new JSONArray();
+            for (ExpectedItem item : expectedItemsMap.values()) {
+                if (!item.isFound) missingArr.put(item.epc);
+            }
+            payload.put("missing_epcs", missingArr);
+            
+            // Unexpected EPCs
+            JSONArray unexpectedArr = new JSONArray();
+            synchronized (recentTags) {
+                for (ScannedTag t : recentTags) {
+                    if (!t.isExpected) unexpectedArr.put(t.epc);
                 }
-                payload.put("missing_epcs", missingArr);
-                JSONArray unexpectedArr = new JSONArray();
-                synchronized (recentTags) {
-                    for (ScannedTag t : recentTags) {
-                        if (!t.isExpected) unexpectedArr.put(t.epc);
-                    }
-                }
-                payload.put("unexpected_epcs", unexpectedArr);
-                MiraApiClient.ApiResponse response = apiClient.reconcileInventory(payload);
-                mainHandler.post(() -> {
-                    if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
-                    if (response != null && response.isSuccess) {
-                        if (getContext() != null) {
-                            Toast.makeText(getContext(),
-                                    ar("✅ تم اعتماد الجرد بنجاح", "✅ Audit finalized successfully"),
-                                    Toast.LENGTH_LONG).show();
-                        }
-                        if (btnFinalizeAudit != null) btnFinalizeAudit.setVisibility(View.GONE);
-                        clearSessionData();
-                    } else {
-                        if (getContext() != null) {
-                            Toast.makeText(getContext(),
-                                    ar("❌ فشل الاعتماد", "❌ Finalize failed"),
-                                    Toast.LENGTH_LONG).show();
-                        }
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "submitReconciliation error: " + e.getMessage());
-                mainHandler.post(() -> {
-                    if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
+            }
+            payload.put("unexpected_epcs", unexpectedArr);
+
+            // Use existing API method
+            payload.put("action", "reconcile_inventory");
+            MiraApiClient.ApiResponse response = apiClient.authorize("system", "inventory_reconcile", payload);
+            
+            mainHandler.post(() -> {
+                if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
+                if (response != null && response.isSuccess) {
                     if (getContext() != null) {
                         Toast.makeText(getContext(),
-                                ar("❌ خطأ: " + e.getMessage(), "❌ Error: " + e.getMessage()),
+                                ar("✅ تم اعتماد الجرد بنجاح", "✅ Audit finalized successfully"),
                                 Toast.LENGTH_LONG).show();
                     }
-                });
-            }
-        });
-    }
+                    if (btnFinalizeAudit != null) btnFinalizeAudit.setVisibility(View.GONE);
+                    clearSessionData();
+                } else {
+                    if (getContext() != null) {
+                        Toast.makeText(getContext(),
+                                ar("❌ فشل الاعتماد", "❌ Finalize failed"),
+                                Toast.LENGTH_LONG).show();
+                    }
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "submitReconciliation error: " + e.getMessage());
+            mainHandler.post(() -> {
+                if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
+                if (getContext() != null) {
+                    Toast.makeText(getContext(),
+                            ar("❌ خطأ: " + e.getMessage(), "❌ Error: " + e.getMessage()),
+                            Toast.LENGTH_LONG).show();
+                }
+            });
+        }
+    });
+}
 
     // ==================== UI STATE ====================
 
@@ -937,44 +945,51 @@ public class MiraUHFReadTagFragment extends Fragment {
     // ==================== RECONCILIATION ENGINE ====================
 
     private void loadExpectedInventory(Runnable onReady) {
-        if (pbScanProgress != null) pbScanProgress.setVisibility(View.VISIBLE);
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                int branchId = branchesManager.getActiveBranchId();
-                MiraApiClient.ApiResponse response = apiClient.getBranchExpectedInventory(branchId);
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONArray array = response.data.optJSONArray("items");
-                    expectedItemsMap.clear();
-                    if (array != null) {
-                        for (int i = 0; i < array.length(); i++) {
-                            JSONObject obj = array.getJSONObject(i);
-                            ExpectedItem item = new ExpectedItem();
-                            item.epc = obj.optString("epc");
-                            item.title = obj.optString("title", "");
-                            item.karat = obj.optString("karat", "");
-                            item.weight = obj.optDouble("weight", 0);
-                            expectedItemsMap.put(item.epc, item);
-                        }
+    if (pbScanProgress != null) pbScanProgress.setVisibility(View.VISIBLE);
+    Executors.newSingleThreadExecutor().execute(() -> {
+        try {
+            int branchId = branchesManager.getActiveBranchId();
+            
+            // Use existing API method
+            JSONObject params = new JSONObject();
+            params.put("branch_id", branchId);
+            params.put("action", "get_expected_inventory");
+            
+            MiraApiClient.ApiResponse response = apiClient.authorize("system", "inventory_list", params);
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONArray array = response.data.optJSONArray("items");
+                expectedItemsMap.clear();
+                if (array != null) {
+                    for (int i = 0; i < array.length(); i++) {
+                        JSONObject obj = array.getJSONObject(i);
+                        ExpectedItem item = new ExpectedItem();
+                        item.epc = obj.optString("epc");
+                        item.title = obj.optString("title", "");
+                        item.karat = obj.optString("karat", "");
+                        item.weight = obj.optDouble("weight", 0);
+                        expectedItemsMap.put(item.epc, item);
                     }
-                    expectedTotal.set(expectedItemsMap.size());
-                    missingCount.set(expectedItemsMap.size());
-                    foundCount.set(0);
-                    unexpectedCount.set(0);
                 }
-                mainHandler.post(() -> {
-                    if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
-                    updateReconciliationCounters();
-                    if (onReady != null) onReady.run();
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "loadExpectedInventory error: " + e.getMessage());
-                mainHandler.post(() -> {
-                    if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
-                    if (onReady != null) onReady.run();
-                });
+                expectedTotal.set(expectedItemsMap.size());
+                missingCount.set(expectedItemsMap.size());
+                foundCount.set(0);
+                unexpectedCount.set(0);
             }
-        });
-    }
+            mainHandler.post(() -> {
+                if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
+                updateReconciliationCounters();
+                if (onReady != null) onReady.run();
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "loadExpectedInventory error: " + e.getMessage());
+            mainHandler.post(() -> {
+                if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
+                if (onReady != null) onReady.run();
+            });
+        }
+    });
+}
 
     public void onTagScanned(String epc, String rssi) {
         if (!isScanning || isPaused || epc == null || epc.isEmpty()) return;
