@@ -31,7 +31,7 @@ import java.util.concurrent.Executors;
 
 public class MiraDashboardFragment extends Fragment {
 
-    private static final String TAG = "Dashboard";
+    private static final String TAG = "MiraDashboardFragment";
 
     private TextView tvGreeting, tvDate, tvLocation, tvLiveStatus;
     private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
@@ -134,7 +134,11 @@ public class MiraDashboardFragment extends Fragment {
             }
 
             if (tvLocation != null) {
-                tvLocation.setText("📍 " + branchesManager.getActiveBranchDisplayName());
+                String branchName = branchesManager.getActiveBranchDisplayName();
+                if (branchName == null || branchName.isEmpty()) {
+                    branchName = isArabic ? "الفرع الحالي" : "Current Branch";
+                }
+                tvLocation.setText("📍 " + branchName);
             }
         } catch (Exception e) {
             Log.e(TAG, "updateHeader error: " + e.getMessage());
@@ -148,9 +152,14 @@ public class MiraDashboardFragment extends Fragment {
                 tvLiveStatus.setTextColor(0xFFF59E0B);
             }
 
+            // جلب معرف الفرع النشط المخصص للمستخدم الحاضر
+            final int activeBranchId = branchesManager.getActiveBranchId();
+
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
-                    MiraApiClient.ApiResponse response = apiClient.getDashboardFull();
+                    // إرسال activeBranchId للـ API لجلب بيانات الداشبورد الخاصة بالفرع فقط
+                    MiraApiClient.ApiResponse response = apiClient.getDashboardFull(activeBranchId);
+                    
                     mainHandler.post(() -> {
                         try {
                             showShimmer(false);
@@ -161,10 +170,12 @@ public class MiraDashboardFragment extends Fragment {
                             }
                             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                         } catch (Exception e) {
-                            Log.e(TAG, "post error: " + e.getMessage());
+                            Log.e(TAG, "post processing error: " + e.getMessage());
+                            showOffline();
                         }
                     });
                 } catch (Exception e) {
+                    Log.e(TAG, "Execution error: " + e.getMessage());
                     mainHandler.post(() -> {
                         showShimmer(false);
                         showOffline();
@@ -175,6 +186,7 @@ public class MiraDashboardFragment extends Fragment {
         } catch (Exception e) {
             Log.e(TAG, "fetchData error: " + e.getMessage());
             showShimmer(false);
+            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
         }
     }
 
@@ -183,7 +195,7 @@ public class MiraDashboardFragment extends Fragment {
             JSONObject inv = data.optJSONObject("inventory");
             if (inv != null) {
                 setText(tvTotalItems, String.valueOf(inv.optInt("total_items", 0)));
-                setText(tvTotalWeight, String.format(Locale.US, "%.1f g", inv.optDouble("total_weight", 0)));
+                setText(tvTotalWeight, String.format(Locale.US, "%.1f g", inv.optDouble("total_weight", 0.0)));
 
                 JSONObject w = inv.optJSONObject("weights");
                 if (w != null) {
