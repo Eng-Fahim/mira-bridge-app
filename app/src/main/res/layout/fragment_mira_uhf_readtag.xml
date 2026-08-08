@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -8,7 +7,6 @@
     android:layoutDirection="rtl"
     android:id="@+id/rootLayout">
 
-    <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -22,7 +20,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="📡 جرد MIRA RFID"
+            android:text="MIRA RFID Inventory"
             android:textColor="#FFFFFF"
             android:textSize="16sp"
             android:textStyle="bold" />
@@ -31,13 +29,11 @@
             android:id="@+id/tvBranchName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="📍 الفرع"
+            android:text="Branch"
             android:textColor="#FFFFFF"
-            android:textSize="11sp"
-            android:alpha="0.85" />
+            android:textSize="11sp" />
     </LinearLayout>
 
-    <!-- Reader Status & Help Bar -->
     <LinearLayout
         android:id="@+id/layoutReaderStatus"
         android:layout_width="match_parent"
@@ -53,7 +49,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="🟢 القارئ متصل"
+            android:text="Reader: Checking..."
             android:textSize="12sp"
             android:textStyle="bold"
             android:textColor="#16A34A" />
@@ -62,7 +58,7 @@
             android:id="@+id/btnScanCamera"
             android:layout_width="wrap_content"
             android:layout_height="36dp"
-            android:text="📷 مسح"
+            android:text="Camera"
             android:textSize="11sp"
             android:layout_marginEnd="4dp"
             android:backgroundTint="#8B5CF6"
@@ -72,13 +68,12 @@
             android:id="@+id/btnHelpGuide"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:text="❓"
+            android:text="?"
             android:textSize="16sp"
             android:backgroundTint="#F59E0B"
             android:textColor="#FFFFFF" />
     </LinearLayout>
 
-    <!-- Zone Selector -->
     <LinearLayout
         android:id="@+id/layoutZoneSelector"
         android:layout_width="match_parent"
@@ -92,7 +87,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="📍 المنطقة:"
+            android:text="Zone:"
             android:textSize="13sp"
             android:textColor="#4B5563"
             android:textStyle="bold"
@@ -103,21 +98,19 @@
             android:layout_width="0dp"
             android:layout_height="40dp"
             android:layout_weight="1"
-            android:background="#F3F4F6"
-            android:paddingHorizontal="8dp" />
+            android:background="#F3F4F6" />
 
         <Button
             android:id="@+id/btnSelectZone"
             android:layout_width="wrap_content"
             android:layout_height="40dp"
-            android:text="تحديد"
+            android:text="Select"
             android:textSize="12sp"
             android:layout_marginStart="8dp"
             android:backgroundTint="#D4AF37"
             android:textColor="#FFFFFF" />
     </LinearLayout>
 
-    <!-- Stats -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -128,23 +121,22 @@
 
         <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
             <TextView android:id="@+id/tvTotalScanned" android:text="0" android:textSize="22sp" android:textStyle="bold" android:textColor="#111827" />
-            <TextView android:text="المسوحات" android:textSize="10sp" android:textColor="#4B5563" />
+            <TextView android:text="Scans" android:textSize="10sp" android:textColor="#4B5563" />
         </LinearLayout>
         <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
             <TextView android:id="@+id/tvUniqueTags" android:text="0" android:textSize="22sp" android:textStyle="bold" android:textColor="#D4AF37" />
-            <TextView android:text="فريدة" android:textSize="10sp" android:textColor="#4B5563" />
+            <TextView android:text="Unique" android:textSize="10sp" android:textColor="#4B5563" />
         </LinearLayout>
         <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
             <TextView android:id="@+id/tvScanRate" android:text="0/s" android:textSize="22sp" android:textStyle="bold" android:textColor="#16A34A" />
-            <TextView android:text="معدل" android:textSize="10sp" android:textColor="#4B5563" />
+            <TextView android:text="Rate" android:textSize="10sp" android:textColor="#4B5563" />
         </LinearLayout>
         <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
             <TextView android:id="@+id/tvElapsed" android:text="00:00" android:textSize="22sp" android:textStyle="bold" android:textColor="#111827" />
-            <TextView android:text="الوقت" android:textSize="10sp" android:textColor="#4B5563" />
+            <TextView android:text="Time" android:textSize="10sp" android:textColor="#4B5563" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Reconciliation Dashboard -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -155,30 +147,29 @@
 
         <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
             <TextView android:id="@+id/tvExpectedTotal" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#111827" />
-            <TextView android:text="المتوقع" android:textSize="9sp" android:textColor="#4B5563" />
+            <TextView android:text="Expected" android:textSize="9sp" android:textColor="#4B5563" />
         </LinearLayout>
         <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
             <TextView android:id="@+id/tvFoundCount" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#16A34A" />
-            <TextView android:text="✓ مطابق" android:textSize="9sp" android:textColor="#4B5563" />
+            <TextView android:text="Found" android:textSize="9sp" android:textColor="#4B5563" />
         </LinearLayout>
         <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
             <TextView android:id="@+id/tvMissingCount" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#DC2626" />
-            <TextView android:text="✗ ناقص" android:textSize="9sp" android:textColor="#4B5563" />
+            <TextView android:text="Missing" android:textSize="9sp" android:textColor="#4B5563" />
         </LinearLayout>
         <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
             <TextView android:id="@+id/tvUnexpectedCount" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#F59E0B" />
-            <TextView android:text="⚠ زائد" android:textSize="9sp" android:textColor="#4B5563" />
+            <TextView android:text="Extra" android:textSize="9sp" android:textColor="#4B5563" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Reconciliation Result -->
     <TextView
         android:id="@+id/tvReconciliationResult"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
         android:padding="6dp"
-        android:text="في انتظار بدء الجرد..."
+        android:text="Awaiting inventory start..."
         android:textSize="11sp"
         android:textStyle="bold"
         android:textColor="#111827"
@@ -190,76 +181,66 @@
         android:layout_width="match_parent"
         android:layout_height="3dp"
         android:indeterminate="true"
-        android:visibility="gone"
-        android:indeterminateTint="#D4AF37" />
+        android:visibility="gone" />
 
-    <!-- Current Tag Card -->
-    <androidx.cardview.widget.CardView
+    <LinearLayout
         android:id="@+id/cardLastTag"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="6dp"
-        app:cardBackgroundColor="#FFFFFF"
-        app:cardElevation="2dp"
-        app:cardCornerRadius="12dp">
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:background="#FFFFFF">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="12dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <TextView
-                    android:id="@+id/tvLastTagTitle"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="في انتظار المسح..."
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:textColor="#111827" />
-
-                <TextView
-                    android:id="@+id/tvLastTagStatus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="⚪"
-                    android:textSize="22sp"
-                    android:layout_marginStart="8dp" />
-            </LinearLayout>
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
             <TextView
-                android:id="@+id/tvLastTagEPC"
-                android:layout_width="match_parent"
+                android:id="@+id/tvLastTagTitle"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="—"
-                android:textSize="11sp"
-                android:textColor="#9CA3AF"
-                android:layout_marginTop="4dp"
-                android:fontFamily="monospace" />
+                android:layout_weight="1"
+                android:text="Awaiting scan..."
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#111827" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
+            <TextView
+                android:id="@+id/tvLastTagStatus"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="4dp">
-
-                <TextView android:id="@+id/tvLastTagKarat" android:text="—"
-                    android:textSize="12sp" android:textColor="#D4AF37" android:textStyle="bold" />
-                <TextView android:text="  •  " android:textColor="#9CA3AF" android:textSize="12sp" />
-                <TextView android:id="@+id/tvLastTagWeight" android:text="—"
-                    android:textSize="12sp" android:textColor="#4B5563" />
-            </LinearLayout>
+                android:text="-"
+                android:textSize="22sp"
+                android:layout_marginStart="8dp" />
         </LinearLayout>
-    </androidx.cardview.widget.CardView>
 
-    <!-- Filter Tabs -->
+        <TextView
+            android:id="@+id/tvLastTagEPC"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="-"
+            android:textSize="11sp"
+            android:textColor="#9CA3AF"
+            android:layout_marginTop="4dp"
+            android:fontFamily="monospace" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+
+            <TextView android:id="@+id/tvLastTagKarat" android:text="-"
+                android:textSize="12sp" android:textColor="#D4AF37" android:textStyle="bold" />
+            <TextView android:text=" . " android:textColor="#9CA3AF" android:textSize="12sp" />
+            <TextView android:id="@+id/tvLastTagWeight" android:text="-"
+                android:textSize="12sp" android:textColor="#4B5563" />
+        </LinearLayout>
+    </LinearLayout>
+
     <LinearLayout
         android:id="@+id/layoutFilterTabs"
         android:layout_width="match_parent"
@@ -274,7 +255,7 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
-            android:text="الكل"
+            android:text="All"
             android:textSize="12sp"
             android:textStyle="bold"
             android:textColor="#D4AF37"
@@ -286,7 +267,7 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
-            android:text="✓ مطابق"
+            android:text="Found"
             android:textSize="12sp"
             android:textColor="#4B5563" />
 
@@ -296,7 +277,7 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
-            android:text="✗ ناقص"
+            android:text="Missing"
             android:textSize="12sp"
             android:textColor="#4B5563" />
 
@@ -306,12 +287,11 @@
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
-            android:text="⚠ زائد"
+            android:text="Extra"
             android:textSize="12sp"
             android:textColor="#4B5563" />
     </LinearLayout>
 
-    <!-- Buttons Row 1 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -320,33 +300,32 @@
         android:paddingVertical="4dp">
 
         <Button android:id="@+id/btnStartInventory"
-            android:text="▶ بدء"
+            android:text="Start"
             android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
             android:layout_marginEnd="2dp" android:textSize="12sp" android:textStyle="bold"
             android:backgroundTint="#D4AF37" android:textColor="#FFFFFF" />
 
         <Button android:id="@+id/btnPauseInventory"
-            android:text="⏸ تعليق"
+            android:text="Pause"
             android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
             android:layout_marginHorizontal="2dp" android:textSize="12sp" android:textStyle="bold"
             android:backgroundTint="#F59E0B" android:textColor="#FFFFFF" android:visibility="gone" />
 
         <Button android:id="@+id/btnStopInventory"
-            android:text="⏹ إيقاف"
+            android:text="Stop"
             android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
             android:layout_marginHorizontal="2dp" android:textSize="12sp" android:textStyle="bold"
             android:enabled="false"
             android:backgroundTint="#DC2626" android:textColor="#FFFFFF" />
 
         <Button android:id="@+id/btnClearInventory"
-            android:text="🗑️ مسح"
+            android:text="Clear"
             android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
             android:layout_marginHorizontal="2dp" android:textSize="12sp"
             android:enabled="false"
             android:backgroundTint="#94A3B8" android:textColor="#FFFFFF" />
     </LinearLayout>
 
-    <!-- Buttons Row 2 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -355,30 +334,29 @@
         android:paddingVertical="2dp">
 
         <Button android:id="@+id/btnExportInventory"
-            android:text="📤 تصدير"
+            android:text="Export"
             android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
             android:layout_marginEnd="2dp" android:textSize="12sp"
             android:backgroundTint="#16A34A" android:textColor="#FFFFFF" />
 
         <Button android:id="@+id/btnExportMissing"
-            android:text="📋 النواقص"
+            android:text="Missing"
             android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
             android:layout_marginHorizontal="2dp" android:textSize="12sp"
             android:backgroundTint="#DC2626" android:textColor="#FFFFFF" />
 
         <Button android:id="@+id/btnScreenshot"
-            android:text="📸 لقطة"
+            android:text="SS"
             android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
             android:layout_marginStart="2dp" android:textSize="12sp"
             android:backgroundTint="#8B5CF6" android:textColor="#FFFFFF" />
     </LinearLayout>
 
-    <!-- Finalize Button -->
     <Button
         android:id="@+id/btnFinalizeAudit"
         android:layout_width="match_parent"
         android:layout_height="44dp"
-        android:text="✅ إنهاء واعتماد الجرد"
+        android:text="Finalize Audit"
         android:textSize="13sp"
         android:textStyle="bold"
         android:layout_marginHorizontal="6dp"
@@ -387,7 +365,6 @@
         android:backgroundTint="#16A34A"
         android:textColor="#FFFFFF" />
 
-    <!-- RecyclerView -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvRecentTags"
         android:layout_width="match_parent"
