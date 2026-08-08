@@ -4,155 +4,145 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="?attr/colorSurface"
-    android:layoutDirection="rtl">
+    android:background="?attr/colorSurface">
 
-    <!-- شريط العنوان -->
+    <!-- Header Toolbar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorPrimary"
+        android:background="?attr/colorPrimaryContainer"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="16dp"
-        android:paddingVertical="14dp">
+        android:paddingVertical="12dp">
 
-        <TextView
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="📦 التحويلات بين الفروع"
-            android:textColor="?attr/colorOnPrimary"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/tvTransferCount"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="الفرع الرئيسي"
-            android:textColor="?attr/colorOnPrimary"
-            android:textSize="11sp"
-            android:layout_marginEnd="10dp"
-            android:alpha="0.8" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="إدارة التحويلات اللوجستية"
+                android:textColor="?attr/colorOnPrimaryContainer"
+                android:textSize="16sp"
+                android:textStyle="bold" />
 
-        <Button
+            <TextView
+                android:id="@+id/tvTransferCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="?attr/colorOnPrimaryContainer"
+                android:textSize="12sp"
+                android:alpha="0.8" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnNewTransfer"
             android:layout_width="wrap_content"
-            android:layout_height="38dp"
-            android:backgroundTint="@android:color/white"
+            android:layout_height="wrap_content"
             android:text="+ تحويل جديد"
-            android:textColor="?attr/colorPrimary"
             android:textSize="12sp"
-            android:textStyle="bold"
             app:cornerRadius="8dp" />
     </LinearLayout>
 
-    <!-- فلاتر سريعة -->
+    <!-- Filter Pills -->
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorSurfaceVariant"
-        android:scrollbars="none">
+        android:scrollbars="none"
+        android:padding="8dp">
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="8dp">
+            android:orientation="horizontal">
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnFilterAll"
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="wrap_content"
-                android:layout_height="34dp"
+                android:layout_height="36dp"
                 android:layout_marginEnd="4dp"
                 android:text="الكل"
-                android:textSize="11sp"
-                android:backgroundTint="?attr/colorPrimary"
-                android:textColor="?attr/colorOnPrimary"
-                android:paddingHorizontal="16dp" />
+                android:textSize="11sp" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnFilterDraft"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="wrap_content"
-                android:layout_height="34dp"
-                android:layout_marginHorizontal="4dp"
+                android:layout_height="36dp"
+                android:layout_marginEnd="4dp"
                 android:text="مسودة"
-                android:textSize="11sp"
-                android:backgroundTint="?attr/colorSurface"
-                android:textColor="?attr/colorOnSurface"
-                android:paddingHorizontal="16dp" />
+                android:textSize="11sp" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnFilterPending"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="wrap_content"
-                android:layout_height="34dp"
-                android:layout_marginHorizontal="4dp"
+                android:layout_height="36dp"
+                android:layout_marginEnd="4dp"
                 android:text="معلقة"
-                android:textSize="11sp"
-                android:backgroundTint="?attr/colorSurface"
-                android:textColor="?attr/colorOnSurface"
-                android:paddingHorizontal="16dp" />
+                android:textSize="11sp" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnFilterInTransit"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="wrap_content"
-                android:layout_height="34dp"
-                android:layout_marginHorizontal="4dp"
-                android:text="بالطريق"
-                android:textSize="11sp"
-                android:backgroundTint="?attr/colorSurface"
-                android:textColor="?attr/colorOnSurface"
-                android:paddingHorizontal="16dp" />
+                android:layout_height="36dp"
+                android:layout_marginEnd="4dp"
+                android:text="في الطريق"
+                android:textSize="11sp" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnFilterCompleted"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="wrap_content"
-                android:layout_height="34dp"
-                android:layout_marginStart="4dp"
+                android:layout_height="36dp"
                 android:text="مكتملة"
-                android:textSize="11sp"
-                android:backgroundTint="?attr/colorSurface"
-                android:textColor="?attr/colorOnSurface"
-                android:paddingHorizontal="16dp" />
+                android:textSize="11sp" />
         </LinearLayout>
     </HorizontalScrollView>
 
-    <!-- زر مسح القطع -->
+    <!-- RFID Quick Scan Trigger -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="8dp"
-        android:background="?attr/colorSurfaceVariant">
+        android:paddingHorizontal="12dp"
+        android:paddingBottom="8dp">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnScanItems"
+            style="@style/Widget.Material3.Button.IconButton.Filled"
             android:layout_width="match_parent"
-            android:layout_height="38dp"
-            android:text="📷 مسح قطع RFID للتحويل"
+            android:layout_height="42dp"
+            android:text="🔍 تدقيق شحنة عبر RFID"
             android:textSize="12sp"
-            android:backgroundTint="?attr/colorSecondary"
-            android:textColor="?attr/colorOnSecondary" />
+            app:cornerRadius="8dp" />
     </LinearLayout>
 
-    <!-- قائمة التحويلات -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvTransfers"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:padding="12dp"
-        android:clipToPadding="false" />
+        android:layout_weight="1">
 
-    <!-- رسالة فارغة -->
-    <TextView
-        android:id="@+id/tvEmptyTransfers"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="center"
-        android:text="لا توجد تحويلات"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="14sp"
-        android:visibility="gone" />
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvTransfers"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="8dp"
+            android:clipToPadding="false" />
+
+        <TextView
+            android:id="@+id/tvEmptyTransfers"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="لا توجد عمليات تحويل مطابقة"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="14sp"
+            android:visibility="gone" />
+    </FrameLayout>
 </LinearLayout>
