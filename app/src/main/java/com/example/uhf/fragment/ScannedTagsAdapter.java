@@ -37,12 +37,14 @@ public class ScannedTagsAdapter extends RecyclerView.Adapter<ScannedTagsAdapter.
         try {
             if (position < itemList.size()) {
                 ScannedItemModel item = itemList.get(position);
-                holder.tvEpc.setText(item.getEpc());
-                holder.tvDetails.setText("الوزن: " + item.getWeight() + " جم | التكرار: " + item.getReadCount());
-                holder.tvStatus.setText(item.getStatus());
+                holder.tvTagTitle.setText(item.getCategory());
+                holder.tvTagEPC.setText(item.getEpc());
+                holder.tvTagDetails.setText("الوزن: " + item.getWeight() + " جم | التكرار: " + item.getReadCount());
+                holder.tvTagStatus.setText(item.getStatus());
+                holder.tvTagTime.setText("--:--");
             }
         } catch (Exception e) {
-            Log.e("ScannedTagsAdapter", "Safe bind error", e);
+            Log.e("ScannedTagsAdapter", "Bind error", e);
         }
     }
 
@@ -52,17 +54,18 @@ public class ScannedTagsAdapter extends RecyclerView.Adapter<ScannedTagsAdapter.
     }
 
     static class TagViewHolder extends RecyclerView.ViewHolder {
-        TextView tvEpc, tvDetails, tvStatus;
+        TextView tvTagTitle, tvTagEPC, tvTagDetails, tvTagStatus, tvTagTime;
 
         public TagViewHolder(@NonNull View itemView) {
             super(itemView);
-            tvEpc = itemView.findViewById(R.id.tvEpc);
-            tvDetails = itemView.findViewById(R.id.tvDetails);
-            tvStatus = itemView.findViewById(R.id.tvStatus);
+            tvTagTitle = itemView.findViewById(R.id.tvTagTitle);
+            tvTagEPC = itemView.findViewById(R.id.tvTagEPC);
+            tvTagDetails = itemView.findViewById(R.id.tvTagDetails);
+            tvTagStatus = itemView.findViewById(R.id.tvTagStatus);
+            tvTagTime = itemView.findViewById(R.id.tvTagTime);
         }
     }
 
-    // فئة حماية التمرير السريع لمنع الانهيار IndexOutOfBoundsException
     public static class SafeLinearLayoutManager extends LinearLayoutManager {
         public SafeLinearLayoutManager(Context context) {
             super(context);
@@ -73,7 +76,7 @@ public class ScannedTagsAdapter extends RecyclerView.Adapter<ScannedTagsAdapter.
             try {
                 super.onLayoutChildren(recycler, state);
             } catch (Exception e) {
-                Log.e("SafeLayoutManager", "Prevented scroll crash during high-speed RFID scan", e);
+                Log.e("SafeLayoutManager", "Prevented layout crash", e);
             }
         }
     }
