@@ -1,307 +1,272 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:attr/colorBackground"
-    android:layoutDirection="rtl"
-    android:padding="16dp">
+    android:orientation="vertical"
+    android:background="#F9FAFB"
+    android:padding="12dp"
+    android:layout_direction="rtl">
 
-    <!-- 1. الشريط العلوي -->
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/cardHeader"
-        android:layout_width="0dp"
+    <!-- شريط الحالة وعرض الفرع والقارئ -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="12dp"
-        app:cardElevation="2dp"
-        app:cardBackgroundColor="?attr/colorSurface"
-        app:strokeWidth="1dp"
-        app:strokeColor="?attr/colorOutlineVariant"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/tvBranchName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📍 الفرع الرئيسي"
+            android:textColor="#1F2937"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvReaderStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🟡 جاري الفحص..."
+            android:textColor="#D4AF37"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/pbScanProgress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:indeterminate="true"
+        android:visibility="gone" />
+
+    <!-- بطاقات الإحصائيات السريعة -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="4">
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="12dp"
-            android:gravity="center_vertical">
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="#FFFFFF"
+            android:padding="8dp"
+            android:layout_margin="2dp">
 
             <TextView
-                android:id="@+id/tvBranchName"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="📍 الفرع الرئيسي"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvReaderStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="🟡 جاهز للمسح"
-                android:textColor="#D4AF37"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+                android:text="الإجمالي"
+                android:textSize="10sp"
+                android:textColor="#6B7280" />
 
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-
-    <!-- 2. شبكة الإحصائيات (عدادات الجرد) -->
-    <LinearLayout
-        android:id="@+id/layoutMetrics"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="8dp"
-        app:layout_constraintTop_toBottomOf="@id/cardHeader"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:baselineAligned="false">
-
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="0dp"
+            <TextView
+                android:id="@+id/tvTotalScanned"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                app:cardCornerRadius="10dp"
-                app:cardElevation="1dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutlineVariant">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="10dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="إجمالي الجرد"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/tvTotalItemsCount"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textColor="?attr/colorPrimary"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvTotalWeight"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0.00 جم"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="10sp" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                app:cardCornerRadius="10dp"
-                app:cardElevation="1dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutlineVariant">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="10dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="الممسوح حالياً"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/tvScannedCount"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textColor="#2E7D32"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvScannedWeight"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0.00 جم"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="10sp" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
+                android:text="0"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#1F2937" />
         </LinearLayout>
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="8dp"
-            android:baselineAligned="false">
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="#FFFFFF"
+            android:padding="8dp"
+            android:layout_margin="2dp">
 
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="0dp"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="4dp"
-                app:cardCornerRadius="10dp"
-                app:cardElevation="1dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutlineVariant">
+                android:text="فريد"
+                android:textSize="10sp"
+                android:textColor="#6B7280" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="10dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="المتبقي"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/tvRemainingCount"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textColor="#C62828"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvRemainingWeight"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0.00 جم"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="10sp" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="0dp"
+            <TextView
+                android:id="@+id/tvUniqueTags"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="4dp"
-                app:cardCornerRadius="10dp"
-                app:cardElevation="1dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutlineVariant">
+                android:text="0"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#2563EB" />
+        </LinearLayout>
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="10dp">
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="#FFFFFF"
+            android:padding="8dp"
+            android:layout_margin="2dp">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="قطع غير مسجلة"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="11sp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="السرعة"
+                android:textSize="10sp"
+                android:textColor="#6B7280" />
 
-                    <TextView
-                        android:id="@+id/tvUnknownCount"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textColor="#EF6C00"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
+            <TextView
+                android:id="@+id/tvScanRate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0/s"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#059669" />
+        </LinearLayout>
 
-                    <TextView
-                        android:id="@+id/tvUnknownWeight"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0.00 جم"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="10sp" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="#FFFFFF"
+            android:padding="8dp"
+            android:layout_margin="2dp">
 
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="الوقت"
+                android:textSize="10sp"
+                android:textColor="#6B7280" />
+
+            <TextView
+                android:id="@+id/tvElapsed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="00:00"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#DC2626" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- 3. كارت ملخص المطابقة -->
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/cardReconciliation"
-        android:layout_width="0dp"
+    <!-- إحصائيات مطابقة المخزون والمتوقع -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        app:cardCornerRadius="12dp"
+        android:orientation="horizontal"
+        android:weightSum="4"
+        android:layout_marginTop="6dp">
+
+        <TextView
+            android:id="@+id/tvExpectedTotal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="0"
+            android:textSize="12sp"
+            android:textColor="#4B5563" />
+
+        <TextView
+            android:id="@+id/tvFoundCount"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="0"
+            android:textSize="12sp"
+            android:textColor="#16A34A" />
+
+        <TextView
+            android:id="@+id/tvMissingCount"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="0"
+            android:textSize="12sp"
+            android:textColor="#DC2626" />
+
+        <TextView
+            android:id="@+id/tvUnexpectedCount"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="0"
+            android:textSize="12sp"
+            android:textColor="#F59E0B" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvReconciliationResult"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:padding="6dp"
+        android:text="جاهز للمسح"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:textColor="#4B5563" />
+
+    <!-- بطاقة آخر قطعة تم مسحها -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardLastTag"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="8dp"
         app:cardElevation="2dp"
-        app:cardBackgroundColor="?attr/colorSurfaceVariant"
-        app:strokeWidth="1dp"
-        app:strokeColor="?attr/colorOutlineVariant"
-        app:layout_constraintTop_toBottomOf="@id/layoutMetrics"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        android:layout_marginBottom="8dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="12dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="ملخص المطابقة الحالية"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+            android:padding="10dp"
+            android:background="#FFFFFF">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="6dp">
+                android:orientation="horizontal">
 
                 <TextView
-                    android:id="@+id/tvMatchedSummary"
+                    android:id="@+id/tvLastTagTitle"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="مطابق: 0 قطعة (0.00 جم)"
-                    android:textColor="#2E7D32"
-                    android:textSize="11sp" />
+                    android:text="—"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#111827" />
 
                 <TextView
-                    android:id="@+id/tvMissingSummary"
-                    android:layout_width="0dp"
+                    android:id="@+id/tvLastTagStatus"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="عجز: 0 قطعة (0.00 جم)"
-                    android:textColor="#C62828"
-                    android:textSize="11sp" />
+                    android:text="—"
+                    android:textSize="16sp" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvLastTagEPC"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="—"
+                android:textSize="11sp"
+                android:textColor="#6B7280" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -310,255 +275,220 @@
                 android:layout_marginTop="4dp">
 
                 <TextView
-                    android:id="@+id/tvSurplusSummary"
-                    android:layout_width="0dp"
+                    android:id="@+id/tvLastTagKarat"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="زيادة: 0 قطعة (0.00 جم)"
-                    android:textColor="#EF6C00"
-                    android:textSize="11sp" />
+                    android:text="—"
+                    android:textSize="12sp"
+                    android:textColor="#D4AF37"
+                    android:layout_marginEnd="12dp" />
 
                 <TextView
-                    android:id="@+id/tvDisplacedSummary"
-                    android:layout_width="0dp"
+                    android:id="@+id/tvLastTagWeight"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="منقول: 0 قطعة (0.00 جم)"
-                    android:textColor="#0277BD"
-                    android:textSize="11sp" />
+                    android:text="—"
+                    android:textSize="12sp"
+                    android:textColor="#374151" />
             </LinearLayout>
         </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
+    </androidx.cardview.widget.CardView>
 
-    <!-- 4. تبويبات الفلترة -->
-    <LinearLayout
-        android:id="@+id/layoutFilterTabs"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="8dp"
-        app:layout_constraintTop_toBottomOf="@id/cardReconciliation"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/tabFilterAll"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_weight="1"
-            android:text="الكل"
-            android:textSize="11sp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/tabFilterMatched"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_weight="1"
-            android:text="مطابق"
-            android:textSize="11sp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/tabFilterFound"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_weight="1"
-            android:text="معثور عليه"
-            android:textSize="11sp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/tabFilterMissing"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_weight="1"
-            android:text="مفقود"
-            android:textSize="11sp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/tabFilterUnexpected"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_weight="1"
-            android:text="غير متوقع"
-            android:textSize="11sp" />
-    </LinearLayout>
-
-    <!-- 5. أزرار التحكم بالمسح -->
-    <LinearLayout
-        android:id="@+id/layoutMainControls"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="8dp"
-        app:layout_constraintTop_toBottomOf="@id/layoutFilterTabs"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnToggleScan"
-            android:layout_width="0dp"
-            android:layout_height="52dp"
-            android:layout_weight="2"
-            android:text="بدء القراءة RFID"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            app:cornerRadius="10dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnManualScan"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="52dp"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:text="مسح يدوي"
-            android:textSize="12sp"
-            app:cornerRadius="10dp" />
-
-    </LinearLayout>
-
-    <!-- 6. عناصر إضافية مستدعاة بملف Java لضمان نجاح الـ Build -->
-    <View android:id="@+id/btnScanCamera" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
-    <View android:id="@+id/btnHelpGuide" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
-    <View android:id="@+id/btnSimulateScan" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
-    <View android:id="@+id/btnExportInventory" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
-    <View android:id="@+id/btnExportMissing" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
-    <View android:id="@+id/btnScreenshot" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
-    <View android:id="@+id/btnFinalizeAudit" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
-    <View android:id="@+id/btnSelectZone" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
-    <View android:id="@+id/btnPauseInventory" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
-    <View android:id="@+id/btnClearInventory" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
-
-    <TextView
-        android:id="@+id/tvReconciliationResult"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <ProgressBar
-        android:id="@+id/pbScanProgress"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
+    <!-- اختيار المنطقة والفلترة -->
     <LinearLayout
         android:id="@+id/layoutZoneSelector"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <Spinner
-        android:id="@+id/spinnerZone"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <!-- 7. آخر قطعة تم قراءتها -->
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/cardLastTag"
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        app:cardCornerRadius="10dp"
-        app:cardElevation="1dp"
-        app:strokeWidth="1dp"
-        app:strokeColor="?attr/colorOutlineVariant"
-        app:layout_constraintTop_toBottomOf="@id/layoutMainControls"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:visibility="gone"
+        android:layout_marginBottom="6dp">
+
+        <androidx.appcompat.widget.AppCompatSpinner
+            android:id="@+id/spinnerZone"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+
+        <Button
+            android:id="@+id/btnSelectZone"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="تحديد"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/layoutFilterTabs"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="4"
+        android:visibility="gone"
+        android:layout_marginBottom="6dp">
+
+        <TextView
+            android:id="@+id/tabFilterAll"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:padding="6dp"
+            android:text="الكل"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/tabFilterFound"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:padding="6dp"
+            android:text="الموجود"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/tabFilterMissing"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:padding="6dp"
+            android:text="الناقص"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/tabFilterUnexpected"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:padding="6dp"
+            android:text="الزائد"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- قائمة العناصر الممسوحة -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvRecentTags"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="vertical" />
+
+    <!-- أزرار التحكم الرئيسية والعمليات -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="8dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="10dp">
+            android:orientation="horizontal">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <Button
+                android:id="@+id/btnStartInventory"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="آخر قطعة تم قراءتها:"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp" />
+                android:layout_weight="1"
+                android:text="▶ بدء الجرد" />
 
-            <TextView
-                android:id="@+id/tvLastTagEpc"
-                android:layout_width="wrap_content"
+            <Button
+                android:id="@+id/btnPauseInventory"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="---"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:fontFamily="monospace" />
+                android:layout_weight="1"
+                android:text="⏸ تعليق"
+                android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/tvLastTagDetails"
-                android:layout_width="wrap_content"
+            <Button
+                android:id="@+id/btnStopInventory"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="الوزن: - | العيار: - | الفئة: -"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp" />
+                android:layout_weight="1"
+                android:text="⏹ إيقاف"
+                android:enabled="false" />
 
+            <Button
+                android:id="@+id/btnClearInventory"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="مسح"
+                android:enabled="false" />
         </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
 
-    <!-- 8. القائمة (RecyclerView) -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvRecentTags"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp"
-        android:clipToPadding="false"
-        app:layout_constraintTop_toBottomOf="@id/cardLastTag"
-        app:layout_constraintBottom_toTopOf="@id/layoutBottomActions"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
 
-    <!-- 9. الأزرار الثابتة في الأسفل -->
-    <LinearLayout
-        android:id="@+id/layoutBottomActions"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+            <Button
+                android:id="@+id/btnScanCamera"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:text="📷 كاميرا/يدوي"
+                android:textSize="11sp" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnClearScan"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:text="مسح الجلسة"
-            android:textColor="#C62828"
-            app:strokeColor="#C62828"
-            android:textSize="13sp"
-            app:cornerRadius="10dp" />
+            <Button
+                android:id="@+id/btnSimulateScan"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:text="محاكاة المسح"
+                android:textSize="11sp" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnCommitSession"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:text="ترحيل الجرد"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            app:cornerRadius="10dp" />
+            <Button
+                android:id="@+id/btnHelpGuide"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:text="❓ تعليمات"
+                android:textSize="11sp" />
+        </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+
+            <Button
+                android:id="@+id/btnExportInventory"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:text="طباعة الجرد"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btnExportMissing"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:text="طباعة النواقص"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btnScreenshot"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:text="لقطة شاشة"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnFinalizeAudit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="اعتماد وترحيل فروقات الجرد"
+            android:visibility="gone"
+            android:layout_marginTop="4dp" />
     </LinearLayout>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</LinearLayout>
