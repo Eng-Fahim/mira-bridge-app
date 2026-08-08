@@ -5,7 +5,8 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="#F9FAFB"
-    android:layoutDirection="rtl">
+    android:layoutDirection="rtl"
+    android:id="@+id/rootLayout">
 
     <!-- Header -->
     <LinearLayout
@@ -36,7 +37,46 @@
             android:alpha="0.85" />
     </LinearLayout>
 
-    <!-- مسح Stats -->
+    <!-- Zone Selector -->
+    <LinearLayout
+        android:id="@+id/layoutZoneSelector"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:background="#FFFFFF"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📍 المنطقة:"
+            android:textSize="13sp"
+            android:textColor="#4B5563"
+            android:textStyle="bold"
+            android:layout_marginEnd="8dp" />
+
+        <androidx.appcompat.widget.AppCompatSpinner
+            android:id="@+id/spinnerZone"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:background="#F3F4F6"
+            android:paddingHorizontal="8dp" />
+
+        <Button
+            android:id="@+id/btnSelectZone"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:text="تحديد"
+            android:textSize="12sp"
+            android:layout_marginStart="8dp"
+            android:backgroundTint="#D4AF37"
+            android:textColor="#FFFFFF" />
+    </LinearLayout>
+
+    <!-- Stats -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -45,35 +85,20 @@
         android:background="#F3F4F6"
         android:weightSum="4">
 
-        <LinearLayout
-            android:layout_width="0dp" android:layout_weight="1"
-            android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvTotalScanned" android:text="0"
-                android:textSize="22sp" android:textStyle="bold" android:textColor="#111827" />
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+            <TextView android:id="@+id/tvTotalScanned" android:text="0" android:textSize="22sp" android:textStyle="bold" android:textColor="#111827" />
             <TextView android:text="المسوحات" android:textSize="10sp" android:textColor="#4B5563" />
         </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp" android:layout_weight="1"
-            android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvUniqueTags" android:text="0"
-                android:textSize="22sp" android:textStyle="bold" android:textColor="#D4AF37" />
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+            <TextView android:id="@+id/tvUniqueTags" android:text="0" android:textSize="22sp" android:textStyle="bold" android:textColor="#D4AF37" />
             <TextView android:text="فريدة" android:textSize="10sp" android:textColor="#4B5563" />
         </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp" android:layout_weight="1"
-            android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvScanRate" android:text="0/s"
-                android:textSize="22sp" android:textStyle="bold" android:textColor="#16A34A" />
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+            <TextView android:id="@+id/tvScanRate" android:text="0/s" android:textSize="22sp" android:textStyle="bold" android:textColor="#16A34A" />
             <TextView android:text="معدل" android:textSize="10sp" android:textColor="#4B5563" />
         </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp" android:layout_weight="1"
-            android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvElapsed" android:text="00:00"
-                android:textSize="22sp" android:textStyle="bold" android:textColor="#111827" />
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+            <TextView android:id="@+id/tvElapsed" android:text="00:00" android:textSize="22sp" android:textStyle="bold" android:textColor="#111827" />
             <TextView android:text="الوقت" android:textSize="10sp" android:textColor="#4B5563" />
         </LinearLayout>
     </LinearLayout>
@@ -87,40 +112,25 @@
         android:background="#FFFFFF"
         android:weightSum="4">
 
-        <LinearLayout
-            android:layout_width="0dp" android:layout_weight="1"
-            android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvExpectedTotal" android:text="0"
-                android:textSize="18sp" android:textStyle="bold" android:textColor="#111827" />
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+            <TextView android:id="@+id/tvExpectedTotal" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#111827" />
             <TextView android:text="المتوقع" android:textSize="9sp" android:textColor="#4B5563" />
         </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp" android:layout_weight="1"
-            android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvFoundCount" android:text="0"
-                android:textSize="18sp" android:textStyle="bold" android:textColor="#16A34A" />
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+            <TextView android:id="@+id/tvFoundCount" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#16A34A" />
             <TextView android:text="✓ مطابق" android:textSize="9sp" android:textColor="#4B5563" />
         </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp" android:layout_weight="1"
-            android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvMissingCount" android:text="0"
-                android:textSize="18sp" android:textStyle="bold" android:textColor="#DC2626" />
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+            <TextView android:id="@+id/tvMissingCount" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#DC2626" />
             <TextView android:text="✗ ناقص" android:textSize="9sp" android:textColor="#4B5563" />
         </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp" android:layout_weight="1"
-            android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvUnexpectedCount" android:text="0"
-                android:textSize="18sp" android:textStyle="bold" android:textColor="#F59E0B" />
+        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+            <TextView android:id="@+id/tvUnexpectedCount" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#F59E0B" />
             <TextView android:text="⚠ زائد" android:textSize="9sp" android:textColor="#4B5563" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- نتيجة المطابقة -->
+    <!-- Reconciliation Result -->
     <TextView
         android:id="@+id/tvReconciliationResult"
         android:layout_width="match_parent"
@@ -208,6 +218,58 @@
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
+    <!-- Filter Tabs -->
+    <LinearLayout
+        android:id="@+id/layoutFilterTabs"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:orientation="horizontal"
+        android:background="#FFFFFF"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tabFilterAll"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="الكل"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="#D4AF37"
+            android:background="#FDF8E7" />
+
+        <TextView
+            android:id="@+id/tabFilterFound"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="✓ مطابق"
+            android:textSize="12sp"
+            android:textColor="#4B5563" />
+
+        <TextView
+            android:id="@+id/tabFilterMissing"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="✗ ناقص"
+            android:textSize="12sp"
+            android:textColor="#4B5563" />
+
+        <TextView
+            android:id="@+id/tabFilterUnexpected"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="⚠ زائد"
+            android:textSize="12sp"
+            android:textColor="#4B5563" />
+    </LinearLayout>
+
     <!-- Buttons Row 1 -->
     <LinearLayout
         android:layout_width="match_parent"
@@ -221,6 +283,12 @@
             android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
             android:layout_marginEnd="2dp" android:textSize="12sp" android:textStyle="bold"
             android:backgroundTint="#D4AF37" android:textColor="#FFFFFF" />
+
+        <Button android:id="@+id/btnPauseInventory"
+            android:text="⏸ تعليق"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
+            android:layout_marginHorizontal="2dp" android:textSize="12sp" android:textStyle="bold"
+            android:backgroundTint="#F59E0B" android:textColor="#FFFFFF" android:visibility="gone" />
 
         <Button android:id="@+id/btnStopInventory"
             android:text="⏹ إيقاف"
@@ -264,7 +332,21 @@
             android:backgroundTint="#8B5CF6" android:textColor="#FFFFFF" />
     </LinearLayout>
 
-    <!-- List -->
+    <!-- Finalize Button -->
+    <Button
+        android:id="@+id/btnFinalizeAudit"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:text="✅ إنهاء واعتماد الجرد"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:layout_marginHorizontal="6dp"
+        android:layout_marginVertical="2dp"
+        android:visibility="gone"
+        android:backgroundTint="#16A34A"
+        android:textColor="#FFFFFF" />
+
+    <!-- RecyclerView -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvRecentTags"
         android:layout_width="match_parent"
