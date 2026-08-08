@@ -1,223 +1,116 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F9FAFB"
     android:orientation="vertical"
+    android:background="#FFFFFF"
     android:layoutDirection="rtl">
 
-    <LinearLayout
+    <TextView
+        android:id="@+id/tvBranchName"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="12dp"
-        android:background="#D4AF37">
+        android:text="📍 الفرع"
+        android:textSize="16sp"
+        android:padding="16dp"/>
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="📡 جرد MIRA RFID"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tvBranchName"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="📍 الفرع"
-            android:textColor="#FFFFFF"
-            android:textSize="11sp"
-            android:alpha="0.85" />
-    </LinearLayout>
-
-    <LinearLayout
+    <TextView
+        android:id="@+id/tvTotalScanned"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="12dp"
-        android:background="#F3F4F6"
-        android:weightSum="4">
+        android:text="0"
+        android:textSize="24sp"
+        android:padding="16dp"/>
 
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
-            <TextView android:id="@+id/tvTotalScanned" android:text="0"
-                android:textSize="24sp" android:textStyle="bold"
-                android:textColor="#111827" />
-            <TextView android:text="المسوحات" android:textSize="10sp"
-                android:textColor="#4B5563" />
-        </LinearLayout>
+    <TextView
+        android:id="@+id/tvUniqueTags"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="0"
+        android:padding="16dp"/>
 
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
-            <TextView android:id="@+id/tvUniqueTags" android:text="0"
-                android:textSize="24sp" android:textStyle="bold"
-                android:textColor="#D4AF37" />
-            <TextView android:text="فريدة" android:textSize="10sp"
-                android:textColor="#4B5563" />
-        </LinearLayout>
+    <TextView
+        android:id="@+id/tvScanRate"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="0/s"
+        android:padding="16dp"/>
 
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
-            <TextView android:id="@+id/tvScanRate" android:text="0/s"
-                android:textSize="24sp" android:textStyle="bold"
-                android:textColor="#16A34A" />
-            <TextView android:text="معدل" android:textSize="10sp"
-                android:textColor="#4B5563" />
-        </LinearLayout>
+    <TextView
+        android:id="@+id/tvElapsed"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="00:00"
+        android:padding="16dp"/>
 
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
-            <TextView android:id="@+id/tvElapsed" android:text="00:00"
-                android:textSize="24sp" android:textStyle="bold"
-                android:textColor="#111827" />
-            <TextView android:text="الوقت" android:textSize="10sp"
-                android:textColor="#4B5563" />
-        </LinearLayout>
-    </LinearLayout>
+    <TextView
+        android:id="@+id/tvLastTagEPC"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="—"
+        android:padding="16dp"/>
+
+    <TextView
+        android:id="@+id/tvLastTagTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Awaiting scan..."
+        android:padding="16dp"/>
+
+    <TextView
+        android:id="@+id/tvLastTagKarat"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="—"
+        android:padding="16dp"/>
+
+    <TextView
+        android:id="@+id/tvLastTagWeight"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="—"
+        android:padding="16dp"/>
+
+    <TextView
+        android:id="@+id/tvLastTagStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="⚪"
+        android:padding="16dp"/>
 
     <ProgressBar
         android:id="@+id/pbScanProgress"
-        style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="3dp"
-        android:indeterminate="true"
-        android:visibility="gone"
-        android:indeterminateTint="#D4AF37" />
+        android:layout_height="wrap_content"/>
 
-    <androidx.cardview.widget.CardView
-        android:id="@+id/cardLastTag"
+    <Button
+        android:id="@+id/btnStartInventory"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="8dp"
-        app:cardBackgroundColor="#FFFFFF"
-        app:cardCornerRadius="12dp"
-        app:cardElevation="2dp"
-        app:strokeWidth="1dp"
-        app:strokeColor="#E5E7EB">
+        android:text="Start"/>
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="14dp">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="القطعة الحالية"
-                android:textSize="10sp"
-                android:textColor="#4B5563"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvLastTagEPC"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="—"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:textColor="#9CA3AF"
-                android:layout_marginTop="2dp"
-                android:fontFamily="monospace" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="8dp"
-                android:gravity="center_vertical">
-
-                <TextView
-                    android:id="@+id/tvLastTagTitle"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="في انتظار المسح..."
-                    android:textSize="15sp"
-                    android:textStyle="bold"
-                    android:textColor="#111827" />
-
-                <TextView
-                    android:id="@+id/tvLastTagStatus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="⚪"
-                    android:textSize="24sp"
-                    android:layout_marginStart="10dp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="6dp">
-
-                <TextView android:id="@+id/tvLastTagKarat" android:text="—"
-                    android:textSize="13sp" android:textColor="#D4AF37" android:textStyle="bold" />
-                <TextView android:text="  •  " android:textColor="#9CA3AF" android:textSize="13sp" />
-                <TextView android:id="@+id/tvLastTagWeight" android:text="—"
-                    android:textSize="13sp" android:textColor="#4B5563" />
-            </LinearLayout>
-        </LinearLayout>
-    </androidx.cardview.widget.CardView>
-
-    <LinearLayout
+    <Button
+        android:id="@+id/btnStopInventory"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingHorizontal="8dp"
-        android:paddingVertical="6dp">
+        android:text="Stop"/>
 
-        <Button android:id="@+id/btnStartInventory"
-            android:text="▶ بدء"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
-            android:layout_marginEnd="2dp" android:textSize="13sp" android:textStyle="bold"
-            android:backgroundTint="#D4AF37" android:textColor="#FFFFFF" />
+    <Button
+        android:id="@+id/btnClearInventory"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Clear"/>
 
-        <Button android:id="@+id/btnStopInventory"
-            android:text="⏹ إيقاف"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
-            android:layout_marginHorizontal="2dp" android:textSize="13sp" android:textStyle="bold"
-            android:enabled="false"
-            android:backgroundTint="#DC2626" android:textColor="#FFFFFF" />
-
-        <Button android:id="@+id/btnClearInventory"
-            android:text="🗑️ مسح"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
-            android:layout_marginHorizontal="2dp" android:textSize="13sp"
-            android:enabled="false"
-            android:backgroundTint="#D1D5DB" android:textColor="#FFFFFF" />
-
-        <Button android:id="@+id/btnExportInventory"
-            android:text="📤 تصدير"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
-            android:layout_marginStart="2dp" android:textSize="13sp"
-            android:backgroundTint="#16A34A" android:textColor="#FFFFFF" />
-    </LinearLayout>
+    <Button
+        android:id="@+id/btnExportInventory"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Export"/>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvRecentTags"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:padding="8dp"
-        android:clipToPadding="false" />
+        android:layout_weight="1"/>
 
 </LinearLayout>
