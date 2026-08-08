@@ -1,6 +1,5 @@
 package com.example.uhf.activity;
 
-import com.example.uhf.fragment.MiraUHFReadTagFragment;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -20,6 +19,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.os.LocaleListCompat;
@@ -27,7 +27,6 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTabHost;
 
-import androidx.activity.OnBackPressedCallback;
 import com.example.uhf.R;
 import com.example.uhf.fragment.AuthenticateNxpUcodeDnaFragment;
 import com.example.uhf.fragment.BlockPermalockFragment;
@@ -46,6 +45,7 @@ import com.example.uhf.fragment.MiraReportsProFragment;
 import com.example.uhf.fragment.MiraSalesHistoryFragment;
 import com.example.uhf.fragment.MiraSecureGateFragment;
 import com.example.uhf.fragment.MiraTransferFragment;
+import com.example.uhf.fragment.MiraUHFReadTagFragment;
 import com.example.uhf.fragment.ProtectedModeAndShortRangeModeFragment;
 import com.example.uhf.fragment.UHFKillFragment;
 import com.example.uhf.fragment.UHFLocationFragment;
@@ -86,72 +86,67 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private int lastActiveBranchId = -1;
 
     @Override
-protected void onCreate(Bundle savedInstanceState) {
-    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-    super.onCreate(savedInstanceState);
+    protected void onCreate(Bundle savedInstanceState) {
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        super.onCreate(savedInstanceState);
 
-    try {
-        isArabic = getResources().getConfiguration().locale.getLanguage().equals("ar");
-        if (isArabic) {
-            getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
-        } else {
-            getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-        }
-    } catch (Exception ignored) {}
+        try {
+            isArabic = getResources().getConfiguration().locale.getLanguage().equals("ar");
+            if (isArabic) {
+                getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+            } else {
+                getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+            }
+        } catch (Exception ignored) {}
 
-    sessionManager = new SessionManager(this);
-    if (!sessionManager.isLoggedIn()) {
-        navigateToLogin();
-        return;
-    }
-
-    branchesManager = MiraBranchesManager.getInstance(this);
-    lastActiveBranchId = branchesManager.getActiveBranchId();
-
-    setContentView(R.layout.activity_main);
-
-    com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
-    if (toolbar != null) {
-        setSupportActionBar(toolbar);
-        updateToolbarTitle();
-    }
-
-    checkReadWritePermission();
-    initSound();
-    initUHF();
-    initViewPageData();
-// تسجيل معالج زر العودة لحماية عملية الجرد النشطة
-getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
-    @Override
-    public void handleOnBackPressed() {
-        // 1. تحقق أولاً إذا كان هناك Stack تنقل خلفي (مثل شاشة الفاتورة)
-        if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
-            getSupportFragmentManager().popBackStack();
+        sessionManager = new SessionManager(this);
+        if (!sessionManager.isLoggedIn()) {
+            navigateToLogin();
             return;
         }
 
-        // 2. الوصول للـ Fragment الحالي النشط داخل الـ TabHost باستخدام الـ Tag
-        if (mTabHost != null) {
-            String currentTabTag = mTabHost.getCurrentTabTag();
-            if (currentTabTag != null) {
-                Fragment activeFragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
-                
-                // 3. التفتيش هل الـ Fragment هو واجهة الجرد
-                if (activeFragment instanceof MiraUHFReadTagFragment && activeFragment.isVisible()) {
-                    if (((MiraUHFReadTagFragment) activeFragment).onBackPressed()) {
-                        // تم معالجة الضغطة وإظهار التنبيه (منع العودة)
-                        return; 
-                    }
-                }
-            }
+        branchesManager = MiraBranchesManager.getInstance(this);
+        lastActiveBranchId = branchesManager.getActiveBranchId();
+
+        setContentView(R.layout.activity_main);
+
+        com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            setSupportActionBar(toolbar);
+            updateToolbarTitle();
         }
 
-        // 4. في حال لم نكن في شاشة جرد نشطة، اغلق النشاط أو نفذ العودة الافتراضية
-        setEnabled(false);
-        getOnBackPressedDispatcher().onBackPressed();
-    }
-});
+        checkReadWritePermission();
+        initSound();
+        initUHF();
+        initViewPageData();
 
+        // تسجيل معالج زر العودة لحماية عملية الجرد النشطة
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+                    getSupportFragmentManager().popBackStack();
+                    return;
+                }
+
+                if (mTabHost != null) {
+                    String currentTabTag = mTabHost.getCurrentTabTag();
+                    if (currentTabTag != null) {
+                        Fragment activeFragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
+                        if (activeFragment instanceof MiraUHFReadTagFragment && activeFragment.isVisible()) {
+                            if (((MiraUHFReadTagFragment) activeFragment).onBackPressed()) {
+                                return; 
+                            }
+                        }
+                    }
+                }
+
+                setEnabled(false);
+                getOnBackPressedDispatcher().onBackPressed();
+            }
+        });
+    } // إغلاق onCreate بالشكل الصحيح
 
     /**
      * معالجة ضغطة زر الـ Hardware الخارجي للجهاز لتبويب الجرد المباشر
@@ -551,15 +546,13 @@ getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
     }
 
     public void openReceiptFragment(String responseJson) {
-    try {
-        MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(responseJson);
-        // فتحها كـ Dialog لمنع تخريب الـ Tabs
-        receipt.show(getSupportFragmentManager(), "mira_receipt");
-    } catch (Exception e) {
-        showToast("✅ تم البيع بنجاح!");
+        try {
+            MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(responseJson);
+            receipt.show(getSupportFragmentManager(), "mira_receipt");
+        } catch (Exception e) {
+            showToast("✅ تم البيع بنجاح!");
+        }
     }
-}
-
 
     private void checkReadWritePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
