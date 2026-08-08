@@ -26,6 +26,16 @@
             android:textSize="16sp"
             android:textStyle="bold" />
 
+        <TextView
+            android:id="@+id/tvTransferCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="الفرع الرئيسي"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="11sp"
+            android:layout_marginEnd="10dp"
+            android:alpha="0.8" />
+
         <Button
             android:id="@+id/btnNewTransfer"
             android:layout_width="wrap_content"
@@ -39,56 +49,90 @@
     </LinearLayout>
 
     <!-- فلاتر سريعة -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorSurfaceVariant"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="8dp">
+
+            <Button
+                android:id="@+id/btnFilterAll"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:layout_marginEnd="4dp"
+                android:text="الكل"
+                android:textSize="11sp"
+                android:backgroundTint="?attr/colorPrimary"
+                android:textColor="?attr/colorOnPrimary"
+                android:paddingHorizontal="16dp" />
+
+            <Button
+                android:id="@+id/btnFilterDraft"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:layout_marginHorizontal="4dp"
+                android:text="مسودة"
+                android:textSize="11sp"
+                android:backgroundTint="?attr/colorSurface"
+                android:textColor="?attr/colorOnSurface"
+                android:paddingHorizontal="16dp" />
+
+            <Button
+                android:id="@+id/btnFilterPending"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:layout_marginHorizontal="4dp"
+                android:text="معلقة"
+                android:textSize="11sp"
+                android:backgroundTint="?attr/colorSurface"
+                android:textColor="?attr/colorOnSurface"
+                android:paddingHorizontal="16dp" />
+
+            <Button
+                android:id="@+id/btnFilterInTransit"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:layout_marginHorizontal="4dp"
+                android:text="بالطريق"
+                android:textSize="11sp"
+                android:backgroundTint="?attr/colorSurface"
+                android:textColor="?attr/colorOnSurface"
+                android:paddingHorizontal="16dp" />
+
+            <Button
+                android:id="@+id/btnFilterCompleted"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:layout_marginStart="4dp"
+                android:text="مكتملة"
+                android:textSize="11sp"
+                android:backgroundTint="?attr/colorSurface"
+                android:textColor="?attr/colorOnSurface"
+                android:paddingHorizontal="16dp" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- زر مسح القطع -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
         android:padding="8dp"
         android:background="?attr/colorSurfaceVariant">
 
         <Button
-            android:id="@+id/btnFilterAll"
-            android:layout_width="0dp"
-            android:layout_height="34dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="3dp"
-            android:text="الكل"
-            android:textSize="11sp"
-            android:backgroundTint="?attr/colorPrimary"
-            android:textColor="?attr/colorOnPrimary" />
-
-        <Button
-            android:id="@+id/btnFilterPending"
-            android:layout_width="0dp"
-            android:layout_height="34dp"
-            android:layout_weight="1"
-            android:layout_marginHorizontal="3dp"
-            android:text="معلقة"
-            android:textSize="11sp"
-            android:backgroundTint="?attr/colorSurface"
-            android:textColor="?attr/colorOnSurface" />
-
-        <Button
-            android:id="@+id/btnFilterInTransit"
-            android:layout_width="0dp"
-            android:layout_height="34dp"
-            android:layout_weight="1"
-            android:layout_marginHorizontal="3dp"
-            android:text="بالطريق"
-            android:textSize="11sp"
-            android:backgroundTint="?attr/colorSurface"
-            android:textColor="?attr/colorOnSurface" />
-
-        <Button
-            android:id="@+id/btnFilterCompleted"
-            android:layout_width="0dp"
-            android:layout_height="34dp"
-            android:layout_weight="1"
-            android:layout_marginStart="3dp"
-            android:text="مكتملة"
-            android:textSize="11sp"
-            android:backgroundTint="?attr/colorSurface"
-            android:textColor="?attr/colorOnSurface" />
+            android:id="@+id/btnScanItems"
+            android:layout_width="match_parent"
+            android:layout_height="38dp"
+            android:text="📷 مسح قطع RFID للتحويل"
+            android:textSize="12sp"
+            android:backgroundTint="?attr/colorSecondary"
+            android:textColor="?attr/colorOnSecondary" />
     </LinearLayout>
 
     <!-- قائمة التحويلات -->
