@@ -1,0 +1,437 @@
+package com.example.uhf.fragment;
+
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.cardview.widget.CardView;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.uhf.R;
+import com.example.uhf.activity.UHFMainActivity;
+import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.manager.MiraBranchesManager;
+import com.example.uhf.manager.MiraOrgProfileManager;
+
+import org.json.JSONObject;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * MIRA UHF RFID Live Inventory Scanner
+ * 
+ * نظام جرد مباشر بالـ RFID:
+ * - مسح مستمر عالي السرعة
+ * - إحصائيات حية (معدل المسح، التاجات الفريدة)
+ * - تفاصيل آخر تاغ
+ * - قائمة حديثة بآخر 100 تاغ
+ * - تصدير CSV
+ * - دعم عربي/إنجليزي كامل
+ * - ربط تلقائي بالفرع النشط
+ */
+public class MiraUHFReadTagFragment extends Fragment {
+
+    private static final String TAG = "MiraUHFInventory";
+
+    // ==================== Stats Dashboard ====================
+    private TextView tvTotalScanned, tvUniqueTags, tvScanRate, tvElapsed, tvBranchName;
+
+    // ==================== Last Tag Card ====================
+    private TextView tvLastTagEPC, tvLastTagTitle, tvLastTagKarat, tvLastTagWeight, tvLastTagStatus;
+    private CardView cardLastTag;
+
+    // ==================== Controls ====================
+    private ProgressBar pbScanProgress;
+    private RecyclerView rvRecentTags;
+    private Button btnStartInventory, btnStopInventory, btnClearInventory, btnExportInventory;
+
+    // ==================== Managers ====================
+    private MiraApiClient apiClient;
+    private MiraBranchesManager branchesManager;
+    private MiraOrgProfileManager orgProfile;
+    private boolean isArabic;
+
+    // ==================== State ====================
+    private boolean isScanning = false;
+    private long startTime = 0;
+    private final AtomicInteger totalScanned = new AtomicInteger(0);
+    private final AtomicInteger uniqueTags = new AtomicInteger(0);
+    private final List<ScannedTag> recentTags = new ArrayList<>();
+    private final List<String> scannedEPCs = new ArrayList<>();
+    private RecentTagsAdapter recentAdapter;
+
+    // ==================== Handlers ====================
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Handler timerHandler = new Handler(Looper.getMainLooper());
+    private Runnable timerRunnable;
+    private double scanRatePerSec = 0;
+    private int lastSecondCount = 0;
+
+    // ==================== Lifecycle ====================
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.fragment_mira_uhf_readtag, container, false);
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        Context ctx = getContext();
+        if (ctx != null) {
+            apiClient = MiraApiClient.getInstance(ctx);
+            branchesManager = MiraBranchesManager.getInstance(ctx);
+            orgProfile = MiraOrgProfileManager.getInstance(ctx);
+        }
+        isArabic = Locale.getDefault().getLanguage().equals("ar");
+
+        initViews(view);
+        setupRecyclerView();
+        setupListeners();
+        updateBranchDisplay();
+    }
+
+    // ==================== Init ====================
+
+    private void initViews(View v) {
+        tvTotalScanned = v.findViewById(R.id.tvTotalScanned);
+        tvUniqueTags = v.findViewById(R.id.tvUniqueTags);
+        tvScanRate = v.findViewById(R.id.tvScanRate);
+        tvElapsed = v.findViewById(R.id.tvElapsed);
+        tvBranchName = v.findViewById(R.id.tvBranchName);
+
+        tvLastTagEPC = v.findViewById(R.id.tvLastTagEPC);
+        tvLastTagTitle = v.findViewById(R.id.tvLastTagTitle);
+        tvLastTagKarat = v.findViewById(R.id.tvLastTagKarat);
+        tvLastTagWeight = v.findViewById(R.id.tvLastTagWeight);
+        tvLastTagStatus = v.findViewById(R.id.tvLastTagStatus);
+        cardLastTag = v.findViewById(R.id.cardLastTag);
+
+        pbScanProgress = v.findViewById(R.id.pbScanProgress);
+        rvRecentTags = v.findViewById(R.id.rvRecentTags);
+
+        btnStartInventory = v.findViewById(R.id.btnStartInventory);
+        btnStopInventory = v.findViewById(R.id.btnStopInventory);
+        btnClearInventory = v.findViewById(R.id.btnClearInventory);
+        btnExportInventory = v.findViewById(R.id.btnExportInventory);
+
+        resetUI();
+    }
+
+    private void setupRecyclerView() {
+        rvRecentTags.setLayoutManager(new LinearLayoutManager(getContext()));
+        recentAdapter = new RecentTagsAdapter(recentTags);
+        rvRecentTags.setAdapter(recentAdapter);
+    }
+
+    private void setupListeners() {
+        btnStartInventory.setOnClickListener(v -> startInventory());
+        btnStopInventory.setOnClickListener(v -> stopInventory());
+        btnClearInventory.setOnClickListener(v -> clearInventory());
+        btnExportInventory.setOnClickListener(v -> exportResults());
+    }
+
+    private void updateBranchDisplay() {
+        if (tvBranchName != null && branchesManager != null) {
+            tvBranchName.setText("📍 " + branchesManager.getActiveBranchDisplayName());
+        }
+    }
+
+    // ==================== Inventory Lifecycle ====================
+
+    private void startInventory() {
+        isScanning = true;
+        startTime = System.currentTimeMillis();
+        totalScanned.set(0);
+        uniqueTags.set(0);
+        lastSecondCount = 0;
+        recentTags.clear();
+        scannedEPCs.clear();
+        if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
+
+        btnStartInventory.setEnabled(false);
+        btnStartInventory.setAlpha(0.5f);
+        btnStopInventory.setEnabled(true);
+        btnStopInventory.setAlpha(1f);
+        btnClearInventory.setEnabled(false);
+        pbScanProgress.setVisibility(View.VISIBLE);
+
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).loopFlag = true;
+        }
+
+        startTimer();
+        updateUI();
+
+        Toast.makeText(getContext(), ar("🔍 بدء الجرد المباشر...", "🔍 Live Inventory Started..."), Toast.LENGTH_SHORT).show();
+    }
+
+    private void stopInventory() {
+        isScanning = false;
+
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).loopFlag = false;
+        }
+
+        btnStartInventory.setEnabled(true);
+        btnStartInventory.setAlpha(1f);
+        btnStopInventory.setEnabled(false);
+        btnStopInventory.setAlpha(0.5f);
+        btnClearInventory.setEnabled(true);
+        pbScanProgress.setVisibility(View.GONE);
+
+        stopTimer();
+        updateUI();
+
+        long elapsed = (System.currentTimeMillis() - startTime) / 1000;
+        String msg = ar(
+            "✅ اكتمل: " + totalScanned.get() + " مسح، " + uniqueTags.get() + " قطعة في " + elapsed + " ثانية",
+            "✅ Done: " + totalScanned.get() + " scans, " + uniqueTags.get() + " items in " + elapsed + "s");
+        Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
+    }
+
+    private void clearInventory() {
+        totalScanned.set(0);
+        uniqueTags.set(0);
+        lastSecondCount = 0;
+        scanRatePerSec = 0;
+        startTime = 0;
+        recentTags.clear();
+        scannedEPCs.clear();
+        if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
+        resetUI();
+        Toast.makeText(getContext(), ar("🗑️ تم مسح الجرد", "🗑️ Cleared"), Toast.LENGTH_SHORT).show();
+    }
+
+    private void resetUI() {
+        tvTotalScanned.setText("0");
+        tvUniqueTags.setText("0");
+        tvScanRate.setText("0/s");
+        tvElapsed.setText("00:00");
+        tvLastTagEPC.setText("—");
+        tvLastTagTitle.setText(ar("في انتظار المسح...", "Awaiting scan..."));
+        tvLastTagKarat.setText("—");
+        tvLastTagWeight.setText("—");
+        tvLastTagStatus.setText("⚪");
+        btnStopInventory.setEnabled(false);
+        btnStopInventory.setAlpha(0.5f);
+        btnClearInventory.setEnabled(false);
+        pbScanProgress.setVisibility(View.GONE);
+    }
+
+    // ==================== RFID Tag Reception ====================
+
+    /**
+     * يستدعيها UHFMainActivity عند قراءة أي تاق RFID
+     */
+    public void onTagScanned(String epc, String rssi) {
+        if (!isScanning) return;
+        if (epc == null || epc.isEmpty()) return;
+
+        if (scannedEPCs.contains(epc)) {
+            totalScanned.incrementAndGet();
+            updateUI();
+            return;
+        }
+
+        scannedEPCs.add(epc);
+        totalScanned.incrementAndGet();
+        uniqueTags.incrementAndGet();
+
+        ScannedTag tag = new ScannedTag();
+        tag.epc = epc;
+        tag.rssi = rssi;
+        tag.timestamp = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
+        recentTags.add(0, tag);
+        if (recentAdapter != null) recentAdapter.notifyItemInserted(0);
+        if (rvRecentTags != null) rvRecentTags.scrollToPosition(0);
+
+        if (recentTags.size() > 100) {
+            recentTags.remove(recentTags.size() - 1);
+        }
+
+        updateLastTagDisplay(epc, rssi);
+        queryItemDetails(epc, rssi);
+        updateUI();
+    }
+
+    private void updateLastTagDisplay(String epc, String rssi) {
+        if (tvLastTagEPC != null) tvLastTagEPC.setText(epc);
+        if (tvLastTagTitle != null) tvLastTagTitle.setText(ar("جاري الاستعلام...", "Querying..."));
+        if (tvLastTagStatus != null) {
+            tvLastTagStatus.setText("🔍");
+            tvLastTagStatus.setTextColor(Color.parseColor("#F59E0B"));
+        }
+        if (cardLastTag != null) cardLastTag.setVisibility(View.VISIBLE);
+    }
+
+    private void queryItemDetails(String epc, String rssi) {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                JSONObject extraParams = new JSONObject();
+                extraParams.put("branch_id", branchesManager.getActiveBranchId());
+                if (rssi != null) extraParams.put("rssi", rssi);
+
+                MiraApiClient.ApiResponse response = apiClient.authorize(epc, "inventory", extraParams);
+
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONObject item = response.data.optJSONObject("item");
+                    if (item != null) {
+                        String title = item.optString("title", "");
+                        String karat = item.optString("karat", "");
+                        String weight = String.format(Locale.US, "%.2fg", item.optDouble("weight", 0));
+                        String status = item.optString("status", "");
+
+                        mainHandler.post(() -> {
+                            if (tvLastTagTitle != null) tvLastTagTitle.setText(title.isEmpty() ? epc : title);
+                            if (tvLastTagKarat != null) tvLastTagKarat.setText(karat);
+                            if (tvLastTagWeight != null) tvLastTagWeight.setText(weight);
+
+                            boolean ok = "in_stock".equals(status) || "available".equals(status);
+                            if (tvLastTagStatus != null) {
+                                tvLastTagStatus.setText(ok ? "✅" : "⚠️");
+                                tvLastTagStatus.setTextColor(ok ? Color.parseColor("#22C55E") : Color.parseColor("#F59E0B"));
+                            }
+
+                            for (ScannedTag t : recentTags) {
+                                if (t.epc.equals(epc)) {
+                                    t.title = title;
+                                    t.karat = karat;
+                                    t.weight = weight;
+                                    t.status = ok ? "✓" : "⚠";
+                                    break;
+                                }
+                            }
+                            if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
+                        });
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Query error: " + e.getMessage());
+            }
+        });
+    }
+
+    // ==================== Timer ====================
+
+    private void startTimer() {
+        timerRunnable = () -> {
+            if (!isAdded()) return;
+            long elapsed = (System.currentTimeMillis() - startTime) / 1000;
+            tvElapsed.setText(String.format(Locale.US, "%02d:%02d", elapsed / 60, elapsed % 60));
+
+            int currentTotal = totalScanned.get();
+            scanRatePerSec = currentTotal - lastSecondCount;
+            lastSecondCount = currentTotal;
+            tvScanRate.setText(String.format(Locale.US, "%.0f/s", scanRatePerSec));
+
+            timerHandler.postDelayed(timerRunnable, 1000);
+        };
+        timerHandler.post(timerRunnable);
+    }
+
+    private void stopTimer() {
+        if (timerRunnable != null) timerHandler.removeCallbacks(timerRunnable);
+    }
+
+    private void updateUI() {
+        tvTotalScanned.setText(String.valueOf(totalScanned.get()));
+        tvUniqueTags.setText(String.valueOf(uniqueTags.get()));
+    }
+
+    // ==================== Export ====================
+
+    private void exportResults() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(orgProfile != null ? orgProfile.getOrgName() : "MIRA Jewelry").append("\n");
+        sb.append(ar("تقرير الجرد", "Inventory Report")).append("\n");
+        sb.append(ar("الفرع: ", "Branch: ")).append(branchesManager.getActiveBranchDisplayName()).append("\n");
+        sb.append(ar("التاريخ: ", "Date: ")).append(new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date())).append("\n");
+        sb.append(ar("إجمالي المسوحات: ", "Total Scans: ")).append(totalScanned.get()).append("\n");
+        sb.append(ar("القطع الفريدة: ", "Unique Items: ")).append(uniqueTags.get()).append("\n\n");
+        sb.append("EPC,Title,Karat,Weight,Status,Time\n");
+        for (ScannedTag t : recentTags) {
+            sb.append(t.epc).append(",").append(t.title).append(",").append(t.karat)
+              .append(",").append(t.weight).append(",").append(t.status).append(",").append(t.timestamp).append("\n");
+        }
+
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("text/csv");
+        intent.putExtra(Intent.EXTRA_TEXT, sb.toString());
+        startActivity(Intent.createChooser(intent, ar("تصدير الجرد", "Export Inventory")));
+    }
+
+    private String ar(String arabic, String english) { return isArabic ? arabic : english; }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        stopTimer();
+        timerHandler.removeCallbacksAndMessages(null);
+        mainHandler.removeCallbacksAndMessages(null);
+    }
+
+    // ==================== Models ====================
+
+    static class ScannedTag {
+        String epc, rssi, title, karat, weight, status, timestamp;
+    }
+
+    class RecentTagsAdapter extends RecyclerView.Adapter<RecentTagsAdapter.VH> {
+        final List<ScannedTag> list;
+        RecentTagsAdapter(List<ScannedTag> list) { this.list = list; }
+
+        @NonNull @Override
+        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            return new VH(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_scanned_tag, parent, false));
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull VH h, int pos) {
+            ScannedTag t = list.get(pos);
+            h.tvEPC.setText(t.epc);
+            h.tvTitle.setText(t.title != null ? t.title : "—");
+            h.tvDetails.setText((t.karat != null ? t.karat : "") + " | " + (t.weight != null ? t.weight : ""));
+            h.tvStatus.setText(t.status != null ? t.status : "");
+            h.tvTime.setText(t.timestamp);
+        }
+
+        @Override public int getItemCount() { return list.size(); }
+
+        class VH extends RecyclerView.ViewHolder {
+            TextView tvEPC, tvTitle, tvDetails, tvStatus, tvTime;
+            VH(View v) {
+                super(v);
+                tvEPC = v.findViewById(R.id.tvTagEPC);
+                tvTitle = v.findViewById(R.id.tvTagTitle);
+                tvDetails = v.findViewById(R.id.tvTagDetails);
+                tvStatus = v.findViewById(R.id.tvTagStatus);
+                tvTime = v.findViewById(R.id.tvTagTime);
+            }
+        }
+    }
+}
