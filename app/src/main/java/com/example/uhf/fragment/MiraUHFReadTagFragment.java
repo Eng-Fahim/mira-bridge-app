@@ -2,8 +2,12 @@ package com.example.uhf.fragment;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -28,14 +32,18 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -43,22 +51,34 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MiraUHFReadTagFragment extends Fragment {
     private static final String TAG = "MiraUHFInventory";
 
-    private final ExecutorService queryExecutor = Executors.newFixedThreadPool(2);
+    private final ExecutorService queryExecutor = Executors.newFixedThreadPool(4);
     private final List<ScannedTag> recentTags = Collections.synchronizedList(new ArrayList<>());
     private final List<String> scannedEPCs = Collections.synchronizedList(new ArrayList<>());
 
+    // Reconciliation Engine
+    private final ConcurrentHashMap<String, ExpectedItem> expectedItemsMap = new ConcurrentHashMap<>();
+    private final AtomicInteger expectedTotal = new AtomicInteger(0);
+    private final AtomicInteger foundCount = new AtomicInteger(0);
+    private final AtomicInteger missingCount = new AtomicInteger(0);
+    private final AtomicInteger unexpectedCount = new AtomicInteger(0);
+    private String lastScreenshotPath = null;
+
+    // UI
     private TextView tvTotalScanned, tvUniqueTags, tvScanRate, tvElapsed, tvBranchName;
     private TextView tvLastTagEPC, tvLastTagTitle, tvLastTagKarat, tvLastTagWeight, tvLastTagStatus;
+    private TextView tvExpectedTotal, tvFoundCount, tvMissingCount, tvUnexpectedCount;
+    private TextView tvReconciliationResult;
     private CardView cardLastTag;
-
     private ProgressBar pbScanProgress;
     private RecyclerView rvRecentTags;
-    private Button btnStartInventory, btnStopInventory, btnClearInventory, btnExportInventory;
+    private Button btnStartInventory, btnStopInventory, btnClearInventory;
+    private Button btnExportInventory, btnExportMissing, btnScreenshot;
 
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
     private boolean isArabic;
+    private String sessionId;
 
     private boolean isScanning = false;
     private long startTime = 0;
@@ -69,35 +89,37 @@ public class MiraUHFReadTagFragment extends Fragment {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Handler timerHandler = new Handler(Looper.getMainLooper());
     private Runnable timerRunnable;
-    private double scanRatePerSec = 0;
     private int lastSecondCount = 0;
 
-    public void onKeyDownTrigger() {
-        if (!isScanning) {
-            startInventory();
-        } else {
-            stopInventory();
-        }
+    // Data class
+    public static class ExpectedItem {
+        public String epc, title, karat;
+        public double weight;
+        public boolean isFound = false;
+        public String scanTime;
     }
 
-    @Nullable
-@Override
-public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-                         @Nullable Bundle savedInstanceState) {
-    try {
-        return inflater.inflate(R.layout.fragment_mira_uhf_readtag, container, false);
-    } catch (Exception e) {
-        String errorMsg = e.getMessage();
-        Log.e(TAG, "❌ onCreateView inflate error: " + errorMsg);
-        e.printStackTrace();
-        
-        // عرض الخطأ الحقيقي
-        if (getContext() != null) {
-            Toast.makeText(getContext(), "خطأ: " + errorMsg, Toast.LENGTH_LONG).show();
-        }
-        return new View(getContext());
+    static class ScannedTag {
+        String epc, rssi, title, karat, weight, status, itemStatus, category, timestamp;
+        double price;
     }
-}
+
+    // ==================== Lifecycle ====================
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        try {
+            return inflater.inflate(R.layout.fragment_mira_uhf_readtag, container, false);
+        } catch (Exception e) {
+            Log.e(TAG, "❌ inflate error: " + e.getMessage());
+            if (getContext() != null) {
+                Toast.makeText(getContext(), "خطأ: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+            return new View(getContext());
+        }
+    }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
@@ -110,12 +132,9 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
             orgProfile = MiraOrgProfileManager.getInstance(ctx);
         }
         isArabic = Locale.getDefault().getLanguage().equals("ar");
+        sessionId = "INV-" + System.currentTimeMillis();
 
-        if (!initViews(view)) {
-            Log.e(TAG, "❌ initViews failed - views missing");
-            return;
-        }
-
+        if (!initViews(view)) return;
         setupRecyclerView();
         setupListeners();
         updateBranchDisplay();
@@ -128,138 +147,118 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
             tvScanRate = v.findViewById(R.id.tvScanRate);
             tvElapsed = v.findViewById(R.id.tvElapsed);
             tvBranchName = v.findViewById(R.id.tvBranchName);
-
             tvLastTagEPC = v.findViewById(R.id.tvLastTagEPC);
             tvLastTagTitle = v.findViewById(R.id.tvLastTagTitle);
             tvLastTagKarat = v.findViewById(R.id.tvLastTagKarat);
             tvLastTagWeight = v.findViewById(R.id.tvLastTagWeight);
             tvLastTagStatus = v.findViewById(R.id.tvLastTagStatus);
+            tvExpectedTotal = v.findViewById(R.id.tvExpectedTotal);
+            tvFoundCount = v.findViewById(R.id.tvFoundCount);
+            tvMissingCount = v.findViewById(R.id.tvMissingCount);
+            tvUnexpectedCount = v.findViewById(R.id.tvUnexpectedCount);
+            tvReconciliationResult = v.findViewById(R.id.tvReconciliationResult);
             cardLastTag = v.findViewById(R.id.cardLastTag);
-
             pbScanProgress = v.findViewById(R.id.pbScanProgress);
             rvRecentTags = v.findViewById(R.id.rvRecentTags);
-
             btnStartInventory = v.findViewById(R.id.btnStartInventory);
             btnStopInventory = v.findViewById(R.id.btnStopInventory);
             btnClearInventory = v.findViewById(R.id.btnClearInventory);
             btnExportInventory = v.findViewById(R.id.btnExportInventory);
+            btnExportMissing = v.findViewById(R.id.btnExportMissing);
+            btnScreenshot = v.findViewById(R.id.btnScreenshot);
 
-            // التحقق من وجود جميع العناصر
-            if (tvTotalScanned == null || tvUniqueTags == null || tvScanRate == null ||
-                tvElapsed == null || rvRecentTags == null || btnStartInventory == null ||
-                btnStopInventory == null || btnClearInventory == null || btnExportInventory == null) {
-                Log.e(TAG, "❌ One or more views are null! Check XML IDs.");
+            if (tvTotalScanned == null || rvRecentTags == null || btnStartInventory == null) {
+                Log.e(TAG, "❌ Critical views null");
                 return false;
             }
-
             resetUI();
             return true;
         } catch (Exception e) {
-            Log.e(TAG, "❌ initViews error: " + e.getMessage());
-            e.printStackTrace();
+            Log.e(TAG, "❌ initViews: " + e.getMessage());
             return false;
         }
     }
 
     private void setupRecyclerView() {
         try {
-            Context ctx = getContext();
-            if (ctx == null) {
-                Log.e(TAG, "❌ setupRecyclerView: Context is null");
-                return;
-            }
-            if (rvRecentTags == null) {
-                Log.e(TAG, "❌ setupRecyclerView: rvRecentTags is null");
-                return;
-            }
-            rvRecentTags.setLayoutManager(new LinearLayoutManager(ctx));
+            if (getContext() == null || rvRecentTags == null) return;
+            rvRecentTags.setLayoutManager(new LinearLayoutManager(getContext()));
             recentAdapter = new RecentTagsAdapter(recentTags);
             rvRecentTags.setAdapter(recentAdapter);
         } catch (Exception e) {
-            Log.e(TAG, "❌ setupRecyclerView error: " + e.getMessage());
-            e.printStackTrace();
+            Log.e(TAG, "❌ RecyclerView: " + e.getMessage());
         }
     }
 
     private void setupListeners() {
-        try {
-            if (btnStartInventory != null) btnStartInventory.setOnClickListener(v -> startInventory());
-            if (btnStopInventory != null) btnStopInventory.setOnClickListener(v -> stopInventory());
-            if (btnClearInventory != null) btnClearInventory.setOnClickListener(v -> clearInventory());
-            if (btnExportInventory != null) btnExportInventory.setOnClickListener(v -> exportResults());
-        } catch (Exception e) {
-            Log.e(TAG, "❌ setupListeners error: " + e.getMessage());
-        }
+        if (btnStartInventory != null) btnStartInventory.setOnClickListener(v -> startInventory());
+        if (btnStopInventory != null) btnStopInventory.setOnClickListener(v -> stopInventory());
+        if (btnClearInventory != null) btnClearInventory.setOnClickListener(v -> clearInventory());
+        if (btnExportInventory != null) btnExportInventory.setOnClickListener(v -> exportFullReport());
+        if (btnExportMissing != null) btnExportMissing.setOnClickListener(v -> exportMissingReport());
+        if (btnScreenshot != null) btnScreenshot.setOnClickListener(v -> takeScreenshot());
     }
 
     private void updateBranchDisplay() {
-        if (tvBranchName != null && branchesManager != null) {
-            try {
+        try {
+            if (tvBranchName != null && branchesManager != null) {
                 tvBranchName.setText("📍 " + branchesManager.getActiveBranchDisplayName());
-            } catch (Exception e) {
-                Log.e(TAG, "❌ updateBranchDisplay error: " + e.getMessage());
             }
+        } catch (Exception e) {
+            Log.e(TAG, "❌ branch: " + e.getMessage());
         }
     }
 
+    // ==================== Inventory Control ====================
+
     private void startInventory() {
-        isScanning = true;
-        startTime = System.currentTimeMillis();
-        totalScanned.set(0);
-        uniqueTags.set(0);
-        lastSecondCount = 0;
-        recentTags.clear();
-        scannedEPCs.clear();
-        if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
+        loadExpectedInventory(() -> {
+            isScanning = true;
+            startTime = System.currentTimeMillis();
+            totalScanned.set(0);
+            uniqueTags.set(0);
+            lastSecondCount = 0;
+            recentTags.clear();
+            scannedEPCs.clear();
 
-        if (btnStartInventory != null) {
-            btnStartInventory.setEnabled(false);
-            btnStartInventory.setAlpha(0.5f);
-        }
-        if (btnStopInventory != null) {
-            btnStopInventory.setEnabled(true);
-            btnStopInventory.setAlpha(1f);
-        }
-        if (btnClearInventory != null) btnClearInventory.setEnabled(false);
-        if (pbScanProgress != null) pbScanProgress.setVisibility(View.VISIBLE);
+            if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
+            if (btnStartInventory != null) { btnStartInventory.setEnabled(false); btnStartInventory.setAlpha(0.5f); }
+            if (btnStopInventory != null) { btnStopInventory.setEnabled(true); btnStopInventory.setAlpha(1f); }
+            if (btnClearInventory != null) btnClearInventory.setEnabled(false);
 
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).loopFlag = true;
-        }
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).loopFlag = true;
+            }
 
-        startTimer();
-        updateUI();
+            startTimer();
+            updateUI();
+            updateReconciliationCounters();
 
-        if (getContext() != null) {
-            Toast.makeText(getContext(), ar("🔍 بدء الجرد المباشر...", "🔍 Live Inventory Started..."), Toast.LENGTH_SHORT).show();
-        }
+            if (getContext() != null) {
+                Toast.makeText(getContext(), ar("🔍 بدء الجرد...", "🔍 Inventory Started..."), Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void stopInventory() {
         isScanning = false;
-
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).loopFlag = false;
         }
 
-        if (btnStartInventory != null) {
-            btnStartInventory.setEnabled(true);
-            btnStartInventory.setAlpha(1f);
-        }
-        if (btnStopInventory != null) {
-            btnStopInventory.setEnabled(false);
-            btnStopInventory.setAlpha(0.5f);
-        }
+        if (btnStartInventory != null) { btnStartInventory.setEnabled(true); btnStartInventory.setAlpha(1f); }
+        if (btnStopInventory != null) { btnStopInventory.setEnabled(false); btnStopInventory.setAlpha(0.5f); }
         if (btnClearInventory != null) btnClearInventory.setEnabled(true);
         if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
 
         stopTimer();
         updateUI();
+        updateReconciliationResult();
 
         long elapsed = (System.currentTimeMillis() - startTime) / 1000;
         String msg = ar(
-            "✅ اكتمل: " + totalScanned.get() + " مسح، " + uniqueTags.get() + " قطعة في " + elapsed + " ثانية",
-            "✅ Done: " + totalScanned.get() + " scans, " + uniqueTags.get() + " items in " + elapsed + "s");
+            "✅ " + totalScanned.get() + " مسح | " + foundCount.get() + " مطابق | " + missingCount.get() + " ناقص | " + unexpectedCount.get() + " زائد",
+            "✅ " + totalScanned.get() + " scans | " + foundCount.get() + " found | " + missingCount.get() + " missing | " + unexpectedCount.get() + " extra");
 
         if (getContext() != null) {
             Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
@@ -269,11 +268,15 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
     private void clearInventory() {
         totalScanned.set(0);
         uniqueTags.set(0);
+        foundCount.set(0);
+        missingCount.set(0);
+        unexpectedCount.set(0);
+        expectedTotal.set(0);
         lastSecondCount = 0;
-        scanRatePerSec = 0;
         startTime = 0;
         recentTags.clear();
         scannedEPCs.clear();
+        expectedItemsMap.clear();
         if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
         resetUI();
         if (getContext() != null) {
@@ -282,25 +285,82 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
     }
 
     private void resetUI() {
-        try {
-            if (tvTotalScanned != null) tvTotalScanned.setText("0");
-            if (tvUniqueTags != null) tvUniqueTags.setText("0");
-            if (tvScanRate != null) tvScanRate.setText("0/s");
-            if (tvElapsed != null) tvElapsed.setText("00:00");
-            if (tvLastTagEPC != null) tvLastTagEPC.setText("—");
-            if (tvLastTagTitle != null) tvLastTagTitle.setText(ar("في انتظار المسح...", "Awaiting scan..."));
-            if (tvLastTagKarat != null) tvLastTagKarat.setText("—");
-            if (tvLastTagWeight != null) tvLastTagWeight.setText("—");
-            if (tvLastTagStatus != null) tvLastTagStatus.setText("⚪");
-            if (btnStopInventory != null) {
-                btnStopInventory.setEnabled(false);
-                btnStopInventory.setAlpha(0.5f);
+        if (tvTotalScanned != null) tvTotalScanned.setText("0");
+        if (tvUniqueTags != null) tvUniqueTags.setText("0");
+        if (tvScanRate != null) tvScanRate.setText("0/s");
+        if (tvElapsed != null) tvElapsed.setText("00:00");
+        if (tvExpectedTotal != null) tvExpectedTotal.setText("0");
+        if (tvFoundCount != null) tvFoundCount.setText("0");
+        if (tvMissingCount != null) tvMissingCount.setText("0");
+        if (tvUnexpectedCount != null) tvUnexpectedCount.setText("0");
+        if (tvReconciliationResult != null) tvReconciliationResult.setText(ar("في انتظار بدء الجرد...", "Awaiting inventory start..."));
+        if (tvLastTagEPC != null) tvLastTagEPC.setText("—");
+        if (tvLastTagTitle != null) tvLastTagTitle.setText(ar("في انتظار المسح...", "Awaiting scan..."));
+        if (tvLastTagKarat != null) tvLastTagKarat.setText("—");
+        if (tvLastTagWeight != null) tvLastTagWeight.setText("—");
+        if (tvLastTagStatus != null) tvLastTagStatus.setText("⚪");
+        if (btnStopInventory != null) { btnStopInventory.setEnabled(false); btnStopInventory.setAlpha(0.5f); }
+        if (btnClearInventory != null) btnClearInventory.setEnabled(false);
+        if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
+    }
+
+    public void onKeyDownTrigger() {
+        if (!isScanning) startInventory();
+        else stopInventory();
+    }
+
+    // ==================== Reconciliation Engine ====================
+
+    private void loadExpectedInventory(Runnable onReady) {
+        if (pbScanProgress != null) pbScanProgress.setVisibility(View.VISIBLE);
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                int branchId = branchesManager.getActiveBranchId();
+                MiraApiClient.ApiResponse response = apiClient.getBranchExpectedInventory(branchId);
+
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONArray array = response.data.optJSONArray("items");
+                    expectedItemsMap.clear();
+
+                    if (array != null) {
+                        for (int i = 0; i < array.length(); i++) {
+                            JSONObject obj = array.getJSONObject(i);
+                            ExpectedItem item = new ExpectedItem();
+                            item.epc = obj.optString("epc");
+                            item.title = obj.optString("title", "");
+                            item.karat = obj.optString("karat", "");
+                            item.weight = obj.optDouble("weight", 0);
+                            item.isFound = false;
+                            expectedItemsMap.put(item.epc, item);
+                        }
+                    }
+
+                    expectedTotal.set(expectedItemsMap.size());
+                    missingCount.set(expectedItemsMap.size());
+                    foundCount.set(0);
+                    unexpectedCount.set(0);
+
+                    mainHandler.post(() -> {
+                        if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
+                        updateReconciliationCounters();
+                        if (onReady != null) onReady.run();
+                    });
+                } else {
+                    mainHandler.post(() -> {
+                        if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
+                        Toast.makeText(getContext(), ar("تحذير: لم يتم تحميل المخزون المتوقع", "Warning: Expected inventory not loaded"), Toast.LENGTH_SHORT).show();
+                        if (onReady != null) onReady.run();
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "loadExpectedInventory: " + e.getMessage());
+                mainHandler.post(() -> {
+                    if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
+                    if (onReady != null) onReady.run();
+                });
             }
-            if (btnClearInventory != null) btnClearInventory.setEnabled(false);
-            if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
-        } catch (Exception e) {
-            Log.e(TAG, "❌ resetUI error: " + e.getMessage());
-        }
+        });
     }
 
     public void onTagScanned(String epc, String rssi) {
@@ -316,140 +376,242 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
         totalScanned.incrementAndGet();
         uniqueTags.incrementAndGet();
 
+        String currentTime = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
+
+        // Reconciliation O(1)
+        if (expectedItemsMap.containsKey(epc)) {
+            ExpectedItem item = expectedItemsMap.get(epc);
+            if (item != null && !item.isFound) {
+                item.isFound = true;
+                item.scanTime = currentTime;
+                foundCount.incrementAndGet();
+                missingCount.decrementAndGet();
+                mainHandler.post(() -> updateLastTagDisplayFull(epc, item.title, item.karat, 
+                    String.format(Locale.US, "%.2fg", item.weight), "✅"));
+            }
+        } else {
+            unexpectedCount.incrementAndGet();
+            mainHandler.post(() -> updateLastTagDisplayFull(epc, ar("غير مسجلة", "Unregistered"), "—", "—", "⚠️"));
+        }
+
         ScannedTag tag = new ScannedTag();
         tag.epc = epc;
-        tag.rssi = rssi;
-        tag.timestamp = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
+        tag.rssi = rssi != null ? rssi : "—";
+        tag.timestamp = currentTime;
+        tag.status = expectedItemsMap.containsKey(epc) ? "✓" : "⚠";
 
         synchronized (recentTags) {
             recentTags.add(0, tag);
-            if (recentTags.size() > 100) {
-                recentTags.remove(recentTags.size() - 1);
-            }
+            if (recentTags.size() > 500) recentTags.remove(recentTags.size() - 1);
         }
 
         mainHandler.post(() -> {
-            if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
+            if (recentAdapter != null) recentAdapter.notifyItemInserted(0);
             if (rvRecentTags != null) rvRecentTags.scrollToPosition(0);
-            updateLastTagDisplay(epc, rssi);
+            updateReconciliationCounters();
             updateUI();
         });
-
-        queryItemDetails(epc, rssi);
     }
 
-    private void updateLastTagDisplay(String epc, String rssi) {
+    private void updateLastTagDisplayFull(String epc, String title, String karat, String weight, String statusIcon) {
         if (tvLastTagEPC != null) tvLastTagEPC.setText(epc);
-        if (tvLastTagTitle != null) tvLastTagTitle.setText(ar("جاري الاستعلام...", "Querying..."));
+        if (tvLastTagTitle != null) tvLastTagTitle.setText(title.isEmpty() ? epc : title);
+        if (tvLastTagKarat != null) tvLastTagKarat.setText(karat);
+        if (tvLastTagWeight != null) tvLastTagWeight.setText(weight);
         if (tvLastTagStatus != null) {
-            tvLastTagStatus.setText("🔍");
-            tvLastTagStatus.setTextColor(Color.parseColor("#F59E0B"));
+            tvLastTagStatus.setText(statusIcon);
+            tvLastTagStatus.setTextColor(statusIcon.equals("✅") ? Color.parseColor("#22C55E") : Color.parseColor("#F59E0B"));
         }
         if (cardLastTag != null) cardLastTag.setVisibility(View.VISIBLE);
     }
 
-    private void queryItemDetails(String epc, String rssi) {
-        queryExecutor.execute(() -> {
-            if (!isAdded() || apiClient == null || branchesManager == null) return;
-            try {
-                JSONObject extraParams = new JSONObject();
-                extraParams.put("branch_id", branchesManager.getActiveBranchId());
-                if (rssi != null) extraParams.put("rssi", rssi);
-
-                MiraApiClient.ApiResponse response = apiClient.authorize(epc, "inventory", extraParams);
-
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject item = response.data.optJSONObject("item");
-                    if (item != null) {
-                        String title = item.optString("title", "");
-                        String karat = item.optString("karat", "");
-                        String weight = String.format(Locale.US, "%.2fg", item.optDouble("weight", 0));
-                        String status = item.optString("status", "");
-
-                        mainHandler.post(() -> {
-                            if (!isAdded()) return;
-                            if (tvLastTagTitle != null) tvLastTagTitle.setText(title.isEmpty() ? epc : title);
-                            if (tvLastTagKarat != null) tvLastTagKarat.setText(karat);
-                            if (tvLastTagWeight != null) tvLastTagWeight.setText(weight);
-
-                            boolean ok = "in_stock".equals(status) || "available".equals(status);
-                            if (tvLastTagStatus != null) {
-                                tvLastTagStatus.setText(ok ? "✅" : "⚠️");
-                                tvLastTagStatus.setTextColor(ok ? Color.parseColor("#22C55E") : Color.parseColor("#F59E0B"));
-                            }
-
-                            synchronized (recentTags) {
-                                for (ScannedTag t : recentTags) {
-                                    if (t.epc.equals(epc)) {
-                                        t.title = title;
-                                        t.karat = karat;
-                                        t.weight = weight;
-                                        t.status = ok ? "✓" : "⚠";
-                                        break;
-                                    }
-                                }
-                            }
-                            if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
-                        });
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Query error: " + e.getMessage());
-            }
-        });
+    private void updateReconciliationCounters() {
+        if (tvExpectedTotal != null) tvExpectedTotal.setText(String.valueOf(expectedTotal.get()));
+        if (tvFoundCount != null) tvFoundCount.setText(String.valueOf(foundCount.get()));
+        if (tvMissingCount != null) tvMissingCount.setText(String.valueOf(missingCount.get()));
+        if (tvUnexpectedCount != null) tvUnexpectedCount.setText(String.valueOf(unexpectedCount.get()));
     }
 
+    private void updateReconciliationResult() {
+        if (tvReconciliationResult == null) return;
+        
+        int found = foundCount.get();
+        int missing = missingCount.get();
+        int unexpected = unexpectedCount.get();
+        int total = expectedTotal.get();
+        
+        if (total == 0) {
+            tvReconciliationResult.setText(ar("لا يوجد مخزون متوقع للمقارنة", "No expected inventory"));
+            tvReconciliationResult.setTextColor(Color.parseColor("#F59E0B"));
+        } else if (missing == 0 && unexpected == 0) {
+            tvReconciliationResult.setText(ar("✅ توافق تام - جميع القطع مطابقة", "✅ Full Match - All items accounted"));
+            tvReconciliationResult.setTextColor(Color.parseColor("#16A34A"));
+        } else if (missing > 0 && unexpected == 0) {
+            tvReconciliationResult.setText(ar("⚠️ نقص: " + missing + " قطعة مفقودة", "⚠️ Missing: " + missing + " items"));
+            tvReconciliationResult.setTextColor(Color.parseColor("#DC2626"));
+        } else if (missing == 0 && unexpected > 0) {
+            tvReconciliationResult.setText(ar("⚠️ زيادة: " + unexpected + " قطعة غير مسجلة", "⚠️ Extra: " + unexpected + " unregistered"));
+            tvReconciliationResult.setTextColor(Color.parseColor("#F59E0B"));
+        } else {
+            tvReconciliationResult.setText(ar("🚨 نقص: " + missing + " | زيادة: " + unexpected, "🚨 Missing: " + missing + " | Extra: " + unexpected));
+            tvReconciliationResult.setTextColor(Color.parseColor("#DC2626"));
+        }
+    }
+
+    // ==================== Export ====================
+
+    private void exportFullReport() {
+        StringBuilder sb = buildReportHeader();
+        sb.append("No,EPC,Title,Karat,Weight,Match,Time,RSSI\n");
+        synchronized (recentTags) {
+            int i = 0;
+            for (ScannedTag t : recentTags) {
+                i++;
+                sb.append(i).append(",").append(csv(t.epc)).append(",").append(csv(t.title)).append(",")
+                  .append(csv(t.karat)).append(",").append(csv(t.weight)).append(",")
+                  .append(csv(t.status)).append(",").append(csv(t.timestamp)).append(",").append(csv(t.rssi)).append("\n");
+            }
+        }
+        shareCsv(sb, "MIRA_Full_Inventory_" + sessionId + ".csv");
+    }
+
+    private void exportMissingReport() {
+        List<ExpectedItem> missing = getMissingItemsList();
+        StringBuilder sb = buildReportHeader();
+        sb.append(ar("النواقص: ", "Missing: ")).append(missing.size()).append("\n\n");
+        sb.append("EPC,Title,Karat,Weight,Status\n");
+        for (ExpectedItem item : missing) {
+            sb.append(csv(item.epc)).append(",").append(csv(item.title)).append(",")
+              .append(csv(item.karat)).append(",").append(item.weight).append(",MISSING\n");
+        }
+        shareCsv(sb, "MIRA_Missing_" + sessionId + ".csv");
+    }
+
+    private List<ExpectedItem> getMissingItemsList() {
+        List<ExpectedItem> missing = new ArrayList<>();
+        for (ExpectedItem item : expectedItemsMap.values()) {
+            if (!item.isFound) missing.add(item);
+        }
+        return missing;
+    }
+
+    private StringBuilder buildReportHeader() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== MIRA INVENTORY REPORT ===\n");
+        sb.append("Organization: ").append(orgProfile != null ? orgProfile.getOrgName() : "MIRA").append("\n");
+        sb.append("Branch: ").append(branchesManager != null ? branchesManager.getActiveBranchDisplayName() : "N/A").append("\n");
+        sb.append("Session: ").append(sessionId).append("\n");
+        sb.append("Date: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date())).append("\n");
+        sb.append("Expected: ").append(expectedTotal.get()).append("\n");
+        sb.append("Found: ").append(foundCount.get()).append("\n");
+        sb.append("Missing: ").append(missingCount.get()).append("\n");
+        sb.append("Unexpected: ").append(unexpectedCount.get()).append("\n");
+        sb.append("Total Scans: ").append(totalScanned.get()).append("\n");
+        sb.append("================================\n\n");
+        return sb;
+    }
+
+    private void shareCsv(StringBuilder sb, String filename) {
+        try {
+            if (getContext() == null) return;
+            Intent intent = new Intent(Intent.ACTION_SEND);
+            intent.setType("text/csv");
+            intent.putExtra(Intent.EXTRA_SUBJECT, filename);
+            intent.putExtra(Intent.EXTRA_TEXT, sb.toString());
+            startActivity(Intent.createChooser(intent, ar("تصدير", "Export")));
+        } catch (Exception e) {
+            Log.e(TAG, "shareCsv: " + e.getMessage());
+        }
+    }
+
+    private String csv(String s) {
+        if (s == null) return "";
+        if (s.contains(",") || s.contains("\"")) return "\"" + s.replace("\"", "\"\"") + "\"";
+        return s;
+    }
+
+    // ==================== Screenshot ====================
+
+    private void takeScreenshot() {
+        try {
+            View rootView = getView();
+            if (rootView == null) {
+                Toast.makeText(getContext(), ar("لا توجد واجهة", "No view"), Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            Bitmap bitmap = Bitmap.createBitmap(rootView.getWidth(), rootView.getHeight(), Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            rootView.draw(canvas);
+
+            String filename = "MIRA_Screenshot_" + sessionId + "_" + System.currentTimeMillis() + ".png";
+            File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+            if (!dir.exists()) dir.mkdirs();
+            File file = new File(dir, filename);
+            FileOutputStream fos = new FileOutputStream(file);
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
+            fos.flush();
+            fos.close();
+
+            lastScreenshotPath = file.getAbsolutePath();
+            
+            // مقارنة مع لقطة سابقة
+            if (lastScreenshotPath != null && !lastScreenshotPath.equals(file.getAbsolutePath())) {
+                Toast.makeText(getContext(), 
+                    ar("📸 تم الحفظ: " + filename + "\nللمقارنة مع اللقطة السابقة", 
+                       "📸 Saved: " + filename + "\nCompare with previous screenshot"), 
+                    Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(getContext(), ar("📸 تم الحفظ: " + filename, "📸 Saved: " + filename), Toast.LENGTH_SHORT).show();
+            }
+
+            // فتح الملف
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(Uri.fromFile(file), "image/png");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(intent, ar("فتح اللقطة", "Open Screenshot")));
+
+        } catch (Exception e) {
+            Log.e(TAG, "screenshot: " + e.getMessage());
+            Toast.makeText(getContext(), ar("فشل التقاط اللقطة", "Screenshot failed"), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // ==================== Timer ====================
+
     private void startTimer() {
-        timerRunnable = () -> {
-            if (!isAdded()) return;
-            long elapsed = (System.currentTimeMillis() - startTime) / 1000;
-            if (tvElapsed != null) {
-                tvElapsed.setText(String.format(Locale.US, "%02d:%02d", elapsed / 60, elapsed % 60));
+        stopTimer();
+        timerRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!isAdded()) return;
+                long elapsed = (System.currentTimeMillis() - startTime) / 1000;
+                if (elapsed < 0) elapsed = 0;
+                if (tvElapsed != null) {
+                    tvElapsed.setText(String.format(Locale.US, "%02d:%02d", elapsed / 60, elapsed % 60));
+                }
+                int currentTotal = totalScanned.get();
+                double rate = currentTotal - lastSecondCount;
+                lastSecondCount = currentTotal;
+                if (tvScanRate != null && rate >= 0) {
+                    tvScanRate.setText(String.format(Locale.US, "%.0f/s", rate));
+                }
+                timerHandler.postDelayed(this, 1000);
             }
-
-            int currentTotal = totalScanned.get();
-            scanRatePerSec = currentTotal - lastSecondCount;
-            lastSecondCount = currentTotal;
-            if (tvScanRate != null) {
-                tvScanRate.setText(String.format(Locale.US, "%.0f/s", scanRatePerSec));
-            }
-
-            timerHandler.postDelayed(timerRunnable, 1000);
         };
         timerHandler.post(timerRunnable);
     }
 
     private void stopTimer() {
-        if (timerRunnable != null) timerHandler.removeCallbacks(timerRunnable);
+        if (timerRunnable != null) {
+            timerHandler.removeCallbacks(timerRunnable);
+            timerRunnable = null;
+        }
     }
 
     private void updateUI() {
         if (tvTotalScanned != null) tvTotalScanned.setText(String.valueOf(totalScanned.get()));
         if (tvUniqueTags != null) tvUniqueTags.setText(String.valueOf(uniqueTags.get()));
-    }
-
-    private void exportResults() {
-        if (getContext() == null) return;
-        StringBuilder sb = new StringBuilder();
-        sb.append(orgProfile != null ? orgProfile.getOrgName() : "MIRA Jewelry").append("\n");
-        sb.append(ar("تقرير الجرد", "Inventory Report")).append("\n");
-        sb.append(ar("الفرع: ", "Branch: ")).append(branchesManager != null ? branchesManager.getActiveBranchDisplayName() : "").append("\n");
-        sb.append(ar("التاريخ: ", "Date: ")).append(new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date())).append("\n");
-        sb.append(ar("إجمالي المسوحات: ", "Total Scans: ")).append(totalScanned.get()).append("\n");
-        sb.append(ar("القطع الفريدة: ", "Unique Items: ")).append(uniqueTags.get()).append("\n\n");
-        sb.append("EPC,Title,Karat,Weight,Status,Time\n");
-
-        synchronized (recentTags) {
-            for (ScannedTag t : recentTags) {
-                sb.append(t.epc).append(",").append(t.title).append(",").append(t.karat)
-                  .append(",").append(t.weight).append(",").append(t.status).append(",").append(t.timestamp).append("\n");
-            }
-        }
-
-        Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.setType("text/csv");
-        intent.putExtra(Intent.EXTRA_TEXT, sb.toString());
-        startActivity(Intent.createChooser(intent, ar("تصدير الجرد", "Export Inventory")));
     }
 
     private String ar(String arabic, String english) { return isArabic ? arabic : english; }
@@ -465,14 +627,10 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (queryExecutor != null && !queryExecutor.isShutdown()) {
-            queryExecutor.shutdownNow();
-        }
+        if (queryExecutor != null && !queryExecutor.isShutdown()) queryExecutor.shutdownNow();
     }
 
-    static class ScannedTag {
-        String epc, rssi, title, karat, weight, status, timestamp;
-    }
+    // ==================== Adapter ====================
 
     class RecentTagsAdapter extends RecyclerView.Adapter<RecentTagsAdapter.VH> {
         final List<ScannedTag> list;
@@ -486,10 +644,7 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
         @Override
         public void onBindViewHolder(@NonNull VH h, int pos) {
             ScannedTag t;
-            synchronized (list) {
-                if (pos >= list.size()) return;
-                t = list.get(pos);
-            }
+            synchronized (list) { if (pos >= list.size()) return; t = list.get(pos); }
             if (t != null) {
                 if (h.tvEPC != null) h.tvEPC.setText(t.epc);
                 if (h.tvTitle != null) h.tvTitle.setText(t.title != null ? t.title : "—");
@@ -499,11 +654,8 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
             }
         }
 
-        @Override public int getItemCount() {
-            synchronized (list) {
-                return list.size();
-            }
-        }
+        @Override
+        public int getItemCount() { synchronized (list) { return list.size(); } }
 
         class VH extends RecyclerView.ViewHolder {
             TextView tvEPC, tvTitle, tvDetails, tvStatus, tvTime;
@@ -517,4 +669,4 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
             }
         }
     }
-}
+                }
