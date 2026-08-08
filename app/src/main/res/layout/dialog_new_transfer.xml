@@ -1,101 +1,100 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:fillViewport="true">
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:layoutDirection="rtl">
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="إنشاء تحويل جديد"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp" />
+
+    <!-- من فرع -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="من فرع:"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="12sp"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:id="@+id/tvFromBranchName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🏢 الفرع الرئيسي"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:background="?attr/colorSurfaceVariant"
+        android:padding="12dp"
+        android:layout_marginBottom="12dp" />
+
+    <!-- إلى فرع -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="إلى فرع:"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="12sp"
+        android:layout_marginBottom="4dp" />
+
+    <Spinner
+        android:id="@+id/spToBranch"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="12dp" />
+
+    <!-- ملاحظات -->
+    <com.google.android.material.textfield.TextInputLayout
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:hint="ملاحظات">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etTransferNotes"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="textMultiLine"
+            android:gravity="top"
+            android:minLines="2"
+            android:textSize="13sp" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- أزرار -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="20dp"
-        android:layoutDirection="rtl">
+        android:orientation="horizontal"
+        android:gravity="end">
 
-        <TextView
+        <Button
+            android:id="@+id/btnCancelTransfer"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="📦 تحويل مخزون جديد"
+            android:layout_height="44dp"
+            android:layout_marginEnd="8dp"
+            android:text="إلغاء"
+            android:backgroundTint="?attr/colorSurfaceVariant"
             android:textColor="?attr/colorOnSurface"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="16dp" />
+            android:textSize="13sp" />
 
-        <!-- الفرع المصدر -->
-        <TextView
+        <Button
+            android:id="@+id/btnCreateTransfer"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="من فرع:"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp"
-            android:layout_marginBottom="4dp" />
-
-        <Spinner
-            android:id="@+id/spFromBranch"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginBottom="14dp"
-            android:background="?attr/colorSurfaceVariant" />
-
-        <!-- الفرع الهدف -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="إلى فرع:"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp"
-            android:layout_marginBottom="4dp" />
-
-        <Spinner
-            android:id="@+id/spToBranch"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginBottom="14dp"
-            android:background="?attr/colorSurfaceVariant" />
-
-        <!-- ملاحظات -->
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:hint="ملاحظات">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etTransferNotes"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="textMultiLine"
-                android:minLines="2"
-                android:textSize="13sp" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- أزرار -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="end">
-
-            <Button
-                android:id="@+id/btnCancelTransfer"
-                android:layout_width="wrap_content"
-                android:layout_height="44dp"
-                android:layout_marginEnd="8dp"
-                android:backgroundTint="?attr/colorSurfaceVariant"
-                android:text="إلغاء"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="13sp" />
-
-            <Button
-                android:id="@+id/btnCreateTransfer"
-                android:layout_width="wrap_content"
-                android:layout_height="44dp"
-                android:backgroundTint="?attr/colorPrimary"
-                android:text="إنشاء التحويل"
-                android:textColor="?attr/colorOnPrimary"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-        </LinearLayout>
+            android:layout_height="44dp"
+            android:text="إنشاء التحويل"
+            android:backgroundTint="?attr/colorPrimary"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="13sp"
+            android:textStyle="bold" />
     </LinearLayout>
-</ScrollView>
+</LinearLayout>
