@@ -270,6 +270,47 @@
             android:textColor="#4B5563" />
     </LinearLayout>
 
+    <!-- Reader Status & Help Bar -->
+<LinearLayout
+    android:id="@+id/layoutReaderStatus"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="6dp"
+    android:background="#FFFFFF">
+
+    <TextView
+        android:id="@+id/tvReaderStatus"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="🟢 القارئ متصل"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:textColor="#16A34A" />
+
+    <Button
+        android:id="@+id/btnScanCamera"
+        android:layout_width="wrap_content"
+        android:layout_height="36dp"
+        android:text="📷 مسح"
+        android:textSize="11sp"
+        android:layout_marginEnd="4dp"
+        android:backgroundTint="#8B5CF6"
+        android:textColor="#FFFFFF" />
+
+    <Button
+        android:id="@+id/btnHelpGuide"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:text="❓"
+        android:textSize="16sp"
+        android:backgroundTint="#F59E0B"
+        android:textColor="#FFFFFF" />
+</LinearLayout>
+
     <!-- Buttons Row 1 -->
     <LinearLayout
         android:layout_width="match_parent"
