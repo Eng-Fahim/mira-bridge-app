@@ -217,20 +217,3 @@
         android:clipToPadding="false" />
 
 </LinearLayout>
-
-و
-app/src/main/res/layout/item_scanned_tag.xml
-
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="wrap_content"
-    android:orientation="horizontal" android:padding="8dp" android:gravity="center_vertical"
-    android:background="@drawable/bg_tag_row">
-    <TextView android:id="@+id/tvTagStatus" android:text="" android:textSize="14sp" android:layout_marginEnd="8dp" android:minWidth="24dp"/>
-    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:orientation="vertical">
-        <TextView android:id="@+id/tvTagEPC" android:text="—" android:textSize="10sp" android:textColor="?attr/colorOnSurfaceVariant"/>
-        <TextView android:id="@+id/tvTagTitle" android:text="—" android:textSize="12sp" android:textStyle="bold"/>
-        <TextView android:id="@+id/tvTagDetails" android:text="" android:textSize="10sp" android:textColor="?attr/colorOnSurfaceVariant"/>
-    </LinearLayout>
-    <TextView android:id="@+id/tvTagTime" android:text="" android:textSize="9sp" android:textColor="?attr/colorOnSurfaceVariant"/>
-</LinearLayout>
