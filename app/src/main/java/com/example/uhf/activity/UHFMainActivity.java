@@ -1,5 +1,5 @@
 package com.example.uhf.activity;
-
+import com.example.uhf.fragment.MiraUHFReadTagFragment;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -329,22 +329,36 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     public void onTagRead(String epc) {
-        if (activePOSFragment != null && activePOSFragment.isVisible()) {
-            activePOSFragment.onRingScanned(epc);
-            return;
-        }
-        if (mTabHost != null) {
-            String currentTabTag = mTabHost.getCurrentTabTag();
-            if (currentTabTag != null) {
-                Fragment fragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
-                if (fragment instanceof MiraIdentityStudioFragment && fragment.isVisible()) {
-                    ((MiraIdentityStudioFragment) fragment).onRfidScanned(epc);
-                } else if (fragment instanceof MiraPosFragment && fragment.isVisible()) {
-                    ((MiraPosFragment) fragment).onRingScanned(epc);
-                }
+    // 1️⃣ الأولوية لـ POS Mode
+    if (activePOSFragment != null && activePOSFragment.isVisible()) {
+        activePOSFragment.onRingScanned(epc);
+        return;
+    }
+
+    if (mTabHost != null) {
+        String currentTabTag = mTabHost.getCurrentTabTag();
+        if (currentTabTag != null) {
+            Fragment fragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
+
+            // 2️⃣ جرد RFID المباشر
+            if (fragment instanceof MiraUHFReadTagFragment && fragment.isVisible()) {
+                ((MiraUHFReadTagFragment) fragment).onTagScanned(epc, "—");
+                return;
+            }
+
+            // 3️⃣ استوديو التكويد
+            if (fragment instanceof MiraIdentityStudioFragment && fragment.isVisible()) {
+                ((MiraIdentityStudioFragment) fragment).onRfidScanned(epc);
+                return;
+            }
+
+            // 4️⃣ POS Mode (من التبويب)
+            if (fragment instanceof MiraPosFragment && fragment.isVisible()) {
+                ((MiraPosFragment) fragment).onRingScanned(epc);
             }
         }
     }
+}
 
     // ==================== التبويبات ====================
 
