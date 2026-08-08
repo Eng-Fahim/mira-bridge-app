@@ -81,7 +81,21 @@
     <ProgressBar
         android:id="@+id/pbScanProgress"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        android:layout_height="wrap_content"
+        android:visibility="gone"/>
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardLastTag"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="CARD"
+            android:padding="16dp"/>
+    </androidx.cardview.widget.CardView>
 
     <Button
         android:id="@+id/btnStartInventory"
