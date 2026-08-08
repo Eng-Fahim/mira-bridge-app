@@ -139,28 +139,15 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         loadInventorySettings();
         loadLastSnapshot();
     }
-    /**
- * تحديث واجهة POS بناءً على الفرع المختار
- */
-private void updateForBranch(int branchId) {
-    if (tvCartStatus != null) {
-        String branchName = MiraBranchesManager.getInstance(getContext()).getActiveBranchDisplayName();
-        tvCartStatus.setText("📍 " + branchName + " | جاهز لمسح القطع");
-    }
-    
-    // إعادة تعيين السلة عند تغيير الفرع
-    clearCart();
-}
-   @Override
+  @Override
 public void onResume() {
     super.onResume();
-    if (getActivity() instanceof UHFMainActivity)
-        ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
     
-    // ✅ أضف هذا فقط
-    MiraBranchesManager bm = MiraBranchesManager.getInstance(requireContext());
-    if (bm.hasActiveBranch() && tvCartStatus != null) {
-        tvCartStatus.setText("📍 " + bm.getActiveBranchDisplayName() + " | جاهز");
+    if (branchesManager != null && branchesManager.hasActiveBranch()) {
+        if (tvInventoryStatus != null) {
+            tvInventoryStatus.setText("📍 " + branchesManager.getActiveBranchDisplayName());
+        }
+        loadLastSnapshot();
     }
 }
 
@@ -724,4 +711,4 @@ public void onResume() {
         if (rvInventoryItems != null) rvInventoryItems.setAdapter(null);
         super.onDestroyView();
     }
-                                                                                                                      }
+                    }
