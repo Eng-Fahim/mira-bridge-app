@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:attr/colorBackground"
+    android:background="#F9FAFB"
     android:orientation="vertical"
     android:layoutDirection="rtl">
 
@@ -14,14 +14,14 @@
         android:orientation="horizontal"
         android:paddingHorizontal="16dp"
         android:paddingVertical="12dp"
-        android:background="?attr/colorPrimary">
+        android:background="#D4AF37">
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="📡 جرد MIRA RFID"
-            android:textColor="?attr/colorOnPrimary"
+            android:textColor="#FFFFFF"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -30,7 +30,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="📍 الفرع"
-            android:textColor="?attr/colorOnPrimary"
+            android:textColor="#FFFFFF"
             android:textSize="11sp"
             android:alpha="0.85" />
     </LinearLayout>
@@ -40,7 +40,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:padding="12dp"
-        android:background="?attr/colorSurfaceVariant"
+        android:background="#F3F4F6"
         android:weightSum="4">
 
         <LinearLayout
@@ -50,9 +50,9 @@
             android:orientation="vertical">
             <TextView android:id="@+id/tvTotalScanned" android:text="0"
                 android:textSize="24sp" android:textStyle="bold"
-                android:textColor="#1E293B" />
+                android:textColor="#111827" />
             <TextView android:text="المسوحات" android:textSize="10sp"
-                android:textColor="#64748B" />
+                android:textColor="#4B5563" />
         </LinearLayout>
 
         <LinearLayout
@@ -62,9 +62,9 @@
             android:orientation="vertical">
             <TextView android:id="@+id/tvUniqueTags" android:text="0"
                 android:textSize="24sp" android:textStyle="bold"
-                android:textColor="?attr/colorPrimary" />
+                android:textColor="#D4AF37" />
             <TextView android:text="فريدة" android:textSize="10sp"
-                android:textColor="#64748B" />
+                android:textColor="#4B5563" />
         </LinearLayout>
 
         <LinearLayout
@@ -74,9 +74,9 @@
             android:orientation="vertical">
             <TextView android:id="@+id/tvScanRate" android:text="0/s"
                 android:textSize="24sp" android:textStyle="bold"
-                android:textColor="#22C55E" />
+                android:textColor="#16A34A" />
             <TextView android:text="معدل" android:textSize="10sp"
-                android:textColor="#64748B" />
+                android:textColor="#4B5563" />
         </LinearLayout>
 
         <LinearLayout
@@ -86,9 +86,9 @@
             android:orientation="vertical">
             <TextView android:id="@+id/tvElapsed" android:text="00:00"
                 android:textSize="24sp" android:textStyle="bold"
-                android:textColor="#1E293B" />
+                android:textColor="#111827" />
             <TextView android:text="الوقت" android:textSize="10sp"
-                android:textColor="#64748B" />
+                android:textColor="#4B5563" />
         </LinearLayout>
     </LinearLayout>
 
@@ -99,7 +99,7 @@
         android:layout_height="3dp"
         android:indeterminate="true"
         android:visibility="gone"
-        android:indeterminateTint="?attr/colorPrimary" />
+        android:indeterminateTint="#D4AF37" />
 
     <androidx.cardview.widget.CardView
         android:id="@+id/cardLastTag"
@@ -110,7 +110,7 @@
         app:cardCornerRadius="12dp"
         app:cardElevation="2dp"
         app:strokeWidth="1dp"
-        app:strokeColor="#E2E8F0">
+        app:strokeColor="#E5E7EB">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -123,7 +123,7 @@
                 android:layout_height="wrap_content"
                 android:text="القطعة الحالية"
                 android:textSize="10sp"
-                android:textColor="#64748B"
+                android:textColor="#4B5563"
                 android:textStyle="bold" />
 
             <TextView
@@ -133,7 +133,7 @@
                 android:text="—"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                android:textColor="#94A3B8"
+                android:textColor="#9CA3AF"
                 android:layout_marginTop="2dp"
                 android:fontFamily="monospace" />
 
@@ -152,7 +152,7 @@
                     android:text="في انتظار المسح..."
                     android:textSize="15sp"
                     android:textStyle="bold"
-                    android:textColor="#0F172A" />
+                    android:textColor="#111827" />
 
                 <TextView
                     android:id="@+id/tvLastTagStatus"
@@ -170,10 +170,10 @@
                 android:layout_marginTop="6dp">
 
                 <TextView android:id="@+id/tvLastTagKarat" android:text="—"
-                    android:textSize="13sp" android:textColor="?attr/colorPrimary" android:textStyle="bold" />
-                <TextView android:text="  •  " android:textColor="#94A3B8" android:textSize="13sp" />
+                    android:textSize="13sp" android:textColor="#D4AF37" android:textStyle="bold" />
+                <TextView android:text="  •  " android:textColor="#9CA3AF" android:textSize="13sp" />
                 <TextView android:id="@+id/tvLastTagWeight" android:text="—"
-                    android:textSize="13sp" android:textColor="#475569" />
+                    android:textSize="13sp" android:textColor="#4B5563" />
             </LinearLayout>
         </LinearLayout>
     </androidx.cardview.widget.CardView>
@@ -189,7 +189,7 @@
             android:text="▶ بدء"
             android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
             android:layout_marginEnd="2dp" android:textSize="13sp" android:textStyle="bold"
-            android:backgroundTint="?attr/colorPrimary" android:textColor="?attr/colorOnPrimary" />
+            android:backgroundTint="#D4AF37" android:textColor="#FFFFFF" />
 
         <Button android:id="@+id/btnStopInventory"
             android:text="⏹ إيقاف"
@@ -203,7 +203,7 @@
             android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
             android:layout_marginHorizontal="2dp" android:textSize="13sp"
             android:enabled="false"
-            android:backgroundTint="#94A3B8" android:textColor="#FFFFFF" />
+            android:backgroundTint="#D1D5DB" android:textColor="#FFFFFF" />
 
         <Button android:id="@+id/btnExportInventory"
             android:text="📤 تصدير"
