@@ -61,6 +61,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private TextView tvAccuracy, tvElapsedTime, tvLastScan, tvRssi;
     private TextView tvLastAuditDate, tvLastAccuracy, tvHighValueCount;
     private TextView tvPrevItems, tvCurrItems, tvDeltaItems;
+    // أضف في الأعلى مع المتغيرات:
+    private TextView tvLocation;
+
     private CardView cardComparison;
     private Button btnStartInventory, btnBlindInventory, btnStopInventory, btnGenerateReport, btnArchiveReports;
     private RecyclerView rvInventoryItems;
@@ -138,6 +141,24 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         loadInventorySettings();
         loadLastSnapshot();
     }
+    
+    @Override
+public void onResume() {
+    super.onResume();
+    
+    // ✅ تحديث البيانات حسب الفرع النشط عند العودة للتبويب
+    if (branchesManager != null && branchesManager.hasActiveBranch()) {
+        int branchId = branchesManager.getActiveBranchId();
+        
+        // تحديث عنوان الموقع
+        if (tvLocation != null) {
+            tvLocation.setText("📍 " + branchesManager.getActiveBranchDisplayName());
+        }
+        
+        // إعادة تحميل اللقطة السابقة للفرع الجديد
+        loadLastSnapshot();
+    }
+}
 
     // ==================== Init ====================
 
@@ -151,6 +172,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         tvLastScan = v.findViewById(R.id.tvLastScan);
         tvRssi = v.findViewById(R.id.tvRssi);
         tvPrevItems = v.findViewById(R.id.tvPrevItems);
+        tvLocation = v.findViewById(R.id.tvLocation);
         tvCurrItems = v.findViewById(R.id.tvCurrItems);
         tvDeltaItems = v.findViewById(R.id.tvDeltaItems);
         cardComparison = v.findViewById(R.id.cardComparison);
@@ -699,4 +721,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (rvInventoryItems != null) rvInventoryItems.setAdapter(null);
         super.onDestroyView();
     }
-                                                                                                                      }
+                               }
