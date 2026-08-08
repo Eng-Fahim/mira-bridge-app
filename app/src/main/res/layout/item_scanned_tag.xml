@@ -22,18 +22,30 @@
             android:layout_weight="1"
             android:orientation="vertical">
 
+            <!-- ID: tvTagTitle -->
             <TextView
-                android:id="@+id/tvEpc"
+                android:id="@+id/tvTagTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="خاتم ذهب عيار 21"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <!-- ID: tvTagEPC -->
+            <TextView
+                android:id="@+id/tvTagEPC"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="E2801191A00000000000"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:fontFamily="monospace" />
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:layout_marginTop="2dp" />
 
+            <!-- ID: tvTagDetails -->
             <TextView
-                android:id="@+id/tvDetails"
+                android:id="@+id/tvTagDetails"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="الوزن: 12.5 جم | العدد: 1"
@@ -42,14 +54,32 @@
                 android:layout_marginTop="2dp" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/tvStatus"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="مطابق"
-            android:textColor="#2E7D32"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:orientation="vertical"
+            android:gravity="end">
+
+            <!-- ID: tvTagStatus -->
+            <TextView
+                android:id="@+id/tvTagStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="مطابق"
+                android:textColor="#2E7D32"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <!-- ID: tvTagTime -->
+            <TextView
+                android:id="@+id/tvTagTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="10:45:12"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="10sp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
 
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
