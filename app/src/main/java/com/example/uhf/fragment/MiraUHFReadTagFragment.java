@@ -50,8 +50,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  * - دعم عربي/إنجليزي كامل
  * - ربط تلقائي بالفرع النشط
  */
-public class MiraUHFReadTagFragment extends Fragment {
+// ❌ قبل
+//public class MiraUHFReadTagFragment extends Fragment {
 
+// ✅ بعد
+public class MiraUHFReadTagFragment extends KeyDwonFragment {
     private static final String TAG = "MiraUHFInventory";
 
     // ==================== Stats Dashboard ====================
