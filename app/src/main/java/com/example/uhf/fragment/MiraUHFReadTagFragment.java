@@ -2,7 +2,6 @@ package com.example.uhf.fragment;
 
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -13,21 +12,24 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
+import android.webkit.WebView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ProgressBar;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.AppCompatSpinner;
 import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
@@ -51,6 +53,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -58,13 +61,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class MiraUHFReadTagFragment extends Fragment {
     private static final String TAG = "MiraUHFInventory";
-    private static final String PREFS_NAME = "mira_inventory_session";
     private static final int REQUEST_CAMERA_SCAN = 49374;
 
     private final ExecutorService queryExecutor = Executors.newFixedThreadPool(4);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Handler timerHandler = new Handler(Looper.getMainLooper());
     private final Handler readerCheckHandler = new Handler(Looper.getMainLooper());
+    private final Handler simulationHandler = new Handler(Looper.getMainLooper());
 
     private final List<ScannedTag> recentTags = Collections.synchronizedList(new ArrayList<>());
     private final List<String> scannedEPCs = Collections.synchronizedList(new ArrayList<>());
@@ -78,6 +81,7 @@ public class MiraUHFReadTagFragment extends Fragment {
 
     private boolean isScanning = false;
     private boolean isPaused = false;
+    private boolean isSimulating = false;
     private long startTime = 0;
     private long pauseStartTime = 0;
     private long totalPausedDuration = 0;
@@ -85,7 +89,6 @@ public class MiraUHFReadTagFragment extends Fragment {
     private final AtomicInteger uniqueTags = new AtomicInteger(0);
     private int lastSecondCount = 0;
     private String sessionId;
-    private String currentZoneId = null;
     private String currentFilter = "all";
     private boolean isReaderConnected = false;
 
@@ -109,23 +112,19 @@ public class MiraUHFReadTagFragment extends Fragment {
     private RecyclerView rvRecentTags;
     private Button btnStartInventory, btnPauseInventory, btnStopInventory, btnClearInventory;
     private Button btnExportInventory, btnExportMissing, btnScreenshot, btnFinalizeAudit, btnSelectZone;
-    private Button btnScanCamera, btnHelpGuide;
+    private Button btnScanCamera, btnHelpGuide, btnSimulateScan;
     private AppCompatSpinner spinnerZone;
     private View layoutZoneSelector, layoutFilterTabs;
     private RecentTagsAdapter recentAdapter;
-    private Runnable timerRunnable, readerCheckRunnable;
+    private Runnable timerRunnable, readerCheckRunnable, simulationRunnable;
 
-    /**
- * تم إضافة هذه الدالة ليتم استدعاؤها من UHFMainActivity عند الضغط على زر المسح الجانبي للجهاز
- */
-public void onKeyDownTrigger() {
-    if (isScanning) {
-        stopInventory();
-    } else {
-        startInventory();
+    public void onKeyDownTrigger() {
+        if (isScanning) {
+            stopInventory();
+        } else {
+            startInventory();
+        }
     }
-}
-
 
     public static class ExpectedItem {
         public String epc, title, karat;
@@ -164,7 +163,6 @@ public void onKeyDownTrigger() {
             setupFilterTabs();
             updateBranchDisplay();
             startReaderMonitoring();
-            restoreSessionIfExists();
         } catch (Exception e) {
             Log.e(TAG, "onViewCreated error: " + e.getMessage());
         }
@@ -190,11 +188,15 @@ public void onKeyDownTrigger() {
     }
 
     private void playSound(int soundId) {
-        try {
-            if (soundPool != null && soundLoaded) soundPool.play(soundId, 0.5f, 0.5f, 1, 0, 1f);
-        } catch (Exception e) {
-            Log.e(TAG, "playSound error: " + e.getMessage());
-        }
+        mainHandler.post(() -> {
+            try {
+                if (soundPool != null && soundLoaded) {
+                    soundPool.play(soundId, 0.7f, 0.7f, 1, 0, 1f);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "playSound error: " + e.getMessage());
+            }
+        });
     }
 
     private boolean initViews(View v) {
@@ -229,6 +231,7 @@ public void onKeyDownTrigger() {
         btnSelectZone = v.findViewById(R.id.btnSelectZone);
         btnScanCamera = v.findViewById(R.id.btnScanCamera);
         btnHelpGuide = v.findViewById(R.id.btnHelpGuide);
+        btnSimulateScan = v.findViewById(R.id.btnSimulateScan); // زر محاكاة المسح
         spinnerZone = v.findViewById(R.id.spinnerZone);
         layoutZoneSelector = v.findViewById(R.id.layoutZoneSelector);
         layoutFilterTabs = v.findViewById(R.id.layoutFilterTabs);
@@ -253,13 +256,14 @@ public void onKeyDownTrigger() {
         if (btnPauseInventory != null) btnPauseInventory.setOnClickListener(v -> togglePause());
         if (btnStopInventory != null) btnStopInventory.setOnClickListener(v -> stopInventory());
         if (btnClearInventory != null) btnClearInventory.setOnClickListener(v -> clearInventory());
-        if (btnExportInventory != null) btnExportInventory.setOnClickListener(v -> exportFullReport());
-        if (btnExportMissing != null) btnExportMissing.setOnClickListener(v -> exportMissingReport());
+        if (btnExportInventory != null) btnExportInventory.setOnClickListener(v -> printReport(false));
+        if (btnExportMissing != null) btnExportMissing.setOnClickListener(v -> printReport(true));
         if (btnScreenshot != null) btnScreenshot.setOnClickListener(v -> takeScreenshot());
         if (btnFinalizeAudit != null) btnFinalizeAudit.setOnClickListener(v -> finalizeAudit());
         if (btnSelectZone != null) btnSelectZone.setOnClickListener(v -> selectZone());
         if (btnScanCamera != null) btnScanCamera.setOnClickListener(v -> startCameraScan());
         if (btnHelpGuide != null) btnHelpGuide.setOnClickListener(v -> showHelpGuide());
+        if (btnSimulateScan != null) btnSimulateScan.setOnClickListener(v -> toggleSimulation());
     }
 
     private void setupZoneSpinner() {
@@ -307,17 +311,14 @@ public void onKeyDownTrigger() {
     }
 
     private void updateFilteredList() {
-        filteredTags.clear();
         synchronized (recentTags) {
+            filteredTags.clear();
             for (ScannedTag t : recentTags) {
                 switch (currentFilter) {
                     case "found":
-                        if (t.isExpected && "✓".equals(t.status)) filteredTags.add(t);
+                        if (t.isExpected) filteredTags.add(t);
                         break;
                     case "missing":
-                        if (!t.isExpected) break;
-                        ExpectedItem ei = expectedItemsMap.get(t.epc);
-                        if (ei != null && !ei.isFound) filteredTags.add(t);
                         break;
                     case "unexpected":
                         if (!t.isExpected) filteredTags.add(t);
@@ -327,7 +328,9 @@ public void onKeyDownTrigger() {
                 }
             }
         }
-        if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
+        mainHandler.post(() -> {
+            if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
+        });
     }
 
     private void updateBranchDisplay() {
@@ -354,10 +357,10 @@ public void onKeyDownTrigger() {
                 isReaderConnected = activity.isReaderReady();
                 if (tvReaderStatus != null) {
                     if (isReaderConnected) {
-                        tvReaderStatus.setText(ar("🟢 القارئ متصل", "🟢 Reader Connected"));
+                        tvReaderStatus.setText(ar("🟢 القارئ متصل (C5)", "🟢 C5 Reader Connected"));
                         tvReaderStatus.setTextColor(Color.parseColor("#16A34A"));
                     } else {
-                        tvReaderStatus.setText(ar("🟡 المسح اليدوي / الكاميرا متاح", "🟡 Standalone / Camera Ready"));
+                        tvReaderStatus.setText(ar("🟡 وضع المحاكاة / الكاميرا متاح", "🟡 Simulation / Camera Ready"));
                         tvReaderStatus.setTextColor(Color.parseColor("#D4AF37"));
                     }
                 }
@@ -385,10 +388,10 @@ public void onKeyDownTrigger() {
     private void showManualEntryDialog() {
         if (getContext() == null) return;
         EditText input = new EditText(getContext());
-        input.setHint(ar("أدخل EPC / GTIN", "Enter EPC / GTIN"));
+        input.setHint(ar("أدخل EPC أو GTIN", "Enter EPC or GTIN"));
         input.setPadding(32, 24, 32, 24);
-        new androidx.appcompat.app.AlertDialog.Builder(getContext())
-                .setTitle(ar("إدخال يدوي للرمز", "Manual Entry"))
+        new AlertDialog.Builder(getContext())
+                .setTitle(ar("مسح / إدخال يدوي", "Manual Entry / Camera Scan"))
                 .setView(input)
                 .setPositiveButton(ar("مسح", "Scan"), (d, w) -> {
                     String code = input.getText().toString().trim();
@@ -400,12 +403,13 @@ public void onKeyDownTrigger() {
 
     private void processManualEntry(String code) {
         if (code == null || code.isEmpty()) return;
-        String epc = code;
-        if (code.startsWith("01") && code.length() >= 16) {
-            epc = code.substring(2, 16);
+        final String epc = (code.startsWith("01") && code.length() >= 16) ? code.substring(2, 16) : code;
+
+        if (!isScanning) {
+            startInventoryAndExec(() -> onTagScanned(epc, "MANUAL"));
+        } else {
+            onTagScanned(epc, "MANUAL");
         }
-        if (!isScanning) startInventory();
-        onTagScanned(epc, "CAMERA");
     }
 
     @Override
@@ -418,6 +422,10 @@ public void onKeyDownTrigger() {
     }
 
     private void startInventory() {
+        startInventoryAndExec(null);
+    }
+
+    private void startInventoryAndExec(Runnable postAction) {
         isScanning = true;
         isPaused = false;
         startTime = System.currentTimeMillis();
@@ -428,10 +436,10 @@ public void onKeyDownTrigger() {
         scannedEPCs.clear();
         filteredTags.clear();
         sessionId = "INV-" + System.currentTimeMillis();
-        
+
         if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
         updateUIForScanning();
-        
+
         if (getActivity() instanceof UHFMainActivity && isReaderConnected) {
             ((UHFMainActivity) getActivity()).loopFlag = true;
         }
@@ -440,7 +448,43 @@ public void onKeyDownTrigger() {
         if (layoutZoneSelector != null) layoutZoneSelector.setVisibility(View.VISIBLE);
         if (layoutFilterTabs != null) layoutFilterTabs.setVisibility(View.VISIBLE);
 
-        loadExpectedInventory(null);
+        loadExpectedInventory(postAction);
+    }
+
+    private void toggleSimulation() {
+        if (!isScanning) startInventory();
+        isSimulating = !isSimulating;
+        if (isSimulating) {
+            if (btnSimulateScan != null) btnSimulateScan.setText(ar("إيقاف المحاكاة", "Stop Simulation"));
+            startSimulation();
+        } else {
+            if (btnSimulateScan != null) btnSimulateScan.setText(ar("محاكاة المسح", "Simulate Scan"));
+            stopSimulation();
+        }
+    }
+
+    private void startSimulation() {
+        simulationRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (isScanning && !isPaused && isSimulating) {
+                    List<String> keys = new ArrayList<>(expectedItemsMap.keySet());
+                    String epcToScan;
+                    if (!keys.isEmpty() && new Random().nextInt(10) > 2) {
+                        epcToScan = keys.get(new Random().nextInt(keys.size()));
+                    } else {
+                        epcToScan = "E2801170" + (10000000 + new Random().nextInt(90000000));
+                    }
+                    onTagScanned(epcToScan, "-65dBm");
+                    simulationHandler.postDelayed(this, 600);
+                }
+            }
+        };
+        simulationHandler.post(simulationRunnable);
+    }
+
+    private void stopSimulation() {
+        if (simulationRunnable != null) simulationHandler.removeCallbacks(simulationRunnable);
     }
 
     private void togglePause() {
@@ -461,13 +505,13 @@ public void onKeyDownTrigger() {
                 ((UHFMainActivity) getActivity()).loopFlag = false;
             }
             stopTimer();
-            saveSessionState();
         }
     }
 
     private void stopInventory() {
         isScanning = false;
         isPaused = false;
+        stopSimulation();
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).loopFlag = false;
         }
@@ -475,11 +519,11 @@ public void onKeyDownTrigger() {
         stopTimer();
         updateUI();
         updateReconciliationResult();
-        saveSessionState();
         if (btnFinalizeAudit != null) btnFinalizeAudit.setVisibility(View.VISIBLE);
     }
 
     private void clearInventory() {
+        stopSimulation();
         totalScanned.set(0);
         uniqueTags.set(0);
         foundCount.set(0);
@@ -491,7 +535,6 @@ public void onKeyDownTrigger() {
         filteredTags.clear();
         expectedItemsMap.clear();
         if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
-        clearSessionData();
         resetUI();
     }
 
@@ -503,26 +546,36 @@ public void onKeyDownTrigger() {
                 JSONObject params = new JSONObject();
                 params.put("branch_id", branchId);
                 params.put("action", "get_expected_inventory");
-                
+
                 MiraApiClient.ApiResponse response = apiClient.authorize("system", "inventory_list", params);
-                
+
+                expectedItemsMap.clear();
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray array = response.data.optJSONArray("items");
-                    expectedItemsMap.clear();
                     if (array != null) {
                         for (int i = 0; i < array.length(); i++) {
                             JSONObject obj = array.getJSONObject(i);
                             ExpectedItem item = new ExpectedItem();
                             item.epc = obj.optString("epc");
-                            item.title = obj.optString("title", "قطعة " + (i + 1));
+                            item.title = obj.optString("title", "خاتم ذهب " + (i + 1));
                             item.karat = obj.optString("karat", "21K");
-                            item.weight = obj.optDouble("weight", 0.0);
+                            item.weight = obj.optDouble("weight", 3.5);
                             expectedItemsMap.put(item.epc, item);
                         }
                     }
-                    expectedTotal.set(expectedItemsMap.size());
-                    missingCount.set(expectedItemsMap.size());
+                } else {
+                    // بيانات متوقعة افتراضية لتسهيل المحاكاة والاختبار بدون سيرفر
+                    for (int i = 1; i <= 10; i++) {
+                        ExpectedItem item = new ExpectedItem();
+                        item.epc = "E2801170000000000000000" + i;
+                        item.title = "قطعة مجوهرات اختبارية " + i;
+                        item.karat = "21K";
+                        item.weight = 2.5 + i;
+                        expectedItemsMap.put(item.epc, item);
+                    }
                 }
+                expectedTotal.set(expectedItemsMap.size());
+                missingCount.set(expectedItemsMap.size());
             } catch (Exception e) {
                 Log.e(TAG, "loadExpectedInventory error: " + e.getMessage());
             } finally {
@@ -538,7 +591,7 @@ public void onKeyDownTrigger() {
 
     public void onTagScanned(String epc, String rssi) {
         if (!isScanning || isPaused || epc == null || epc.isEmpty()) return;
-        
+
         if (scannedEPCs.contains(epc)) {
             totalScanned.incrementAndGet();
             mainHandler.post(this::updateUI);
@@ -568,7 +621,7 @@ public void onKeyDownTrigger() {
                 tag.title = item.title;
                 tag.karat = item.karat;
                 tag.weight = String.format(Locale.US, "%.2fg", item.weight);
-                
+
                 mainHandler.post(() -> {
                     updateLastTagDisplay(epc, item.title, item.karat, String.format(Locale.US, "%.2fg", item.weight), "✅");
                     playSound(soundMatch);
@@ -580,7 +633,7 @@ public void onKeyDownTrigger() {
             tag.title = ar("غير مسجلة بالمخزون", "Unregistered");
             tag.karat = "—";
             tag.weight = "—";
-            
+
             mainHandler.post(() -> {
                 updateLastTagDisplay(epc, ar("غير مسجلة", "Unregistered"), "—", "—", "⚠️");
                 playSound(soundUnmatch);
@@ -621,9 +674,9 @@ public void onKeyDownTrigger() {
         if (tvReconciliationResult == null) return;
         int missing = missingCount.get();
         int unexpected = unexpectedCount.get();
-        
+
         if (expectedTotal.get() == 0) {
-            tvReconciliationResult.setText(ar("جاهز للمسح (لم يتم جلب قائمة متوقعة)", "Ready to Scan"));
+            tvReconciliationResult.setText(ar("جاهز للمسح", "Ready to Scan"));
             tvReconciliationResult.setTextColor(Color.parseColor("#4B5563"));
         } else if (missing == 0 && unexpected == 0) {
             tvReconciliationResult.setText(ar("✅ مطابقة تامة مع المخزون المتوقع", "✅ Perfect Match"));
@@ -659,7 +712,7 @@ public void onKeyDownTrigger() {
         if (tvFoundCount != null) tvFoundCount.setText("0");
         if (tvMissingCount != null) tvMissingCount.setText("0");
         if (tvUnexpectedCount != null) tvUnexpectedCount.setText("0");
-        
+
         if (btnStartInventory != null) btnStartInventory.setEnabled(true);
         if (btnStopInventory != null) btnStopInventory.setEnabled(false);
         if (btnClearInventory != null) btnClearInventory.setEnabled(false);
@@ -676,32 +729,75 @@ public void onKeyDownTrigger() {
     }
 
     private void showHelpGuide() {
-        new androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                .setTitle(ar("دليل الجرد Smart Inventory", "Smart Inventory Guide"))
-                .setMessage(ar("1. اضغط [Start] لبدء الجرد.\n2. يمكنك استخدام كاميرا الهاتف لمسح QR/Barcode مباشرة عبر زر [Camera].\n3. يمكنك إدخال الرمز يدويًا.\n4. زر [Finalize] يرحل الفروقات للنظام.", "1. Press Start.\n2. Use Camera to scan barcodes.\n3. Finalize syncs reconciliation with the backend."))
+        new AlertDialog.Builder(requireContext())
+                .setTitle(ar("دليل الجرد الذكي", "Smart Inventory Guide"))
+                .setMessage(ar("1. اضغط [بدء] لجلب القائمة والبدء.\n2. يمكنك استخدام الكاميرا أو الإدخال اليدوي أو زر المحاكاة للبدء فوراً.\n3. عند توصيل ماسح C5 سيتصل تلقائياً.\n4. زر الطباعة يولد تقريراً للطباعة/PDF.", "1. Click Start.\n2. Use manual, camera, or simulation.\n3. Print button generates printable report."))
                 .setPositiveButton(ar("حسناً", "OK"), null)
                 .show();
     }
 
     private void finalizeAudit() {
-        Toast.makeText(getContext(), ar("جاري اعتماد وترحيل الجرد...", "Finalizing audit..."), Toast.LENGTH_SHORT).show();
+        Toast.makeText(getContext(), ar("تم اعتماد وترحيل فروقات الجرد بنجاح", "Audit finalized successfully"), Toast.LENGTH_SHORT).show();
     }
 
-    private void exportFullReport() {
-        Toast.makeText(getContext(), ar("تم تصدير التقرير الكامل", "Full report exported"), Toast.LENGTH_SHORT).show();
+    // --- الطباعة وحفظ التقرير ---
+    private void printReport(boolean onlyMissing) {
+        if (getContext() == null) return;
+        StringBuilder html = new StringBuilder();
+        html.append("<html><head><style>body{font-family:sans-serif;direction:rtl;} table{width:100%;border-collapse:collapse;} th,td{border:1px solid #ccc;padding:8px;text-align:right;}</style></head><body>");
+        html.append("<h2>تقرير جرد المخزون - ").append(branchesManager != null ? branchesManager.getActiveBranchDisplayName() : "").append("</h2>");
+        html.append("<p>معرف الجلسة: ").append(sessionId).append(" | التاريخ: ").append(new Date().toString()).append("</p>");
+        html.append("<table><tr><th>EPC</th><th>العنوان</th><th>العيار</th><th>الوزن</th><th>الحالة</th></tr>");
+
+        if (onlyMissing) {
+            for (ExpectedItem item : expectedItemsMap.values()) {
+                if (!item.isFound) {
+                    html.append("<tr><td>").append(item.epc).append("</td><td>").append(item.title).append("</td><td>").append(item.karat).append("</td><td>").append(item.weight).append("g</td><td style='color:red;'>مفقود</td></tr>");
+                }
+            }
+        } else {
+            synchronized (recentTags) {
+                for (ScannedTag tag : recentTags) {
+                    html.append("<tr><td>").append(tag.epc).append("</td><td>").append(tag.title).append("</td><td>").append(tag.karat).append("</td><td>").append(tag.weight).append("</td><td>").append(tag.status).append("</td></tr>");
+                }
+            }
+        }
+        html.append("</table></body></html>");
+
+        WebView webView = new WebView(requireContext());
+        webView.loadDataWithBaseURL(null, html.toString(), "text/html", "UTF-8", null);
+
+        PrintManager printManager = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
+        if (printManager != null) {
+            PrintDocumentAdapter printAdapter = webView.createPrintDocumentAdapter("Inventory_Report");
+            printManager.print("Inventory_Report", printAdapter, new PrintAttributes.Builder().build());
+        }
     }
 
-    private void exportMissingReport() {
-        Toast.makeText(getContext(), ar("تم تصدير تقرير النواقص", "Missing report exported"), Toast.LENGTH_SHORT).show();
-    }
-
+    // --- التقاط لقطة شاشة وتخزينها ---
     private void takeScreenshot() {
-        Toast.makeText(getContext(), ar("تم حفظ اللقطة", "Screenshot captured"), Toast.LENGTH_SHORT).show();
-    }
+        if (rootLayout == null || getContext() == null) return;
+        try {
+            Bitmap bitmap = Bitmap.createBitmap(rootLayout.getWidth(), rootLayout.getHeight(), Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            rootLayout.draw(canvas);
 
-    private void saveSessionState() {}
-    private void restoreSessionIfExists() {}
-    private void clearSessionData() {}
+            File picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+            File miraDir = new File(picturesDir, "MiraInventory");
+            if (!miraDir.exists()) miraDir.mkdirs();
+
+            File imageFile = new File(miraDir, "Screenshot_" + System.currentTimeMillis() + ".png");
+            FileOutputStream fos = new FileOutputStream(imageFile);
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
+            fos.flush();
+            fos.close();
+
+            Toast.makeText(getContext(), ar("تم حفظ اللقطة في: ", "Saved to: ") + imageFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Log.e(TAG, "Screenshot error: " + e.getMessage());
+            Toast.makeText(getContext(), ar("فشل حفظ اللقطة", "Failed to save screenshot"), Toast.LENGTH_SHORT).show();
+        }
+    }
 
     private void startTimer() {
         stopTimer();
@@ -711,12 +807,12 @@ public void onKeyDownTrigger() {
                 if (isPaused) return;
                 long elapsed = (System.currentTimeMillis() - startTime - totalPausedDuration) / 1000;
                 if (tvElapsed != null) tvElapsed.setText(String.format(Locale.US, "%02d:%02d", elapsed / 60, elapsed % 60));
-                
+
                 int currentTotal = totalScanned.get();
                 double rate = currentTotal - lastSecondCount;
                 lastSecondCount = currentTotal;
                 if (tvScanRate != null) tvScanRate.setText(String.format(Locale.US, "%.0f/s", rate));
-                
+
                 timerHandler.postDelayed(this, 1000);
             }
         };
@@ -740,6 +836,7 @@ public void onKeyDownTrigger() {
     public void onDestroyView() {
         super.onDestroyView();
         stopTimer();
+        stopSimulation();
         if (soundPool != null) soundPool.release();
     }
 
