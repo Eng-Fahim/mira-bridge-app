@@ -1636,6 +1636,20 @@
     <string name="title_stop_read_card">يرجى إيقاف قراءة الشرائح!</string>
 
     <string name="tv_fast_inventory">الجرد السريع</string>
+    
+    <!-- ============Inventory الجرد ======////-->
+      <string name="app_title_inventory">📡 جرد MIRA RFID</string>
+    <string name="branch_label">📍 الفرع</string>
+    <string name="metric_total_scans">إجمالي القراءات</string>
+    <string name="metric_unique_tags">القطع الفريدة</string>
+    <string name="metric_scan_rate">السرعة/ث</string>
+    <string name="metric_time">الوقت</string>
+    <string name="current_tag_header">القطعة الحالية</string>
+    <string name="awaiting_scan">في انتظار المسح...</string>
+    <string name="btn_start_inventory">▶ بدء الجرد</string>
+    <string name="btn_stop_inventory">⏹ إيقاف</string>
+    <string name="btn_clear_inventory">🗑️ مسح</string>
+    <string name="btn_export_inventory">📤 تصدير</string>
 <!-- ============================================ -->
 <!-- 🟢 MIRA Bridge - About & Branding -->
 <!-- ============================================ -->
