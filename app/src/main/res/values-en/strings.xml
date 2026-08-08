@@ -1448,7 +1448,20 @@
     <string name="btn_clear_inventory">🗑️ Clear</string>
     <string name="btn_export_inventory">📤 Export</string>
 
-
+<!-- Inventory Fragment -->
+<string name="simulation_mode_available">وضع المحاكاة / الكاميرا متاح</string>
+<string name="total">الإجمالي</string>
+<string name="unique">فريد</string>
+<string name="speed">السرعة</string>
+<string name="time">الوقت</string>
+<string name="ready_to_scan">جاهز للمسح</string>
+<string name="start_inventory">بدء الجرد</string>
+<string name="camera_manual">كاميرا/يدوي</string>
+<string name="simulate_scan">محاكاة المسح</string>
+<string name="instructions">تعليمات</string>
+<string name="print_inventory">طباعة الجرد</string>
+<string name="print_missing">طباعة النواقص</string>
+<string name="screenshot">لقطة شاشة</string>
     <!-- MIRA Bridge - About & Branding -->
     <string name="about_title">About MIRA Bridge</string>
     <string name="about_version">Version 1.3.0</string>
