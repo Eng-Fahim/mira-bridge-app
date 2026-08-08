@@ -1,5 +1,4 @@
 package com.example.uhf.fragment;
-import com.example.uhf.fragment.KeyDwonFragment;
 
 import android.content.Context;
 import android.content.Intent;
@@ -19,7 +18,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
-
+import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -33,32 +32,24 @@ import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * MIRA UHF RFID Live Inventory Scanner
- * 
- * نظام جرد مباشر بالـ RFID:
- * - مسح مستمر عالي السرعة
- * - إحصائيات حية (معدل المسح، التاجات الفريدة)
- * - تفاصيل آخر تاغ
- * - قائمة حديثة بآخر 100 تاغ
- * - تصدير CSV
- * - دعم عربي/إنجليزي كامل
- * - ربط تلقائي بالفرع النشط
- */
-// ❌ قبل
-//public class MiraUHFReadTagFragment extends Fragment {
-
-// ✅ بعد
-public class MiraUHFReadTagFragment extends KeyDwonFragment {
+public class MiraUHFReadTagFragment extends Fragment {
     private static final String TAG = "MiraUHFInventory";
 
-    
+    // Executor موحد لمنع استهلاك الذاكرة والانهيار
+    private final ExecutorService queryExecutor = Executors.newFixedThreadPool(2);
+
+    // Dynamic Lists آمنة من التعارض المتوازي
+    private final List<ScannedTag> recentTags = Collections.synchronizedList(new ArrayList<>());
+    private final List<String> scannedEPCs = Collections.synchronizedList(new ArrayList<>());
+
     // ==================== Stats Dashboard ====================
     private TextView tvTotalScanned, tvUniqueTags, tvScanRate, tvElapsed, tvBranchName;
 
@@ -82,8 +73,6 @@ public class MiraUHFReadTagFragment extends KeyDwonFragment {
     private long startTime = 0;
     private final AtomicInteger totalScanned = new AtomicInteger(0);
     private final AtomicInteger uniqueTags = new AtomicInteger(0);
-    private final List<ScannedTag> recentTags = new ArrayList<>();
-    private final List<String> scannedEPCs = new ArrayList<>();
     private RecentTagsAdapter recentAdapter;
 
     // ==================== Handlers ====================
@@ -93,17 +82,17 @@ public class MiraUHFReadTagFragment extends KeyDwonFragment {
     private double scanRatePerSec = 0;
     private int lastSecondCount = 0;
 
-    // ==================== Lifecycle ====================
-
-    @Override
-public void myOnKeyDwon() {
-    // زر المسح الضوئي على الجهاز
-    if (!isScanning) {
-        startInventory();
-    } else {
-        stopInventory();
+    /**
+     * معالجة الضغط على زر المسح من الـ Activity
+     */
+    public void onKeyDownTrigger() {
+        if (!isScanning) {
+            startInventory();
+        } else {
+            stopInventory();
+        }
     }
-}
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -128,8 +117,6 @@ public void myOnKeyDwon() {
         setupListeners();
         updateBranchDisplay();
     }
-
-    // ==================== Init ====================
 
     private void initViews(View v) {
         tvTotalScanned = v.findViewById(R.id.tvTotalScanned);
@@ -157,6 +144,7 @@ public void myOnKeyDwon() {
     }
 
     private void setupRecyclerView() {
+        if (getContext() == null) return;
         rvRecentTags.setLayoutManager(new LinearLayoutManager(getContext()));
         recentAdapter = new RecentTagsAdapter(recentTags);
         rvRecentTags.setAdapter(recentAdapter);
@@ -174,8 +162,6 @@ public void myOnKeyDwon() {
             tvBranchName.setText("📍 " + branchesManager.getActiveBranchDisplayName());
         }
     }
-
-    // ==================== Inventory Lifecycle ====================
 
     private void startInventory() {
         isScanning = true;
@@ -201,7 +187,9 @@ public void myOnKeyDwon() {
         startTimer();
         updateUI();
 
-        Toast.makeText(getContext(), ar("🔍 بدء الجرد المباشر...", "🔍 Live Inventory Started..."), Toast.LENGTH_SHORT).show();
+        if (getContext() != null) {
+            Toast.makeText(getContext(), ar("🔍 بدء الجرد المباشر...", "🔍 Live Inventory Started..."), Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void stopInventory() {
@@ -225,7 +213,10 @@ public void myOnKeyDwon() {
         String msg = ar(
             "✅ اكتمل: " + totalScanned.get() + " مسح، " + uniqueTags.get() + " قطعة في " + elapsed + " ثانية",
             "✅ Done: " + totalScanned.get() + " scans, " + uniqueTags.get() + " items in " + elapsed + "s");
-        Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
+        
+        if (getContext() != null) {
+            Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
+        }
     }
 
     private void clearInventory() {
@@ -238,7 +229,9 @@ public void myOnKeyDwon() {
         scannedEPCs.clear();
         if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
         resetUI();
-        Toast.makeText(getContext(), ar("🗑️ تم مسح الجرد", "🗑️ Cleared"), Toast.LENGTH_SHORT).show();
+        if (getContext() != null) {
+            Toast.makeText(getContext(), ar("🗑️ تم مسح الجرد", "🗑️ Cleared"), Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void resetUI() {
@@ -257,18 +250,12 @@ public void myOnKeyDwon() {
         pbScanProgress.setVisibility(View.GONE);
     }
 
-    // ==================== RFID Tag Reception ====================
-
-    /**
-     * يستدعيها UHFMainActivity عند قراءة أي تاق RFID
-     */
     public void onTagScanned(String epc, String rssi) {
-        if (!isScanning) return;
-        if (epc == null || epc.isEmpty()) return;
+        if (!isScanning || epc == null || epc.isEmpty()) return;
 
         if (scannedEPCs.contains(epc)) {
             totalScanned.incrementAndGet();
-            updateUI();
+            mainHandler.post(this::updateUI);
             return;
         }
 
@@ -280,17 +267,22 @@ public void myOnKeyDwon() {
         tag.epc = epc;
         tag.rssi = rssi;
         tag.timestamp = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
-        recentTags.add(0, tag);
-        if (recentAdapter != null) recentAdapter.notifyItemInserted(0);
-        if (rvRecentTags != null) rvRecentTags.scrollToPosition(0);
 
-        if (recentTags.size() > 100) {
-            recentTags.remove(recentTags.size() - 1);
+        synchronized (recentTags) {
+            recentTags.add(0, tag);
+            if (recentTags.size() > 100) {
+                recentTags.remove(recentTags.size() - 1);
+            }
         }
 
-        updateLastTagDisplay(epc, rssi);
+        mainHandler.post(() -> {
+            if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
+            if (rvRecentTags != null) rvRecentTags.scrollToPosition(0);
+            updateLastTagDisplay(epc, rssi);
+            updateUI();
+        });
+
         queryItemDetails(epc, rssi);
-        updateUI();
     }
 
     private void updateLastTagDisplay(String epc, String rssi) {
@@ -304,7 +296,8 @@ public void myOnKeyDwon() {
     }
 
     private void queryItemDetails(String epc, String rssi) {
-        Executors.newSingleThreadExecutor().execute(() -> {
+        queryExecutor.execute(() -> {
+            if (!isAdded() || apiClient == null || branchesManager == null) return;
             try {
                 JSONObject extraParams = new JSONObject();
                 extraParams.put("branch_id", branchesManager.getActiveBranchId());
@@ -321,6 +314,7 @@ public void myOnKeyDwon() {
                         String status = item.optString("status", "");
 
                         mainHandler.post(() -> {
+                            if (!isAdded()) return;
                             if (tvLastTagTitle != null) tvLastTagTitle.setText(title.isEmpty() ? epc : title);
                             if (tvLastTagKarat != null) tvLastTagKarat.setText(karat);
                             if (tvLastTagWeight != null) tvLastTagWeight.setText(weight);
@@ -331,13 +325,15 @@ public void myOnKeyDwon() {
                                 tvLastTagStatus.setTextColor(ok ? Color.parseColor("#22C55E") : Color.parseColor("#F59E0B"));
                             }
 
-                            for (ScannedTag t : recentTags) {
-                                if (t.epc.equals(epc)) {
-                                    t.title = title;
-                                    t.karat = karat;
-                                    t.weight = weight;
-                                    t.status = ok ? "✓" : "⚠";
-                                    break;
+                            synchronized (recentTags) {
+                                for (ScannedTag t : recentTags) {
+                                    if (t.epc.equals(epc)) {
+                                        t.title = title;
+                                        t.karat = karat;
+                                        t.weight = weight;
+                                        t.status = ok ? "✓" : "⚠";
+                                        break;
+                                    }
                                 }
                             }
                             if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
@@ -350,18 +346,20 @@ public void myOnKeyDwon() {
         });
     }
 
-    // ==================== Timer ====================
-
     private void startTimer() {
         timerRunnable = () -> {
             if (!isAdded()) return;
             long elapsed = (System.currentTimeMillis() - startTime) / 1000;
-            tvElapsed.setText(String.format(Locale.US, "%02d:%02d", elapsed / 60, elapsed % 60));
+            if (tvElapsed != null) {
+                tvElapsed.setText(String.format(Locale.US, "%02d:%02d", elapsed / 60, elapsed % 60));
+            }
 
             int currentTotal = totalScanned.get();
             scanRatePerSec = currentTotal - lastSecondCount;
             lastSecondCount = currentTotal;
-            tvScanRate.setText(String.format(Locale.US, "%.0f/s", scanRatePerSec));
+            if (tvScanRate != null) {
+                tvScanRate.setText(String.format(Locale.US, "%.0f/s", scanRatePerSec));
+            }
 
             timerHandler.postDelayed(timerRunnable, 1000);
         };
@@ -373,24 +371,26 @@ public void myOnKeyDwon() {
     }
 
     private void updateUI() {
-        tvTotalScanned.setText(String.valueOf(totalScanned.get()));
-        tvUniqueTags.setText(String.valueOf(uniqueTags.get()));
+        if (tvTotalScanned != null) tvTotalScanned.setText(String.valueOf(totalScanned.get()));
+        if (tvUniqueTags != null) tvUniqueTags.setText(String.valueOf(uniqueTags.get()));
     }
 
-    // ==================== Export ====================
-
     private void exportResults() {
+        if (getContext() == null) return;
         StringBuilder sb = new StringBuilder();
         sb.append(orgProfile != null ? orgProfile.getOrgName() : "MIRA Jewelry").append("\n");
         sb.append(ar("تقرير الجرد", "Inventory Report")).append("\n");
-        sb.append(ar("الفرع: ", "Branch: ")).append(branchesManager.getActiveBranchDisplayName()).append("\n");
+        sb.append(ar("الفرع: ", "Branch: ")).append(branchesManager != null ? branchesManager.getActiveBranchDisplayName() : "").append("\n");
         sb.append(ar("التاريخ: ", "Date: ")).append(new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date())).append("\n");
         sb.append(ar("إجمالي المسوحات: ", "Total Scans: ")).append(totalScanned.get()).append("\n");
         sb.append(ar("القطع الفريدة: ", "Unique Items: ")).append(uniqueTags.get()).append("\n\n");
         sb.append("EPC,Title,Karat,Weight,Status,Time\n");
-        for (ScannedTag t : recentTags) {
-            sb.append(t.epc).append(",").append(t.title).append(",").append(t.karat)
-              .append(",").append(t.weight).append(",").append(t.status).append(",").append(t.timestamp).append("\n");
+
+        synchronized (recentTags) {
+            for (ScannedTag t : recentTags) {
+                sb.append(t.epc).append(",").append(t.title).append(",").append(t.karat)
+                  .append(",").append(t.weight).append(",").append(t.status).append(",").append(t.timestamp).append("\n");
+            }
         }
 
         Intent intent = new Intent(Intent.ACTION_SEND);
@@ -409,7 +409,13 @@ public void myOnKeyDwon() {
         mainHandler.removeCallbacksAndMessages(null);
     }
 
-    // ==================== Models ====================
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (queryExecutor != null && !queryExecutor.isShutdown()) {
+            queryExecutor.shutdownNow();
+        }
+    }
 
     static class ScannedTag {
         String epc, rssi, title, karat, weight, status, timestamp;
@@ -426,15 +432,25 @@ public void myOnKeyDwon() {
 
         @Override
         public void onBindViewHolder(@NonNull VH h, int pos) {
-            ScannedTag t = list.get(pos);
-            h.tvEPC.setText(t.epc);
-            h.tvTitle.setText(t.title != null ? t.title : "—");
-            h.tvDetails.setText((t.karat != null ? t.karat : "") + " | " + (t.weight != null ? t.weight : ""));
-            h.tvStatus.setText(t.status != null ? t.status : "");
-            h.tvTime.setText(t.timestamp);
+            ScannedTag t;
+            synchronized (list) {
+                if (pos >= list.size()) return;
+                t = list.get(pos);
+            }
+            if (t != null) {
+                h.tvEPC.setText(t.epc);
+                h.tvTitle.setText(t.title != null ? t.title : "—");
+                h.tvDetails.setText((t.karat != null ? t.karat : "") + " | " + (t.weight != null ? t.weight : ""));
+                h.tvStatus.setText(t.status != null ? t.status : "");
+                h.tvTime.setText(t.timestamp);
+            }
         }
 
-        @Override public int getItemCount() { return list.size(); }
+        @Override public int getItemCount() { 
+            synchronized (list) {
+                return list.size(); 
+            }
+        }
 
         class VH extends RecyclerView.ViewHolder {
             TextView tvEPC, tvTitle, tvDetails, tvStatus, tvTime;
@@ -442,7 +458,7 @@ public void myOnKeyDwon() {
                 super(v);
                 tvEPC = v.findViewById(R.id.tvTagEPC);
                 tvTitle = v.findViewById(R.id.tvTagTitle);
-                tvDetails = v.findViewById(R.id.tvTagDetails);
+                tvTagDetails = v.findViewById(R.id.tvTagDetails);
                 tvStatus = v.findViewById(R.id.tvTagStatus);
                 tvTime = v.findViewById(R.id.tvTagTime);
             }
