@@ -43,48 +43,35 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MiraUHFReadTagFragment extends Fragment {
     private static final String TAG = "MiraUHFInventory";
 
-    // Executor موحد لمنع استهلاك الذاكرة والانهيار
     private final ExecutorService queryExecutor = Executors.newFixedThreadPool(2);
-
-    // Dynamic Lists آمنة من التعارض المتوازي
     private final List<ScannedTag> recentTags = Collections.synchronizedList(new ArrayList<>());
     private final List<String> scannedEPCs = Collections.synchronizedList(new ArrayList<>());
 
-    // ==================== Stats Dashboard ====================
     private TextView tvTotalScanned, tvUniqueTags, tvScanRate, tvElapsed, tvBranchName;
-
-    // ==================== Last Tag Card ====================
     private TextView tvLastTagEPC, tvLastTagTitle, tvLastTagKarat, tvLastTagWeight, tvLastTagStatus;
     private CardView cardLastTag;
 
-    // ==================== Controls ====================
     private ProgressBar pbScanProgress;
     private RecyclerView rvRecentTags;
     private Button btnStartInventory, btnStopInventory, btnClearInventory, btnExportInventory;
 
-    // ==================== Managers ====================
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
     private boolean isArabic;
 
-    // ==================== State ====================
     private boolean isScanning = false;
     private long startTime = 0;
     private final AtomicInteger totalScanned = new AtomicInteger(0);
     private final AtomicInteger uniqueTags = new AtomicInteger(0);
     private RecentTagsAdapter recentAdapter;
 
-    // ==================== Handlers ====================
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Handler timerHandler = new Handler(Looper.getMainLooper());
     private Runnable timerRunnable;
     private double scanRatePerSec = 0;
     private int lastSecondCount = 0;
 
-    /**
-     * معالجة الضغط على زر المسح من الـ Activity
-     */
     public void onKeyDownTrigger() {
         if (!isScanning) {
             startInventory();
@@ -458,7 +445,7 @@ public class MiraUHFReadTagFragment extends Fragment {
                 super(v);
                 tvEPC = v.findViewById(R.id.tvTagEPC);
                 tvTitle = v.findViewById(R.id.tvTagTitle);
-                tvTagDetails = v.findViewById(R.id.tvTagDetails);
+                tvDetails = v.findViewById(R.id.tvTagDetails);
                 tvStatus = v.findViewById(R.id.tvTagStatus);
                 tvTime = v.findViewById(R.id.tvTagTime);
             }
