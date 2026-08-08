@@ -81,20 +81,23 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     @Nullable
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
-        try {
-            return inflater.inflate(R.layout.fragment_mira_uhf_readtag, container, false);
-        } catch (Exception e) {
-            Log.e(TAG, "❌ onCreateView inflate error: " + e.getMessage());
-            e.printStackTrace();
-            if (getContext() != null) {
-                Toast.makeText(getContext(), "خطأ في تحميل واجهة الجرد", Toast.LENGTH_LONG).show();
-            }
-            return new View(getContext());
+@Override
+public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                         @Nullable Bundle savedInstanceState) {
+    try {
+        return inflater.inflate(R.layout.fragment_mira_uhf_readtag, container, false);
+    } catch (Exception e) {
+        String errorMsg = e.getMessage();
+        Log.e(TAG, "❌ onCreateView inflate error: " + errorMsg);
+        e.printStackTrace();
+        
+        // عرض الخطأ الحقيقي
+        if (getContext() != null) {
+            Toast.makeText(getContext(), "خطأ: " + errorMsg, Toast.LENGTH_LONG).show();
         }
+        return new View(getContext());
     }
+}
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
