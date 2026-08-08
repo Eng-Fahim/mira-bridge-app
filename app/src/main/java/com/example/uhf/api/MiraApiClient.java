@@ -14,7 +14,10 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-
+import okhttp3.MediaType;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 public class MiraApiClient {
 
     private static final String TAG = "MiraApiClient";
@@ -115,18 +118,46 @@ public class MiraApiClient {
             .addHeader("Authorization", "Bearer " + authToken)
             .build();
 
-        try (Response response = client.newCall(request).execute()) {
+        // استخدام okHttpClient المنسق مع تعريف الـ ApiResponse بالشكل الصحيح
+        try (Response response = okHttpClient.newCall(request).execute()) {
+            int statusCode = response.code();
             if (response.body() != null) {
                 String responseData = response.body().string();
                 JSONObject json = new JSONObject(responseData);
-                boolean success = json.optBoolean("success", false);
-                return new ApiResponse(success, json);
+                String message = json.optString("message", "");
+                return new ApiResponse(statusCode, json, message);
             }
+            return new ApiResponse(statusCode, null, "Empty response body");
         }
     } catch (Exception e) {
         e.printStackTrace();
+        return new ApiResponse(500, null, e.getMessage());
     }
-    return new ApiResponse(false, null);
+}
+public ApiResponse getTransferDetails(int transferId) {
+    try {
+        String url = baseUrl + "/mira/v2/transfer/" + transferId;
+
+        Request request = new Request.Builder()
+            .url(url)
+            .get()
+            .addHeader("Authorization", "Bearer " + authToken)
+            .build();
+
+        try (Response response = okHttpClient.newCall(request).execute()) {
+            int statusCode = response.code();
+            if (response.body() != null) {
+                String responseData = response.body().string();
+                JSONObject json = new JSONObject(responseData);
+                String message = json.optString("message", "");
+                return new ApiResponse(statusCode, json, message);
+            }
+            return new ApiResponse(statusCode, null, "Empty response body");
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+        return new ApiResponse(500, null, e.getMessage());
+    }
 }
 
 
