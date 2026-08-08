@@ -84,7 +84,16 @@ public class MiraUHFReadTagFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_mira_uhf_readtag, container, false);
+        try {
+            return inflater.inflate(R.layout.fragment_mira_uhf_readtag, container, false);
+        } catch (Exception e) {
+            Log.e(TAG, "❌ onCreateView inflate error: " + e.getMessage());
+            e.printStackTrace();
+            if (getContext() != null) {
+                Toast.makeText(getContext(), "خطأ في تحميل واجهة الجرد", Toast.LENGTH_LONG).show();
+            }
+            return new View(getContext());
+        }
     }
 
     @Override
@@ -99,54 +108,94 @@ public class MiraUHFReadTagFragment extends Fragment {
         }
         isArabic = Locale.getDefault().getLanguage().equals("ar");
 
-        initViews(view);
+        if (!initViews(view)) {
+            Log.e(TAG, "❌ initViews failed - views missing");
+            return;
+        }
+
         setupRecyclerView();
         setupListeners();
         updateBranchDisplay();
     }
 
-    private void initViews(View v) {
-        tvTotalScanned = v.findViewById(R.id.tvTotalScanned);
-        tvUniqueTags = v.findViewById(R.id.tvUniqueTags);
-        tvScanRate = v.findViewById(R.id.tvScanRate);
-        tvElapsed = v.findViewById(R.id.tvElapsed);
-        tvBranchName = v.findViewById(R.id.tvBranchName);
+    private boolean initViews(View v) {
+        try {
+            tvTotalScanned = v.findViewById(R.id.tvTotalScanned);
+            tvUniqueTags = v.findViewById(R.id.tvUniqueTags);
+            tvScanRate = v.findViewById(R.id.tvScanRate);
+            tvElapsed = v.findViewById(R.id.tvElapsed);
+            tvBranchName = v.findViewById(R.id.tvBranchName);
 
-        tvLastTagEPC = v.findViewById(R.id.tvLastTagEPC);
-        tvLastTagTitle = v.findViewById(R.id.tvLastTagTitle);
-        tvLastTagKarat = v.findViewById(R.id.tvLastTagKarat);
-        tvLastTagWeight = v.findViewById(R.id.tvLastTagWeight);
-        tvLastTagStatus = v.findViewById(R.id.tvLastTagStatus);
-        cardLastTag = v.findViewById(R.id.cardLastTag);
+            tvLastTagEPC = v.findViewById(R.id.tvLastTagEPC);
+            tvLastTagTitle = v.findViewById(R.id.tvLastTagTitle);
+            tvLastTagKarat = v.findViewById(R.id.tvLastTagKarat);
+            tvLastTagWeight = v.findViewById(R.id.tvLastTagWeight);
+            tvLastTagStatus = v.findViewById(R.id.tvLastTagStatus);
+            cardLastTag = v.findViewById(R.id.cardLastTag);
 
-        pbScanProgress = v.findViewById(R.id.pbScanProgress);
-        rvRecentTags = v.findViewById(R.id.rvRecentTags);
+            pbScanProgress = v.findViewById(R.id.pbScanProgress);
+            rvRecentTags = v.findViewById(R.id.rvRecentTags);
 
-        btnStartInventory = v.findViewById(R.id.btnStartInventory);
-        btnStopInventory = v.findViewById(R.id.btnStopInventory);
-        btnClearInventory = v.findViewById(R.id.btnClearInventory);
-        btnExportInventory = v.findViewById(R.id.btnExportInventory);
+            btnStartInventory = v.findViewById(R.id.btnStartInventory);
+            btnStopInventory = v.findViewById(R.id.btnStopInventory);
+            btnClearInventory = v.findViewById(R.id.btnClearInventory);
+            btnExportInventory = v.findViewById(R.id.btnExportInventory);
 
-        resetUI();
+            // التحقق من وجود جميع العناصر
+            if (tvTotalScanned == null || tvUniqueTags == null || tvScanRate == null ||
+                tvElapsed == null || rvRecentTags == null || btnStartInventory == null ||
+                btnStopInventory == null || btnClearInventory == null || btnExportInventory == null) {
+                Log.e(TAG, "❌ One or more views are null! Check XML IDs.");
+                return false;
+            }
+
+            resetUI();
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "❌ initViews error: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
     }
 
     private void setupRecyclerView() {
-        if (getContext() == null) return;
-        rvRecentTags.setLayoutManager(new LinearLayoutManager(getContext()));
-        recentAdapter = new RecentTagsAdapter(recentTags);
-        rvRecentTags.setAdapter(recentAdapter);
+        try {
+            Context ctx = getContext();
+            if (ctx == null) {
+                Log.e(TAG, "❌ setupRecyclerView: Context is null");
+                return;
+            }
+            if (rvRecentTags == null) {
+                Log.e(TAG, "❌ setupRecyclerView: rvRecentTags is null");
+                return;
+            }
+            rvRecentTags.setLayoutManager(new LinearLayoutManager(ctx));
+            recentAdapter = new RecentTagsAdapter(recentTags);
+            rvRecentTags.setAdapter(recentAdapter);
+        } catch (Exception e) {
+            Log.e(TAG, "❌ setupRecyclerView error: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     private void setupListeners() {
-        btnStartInventory.setOnClickListener(v -> startInventory());
-        btnStopInventory.setOnClickListener(v -> stopInventory());
-        btnClearInventory.setOnClickListener(v -> clearInventory());
-        btnExportInventory.setOnClickListener(v -> exportResults());
+        try {
+            if (btnStartInventory != null) btnStartInventory.setOnClickListener(v -> startInventory());
+            if (btnStopInventory != null) btnStopInventory.setOnClickListener(v -> stopInventory());
+            if (btnClearInventory != null) btnClearInventory.setOnClickListener(v -> clearInventory());
+            if (btnExportInventory != null) btnExportInventory.setOnClickListener(v -> exportResults());
+        } catch (Exception e) {
+            Log.e(TAG, "❌ setupListeners error: " + e.getMessage());
+        }
     }
 
     private void updateBranchDisplay() {
         if (tvBranchName != null && branchesManager != null) {
-            tvBranchName.setText("📍 " + branchesManager.getActiveBranchDisplayName());
+            try {
+                tvBranchName.setText("📍 " + branchesManager.getActiveBranchDisplayName());
+            } catch (Exception e) {
+                Log.e(TAG, "❌ updateBranchDisplay error: " + e.getMessage());
+            }
         }
     }
 
@@ -160,12 +209,16 @@ public class MiraUHFReadTagFragment extends Fragment {
         scannedEPCs.clear();
         if (recentAdapter != null) recentAdapter.notifyDataSetChanged();
 
-        btnStartInventory.setEnabled(false);
-        btnStartInventory.setAlpha(0.5f);
-        btnStopInventory.setEnabled(true);
-        btnStopInventory.setAlpha(1f);
-        btnClearInventory.setEnabled(false);
-        pbScanProgress.setVisibility(View.VISIBLE);
+        if (btnStartInventory != null) {
+            btnStartInventory.setEnabled(false);
+            btnStartInventory.setAlpha(0.5f);
+        }
+        if (btnStopInventory != null) {
+            btnStopInventory.setEnabled(true);
+            btnStopInventory.setAlpha(1f);
+        }
+        if (btnClearInventory != null) btnClearInventory.setEnabled(false);
+        if (pbScanProgress != null) pbScanProgress.setVisibility(View.VISIBLE);
 
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).loopFlag = true;
@@ -186,12 +239,16 @@ public class MiraUHFReadTagFragment extends Fragment {
             ((UHFMainActivity) getActivity()).loopFlag = false;
         }
 
-        btnStartInventory.setEnabled(true);
-        btnStartInventory.setAlpha(1f);
-        btnStopInventory.setEnabled(false);
-        btnStopInventory.setAlpha(0.5f);
-        btnClearInventory.setEnabled(true);
-        pbScanProgress.setVisibility(View.GONE);
+        if (btnStartInventory != null) {
+            btnStartInventory.setEnabled(true);
+            btnStartInventory.setAlpha(1f);
+        }
+        if (btnStopInventory != null) {
+            btnStopInventory.setEnabled(false);
+            btnStopInventory.setAlpha(0.5f);
+        }
+        if (btnClearInventory != null) btnClearInventory.setEnabled(true);
+        if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
 
         stopTimer();
         updateUI();
@@ -200,7 +257,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         String msg = ar(
             "✅ اكتمل: " + totalScanned.get() + " مسح، " + uniqueTags.get() + " قطعة في " + elapsed + " ثانية",
             "✅ Done: " + totalScanned.get() + " scans, " + uniqueTags.get() + " items in " + elapsed + "s");
-        
+
         if (getContext() != null) {
             Toast.makeText(getContext(), msg, Toast.LENGTH_LONG).show();
         }
@@ -222,19 +279,25 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     private void resetUI() {
-        tvTotalScanned.setText("0");
-        tvUniqueTags.setText("0");
-        tvScanRate.setText("0/s");
-        tvElapsed.setText("00:00");
-        tvLastTagEPC.setText("—");
-        tvLastTagTitle.setText(ar("في انتظار المسح...", "Awaiting scan..."));
-        tvLastTagKarat.setText("—");
-        tvLastTagWeight.setText("—");
-        tvLastTagStatus.setText("⚪");
-        btnStopInventory.setEnabled(false);
-        btnStopInventory.setAlpha(0.5f);
-        btnClearInventory.setEnabled(false);
-        pbScanProgress.setVisibility(View.GONE);
+        try {
+            if (tvTotalScanned != null) tvTotalScanned.setText("0");
+            if (tvUniqueTags != null) tvUniqueTags.setText("0");
+            if (tvScanRate != null) tvScanRate.setText("0/s");
+            if (tvElapsed != null) tvElapsed.setText("00:00");
+            if (tvLastTagEPC != null) tvLastTagEPC.setText("—");
+            if (tvLastTagTitle != null) tvLastTagTitle.setText(ar("في انتظار المسح...", "Awaiting scan..."));
+            if (tvLastTagKarat != null) tvLastTagKarat.setText("—");
+            if (tvLastTagWeight != null) tvLastTagWeight.setText("—");
+            if (tvLastTagStatus != null) tvLastTagStatus.setText("⚪");
+            if (btnStopInventory != null) {
+                btnStopInventory.setEnabled(false);
+                btnStopInventory.setAlpha(0.5f);
+            }
+            if (btnClearInventory != null) btnClearInventory.setEnabled(false);
+            if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
+        } catch (Exception e) {
+            Log.e(TAG, "❌ resetUI error: " + e.getMessage());
+        }
     }
 
     public void onTagScanned(String epc, String rssi) {
@@ -425,17 +488,17 @@ public class MiraUHFReadTagFragment extends Fragment {
                 t = list.get(pos);
             }
             if (t != null) {
-                h.tvEPC.setText(t.epc);
-                h.tvTitle.setText(t.title != null ? t.title : "—");
-                h.tvDetails.setText((t.karat != null ? t.karat : "") + " | " + (t.weight != null ? t.weight : ""));
-                h.tvStatus.setText(t.status != null ? t.status : "");
-                h.tvTime.setText(t.timestamp);
+                if (h.tvEPC != null) h.tvEPC.setText(t.epc);
+                if (h.tvTitle != null) h.tvTitle.setText(t.title != null ? t.title : "—");
+                if (h.tvDetails != null) h.tvDetails.setText((t.karat != null ? t.karat : "") + " | " + (t.weight != null ? t.weight : ""));
+                if (h.tvStatus != null) h.tvStatus.setText(t.status != null ? t.status : "");
+                if (h.tvTime != null) h.tvTime.setText(t.timestamp);
             }
         }
 
-        @Override public int getItemCount() { 
+        @Override public int getItemCount() {
             synchronized (list) {
-                return list.size(); 
+                return list.size();
             }
         }
 
