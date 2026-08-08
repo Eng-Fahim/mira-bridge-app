@@ -713,4 +713,4 @@ public void onResume() {
         if (rvInventoryItems != null) rvInventoryItems.setAdapter(null);
         super.onDestroyView();
     }
-            }
+                                                                                                                      }
