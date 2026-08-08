@@ -330,7 +330,7 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- 4. تبويبات الفلترة مع كافة الـ IDs المطلوبة فيMiraUHFReadTagFragment -->
+    <!-- 4. تبويبات الفلترة -->
     <LinearLayout
         android:id="@+id/layoutFilterTabs"
         android:layout_width="0dp"
@@ -421,30 +421,15 @@
 
     </LinearLayout>
 
-    <!-- عناصر إضافية مخفية لتلبية كافة المتغيرات المذكورة في MiraUHFReadTagFragment.java لضمان إتمام الـ Build دون تعارض -->
-    <View
-        android:id="@+id/btnScanCamera"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <View
-        android:id="@+id/btnHelpGuide"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <View
-        android:id="@+id/btnSimulateScan"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+    <!-- 6. عناصر الإجراءات والتصدير والخيارات الجانبية (Dummy Views لمنع أخطاء الجافا) -->
+    <View android:id="@+id/btnScanCamera" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <View android:id="@+id/btnHelpGuide" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <View android:id="@+id/btnSimulateScan" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <View android:id="@+id/btnExportInventory" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <View android:id="@+id/btnExportMissing" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <View android:id="@+id/btnScreenshot" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <View android:id="@+id/btnFinalizeAudit" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <View android:id="@+id/btnSelectZone" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" app:layout_constraintTop_toTopOf="parent" app:layout_constraintStart_toStartOf="parent" />
 
     <Spinner
         android:id="@+id/spinnerZone"
@@ -454,7 +439,7 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <!-- 6. آخر قطعة تم قراءتها -->
+    <!-- 7. آخر قطعة تم قراءتها -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/cardLastTag"
         android:layout_width="0dp"
@@ -502,7 +487,7 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- 7. القائمة (RecyclerView) -->
+    <!-- 8. القائمة (RecyclerView) -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvRecentTags"
         android:layout_width="0dp"
@@ -515,7 +500,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- 8. الأزرار الثابتة في الأسفل -->
+    <!-- 9. الأزرار الثابتة في الأسفل -->
     <LinearLayout
         android:id="@+id/layoutBottomActions"
         android:layout_width="0dp"
