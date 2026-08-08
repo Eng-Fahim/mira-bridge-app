@@ -258,13 +258,17 @@ public class MiraApiClient {
     }
 
     public ApiResponse startInventorySession(String location, String type) {
-        JSONObject payload = new JSONObject();
-        try {
-            payload.put("location", location != null ? location : "default");
-            payload.put("type", type != null ? type : "full");
-        } catch (Exception ignored) {}
-        return post("/inventory/start-session", payload);
-    }
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("location", location != null ? location : "default");
+        payload.put("type", type != null ? type : "full");
+        
+        // ✅ أضف branch_id من الـ context
+        MiraBranchesManager bm = MiraBranchesManager.getInstance(context);
+        payload.put("branch_id", bm.getActiveBranchId());
+    } catch (Exception ignored) {}
+    return post("/inventory/start-session", payload);
+}
 
     public ApiResponse startBlindInventory(String location, String category) {
         JSONObject payload = new JSONObject();
