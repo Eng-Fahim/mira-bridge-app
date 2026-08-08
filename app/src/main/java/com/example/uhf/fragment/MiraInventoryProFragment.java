@@ -620,7 +620,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
     // ==================== History ====================
 
-    private void showAuditHistoryDialog() {
+        private void showAuditHistoryDialog() {
         if (getContext() == null || apiClient == null || branchesManager == null) return;
         Toast.makeText(getContext(), isArabic ? "🔄 جاري التحميل..." : "🔄 Loading...", Toast.LENGTH_SHORT).show();
 
@@ -628,23 +628,39 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
         new Thread(() -> {
             try {
-                // تصفية الأرشيف لجلب جلسات الفرع الحالي فقط
-                MiraApiClient.ApiResponse response = apiClient.getInventorySessionsList(activeBranchId);
+                // استدعاء الدالة بدون متغيرات لتطابق التعريف الموجود في MiraApiClient
+                MiraApiClient.ApiResponse response = apiClient.getInventorySessionsList();
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray sessionsArr = response.data.optJSONArray("sessions");
                     if (sessionsArr == null || sessionsArr.length() == 0) {
                         safeRun(() -> Toast.makeText(getContext(), isArabic ? "لا توجد جلسات سابقة لهذا الفرع" : "No previous sessions for this branch", Toast.LENGTH_SHORT).show());
                         return;
                     }
-                    final String[] titles = new String[sessionsArr.length()];
-                    final int[] ids = new int[sessionsArr.length()];
+
+                    List<String> titleList = new ArrayList<>();
+                    List<Integer> idList = new ArrayList<>();
+
+                    // تصفية الجلسات لتناسب الفرع النشط فقط
                     for (int i = 0; i < sessionsArr.length(); i++) {
                         JSONObject s = sessionsArr.optJSONObject(i);
                         if (s != null) {
-                            ids[i] = s.optInt("id");
-                            titles[i] = (isArabic ? "جلسة #" : "Session #") + ids[i] + " - " + s.optString("created_at");
+                            int bId = s.optInt("branch_id", -1);
+                            if (bId == -1 || bId == activeBranchId) {
+                                int id = s.optInt("id");
+                                idList.add(id);
+                                titleList.add((isArabic ? "جلسة #" : "Session #") + id + " - " + s.optString("created_at"));
+                            }
                         }
                     }
+
+                    if (titleList.isEmpty()) {
+                        safeRun(() -> Toast.makeText(getContext(), isArabic ? "لا توجد جلسات سابقة لهذا الفرع" : "No previous sessions for this branch", Toast.LENGTH_SHORT).show());
+                        return;
+                    }
+
+                    final String[] titles = titleList.toArray(new String[0]);
+                    final int[] ids = idList.stream().mapToInt(Integer::intValue).toArray();
+
                     safeRun(() -> {
                         if (!isAdded()) return;
                         new AlertDialog.Builder(getContext())
@@ -659,6 +675,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             }
         }).start();
     }
+
 
     private void loadAndPrintHistoricalReport(int targetSessionId) {
         if (apiClient == null || getContext() == null) return;
@@ -738,4 +755,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (rvInventoryItems != null) rvInventoryItems.setAdapter(null);
         super.onDestroyView();
     }
-}
+                                                     }
