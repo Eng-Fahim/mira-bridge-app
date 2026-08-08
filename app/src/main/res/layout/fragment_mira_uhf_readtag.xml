@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="#F9FAFB"
     android:layoutDirection="rtl"
-    android:id="@+id/rootLayout">
+    android:background="#F9FAFB"
+    android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="#D4AF37"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="16dp"
-        android:paddingVertical="12dp"
-        android:background="#D4AF37">
+        android:paddingVertical="12dp">
 
         <TextView
             android:layout_width="0dp"
@@ -38,11 +38,11 @@
         android:id="@+id/layoutReaderStatus"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="#FFFFFF"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="12dp"
-        android:paddingVertical="6dp"
-        android:background="#FFFFFF">
+        android:paddingVertical="6dp">
 
         <TextView
             android:id="@+id/tvReaderStatus"
@@ -50,48 +50,48 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="Reader: Checking..."
+            android:textColor="#16A34A"
             android:textSize="12sp"
-            android:textStyle="bold"
-            android:textColor="#16A34A" />
+            android:textStyle="bold" />
 
         <Button
             android:id="@+id/btnScanCamera"
             android:layout_width="wrap_content"
             android:layout_height="36dp"
-            android:text="Camera"
-            android:textSize="11sp"
             android:layout_marginEnd="4dp"
             android:backgroundTint="#8B5CF6"
-            android:textColor="#FFFFFF" />
+            android:text="Camera"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp" />
 
         <Button
             android:id="@+id/btnHelpGuide"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:text="?"
-            android:textSize="16sp"
             android:backgroundTint="#F59E0B"
-            android:textColor="#FFFFFF" />
+            android:text="?"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp" />
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/layoutZoneSelector"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="#FFFFFF"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:padding="8dp"
-        android:background="#FFFFFF"
         android:visibility="gone">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
             android:text="Zone:"
-            android:textSize="13sp"
             android:textColor="#4B5563"
-            android:textStyle="bold"
-            android:layout_marginEnd="8dp" />
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
         <Spinner
             android:id="@+id/spinnerZone"
@@ -104,62 +104,220 @@
             android:id="@+id/btnSelectZone"
             android:layout_width="wrap_content"
             android:layout_height="40dp"
-            android:text="Select"
-            android:textSize="12sp"
             android:layout_marginStart="8dp"
             android:backgroundTint="#D4AF37"
-            android:textColor="#FFFFFF" />
+            android:text="Select"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="#F3F4F6"
         android:orientation="horizontal"
         android:padding="10dp"
-        android:background="#F3F4F6"
         android:weightSum="4">
 
-        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvTotalScanned" android:text="0" android:textSize="22sp" android:textStyle="bold" android:textColor="#111827" />
-            <TextView android:text="Scans" android:textSize="10sp" android:textColor="#4B5563" />
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvTotalScanned"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#111827"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Scans"
+                android:textColor="#4B5563"
+                android:textSize="10sp" />
         </LinearLayout>
-        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvUniqueTags" android:text="0" android:textSize="22sp" android:textStyle="bold" android:textColor="#D4AF37" />
-            <TextView android:text="Unique" android:textSize="10sp" android:textColor="#4B5563" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvUniqueTags"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#D4AF37"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Unique"
+                android:textColor="#4B5563"
+                android:textSize="10sp" />
         </LinearLayout>
-        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvScanRate" android:text="0/s" android:textSize="22sp" android:textStyle="bold" android:textColor="#16A34A" />
-            <TextView android:text="Rate" android:textSize="10sp" android:textColor="#4B5563" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvScanRate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0/s"
+                android:textColor="#16A34A"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Rate"
+                android:textColor="#4B5563"
+                android:textSize="10sp" />
         </LinearLayout>
-        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvElapsed" android:text="00:00" android:textSize="22sp" android:textStyle="bold" android:textColor="#111827" />
-            <TextView android:text="Time" android:textSize="10sp" android:textColor="#4B5563" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvElapsed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="00:00"
+                android:textColor="#111827"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Time"
+                android:textColor="#4B5563"
+                android:textSize="10sp" />
         </LinearLayout>
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="#FFFFFF"
         android:orientation="horizontal"
         android:padding="8dp"
-        android:background="#FFFFFF"
         android:weightSum="4">
 
-        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvExpectedTotal" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#111827" />
-            <TextView android:text="Expected" android:textSize="9sp" android:textColor="#4B5563" />
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvExpectedTotal"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#111827"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Expected"
+                android:textColor="#4B5563"
+                android:textSize="9sp" />
         </LinearLayout>
-        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvFoundCount" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#16A34A" />
-            <TextView android:text="Found" android:textSize="9sp" android:textColor="#4B5563" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvFoundCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#16A34A"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Found"
+                android:textColor="#4B5563"
+                android:textSize="9sp" />
         </LinearLayout>
-        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvMissingCount" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#DC2626" />
-            <TextView android:text="Missing" android:textSize="9sp" android:textColor="#4B5563" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvMissingCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#DC2626"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Missing"
+                android:textColor="#4B5563"
+                android:textSize="9sp" />
         </LinearLayout>
-        <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-            <TextView android:id="@+id/tvUnexpectedCount" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#F59E0B" />
-            <TextView android:text="Extra" android:textSize="9sp" android:textColor="#4B5563" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvUnexpectedCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#F59E0B"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Extra"
+                android:textColor="#4B5563"
+                android:textSize="9sp" />
         </LinearLayout>
     </LinearLayout>
 
@@ -167,13 +325,13 @@
         android:id="@+id/tvReconciliationResult"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="#FFFFFF"
         android:gravity="center"
         android:padding="6dp"
         android:text="Awaiting inventory start..."
-        android:textSize="11sp"
-        android:textStyle="bold"
         android:textColor="#111827"
-        android:background="#FFFFFF" />
+        android:textSize="11sp"
+        android:textStyle="bold" />
 
     <ProgressBar
         android:id="@+id/pbScanProgress"
@@ -188,15 +346,15 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="6dp"
+        android:background="#FFFFFF"
         android:orientation="vertical"
-        android:padding="12dp"
-        android:background="#FFFFFF">
+        android:padding="12dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
             <TextView
                 android:id="@+id/tvLastTagTitle"
@@ -204,40 +362,58 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="Awaiting scan..."
+                android:textColor="#111827"
                 android:textSize="14sp"
-                android:textStyle="bold"
-                android:textColor="#111827" />
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvLastTagStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
                 android:text="-"
-                android:textSize="22sp"
-                android:layout_marginStart="8dp" />
+                android:textSize="22sp" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/tvLastTagEPC"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="-"
-            android:textSize="11sp"
-            android:textColor="#9CA3AF"
             android:layout_marginTop="4dp"
-            android:fontFamily="monospace" />
+            android:fontFamily="monospace"
+            android:text="-"
+            android:textColor="#9CA3AF"
+            android:textSize="11sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="4dp">
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
 
-            <TextView android:id="@+id/tvLastTagKarat" android:text="-"
-                android:textSize="12sp" android:textColor="#D4AF37" android:textStyle="bold" />
-            <TextView android:text=" . " android:textColor="#9CA3AF" android:textSize="12sp" />
-            <TextView android:id="@+id/tvLastTagWeight" android:text="-"
-                android:textSize="12sp" android:textColor="#4B5563" />
+            <TextView
+                android:id="@+id/tvLastTagKarat"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:textColor="#D4AF37"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" . "
+                android:textColor="#9CA3AF"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvLastTagWeight"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:textColor="#4B5563"
+                android:textSize="12sp" />
         </LinearLayout>
     </LinearLayout>
 
@@ -245,8 +421,8 @@
         android:id="@+id/layoutFilterTabs"
         android:layout_width="match_parent"
         android:layout_height="36dp"
-        android:orientation="horizontal"
         android:background="#FFFFFF"
+        android:orientation="horizontal"
         android:visibility="gone">
 
         <TextView
@@ -254,12 +430,12 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
+            android:background="#FDF8E7"
             android:gravity="center"
             android:text="All"
-            android:textSize="12sp"
-            android:textStyle="bold"
             android:textColor="#D4AF37"
-            android:background="#FDF8E7" />
+            android:textSize="12sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tabFilterFound"
@@ -268,8 +444,8 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="Found"
-            android:textSize="12sp"
-            android:textColor="#4B5563" />
+            android:textColor="#4B5563"
+            android:textSize="12sp" />
 
         <TextView
             android:id="@+id/tabFilterMissing"
@@ -278,8 +454,8 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="Missing"
-            android:textSize="12sp"
-            android:textColor="#4B5563" />
+            android:textColor="#4B5563"
+            android:textSize="12sp" />
 
         <TextView
             android:id="@+id/tabFilterUnexpected"
@@ -288,8 +464,8 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="Extra"
-            android:textSize="12sp"
-            android:textColor="#4B5563" />
+            android:textColor="#4B5563"
+            android:textSize="12sp" />
     </LinearLayout>
 
     <LinearLayout
@@ -299,31 +475,55 @@
         android:paddingHorizontal="6dp"
         android:paddingVertical="4dp">
 
-        <Button android:id="@+id/btnStartInventory"
+        <Button
+            android:id="@+id/btnStartInventory"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_marginEnd="2dp"
+            android:layout_weight="1"
+            android:backgroundTint="#D4AF37"
             android:text="Start"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
-            android:layout_marginEnd="2dp" android:textSize="12sp" android:textStyle="bold"
-            android:backgroundTint="#D4AF37" android:textColor="#FFFFFF" />
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
 
-        <Button android:id="@+id/btnPauseInventory"
+        <Button
+            android:id="@+id/btnPauseInventory"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_marginHorizontal="2dp"
+            android:layout_weight="1"
+            android:backgroundTint="#F59E0B"
             android:text="Pause"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
-            android:layout_marginHorizontal="2dp" android:textSize="12sp" android:textStyle="bold"
-            android:backgroundTint="#F59E0B" android:textColor="#FFFFFF" android:visibility="gone" />
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
 
-        <Button android:id="@+id/btnStopInventory"
+        <Button
+            android:id="@+id/btnStopInventory"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_marginHorizontal="2dp"
+            android:layout_weight="1"
+            android:backgroundTint="#DC2626"
+            android:enabled="false"
             android:text="Stop"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
-            android:layout_marginHorizontal="2dp" android:textSize="12sp" android:textStyle="bold"
-            android:enabled="false"
-            android:backgroundTint="#DC2626" android:textColor="#FFFFFF" />
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
 
-        <Button android:id="@+id/btnClearInventory"
-            android:text="Clear"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
-            android:layout_marginHorizontal="2dp" android:textSize="12sp"
+        <Button
+            android:id="@+id/btnClearInventory"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_marginHorizontal="2dp"
+            android:layout_weight="1"
+            android:backgroundTint="#94A3B8"
             android:enabled="false"
-            android:backgroundTint="#94A3B8" android:textColor="#FFFFFF" />
+            android:text="Clear"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
     </LinearLayout>
 
     <LinearLayout
@@ -333,44 +533,59 @@
         android:paddingHorizontal="6dp"
         android:paddingVertical="2dp">
 
-        <Button android:id="@+id/btnExportInventory"
+        <Button
+            android:id="@+id/btnExportInventory"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_marginEnd="2dp"
+            android:layout_weight="1"
+            android:backgroundTint="#16A34A"
             android:text="Export"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
-            android:layout_marginEnd="2dp" android:textSize="12sp"
-            android:backgroundTint="#16A34A" android:textColor="#FFFFFF" />
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
 
-        <Button android:id="@+id/btnExportMissing"
+        <Button
+            android:id="@+id/btnExportMissing"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_marginHorizontal="2dp"
+            android:layout_weight="1"
+            android:backgroundTint="#DC2626"
             android:text="Missing"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
-            android:layout_marginHorizontal="2dp" android:textSize="12sp"
-            android:backgroundTint="#DC2626" android:textColor="#FFFFFF" />
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
 
-        <Button android:id="@+id/btnScreenshot"
+        <Button
+            android:id="@+id/btnScreenshot"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="2dp"
+            android:layout_weight="1"
+            android:backgroundTint="#8B5CF6"
             android:text="SS"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="42dp"
-            android:layout_marginStart="2dp" android:textSize="12sp"
-            android:backgroundTint="#8B5CF6" android:textColor="#FFFFFF" />
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
     </LinearLayout>
 
     <Button
         android:id="@+id/btnFinalizeAudit"
         android:layout_width="match_parent"
         android:layout_height="44dp"
-        android:text="Finalize Audit"
-        android:textSize="13sp"
-        android:textStyle="bold"
         android:layout_marginHorizontal="6dp"
         android:layout_marginVertical="2dp"
-        android:visibility="gone"
         android:backgroundTint="#16A34A"
-        android:textColor="#FFFFFF" />
+        android:text="Finalize Audit"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvRecentTags"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:padding="6dp"
-        android:clipToPadding="false" />
+        android:clipToPadding="false"
+        android:padding="6dp" />
 
 </LinearLayout>
