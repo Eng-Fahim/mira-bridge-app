@@ -44,13 +44,12 @@ import java.util.Locale;
 /**
  * MIRA Inventory Pro Fragment
  * 
- * المميزات:
- * - جرد كامل وجرد أعمى
- * - ربط بالفرع النشط تلقائياً
- * - دعم عربي/إنجليزي كامل
- * - تقارير مطابقة احترافية
- * - محاكاة للاختبار
- * - أرشيف الجلسات السابقة
+ * الميزات:
+ * - جرد كامل وجرد أعمى مخصص لكل فرع بشكل منفصل
+ * - الربط الديناميكي المباشر بالفرع النشط (activeBranchId)
+ * - دعم كامل ثنائي اللغة (عربي/إنجليزي)
+ * - طباعة تقارير جرد رسمية معتمدة
+ * - أرشيف الجلسات لكل فرع
  */
 public class MiraInventoryProFragment extends KeyDwonFragment {
 
@@ -59,9 +58,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     // ==================== UI Elements ====================
     private TextView tvInventoryStatus, tvExpectedCount, tvScannedCount, tvVariance;
     private TextView tvAccuracy, tvElapsedTime, tvLastScan, tvRssi;
-    private TextView tvLastAuditDate, tvLastAccuracy, tvHighValueCount;
     private TextView tvPrevItems, tvCurrItems, tvDeltaItems;
-    // أضف في الأعلى مع المتغيرات:
     private CardView cardComparison;
     private Button btnStartInventory, btnBlindInventory, btnStopInventory, btnGenerateReport, btnArchiveReports;
     private RecyclerView rvInventoryItems;
@@ -137,19 +134,29 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         loadInventorySettings();
+        updateBranchHeader();
         loadLastSnapshot();
     }
-  @Override
-public void onResume() {
-    super.onResume();
-    
-    if (branchesManager != null && branchesManager.hasActiveBranch()) {
-        if (tvInventoryStatus != null) {
-            tvInventoryStatus.setText("📍 " + branchesManager.getActiveBranchDisplayName());
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        updateBranchHeader();
+        if (!isScanning) {
+            loadLastSnapshot();
         }
-        loadLastSnapshot();
     }
-}
+
+    private void updateBranchHeader() {
+        if (branchesManager != null && tvInventoryStatus != null && !isScanning) {
+            String branchName = branchesManager.getActiveBranchDisplayName();
+            if (branchName == null || branchName.isEmpty()) {
+                branchName = isArabic ? "الفرع الحالي" : "Current Branch";
+            }
+            tvInventoryStatus.setText("📍 " + branchName);
+            tvInventoryStatus.setTextColor(Color.parseColor("#1E293B"));
+        }
+    }
 
     // ==================== Init ====================
 
@@ -213,13 +220,15 @@ public void onResume() {
     // ==================== Last Snapshot ====================
 
     private void loadLastSnapshot() {
-        if (apiClient == null) return;
+        if (apiClient == null || branchesManager == null) return;
+        final int activeBranchId = branchesManager.getActiveBranchId();
+        final String branchDisplayName = branchesManager.getActiveBranchDisplayName();
+
         new Thread(() -> {
             int loadedPrevItems = 0;
             try {
-                String showroom = (isArabic ? "المعرض الرئيسي" : "Main Showroom")
-                        + " | branch:" + branchesManager.getActiveBranchId();
-                MiraApiClient.ApiResponse response = apiClient.getLastSnapshot(showroom);
+                // تمرير المعرف المباشر للفرع
+                MiraApiClient.ApiResponse response = apiClient.getLastSnapshot(branchDisplayName + " | branch:" + activeBranchId);
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONObject snapshotObj = response.data;
                     if (snapshotObj.has("snapshot")) snapshotObj = snapshotObj.optJSONObject("snapshot");
@@ -228,7 +237,7 @@ public void onResume() {
                     }
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Error loading snapshot: " + e.getMessage());
+                Log.e(TAG, "Error loading snapshot for branch " + activeBranchId + ": " + e.getMessage());
             }
 
             final int finalItems = loadedPrevItems;
@@ -243,25 +252,28 @@ public void onResume() {
     // ==================== Tag Processing ====================
 
     public void processScannedTag(String epcOrGtin, String rssi) {
-        if (!isScanning || apiClient == null) return;
+        if (!isScanning || apiClient == null || branchesManager == null) return;
 
         // منع التكرار
         for (InventoryItem item : scannedItems) {
             if (item.serial.equalsIgnoreCase(epcOrGtin)) return;
         }
 
+        final int activeBranchId = branchesManager.getActiveBranchId();
+        final String branchDisplayName = branchesManager.getActiveBranchDisplayName();
+
         new Thread(() -> {
             try {
                 JSONObject extraParams = new JSONObject();
                 if (rssi != null) extraParams.put("rssi", rssi);
-                extraParams.put("branch_id", branchesManager.getActiveBranchId());
+                extraParams.put("branch_id", activeBranchId);
 
                 MiraApiClient.ApiResponse response = apiClient.authorize(epcOrGtin, "inventory", extraParams);
 
                 String title = isArabic ? "قطعة غير معرفة" : "Unknown Item";
                 String karat = "21K";
                 String weight = "0.00g";
-                String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
+                String location = branchDisplayName;
                 String status = "⚠️";
                 boolean found = false;
 
@@ -272,7 +284,7 @@ public void onResume() {
                         karat = item.optString("karat", "21K");
                         double w = item.optDouble("weight", 0);
                         weight = String.format(Locale.US, "%.2fg", w);
-                        location = item.optString("location", location);
+                        location = item.optString("location", branchDisplayName);
                         String vaultStatus = item.optString("status", "");
                         found = !"sold".equalsIgnoreCase(vaultStatus);
                         status = found ? "✓" : "⚠️";
@@ -317,11 +329,13 @@ public void onResume() {
     // ==================== Session Management ====================
 
     private void startSessionOnServer(boolean blind) {
-        if (apiClient == null) return;
+        if (apiClient == null || branchesManager == null) return;
+        final int activeBranchId = branchesManager.getActiveBranchId();
+        final String branchDisplayName = branchesManager.getActiveBranchDisplayName();
+
         new Thread(() -> {
             try {
-                String location = (isArabic ? "المعرض الرئيسي" : "Main Showroom")
-                        + " | branch:" + branchesManager.getActiveBranchId();
+                String location = branchDisplayName + " | branch:" + activeBranchId;
                 MiraApiClient.ApiResponse response = apiClient.startInventorySession(location, blind ? "blind" : "full");
                 if (response != null && response.isSuccess && response.data != null) {
                     sessionId = response.data.optInt("session_id", 0);
@@ -339,7 +353,9 @@ public void onResume() {
     }
 
     private void closeSessionOnServer() {
-        if (apiClient == null) return;
+        if (apiClient == null || branchesManager == null) return;
+        final int activeBranchId = branchesManager.getActiveBranchId();
+
         new Thread(() -> {
             try {
                 JSONObject payload = new JSONObject();
@@ -347,28 +363,36 @@ public void onResume() {
                 payload.put("found_count", foundCount);
                 payload.put("expected_count", expectedCount);
                 payload.put("variance", varianceCount);
-                payload.put("branch_id", branchesManager.getActiveBranchId());
+                payload.put("branch_id", activeBranchId);
                 apiClient.closeInventorySession(payload);
             } catch (Exception ignored) {}
         }).start();
     }
 
     private void createSnapshotOnServer() {
-        if (scannedItems.isEmpty() || foundCount == 0 || apiClient == null) return;
+        if (scannedItems.isEmpty() || foundCount == 0 || apiClient == null || branchesManager == null) return;
+        final int activeBranchId = branchesManager.getActiveBranchId();
+        final String branchDisplayName = branchesManager.getActiveBranchDisplayName();
+
         new Thread(() -> {
             try {
                 JSONObject payload = new JSONObject();
                 payload.put("session_id", sessionId);
-                payload.put("location", isArabic ? "المعرض الرئيسي" : "Main Showroom");
+                payload.put("branch_id", activeBranchId);
+                payload.put("location", branchDisplayName);
                 payload.put("total_items", foundCount);
                 payload.put("total_weight", calculateTotalWeight());
                 payload.put("total_value", calculateTotalValue());
+                
                 JSONArray itemsJson = new JSONArray();
                 for (InventoryItem item : scannedItems) {
                     JSONObject obj = new JSONObject();
-                    obj.put("serial", item.serial); obj.put("title", item.title);
-                    obj.put("karat", item.karat); obj.put("weight", item.weight);
-                    obj.put("status", item.status); obj.put("location", item.location);
+                    obj.put("serial", item.serial); 
+                    obj.put("title", item.title);
+                    obj.put("karat", item.karat); 
+                    obj.put("weight", item.weight);
+                    obj.put("status", item.status); 
+                    obj.put("location", item.location);
                     itemsJson.put(obj);
                 }
                 payload.put("items", itemsJson);
@@ -523,8 +547,8 @@ public void onResume() {
 
         String orgName = orgProfile != null ? orgProfile.getOrgName() : (isArabic ? "مؤسسة المجوهرات" : "Jewelry Enterprise");
         String orgPhone = orgProfile != null ? orgProfile.getOrgPhone() : "";
-        String orgEmail = orgProfile != null ? orgProfile.getOrgEmail() : "";
         String orgAddress = orgProfile != null ? orgProfile.getOrgAddress() : (isArabic ? "اليمن" : "Yemen");
+        String activeBranchName = branchesManager != null ? branchesManager.getActiveBranchDisplayName() : "";
 
         double totalWt = calculateTotalWeight();
         double totalVal = calculateTotalValue();
@@ -560,7 +584,7 @@ public void onResume() {
             "th{background:#1A237E;color:#fff;padding:6px}td{padding:5px;border-bottom:1px solid #eee;text-align:center}" +
             ".footer{text-align:center;margin-top:16px;font-size:9px;color:#999}" +
             "</style></head><body>" +
-            "<div class='header'><h2>" + orgName + "</h2><p>" + orgAddress + " | " + orgPhone + "</p></div>" +
+            "<div class='header'><h2>" + orgName + " - " + activeBranchName + "</h2><p>" + orgAddress + " | " + orgPhone + "</p></div>" +
             "<div style='text-align:center;font-weight:bold;margin:8px 0;color:#92400E'>" +
             (isArabic ? "تقرير تدقيق المخزون" : "Inventory Audit Report") + " | " +
             new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date()) + "</div>" +
@@ -587,7 +611,7 @@ public void onResume() {
                 if (getContext() == null || !isAdded()) return;
                 PrintManager pm = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
                 if (pm != null) {
-                    PrintDocumentAdapter pda = view.createPrintDocumentAdapter("MIRA_Inventory_Report");
+                    PrintDocumentAdapter pda = view.createPrintDocumentAdapter("MIRA_Inventory_Report_" + activeBranchName);
                     pm.print("MIRA Inventory Report", pda, new PrintAttributes.Builder().build());
                 }
             }
@@ -597,16 +621,19 @@ public void onResume() {
     // ==================== History ====================
 
     private void showAuditHistoryDialog() {
-        if (getContext() == null || apiClient == null) return;
+        if (getContext() == null || apiClient == null || branchesManager == null) return;
         Toast.makeText(getContext(), isArabic ? "🔄 جاري التحميل..." : "🔄 Loading...", Toast.LENGTH_SHORT).show();
+
+        final int activeBranchId = branchesManager.getActiveBranchId();
 
         new Thread(() -> {
             try {
-                MiraApiClient.ApiResponse response = apiClient.getInventorySessionsList();
+                // تصفية الأرشيف لجلب جلسات الفرع الحالي فقط
+                MiraApiClient.ApiResponse response = apiClient.getInventorySessionsList(activeBranchId);
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray sessionsArr = response.data.optJSONArray("sessions");
                     if (sessionsArr == null || sessionsArr.length() == 0) {
-                        safeRun(() -> Toast.makeText(getContext(), isArabic ? "لا توجد جلسات سابقة" : "No previous sessions", Toast.LENGTH_SHORT).show());
+                        safeRun(() -> Toast.makeText(getContext(), isArabic ? "لا توجد جلسات سابقة لهذا الفرع" : "No previous sessions for this branch", Toast.LENGTH_SHORT).show());
                         return;
                     }
                     final String[] titles = new String[sessionsArr.length()];
@@ -621,7 +648,7 @@ public void onResume() {
                     safeRun(() -> {
                         if (!isAdded()) return;
                         new AlertDialog.Builder(getContext())
-                            .setTitle(isArabic ? "📂 أرشيف الجرد" : "📂 Audit Archive")
+                            .setTitle(isArabic ? "📂 أرشيف الجرد (" + branchesManager.getActiveBranchDisplayName() + ")" : "📂 Audit Archive (" + branchesManager.getActiveBranchDisplayName() + ")")
                             .setItems(titles, (d, w) -> loadAndPrintHistoricalReport(ids[w]))
                             .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
                             .show();
@@ -711,4 +738,4 @@ public void onResume() {
         if (rvInventoryItems != null) rvInventoryItems.setAdapter(null);
         super.onDestroyView();
     }
-                    }
+}
