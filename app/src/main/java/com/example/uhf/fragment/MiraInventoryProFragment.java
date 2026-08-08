@@ -61,7 +61,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private TextView tvAccuracy, tvElapsedTime, tvLastScan, tvRssi;
     private TextView tvLastAuditDate, tvLastAccuracy, tvHighValueCount;
     private TextView tvPrevItems, tvCurrItems, tvDeltaItems;
-    
+    // أضف في الأعلى مع المتغيرات:
     private CardView cardComparison;
     private Button btnStartInventory, btnBlindInventory, btnStopInventory, btnGenerateReport, btnArchiveReports;
     private RecyclerView rvInventoryItems;
@@ -139,17 +139,17 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         loadInventorySettings();
         loadLastSnapshot();
     }
-    @Override
+    
+   @Override
 public void onResume() {
     super.onResume();
+    if (getActivity() instanceof UHFMainActivity)
+        ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
     
-    if (branchesManager != null && branchesManager.hasActiveBranch()) {
-        // ✅ عرض الفرع في شريط الحالة الموجود
-        if (tvInventoryStatus != null) {
-            String branchName = branchesManager.getActiveBranchDisplayName();
-            tvInventoryStatus.setText("📍 " + branchName);
-        }
-        loadLastSnapshot();
+    // ✅ أضف هذا فقط
+    MiraBranchesManager bm = MiraBranchesManager.getInstance(requireContext());
+    if (bm.hasActiveBranch() && tvCartStatus != null) {
+        tvCartStatus.setText("📍 " + bm.getActiveBranchDisplayName() + " | جاهز");
     }
 }
 
