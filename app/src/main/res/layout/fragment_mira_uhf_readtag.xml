@@ -4,12 +4,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="?android:attr/colorBackground">
+    android:background="@color/colorBackground">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorPrimary"
+        android:background="@color/colorPrimary"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="16dp"
@@ -19,14 +19,14 @@
             android:layout_width="0dp"
             android:layout_weight="1"
             android:text="@string/app_title_inventory"
-            android:textColor="?attr/colorOnPrimary"
+            android:textColor="@color/colorOnPrimary"
             android:textSize="17sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tvBranchName"
             android:text="@string/branch_label"
-            android:textColor="?attr/colorOnPrimary"
+            android:textColor="@color/colorOnPrimary"
             android:textSize="11sp"
             android:alpha="0.85" />
     </LinearLayout>
@@ -36,7 +36,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:padding="12dp"
-        android:background="?attr/colorSurfaceVariant"
+        android:background="@color/colorSurfaceVariant"
         android:weightSum="4">
 
         <LinearLayout
@@ -49,11 +49,11 @@
                 android:text="0"
                 android:textSize="24sp" 
                 android:textStyle="bold"
-                android:textColor="?attr/colorOnSurface" />
+                android:textColor="@color/colorOnSurface" />
             <TextView 
                 android:text="@string/metric_total_scans" 
                 android:textSize="10sp"
-                android:textColor="?attr/colorOnSurfaceVariant" />
+                android:textColor="@color/colorOnSurfaceVariant" />
         </LinearLayout>
 
         <LinearLayout
@@ -66,11 +66,11 @@
                 android:text="0"
                 android:textSize="24sp" 
                 android:textStyle="bold"
-                android:textColor="?attr/colorPrimary" />
+                android:textColor="@color/colorPrimary" />
             <TextView 
                 android:text="@string/metric_unique_tags" 
                 android:textSize="10sp"
-                android:textColor="?attr/colorOnSurfaceVariant" />
+                android:textColor="@color/colorOnSurfaceVariant" />
         </LinearLayout>
 
         <LinearLayout
@@ -87,7 +87,7 @@
             <TextView 
                 android:text="@string/metric_scan_rate" 
                 android:textSize="10sp"
-                android:textColor="?attr/colorOnSurfaceVariant" />
+                android:textColor="@color/colorOnSurfaceVariant" />
         </LinearLayout>
 
         <LinearLayout
@@ -100,11 +100,11 @@
                 android:text="00:00"
                 android:textSize="24sp" 
                 android:textStyle="bold"
-                android:textColor="?attr/colorOnSurface" />
+                android:textColor="@color/colorOnSurface" />
             <TextView 
                 android:text="@string/metric_time" 
                 android:textSize="10sp"
-                android:textColor="?attr/colorOnSurfaceVariant" />
+                android:textColor="@color/colorOnSurfaceVariant" />
         </LinearLayout>
     </LinearLayout>
 
@@ -115,7 +115,7 @@
         android:layout_height="3dp"
         android:indeterminate="true"
         android:visibility="gone"
-        android:indeterminateTint="?attr/colorPrimary" />
+        android:indeterminateTint="@color/colorPrimary" />
 
     <androidx.cardview.widget.CardView
         android:id="@+id/cardLastTag"
@@ -124,7 +124,7 @@
         android:layout_margin="8dp"
         app:cardCornerRadius="14dp"
         app:cardElevation="2dp"
-        app:cardBackgroundColor="?attr/colorSurface">
+        app:cardBackgroundColor="@color/colorSurface">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -135,7 +135,7 @@
             <TextView
                 android:text="@string/current_tag_header"
                 android:textSize="10sp"
-                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textColor="@color/colorOnSurfaceVariant"
                 android:textStyle="bold" />
 
             <TextView
@@ -143,7 +143,7 @@
                 android:text="—"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textColor="@color/colorOnSurfaceVariant"
                 android:layout_marginTop="2dp"
                 android:fontFamily="monospace" />
 
@@ -159,7 +159,7 @@
                     android:text="@string/awaiting_scan"
                     android:textSize="15sp"
                     android:textStyle="bold"
-                    android:textColor="?attr/colorOnSurface"
+                    android:textColor="@color/colorOnSurface"
                     android:layout_weight="1" />
 
                 <TextView
@@ -179,17 +179,17 @@
                     android:id="@+id/tvLastTagKarat" 
                     android:text="—"
                     android:textSize="13sp" 
-                    android:textColor="?attr/colorPrimary" 
+                    android:textColor="@color/colorPrimary" 
                     android:textStyle="bold" />
                 <TextView 
                     android:text="  •  " 
-                    android:textColor="?attr/colorOnSurfaceVariant" 
+                    android:textColor="@color/colorOnSurfaceVariant" 
                     android:textSize="13sp" />
                 <TextView 
                     android:id="@+id/tvLastTagWeight" 
                     android:text="—"
                     android:textSize="13sp" 
-                    android:textColor="?attr/colorOnSurface" />
+                    android:textColor="@color/colorOnSurface" />
             </LinearLayout>
         </LinearLayout>
     </androidx.cardview.widget.CardView>
@@ -211,8 +211,8 @@
             android:layout_marginStart="2dp"
             android:textSize="13sp" 
             android:textStyle="bold"
-            android:backgroundTint="?attr/colorPrimary" 
-            android:textColor="?attr/colorOnPrimary" />
+            android:backgroundTint="@color/colorPrimary" 
+            android:textColor="@color/colorOnPrimary" />
 
         <Button 
             android:id="@+id/btnStopInventory"
@@ -226,7 +226,7 @@
             android:textStyle="bold"
             android:enabled="false" 
             android:backgroundTint="@color/status_offline" 
-            android:textColor="#FFFFFF" />
+            android:textColor="@color/colorWhite" />
 
         <Button 
             android:id="@+id/btnClearInventory"
@@ -238,8 +238,8 @@
             android:layout_marginStart="2dp"
             android:textSize="13sp"
             android:enabled="false"
-            android:backgroundTint="?attr/colorOutlineVariant" 
-            android:textColor="?attr/colorOnSurfaceVariant" />
+            android:backgroundTint="@color/colorOutlineVariant" 
+            android:textColor="@color/colorOnSurfaceVariant" />
 
         <Button 
             android:id="@+id/btnExportInventory"
@@ -251,7 +251,7 @@
             android:layout_marginStart="2dp"
             android:textSize="13sp"
             android:backgroundTint="@color/status_online" 
-            android:textColor="#FFFFFF" />
+            android:textColor="@color/colorWhite" />
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
