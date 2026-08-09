@@ -25,7 +25,6 @@ import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -42,6 +41,7 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.DeviceDetector;
+import com.example.uhf.tools.ToastUtil;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -295,7 +295,7 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     private void displayStockList() {
-        if (expectedItemsMap.isEmpty()) { Toast.makeText(getContext(), ar("لا يوجد مخزون", "No stock"), Toast.LENGTH_SHORT).show(); return; }
+        if (expectedItemsMap.isEmpty()) { ToastUtil.showWarning(ar("لا يوجد مخزون", "No stock")); return; }
         StringBuilder sb = new StringBuilder(); sb.append(ar("الإجمالي: ", "Total: ")).append(expectedItemsMap.size()).append("\n\n");
         int c = 0; for (ExpectedItem i : expectedItemsMap.values()) { c++; sb.append(c).append(". ").append(i.epc).append("\n   ").append(i.title).append(" | ").append(i.karat).append(" | ").append(String.format(Locale.US, "%.1fg", i.weight)).append("\n\n"); if (c >= 30) { sb.append("... +").append(expectedItemsMap.size() - 30).append(ar(" أكثر", " more")); break; } }
         TextView tv = new TextView(getContext()); tv.setText(sb.toString()); tv.setTextSize(11); tv.setPadding(24, 16, 24, 16); tv.setTextIsSelectable(true);
@@ -304,20 +304,12 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     private void startCameraScan() {
-    try {
-        // محاولة ZXing أولاً
-        Intent intent = new Intent("com.google.zxing.client.android.SCAN");
-        intent.putExtra("SCAN_MODE", "QR_CODE_MODE,DATA_MATRIX_MODE,PRODUCT_MODE");
-        if (getActivity() != null && intent.resolveActivity(getActivity().getPackageManager()) != null) {
-            startActivityForResult(intent, REQUEST_CAMERA_SCAN);
-            return;
-        }
-    } catch (Exception ignored) {}
-    
-    // لا يوجد ZXing - افتح الكاميرا العادية أو الإدخال اليدوي
-    Toast.makeText(getContext(), ar("الكاميرا غير متاحة - استخدم الإدخال اليدوي", "Camera unavailable - use manual entry"), Toast.LENGTH_LONG).show();
-    showManualEntryDialog();
-}
+        try {
+            Intent intent = new Intent("com.google.zxing.client.android.SCAN"); intent.putExtra("SCAN_MODE", "QR_CODE_MODE,DATA_MATRIX_MODE,PRODUCT_MODE");
+            if (getActivity() != null && intent.resolveActivity(getActivity().getPackageManager()) != null) startActivityForResult(intent, REQUEST_CAMERA_SCAN);
+            else { ToastUtil.showInfo(ar("الكاميرا غير متاحة - استخدم الإدخال اليدوي", "Camera unavailable - use manual entry")); showManualEntryDialog(); }
+        } catch (Exception e) { showManualEntryDialog(); }
+    }
 
     private void showManualEntryDialog() {
         if (getContext() == null) return;
@@ -406,78 +398,49 @@ public class MiraUHFReadTagFragment extends Fragment {
     // ==================== API ====================
 
     private void loadExpectedInventory(Runnable onReady) {
-    if (pbScanProgress != null) pbScanProgress.setVisibility(View.VISIBLE);
-    Log.i(TAG, "🔄 Loading inventory from API...");
-    queryExecutor.execute(() -> {
-        try {
-            int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 1;
-            
-            // استخدم الدالة الموجودة في API
-            MiraApiClient.ApiResponse response = apiClient.getBranchInventory(branchId);
-            
-            expectedItemsMap.clear();
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONArray items = response.data.optJSONArray("items");
-                if (items == null) items = response.data.optJSONArray("inventory");
-                
-                if (items != null) {
-                    Log.i(TAG, "📦 Items received: " + items.length());
-                    for (int i = 0; i < items.length(); i++) {
-                        JSONObject obj = items.getJSONObject(i);
-                        ExpectedItem item = new ExpectedItem();
-                        item.epc = obj.optString("epc");
-                        item.title = obj.optString("title", "");
-                        item.karat = obj.optString("karat", "");
-                        item.weight = obj.optDouble("weight", 0);
-                        expectedItemsMap.put(item.epc, item);
+        if (pbScanProgress != null) pbScanProgress.setVisibility(View.VISIBLE);
+        Log.i(TAG, "🔄 Loading inventory from API...");
+        queryExecutor.execute(() -> {
+            try {
+                int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 1;
+                MiraApiClient.ApiResponse response = apiClient.getBranchInventory(branchId);
+                expectedItemsMap.clear();
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONArray items = response.data.optJSONArray("items");
+                    if (items == null) items = response.data.optJSONArray("inventory");
+                    if (items != null) {
+                        Log.i(TAG, "📦 Items received: " + items.length());
+                        for (int i = 0; i < items.length(); i++) {
+                            JSONObject obj = items.getJSONObject(i);
+                            ExpectedItem item = new ExpectedItem();
+                            item.epc = obj.optString("epc"); item.title = obj.optString("title", "");
+                            item.karat = obj.optString("karat", ""); item.weight = obj.optDouble("weight", 0);
+                            expectedItemsMap.put(item.epc, item);
+                        }
                     }
-                }
-            } else {
-                Log.w(TAG, "⚠️ API failed or empty - loading demo data");
-                loadDemoData();
-            }
-            
-            expectedTotal.set(expectedItemsMap.size());
-            missingCount.set(expectedItemsMap.size());
-            
-            final int count = expectedItemsMap.size();
-            Log.i(TAG, "✅ Loaded " + count + " items");
-            
-            mainHandler.post(() -> {
-                Toast.makeText(getContext(), 
-                    ar("✅ تم تحميل " + count + " قطعة", "✅ Loaded " + count + " items"),
-                    Toast.LENGTH_SHORT).show();
-            });
-            
-        } catch (Exception e) {
-            Log.e(TAG, "❌ load error: " + e.getMessage(), e);
-            loadDemoData();
-            expectedTotal.set(expectedItemsMap.size());
-            missingCount.set(expectedItemsMap.size());
-        } finally {
-            mainHandler.post(() -> {
-                if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE);
-                updateReconciliationCounters();
-                updateReconciliationResult();
-                if (onReady != null) onReady.run();
-            });
-        }
-    });
-}
-
-// بيانات تجريبية عند فشل API
-private void loadDemoData() {
-    Log.w(TAG, "⚠️ Loading demo data");
-    expectedItemsMap.clear();
-    for (int i = 1; i <= 50; i++) {
-        ExpectedItem item = new ExpectedItem();
-        item.epc = "E28011700000000000000" + String.format("%03d", i);
-        item.title = "قطعة تجريبية " + i;
-        item.karat = (i % 3 == 0) ? "24K" : ((i % 2 == 0) ? "21K" : "18K");
-        item.weight = 2.5 + (i * 0.5);
-        expectedItemsMap.put(item.epc, item);
+                } else { loadDemoData(); }
+                expectedTotal.set(expectedItemsMap.size()); missingCount.set(expectedItemsMap.size());
+                final int count = expectedItemsMap.size();
+                Log.i(TAG, "✅ Loaded " + count + " items");
+                mainHandler.post(() -> { ToastUtil.showSuccess(ar("✅ تم تحميل " + count + " قطعة", "✅ Loaded " + count + " items")); });
+            } catch (Exception e) { Log.e(TAG, "❌ load error: " + e.getMessage()); loadDemoData(); expectedTotal.set(expectedItemsMap.size()); missingCount.set(expectedItemsMap.size()); }
+            finally { mainHandler.post(() -> { if (pbScanProgress != null) pbScanProgress.setVisibility(View.GONE); updateReconciliationCounters(); updateReconciliationResult(); if (onReady != null) onReady.run(); }); }
+        });
     }
-}
+
+    private void loadDemoData() {
+        Log.w(TAG, "⚠️ Loading demo data");
+        expectedItemsMap.clear();
+        for (int i = 1; i <= 50; i++) {
+            ExpectedItem item = new ExpectedItem();
+            item.epc = "E28011700000000000000" + String.format("%03d", i);
+            item.title = "قطعة تجريبية " + i;
+            item.karat = (i % 3 == 0) ? "24K" : ((i % 2 == 0) ? "21K" : "18K");
+            item.weight = 2.5 + (i * 0.5);
+            expectedItemsMap.put(item.epc, item);
+        }
+    }
+
     public void onTagScanned(String epc, String rssi) {
         if (!isScanning || isPaused || epc == null || epc.isEmpty()) return;
         String cleanEpc = epc.trim();
@@ -510,9 +473,9 @@ private void loadDemoData() {
         if (btnPauseInventory != null) btnPauseInventory.setVisibility(View.GONE); if (btnFinalizeAudit != null) btnFinalizeAudit.setVisibility(View.GONE);
     }
 
-    private void selectZone() { if (spinnerZone != null) Toast.makeText(getContext(), ar("تم تحديد: ", "Zone: ") + spinnerZone.getSelectedItem(), Toast.LENGTH_SHORT).show(); }
+    private void selectZone() { if (spinnerZone != null) ToastUtil.showInfo(ar("تم تحديد: ", "Zone: ") + spinnerZone.getSelectedItem()); }
     private void showHelpGuide() { new AlertDialog.Builder(requireContext()).setTitle(ar("دليل الجرد", "Guide")).setMessage(ar("1. اضغط بدء\n2. استخدم الكاميرا أو المحاكاة\n3. القارئ يتصل تلقائياً", "1. Press Start\n2. Use camera or simulation\n3. Reader auto-connects")).setPositiveButton("OK", null).show(); }
-    private void finalizeAudit() { Toast.makeText(getContext(), ar("✅ تم اعتماد الجرد", "✅ Audit finalized"), Toast.LENGTH_SHORT).show(); }
+    private void finalizeAudit() { ToastUtil.showSuccess(ar("✅ تم اعتماد الجرد", "✅ Audit finalized")); }
 
     private void printReport(boolean onlyMissing) {
         if (getContext() == null) return;
@@ -527,7 +490,7 @@ private void loadDemoData() {
 
     private void takeScreenshot() {
         if (rootLayout == null || getContext() == null) return;
-        try { Bitmap b = Bitmap.createBitmap(rootLayout.getWidth(), rootLayout.getHeight(), Bitmap.Config.ARGB_8888); rootLayout.draw(new Canvas(b)); File d = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "MiraInventory"); if (!d.exists()) d.mkdirs(); File f = new File(d, "SS_" + System.currentTimeMillis() + ".png"); FileOutputStream o = new FileOutputStream(f); b.compress(Bitmap.CompressFormat.PNG, 100, o); o.flush(); o.close(); Toast.makeText(getContext(), ar("📸 تم الحفظ", "📸 Saved"), Toast.LENGTH_SHORT).show(); } catch (Exception e) { Log.e(TAG, "SS error: " + e.getMessage()); }
+        try { Bitmap b = Bitmap.createBitmap(rootLayout.getWidth(), rootLayout.getHeight(), Bitmap.Config.ARGB_8888); rootLayout.draw(new Canvas(b)); File d = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "MiraInventory"); if (!d.exists()) d.mkdirs(); File f = new File(d, "SS_" + System.currentTimeMillis() + ".png"); FileOutputStream o = new FileOutputStream(f); b.compress(Bitmap.CompressFormat.PNG, 100, o); o.flush(); o.close(); ToastUtil.showSuccess(ar("📸 تم الحفظ", "📸 Saved")); } catch (Exception e) { Log.e(TAG, "SS error: " + e.getMessage()); ToastUtil.showError(ar("فشل الحفظ", "Save failed")); }
     }
 
     private void startTimer() { stopTimer(); timerRunnable = () -> { if (isPaused) return; long e = (System.currentTimeMillis() - startTime - totalPausedDuration) / 1000; if (tvElapsed != null) tvElapsed.setText(String.format(Locale.US, "%02d:%02d", e / 60, e % 60)); int cur = totalScanned.get(); double r = cur - lastSecondCount; lastSecondCount = cur; if (tvScanRate != null) tvScanRate.setText(String.format(Locale.US, "%.0f/s", Math.max(0, r))); timerHandler.postDelayed(timerRunnable, 1000); }; timerHandler.post(timerRunnable); }
@@ -543,5 +506,5 @@ private void loadDemoData() {
         @Override public void onBindViewHolder(@NonNull VH h, int pos) { ScannedTag t; synchronized (list) { if (pos >= list.size()) return; t = list.get(pos); } if (t != null) { if (h.tvEPC != null) h.tvEPC.setText(t.epc); if (h.tvTitle != null) h.tvTitle.setText(t.title); if (h.tvDetails != null) h.tvDetails.setText((t.karat != null ? t.karat : "") + " | " + (t.weight != null ? t.weight : "")); if (h.tvStatus != null) { h.tvStatus.setText(t.status); h.tvStatus.setTextColor(t.isExpected ? Color.parseColor("#16A34A") : Color.parseColor("#F59E0B")); } if (h.tvTime != null) h.tvTime.setText(t.timestamp); } }
         @Override public int getItemCount() { synchronized (list) { return list.size(); } }
         class VH extends RecyclerView.ViewHolder { TextView tvEPC, tvTitle, tvDetails, tvStatus, tvTime; VH(View v) { super(v); tvEPC = v.findViewById(R.id.tvTagEPC); tvTitle = v.findViewById(R.id.tvTagTitle); tvDetails = v.findViewById(R.id.tvTagDetails); tvStatus = v.findViewById(R.id.tvTagStatus); tvTime = v.findViewById(R.id.tvTagTime); } }
-    }               
-}
+    }
+    }
