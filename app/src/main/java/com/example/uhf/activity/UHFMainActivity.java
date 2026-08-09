@@ -61,6 +61,7 @@ import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.ExportExcelAsyncTask;
 import com.example.uhf.tools.SessionManager;
+import com.example.uhf.tools.DeviceDetector;
 import com.example.uhf.tools.UIHelper;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 import com.rscja.deviceapi.interfaces.ConnectionStatus;
