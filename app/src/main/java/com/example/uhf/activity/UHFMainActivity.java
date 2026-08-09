@@ -59,6 +59,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private static final String TAG = "MainActivity";
     public ArrayList<UHFTAGInfo> tagList = new ArrayList<>();
+    public int selectIndex = -1;
+    
     public boolean loopFlag = false;
     public Fragment currentFragment;
 
