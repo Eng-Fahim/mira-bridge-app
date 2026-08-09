@@ -21,7 +21,6 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.SessionManager;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import org.json.JSONObject;
 
@@ -107,7 +106,7 @@ public class MiraDashboardFragment extends Fragment {
 
     private void setupListeners() {
         if (btnGate != null) btnGate.setOnClickListener(v -> switchTab("SecureGate"));
-        if (btnInventory != null) btnInventory.setOnClickListener(v -> switchTab("Inventory"));
+        if (btnInventory != null) btnInventory.setOnClickListener(v -> switchTab("Inventory Pro"));
     }
 
     private void showShimmer(boolean show) {
@@ -213,12 +212,7 @@ public class MiraDashboardFragment extends Fragment {
         try {
             if (getActivity() instanceof UHFMainActivity) {
                 UHFMainActivity a = (UHFMainActivity) getActivity();
-                BottomNavigationView nav = a.findViewById(R.id.bottomNavigation);
-                if (nav != null) {
-                    if (tag.contains("POS") || tag.contains("pos")) nav.setSelectedItemId(R.id.nav_pos);
-                    else if (tag.contains("Inventory") || tag.contains("Scan") || tag.contains("جرد")) nav.setSelectedItemId(R.id.nav_inventory);
-                    else if (tag.contains("Secure") || tag.contains("Gate") || tag.contains("بوابة")) nav.setSelectedItemId(R.id.nav_more);
-                }
+                if (a.mTabHost != null) a.mTabHost.setCurrentTabByTag(tag);
             }
         } catch (Exception e) {
             Toast.makeText(getContext(), isArabic ? "جاري الفتح..." : "Opening...", Toast.LENGTH_SHORT).show();
