@@ -3,7 +3,12 @@
     <!-- Menu -->
     <string name="menu_profile">My Profile</string>
     <string name="menu_logout">Sign Out</string>
-
+<!-- Bottom Navigation -->
+<string name="nav_dashboard">Home</string>
+<string name="nav_jewelry">Jewelry</string>
+<string name="nav_inventory">Inventory</string>
+<string name="nav_pos">Sales</string>
+<string name="nav_more">More</string>
 
     <!-- DASHBOARD-->
     <string name="greeting_default">Welcome...</string>
