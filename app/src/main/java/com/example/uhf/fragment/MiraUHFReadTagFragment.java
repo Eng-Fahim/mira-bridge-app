@@ -483,3 +483,4 @@ public class MiraUHFReadTagFragment extends Fragment {
         class VH extends RecyclerView.ViewHolder { TextView tvEPC, tvTitle, tvDetails, tvStatus, tvTime; VH(View v) { super(v); tvEPC = v.findViewById(R.id.tvTagEPC); tvTitle = v.findViewById(R.id.tvTagTitle); tvDetails = v.findViewById(R.id.tvTagDetails); tvStatus = v.findViewById(R.id.tvTagStatus); tvTime = v.findViewById(R.id.tvTagTime); } }
     }
                 }
+}
