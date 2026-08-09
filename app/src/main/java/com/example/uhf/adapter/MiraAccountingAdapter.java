@@ -1,6 +1,5 @@
 package com.example.uhf.adapter;
 
-import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -17,15 +16,6 @@ import java.util.List;
 public class MiraAccountingAdapter extends RecyclerView.Adapter<MiraAccountingAdapter.AccountingViewHolder> {
 
     private List<MiraAccountingItem> itemList = new ArrayList<>();
-    private OnItemClickListener listener;
-
-    public interface OnItemClickListener {
-        void onItemClick(MiraAccountingItem item);
-    }
-
-    public void setOnItemClickListener(OnItemClickListener listener) {
-        this.listener = listener;
-    }
 
     public void setItems(List<MiraAccountingItem> items) {
         this.itemList = items != null ? items : new ArrayList<>();
@@ -44,32 +34,10 @@ public class MiraAccountingAdapter extends RecyclerView.Adapter<MiraAccountingAd
     public void onBindViewHolder(@NonNull AccountingViewHolder holder, int position) {
         MiraAccountingItem item = itemList.get(position);
 
-        // استخدام الميثودز الأساسية القديمة الموجودة بالتأكيد في الكلاس المستهدف
-        if (holder.tvRowCol1 != null) {
-            holder.tvRowCol1.setText(item.getCol1Text());
-        }
-        if (holder.tvRowCol2 != null) {
-            holder.tvRowCol2.setText(item.getCol2Text());
-        }
-        if (holder.tvRowCol3 != null) {
-            holder.tvRowCol3.setText(item.getCol3Text());
-            holder.tvRowCol3.setTextColor(Color.parseColor("#D35400"));
-        }
-        if (holder.tvRowCol4 != null) {
-            holder.tvRowCol4.setText(item.getCol4Text());
-            holder.tvRowCol4.setTextColor(Color.parseColor("#27AE60"));
-        }
-
-        // إخفاء شارة RFID إذا لم تكن مدعومة في الكلاس الحالي
-        if (holder.tvRowRfidTag != null) {
-            holder.tvRowRfidTag.setVisibility(View.GONE);
-        }
-
-        holder.itemView.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onItemClick(item);
-            }
-        });
+        if (holder.tvRowCol1 != null) holder.tvRowCol1.setText(item.getCol1Text());
+        if (holder.tvRowCol2 != null) holder.tvRowCol2.setText(item.getCol2Text());
+        if (holder.tvRowCol3 != null) holder.tvRowCol3.setText(item.getCol3Text());
+        if (holder.tvRowCol4 != null) holder.tvRowCol4.setText(item.getCol4Text());
     }
 
     @Override
@@ -78,7 +46,7 @@ public class MiraAccountingAdapter extends RecyclerView.Adapter<MiraAccountingAd
     }
 
     static class AccountingViewHolder extends RecyclerView.ViewHolder {
-        TextView tvRowCol1, tvRowCol2, tvRowCol3, tvRowCol4, tvRowRfidTag;
+        TextView tvRowCol1, tvRowCol2, tvRowCol3, tvRowCol4;
 
         public AccountingViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -86,7 +54,6 @@ public class MiraAccountingAdapter extends RecyclerView.Adapter<MiraAccountingAd
             tvRowCol2 = itemView.findViewById(R.id.tvRowCol2);
             tvRowCol3 = itemView.findViewById(R.id.tvRowCol3);
             tvRowCol4 = itemView.findViewById(R.id.tvRowCol4);
-            tvRowRfidTag = itemView.findViewById(R.id.tvRowRfidTag);
         }
     }
 }
