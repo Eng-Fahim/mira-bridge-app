@@ -84,7 +84,7 @@ public class TagLedAdapter extends RecyclerView.Adapter<TagLedAdapter.ViewHolder
             }
 
             if (checkedCount > CHECK_COUNT_MAX) {
-                ToastUtil.show(R.string.msg_max_select_tag_8);
+                ToastUtil.warning(R.string.msg_max_select_tag_8);
                 checkedCount = CHECK_COUNT_MAX;
                 holder.cbTagLed.setChecked(false);
                 return;
