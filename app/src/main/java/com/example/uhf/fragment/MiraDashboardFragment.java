@@ -27,7 +27,6 @@ import org.json.JSONObject;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MiraDashboardFragment extends Fragment {
@@ -47,7 +46,6 @@ public class MiraDashboardFragment extends Fragment {
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private boolean isArabic;
 
     @Nullable
@@ -62,8 +60,8 @@ public class MiraDashboardFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         try {
-            if (getContext() == null) return;
-
+            showDirectError("1. بدء تحميل Dashboard...");
+            
             apiClient = MiraApiClient.getInstance(requireContext());
             sessionManager = new SessionManager(requireContext());
             branchesManager = MiraBranchesManager.getInstance(requireContext());
@@ -74,37 +72,44 @@ public class MiraDashboardFragment extends Fragment {
             setupListeners();
             updateHeader();
             fetchData();
-        } catch (Exception e) {
-            Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
+
+        } catch (Throwable e) {
+            // إظهار أي خطأ أثناء إنشاء الواجهة فوراً للمستخدم
+            showDirectError("❌ خطأ في إنشاء Dashboard: " + e.getMessage());
+            Log.e(TAG, "onViewCreated error", e);
         }
     }
 
     private void initViews(View v) {
-        tvGreeting = v.findViewById(R.id.tvGreeting);
-        tvDate = v.findViewById(R.id.tvDate);
-        tvLocation = v.findViewById(R.id.tvLocation);
-        tvLiveStatus = v.findViewById(R.id.tvLiveStatus);
+        try {
+            tvGreeting = v.findViewById(R.id.tvGreeting);
+            tvDate = v.findViewById(R.id.tvDate);
+            tvLocation = v.findViewById(R.id.tvLocation);
+            tvLiveStatus = v.findViewById(R.id.tvLiveStatus);
 
-        tvTotalItems = v.findViewById(R.id.tvTotalItems);
-        tvTotalWeight = v.findViewById(R.id.tvTotalWeight);
-        tvSoldToday = v.findViewById(R.id.tvSoldToday);
+            tvTotalItems = v.findViewById(R.id.tvTotalItems);
+            tvTotalWeight = v.findViewById(R.id.tvTotalWeight);
+            tvSoldToday = v.findViewById(R.id.tvSoldToday);
 
-        tvSalesToday = v.findViewById(R.id.tvSalesToday);
-        tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
-        tvSalesYear = v.findViewById(R.id.tvSalesYear);
+            tvSalesToday = v.findViewById(R.id.tvSalesToday);
+            tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
+            tvSalesYear = v.findViewById(R.id.tvSalesYear);
 
-        tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
-        tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
-        tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
+            tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
+            tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
+            tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
 
-        btnGate = v.findViewById(R.id.btnGateSecurity);
-        btnInventory = v.findViewById(R.id.btnRfidAudit);
-        
-        shimmerLayout = v.findViewById(R.id.shimmerLayout);
-        swipeRefresh = v.findViewById(R.id.swipeRefresh);
+            btnGate = v.findViewById(R.id.btnGateSecurity);
+            btnInventory = v.findViewById(R.id.btnRfidAudit);
+            
+            shimmerLayout = v.findViewById(R.id.shimmerLayout);
+            swipeRefresh = v.findViewById(R.id.swipeRefresh);
 
-        if (swipeRefresh != null) {
-            swipeRefresh.setOnRefreshListener(this::fetchData);
+            if (swipeRefresh != null) {
+                swipeRefresh.setOnRefreshListener(this::fetchData);
+            }
+        } catch (Throwable e) {
+            showDirectError("❌ خطأ في الربط بالمكونات (Views): " + e.getMessage());
         }
     }
 
@@ -114,14 +119,12 @@ public class MiraDashboardFragment extends Fragment {
     }
 
     private void showShimmer(boolean show) {
-        if (!isAdded()) return;
         if (shimmerLayout != null) shimmerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
         if (swipeRefresh != null) swipeRefresh.setVisibility(show ? View.GONE : View.VISIBLE);
     }
 
     private void updateHeader() {
         try {
-            if (!isAdded()) return;
             if (tvDate != null) {
                 Locale loc = isArabic ? new Locale("ar") : Locale.US;
                 String pattern = isArabic ? "EEEE، d MMMM yyyy" : "EEEE, MMMM d, yyyy";
@@ -136,59 +139,59 @@ public class MiraDashboardFragment extends Fragment {
             if (tvLocation != null && branchesManager != null) {
                 tvLocation.setText("📍 " + branchesManager.getActiveBranchDisplayName());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "updateHeader error: " + e.getMessage());
+        } catch (Throwable e) {
+            showDirectError("❌ خطأ الهيدر: " + e.getMessage());
         }
     }
 
     private void fetchData() {
         try {
-            if (!isAdded()) return;
-            
+            showDirectError("2. جاري طلب بيانات الـ API...");
             if (tvLiveStatus != null) {
-                tvLiveStatus.setText(isArabic ? "جاري التحديث..." : "Updating...");
+                tvLiveStatus.setText("جاري التحديث...");
                 tvLiveStatus.setTextColor(0xFFF59E0B);
             }
             
             final int activeBranchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : -1;
-            
-            executor.execute(() -> {
+
+            Executors.newSingleThreadExecutor().execute(() -> {
                 try {
-                    MiraApiClient.ApiResponse response = (apiClient != null) ? apiClient.getDashboardFull(activeBranchId) : null;
+                    MiraApiClient.ApiResponse response = apiClient.getDashboardFull(activeBranchId);
+                    
                     mainHandler.post(() -> {
-                        if (!isAdded()) return; // حماية ضد الانهيار إذا غادر المستخدم الصفحة
                         try {
                             showShimmer(false);
                             if (response != null && response.isSuccess && response.data != null) {
+                                showDirectError("✅ تم جلب البيانات بنجاح!");
                                 processData(response.data);
                             } else {
+                                String errorMsg = (response != null) ? response.errorMessage : "الرد فارغ Null";
+                                showDirectError("❌ فشل السيرفر: " + errorMsg);
                                 showOffline();
                             }
                             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                        } catch (Exception e) {
-                            Log.e(TAG, "post processing error: " + e.getMessage());
+                        } catch (Throwable e) {
+                            showDirectError("❌ خطأ أثناء معالجة بيانات الـ API: " + e.getMessage());
                             showOffline();
                         }
                     });
-                } catch (Exception e) {
-                    Log.e(TAG, "Execution error: " + e.getMessage());
+                } catch (Throwable e) {
                     mainHandler.post(() -> {
-                        if (!isAdded()) return;
+                        showDirectError("❌ خطأ اتصال بالشبكة: " + e.getMessage());
                         showShimmer(false); 
                         showOffline(); 
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false); 
                     });
                 }
             });
-        } catch (Exception e) {
-            Log.e(TAG, "fetchData error: " + e.getMessage());
+        } catch (Throwable e) {
+            showDirectError("❌ خطأ تنفيذ fetchData: " + e.getMessage());
             showShimmer(false);
             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
         }
     }
 
     private void processData(JSONObject data) {
-        if (!isAdded() || data == null) return;
         try {
             JSONObject inv = data.optJSONObject("inventory");
             if (inv != null) {
@@ -209,16 +212,17 @@ public class MiraDashboardFragment extends Fragment {
                 setText(tvSalesYear, cleanAmount(sales.optString("year", "0")));
             }
             if (tvLiveStatus != null) { 
-                tvLiveStatus.setText(isArabic ? "متصل" : "Online"); 
+                tvLiveStatus.setText("متصل"); 
                 tvLiveStatus.setTextColor(0xFF16A34A); 
             }
-        } catch (Exception e) { Log.e(TAG, "Process error: " + e.getMessage()); }
+        } catch (Throwable e) { 
+            showDirectError("❌ خطأ قراءة JSON: " + e.getMessage()); 
+        }
     }
 
     private void setKarat(TextView tv, String label, int count) {
-        if (tv == null || !isAdded()) return;
-        String pieceText = isArabic ? " قطعة" : " pcs";
-        tv.setText(count > 0 ? label + " | " + count + pieceText : label + " | —");
+        if (tv == null) return;
+        tv.setText(count > 0 ? label + " | " + count + " قطعة" : label + " | —");
     }
 
     private String cleanAmount(String amount) {
@@ -234,10 +238,9 @@ public class MiraDashboardFragment extends Fragment {
     private void setText(TextView tv, String text) { if (tv != null) tv.setText(text); }
 
     private void showOffline() {
-        if (!isAdded()) return;
         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
         if (tvLiveStatus != null) { 
-            tvLiveStatus.setText(isArabic ? "غير متصل" : "Offline"); 
+            tvLiveStatus.setText("غير متصل"); 
             tvLiveStatus.setTextColor(0xFFDC2626); 
         }
     }
@@ -249,10 +252,19 @@ public class MiraDashboardFragment extends Fragment {
                 if (a.mTabHost != null) a.mTabHost.setCurrentTabByTag(tag);
             }
         } catch (Exception e) {
-            if (getContext() != null) {
-                Toast.makeText(getContext(), isArabic ? "جاري الفتح..." : "Opening...", Toast.LENGTH_SHORT).show();
-            }
+            Toast.makeText(getContext(), "جاري الفتح...", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    // دالة عرض الخطأ المباشر على الشاشة
+    private void showDirectError(String message) {
+        mainHandler.post(() -> {
+            try {
+                if (getContext() != null) {
+                    Toast.makeText(getContext().getApplicationContext(), message, Toast.LENGTH_LONG).show();
+                }
+            } catch (Exception ignored) {}
+        });
     }
 
     @Override
