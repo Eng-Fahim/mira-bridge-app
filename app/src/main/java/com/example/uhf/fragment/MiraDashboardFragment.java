@@ -143,7 +143,6 @@ public class MiraDashboardFragment extends Fragment {
             showDirectError("❌ خطأ الهيدر: " + e.getMessage());
         }
     }
-
     private void fetchData() {
         try {
             showDirectError("2. جاري طلب بيانات الـ API...");
@@ -165,7 +164,7 @@ public class MiraDashboardFragment extends Fragment {
                                 showDirectError("✅ تم جلب البيانات بنجاح!");
                                 processData(response.data);
                             } else {
-                                String errorMsg = (response != null) ? (response.message != null ? response.message : "فشل الطلب") : "الرد فارغ Null";
+                                String errorMsg = (response != null) ? "حدث خطأ في استجابة السيرفر" : "الرد فارغ Null";
 
                                 showDirectError("❌ فشل السيرفر: " + errorMsg);
                                 showOffline();
@@ -191,6 +190,9 @@ public class MiraDashboardFragment extends Fragment {
             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
         }
     }
+
+
+
 
     private void processData(JSONObject data) {
         try {
