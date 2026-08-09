@@ -205,38 +205,49 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     // ==================== Init Task ====================
 
     public class InitTask extends AsyncTask<String, Integer, Boolean> {
-        ProgressDialog mypDialog;
+    ProgressDialog mypDialog;
 
-        @Override
-        protected Boolean doInBackground(String... params) {
-            return mReader.init(BaseTabFragmentActivity.this);
-        }
+    @Override
+    protected Boolean doInBackground(String... params) {
+        return mReader.init(BaseTabFragmentActivity.this);
+    }
 
-        @Override
-        protected void onPostExecute(Boolean result) {
-            super.onPostExecute(result);
-            mypDialog.cancel();
+    @Override
+    protected void onPostExecute(Boolean result) {
+        super.onPostExecute(result);
+        mypDialog.cancel();
+        
+        if (!result) {
+            isInitialized = false;
+            DeviceDetector.reset();
+            Toast.makeText(BaseTabFragmentActivity.this,
+                "UHF Init Failed\nDevice: " + DeviceDetector.getDeviceModelName(),
+                Toast.LENGTH_LONG).show();
+        } else {
+            // التدفق الكامل: اكتشاف → قدرات → Profile → تحقق → تسجيل
+            DeviceDetector.DeviceProfile profile = DeviceDetector.configure(mReader);
             
-            if (!result) {
-                isInitialized = false;
-                Toast.makeText(BaseTabFragmentActivity.this,
-                    "UHF Init Failed\nDevice: " + DeviceDetector.getDeviceModelName(),
-                    Toast.LENGTH_LONG).show();
-            } else {
+            if (profile != null && profile.ready) {
                 isInitialized = true;
-                configureReaderForDevice();
-                Log.i("UHF", "UHF initialized successfully");
+                Log.i("UHF", "✅ UHF ready with profile applied");
+            } else {
+                isInitialized = false;
+                String error = DeviceDetector.getLastError();
+                Toast.makeText(BaseTabFragmentActivity.this,
+                    "UHF Config Failed\n" + (error != null ? error : "Unknown error"),
+                    Toast.LENGTH_LONG).show();
             }
         }
-
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-            mypDialog = new ProgressDialog(BaseTabFragmentActivity.this);
-            mypDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
-            mypDialog.setMessage("Initializing UHF...");
-            mypDialog.setCanceledOnTouchOutside(false);
-            mypDialog.show();
-        }
     }
+
+    @Override
+    protected void onPreExecute() {
+        super.onPreExecute();
+        mypDialog = new ProgressDialog(BaseTabFragmentActivity.this);
+        mypDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+        mypDialog.setMessage("Initializing UHF...\nDetecting device...");
+        mypDialog.setCanceledOnTouchOutside(false);
+        mypDialog.show();
+    }
+}
 }
