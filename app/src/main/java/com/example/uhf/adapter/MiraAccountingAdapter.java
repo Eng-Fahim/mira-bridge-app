@@ -11,7 +11,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.uhf.R;
 import com.example.uhf.model.MiraAccountingItem;
 
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,26 +44,26 @@ public class MiraAccountingAdapter extends RecyclerView.Adapter<MiraAccountingAd
     public void onBindViewHolder(@NonNull AccountingViewHolder holder, int position) {
         MiraAccountingItem item = itemList.get(position);
 
-        // الاعتماد على getCol1Text إلى getCol4Text المضمونة التواجد في جميع النسخ
-        holder.tvRowCol1.setText(item.getCol1Text());
-        holder.tvRowCol2.setText(item.getCol2Text());
-
-        // ربط شارة الـ RFID إن وجدت
-        if (holder.tvRowRfidTag != null) {
-            if (item.getRfidTag() != null && !item.getRfidTag().trim().isEmpty()) {
-                holder.tvRowRfidTag.setText("RFID: " + item.getRfidTag());
-                holder.tvRowRfidTag.setVisibility(View.VISIBLE);
-            } else {
-                holder.tvRowRfidTag.setVisibility(View.GONE);
-            }
+        // استخدام الميثودز الأساسية القديمة الموجودة بالتأكيد في الكلاس المستهدف
+        if (holder.tvRowCol1 != null) {
+            holder.tvRowCol1.setText(item.getCol1Text());
+        }
+        if (holder.tvRowCol2 != null) {
+            holder.tvRowCol2.setText(item.getCol2Text());
+        }
+        if (holder.tvRowCol3 != null) {
+            holder.tvRowCol3.setText(item.getCol3Text());
+            holder.tvRowCol3.setTextColor(Color.parseColor("#D35400"));
+        }
+        if (holder.tvRowCol4 != null) {
+            holder.tvRowCol4.setText(item.getCol4Text());
+            holder.tvRowCol4.setTextColor(Color.parseColor("#27AE60"));
         }
 
-        // عرض القيم بفرز الألوان المعتمد
-        holder.tvRowCol3.setText(item.getCol3Text());
-        holder.tvRowCol3.setTextColor(Color.parseColor("#D35400"));
-
-        holder.tvRowCol4.setText(item.getCol4Text());
-        holder.tvRowCol4.setTextColor(Color.parseColor("#27AE60"));
+        // إخفاء شارة RFID إذا لم تكن مدعومة في الكلاس الحالي
+        if (holder.tvRowRfidTag != null) {
+            holder.tvRowRfidTag.setVisibility(View.GONE);
+        }
 
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) {
