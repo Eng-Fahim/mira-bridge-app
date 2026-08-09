@@ -9,6 +9,14 @@
 <string name="nav_inventory">الجرد</string>
 <string name="nav_pos">البيع</string>
 <string name="nav_more">المزيد</string>
+<string name="nav_identity">التكويد</string>
+<string name="nav_reports">التقارير</string>
+<string name="nav_transfers">التحويلات</string>
+<string name="nav_gate">البوابات</string>
+<string name="nav_accounting">المحاسبة</string>
+<string name="nav_settings">الإعدادات</string>
+<string name="nav_close">إغلاق</string>
+    
     <string name="app_name">MIRA Jewelry Enterprise™</string>
     <string name="action_settings">الإعدادات</string>
     <string name="action_about">حول التطبيق</string>
