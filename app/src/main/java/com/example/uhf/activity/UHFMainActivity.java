@@ -68,6 +68,7 @@ import com.rscja.deviceapi.interfaces.ConnectionStatus;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
@@ -125,11 +126,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         configureReaderForDevice();
         initViewPageData();
         
-        // ✅ الجديد - Bottom Navigation سريعة
-       // setupQuickNav();
+        // Quick Bottom Navigation
+        setupQuickNav();
     }
 
-    // ==================== QUICK BOTTOM NAV (جديد - آمن) ====================
+    // ==================== QUICK BOTTOM NAV ====================
 
     private void setupQuickNav() {
         BottomNavigationView quickNav = findViewById(R.id.bottomQuickNav);
@@ -138,13 +139,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         quickNav.setOnItemSelectedListener(item -> {
             int id = item.getItemId();
             if (id == R.id.nav_quick_dashboard) {
-                if (mTabHost != null) mTabHost.setCurrentTabByTag("Dashboard");
+                switchToTabSafely("Dashboard");
             } else if (id == R.id.nav_quick_inventory) {
-                if (mTabHost != null) mTabHost.setCurrentTabByTag("Scan");
+                switchToTabSafely("Scan");
             } else if (id == R.id.nav_quick_pos) {
-                if (mTabHost != null) mTabHost.setCurrentTabByTag("POS Mode");
+                switchToTabSafely("POS Mode");
             } else if (id == R.id.nav_quick_more) {
-                // فتح قائمة المزيد
                 String[] options = {
                     ar("🆔 التكويد", "🆔 Identity"),
                     ar("📊 التقارير", "📊 Reports"),
@@ -157,10 +157,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     .setTitle(ar("المزيد", "More"))
                     .setItems(options, (d, w) -> {
                         switch (w) {
-                            case 0: if (mTabHost != null) mTabHost.setCurrentTabByTag("IdentityStudio"); break;
-                            case 1: if (mTabHost != null) mTabHost.setCurrentTabByTag("ReportsPro"); break;
-                            case 2: if (mTabHost != null) mTabHost.setCurrentTabByTag("Transfers"); break;
-                            case 3: if (mTabHost != null) mTabHost.setCurrentTabByTag("Settings"); break;
+                            case 0: switchToTabSafely("IdentityStudio"); break;
+                            case 1: switchToTabSafely("ReportsPro"); break;
+                            case 2: switchToTabSafely("Transfers"); break;
+                            case 3: switchToTabSafely("Settings"); break;
                             case 4: toggleLanguage(); break;
                             case 5: showLogoutConfirmation(); break;
                         }
@@ -171,7 +171,18 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         });
     }
 
-    // ==================== باقي الكود الأصلي (لم يتغير) ====================
+    private void switchToTabSafely(String tag) {
+        if (mTabHost != null) {
+            try {
+                mTabHost.setCurrentTabByTag(tag);
+            } catch (Exception e) {
+                Log.w(TAG, "Tab missing or unauthorized: " + tag);
+                Toast.makeText(this, isArabic ? "غير مصرح لهذه الشاشة" : "Access denied for this screen", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    // ==================== CORE LOGIC ====================
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
@@ -263,7 +274,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         LocaleListCompat appLocale = isArabic ? LocaleListCompat.forLanguageTags("ar") : LocaleListCompat.forLanguageTags("en");
         AppCompatDelegate.setApplicationLocales(appLocale);
         getWindow().getDecorView().setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
-        recreate();
     }
 
     private void showBranchPicker() {
@@ -460,10 +470,23 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private void checkReadWritePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) { Intent i = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION); i.setData(Uri.parse("package:" + getPackageName())); startActivityForResult(i, 0); finish(); }
+            if (!Environment.isExternalStorageManager()) { 
+                Intent i = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION); 
+                i.setData(Uri.parse("package:" + getPackageName())); 
+                startActivityForResult(i, 0); 
+                finish(); 
+            }
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
-            if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, 2);
+            List<String> permissions = new ArrayList<>();
+            if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            }
+            if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+            }
+            if (!permissions.isEmpty()) {
+                requestPermissions(permissions.toArray(new String[0]), 1);
+            }
         }
     }
 
