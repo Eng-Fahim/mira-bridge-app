@@ -21,6 +21,7 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.SessionManager;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import org.json.JSONObject;
 
@@ -106,16 +107,12 @@ public class MiraDashboardFragment extends Fragment {
 
     private void setupListeners() {
         if (btnGate != null) btnGate.setOnClickListener(v -> switchTab("SecureGate"));
-        if (btnInventory != null) btnInventory.setOnClickListener(v -> switchTab("Inventory Pro"));
+        if (btnInventory != null) btnInventory.setOnClickListener(v -> switchTab("Inventory"));
     }
 
     private void showShimmer(boolean show) {
-        if (shimmerLayout != null) {
-            shimmerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
-        }
-        if (swipeRefresh != null) {
-            swipeRefresh.setVisibility(show ? View.GONE : View.VISIBLE);
-        }
+        if (shimmerLayout != null) shimmerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (swipeRefresh != null) swipeRefresh.setVisibility(show ? View.GONE : View.VISIBLE);
     }
 
     private void updateHeader() {
@@ -125,20 +122,14 @@ public class MiraDashboardFragment extends Fragment {
                 String pattern = isArabic ? "EEEE، d MMMM yyyy" : "EEEE, MMMM d, yyyy";
                 tvDate.setText(new SimpleDateFormat(pattern, loc).format(new Date()));
             }
-
             if (tvGreeting != null) {
                 String name = sessionManager.getDisplayName();
                 if (name == null || name.isEmpty()) name = sessionManager.getUsername();
                 if (name == null) name = isArabic ? "المستخدم" : "User";
                 tvGreeting.setText(isArabic ? "مرحباً، " + name : "Welcome, " + name);
             }
-
             if (tvLocation != null) {
-                String branchName = branchesManager.getActiveBranchDisplayName();
-                if (branchName == null || branchName.isEmpty()) {
-                    branchName = isArabic ? "الفرع الحالي" : "Current Branch";
-                }
-                tvLocation.setText("📍 " + branchName);
+                tvLocation.setText("📍 " + branchesManager.getActiveBranchDisplayName());
             }
         } catch (Exception e) {
             Log.e(TAG, "updateHeader error: " + e.getMessage());
@@ -151,15 +142,10 @@ public class MiraDashboardFragment extends Fragment {
                 tvLiveStatus.setText(getString(R.string.updating));
                 tvLiveStatus.setTextColor(0xFFF59E0B);
             }
-
-            // جلب معرف الفرع النشط المخصص للمستخدم الحاضر
             final int activeBranchId = branchesManager.getActiveBranchId();
-
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
-                    // إرسال activeBranchId للـ API لجلب بيانات الداشبورد الخاصة بالفرع فقط
                     MiraApiClient.ApiResponse response = apiClient.getDashboardFull(activeBranchId);
-                    
                     mainHandler.post(() -> {
                         try {
                             showShimmer(false);
@@ -176,11 +162,7 @@ public class MiraDashboardFragment extends Fragment {
                     });
                 } catch (Exception e) {
                     Log.e(TAG, "Execution error: " + e.getMessage());
-                    mainHandler.post(() -> {
-                        showShimmer(false);
-                        showOffline();
-                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                    });
+                    mainHandler.post(() -> { showShimmer(false); showOffline(); if (swipeRefresh != null) swipeRefresh.setRefreshing(false); });
                 }
             });
         } catch (Exception e) {
@@ -196,15 +178,9 @@ public class MiraDashboardFragment extends Fragment {
             if (inv != null) {
                 setText(tvTotalItems, String.valueOf(inv.optInt("total_items", 0)));
                 setText(tvTotalWeight, String.format(Locale.US, "%.1f g", inv.optDouble("total_weight", 0.0)));
-
                 JSONObject w = inv.optJSONObject("weights");
-                if (w != null) {
-                    setKarat(tvKarat24, "24K", w.optInt("k24", 0));
-                    setKarat(tvKarat21, "21K", w.optInt("k21", 0));
-                    setKarat(tvKarat18, "18K", w.optInt("k18", 0));
-                }
+                if (w != null) { setKarat(tvKarat24, "24K", w.optInt("k24", 0)); setKarat(tvKarat21, "21K", w.optInt("k21", 0)); setKarat(tvKarat18, "18K", w.optInt("k18", 0)); }
             }
-
             JSONObject sales = data.optJSONObject("sales");
             if (sales != null) {
                 setText(tvSoldToday, String.valueOf(sales.optInt("count_today", 0)));
@@ -212,55 +188,37 @@ public class MiraDashboardFragment extends Fragment {
                 setText(tvSalesMonth, cleanAmount(sales.optString("month", "0")));
                 setText(tvSalesYear, cleanAmount(sales.optString("year", "0")));
             }
-
-            if (tvLiveStatus != null) {
-                tvLiveStatus.setText(getString(R.string.online));
-                tvLiveStatus.setTextColor(0xFF16A34A);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Process error: " + e.getMessage());
-        }
+            if (tvLiveStatus != null) { tvLiveStatus.setText(getString(R.string.online)); tvLiveStatus.setTextColor(0xFF16A34A); }
+        } catch (Exception e) { Log.e(TAG, "Process error: " + e.getMessage()); }
     }
 
     private void setKarat(TextView tv, String label, int count) {
         if (tv == null) return;
-        String piecesText = getString(R.string.pieces);
-        if (count > 0) {
-            tv.setText(label + " | " + count + " " + piecesText);
-        } else {
-            tv.setText(label + " | —");
-        }
+        tv.setText(count > 0 ? label + " | " + count + " " + getString(R.string.pieces) : label + " | —");
     }
 
     private String cleanAmount(String amount) {
         if (amount == null || amount.isEmpty() || amount.equals("$0") || amount.equals("0")) return "—";
-        String cleaned = amount.replace("$", "").replace(",", "").trim();
-        try {
-            double val = Double.parseDouble(cleaned);
-            if (val == 0) return "—";
-            return String.format(Locale.US, "%,.0f YER", val);
-        } catch (Exception e) {
-            return amount;
-        }
+        try { double val = Double.parseDouble(amount.replace("$", "").replace(",", "").trim()); return val == 0 ? "—" : String.format(Locale.US, "%,.0f YER", val); } catch (Exception e) { return amount; }
     }
 
-    private void setText(TextView tv, String text) {
-        if (tv != null) tv.setText(text);
-    }
+    private void setText(TextView tv, String text) { if (tv != null) tv.setText(text); }
 
     private void showOffline() {
         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-        if (tvLiveStatus != null) {
-            tvLiveStatus.setText(getString(R.string.offline));
-            tvLiveStatus.setTextColor(0xFFDC2626);
-        }
+        if (tvLiveStatus != null) { tvLiveStatus.setText(getString(R.string.offline)); tvLiveStatus.setTextColor(0xFFDC2626); }
     }
 
     private void switchTab(String tag) {
         try {
             if (getActivity() instanceof UHFMainActivity) {
                 UHFMainActivity a = (UHFMainActivity) getActivity();
-                if (a.mTabHost != null) a.mTabHost.setCurrentTabByTag(tag);
+                BottomNavigationView nav = a.findViewById(R.id.bottomNavigation);
+                if (nav != null) {
+                    if (tag.contains("POS") || tag.contains("pos")) nav.setSelectedItemId(R.id.nav_pos);
+                    else if (tag.contains("Inventory") || tag.contains("Scan") || tag.contains("جرد")) nav.setSelectedItemId(R.id.nav_inventory);
+                    else if (tag.contains("Secure") || tag.contains("Gate") || tag.contains("بوابة")) nav.setSelectedItemId(R.id.nav_more);
+                }
             }
         } catch (Exception e) {
             Toast.makeText(getContext(), isArabic ? "جاري الفتح..." : "Opening...", Toast.LENGTH_SHORT).show();
