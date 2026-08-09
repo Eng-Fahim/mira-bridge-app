@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/nav_quick_dashboard" android:icon="@drawable/ic_dashboard" android:title="الرئيسية" />
+    <item android:id="@+id/nav_quick_inventory" android:icon="@drawable/ic_search" android:title="الجرد" />
+    <item android:id="@+id/nav_quick_pos" android:icon="@drawable/ic_pos" android:title="البيع" />
+    <item android:id="@+id/nav_quick_more" android:icon="@drawable/ic_more" android:title="المزيد" />
+</menu>
