@@ -137,9 +137,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     if (currentTabTag != null) {
                         Fragment activeFragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
                         if (activeFragment instanceof MiraUHFReadTagFragment && activeFragment.isVisible()) {
-                            if (((MiraUHFReadTagFragment) activeFragment).onBackPressed()) {
-                                return; 
-                            }
+                            
                         }
                     }
                 }
