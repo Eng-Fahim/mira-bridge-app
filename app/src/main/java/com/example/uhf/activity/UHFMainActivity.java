@@ -119,6 +119,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         checkReadWritePermission();
         initSound();
         initUHF();
+        configureReaderForDevice();
         initViewPageData();
 
         // تسجيل معالج زر العودة لحماية عملية الجرد النشطة
