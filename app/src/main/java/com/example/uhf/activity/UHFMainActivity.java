@@ -126,7 +126,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         initViewPageData();
         
         // ✅ الجديد - Bottom Navigation سريعة
-        setupQuickNav();
+       // setupQuickNav();
     }
 
     // ==================== QUICK BOTTOM NAV (جديد - آمن) ====================
