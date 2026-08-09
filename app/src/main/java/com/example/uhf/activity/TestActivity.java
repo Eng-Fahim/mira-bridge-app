@@ -1,6 +1,7 @@
 package com.example.uhf.activity;
 
 import androidx.appcompat.app.AppCompatActivity;
+import com.example.uhf.tools.DeviceDetector;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
