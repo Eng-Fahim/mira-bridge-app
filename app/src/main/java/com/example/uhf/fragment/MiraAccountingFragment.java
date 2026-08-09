@@ -25,8 +25,19 @@ public class MiraAccountingFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_mira_accounting, container, false);
-        
-        recyclerView = view.findViewById(R.id.rvAccountingList);
+
+        // البحث عن RecyclerView بشكل ديناميكي لتفادي اختلاف مسميات الـ ID في الـ XML
+        int rvId = requireContext().getResources().getIdentifier("rvAccountingList", "id", requireContext().getPackageName());
+        if (rvId == 0) {
+            rvId = requireContext().getResources().getIdentifier("rv_accounting_list", "id", requireContext().getPackageName());
+        }
+
+        if (rvId != 0) {
+            recyclerView = view.findViewById(rvId);
+        } else if (view instanceof RecyclerView) {
+            recyclerView = (RecyclerView) view;
+        }
+
         if (recyclerView != null) {
             recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
             adapter = new MiraAccountingAdapter();
@@ -39,15 +50,11 @@ public class MiraAccountingFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        viewModel = new ViewModelProvider(this).get(MiraAccountingViewModel.class);
-
-        if (viewModel != null && adapter != null) {
-            viewModel.getItemsLiveData().observe(getViewLifecycleOwner(), items -> {
-                if (items != null) {
-                    adapter.setItems(items);
-                }
-            });
-            viewModel.loadAccountingData();
+        
+        try {
+            viewModel = new ViewModelProvider(this).get(MiraAccountingViewModel.class);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }
