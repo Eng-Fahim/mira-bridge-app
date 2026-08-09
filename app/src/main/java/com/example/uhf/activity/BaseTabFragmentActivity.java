@@ -220,3 +220,4 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
             mypDialog.show();
         }
     }
+}
