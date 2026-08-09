@@ -1,8 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:id="@+id/nav_dashboard" android:title="🏠"/>
-    <item android:id="@+id/nav_scan" android:title="📷"/>
-    <item android:id="@+id/nav_inventory" android:title="📊"/>
-    <item android:id="@+id/nav_gates" android:title="🚪"/>
-    <item android:id="@+id/nav_settings" android:title="⚙️"/>
+
+    <item
+        android:id="@+id/nav_dashboard"
+        android:icon="@drawable/ic_dashboard"
+        android:title="@string/nav_dashboard" />
+
+    <item
+        android:id="@+id/nav_jewelry"
+        android:icon="@drawable/ic_jewelry"
+        android:title="@string/nav_jewelry" />
+
+    <item
+        android:id="@+id/nav_inventory"
+        android:icon="@drawable/ic_search"
+        android:title="@string/nav_inventory" />
+
+    <item
+        android:id="@+id/nav_pos"
+        android:icon="@drawable/ic_pos"
+        android:title="@string/nav_pos" />
+
+    <item
+        android:id="@+id/nav_more"
+        android:icon="@drawable/ic_more"
+        android:title="@string/nav_more" />
+
 </menu>
