@@ -5,7 +5,6 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <!-- Toolbar -->
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
@@ -14,14 +13,12 @@
         app:titleTextColor="?attr/colorOnPrimary"
         app:subtitleTextColor="?attr/colorOnPrimary" />
 
-    <!-- التبويبات القديمة (نظام FragmentTabHost) -->
     <FrameLayout
         android:id="@+id/realtabcontent"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <!-- Bottom Navigation - ٤ أزرار سريعة -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomQuickNav"
         android:layout_width="match_parent"
