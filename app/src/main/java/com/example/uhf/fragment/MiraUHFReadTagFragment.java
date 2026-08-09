@@ -814,6 +814,31 @@ public class MiraUHFReadTagFragment extends Fragment {
                 .setCancelable(false)
                 .show();
     }
+    private void checkReaderStatus() {
+    try {
+        if (getActivity() instanceof UHFMainActivity) {
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+            isReaderConnected = activity.isReaderReady() && DeviceDetector.isReady();
+            
+            if (tvReaderStatus != null) {
+                if (isReaderConnected) {
+                    DeviceDetector.DeviceProfile profile = DeviceDetector.getProfile();
+                    String deviceName = profile != null ? profile.modelName : DeviceDetector.getDeviceModelName();
+                    int power = DeviceDetector.getCurrentPower();
+                    
+                    tvReaderStatus.setText("🟢 " + deviceName + " | " + power + "dBm");
+                    tvReaderStatus.setTextColor(Color.parseColor("#16A34A"));
+                } else {
+                    String status = DeviceDetector.getStatus().name();
+                    tvReaderStatus.setText("🟡 " + status + " | Camera Ready");
+                    tvReaderStatus.setTextColor(Color.parseColor("#D4AF37"));
+                }
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "checkReaderStatus error: " + e.getMessage());
+    }
+}
 
     private void printReport(boolean onlyMissing) {
         if (getContext() == null) return;
