@@ -361,25 +361,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         readerCheckHandler.post(readerCheckRunnable);
     }
 
-    private void checkReaderStatus() {
-        try {
-            if (getActivity() instanceof UHFMainActivity) {
-                UHFMainActivity activity = (UHFMainActivity) getActivity();
-                isReaderConnected = activity.isReaderReady();
-                if (tvReaderStatus != null) {
-                    if (isReaderConnected) {
-                        tvReaderStatus.setText(ar("🟢 القارئ متصل (C5)", "🟢 C5 Reader Connected"));
-                        tvReaderStatus.setTextColor(Color.parseColor("#16A34A"));
-                    } else {
-                        tvReaderStatus.setText(ar("🟡 وضع المحاكاة / الكاميرا متاح", "🟡 Simulation / Camera Ready"));
-                        tvReaderStatus.setTextColor(Color.parseColor("#D4AF37"));
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "checkReaderStatus error: " + e.getMessage());
-        }
-    }
+    
 
     private void startCameraScan() {
         try {
