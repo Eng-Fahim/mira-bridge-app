@@ -50,19 +50,28 @@ public class MiraAccountingAdapter extends RecyclerView.Adapter<MiraAccountingAd
         holder.tvRowCol1.setText(item.getCodeOrRef());
         holder.tvRowCol2.setText(item.getNameOrDesc());
 
+        // ربط شارة الـ RFID إن وجدت
+        if (holder.tvRowRfidTag != null) {
+            if (item.getRfidTag() != null && !item.getRfidTag().trim().isEmpty()) {
+                holder.tvRowRfidTag.setText("RFID: " + item.getRfidTag());
+                holder.tvRowRfidTag.setVisibility(View.VISIBLE);
+            } else {
+                holder.tvRowRfidTag.setVisibility(View.GONE);
+            }
+        }
+
         if (item.getItemType() == MiraAccountingItem.ItemType.JOURNAL_ENTRY) {
-            // العمود 3: صافي الذهب 24 (مدين / دائن)
+            // العمود 3: صافي الذهب 24 (مدين - دائن)
             double netGold = item.getFineGold24Debit() - item.getFineGold24Credit();
             holder.tvRowCol3.setText(dfGold.format(netGold) + " جم");
-            holder.tvRowCol3.setTextColor(netGold >= 0 ? Color.parseColor("#F39C12") : Color.parseColor("#E67E22"));
+            holder.tvRowCol3.setTextColor(netGold >= 0 ? Color.parseColor("#D35400") : Color.parseColor("#E67E22"));
 
-            // العمود 4: الحركة النقدية (مدين / دائن)
+            // العمود 4: الحركة النقدية (مدين - دائن)
             double netCash = item.getDebitCash() - item.getCreditCash();
             holder.tvRowCol4.setText(dfCash.format(netCash) + " " + item.getCurrency());
             holder.tvRowCol4.setTextColor(netCash >= 0 ? Color.parseColor("#27AE60") : Color.parseColor("#C0392B"));
 
         } else if (item.getItemType() == MiraAccountingItem.ItemType.CHART_OF_ACCOUNT) {
-            // رصيد الذهب والرصيد النقدي للحساب
             holder.tvRowCol3.setText(dfGold.format(item.getFineGoldBalance()) + " جم");
             holder.tvRowCol3.setTextColor(Color.parseColor("#F1C40F"));
 
@@ -91,7 +100,7 @@ public class MiraAccountingAdapter extends RecyclerView.Adapter<MiraAccountingAd
     }
 
     static class AccountingViewHolder extends RecyclerView.ViewHolder {
-        TextView tvRowCol1, tvRowCol2, tvRowCol3, tvRowCol4;
+        TextView tvRowCol1, tvRowCol2, tvRowCol3, tvRowCol4, tvRowRfidTag;
 
         public AccountingViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -99,6 +108,7 @@ public class MiraAccountingAdapter extends RecyclerView.Adapter<MiraAccountingAd
             tvRowCol2 = itemView.findViewById(R.id.tvRowCol2);
             tvRowCol3 = itemView.findViewById(R.id.tvRowCol3);
             tvRowCol4 = itemView.findViewById(R.id.tvRowCol4);
+            tvRowRfidTag = itemView.findViewById(R.id.tvRowRfidTag);
         }
     }
 }
