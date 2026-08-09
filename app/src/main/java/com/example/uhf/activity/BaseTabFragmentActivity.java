@@ -24,6 +24,7 @@ import com.example.uhf.R;
 import com.example.uhf.fragment.KeyDwonFragment;
 import com.example.uhf.tools.DeviceDetector;
 import com.example.uhf.tools.UIHelper;
+import com.example.uhf.tools.DeviceDetector;
 import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.utility.StringUtility;
 
