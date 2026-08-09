@@ -3,7 +3,12 @@
     <!-- ✅ أضف فقط هذه إذا لم تكن موجودة -->
 <string name="menu_profile">ملفي</string>
 <string name="menu_logout">تسجيل الخروج</string>
-
+<!-- Bottom Navigation -->
+<string name="nav_dashboard">الرئيسية</string>
+<string name="nav_jewelry">المجوهرات</string>
+<string name="nav_inventory">الجرد</string>
+<string name="nav_pos">البيع</string>
+<string name="nav_more">المزيد</string>
     <string name="app_name">MIRA Jewelry Enterprise™</string>
     <string name="action_settings">الإعدادات</string>
     <string name="action_about">حول التطبيق</string>
