@@ -395,7 +395,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
 
         if (isManager || role == SessionManager.Role.AUDITOR) {
-           // safeAddTab("Accounting", isArabic ? "💰 المحاسبة" : "💰 Accounting", MiraAccountingFragment.class);
+            safeAddTab("Accounting", isArabic ? "💰 المحاسبة" : "💰 Accounting", MiraAccountingFragment.class);
         }
 
         if (isManager || isInventoryMgr) {
