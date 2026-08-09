@@ -481,6 +481,5 @@ public class MiraUHFReadTagFragment extends Fragment {
         @Override public void onBindViewHolder(@NonNull VH h, int pos) { ScannedTag t; synchronized (list) { if (pos >= list.size()) return; t = list.get(pos); } if (t != null) { if (h.tvEPC != null) h.tvEPC.setText(t.epc); if (h.tvTitle != null) h.tvTitle.setText(t.title); if (h.tvDetails != null) h.tvDetails.setText((t.karat != null ? t.karat : "") + " | " + (t.weight != null ? t.weight : "")); if (h.tvStatus != null) { h.tvStatus.setText(t.status); h.tvStatus.setTextColor(t.isExpected ? Color.parseColor("#16A34A") : Color.parseColor("#F59E0B")); } if (h.tvTime != null) h.tvTime.setText(t.timestamp); } }
         @Override public int getItemCount() { synchronized (list) { return list.size(); } }
         class VH extends RecyclerView.ViewHolder { TextView tvEPC, tvTitle, tvDetails, tvStatus, tvTime; VH(View v) { super(v); tvEPC = v.findViewById(R.id.tvTagEPC); tvTitle = v.findViewById(R.id.tvTagTitle); tvDetails = v.findViewById(R.id.tvTagDetails); tvStatus = v.findViewById(R.id.tvTagStatus); tvTime = v.findViewById(R.id.tvTagTime); } }
-    }
-                }
+    }               
 }
