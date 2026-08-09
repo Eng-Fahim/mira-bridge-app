@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.uhf.R;
 import com.example.uhf.model.MiraAccountingItem;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,6 +19,8 @@ public class MiraAccountingAdapter extends RecyclerView.Adapter<MiraAccountingAd
 
     private List<MiraAccountingItem> itemList = new ArrayList<>();
     private OnItemClickListener listener;
+    private final DecimalFormat dfGold = new DecimalFormat("#,##0.000");
+    private final DecimalFormat dfCash = new DecimalFormat("#,##0.00");
 
     public interface OnItemClickListener {
         void onItemClick(MiraAccountingItem item);
@@ -44,21 +47,35 @@ public class MiraAccountingAdapter extends RecyclerView.Adapter<MiraAccountingAd
     public void onBindViewHolder(@NonNull AccountingViewHolder holder, int position) {
         MiraAccountingItem item = itemList.get(position);
 
-        holder.tvRowCol1.setText(item.getCol1Text());
-        holder.tvRowCol2.setText(item.getCol2Text());
-        holder.tvRowCol3.setText(item.getCol3Text());
-        holder.tvRowCol4.setText(item.getCol4Text());
+        holder.tvRowCol1.setText(item.getCodeOrRef());
+        holder.tvRowCol2.setText(item.getNameOrDesc());
 
-        // تنسيق الألوان والتصميم حسب نوع البيانات المعروضة
         if (item.getItemType() == MiraAccountingItem.ItemType.JOURNAL_ENTRY) {
-            holder.tvRowCol3.setTextColor(Color.parseColor("#27AE60")); // أخضر للمدين
-            holder.tvRowCol4.setTextColor(Color.parseColor("#C0392B")); // أحمر للدائن
+            // العمود 3: صافي الذهب 24 (مدين / دائن)
+            double netGold = item.getFineGold24Debit() - item.getFineGold24Credit();
+            holder.tvRowCol3.setText(dfGold.format(netGold) + " جم");
+            holder.tvRowCol3.setTextColor(netGold >= 0 ? Color.parseColor("#F39C12") : Color.parseColor("#E67E22"));
+
+            // العمود 4: الحركة النقدية (مدين / دائن)
+            double netCash = item.getDebitCash() - item.getCreditCash();
+            holder.tvRowCol4.setText(dfCash.format(netCash) + " " + item.getCurrency());
+            holder.tvRowCol4.setTextColor(netCash >= 0 ? Color.parseColor("#27AE60") : Color.parseColor("#C0392B"));
+
         } else if (item.getItemType() == MiraAccountingItem.ItemType.CHART_OF_ACCOUNT) {
-            holder.tvRowCol3.setTextColor(Color.parseColor("#2980B9")); // أزرق لنوع الحساب
-            holder.tvRowCol4.setTextColor(Color.parseColor("#2C3E50")); // داكن للرصيد
+            // رصيد الذهب والرصيد النقدي للحساب
+            holder.tvRowCol3.setText(dfGold.format(item.getFineGoldBalance()) + " جم");
+            holder.tvRowCol3.setTextColor(Color.parseColor("#F1C40F"));
+
+            holder.tvRowCol4.setText(dfCash.format(item.getCashBalance()) + " " + item.getCurrency());
+            holder.tvRowCol4.setTextColor(Color.parseColor("#2C3E50"));
+
         } else {
-            holder.tvRowCol3.setTextColor(Color.parseColor("#27AE60"));
-            holder.tvRowCol4.setTextColor(Color.parseColor("#C0392B"));
+            // ميزان المراجعة
+            holder.tvRowCol3.setText(dfGold.format(item.getFineGoldBalance()) + " جم 24");
+            holder.tvRowCol3.setTextColor(Color.parseColor("#D35400"));
+
+            holder.tvRowCol4.setText(dfCash.format(item.getCashBalance()) + " " + item.getCurrency());
+            holder.tvRowCol4.setTextColor(Color.parseColor("#27AE60"));
         }
 
         holder.itemView.setOnClickListener(v -> {
