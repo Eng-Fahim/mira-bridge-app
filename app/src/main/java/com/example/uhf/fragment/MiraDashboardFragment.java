@@ -165,7 +165,8 @@ public class MiraDashboardFragment extends Fragment {
                                 showDirectError("✅ تم جلب البيانات بنجاح!");
                                 processData(response.data);
                             } else {
-                                String errorMsg = (response != null) ? response.errorMessage : "الرد فارغ Null";
+                                String errorMsg = (response != null) ? (response.message != null ? response.message : "فشل الطلب") : "الرد فارغ Null";
+
                                 showDirectError("❌ فشل السيرفر: " + errorMsg);
                                 showOffline();
                             }
