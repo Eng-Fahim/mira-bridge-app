@@ -27,7 +27,6 @@
             android:layout_height="match_parent"
             android:orientation="vertical">
 
-            <!-- شريط التبويبات العلوي (مخفي إن كنت تعتمد على الملاحة السفلية أو يظهر كـ Tabs) -->
             <TabWidget
                 android:id="@android:id/tabs"
                 android:layout_width="match_parent"
@@ -40,7 +39,6 @@
                 android:layout_height="0dp"
                 android:layout_weight="0" />
 
-            <!-- عرض محتوى الفرع الحالي/الشاشات -->
             <FrameLayout
                 android:id="@+id/realtabcontent"
                 android:layout_width="match_parent"
@@ -48,13 +46,13 @@
         </LinearLayout>
     </androidx.fragment.app.FragmentTabHost>
 
-    <!-- شريط الملاحة السريع الذي كان مفقوداً -->
+    <!-- شريط الملاحة السريع -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomQuickNav"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="?android:attr/windowBackground"
         app:elevation="8dp"
-        app:menu="@menu/quick_nav_menu" />
+        app:menu="@menu/bottom_quick_menu" />
 
 </LinearLayout>
