@@ -5,6 +5,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <!-- الشريط العلوي Toolbar -->
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
@@ -14,10 +15,46 @@
         app:titleTextColor="?attr/colorOnPrimary"
         app:subtitleTextColor="?attr/colorOnPrimary" />
 
-    <FrameLayout
-        android:id="@+id/realtabcontent"
+    <!-- الحاوية الأساسية للتبويبات (TabHost) -->
+    <androidx.fragment.app.FragmentTabHost
+        android:id="@android:id/tabhost"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <!-- شريط التبويبات العلوي (مخفي إن كنت تعتمد على الملاحة السفلية أو يظهر كـ Tabs) -->
+            <TabWidget
+                android:id="@android:id/tabs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone" />
+
+            <FrameLayout
+                android:id="@android:id/tabcontent"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="0" />
+
+            <!-- عرض محتوى الفرع الحالي/الشاشات -->
+            <FrameLayout
+                android:id="@+id/realtabcontent"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+        </LinearLayout>
+    </androidx.fragment.app.FragmentTabHost>
+
+    <!-- شريط الملاحة السريع الذي كان مفقوداً -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomQuickNav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/windowBackground"
+        app:elevation="8dp"
+        app:menu="@menu/quick_nav_menu" />
 
 </LinearLayout>
