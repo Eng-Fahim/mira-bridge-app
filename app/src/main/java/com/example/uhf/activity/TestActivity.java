@@ -126,16 +126,27 @@ public class TestActivity extends Activity {
         releaseSoundPool();
     }
 
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (DeviceDetector.isScanKey(keyCode)) {
-            if (event.getRepeatCount() == 0) {
-                readTag();
-            }
-            return true;
-        }
-        return super.onKeyDown(keyCode, event);
+private static final int[] SCAN_KEY_CODES = {
+    139, 280, 291, 293, 294, 311, 312, 313, 315, 591, 593, 594, 596
+};
+
+private boolean isScanKey(int keyCode) {
+    for (int code : SCAN_KEY_CODES) {
+        if (code == keyCode) return true;
     }
+    return false;
+}
+
+@Override
+public boolean onKeyDown(int keyCode, KeyEvent event) {
+    if (isScanKey(keyCode)) {
+        if (event.getRepeatCount() == 0) {
+            readTag();
+        }
+        return true;
+    }
+    return super.onKeyDown(keyCode, event);
+}
 
     private void readTag() {
         if (rfidWithUHFUART == null) {
