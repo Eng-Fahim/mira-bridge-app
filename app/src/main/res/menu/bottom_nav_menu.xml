@@ -2,6 +2,7 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:id="@+id/nav_dashboard" android:icon="@drawable/ic_dashboard" android:title="@string/nav_dashboard" />
     <item android:id="@+id/nav_jewelry" android:icon="@drawable/ic_jewelry" android:title="@string/nav_jewelry" />
+    <item android:id="@+id/nav_inventory" android:icon="@drawable/ic_search" android:title="@string/nav_inventory" />
     <!-- المسافة الفارغة للزر الوسطي -->
     <item android:id="@+id/nav_empty" android:enabled="false" android:title="" />
     <item android:id="@+id/nav_pos" android:icon="@drawable/ic_pos" android:title="@string/nav_pos" />
