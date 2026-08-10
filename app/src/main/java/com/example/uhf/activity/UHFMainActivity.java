@@ -118,7 +118,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
 
             setContentView(R.layout.activity_main);
-            loadingOverlay = findViewById(R.id/loading_overlay);
+            
+            // ✅ صحيح
+            loadingOverlay = findViewById(R.id.loading_overlay);
+
 
             com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
             if (toolbar != null) {
