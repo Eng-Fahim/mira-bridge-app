@@ -112,4 +112,13 @@
         <item name="android:fontFamily">@font/cairo</item>
         <item name="android:textFontWeight">700</item>
     </style>
+
+    <style name="CustomNavIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+    <item name="android:color">#1AC5A059</item> <!-- خلفية شفافة فاخرة خلف العنصر النشط -->
+    <item name="android:width">48dp</item>
+    <item name="android:height">32dp</item>
+    <item name="marginHorizontal">4dp</item>
+    <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.Full</item>
+</style>
+
 </resources>
