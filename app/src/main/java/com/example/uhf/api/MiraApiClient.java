@@ -66,6 +66,17 @@ public class MiraApiClient {
         return post("/auth/login", payload);
     }
 
+    /**
+ * إضافة قطع إلى تحويل موجود
+ */
+public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("items", epcs);
+    } catch (Exception ignored) {}
+    return postWithAuth("/transfers/" + transferId + "/items", payload);
+}
+
     public ApiResponse validateToken(String token) {
         JSONObject payload = new JSONObject();
         try {
