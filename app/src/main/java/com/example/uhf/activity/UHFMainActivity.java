@@ -19,6 +19,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Toast;
+import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDelegate;
@@ -72,6 +73,7 @@ import java.util.List;
 
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
+    private FrameLayout loadingOverlay; 
     private final static String TAG = "UHFMainActivity";
     public FragmentTabHost mTabHost;
     private FragmentManager fm;
@@ -116,6 +118,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
 
             setContentView(R.layout.activity_main);
+            loadingOverlay = findViewById(R.id/loading_overlay);
 
             com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
             if (toolbar != null) {
@@ -445,13 +448,24 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             if (isManager || isInventoryMgr) {
                 safeAddTab("Transfers", isArabic ? "📦 التحويلات" : "📦 Transfers", MiraTransferFragment.class);
             }
-
+            
             mTabHost.setOnTabChangedListener(tabId -> {
-                try {
-                    Fragment fragment = getSupportFragmentManager().findFragmentByTag(tabId);
-                    if (fragment != null) currentFragment = fragment;
-                } catch (Exception e) { Log.e(TAG, "Tab switch error: " + e.getMessage()); }
-            });
+    try {
+        // 1. إظهار علامة التحميل عند الضغط على التبويب
+        showLoading();
+
+        Fragment fragment = getSupportFragmentManager().findFragmentByTag(tabId);
+        if (fragment != null) currentFragment = fragment;
+
+        // 2. إخفاء التحميل تلقائياً بعد 300 مللي ثانية لسلاسة الانتقال
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::hideLoading, 300);
+
+    } catch (Exception e) { 
+        Log.e(TAG, "Tab switch error: " + e.getMessage()); 
+        hideLoading();
+    }
+});
+
         } catch (Exception e) {
             Log.e(TAG, "initViewPageData error: " + e.getMessage());
         }
@@ -464,6 +478,17 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         } catch (Exception e) { Log.e(TAG, "Failed to add tab: " + tag); }
     }
+public void showLoading() {
+    if (loadingOverlay != null) {
+        loadingOverlay.setVisibility(View.VISIBLE);
+    }
+}
+
+public void hideLoading() {
+    if (loadingOverlay != null) {
+        loadingOverlay.setVisibility(View.GONE);
+    }
+}
 
     private void showLogoutConfirmation() {
         try {
