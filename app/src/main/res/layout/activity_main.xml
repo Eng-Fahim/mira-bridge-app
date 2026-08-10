@@ -91,7 +91,7 @@
 
     </LinearLayout>
 
-        <!-- غطاء التحميل الفاخر الخاص بالمجوهرات -->
+    <!-- غطاء التحميل الفاخر الخاص بالمجوهرات -->
     <FrameLayout
         android:id="@+id/loading_overlay"
         android:layout_width="match_parent"
@@ -111,7 +111,6 @@
             android:orientation="vertical"
             android:padding="20dp">
 
-            <!-- أيقونة المجوهرات/الماس الدوارة أو الثابتة مع مؤشر فاخر -->
             <RelativeLayout
                 android:layout_width="64dp"
                 android:layout_height="64dp">
@@ -119,7 +118,7 @@
                 <ProgressBar
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:indeterminateTint="#C5A059" /> <!-- لون ذهبي فاخر -->
+                    android:indeterminateTint="#C5A059" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -141,6 +140,5 @@
 
         </LinearLayout>
     </FrameLayout>
-
 
 </RelativeLayout>
