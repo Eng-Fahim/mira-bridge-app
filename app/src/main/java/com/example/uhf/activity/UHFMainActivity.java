@@ -180,7 +180,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             try {
                 int id = item.getItemId();
                 if (id == R.id.nav_quick_dashboard) switchToTabSafely("Dashboard");
-                else if (id == R.id.nav_quick_jewelry) switchToTabSafely("JewelryDashboard");
                 else if (id == R.id.nav_quick_menu) showRadialMenu(); // ⚡ فتح قائمة الإجراءات الفاخرة
                 else if (id == R.id.nav_quick_inventory) switchToTabSafely("Scan");
                 else if (id == R.id.nav_quick_pos) switchToTabSafely("POS Mode");
@@ -292,13 +291,12 @@ private void updateDynamicUIStrings() {
         if (quickNav != null && quickNav.getMenu() != null) {
             Menu menu = quickNav.getMenu();
             MenuItem itemDash = menu.findItem(R.id.nav_quick_dashboard);
-            MenuItem itemJewelry = menu.findItem(R.id.nav_quick_jewelry);
             MenuItem itemActions = menu.findItem(R.id.nav_quick_menu);
             MenuItem itemScan = menu.findItem(R.id.nav_quick_inventory);
             MenuItem itemPos = menu.findItem(R.id.nav_quick_pos);
 
             if (itemDash != null) itemDash.setTitle(isArabic ? "الرئيسية" : "Home");
-            if (itemJewelry != null) itemJewelry.setTitle(isArabic ? "مجوهرات" : "Jewelry");
+            
             if (itemActions != null) itemActions.setTitle(isArabic ? "إجراءات" : "Actions");
             if (itemScan != null) itemScan.setTitle(isArabic ? "الجرد" : "Inventory");
             if (itemPos != null) itemPos.setTitle(isArabic ? "البيع" : "POS");
