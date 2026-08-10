@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources translatable="false">
+
+    <!-- Country Codes -->
     <string-array name="country_codes" translatable="false">
         <item>-</item>
         <item>AR</item>
@@ -33,19 +35,22 @@
         <item>US</item>
     </string-array>
 
+    <!-- Working Modes -->
     <string-array name="working_modes">
-    <item>🇾🇪 MIRA ID Yemen (محسّن)</item>
-    <item>🌍 MIRA ID Standard</item>
-    <item>📡 RFID Only</item>
-    <item>🛠️ Development Mode</item>
-</string-array>
-  
+        <item>🇾🇪 MIRA ID Yemen (محسّن)</item>
+        <item>🌍 MIRA ID Standard</item>
+        <item>📡 RFID Only</item>
+        <item>🛠️ Development Mode</item>
+    </string-array>
+
+    <!-- Inventory Modes -->
     <string-array name="inventory_modes">
-    <item>جرد كامل (Full)</item>
-    <item>جرد جزئي (Partial)</item>
-    <item>جرد سريع (Quick)</item>
-    <item>جرد بالموقع (Location)</item>
-</string-array>
+        <item>جرد كامل (Full)</item>
+        <item>جرد جزئي (Partial)</item>
+        <item>جرد سريع (Quick)</item>
+        <item>جرد بالموقع (Location)</item>
+    </string-array>
+
     <!-- GB label Lock -->
     <string-array name="storageArea">
         <item>Label information area</item>
@@ -91,6 +96,8 @@
         <item>Need authentication, no need for secure communication</item>
         <item>Need identification, need secure communication</item>
     </string-array>
+
+    <!-- RFID Power Levels -->
     <string-array name="arrayPower" translatable="false">
         <item>1</item>
         <item>2</item>
@@ -123,18 +130,26 @@
         <item>29</item>
         <item>30</item>
     </string-array>
+
+    <!-- Gen2 RFID Sessions & Targets -->
     <string-array name="arraySession">
         <item>S0</item>
         <item>S1</item>
         <item>S2</item>
         <item>S3</item>
     </string-array>
+
     <string-array name="arrayInventoried">
         <item>A</item>
         <item>B</item>
     </string-array>
 
+    <string-array name="arrayTarget">
+        <item>A</item>
+        <item>B</item>
+    </string-array>
 
+    <!-- Fast Inventory Settings -->
     <string-array name="arrayFastInventory" translatable="false">
         <item>Close</item>
         <item>CrID16</item>
@@ -151,18 +166,51 @@
         <item>4</item>
     </integer-array>
 
-    <!-- أضف داخل resources في res/values/arrays.xml -->
-<string-array name="payment_methods">
-    <item>💵 نقدي</item>
-    <item>💳 بطاقة ائتمان</item>
-    <item>🏦 تحويل بنكي</item>
-    <item>📱 محفظة رقمية</item>
-    <item>🔐 شيك</item>
-</string-array>
+    <!-- Payment Methods -->
+    <string-array name="payment_methods">
+        <item>💵 نقدي</item>
+        <item>💳 بطاقة ائتمان</item>
+        <item>🏦 تحويل بنكي</item>
+        <item>📱 محفظة رقمية</item>
+        <item>🔐 شيك</item>
+    </string-array>
 
-    <!-- 🟢 MIRA Bridge API URLs -->
+    <!-- MIRA Bridge API URLs -->
     <string-array name="mira_api_urls">
         <item>https://ams.ibreg.org/wp-json/mira-gate/v1/authorize</item>
+        <item>https://api.mira.ye/v1/</item>
+    </string-array>
+
+    <!-- ➕ الإضافات المطلوبة لتوافق واجهة UHF RFID -->
+
+    <!-- نطاقات التردد (Frequency Regions) -->
+    <string-array name="arrayMode">
+        <item>China2 (920-925MHz)</item>
+        <item>America (902-928MHz)</item>
+        <item>Europe (865-868MHz)</item>
+        <item>Custom/Other</item>
+    </string-array>
+
+    <!-- بنوك الذاكرة (Memory Banks) -->
+    <string-array name="arrayMemoryBank">
+        <item>EPC</item>
+        <item>TID</item>
+        <item>USER</item>
+        <item>RESERVED</item>
+    </string-array>
+
+    <!-- معدل الربط والإشارة (Link Profiles) -->
+    <string-array name="arrayLinkParams">
+        <item>DSB_ASK / FM0 / 40KHZ</item>
+        <item>PR_ASK / Miller 4 / 250KHZ</item>
+        <item>PR_ASK / Miller 4 / 300KHZ</item>
+    </string-array>
+
+    <!-- أنماط الجرد العتادية (Hardware Inventory Modes) -->
+    <string-array name="arrayInventoryMode">
+        <item>الوضع القياسي (Standard)</item>
+        <item>وضع السرعة العالية (Fast Scan)</item>
+        <item>وضع التصفية المستمرة (Continuous Filtered)</item>
     </string-array>
 
 </resources>
