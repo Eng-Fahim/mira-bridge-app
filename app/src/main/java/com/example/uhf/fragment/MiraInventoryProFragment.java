@@ -116,15 +116,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         return v;
     }
 
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        loadInventorySettings();
-        updateBranchHeader();
-        // ✅ تحميل آخر لقطة محلية أولاً
-        loadLastSnapshotOffline();
-        loadLastSnapshot();
-    }
+    
 
     @Override
     public void onResume() {
