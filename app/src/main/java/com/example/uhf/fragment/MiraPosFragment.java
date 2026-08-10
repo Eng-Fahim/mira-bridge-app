@@ -110,10 +110,12 @@ public void onResume() {
     if (getActivity() instanceof UHFMainActivity)
         ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
     
-    // ✅ عرض الفرع النشط
     if (branchesManager.hasActiveBranch() && tvCartStatus != null) {
         tvCartStatus.setText("📍 " + branchesManager.getActiveBranchDisplayName() + " | " + (isArabic ? "جاهز" : "Ready"));
     }
+    
+    // ✅ مزامنة الطلبات المعلقة عند الاتصال
+    syncPendingSales();
 }
     @Override public void onPause() {
         super.onPause();
@@ -417,7 +419,7 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
         } catch (Exception e) {
             Log.e(TAG, "Checkout Error: " + e.getMessage());
             safeRun(() -> { 
-                saveSaleLocally(data); 
+                saveFullSaleLocally(data);
                 clearCart(); 
                 if (btnCheckout != null) { btnCheckout.setEnabled(true); btnCheckout.setAlpha(1f); } 
                 showToast(isArabic ? "💾 تم الحفظ محلياً للترحيل لاحقاً" : "💾 Saved locally for later posting"); 
@@ -427,15 +429,148 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
 }
 
 
-    private void saveSaleLocally(POSCheckoutDialog.POSCheckoutData data) {
-        if (getContext() == null) return;
+    // ==================== OFFLINE SUPPORT ====================
+
+/**
+ * حفظ الطلب بالكامل محلياً عند فشل الاتصال
+ */
+private void saveFullSaleLocally(POSCheckoutDialog.POSCheckoutData data) {
+    if (getContext() == null) return;
+    try {
+        SharedPreferences p = getContext().getSharedPreferences(PENDING_SALES_PREFS, Context.MODE_PRIVATE);
+        JSONArray arr = new JSONArray(p.getString("pending", "[]"));
+        
+        JSONObject sale = new JSONObject();
+        sale.put("id", System.currentTimeMillis());
+        sale.put("customer_name", data.customerName);
+        sale.put("customer_phone", data.customerPhone);
+        sale.put("payment_method", data.paymentMethod);
+        sale.put("discount", data.discount);
+        sale.put("final_amount", data.finalAmount);
+        sale.put("item_count", cartList.size());
+        sale.put("created_at", new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(new java.util.Date()));
+        
+        // حفظ الأصناف
+        JSONArray itemsArr = new JSONArray();
+        for (CartItem item : cartList) {
+            JSONObject obj = new JSONObject();
+            obj.put("epc", item.epc);
+            obj.put("serial_no", item.serialNo);
+            obj.put("title", item.name);
+            obj.put("karat", item.karat);
+            obj.put("weight", item.weight);
+            obj.put("price", item.price);
+            itemsArr.put(obj);
+        }
+        sale.put("items", itemsArr);
+        
+        arr.put(sale);
+        p.edit().putString("pending", arr.toString()).apply();
+        
+        Log.i(TAG, "💾 Sale saved locally: " + sale.optString("id"));
+    } catch (Exception e) {
+        Log.e(TAG, "Save local sale error: " + e.getMessage());
+    }
+}
+
+/**
+ * عرض عدد الطلبات المعلقة
+ */
+private void checkPendingSales() {
+    if (getContext() == null) return;
+    try {
+        JSONArray arr = new JSONArray(getContext().getSharedPreferences(PENDING_SALES_PREFS, Context.MODE_PRIVATE)
+            .getString("pending", "[]"));
+        if (arr.length() > 0) {
+            safeRun(() -> {
+                if (tvCartStatus != null) {
+                    tvCartStatus.setText("⚠️ " + arr.length() + " " + (isArabic ? "عملية معلقة" : "pending sales"));
+                    tvCartStatus.setTextColor(Color.parseColor("#F59E0B"));
+                }
+            });
+        }
+    } catch (Exception ignored) {}
+}
+
+/**
+ * محاولة إرسال الطلبات المعلقة عند الاتصال
+ */
+private void syncPendingSales() {
+    if (getContext() == null) return;
+    new Thread(() -> {
         try {
             SharedPreferences p = getContext().getSharedPreferences(PENDING_SALES_PREFS, Context.MODE_PRIVATE);
             JSONArray arr = new JSONArray(p.getString("pending", "[]"));
-            JSONObject s = new JSONObject(); s.put("id", System.currentTimeMillis()); s.put("customer_name", data.customerName); s.put("final_amount", data.finalAmount); s.put("item_count", cartList.size());
-            arr.put(s); p.edit().putString("pending", arr.toString()).apply();
-        } catch (Exception ignored) {}
-    }
+            
+            if (arr.length() == 0) return;
+            
+            Log.i(TAG, "🔄 Syncing " + arr.length() + " pending sales...");
+            
+            MiraApiClient client = MiraApiClient.getInstance(getContext());
+            JSONArray remainingArr = new JSONArray();
+            int synced = 0;
+            
+            for (int i = 0; i < arr.length(); i++) {
+                try {
+                    JSONObject sale = arr.getJSONObject(i);
+                    JSONObject payload = new JSONObject();
+                    payload.put("action", "COMPLETE_POS_SALE");
+                    payload.put("gate_id", client.getGateId());
+                    payload.put("branch_id", branchesManager.getActiveBranchId());
+                    
+                    JSONObject customer = new JSONObject();
+                    customer.put("name", sale.optString("customer_name", ""));
+                    customer.put("phone", sale.optString("customer_phone", ""));
+                    customer.put("payment_method", sale.optString("payment_method", "CASH"));
+                    payload.put("customer", customer);
+                    
+                    payload.put("items", sale.optJSONArray("items"));
+                    
+                    JSONObject payment = new JSONObject();
+                    payment.put("subtotal", sale.optDouble("final_amount", 0));
+                    payment.put("discount_percent", sale.optDouble("discount", 0));
+                    payment.put("final_amount", sale.optDouble("final_amount", 0));
+                    payload.put("payment", payment);
+                    
+                    MiraApiClient.ApiResponse response = client.checkout(payload);
+                    
+                    if (response != null && response.isSuccess) {
+                        synced++;
+                        Log.i(TAG, "✅ Synced sale: " + sale.optString("id"));
+                    } else {
+                        remainingArr.put(sale);
+                    }
+                } catch (Exception e) {
+                    remainingArr.put(arr.getJSONObject(i));
+                }
+            }
+            
+            p.edit().putString("pending", remainingArr.toString()).apply();
+            
+            final int s = synced;
+            final int r = remainingArr.length();
+            safeRun(() -> {
+                if (s > 0) {
+                    showToast(isArabic ? "✅ تمت مزامنة " + s + " عملية" : "✅ Synced " + s + " sales");
+                }
+                if (r > 0) {
+                    if (tvCartStatus != null) {
+                        tvCartStatus.setText("⚠️ " + r + " " + (isArabic ? "معلقة" : "pending"));
+                        tvCartStatus.setTextColor(Color.parseColor("#F59E0B"));
+                    }
+                } else {
+                    if (tvCartStatus != null) {
+                        tvCartStatus.setText(isArabic ? "جاهز لمسح القطع..." : "Ready to scan...");
+                        tvCartStatus.setTextColor(Color.parseColor("#94A3B8"));
+                    }
+                }
+            });
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Sync pending error: " + e.getMessage());
+        }
+    }).start();
+}
 
     private void checkPendingSales() {
         if (getContext() == null) return;
