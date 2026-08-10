@@ -188,6 +188,45 @@ public class MiraApiClient {
         } catch (Exception ignored) {}
         return post("/authorize", payload);
     }
+    // ===================== 📡 PING & TEST CONNECTION =====================
+
+    /**
+     * اختبار الاتصال بالسيرفر مع إمكانية تحديد رابط ومفتاح API مخصصين
+     */
+    public boolean pingApi(String targetUrl, String targetApiKey) {
+        HttpURLConnection conn = null;
+        try {
+            String baseUrl = (targetUrl != null && !targetUrl.isEmpty()) ? targetUrl : this.apiUrl;
+            // تنظيف الرابط والتأكد من توجيهه لنقطة نهاية الفحص أو الـ Root
+            if (baseUrl.endsWith("/")) {
+                baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+            }
+            
+            URL url = new URL(baseUrl + "/heartbeat");
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setRequestProperty("X-MIRA-API-Key", (targetApiKey != null && !targetApiKey.isEmpty()) ? targetApiKey : this.apiKey);
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(8000);
+
+            int responseCode = conn.getResponseCode();
+            return (responseCode >= 200 && responseCode < 400);
+        } catch (Exception e) {
+            Log.e(TAG, "pingApi Error: " + e.getMessage());
+            return false;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    /**
+     * Overload لاختبار الاتصال باستخدام الرابط والمفتاح الافتراضيين
+     */
+    public boolean pingApi() {
+        return pingApi(this.apiUrl, this.apiKey);
+    }
+
 
     // ===================== 📊 DASHBOARD =====================
 
@@ -763,4 +802,4 @@ public class MiraApiClient {
             return null;
         }
     }
-}
+        }
