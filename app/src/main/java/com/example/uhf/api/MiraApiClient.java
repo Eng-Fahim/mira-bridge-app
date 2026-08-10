@@ -512,6 +512,12 @@ public class MiraApiClient {
         }
         return getWithAuth(url);
     }
+    /**
+ * جلب قائمة القطع في الفرع (EPC/GTIN) لاستخدامها في الجرد والمحاكاة
+ */
+public ApiResponse getBranchItemsList(int branchId) {
+    return getWithAuth("/branches/" + branchId + "/inventory/items");
+}
 
     public ApiResponse createTransfer(JSONObject payload) {
         return postWithAuth("/transfers", payload);
@@ -802,4 +808,4 @@ public class MiraApiClient {
             return null;
         }
     }
-        }
+}
