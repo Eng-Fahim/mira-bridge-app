@@ -125,12 +125,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             checkReadWritePermission();
 
-            // تهيئة العتاد والأصوات بحذر لتفادي الانهيار عند الفشل
             try { initSound(); } catch (Exception e) { Log.e(TAG, "Sound init error: " + e.getMessage()); }
             try { initUHF(); } catch (Exception e) { Log.e(TAG, "UHF init error: " + e.getMessage()); }
             try { configureReaderForDevice(); } catch (Exception e) { Log.e(TAG, "Reader config error: " + e.getMessage()); }
 
             initViewPageData();
+            setupTopTabs();
             setupQuickNav();
 
         } catch (Exception e) {
@@ -139,7 +139,25 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    // ==================== QUICK BOTTOM NAV (آمن ضد الانهيار) ====================
+    // ==================== TOP TABS ====================
+
+    private void setupTopTabs() {
+        setupTopTab(R.id.tabTopSettings, "Settings");
+        setupTopTab(R.id.tabTopIdentity, "IdentityStudio");
+        setupTopTab(R.id.tabTopTransfers, "Transfers");
+        setupTopTab(R.id.tabTopBranches, "BranchesManagement");
+        setupTopTab(R.id.tabTopUsers, "UsersManagement");
+        setupTopTab(R.id.tabTopRfid, "Settings");
+    }
+
+    private void setupTopTab(int tabId, String tag) {
+        View tab = findViewById(tabId);
+        if (tab != null) {
+            tab.setOnClickListener(v -> switchToTabSafely(tag));
+        }
+    }
+
+    // ==================== BOTTOM NAV ====================
 
     private void setupQuickNav() {
         try {
@@ -149,35 +167,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             quickNav.setOnItemSelectedListener(item -> {
                 try {
                     int id = item.getItemId();
-                    if (id == R.id.nav_quick_dashboard) {
-                        switchToTabSafely("Dashboard");
-                    } else if (id == R.id.nav_quick_inventory) {
-                        switchToTabSafely("Scan");
-                    } else if (id == R.id.nav_quick_pos) {
-                        switchToTabSafely("POS Mode");
-                    } else if (id == R.id.nav_quick_more) {
-                        String[] options = {
-                            ar("🆔 التكويد", "🆔 Identity"),
-                            ar("📊 التقارير", "📊 Reports"),
-                            ar("📦 التحويلات", "📦 Transfers"),
-                            ar("⚙️ الإعدادات", "⚙️ Settings"),
-                            ar("🔀 تغيير اللغة", "🔀 Language"),
-                            ar("🚪 تسجيل الخروج", "🚪 Logout")
-                        };
-                        new androidx.appcompat.app.AlertDialog.Builder(UHFMainActivity.this)
-                            .setTitle(ar("المزيد", "More"))
-                            .setItems(options, (d, w) -> {
-                                switch (w) {
-                                    case 0: switchToTabSafely("IdentityStudio"); break;
-                                    case 1: switchToTabSafely("ReportsPro"); break;
-                                    case 2: switchToTabSafely("Transfers"); break;
-                                    case 3: switchToTabSafely("Settings"); break;
-                                    case 4: toggleLanguage(); break;
-                                    case 5: showLogoutConfirmation(); break;
-                                }
-                            })
-                            .show();
-                    }
+                    if (id == R.id.nav_quick_dashboard) switchToTabSafely("Dashboard");
+                    else if (id == R.id.nav_quick_jewelry) switchToTabSafely("JewelryDashboard");
+                    else if (id == R.id.nav_quick_menu) showRadialMenu();
+                    else if (id == R.id.nav_quick_inventory) switchToTabSafely("Scan");
+                    else if (id == R.id.nav_quick_pos) switchToTabSafely("POS Mode");
                 } catch (Exception e) {
                     Log.e(TAG, "Navigation Error: " + e.getMessage());
                 }
@@ -186,6 +180,23 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         } catch (Exception e) {
             Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
         }
+    }
+
+    private void showRadialMenu() {
+        String[] options = {
+            ar("🎯 الرادار", "🎯 Radar"),
+            ar("🚪 البوابات", "🚪 Gates"),
+            ar("💰 المحاسبة", "💰 Accounting"),
+            ar("📊 التقارير", "📊 Reports"),
+            ar("📜 المبيعات", "📜 Sales"),
+            ar("📋 المخزون", "📋 Inventory Pro")
+        };
+        String[] tags = {"RadarLocation", "SecureGate", "Accounting", "ReportsPro", "SalesHistory", "Inventory Pro"};
+
+        new androidx.appcompat.app.AlertDialog.Builder(UHFMainActivity.this)
+            .setTitle(ar("⚡ القائمة السريعة", "⚡ Quick Menu"))
+            .setItems(options, (d, w) -> switchToTabSafely(tags[w]))
+            .show();
     }
 
     private void switchToTabSafely(String tag) {
@@ -263,11 +274,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        try {
-            getMenuInflater().inflate(R.menu.main, menu);
-        } catch (Exception e) {
-            Log.e(TAG, "Menu inflation error: " + e.getMessage());
-        }
+        try { getMenuInflater().inflate(R.menu.main, menu); } catch (Exception e) { Log.e(TAG, "Menu inflation error: " + e.getMessage()); }
         return true;
     }
 
@@ -275,9 +282,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public boolean onPrepareOptionsMenu(Menu menu) {
         try {
             MenuItem langItem = menu.findItem(R.id.action_change_language);
-            if (langItem != null) {
-                langItem.setTitle(isArabic ? "English" : "العربية");
-            }
+            if (langItem != null) langItem.setTitle(isArabic ? "English" : "العربية");
         } catch (Exception ignored) {}
         return super.onPrepareOptionsMenu(menu);
     }
@@ -297,10 +302,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         if (id == R.id.action_branches) { showBranchPicker(); return true; }
         if (id == R.id.export) { exportData(); return true; }
         if (id == R.id.UHF_ver) { getUHFVersion(); return true; }
-        if (id == R.id.speed) { 
-            try { startActivity(new Intent(this, TestActivity.class)); } catch (Exception ignored) {}
-            return true; 
-        }
+        if (id == R.id.speed) { try { startActivity(new Intent(this, TestActivity.class)); } catch (Exception ignored) {} return true; }
         return super.onOptionsItemSelected(item);
     }
 
@@ -315,9 +317,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             LocaleListCompat appLocale = isArabic ? LocaleListCompat.forLanguageTags("ar") : LocaleListCompat.forLanguageTags("en");
             AppCompatDelegate.setApplicationLocales(appLocale);
             getWindow().getDecorView().setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
-        } catch (Exception e) {
-            Log.e(TAG, "Language apply error: " + e.getMessage());
-        }
+        } catch (Exception e) { Log.e(TAG, "Language apply error: " + e.getMessage()); }
     }
 
     private void showBranchPicker() {
@@ -335,9 +335,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 Toast.makeText(this, (isArabic ? "✅ تم التبديل إلى: " : "✅ Switched to: ") + branchName, Toast.LENGTH_SHORT).show();
             });
             picker.show(getSupportFragmentManager(), "branch_picker");
-        } catch (Exception e) {
-            Log.e(TAG, "Branch picker error: " + e.getMessage());
-        }
+        } catch (Exception e) { Log.e(TAG, "Branch picker error: " + e.getMessage()); }
     }
 
     private void refreshCurrentTab() {
@@ -354,9 +352,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     }
                 }
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error refreshing tab: " + e.getMessage());
-        }
+        } catch (Exception e) { Log.e(TAG, "Error refreshing tab: " + e.getMessage()); }
     }
 
     public void setActivePOSFragment(MiraPosFragment fragment) { this.activePOSFragment = fragment; }
@@ -378,9 +374,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     }
                 }
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Tag read handling error: " + e.getMessage());
-        }
+        } catch (Exception e) { Log.e(TAG, "Tag read handling error: " + e.getMessage()); }
     }
 
     protected void initViewPageData() {
@@ -476,9 +470,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             if (sessionManager != null) sessionManager.logout();
             if (branchesManager != null) branchesManager.clear();
             navigateToLogin();
-        } catch (Exception e) {
-            navigateToLogin();
-        }
+        } catch (Exception e) { navigateToLogin(); }
     }
 
     private void navigateToLogin() {
@@ -496,9 +488,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             if (playSoundThread != null) playSoundThread.stopPlay();
             releaseSoundPool();
             if (mReader != null) mReader.free();
-        } catch (Exception e) {
-            Log.e(TAG, "onDestroy error: " + e.getMessage());
-        }
+        } catch (Exception e) { Log.e(TAG, "onDestroy error: " + e.getMessage()); }
         super.onDestroy();
     }
 
@@ -509,9 +499,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             if (loopFlag) { UIHelper.ToastMessage(this, R.string.uhf_msg_scaning); return; }
             if (tagList == null || tagList.isEmpty()) { UIHelper.ToastMessage(this, R.string.uhf_msg_export_data_empty); return; }
             new ExportExcelAsyncTask(this, tagList).execute();
-        } catch (Exception e) {
-            Log.e(TAG, "Export error: " + e.getMessage());
-        }
+        } catch (Exception e) { Log.e(TAG, "Export error: " + e.getMessage()); }
     }
 
     // ==================== SOUND ====================
@@ -551,26 +539,14 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private void checkReadWritePermission() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                if (!Environment.isExternalStorageManager()) { 
-                    Intent i = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION); 
-                    i.setData(Uri.parse("package:" + getPackageName())); 
-                    startActivityForResult(i, 0); 
-                }
+                if (!Environment.isExternalStorageManager()) { Intent i = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION); i.setData(Uri.parse("package:" + getPackageName())); startActivityForResult(i, 0); }
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 List<String> permissions = new ArrayList<>();
-                if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                    permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-                }
-                if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                    permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
-                }
-                if (!permissions.isEmpty()) {
-                    requestPermissions(permissions.toArray(new String[0]), 1);
-                }
+                if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+                if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+                if (!permissions.isEmpty()) requestPermissions(permissions.toArray(new String[0]), 1);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Permission check error: " + e.getMessage());
-        }
+        } catch (Exception e) { Log.e(TAG, "Permission check error: " + e.getMessage()); }
     }
 
     private Toast toast;
@@ -584,12 +560,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         int interval = 500;
         long lastPlayTime = SystemClock.elapsedRealtime();
         @Override public void run() {
-            while (!isStop) { 
-                synchronized (objectLock) { 
-                    try { objectLock.wait(interval); } catch (InterruptedException e) { break; } 
-                } 
-                if (!isStop && SystemClock.elapsedRealtime() - lastPlayTime < 500) playSound(1); 
-            }
+            while (!isStop) { synchronized (objectLock) { try { objectLock.wait(interval); } catch (InterruptedException e) { break; } } if (!isStop && SystemClock.elapsedRealtime() - lastPlayTime < 500) playSound(1); }
         }
         public void play(int speed) { interval = speed > 85 ? 3 : speed > 66 ? 100 - speed : speed > 33 ? (100 - speed) * 2 : (100 - speed) * 3; lastPlayTime = SystemClock.elapsedRealtime(); }
         public void stopPlay() { isStop = true; synchronized (objectLock) { objectLock.notifyAll(); } }
