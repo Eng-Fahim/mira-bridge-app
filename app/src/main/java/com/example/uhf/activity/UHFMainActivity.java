@@ -483,9 +483,14 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 public void showLoading() {
     if (loadingOverlay != null) {
+        TextView tvTitle = loadingOverlay.findViewById(R.id.tvLoadingTitle);
+        if (tvTitle != null) {
+            tvTitle.setText(isArabic ? "جاري التحميل..." : "Loading...");
+        }
         loadingOverlay.setVisibility(View.VISIBLE);
     }
 }
+
 
 public void hideLoading() {
     if (loadingOverlay != null) {
@@ -618,4 +623,4 @@ public void hideLoading() {
     }
 
     private String ar(String arabic, String english) { return isArabic ? arabic : english; }
-                }
+    }
