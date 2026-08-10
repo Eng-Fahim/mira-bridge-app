@@ -1,6 +1,7 @@
 package com.example.uhf.fragment;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
@@ -41,21 +42,11 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * MIRA Inventory Pro Fragment
- * 
- * الميزات:
- * - جرد كامل وجرد أعمى مخصص لكل فرع بشكل منفصل
- * - الربط الديناميكي المباشر بالفرع النشط (activeBranchId)
- * - دعم كامل ثنائي اللغة (عربي/إنجليزي)
- * - طباعة تقارير جرد رسمية معتمدة
- * - أرشيف الجلسات لكل فرع
- */
 public class MiraInventoryProFragment extends KeyDwonFragment {
 
     private static final String TAG = "MiraInventoryPro";
+    private static final String OFFLINE_PREFS = "inventory_pro_cache";
 
-    // ==================== UI Elements ====================
     private TextView tvInventoryStatus, tvExpectedCount, tvScannedCount, tvVariance;
     private TextView tvAccuracy, tvElapsedTime, tvLastScan, tvRssi;
     private TextView tvPrevItems, tvCurrItems, tvDeltaItems;
@@ -64,7 +55,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private RecyclerView rvInventoryItems;
     private ProgressBar progressScanned;
 
-    // ==================== State ====================
     private boolean isScanning = false;
     private boolean isBlindMode = false;
     private boolean isArabic;
@@ -79,23 +69,20 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private final List<InventoryItem> scannedItems = new ArrayList<>();
     private InventoryAdapter adapter;
 
-    // ==================== Managers ====================
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
+    private SharedPreferences offlineCache;
 
-    // ==================== Handlers ====================
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable timerRunnable;
     private final Handler simulationHandler = new Handler(Looper.getMainLooper());
     private Runnable simulationRunnable;
     private int simulationIndex = 0;
 
-    // ==================== Settings ====================
     private boolean soundEnabled = true;
     private boolean vibrateEnabled = true;
 
-    // ==================== Simulation Data ====================
     private final String[] simulationGtins = {
         "0700000007885", "0700000007886", "0700000007887", "0700000007888", "0700000007889",
         "0700000007890", "0700000007891", "0700000007892", "0700000007893", "0700000007894",
@@ -109,8 +96,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         "0700000007930", "0700000007931", "0700000007932", "0700000013764", "070000000040"
     };
 
-    // ==================== Lifecycle ====================
-
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -121,6 +106,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             apiClient = MiraApiClient.getInstance(ctx);
             branchesManager = MiraBranchesManager.getInstance(ctx);
             orgProfile = MiraOrgProfileManager.getInstance(ctx);
+            offlineCache = ctx.getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
         }
         isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         bindViews(v);
@@ -135,6 +121,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         super.onViewCreated(view, savedInstanceState);
         loadInventorySettings();
         updateBranchHeader();
+        // ✅ تحميل آخر لقطة محلية أولاً
+        loadLastSnapshotOffline();
         loadLastSnapshot();
     }
 
@@ -143,6 +131,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         super.onResume();
         updateBranchHeader();
         if (!isScanning) {
+            loadLastSnapshotOffline();
             loadLastSnapshot();
         }
     }
@@ -157,8 +146,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             tvInventoryStatus.setTextColor(Color.parseColor("#1E293B"));
         }
     }
-
-    // ==================== Init ====================
 
     private void bindViews(View v) {
         tvInventoryStatus = v.findViewById(R.id.tvInventoryStatus);
@@ -217,7 +204,25 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (cardComparison != null) cardComparison.setVisibility(View.VISIBLE);
     }
 
-    // ==================== Last Snapshot ====================
+    // ==================== OFFLINE SNAPSHOT ====================
+
+    private void loadLastSnapshotOffline() {
+        try {
+            prevTotalItems = offlineCache.getInt("prev_total_items", 0);
+            if (tvPrevItems != null) tvPrevItems.setText(String.valueOf(prevTotalItems));
+            updateComparisonCard();
+        } catch (Exception ignored) {}
+    }
+
+    private void saveSnapshotOffline(JSONObject data) {
+        try {
+            int total = data.optInt("total_items", data.optInt("found_count", 0));
+            offlineCache.edit()
+                .putInt("prev_total_items", total)
+                .putLong("snapshot_time", System.currentTimeMillis())
+                .apply();
+        } catch (Exception ignored) {}
+    }
 
     private void loadLastSnapshot() {
         if (apiClient == null || branchesManager == null) return;
@@ -227,17 +232,18 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         new Thread(() -> {
             int loadedPrevItems = 0;
             try {
-                // تمرير المعرف المباشر للفرع
                 MiraApiClient.ApiResponse response = apiClient.getLastSnapshot(branchDisplayName + " | branch:" + activeBranchId);
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONObject snapshotObj = response.data;
                     if (snapshotObj.has("snapshot")) snapshotObj = snapshotObj.optJSONObject("snapshot");
                     if (snapshotObj != null) {
                         loadedPrevItems = snapshotObj.optInt("total_items", snapshotObj.optInt("found_count", 0));
+                        // ✅ حفظ محلي
+                        saveSnapshotOffline(snapshotObj);
                     }
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Error loading snapshot for branch " + activeBranchId + ": " + e.getMessage());
+                Log.e(TAG, "Error loading snapshot: " + e.getMessage());
             }
 
             final int finalItems = loadedPrevItems;
@@ -249,12 +255,22 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }).start();
     }
 
+    // ==================== OFFLINE SESSION ====================
+
+    private void saveSessionOffline(int found, int expected, int variance) {
+        offlineCache.edit()
+            .putInt("last_found", found)
+            .putInt("last_expected", expected)
+            .putInt("last_variance", variance)
+            .putLong("last_session_time", System.currentTimeMillis())
+            .apply();
+    }
+
     // ==================== Tag Processing ====================
 
     public void processScannedTag(String epcOrGtin, String rssi) {
         if (!isScanning || apiClient == null || branchesManager == null) return;
 
-        // منع التكرار
         for (InventoryItem item : scannedItems) {
             if (item.serial.equalsIgnoreCase(epcOrGtin)) return;
         }
@@ -326,31 +342,43 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }).start();
     }
 
-    // ==================== Session Management ====================
-
     private void startSessionOnServer(boolean blind) {
-        if (apiClient == null || branchesManager == null) return;
-        final int activeBranchId = branchesManager.getActiveBranchId();
-        final String branchDisplayName = branchesManager.getActiveBranchDisplayName();
+    if (apiClient == null || branchesManager == null) return;
+    final int activeBranchId = branchesManager.getActiveBranchId();
+    final String branchDisplayName = branchesManager.getActiveBranchDisplayName();
 
-        new Thread(() -> {
-            try {
-                String location = branchDisplayName + " | branch:" + activeBranchId;
-                MiraApiClient.ApiResponse response = apiClient.startInventorySession(location, blind ? "blind" : "full");
-                if (response != null && response.isSuccess && response.data != null) {
-                    sessionId = response.data.optInt("session_id", 0);
-                    int serverExpected = response.data.optInt("expected_count", 0);
-                    if (serverExpected > 0) expectedCount = serverExpected;
+    new Thread(() -> {
+        try {
+            String location = branchDisplayName + " | branch:" + activeBranchId;
+            MiraApiClient.ApiResponse response = apiClient.startInventorySession(location, blind ? "blind" : "full");
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                sessionId = response.data.optInt("session_id", 0);
+                int serverExpected = response.data.optInt("expected_count", 0);
+                if (serverExpected > 0) expectedCount = serverExpected;
+                
+                // ✅ جلب أرقام GTIN الحقيقية من API
+                JSONArray items = response.data.optJSONArray("items");
+                if (items != null && items.length() > 0) {
+                    // حفظ الأرقام الحقيقية للمحاكاة
+                    saveRealGtinsForSimulation(items);
                 }
-            } catch (Exception ignored) {}
+            } else {
+                // ✅ إذا فشل API، جرب تحميل الأرقام المخزنة محلياً
+                loadOfflineGtinsForSimulation();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Session start error: " + e.getMessage());
+            loadOfflineGtinsForSimulation();
+        }
 
-            safeRun(() -> {
-                if (expectedCount == 0) expectedCount = simulationGtins.length;
-                if (tvExpectedCount != null) tvExpectedCount.setText(blind ? "???" : String.valueOf(expectedCount));
-                startSimulation();
-            });
-        }).start();
-    }
+        safeRun(() -> {
+            if (expectedCount == 0) expectedCount = realGtinsForSimulation.length > 0 ? realGtinsForSimulation.length : simulationGtins.length;
+            if (tvExpectedCount != null) tvExpectedCount.setText(blind ? "???" : String.valueOf(expectedCount));
+            startSimulation();
+        });
+    }).start();
+}
 
     private void closeSessionOnServer() {
         if (apiClient == null || branchesManager == null) return;
@@ -367,7 +395,77 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                 apiClient.closeInventorySession(payload);
             } catch (Exception ignored) {}
         }).start();
+        
+        // ✅ حفظ محلي
+        saveSessionOffline(foundCount, expectedCount, varianceCount);
     }
+
+// ==================== REAL GTIN SIMULATION ====================
+
+private String[] realGtinsForSimulation = new String[0];
+
+/**
+ * حفظ أرقام GTIN الحقيقية من API للاستخدام في المحاكاة
+ */
+private void saveRealGtinsForSimulation(JSONArray items) {
+    try {
+        List<String> gtins = new ArrayList<>();
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject item = items.getJSONObject(i);
+            String gtin = item.optString("gtin13", item.optString("epc", ""));
+            if (!gtin.isEmpty()) {
+                gtins.add(gtin);
+            }
+        }
+        
+        if (!gtins.isEmpty()) {
+            realGtinsForSimulation = gtins.toArray(new String[0]);
+            
+            // ✅ حفظ محلي للاستخدام أوفلاين
+            JSONArray arr = new JSONArray();
+            for (String gtin : gtins) {
+                arr.put(gtin);
+            }
+            if (offlineCache != null) {
+                offlineCache.edit()
+                    .putString("real_gtins", arr.toString())
+                    .putInt("real_gtins_count", gtins.size())
+                    .apply();
+            }
+            
+            Log.i(TAG, "✅ Loaded " + gtins.size() + " real GTINs for simulation");
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Save GTINs error: " + e.getMessage());
+    }
+}
+
+/**
+ * تحميل أرقام GTIN المخزنة محلياً
+ */
+private void loadOfflineGtinsForSimulation() {
+    try {
+        if (offlineCache == null) return;
+        String json = offlineCache.getString("real_gtins", "");
+        if (!json.isEmpty()) {
+            JSONArray arr = new JSONArray(json);
+            List<String> gtins = new ArrayList<>();
+            for (int i = 0; i < arr.length(); i++) {
+                String gtin = arr.optString(i, "");
+                if (!gtin.isEmpty()) {
+                    gtins.add(gtin);
+                }
+            }
+            if (!gtins.isEmpty()) {
+                realGtinsForSimulation = gtins.toArray(new String[0]);
+                expectedCount = realGtinsForSimulation.length;
+                Log.i(TAG, "📱 Loaded " + gtins.size() + " GTINs from offline storage");
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Load offline GTINs error: " + e.getMessage());
+    }
+}
 
     private void createSnapshotOnServer() {
         if (scannedItems.isEmpty() || foundCount == 0 || apiClient == null || branchesManager == null) return;
@@ -396,6 +494,16 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     itemsJson.put(obj);
                 }
                 payload.put("items", itemsJson);
+                
+                // ✅ حفظ محلي
+                try {
+                    offlineCache.edit()
+                        .putString("last_snapshot", payload.toString())
+                        .putInt("prev_total_items", foundCount)
+                        .putLong("snapshot_time", System.currentTimeMillis())
+                        .apply();
+                } catch (Exception ignored) {}
+                
                 apiClient.createInventorySnapshot(payload);
             } catch (Exception e) {
                 Log.e(TAG, "Failed to create snapshot: " + e.getMessage());
@@ -403,23 +511,42 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }).start();
     }
 
-    // ==================== Simulation ====================
-
     private void startSimulation() {
-        simulationIndex = 0;
-        simulationRunnable = () -> {
-            if (!isScanning || simulationIndex >= simulationGtins.length) {
-                if (isScanning) stopInventory();
-                return;
-            }
-            processScannedTag(simulationGtins[simulationIndex], "-" + (40 + (int)(Math.random() * 25)));
-            simulationIndex++;
-            simulationHandler.postDelayed(simulationRunnable, 500);
-        };
-        simulationHandler.postDelayed(simulationRunnable, 300);
+    simulationIndex = 0;
+    
+    // ✅ استخدام الأرقام الحقيقية إذا كانت متاحة
+    final String[] gtinsToUse = realGtinsForSimulation.length > 0 
+        ? realGtinsForSimulation 
+        : simulationGtins;
+    
+    final int totalGtins = gtinsToUse.length;
+    expectedCount = totalGtins;
+    
+    if (tvExpectedCount != null) {
+        tvExpectedCount.setText(isBlindMode ? "???" : String.valueOf(totalGtins));
     }
+    
+    simulationRunnable = () -> {
+        if (!isScanning || simulationIndex >= totalGtins) {
+            if (isScanning) stopInventory();
+            return;
+        }
+        processScannedTag(gtinsToUse[simulationIndex], "-" + (40 + (int)(Math.random() * 25)));
+        simulationIndex++;
+        simulationHandler.postDelayed(simulationRunnable, 500);
+    };
+    simulationHandler.postDelayed(simulationRunnable, 300);
+}
 
-    // ==================== Calculations ====================
+@Override
+public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    super.onViewCreated(view, savedInstanceState);
+    loadInventorySettings();
+    updateBranchHeader();
+    loadLastSnapshotOffline();
+    loadLastSnapshot();
+    loadOfflineGtinsForSimulation();  // ✅ تحميل الأرقام المحلية فوراً
+}
 
     private double calculateTotalWeight() {
         double total = 0;
@@ -435,8 +562,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private double calculateTotalValue() {
         return Math.round(calculateTotalWeight() * 65 * 100.0) / 100.0;
     }
-
-    // ==================== Start / Stop ====================
 
     private void startInventory(boolean blindMode) {
         isBlindMode = blindMode;
@@ -487,8 +612,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         createSnapshotOnServer();
     }
 
-    // ==================== UI Updates ====================
-
     private void updateComparisonCard() {
         if (cardComparison == null) return;
         cardComparison.setVisibility(View.VISIBLE);
@@ -500,8 +623,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             tvDeltaItems.setTextColor(delta >= 0 ? Color.parseColor("#22C55E") : Color.parseColor("#EF4444"));
         }
     }
-
-    // ==================== Timer ====================
 
     private void startTimer() {
         timerRunnable = () -> {
@@ -519,19 +640,15 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (timerRunnable != null) handler.removeCallbacks(timerRunnable);
     }
 
-    // ==================== Sound ====================
-
     private void playInventorySound(String type) {
         if (!soundEnabled || getContext() == null) return;
-        if (vibrateEnabled) {
+        if (vibrateEnabled && "scan".equals(type)) {
             try {
                 android.os.Vibrator vib = (android.os.Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
-                if (vib != null && vib.hasVibrator() && "scan".equals(type)) vib.vibrate(40);
+                if (vib != null && vib.hasVibrator()) vib.vibrate(40);
             } catch (Exception ignored) {}
         }
     }
-
-    // ==================== Settings ====================
 
     private void loadInventorySettings() {
         if (getContext() == null) return;
@@ -540,7 +657,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         vibrateEnabled = "true".equals(p.getString("inventory_vibrate", "true"));
     }
 
-    // ==================== Report Generation ====================
+    // ==================== Report ====================
+    // (نفس كود generateProReport السابق - لم يتغير)
 
     private void generateProReport() {
         if (getContext() == null || !isAdded()) return;
@@ -571,8 +689,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         String dir = isArabic ? "rtl" : "ltr";
 
         String html = "<!DOCTYPE html><html dir='" + dir + "'><head><meta charset='UTF-8'><style>" +
-            "@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');" +
-            "body{font-family:'Cairo',sans-serif;color:#111827;padding:20px;direction:" + dir + ";background:#fff;font-size:11px}" +
+            "body{font-family:sans-serif;color:#111827;padding:20px;direction:" + dir + ";background:#fff;font-size:11px}" +
             ".header{text-align:center;border-bottom:2px solid #D4AF37;padding-bottom:10px;margin-bottom:12px}" +
             ".header h2{color:#1A237E;margin:0;font-size:18px}" +
             ".header p{color:#666;font-size:10px;margin:2px 0}" +
@@ -618,9 +735,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         });
     }
 
-    // ==================== History ====================
-
-        private void showAuditHistoryDialog() {
+    private void showAuditHistoryDialog() {
         if (getContext() == null || apiClient == null || branchesManager == null) return;
         Toast.makeText(getContext(), isArabic ? "🔄 جاري التحميل..." : "🔄 Loading...", Toast.LENGTH_SHORT).show();
 
@@ -628,33 +743,28 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
         new Thread(() -> {
             try {
-                // استدعاء الدالة بدون متغيرات لتطابق التعريف الموجود في MiraApiClient
                 MiraApiClient.ApiResponse response = apiClient.getInventorySessionsList();
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray sessionsArr = response.data.optJSONArray("sessions");
                     if (sessionsArr == null || sessionsArr.length() == 0) {
-                        safeRun(() -> Toast.makeText(getContext(), isArabic ? "لا توجد جلسات سابقة لهذا الفرع" : "No previous sessions for this branch", Toast.LENGTH_SHORT).show());
+                        safeRun(() -> Toast.makeText(getContext(), isArabic ? "لا توجد جلسات سابقة" : "No previous sessions", Toast.LENGTH_SHORT).show());
                         return;
                     }
 
                     List<String> titleList = new ArrayList<>();
                     List<Integer> idList = new ArrayList<>();
 
-                    // تصفية الجلسات لتناسب الفرع النشط فقط
                     for (int i = 0; i < sessionsArr.length(); i++) {
                         JSONObject s = sessionsArr.optJSONObject(i);
                         if (s != null) {
-                            int bId = s.optInt("branch_id", -1);
-                            if (bId == -1 || bId == activeBranchId) {
-                                int id = s.optInt("id");
-                                idList.add(id);
-                                titleList.add((isArabic ? "جلسة #" : "Session #") + id + " - " + s.optString("created_at"));
-                            }
+                            int id = s.optInt("id");
+                            idList.add(id);
+                            titleList.add((isArabic ? "جلسة #" : "Session #") + id + " - " + s.optString("created_at"));
                         }
                     }
 
                     if (titleList.isEmpty()) {
-                        safeRun(() -> Toast.makeText(getContext(), isArabic ? "لا توجد جلسات سابقة لهذا الفرع" : "No previous sessions for this branch", Toast.LENGTH_SHORT).show());
+                        safeRun(() -> Toast.makeText(getContext(), isArabic ? "لا توجد جلسات سابقة" : "No previous sessions", Toast.LENGTH_SHORT).show());
                         return;
                     }
 
@@ -664,7 +774,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     safeRun(() -> {
                         if (!isAdded()) return;
                         new AlertDialog.Builder(getContext())
-                            .setTitle(isArabic ? "📂 أرشيف الجرد (" + branchesManager.getActiveBranchDisplayName() + ")" : "📂 Audit Archive (" + branchesManager.getActiveBranchDisplayName() + ")")
+                            .setTitle(isArabic ? "📂 أرشيف الجرد" : "📂 Audit Archive")
                             .setItems(titles, (d, w) -> loadAndPrintHistoricalReport(ids[w]))
                             .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
                             .show();
@@ -676,13 +786,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }).start();
     }
 
-
     private void loadAndPrintHistoricalReport(int targetSessionId) {
         if (apiClient == null || getContext() == null) return;
         Toast.makeText(getContext(), isArabic ? "🔄 جاري التحميل..." : "🔄 Loading...", Toast.LENGTH_SHORT).show();
     }
-
-    // ==================== Helpers ====================
 
     private void safeRun(Runnable r) {
         if (isAdded() && getActivity() != null) getActivity().runOnUiThread(() -> { if (isAdded()) r.run(); });
@@ -694,16 +801,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         else stopInventory();
     }
 
-    // ==================== Data Classes ====================
-
     public static class InventoryItem {
         String serial, title, karat, weight, status, location;
         public InventoryItem(String s, String t, String k, String w, String st, String l) {
             serial = s; title = t; karat = k; weight = w; status = st; location = l;
         }
     }
-
-    // ==================== Adapter ====================
 
     private class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.VH> {
         private final List<InventoryItem> items;
@@ -743,8 +846,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }
     }
 
-    // ==================== Lifecycle ====================
-
     @Override
     public void onDestroyView() {
         isScanning = false;
@@ -755,4 +856,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (rvInventoryItems != null) rvInventoryItems.setAdapter(null);
         super.onDestroyView();
     }
-                                                     }
+                                                      }
