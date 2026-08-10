@@ -35,12 +35,88 @@
                 android:orientation="horizontal"
                 android:paddingHorizontal="8dp">
 
-                <TextView android:id="@+id/tabTopSettings" android:layout_width="wrap_content" android:layout_height="32dp" android:gravity="center" android:paddingHorizontal="14dp" android:text="⚙️ الإعدادات" android:textColor="?attr/colorOnSurface" android:textSize="12sp" android:background="@drawable/bg_tab_top_selector" android:clickable="true" android:focusable="true" android:layout_marginEnd="6dp" />
-                <TextView android:id="@+id/tabTopIdentity" android:layout_width="wrap_content" android:layout_height="32dp" android:gravity="center" android:paddingHorizontal="14dp" android:text="🆔 التكويد" android:textColor="?attr/colorOnSurface" android:textSize="12sp" android:background="@drawable/bg_tab_top_selector" android:clickable="true" android:focusable="true" android:layout_marginEnd="6dp" />
-                <TextView android:id="@+id/tabTopTransfers" android:layout_width="wrap_content" android:layout_height="32dp" android:gravity="center" android:paddingHorizontal="14dp" android:text="📦 تحويلات" android:textColor="?attr/colorOnSurface" android:textSize="12sp" android:background="@drawable/bg_tab_top_selector" android:clickable="true" android:focusable="true" android:layout_marginEnd="6dp" />
-                <TextView android:id="@+id/tabTopBranches" android:layout_width="wrap_content" android:layout_height="32dp" android:gravity="center" android:paddingHorizontal="14dp" android:text="🏢 فروع" android:textColor="?attr/colorOnSurface" android:textSize="12sp" android:background="@drawable/bg_tab_top_selector" android:clickable="true" android:focusable="true" android:layout_marginEnd="6dp" />
-                <TextView android:id="@+id/tabTopUsers" android:layout_width="wrap_content" android:layout_height="32dp" android:gravity="center" android:paddingHorizontal="14dp" android:text="👥 مستخدمين" android:textColor="?attr/colorOnSurface" android:textSize="12sp" android:background="@drawable/bg_tab_top_selector" android:clickable="true" android:focusable="true" android:layout_marginEnd="6dp" />
-                <TextView android:id="@+id/tabTopRfid" android:layout_width="wrap_content" android:layout_height="32dp" android:gravity="center" android:paddingHorizontal="14dp" android:text="🔧 RFID" android:textColor="?attr/colorOnSurface" android:textSize="12sp" android:background="@drawable/bg_tab_top_selector" android:clickable="true" android:focusable="true" />
+                <TextView
+                    android:id="@+id/tabTopSettings"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_tab_top_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:text="⚙️ الإعدادات"
+                    android:textColor="@color/tab_top_text_color"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tabTopIdentity"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_tab_top_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:text="🆔 التكويد"
+                    android:textColor="@color/tab_top_text_color"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tabTopTransfers"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_tab_top_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:text="📦 تحويلات"
+                    android:textColor="@color/tab_top_text_color"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tabTopBranches"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_tab_top_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:text="🏢 فروع"
+                    android:textColor="@color/tab_top_text_color"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tabTopUsers"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_tab_top_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:text="👥 مستخدمين"
+                    android:textColor="@color/tab_top_text_color"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tabTopRfid"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:background="@drawable/bg_tab_top_selector"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:text="🔧 RFID"
+                    android:textColor="@color/tab_top_text_color"
+                    android:textSize="12sp" />
 
             </LinearLayout>
         </HorizontalScrollView>
@@ -85,11 +161,11 @@
             android:layout_marginBottom="12dp"
             android:background="@drawable/bg_bottom_nav_dynamic"
             android:elevation="8dp"
+            app:itemActiveIndicatorStyle="@style/CustomNavIndicator"
             app:itemIconSize="22dp"
             app:itemIconTint="@color/bottom_nav_colors"
-            app:itemTextColor="@color/bottom_nav_colors"
             app:itemRippleColor="?attr/colorControlHighlight"
-            app:itemActiveIndicatorStyle="@style/CustomNavIndicator"
+            app:itemTextColor="@color/bottom_nav_colors"
             app:labelVisibilityMode="labeled"
             app:menu="@menu/bottom_nav_menu" />
 
