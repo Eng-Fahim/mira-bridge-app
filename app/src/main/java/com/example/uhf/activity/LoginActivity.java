@@ -1,4 +1,5 @@
 package com.example.uhf.activity;
+
 import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.content.Intent;
@@ -13,7 +14,6 @@ import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.view.animation.AccelerateDecelerateInterpolator;
-import androidx.appcompat.app.AppCompatDelegate;
 import android.view.animation.AnimationUtils;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
@@ -21,6 +21,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
@@ -79,6 +80,7 @@ public class LoginActivity extends AppCompatActivity {
         animateEntrance();
         setupTextWatchers();
         updateUiLanguage(isArabic);
+        loadOrgProfileFromCloud();
     }
 
     private void initViews() {
@@ -96,6 +98,7 @@ public class LoginActivity extends AppCompatActivity {
         tvAppVersion = findViewById(R.id.tvAppVersion);
         tvBrandName = findViewById(R.id.tvBrandName);
         tvBrandSubtitle = findViewById(R.id.tvBrandSubtitle);
+        tvBrandDescription = findViewById(R.id.tvBrandDescription);
         tvSignInTitle = findViewById(R.id.tvSignInTitle);
         tvSignInSubtitle = findViewById(R.id.tvSignInSubtitle);
         ivAppLogo = findViewById(R.id.ivAppLogo);
@@ -141,7 +144,6 @@ public class LoginActivity extends AppCompatActivity {
         }
 
         applyOrgProfile();
-        loadOrgProfileFromCloud();
     }
 
     // ==================== Cloud Org Profile ====================
@@ -353,17 +355,14 @@ public class LoginActivity extends AppCompatActivity {
         String branchCode = response.optString("branch_code", "");
         String serverUrl = getText(etServerUrl);
 
-        // حفظ الجلسة
         sessionManager.createLoginSession(username, roleStr, token, serverUrl);
         sessionManager.setDisplayName(displayName);
         sessionManager.setUserId(userId);
 
-        // حفظ بيانات البصمة كاملة
         sessionManager.saveBiometricUser(username, roleStr, displayName, userId, token);
         sessionManager.saveBiometricBranch(branchId, branchName);
         sessionManager.setBiometricEnabled(true);
 
-        // حفظ الفرع النشط تلقائياً وقفله
         MiraBranchesManager bm = MiraBranchesManager.getInstance(this);
         bm.setActiveBranch(branchId, branchName, branchCode, "", "");
         bm.setUserBranchLocked(true);
@@ -393,14 +392,12 @@ public class LoginActivity extends AppCompatActivity {
 
                 if (!lastUser.isEmpty()) {
                     if (!sessionManager.isLoggedIn()) {
-                        // إنشاء جلسة كاملة
                         sessionManager.createLoginSession(lastUser, lastRole,
                             lastToken.isEmpty() ? "BIOMETRIC_TOKEN" : lastToken,
                             sessionManager.getServerUrl());
                         sessionManager.setDisplayName(lastDisplayName);
                         sessionManager.setUserId(lastUserId);
 
-                        // استعادة الفرع
                         int savedBranchId = sessionManager.getLastBiometricBranchId();
                         String savedBranchName = sessionManager.getLastBiometricBranchName();
                         if (savedBranchId > 0) {
@@ -485,4 +482,4 @@ public class LoginActivity extends AppCompatActivity {
         finish();
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
     }
-            }
+}
