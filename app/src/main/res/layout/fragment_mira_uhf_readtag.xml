@@ -348,13 +348,15 @@
 
             <!-- Progress Bar -->
             <ProgressBar
-                android:id="@+id/pbScanProgress"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="3dp"
-                android:layout_marginBottom="8dp"
-                android:indeterminate="true"
-                android:visibility="gone" />
+    android:id="@+id/pbScanProgress"
+    style="?android:attr/progressBarStyleHorizontal"
+    android:layout_width="match_parent"
+    android:layout_height="6dp"
+    android:max="100"
+    android:progress="0"
+    android:visibility="gone"
+    android:progressTint="#16A34A"
+    android:progressBackgroundTint="#E5E7EB" />
 
             <!-- Current Tag Card -->
             <com.google.android.material.card.MaterialCardView
