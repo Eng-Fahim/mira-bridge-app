@@ -228,7 +228,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 mTabHost.setCurrentTabByTag(tag);
             } catch (Exception e) {
                 Log.w(TAG, "Tab not found or unauthorized: " + tag);
-                Toast.makeText(this, isArabic ? "الشاشة غير متوفرة لحسابك" : "Screen not available for your role", Toast.LENGTH_SHORT).show();
+                
             }
         }
     }
@@ -590,4 +590,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private String ar(String arabic, String english) { return isArabic ? arabic : english; }
-            }
+                }
