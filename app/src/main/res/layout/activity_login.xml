@@ -3,27 +3,21 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_luxury_pattern"
+    android:background="?android:attr/colorBackground"
     android:padding="24dp">
 
-
-    <!-- Pattern/Watermark (اختياري، يضيف عمقاً كبيراً كما في تطبيق جيب) -->
-    <!-- يمكنك إضافة ImageView هنا كخلفية خفيفة إذا أردت لاحقاً -->
-
-    <!-- Top Header (Language & Version) -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnToggleLanguage"
         style="@style/Widget.Material3.Button.TextButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="EN / AR"
-        android:textColor="?attr/colorOnBackground"
+        android:textColor="?attr/colorOnSurfaceVariant"
         android:textSize="12sp"
         android:textStyle="bold"
-        android:letterSpacing="0.1"
         app:icon="@drawable/ic_language"
         app:iconSize="18dp"
-        app:iconTint="?attr/colorOnBackground"
+        app:iconTint="?attr/colorOnSurfaceVariant"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -31,15 +25,13 @@
         android:id="@+id/tvAppVersion"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="v1.0.0 Enterprise"
+        android:text="v1.0.0"
         android:textColor="?attr/colorOutline"
         android:textSize="11sp"
-        android:textStyle="bold"
         app:layout_constraintBottom_toBottomOf="@+id/btnToggleLanguage"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="@+id/btnToggleLanguage" />
 
-    <!-- Center Content Group (Logo + Title) -->
     <LinearLayout
         android:id="@+id/logoContainer"
         android:layout_width="match_parent"
@@ -67,13 +59,12 @@
                 android:src="@drawable/ic_luxury_mira_logo" />
         </FrameLayout>
 
-        <!-- دمجنا اسم العلامة التجارية ووصفها لتكون كتلة متماسكة -->
         <com.google.android.material.textview.MaterialTextView
             android:id="@+id/tvBrandName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="البوعاني للذهب والمجوهرات"
+            android:text="MIRA Jewelry Enterprise"
             android:textColor="?attr/colorOnBackground"
             android:textSize="24sp"
             android:textStyle="bold" />
@@ -82,22 +73,31 @@
             android:id="@+id/tvBrandSubtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Enterprise Authentication"
+            android:text="MIRA ID™ Smart Jewelry Tag"
             android:textAllCaps="true"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp"
             android:textStyle="bold" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvBrandDescription"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="منظومة التتبع والمصادقة المعتمدة للمجوهرات"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="11sp"
+            android:textAlignment="center" />
     </LinearLayout>
 
-    <!-- Login Card (البطاقة الفاخرة) -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/loginCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="8dp"
         app:cardBackgroundColor="?attr/colorSurface"
-        app:cardCornerRadius="24dp" 
-        app:cardElevation="12dp" 
+        app:cardCornerRadius="24dp"
+        app:cardElevation="12dp"
         app:strokeWidth="0dp"
         app:layout_constraintBottom_toTopOf="@+id/tvFooter"
         app:layout_constraintEnd_toEndOf="parent"
@@ -131,7 +131,6 @@
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="14sp" />
 
-            <!-- Username Field -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilUsername"
                 style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
@@ -157,7 +156,6 @@
                     android:imeOptions="actionNext" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Password Field -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilPassword"
                 style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
@@ -184,7 +182,6 @@
                     android:imeOptions="actionDone" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Buttons (أزرار بارزة باللون الذهبي) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -192,7 +189,6 @@
                 android:weightSum="3"
                 android:layoutDirection="locale">
 
-                <!-- زر الدخول الرئيسي بلون الهوية (الذهبي) -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnLogin"
                     android:layout_width="0dp"
@@ -205,7 +201,6 @@
                     app:backgroundTint="?attr/colorPrimary"
                     app:cornerRadius="12dp" />
 
-                <!-- زر البصمة/RFID -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnBiometric"
                     style="@style/Widget.Material3.Button.OutlinedButton"
@@ -226,7 +221,6 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- عناصر الخادم المخفية (تبقى كما هي) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -261,7 +255,6 @@
                 android:layout_height="wrap_content" />
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- حاوية التحميل -->
         <FrameLayout
             android:id="@+id/loadingContainer"
             android:layout_width="wrap_content"
@@ -273,7 +266,6 @@
         </FrameLayout>
     </LinearLayout>
 
-    <!-- Footer -->
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/tvFooter"
         android:layout_width="wrap_content"
