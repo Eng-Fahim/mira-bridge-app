@@ -341,23 +341,21 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
     new Thread(() -> {
         try {
-            String location = branchDisplayName + " | branch:" + activeBranchId;
-            MiraApiClient.ApiResponse response = apiClient.startInventorySession(location, blind ? "blind" : "full");
+            // ✅ جلب قائمة القطع مباشرة
+            MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(activeBranchId);
             
             if (response != null && response.isSuccess && response.data != null) {
-                sessionId = response.data.optInt("session_id", 0);
-                int serverExpected = response.data.optInt("expected_count", 0);
-                if (serverExpected > 0) expectedCount = serverExpected;
-                
-                // ✅ جلب أرقام GTIN الحقيقية من API
                 JSONArray items = response.data.optJSONArray("items");
                 if (items != null && items.length() > 0) {
-                    // حفظ الأرقام الحقيقية للمحاكاة
+                    expectedCount = items.length();
                     saveRealGtinsForSimulation(items);
+                    Log.i(TAG, "✅ Loaded " + items.length() + " items for inventory");
+                } else {
+                    // جرب المخزون العادي
+                    loadInventoryFallback(activeBranchId);
                 }
             } else {
-                // ✅ إذا فشل API، جرب تحميل الأرقام المخزنة محلياً
-                loadOfflineGtinsForSimulation();
+                loadInventoryFallback(activeBranchId);
             }
         } catch (Exception e) {
             Log.e(TAG, "Session start error: " + e.getMessage());
@@ -370,6 +368,22 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             startSimulation();
         });
     }).start();
+}
+
+private void loadInventoryFallback(int branchId) {
+    try {
+        MiraApiClient.ApiResponse response = apiClient.getBranchInventory(branchId);
+        if (response != null && response.isSuccess && response.data != null) {
+            JSONArray items = response.data.optJSONArray("items");
+            if (items == null) items = response.data.optJSONArray("inventory");
+            if (items != null && items.length() > 0) {
+                expectedCount = items.length();
+                saveRealGtinsForSimulation(items);
+            }
+        }
+    } catch (Exception e) {
+        loadOfflineGtinsForSimulation();
+    }
 }
 
     private void closeSessionOnServer() {
