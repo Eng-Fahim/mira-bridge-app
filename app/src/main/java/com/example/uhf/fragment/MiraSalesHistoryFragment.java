@@ -128,7 +128,7 @@ private void loadSalesOffline() {
         if (getContext() != null) {
             apiClient = MiraApiClient.getInstance(getContext());
             branchesManager = MiraBranchesManager.getInstance(getContext());
-            offlineCache = getContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
+            offlineCache = requireContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
         }
 
         rvSales = view.findViewById(R.id.rvMiraSalesHistory);
