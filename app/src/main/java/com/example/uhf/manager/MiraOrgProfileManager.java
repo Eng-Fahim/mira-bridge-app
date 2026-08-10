@@ -51,6 +51,17 @@ public class MiraOrgProfileManager {
     public String getOrgWebsite() {
         return prefs.getString("org_website", "");
     }
+    public String getOrgNameEn() {
+    return prefs.getString("org_name_en", "");
+}
+
+public String getOrgSloganEn() {
+    return prefs.getString("org_slogan_en", "");
+}
+
+public String getOrgLogo() {
+    return prefs.getString("org_logo", "");
+}
 
     // ==================== دوال مساعدة ====================
 
