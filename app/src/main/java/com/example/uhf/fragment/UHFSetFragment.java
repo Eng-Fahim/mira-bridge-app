@@ -50,7 +50,7 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
     private Spinner spWorkingMode;
 
     // Organization Profile
-    private EditText etOrgName, etOrgSlogan, etOrgPhone, etOrgEmail, etOrgAddress, etOrgWebsite;
+    private EditText etOrgName, etOrgSlogan, etOrgPhone, etOrgEmail, etOrgAddress, etOrgWebsite,etOrgNameEn, etOrgSloganEn, etOrgAddressEn;
     private ImageView ivOrgLogo;
     private TextView tvOrgStatus;
     private Button btnSaveOrgProfile, btnPickLogo;
@@ -106,6 +106,9 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
         tvOrgStatus = view.findViewById(R.id.tvOrgStatus);
         btnSaveOrgProfile = view.findViewById(R.id.btnSaveOrgProfile);
         btnPickLogo = view.findViewById(R.id.btnPickLogo);
+        etOrgNameEn = view.findViewById(R.id.etOrgNameEn);
+        etOrgSloganEn = view.findViewById(R.id.etOrgSloganEn);
+        etOrgAddressEn = view.findViewById(R.id.etOrgAddressEn);
 
         // App Settings
         cbSoundOnScan = view.findViewById(R.id.cbSoundOnScan);
@@ -185,20 +188,31 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
     }
 
     private void saveOrgToCloud() {
-        new Thread(() -> {
-            try {
-                com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
-                org.json.JSONObject payload = new org.json.JSONObject();
-                payload.put("org_name", getText(etOrgName));
-                payload.put("org_slogan", getText(etOrgSlogan));
-                payload.put("org_phone", getText(etOrgPhone));
-                payload.put("org_email", getText(etOrgEmail));
-                payload.put("org_address", getText(etOrgAddress));
-                payload.put("org_website", getText(etOrgWebsite));
-                client.saveOrgProfile(payload);
-            } catch (Exception ignored) {}
-        }).start();
-    }
+    new Thread(() -> {
+        try {
+            com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
+            org.json.JSONObject payload = new org.json.JSONObject();
+            payload.put("org_name", getText(etOrgName));
+            payload.put("org_slogan", getText(etOrgSlogan));
+            payload.put("org_phone", getText(etOrgPhone));
+            payload.put("org_email", getText(etOrgEmail));
+            payload.put("org_address", getText(etOrgAddress));
+            payload.put("org_website", getText(etOrgWebsite));
+            payload.put("org_name_en", getText(etOrgNameEn));
+            payload.put("org_slogan_en", getText(etOrgSloganEn));
+            payload.put("org_address_en", getText(etOrgAddressEn));
+            
+            // ✅ إرسال الشعار
+            SharedPreferences orgPrefs = mContext.getSharedPreferences(ORG_PREFS, Context.MODE_PRIVATE);
+            String logoBase64 = orgPrefs.getString("org_logo", "");
+            if (!logoBase64.isEmpty()) {
+                payload.put("org_logo", logoBase64);
+            }
+            
+            client.saveOrgProfile(payload);
+        } catch (Exception ignored) {}
+    }).start();
+}
 
     private void pickLogo() {
         Intent intent = new Intent(Intent.ACTION_PICK);
@@ -320,7 +334,11 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
         if (etOrgEmail != null) etOrgEmail.setText(orgPrefs.getString("org_email", ""));
         if (etOrgAddress != null) etOrgAddress.setText(orgPrefs.getString("org_address", ""));
         if (etOrgWebsite != null) etOrgWebsite.setText(orgPrefs.getString("org_website", ""));
-
+        
+        if (etOrgNameEn != null) etOrgNameEn.setText(orgPrefs.getString("org_name_en", ""));
+        if (etOrgSloganEn != null) etOrgSloganEn.setText(orgPrefs.getString("org_slogan_en", ""));
+        if (etOrgAddressEn != null) etOrgAddressEn.setText(orgPrefs.getString("org_address_en", ""));
+        
         // Logo
         String logoBase64 = orgPrefs.getString("org_logo", "");
         if (!logoBase64.isEmpty() && ivOrgLogo != null) {
@@ -384,4 +402,4 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
             tv.postDelayed(() -> tv.setText(""), 3000);
         }
     }
-}
+                }
