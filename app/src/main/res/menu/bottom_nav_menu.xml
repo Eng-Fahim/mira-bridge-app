@@ -5,10 +5,7 @@
         android:icon="@drawable/ic_dashboard"
         android:title="الرئيسية" />
 
-    <item
-        android:id="@+id/nav_quick_jewelry"
-        android:icon="@drawable/ic_gem"
-        android:title="مجوهرات" />
+    
 
     <item
         android:id="@+id/nav_quick_menu"
