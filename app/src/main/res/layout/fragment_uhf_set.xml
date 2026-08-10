@@ -270,6 +270,60 @@
                     android:textColor="?attr/colorOnSurface"
                     android:textSize="14sp" />
             </com.google.android.material.textfield.TextInputLayout>
+            
+            <!-- اسم الجهة بالإنجليزي -->
+<com.google.android.material.textfield.TextInputLayout
+    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="10dp"
+    android:hint="Organization Name (English)">
+
+    <com.google.android.material.textfield.TextInputEditText
+        android:id="@+id/etOrgNameEn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:inputType="text"
+        android:text="MIRA Jewelry"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="14sp" />
+</com.google.android.material.textfield.TextInputLayout>
+
+<!-- الشعار بالإنجليزي -->
+<com.google.android.material.textfield.TextInputLayout
+    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="10dp"
+    android:hint="Slogan (English)">
+
+    <com.google.android.material.textfield.TextInputEditText
+        android:id="@+id/etOrgSloganEn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:inputType="text"
+        android:text="Jewelry Enterprise Platform"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="14sp" />
+</com.google.android.material.textfield.TextInputLayout>
+
+<!-- العنوان بالإنجليزي -->
+<com.google.android.material.textfield.TextInputLayout
+    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="10dp"
+    android:hint="Address (English)">
+
+    <com.google.android.material.textfield.TextInputEditText
+        android:id="@+id/etOrgAddressEn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:inputType="text"
+        android:text=""
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="14sp" />
+</com.google.android.material.textfield.TextInputLayout>
 
             <!-- زر حفظ بيانات الجهة -->
             <com.google.android.material.button.MaterialButton
