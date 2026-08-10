@@ -60,8 +60,6 @@ public class MiraDashboardFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         try {
-            showDirectError("1. بدء تحميل Dashboard...");
-            
             apiClient = MiraApiClient.getInstance(requireContext());
             sessionManager = new SessionManager(requireContext());
             branchesManager = MiraBranchesManager.getInstance(requireContext());
@@ -74,8 +72,6 @@ public class MiraDashboardFragment extends Fragment {
             fetchData();
 
         } catch (Throwable e) {
-            // إظهار أي خطأ أثناء إنشاء الواجهة فوراً للمستخدم
-            showDirectError("❌ خطأ في إنشاء Dashboard: " + e.getMessage());
             Log.e(TAG, "onViewCreated error", e);
         }
     }
@@ -109,7 +105,7 @@ public class MiraDashboardFragment extends Fragment {
                 swipeRefresh.setOnRefreshListener(this::fetchData);
             }
         } catch (Throwable e) {
-            showDirectError("❌ خطأ في الربط بالمكونات (Views): " + e.getMessage());
+            Log.e(TAG, "initViews error", e);
         }
     }
 
@@ -140,12 +136,12 @@ public class MiraDashboardFragment extends Fragment {
                 tvLocation.setText("📍 " + branchesManager.getActiveBranchDisplayName());
             }
         } catch (Throwable e) {
-            showDirectError("❌ خطأ الهيدر: " + e.getMessage());
+            Log.e(TAG, "updateHeader error", e);
         }
     }
+
     private void fetchData() {
         try {
-            showDirectError("2. جاري طلب بيانات الـ API...");
             if (tvLiveStatus != null) {
                 tvLiveStatus.setText("جاري التحديث...");
                 tvLiveStatus.setTextColor(0xFFF59E0B);
@@ -161,23 +157,19 @@ public class MiraDashboardFragment extends Fragment {
                         try {
                             showShimmer(false);
                             if (response != null && response.isSuccess && response.data != null) {
-                                showDirectError("✅ تم جلب البيانات بنجاح!");
                                 processData(response.data);
                             } else {
-                                String errorMsg = (response != null) ? "حدث خطأ في استجابة السيرفر" : "الرد فارغ Null";
-
-                                showDirectError("❌ فشل السيرفر: " + errorMsg);
                                 showOffline();
                             }
                             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                         } catch (Throwable e) {
-                            showDirectError("❌ خطأ أثناء معالجة بيانات الـ API: " + e.getMessage());
+                            Log.e(TAG, "processData callback error", e);
                             showOffline();
                         }
                     });
                 } catch (Throwable e) {
                     mainHandler.post(() -> {
-                        showDirectError("❌ خطأ اتصال بالشبكة: " + e.getMessage());
+                        Log.e(TAG, "Network request error", e);
                         showShimmer(false); 
                         showOffline(); 
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false); 
@@ -185,14 +177,11 @@ public class MiraDashboardFragment extends Fragment {
                 }
             });
         } catch (Throwable e) {
-            showDirectError("❌ خطأ تنفيذ fetchData: " + e.getMessage());
+            Log.e(TAG, "fetchData error", e);
             showShimmer(false);
             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
         }
     }
-
-
-
 
     private void processData(JSONObject data) {
         try {
@@ -219,7 +208,7 @@ public class MiraDashboardFragment extends Fragment {
                 tvLiveStatus.setTextColor(0xFF16A34A); 
             }
         } catch (Throwable e) { 
-            showDirectError("❌ خطأ قراءة JSON: " + e.getMessage()); 
+            Log.e(TAG, "processData JSON error", e); 
         }
     }
 
@@ -255,19 +244,8 @@ public class MiraDashboardFragment extends Fragment {
                 if (a.mTabHost != null) a.mTabHost.setCurrentTabByTag(tag);
             }
         } catch (Exception e) {
-            Toast.makeText(getContext(), "جاري الفتح...", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "switchTab error", e);
         }
-    }
-
-    // دالة عرض الخطأ المباشر على الشاشة
-    private void showDirectError(String message) {
-        mainHandler.post(() -> {
-            try {
-                if (getContext() != null) {
-                    Toast.makeText(getContext().getApplicationContext(), message, Toast.LENGTH_LONG).show();
-                }
-            } catch (Exception ignored) {}
-        });
     }
 
     @Override
