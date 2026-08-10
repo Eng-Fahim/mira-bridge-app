@@ -149,29 +149,30 @@ public class LoginActivity extends AppCompatActivity {
     // ==================== Cloud Org Profile ====================
 
     private void loadOrgProfileFromCloud() {
-        bgExecutor.execute(() -> {
-            try {
-                MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
-                if (response != null && response.isSuccess && response.data != null) {
-                    String orgName = response.data.optString("org_name", "");
-                    if (!orgName.isEmpty()) {
-                        getSharedPreferences("MIRA_ORG_PROFILE", Context.MODE_PRIVATE)
-                            .edit()
-                            .putString("org_name", orgName)
-                            .putString("org_slogan", response.data.optString("org_slogan", ""))
-                            .putString("org_phone", response.data.optString("org_phone", ""))
-                            .putString("org_email", response.data.optString("org_email", ""))
-                            .putString("org_address", response.data.optString("org_address", ""))
-                            .putString("org_website", response.data.optString("org_website", ""))
-                            .apply();
-                        mainHandler.post(this::applyOrgProfile);
-                    }
-                }
-            } catch (Exception e) {
-                Log.e("LoginActivity", "Cloud org load error: " + e.getMessage());
+    bgExecutor.execute(() -> {
+        try {
+            MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
+            if (response != null && response.isSuccess && response.data != null) {
+                getSharedPreferences("MIRA_ORG_PROFILE", Context.MODE_PRIVATE)
+                    .edit()
+                    .putString("org_name", response.data.optString("org_name", ""))
+                    .putString("org_name_en", response.data.optString("org_name_en", ""))
+                    .putString("org_slogan", response.data.optString("org_slogan", ""))
+                    .putString("org_slogan_en", response.data.optString("org_slogan_en", ""))
+                    .putString("org_phone", response.data.optString("org_phone", ""))
+                    .putString("org_email", response.data.optString("org_email", ""))
+                    .putString("org_address", response.data.optString("org_address", ""))
+                    .putString("org_address_en", response.data.optString("org_address_en", ""))
+                    .putString("org_website", response.data.optString("org_website", ""))
+                    .putString("org_logo", response.data.optString("org_logo", ""))
+                    .apply();
+                mainHandler.post(this::applyOrgProfile);
             }
-        });
-    }
+        } catch (Exception e) {
+            Log.e("LoginActivity", "Cloud org load error: " + e.getMessage());
+        }
+    });
+}
 
     // ==================== Language ====================
 
@@ -201,31 +202,51 @@ public class LoginActivity extends AppCompatActivity {
     // ==================== Org Profile ====================
 
     private void applyOrgProfile() {
-        MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
-        String orgName = orgProfile.getOrgName();
-        String orgSlogan = orgProfile.getOrgSlogan();
-
-        if (tvBrandName != null && orgName != null && !orgName.isEmpty()) {
-            tvBrandName.setText(orgName);
+    MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
+    
+    // ✅ اسم الجهة - حسب اللغة
+    if (tvBrandName != null) {
+        String nameAr = orgProfile.getOrgName();
+        String nameEn = orgProfile.getOrgNameEn();
+        if (isArabic) {
+            tvBrandName.setText(nameAr != null && !nameAr.isEmpty() ? nameAr : "MIRA Jewelry");
+        } else {
+            tvBrandName.setText(nameEn != null && !nameEn.isEmpty() ? nameEn : "MIRA Jewelry");
         }
-        if (tvBrandSubtitle != null) {
-            if (orgName != null && !orgName.isEmpty() && !orgName.equals("MIRA Jewelry")) {
-                tvBrandSubtitle.setText(orgName + " Enterprise");
-            } else {
-                tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
+    }
+    
+    // ✅ الوصف
+    if (tvBrandSubtitle != null) {
+        tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
+    }
+    
+    // ✅ الشعار التجاري - حسب اللغة
+    if (tvBrandDescription != null) {
+        String sloganAr = orgProfile.getOrgSlogan();
+        String sloganEn = orgProfile.getOrgSloganEn();
+        if (isArabic) {
+            tvBrandDescription.setText(sloganAr != null && !sloganAr.isEmpty() ? sloganAr : "منظومة التتبع والمصادقة المعتمدة للمجوهرات");
+        } else {
+            tvBrandDescription.setText(sloganEn != null && !sloganEn.isEmpty() ? sloganEn : "Enterprise Jewelry Traceability & Authentication");
+        }
+    }
+    
+    // ✅ الشعار - من Base64 أو الافتراضي
+    if (ivAppLogo != null) {
+        String logoBase64 = orgProfile.getOrgLogo();
+        if (logoBase64 != null && !logoBase64.isEmpty()) {
+            try {
+                byte[] bytes = android.util.Base64.decode(logoBase64, android.util.Base64.DEFAULT);
+                android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                ivAppLogo.setImageBitmap(bitmap);
+            } catch (Exception e) {
+                ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
             }
-        }
-        if (tvBrandDescription != null) {
-            if (orgSlogan != null && !orgSlogan.isEmpty() && !orgSlogan.equals("Jewelry Enterprise Platform")) {
-                tvBrandDescription.setText(orgSlogan);
-            } else {
-                tvBrandDescription.setText(isArabic ? "منظومة التتبع والمصادقة المعتمدة للمجوهرات" : "Enterprise Jewelry Traceability & Authentication");
-            }
-        }
-        if (ivAppLogo != null) {
+        } else {
             ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
         }
     }
+}
 
     // ==================== Server Config ====================
 
