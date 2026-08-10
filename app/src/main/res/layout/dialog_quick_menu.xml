@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_bottom_sheet"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <!-- مقبض السحب العلوي (يتكيف مع اللون) -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"
+        android:background="?attr/colorOutline"
+        android:alpha="0.4" />
+
+    <!-- عنوان القائمة -->
+    <TextView
+        android:id="@+id/tvQuickMenuTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="20dp"
+        android:text="⚡ القائمة السريعة"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <!-- شبكة الخيارات 2x3 -->
+    <GridLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:columnCount="3"
+        android:rowCount="2">
+
+        <!-- الرادار -->
+        <LinearLayout
+            android:id="@+id/btnMenuRadar"
+            style="@style/QuickMenuItemStyle">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🎯" android:textSize="26sp" />
+            <TextView android:id="@+id/tvLabelRadar" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الرادار" style="@style/QuickMenuTextStyle" />
+        </LinearLayout>
+
+        <!-- البوابات -->
+        <LinearLayout
+            android:id="@+id/btnMenuGate"
+            style="@style/QuickMenuItemStyle">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🚪" android:textSize="26sp" />
+            <TextView android:id="@+id/tvLabelGate" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="البوابات" style="@style/QuickMenuTextStyle" />
+        </LinearLayout>
+
+        <!-- المحاسبة -->
+        <LinearLayout
+            android:id="@+id/btnMenuAccounting"
+            style="@style/QuickMenuItemStyle">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="💰" android:textSize="26sp" />
+            <TextView android:id="@+id/tvLabelAccounting" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="المحاسبة" style="@style/QuickMenuTextStyle" />
+        </LinearLayout>
+
+        <!-- التقارير -->
+        <LinearLayout
+            android:id="@+id/btnMenuReports"
+            style="@style/QuickMenuItemStyle">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="📊" android:textSize="26sp" />
+            <TextView android:id="@+id/tvLabelReports" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="التقارير" style="@style/QuickMenuTextStyle" />
+        </LinearLayout>
+
+        <!-- المبيعات -->
+        <LinearLayout
+            android:id="@+id/btnMenuSales"
+            style="@style/QuickMenuItemStyle">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="📜" android:textSize="26sp" />
+            <TextView android:id="@+id/tvLabelSales" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="المبيعات" style="@style/QuickMenuTextStyle" />
+        </LinearLayout>
+
+        <!-- المخزون -->
+        <LinearLayout
+            android:id="@+id/btnMenuInventory"
+            style="@style/QuickMenuItemStyle">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="📋" android:textSize="26sp" />
+            <TextView android:id="@+id/tvLabelInventory" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="المخزون" style="@style/QuickMenuTextStyle" />
+        </LinearLayout>
+
+    </GridLayout>
+
+</LinearLayout>
