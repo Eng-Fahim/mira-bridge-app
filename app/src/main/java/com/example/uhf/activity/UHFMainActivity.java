@@ -137,6 +137,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             initViewPageData();
             setupTopTabs();
             setupQuickNav();
+            
+            updateDynamicUIStrings();
 
             // عرض التحميل الفاخر عند الفتح في المرة الأولى
             showLoading();
@@ -169,27 +171,28 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ==================== BOTTOM NAV ====================
 
     private void setupQuickNav() {
-        try {
-            BottomNavigationView quickNav = findViewById(R.id.bottomQuickNav);
-            if (quickNav == null) return;
+    try {
+        BottomNavigationView quickNav = findViewById(R.id.bottomQuickNav);
+        if (quickNav == null) return;
 
-            quickNav.setOnItemSelectedListener(item -> {
-                try {
-                    int id = item.getItemId();
-                    if (id == R.id.nav_quick_dashboard) switchToTabSafely("Dashboard");
-                    else if (id == R.id.nav_quick_jewelry) switchToTabSafely("JewelryDashboard");
-                    else if (id == R.id.nav_quick_menu) showRadialMenu();
-                    else if (id == R.id.nav_quick_inventory) switchToTabSafely("Scan");
-                    else if (id == R.id.nav_quick_pos) switchToTabSafely("POS Mode");
-                } catch (Exception e) {
-                    Log.e(TAG, "Navigation Error: " + e.getMessage());
-                }
-                return true;
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
-        }
+        quickNav.setOnItemSelectedListener(item -> {
+            try {
+                int id = item.getItemId();
+                if (id == R.id.nav_quick_dashboard) switchToTabSafely("Dashboard");
+                else if (id == R.id.nav_quick_jewelry) switchToTabSafely("JewelryDashboard");
+                else if (id == R.id.nav_quick_menu) showRadialMenu(); // ⚡ فتح قائمة الإجراءات الفاخرة
+                else if (id == R.id.nav_quick_inventory) switchToTabSafely("Scan");
+                else if (id == R.id.nav_quick_pos) switchToTabSafely("POS Mode");
+            } catch (Exception e) {
+                Log.e(TAG, "Navigation Error: " + e.getMessage());
+            }
+            return true;
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
     }
+}
+
 
     private void showRadialMenu() {
         try {
@@ -280,6 +283,44 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Branch check error: " + e.getMessage());
         }
     }
+    
+    // تحديث تسميات القائمة السفلية والعلوبة والـ Loading طبقاً للغة الحالية ديناميكياً
+private void updateDynamicUIStrings() {
+    try {
+        BottomNavigationView quickNav = findViewById(R.id.bottomQuickNav);
+        if (quickNav != null && quickNav.getMenu() != null) {
+            Menu menu = quickNav.getMenu();
+            MenuItem itemDash = menu.findItem(R.id.nav_quick_dashboard);
+            MenuItem itemJewelry = menu.findItem(R.id.nav_quick_jewelry);
+            MenuItem itemActions = menu.findItem(R.id.nav_quick_menu);
+            MenuItem itemScan = menu.findItem(R.id.nav_quick_inventory);
+            MenuItem itemPos = menu.findItem(R.id.nav_quick_pos);
+
+            if (itemDash != null) itemDash.setTitle(isArabic ? "الرئيسية" : "Home");
+            if (itemJewelry != null) itemJewelry.setTitle(isArabic ? "مجوهرات" : "Jewelry");
+            if (itemActions != null) itemActions.setTitle(isArabic ? "إجراءات" : "Actions");
+            if (itemScan != null) itemScan.setTitle(isArabic ? "الجرد" : "Inventory");
+            if (itemPos != null) itemPos.setTitle(isArabic ? "البيع" : "POS");
+        }
+
+        // تحديث أزرار الشريط العلوي
+        setTopTabLabel(R.id.tabTopSettings, isArabic ? "⚙️ الإعدادات" : "⚙️ Settings");
+        setTopTabLabel(R.id.tabTopIdentity, isArabic ? "🆔 التكويد" : "🆔 Identity");
+        setTopTabLabel(R.id.tabTopTransfers, isArabic ? "📦 التحويلات" : "📦 Transfers");
+        setTopTabLabel(R.id.tabTopBranches, isArabic ? "🏢 الفروع" : "🏢 Branches");
+        setTopTabLabel(R.id.tabTopUsers, isArabic ? "👥 المستخدمين" : "👥 Users");
+        setTopTabLabel(R.id.tabTopRfid, isArabic ? "🔧 RFID" : "🔧 RFID");
+
+    } catch (Exception e) {
+        Log.e(TAG, "Dynamic UI Strings update error: " + e.getMessage());
+    }
+}
+
+private void setTopTabLabel(int viewId, String text) {
+    TextView tv = findViewById(viewId);
+    if (tv != null) tv.setText(text);
+}
+
 
     private void updateToolbarTitle() {
         try {
@@ -335,10 +376,19 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void toggleLanguage() {
-        isArabic = !isArabic;
-        getSharedPreferences("app_settings", MODE_PRIVATE).edit().putString("language", isArabic ? "ar" : "en").apply();
-        applyLanguage();
-    }
+    isArabic = !isArabic;
+    getSharedPreferences("app_settings", MODE_PRIVATE)
+            .edit()
+            .putString("language", isArabic ? "ar" : "en")
+            .apply();
+            
+    applyLanguage();
+    
+    // 👈 تحديث نصوص القوائم والأشرطة فوراً
+    updateDynamicUIStrings();
+    updateToolbarTitle();
+}
+
 
     private void applyLanguage() {
         try {
@@ -617,4 +667,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private String ar(String arabic, String english) { return isArabic ? arabic : english; }
-}
+                }
