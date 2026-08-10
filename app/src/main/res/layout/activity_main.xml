@@ -27,119 +27,29 @@
             android:orientation="horizontal"
             android:paddingHorizontal="4dp">
 
-            <TextView
-                android:id="@+id/tabTopSettings"
-                android:layout_width="wrap_content"
-                android:layout_height="34dp"
-                android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="⚙️ الإعدادات"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="12sp"
-                android:background="@drawable/bg_tab_top"
-                android:clickable="true"
-                android:focusable="true" />
-
-            <TextView
-                android:id="@+id/tabTopIdentity"
-                android:layout_width="wrap_content"
-                android:layout_height="34dp"
-                android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="🆔 التكويد"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="12sp"
-                android:background="@drawable/bg_tab_top"
-                android:clickable="true"
-                android:focusable="true" />
-
-            <TextView
-                android:id="@+id/tabTopTransfers"
-                android:layout_width="wrap_content"
-                android:layout_height="34dp"
-                android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="📦 تحويلات"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="12sp"
-                android:background="@drawable/bg_tab_top"
-                android:clickable="true"
-                android:focusable="true" />
-
-            <TextView
-                android:id="@+id/tabTopBranches"
-                android:layout_width="wrap_content"
-                android:layout_height="34dp"
-                android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="🏢 فروع"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="12sp"
-                android:background="@drawable/bg_tab_top"
-                android:clickable="true"
-                android:focusable="true" />
-
-            <TextView
-                android:id="@+id/tabTopUsers"
-                android:layout_width="wrap_content"
-                android:layout_height="34dp"
-                android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="👥 مستخدمين"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="12sp"
-                android:background="@drawable/bg_tab_top"
-                android:clickable="true"
-                android:focusable="true" />
-
-            <TextView
-                android:id="@+id/tabTopRfid"
-                android:layout_width="wrap_content"
-                android:layout_height="34dp"
-                android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="🔧 RFID"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="12sp"
-                android:background="@drawable/bg_tab_top"
-                android:clickable="true"
-                android:focusable="true" />
+            <TextView android:id="@+id/tabTopSettings" android:layout_width="wrap_content" android:layout_height="34dp" android:gravity="center" android:paddingHorizontal="12dp" android:text="⚙️ الإعدادات" android:textColor="?attr/colorOnSurface" android:textSize="12sp" android:background="@drawable/bg_tab_top" android:clickable="true" android:focusable="true" />
+            <TextView android:id="@+id/tabTopIdentity" android:layout_width="wrap_content" android:layout_height="34dp" android:gravity="center" android:paddingHorizontal="12dp" android:text="🆔 التكويد" android:textColor="?attr/colorOnSurface" android:textSize="12sp" android:background="@drawable/bg_tab_top" android:clickable="true" android:focusable="true" />
+            <TextView android:id="@+id/tabTopTransfers" android:layout_width="wrap_content" android:layout_height="34dp" android:gravity="center" android:paddingHorizontal="12dp" android:text="📦 تحويلات" android:textColor="?attr/colorOnSurface" android:textSize="12sp" android:background="@drawable/bg_tab_top" android:clickable="true" android:focusable="true" />
+            <TextView android:id="@+id/tabTopBranches" android:layout_width="wrap_content" android:layout_height="34dp" android:gravity="center" android:paddingHorizontal="12dp" android:text="🏢 فروع" android:textColor="?attr/colorOnSurface" android:textSize="12sp" android:background="@drawable/bg_tab_top" android:clickable="true" android:focusable="true" />
+            <TextView android:id="@+id/tabTopUsers" android:layout_width="wrap_content" android:layout_height="34dp" android:gravity="center" android:paddingHorizontal="12dp" android:text="👥 مستخدمين" android:textColor="?attr/colorOnSurface" android:textSize="12sp" android:background="@drawable/bg_tab_top" android:clickable="true" android:focusable="true" />
+            <TextView android:id="@+id/tabTopRfid" android:layout_width="wrap_content" android:layout_height="34dp" android:gravity="center" android:paddingHorizontal="12dp" android:text="🔧 RFID" android:textColor="?attr/colorOnSurface" android:textSize="12sp" android:background="@drawable/bg_tab_top" android:clickable="true" android:focusable="true" />
 
         </LinearLayout>
     </HorizontalScrollView>
 
-    <!-- ✅ TabHost الوهمي - ضروري لعمل FragmentTabHost -->
-    <TabHost
+    <!-- FragmentTabHost -->
+    <android.support.v4.app.FragmentTabHost
         android:id="@android:id/tabhost"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical">
-
-            <TabWidget
-                android:id="@android:id/tabs"
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:visibility="gone" />
-
-            <FrameLayout
-                android:id="@android:id/tabcontent"
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:visibility="gone" />
-        </LinearLayout>
-    </TabHost>
-
-    <!-- Main Content -->
-    <FrameLayout
-        android:id="@+id/realtabcontent"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1">
+
+        <FrameLayout
+            android:id="@+id/realtabcontent"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </android.support.v4.app.FragmentTabHost>
 
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomQuickNav"
