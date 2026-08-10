@@ -183,21 +183,45 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void showRadialMenu() {
-        String[] options = {
-            ar("🎯 الرادار", "🎯 Radar"),
-            ar("🚪 البوابات", "🚪 Gates"),
-            ar("💰 المحاسبة", "💰 Accounting"),
-            ar("📊 التقارير", "📊 Reports"),
-            ar("📜 المبيعات", "📜 Sales"),
-            ar("📋 المخزون", "📋 Inventory Pro")
-        };
-        String[] tags = {"RadarLocation", "SecureGate", "Accounting", "ReportsPro", "SalesHistory", "Inventory Pro"};
+    private void showRadialMenu() {
+    try {
+        com.google.android.material.bottomsheet.BottomSheetDialog bottomSheet = 
+            new com.google.android.material.bottomsheet.BottomSheetDialog(this);
+        
+        View view = getLayoutInflater().inflate(R.layout.dialog_quick_menu, null);
+        bottomSheet.setContentView(view);
 
-        new androidx.appcompat.app.AlertDialog.Builder(UHFMainActivity.this)
-            .setTitle(ar("⚡ القائمة السريعة", "⚡ Quick Menu"))
-            .setItems(options, (d, w) -> switchToTabSafely(tags[w]))
-            .show();
+        // ضبط النصوص ديناميكياً حسب اللغة المحددة في التطبيق
+        android.widget.TextView tvTitle = view.findViewById(R.id.tvQuickMenuTitle);
+        android.widget.TextView tvRadar = view.findViewById(R.id.tvLabelRadar);
+        android.widget.TextView tvGate = view.findViewById(R.id.tvLabelGate);
+        android.widget.TextView tvAccounting = view.findViewById(R.id.tvLabelAccounting);
+        android.widget.TextView tvReports = view.findViewById(R.id.tvLabelReports);
+        android.widget.TextView tvSales = view.findViewById(R.id.tvLabelSales);
+        android.widget.TextView tvInventory = view.findViewById(R.id.tvLabelInventory);
+
+        if (tvTitle != null) tvTitle.setText(ar("⚡ القائمة السريعة", "⚡ Quick Menu"));
+        if (tvRadar != null) tvRadar.setText(ar("الرادار", "Radar"));
+        if (tvGate != null) tvGate.setText(ar("البوابات", "Gates"));
+        if (tvAccounting != null) tvAccounting.setText(ar("المحاسبة", "Accounting"));
+        if (tvReports != null) tvReports.setText(ar("التقارير", "Reports"));
+        if (tvSales != null) tvSales.setText(ar("المبيعات", "Sales"));
+        if (tvInventory != null) tvInventory.setText(ar("المخزون", "Inventory"));
+
+        // ربط الأحداث والأزرار
+        view.findViewById(R.id.btnMenuRadar).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("RadarLocation"); });
+        view.findViewById(R.id.btnMenuGate).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("SecureGate"); });
+        view.findViewById(R.id.btnMenuAccounting).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("Accounting"); });
+        view.findViewById(R.id.btnMenuReports).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("ReportsPro"); });
+        view.findViewById(R.id.btnMenuSales).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("SalesHistory"); });
+        view.findViewById(R.id.btnMenuInventory).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("Inventory Pro"); });
+
+        bottomSheet.show();
+    } catch (Exception e) {
+        Log.e(TAG, "BottomSheet Error: " + e.getMessage());
     }
+}
+
 
     private void switchToTabSafely(String tag) {
         if (mTabHost != null) {
