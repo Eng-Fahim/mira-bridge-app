@@ -2,14 +2,18 @@ workflows:
   android-workflow:
     name: Android Build
     max_build_duration: 30
+
     environment:
       vars:
         PACKAGE_NAME: "com.mira.jewelry.enterprise"
+
     scripts:
       - name: Grant gradlew permission
         script: chmod +x gradlew
-      - name: Build debug APK
+
+      - name: Build release APK
         script: |
-          ./gradlew :app:assembleDebug
+          ./gradlew :app:assembleRelease
+
     artifacts:
-      - app/build/outputs/apk/debug/*.apk
+      - app/build/outputs/apk/release/*.apk
