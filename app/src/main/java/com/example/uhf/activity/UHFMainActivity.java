@@ -153,13 +153,14 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ==================== TOP TABS ====================
 
     private void setupTopTabs() {
-        setupTopTab(R.id.tabTopSettings, "Settings");
-        setupTopTab(R.id.tabTopIdentity, "IdentityStudio");
-        setupTopTab(R.id.tabTopTransfers, "Transfers");
-        setupTopTab(R.id.tabTopBranches, "BranchesManagement");
-        setupTopTab(R.id.tabTopUsers, "UsersManagement");
-        setupTopTab(R.id.tabTopRfid, "Settings");
-    }
+    setupTopTab(R.id.tabTopSettings, "Settings");       // إعدادات القارئ
+    setupTopTab(R.id.tabTopIdentity, "IdentityStudio"); // التكويد
+    setupTopTab(R.id.tabTopTransfers, "Transfers");      // التحويلات
+    setupTopTab(R.id.tabTopBranches, "BranchesManagement"); // الفروع
+    setupTopTab(R.id.tabTopUsers, "UsersManagement");   // المستخدمين
+    setupTopTab(R.id.tabTopRfid, "ReadWrite");          // قراءة وكتابة RFID
+}
+
 
     private void setupTopTab(int tabId, String tag) {
         View tab = findViewById(tabId);
@@ -456,67 +457,76 @@ private void setTopTabLabel(int viewId, String text) {
     }
 
     protected void initViewPageData() {
-        try {
-            fm = getSupportFragmentManager();
-            mTabHost = findViewById(android.R.id.tabhost);
-            if (mTabHost == null) {
-                Log.e(TAG, "mTabHost is null! Check activity_main.xml layout");
-                return;
-            }
-            mTabHost.setup(this, fm, R.id.realtabcontent);
+    try {
+        fm = getSupportFragmentManager();
+        mTabHost = findViewById(android.R.id.tabhost);
+        if (mTabHost == null) return;
+        
+        mTabHost.setup(this, fm, R.id.realtabcontent);
 
-            SessionManager.Role role = (sessionManager != null) ? sessionManager.getUserRole() : SessionManager.Role.POS_OPERATOR;
-            boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
-            boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
-            boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
-            boolean isAnyAdmin = isSystemAdmin || isOrgAdmin;
-            boolean isManager = isAnyAdmin || isBranchManager;
-            boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
-            boolean isPosOperator = (role == SessionManager.Role.POS_OPERATOR);
-            boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
+        SessionManager.Role role = (sessionManager != null) ? sessionManager.getUserRole() : SessionManager.Role.POS_OPERATOR;
+        boolean isManager = (role == SessionManager.Role.SYSTEM_ADMIN || role == SessionManager.Role.ORG_ADMIN || role == SessionManager.Role.BRANCH_MANAGER);
+        boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
+        boolean isPosOperator = (role == SessionManager.Role.POS_OPERATOR);
+        boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
 
-            safeAddTab("Dashboard", isArabic ? "🏠 الرئيسية" : "🏠 Dashboard", MiraDashboardFragment.class);
-            if (isManager || isPosOperator) {
-                safeAddTab("JewelryDashboard", isArabic ? "💎 المجوهرات" : "💎 Jewelry", JewelryDashboardFragment.class);
-                safeAddTab("POS Mode", isArabic ? "🛒 البيع" : "🛒 POS", MiraPosFragment.class);
-                safeAddTab("SalesHistory", isArabic ? "📜 المبيعات" : "📜 Sales", MiraSalesHistoryFragment.class);
-            }
-            safeAddTab("Scan", isArabic ? "📡 الجرد" : "📡 Inventory", MiraUHFReadTagFragment.class);
-            if (isManager || isInventoryMgr) {
-                safeAddTab("IdentityStudio", isArabic ? "🆔 التكويد" : "🆔 ID", MiraIdentityStudioFragment.class);
-                safeAddTab("Inventory Pro", isArabic ? "📊 المخزون" : "📊 Inventory", MiraInventoryProFragment.class);
-            }
-            if (isManager || isGateSecurity) {
-                safeAddTab("SecureGate", isArabic ? "🚪 البوابات" : "🚪 Gate", MiraSecureGateFragment.class);
-            }
-            if (isManager) {
-                safeAddTab("BranchesManagement", isArabic ? "🏢 الفروع" : "🏢 Branches", MiraBranchesManagementFragment.class);
-                safeAddTab("UsersManagement", isArabic ? "👥 المستخدمين" : "👥 Users", UsersManagementFragment.class);
-                safeAddTab("ReportsPro", isArabic ? "📊 التقارير" : "📊 Reports", MiraReportsProFragment.class);
-            }
-            if (isManager || role == SessionManager.Role.AUDITOR) {
-                safeAddTab("Accounting", isArabic ? "💰 المحاسبة" : "💰 Accounting", MiraAccountingFragment.class);
-            }
-            if (isManager || isInventoryMgr) {
-                safeAddTab("Transfers", isArabic ? "📦 التحويلات" : "📦 Transfers", MiraTransferFragment.class);
-            }
-            
-            mTabHost.setOnTabChangedListener(tabId -> {
-                try {
-                    showLoading();
-                    Fragment fragment = getSupportFragmentManager().findFragmentByTag(tabId);
-                    if (fragment != null) currentFragment = fragment;
-                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::hideLoading, 300);
-                } catch (Exception e) { 
-                    Log.e(TAG, "Tab switch error: " + e.getMessage()); 
-                    hideLoading();
-                }
-            });
-
-        } catch (Exception e) {
-            Log.e(TAG, "initViewPageData error: " + e.getMessage());
+        // --- 1. الواجهات الرئيسية للعمليات ---
+        safeAddTab("Dashboard", isArabic ? "🏠 الرئيسية" : "🏠 Dashboard", MiraDashboardFragment.class);
+        if (isManager || isPosOperator) {
+            safeAddTab("JewelryDashboard", isArabic ? "💎 المجوهرات" : "💎 Jewelry", JewelryDashboardFragment.class);
+            safeAddTab("POS Mode", isArabic ? "🛒 البيع" : "🛒 POS", MiraPosFragment.class);
+            safeAddTab("SalesHistory", isArabic ? "📜 المبيعات" : "📜 Sales", MiraSalesHistoryFragment.class);
         }
+        
+        // --- 2. تبويبات عمليات الجرد والتكويد ---
+        safeAddTab("Scan", isArabic ? "📡 الجرد" : "📡 Inventory", MiraUHFReadTagFragment.class);
+        if (isManager || isInventoryMgr) {
+            safeAddTab("IdentityStudio", isArabic ? "🆔 التكويد" : "🆔 ID", MiraIdentityStudioFragment.class);
+            safeAddTab("Inventory Pro", isArabic ? "📊 المخزون" : "📊 Inventory", MiraInventoryProFragment.class);
+        }
+
+        // --- 3. تبويبات الشريحة والقارئ (UHF / RFID Hardware Tabs) ---
+        safeAddTab("ReadWrite", isArabic ? "📝 قراءة/كتابة" : "📝 Read/Write", UHFReadWriteFragment.class);
+        safeAddTab("RadarLocation", isArabic ? "🎯 الرادار" : "🎯 Radar", UHFRadarLocationFragment.class);
+        safeAddTab("Lock", isArabic ? "🔒 قفل التاج" : "🔒 Lock Tag", UHFLockFragment.class);
+        safeAddTab("Kill", isArabic ? "💀 إتلاف التاج" : "💀 Kill Tag", UHFKillFragment.class);
+
+        // --- 4. تبويب إعدادات القارئ RFID (مهم جداً لتفعيل زر الإعدادات) ---
+        safeAddTab("Settings", isArabic ? "⚙️ إعدادات القارئ" : "⚙️ Reader Settings", UHFSetFragment.class);
+
+        // --- 5. الإدارة والخدمات اللوجستية ---
+        if (isManager || isGateSecurity) {
+            safeAddTab("SecureGate", isArabic ? "🚪 البوابات" : "🚪 Gate", MiraSecureGateFragment.class);
+        }
+        if (isManager) {
+            safeAddTab("BranchesManagement", isArabic ? "🏢 الفروع" : "🏢 Branches", MiraBranchesManagementFragment.class);
+            safeAddTab("UsersManagement", isArabic ? "👥 المستخدمين" : "👥 Users", UsersManagementFragment.class);
+            safeAddTab("ReportsPro", isArabic ? "📊 التقارير" : "📊 Reports", MiraReportsProFragment.class);
+        }
+        if (isManager || role == SessionManager.Role.AUDITOR) {
+            safeAddTab("Accounting", isArabic ? "💰 المحاسبة" : "💰 Accounting", MiraAccountingFragment.class);
+        }
+        if (isManager || isInventoryMgr) {
+            safeAddTab("Transfers", isArabic ? "📦 التحويلات" : "📦 Transfers", MiraTransferFragment.class);
+        }
+        
+        mTabHost.setOnTabChangedListener(tabId -> {
+            try {
+                showLoading();
+                Fragment fragment = getSupportFragmentManager().findFragmentByTag(tabId);
+                if (fragment != null) currentFragment = fragment;
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::hideLoading, 300);
+            } catch (Exception e) { 
+                Log.e(TAG, "Tab switch error: " + e.getMessage()); 
+                hideLoading();
+            }
+        });
+
+    } catch (Exception e) {
+        Log.e(TAG, "initViewPageData error: " + e.getMessage());
     }
+}
+
 
     private void safeAddTab(String tag, String label, Class<?> clazz) {
         try {
@@ -667,4 +677,4 @@ private void setTopTabLabel(int viewId, String text) {
     }
 
     private String ar(String arabic, String english) { return isArabic ? arabic : english; }
-                }
+}
