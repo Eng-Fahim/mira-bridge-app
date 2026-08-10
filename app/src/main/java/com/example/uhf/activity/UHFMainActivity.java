@@ -18,8 +18,9 @@ import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.Toast;
 import android.widget.FrameLayout;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDelegate;
@@ -119,9 +120,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             setContentView(R.layout.activity_main);
             
-            // ✅ صحيح
             loadingOverlay = findViewById(R.id.loading_overlay);
-
 
             com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
             if (toolbar != null) {
@@ -138,6 +137,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             initViewPageData();
             setupTopTabs();
             setupQuickNav();
+
+            // عرض التحميل الفاخر عند الفتح في المرة الأولى
+            showLoading();
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::hideLoading, 300);
 
         } catch (Exception e) {
             Log.e(TAG, "Fatal error prevented crash in onCreate: " + e.getMessage(), e);
@@ -189,44 +192,41 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void showRadialMenu() {
-    try {
-        com.google.android.material.bottomsheet.BottomSheetDialog bottomSheet = 
-            new com.google.android.material.bottomsheet.BottomSheetDialog(this);
-        
-        View view = getLayoutInflater().inflate(R.layout.dialog_quick_menu, null);
-        bottomSheet.setContentView(view);
+        try {
+            com.google.android.material.bottomsheet.BottomSheetDialog bottomSheet = 
+                new com.google.android.material.bottomsheet.BottomSheetDialog(this);
+            
+            View view = getLayoutInflater().inflate(R.layout.dialog_quick_menu, null);
+            bottomSheet.setContentView(view);
 
-        // ضبط النصوص ديناميكياً حسب اللغة المحددة في التطبيق
-        android.widget.TextView tvTitle = view.findViewById(R.id.tvQuickMenuTitle);
-        android.widget.TextView tvRadar = view.findViewById(R.id.tvLabelRadar);
-        android.widget.TextView tvGate = view.findViewById(R.id.tvLabelGate);
-        android.widget.TextView tvAccounting = view.findViewById(R.id.tvLabelAccounting);
-        android.widget.TextView tvReports = view.findViewById(R.id.tvLabelReports);
-        android.widget.TextView tvSales = view.findViewById(R.id.tvLabelSales);
-        android.widget.TextView tvInventory = view.findViewById(R.id.tvLabelInventory);
+            TextView tvTitle = view.findViewById(R.id.tvQuickMenuTitle);
+            TextView tvRadar = view.findViewById(R.id.tvLabelRadar);
+            TextView tvGate = view.findViewById(R.id.tvLabelGate);
+            TextView tvAccounting = view.findViewById(R.id.tvLabelAccounting);
+            TextView tvReports = view.findViewById(R.id.tvLabelReports);
+            TextView tvSales = view.findViewById(R.id.tvLabelSales);
+            TextView tvInventory = view.findViewById(R.id.tvLabelInventory);
 
-        if (tvTitle != null) tvTitle.setText(ar("⚡ القائمة السريعة", "⚡ Quick Menu"));
-        if (tvRadar != null) tvRadar.setText(ar("الرادار", "Radar"));
-        if (tvGate != null) tvGate.setText(ar("البوابات", "Gates"));
-        if (tvAccounting != null) tvAccounting.setText(ar("المحاسبة", "Accounting"));
-        if (tvReports != null) tvReports.setText(ar("التقارير", "Reports"));
-        if (tvSales != null) tvSales.setText(ar("المبيعات", "Sales"));
-        if (tvInventory != null) tvInventory.setText(ar("المخزون", "Inventory"));
+            if (tvTitle != null) tvTitle.setText(ar("⚡ القائمة السريعة", "⚡ Quick Menu"));
+            if (tvRadar != null) tvRadar.setText(ar("الرادار", "Radar"));
+            if (tvGate != null) tvGate.setText(ar("البوابات", "Gates"));
+            if (tvAccounting != null) tvAccounting.setText(ar("المحاسبة", "Accounting"));
+            if (tvReports != null) tvReports.setText(ar("التقارير", "Reports"));
+            if (tvSales != null) tvSales.setText(ar("المبيعات", "Sales"));
+            if (tvInventory != null) tvInventory.setText(ar("المخزون", "Inventory"));
 
-        // ربط الأحداث والأزرار
-        view.findViewById(R.id.btnMenuRadar).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("RadarLocation"); });
-        view.findViewById(R.id.btnMenuGate).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("SecureGate"); });
-        view.findViewById(R.id.btnMenuAccounting).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("Accounting"); });
-        view.findViewById(R.id.btnMenuReports).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("ReportsPro"); });
-        view.findViewById(R.id.btnMenuSales).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("SalesHistory"); });
-        view.findViewById(R.id.btnMenuInventory).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("Inventory Pro"); });
+            view.findViewById(R.id.btnMenuRadar).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("RadarLocation"); });
+            view.findViewById(R.id.btnMenuGate).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("SecureGate"); });
+            view.findViewById(R.id.btnMenuAccounting).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("Accounting"); });
+            view.findViewById(R.id.btnMenuReports).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("ReportsPro"); });
+            view.findViewById(R.id.btnMenuSales).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("SalesHistory"); });
+            view.findViewById(R.id.btnMenuInventory).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("Inventory Pro"); });
 
-        bottomSheet.show();
-    } catch (Exception e) {
-        Log.e(TAG, "BottomSheet Error: " + e.getMessage());
+            bottomSheet.show();
+        } catch (Exception e) {
+            Log.e(TAG, "BottomSheet Error: " + e.getMessage());
+        }
     }
-}
-
 
     private void switchToTabSafely(String tag) {
         if (mTabHost != null) {
@@ -234,7 +234,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 mTabHost.setCurrentTabByTag(tag);
             } catch (Exception e) {
                 Log.w(TAG, "Tab not found or unauthorized: " + tag);
-                
             }
         }
     }
@@ -375,7 +374,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             if (cf != null && cf.isAdded()) {
                 View v = cf.getView();
                 if (v != null) {
-                    android.widget.TextView tvBranch = v.findViewById(R.id.tvBranchName);
+                    TextView tvBranch = v.findViewById(R.id.tvBranchName);
                     if (tvBranch != null && branchesManager != null) {
                         tvBranch.setText("📍 " + branchesManager.getActiveBranchDisplayName());
                     }
@@ -453,21 +452,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
             
             mTabHost.setOnTabChangedListener(tabId -> {
-    try {
-        // 1. إظهار علامة التحميل عند الضغط على التبويب
-        showLoading();
-
-        Fragment fragment = getSupportFragmentManager().findFragmentByTag(tabId);
-        if (fragment != null) currentFragment = fragment;
-
-        // 2. إخفاء التحميل تلقائياً بعد 300 مللي ثانية لسلاسة الانتقال
-        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::hideLoading, 300);
-
-    } catch (Exception e) { 
-        Log.e(TAG, "Tab switch error: " + e.getMessage()); 
-        hideLoading();
-    }
-});
+                try {
+                    showLoading();
+                    Fragment fragment = getSupportFragmentManager().findFragmentByTag(tabId);
+                    if (fragment != null) currentFragment = fragment;
+                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::hideLoading, 300);
+                } catch (Exception e) { 
+                    Log.e(TAG, "Tab switch error: " + e.getMessage()); 
+                    hideLoading();
+                }
+            });
 
         } catch (Exception e) {
             Log.e(TAG, "initViewPageData error: " + e.getMessage());
@@ -479,24 +473,24 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             if (mTabHost != null && Fragment.class.isAssignableFrom(clazz)) {
                 mTabHost.addTab(mTabHost.newTabSpec(tag).setIndicator(label), (Class<? extends Fragment>) clazz, null);
             }
-        } catch (Exception e) { Log.e(TAG, "Failed to add tab: " + tag); }
+        } catch (Exception e) { Log.e(TAG, "Failed to add tab: " + e.getMessage()); }
     }
-public void showLoading() {
-    if (loadingOverlay != null) {
-        TextView tvTitle = loadingOverlay.findViewById(R.id.tvLoadingTitle);
-        if (tvTitle != null) {
-            tvTitle.setText(isArabic ? "جاري التحميل..." : "Loading...");
+
+    public void showLoading() {
+        if (loadingOverlay != null) {
+            TextView tvTitle = loadingOverlay.findViewById(R.id.tvLoadingTitle);
+            if (tvTitle != null) {
+                tvTitle.setText(isArabic ? "جاري التحميل..." : "Loading...");
+            }
+            loadingOverlay.setVisibility(View.VISIBLE);
         }
-        loadingOverlay.setVisibility(View.VISIBLE);
     }
-}
 
-
-public void hideLoading() {
-    if (loadingOverlay != null) {
-        loadingOverlay.setVisibility(View.GONE);
+    public void hideLoading() {
+        if (loadingOverlay != null) {
+            loadingOverlay.setVisibility(View.GONE);
+        }
     }
-}
 
     private void showLogoutConfirmation() {
         try {
@@ -623,4 +617,4 @@ public void hideLoading() {
     }
 
     private String ar(String arabic, String english) { return isArabic ? arabic : english; }
-    }
+}
