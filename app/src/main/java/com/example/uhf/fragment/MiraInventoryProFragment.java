@@ -418,28 +418,27 @@ private void saveRealGtinsForSimulation(JSONArray items) {
         List<String> gtins = new ArrayList<>();
         for (int i = 0; i < items.length(); i++) {
             JSONObject item = items.getJSONObject(i);
-            String gtin = item.optString("gtin13", item.optString("epc", ""));
-            if (!gtin.isEmpty()) {
-                gtins.add(gtin);
-            }
+            // ✅ جرب جميع الحقول الممكنة
+            String gtin = item.optString("gtin13", "");
+            if (gtin.isEmpty()) gtin = item.optString("serial_number", "");
+            if (gtin.isEmpty()) gtin = item.optString("epc", "");
+            if (gtin.isEmpty()) gtin = item.optString("code", "");
+            if (!gtin.isEmpty()) gtins.add(gtin);
         }
         
         if (!gtins.isEmpty()) {
             realGtinsForSimulation = gtins.toArray(new String[0]);
+            expectedCount = gtins.size();
             
-            // ✅ حفظ محلي للاستخدام أوفلاين
             JSONArray arr = new JSONArray();
-            for (String gtin : gtins) {
-                arr.put(gtin);
-            }
+            for (String gtin : gtins) arr.put(gtin);
             if (offlineCache != null) {
                 offlineCache.edit()
                     .putString("real_gtins", arr.toString())
                     .putInt("real_gtins_count", gtins.size())
                     .apply();
             }
-            
-            Log.i(TAG, "✅ Loaded " + gtins.size() + " real GTINs for simulation");
+            Log.i(TAG, "✅ Saved " + gtins.size() + " GTINs for simulation");
         }
     } catch (Exception e) {
         Log.e(TAG, "Save GTINs error: " + e.getMessage());
@@ -862,4 +861,4 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
         if (rvInventoryItems != null) rvInventoryItems.setAdapter(null);
         super.onDestroyView();
     }
-                                                      }
+            }
