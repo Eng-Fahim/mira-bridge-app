@@ -20,11 +20,13 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
-import androidx.fragment.app.DialogFragment; // تم التحويل إلى DialogFragment
+import androidx.fragment.app.DialogFragment;
+
 
 import com.example.uhf.R;
 import com.example.uhf.manager.MiraOrgProfileManager;
@@ -116,14 +118,26 @@ public class MiraReceiptFragment extends DialogFragment {
 
     // ==================== 🖨️ طباعة ====================
     private void printReceipt() {
-        if (getContext() == null || webReceipt == null) return;
+    if (getContext() == null || webReceipt == null) return;
+    
+    // ✅ حفظ محلي أولاً
+    saveReceiptOffline();
+    
+    // محاولة الطباعة
+    try {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
             PrintManager pm = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
             PrintDocumentAdapter adapter = webReceipt.createPrintDocumentAdapter(orgName);
             pm.print(orgName, adapter, new PrintAttributes.Builder().build());
             Toast.makeText(getContext(), isArabic ? "🖨️ تم فتح الطباعة" : "🖨️ Print opened", Toast.LENGTH_SHORT).show();
         }
+    } catch (Exception e) {
+        // فشل الطباعة - السند محفوظ محلياً
+        Toast.makeText(getContext(), 
+            isArabic ? "💾 تم حفظ السند محلياً" : "💾 Receipt saved locally", 
+            Toast.LENGTH_SHORT).show();
     }
+}
 
     // ==================== 📤 مشاركة PDF ====================
     private void shareReceiptAsPDF() {
@@ -201,7 +215,64 @@ public class MiraReceiptFragment extends DialogFragment {
             return b;
         } catch (Exception e) { return null; }
     }
+    
+    
+// ==================== OFFLINE RECEIPT ====================
 
+/**
+ * حفظ السند محلياً عند عدم وجود اتصال
+ */
+private void saveReceiptOffline() {
+    try {
+        if (getContext() == null) return;
+        
+        JSONObject receiptData = new JSONObject();
+        try {
+            receiptData = new JSONObject(receiptJsonStr);
+        } catch (Exception ignored) {}
+        
+        receiptData.put("saved_at", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()));
+        receiptData.put("org_name", orgName);
+        receiptData.put("printed", false);
+        
+        // تحميل السندات المحفوظة
+        SharedPreferences prefs = getContext().getSharedPreferences("offline_receipts", Context.MODE_PRIVATE);
+        String existingJson = prefs.getString("receipts", "[]");
+        JSONArray receiptsArray = new JSONArray(existingJson);
+        receiptsArray.put(receiptData);
+        
+        // الاحتفاظ بآخر 50 سند فقط
+        while (receiptsArray.length() > 50) {
+            receiptsArray.remove(0);
+        }
+        
+        prefs.edit().putString("receipts", receiptsArray.toString()).apply();
+        
+        Log.i(TAG, "💾 Receipt saved offline: " + receiptData.optString("sale_id", "unknown"));
+    } catch (Exception e) {
+        Log.e(TAG, "Save receipt offline error: " + e.getMessage());
+    }
+}
+
+/**
+ * طباعة أو مشاركة السند المحفوظ
+ */
+private void printOrShareOfflineReceipt() {
+    // توليد PDF من WebView مباشرة
+    webReceipt.postDelayed(() -> {
+        try {
+            File pdf = generatePDF();
+            if (pdf != null) {
+                saveReceiptOffline();
+                Toast.makeText(getContext(), 
+                    isArabic ? "✅ تم حفظ السند محلياً" : "✅ Receipt saved locally", 
+                    Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Offline receipt error: " + e.getMessage());
+        }
+    }, 500);
+}
     // ==================== HTML ====================
     private void renderHtmlReceipt() {
         if (webReceipt == null) return;
@@ -269,4 +340,4 @@ public class MiraReceiptFragment extends DialogFragment {
         if (!isAdded()) return;
         dismissAllowingStateLoss(); // إغلاق الـ Dialog بشكل آمن
     }
-}
+    }
