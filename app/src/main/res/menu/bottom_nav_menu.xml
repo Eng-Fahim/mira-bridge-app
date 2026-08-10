@@ -1,8 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:id="@+id/nav_quick_dashboard" android:icon="@drawable/ic_dashboard" android:title="الرئيسية" />
-    <item android:id="@+id/nav_quick_jewelry" android:icon="@drawable/ic_jewelry" android:title="مجوهرات" />
-    <item android:id="@+id/nav_quick_menu" android:icon="@drawable/ic_flash" android:title="قائمة" />
-    <item android:id="@+id/nav_quick_inventory" android:icon="@drawable/ic_search" android:title="الجرد" />
-    <item android:id="@+id/nav_quick_pos" android:icon="@drawable/ic_pos" android:title="البيع" />
+    <item
+        android:id="@+id/nav_quick_dashboard"
+        android:icon="@drawable/ic_dashboard"
+        android:title="الرئيسية" />
+
+    <item
+        android:id="@+id/nav_quick_jewelry"
+        android:icon="@drawable/ic_gem"
+        android:title="مجوهرات" />
+
+    <item
+        android:id="@+id/nav_quick_menu"
+        android:icon="@drawable/ic_flash"
+        android:title="إجراءات" />
+
+    <item
+        android:id="@+id/nav_quick_inventory"
+        android:icon="@drawable/ic_scan"
+        android:title="الجرد" />
+
+    <item
+        android:id="@+id/nav_quick_pos"
+        android:icon="@drawable/ic_cart"
+        android:title="البيع" />
 </menu>
