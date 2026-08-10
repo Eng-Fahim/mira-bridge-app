@@ -5,7 +5,6 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <!-- Toolbar -->
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
@@ -14,7 +13,6 @@
         app:titleTextColor="?attr/colorOnPrimary"
         app:subtitleTextColor="?attr/colorOnPrimary" />
 
-    <!-- Top Tabs (HorizontalScrollView) -->
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="44dp"
@@ -110,6 +108,32 @@
         </LinearLayout>
     </HorizontalScrollView>
 
+    <!-- ✅ TabHost الوهمي - ضروري لعمل FragmentTabHost -->
+    <TabHost
+        android:id="@android:id/tabhost"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <TabWidget
+                android:id="@android:id/tabs"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+
+            <FrameLayout
+                android:id="@android:id/tabcontent"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+        </LinearLayout>
+    </TabHost>
+
     <!-- Main Content -->
     <FrameLayout
         android:id="@+id/realtabcontent"
@@ -117,23 +141,22 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <!-- Bottom Navigation (5 buttons) -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
-    android:id="@+id/bottomQuickNav"
-    android:layout_width="match_parent"
-    android:layout_height="72dp"
-    android:layout_gravity="bottom"
-    android:layout_marginStart="16dp"
-    android:layout_marginEnd="16dp"
-    android:layout_marginBottom="16dp"
-    android:background="@drawable/bg_bottom_nav"
-    android:elevation="12dp"
-    app:itemIconSize="22dp"
-    app:itemIconTint="@color/bottom_nav_colors"
-    app:itemTextColor="@color/bottom_nav_colors"
-    app:itemRippleColor="#20C5A059"
-    app:itemActiveIndicatorStyle="@style/CustomNavIndicator"
-    app:labelVisibilityMode="labeled"
-    app:menu="@menu/bottom_nav_menu" />
+        android:id="@+id/bottomQuickNav"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_bottom_nav"
+        android:elevation="12dp"
+        app:itemIconSize="22dp"
+        app:itemIconTint="@color/bottom_nav_colors"
+        app:itemTextColor="@color/bottom_nav_colors"
+        app:itemRippleColor="#20C5A059"
+        app:itemActiveIndicatorStyle="@style/CustomNavIndicator"
+        app:labelVisibilityMode="labeled"
+        app:menu="@menu/bottom_nav_menu" />
 
 </LinearLayout>
