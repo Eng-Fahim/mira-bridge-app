@@ -119,7 +119,7 @@
 
     <!-- Bottom Navigation (5 buttons) -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
-    android:id="@+id/bottom_navigation"
+    android:id="@+id/bottomQuickNav"
     android:layout_width="match_parent"
     android:layout_height="72dp"
     android:layout_gravity="bottom"
