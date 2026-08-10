@@ -20,6 +20,7 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import android.content.SharedPreferences;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
@@ -49,12 +50,15 @@ public class MiraSalesHistoryFragment extends Fragment {
     private MiraSalesAdapter adapter;
     private final List<MiraSaleItem> saleList = new ArrayList<>();
     private final List<MiraSaleItem> filteredList = new ArrayList<>();
+    
+    private static final String OFFLINE_PREFS = "sales_history_cache";
+    private SharedPreferences offlineCache;
 
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isArabic;
-private boolean isArabic() {
+    private boolean isArabic() {
     return getResources().getConfiguration().getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
 }
 
@@ -66,7 +70,55 @@ private String ar(String arabic, String english) {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_mira_sales_history, container, false);
     }
+    
+    
+// ==================== OFFLINE ====================
 
+private void saveSalesOffline(JSONArray sales) {
+    try {
+        if (offlineCache == null) return;
+        offlineCache.edit()
+            .putString("sales", sales.toString())
+            .putLong("last_update", System.currentTimeMillis())
+            .apply();
+    } catch (Exception ignored) {}
+}
+
+private void loadSalesOffline() {
+    try {
+        if (offlineCache == null) return;
+        String json = offlineCache.getString("sales", "");
+        if (json.isEmpty()) return;
+        
+        JSONArray sales = new JSONArray(json);
+        List<MiraSaleItem> items = new ArrayList<>();
+        
+        for (int i = 0; i < sales.length(); i++) {
+            JSONObject sale = sales.optJSONObject(i);
+            if (sale == null) continue;
+            
+            MiraSaleItem item = new MiraSaleItem();
+            item.saleId = sale.optString("sale_id", sale.optString("id", "—"));
+            item.customerName = sale.optString("customer_name", isArabic ? "عميل" : "Customer");
+            item.amount = sale.optDouble("final_amount", sale.optDouble("amount", 0));
+            item.itemCount = sale.optInt("item_count", 0);
+            item.paymentMethod = sale.optString("payment_method", "CASH");
+            item.date = sale.optString("created_at", "");
+            item.rawJson = sale.toString();
+            items.add(item);
+        }
+        
+        saleList.clear();
+        saleList.addAll(items);
+        
+        String currentQuery = etSearch != null ? etSearch.getText().toString() : "";
+        filterSales(currentQuery);
+        
+        if (tvEmpty != null && !saleList.isEmpty()) {
+            tvEmpty.setVisibility(View.GONE);
+        }
+    } catch (Exception ignored) {}
+}
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
@@ -76,6 +128,7 @@ private String ar(String arabic, String english) {
         if (getContext() != null) {
             apiClient = MiraApiClient.getInstance(getContext());
             branchesManager = MiraBranchesManager.getInstance(getContext());
+            offlineCache = getContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
         }
 
         rvSales = view.findViewById(R.id.rvMiraSalesHistory);
@@ -105,90 +158,91 @@ private String ar(String arabic, String english) {
     }
 
     private void loadSalesHistory() {
-        if (!isAdded()) return;
+    if (!isAdded()) return;
 
-        if (tvEmpty != null) {
-            tvEmpty.setVisibility(View.VISIBLE);
-            tvEmpty.setText(isArabic ? "جاري تحميل المبيعات..." : "Loading sales...");
-        }
+    if (tvEmpty != null) {
+        tvEmpty.setVisibility(View.VISIBLE);
+        tvEmpty.setText(isArabic ? "جاري تحميل المبيعات..." : "Loading sales...");
+    }
+    
+    // ✅ تحميل محلي فوري أولاً
+    loadSalesOffline();
 
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                if (apiClient == null && getContext() != null) {
-                    apiClient = MiraApiClient.getInstance(getContext());
-                }
+    Executors.newSingleThreadExecutor().execute(() -> {
+        try {
+            if (apiClient == null && getContext() != null) {
+                apiClient = MiraApiClient.getInstance(getContext());
+            }
 
-                if (apiClient == null) {
-                    mainHandler.post(() -> showEmptyState(isArabic ? "⚠️ خطأ في تهيئة النظام" : "⚠️ System initialization error"));
-                    return;
-                }
+            if (apiClient == null) {
+                mainHandler.post(() -> showEmptyState(isArabic ? "⚠️ خطأ في تهيئة النظام" : "⚠️ System initialization error"));
+                return;
+            }
 
-                MiraApiClient.ApiResponse response = apiClient.getSalesHistory();
+            MiraApiClient.ApiResponse response = apiClient.getSalesHistory();
 
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONArray sales = null;
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONArray sales = null;
 
-                    // مرونة في قراءة مصفوفة المبيعات بجميع احتمالات رد الـ REST API
-                    if (response.data.has("sales")) {
-                        sales = response.data.optJSONArray("sales");
-                    } else if (response.data.has("data")) {
-                        Object dataObj = response.data.opt("data");
-                        if (dataObj instanceof JSONArray) {
-                            sales = (JSONArray) dataObj;
-                        } else if (dataObj instanceof JSONObject) {
-                            sales = ((JSONObject) dataObj).optJSONArray("sales");
-                        }
+                if (response.data.has("sales")) {
+                    sales = response.data.optJSONArray("sales");
+                } else if (response.data.has("data")) {
+                    Object dataObj = response.data.opt("data");
+                    if (dataObj instanceof JSONArray) {
+                        sales = (JSONArray) dataObj;
+                    } else if (dataObj instanceof JSONObject) {
+                        sales = ((JSONObject) dataObj).optJSONArray("sales");
                     }
-
-                    List<MiraSaleItem> items = new ArrayList<>();
-
-                    if (sales != null && sales.length() > 0) {
-                        for (int i = 0; i < sales.length(); i++) {
-                            JSONObject sale = sales.optJSONObject(i);
-                            if (sale == null) continue;
-
-                            MiraSaleItem item = new MiraSaleItem();
-                            item.saleId = sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")));
-                            item.customerName = sale.optString("customer_name", sale.optString("client_name", isArabic ? "عميل" : "Customer"));
-                            item.amount = sale.optDouble("final_amount", sale.optDouble("total_amount", sale.optDouble("amount", 0)));
-                            item.itemCount = sale.optInt("item_count", sale.optInt("total_items", sale.optInt("count", 0)));
-                            item.paymentMethod = sale.optString("payment_method", sale.optString("pay_type", "CASH"));
-                            item.date = sale.optString("created_at", sale.optString("date", ""));
-                            item.rawJson = sale.toString();
-                            items.add(item);
-                        }
-                    }
-
-                    mainHandler.post(() -> {
-                        if (!isAdded()) return;
-                        saleList.clear();
-                        saleList.addAll(items);
-                        
-                        String currentQuery = etSearch != null ? etSearch.getText().toString() : "";
-                        filterSales(currentQuery);
-
-                        if (saleList.isEmpty()) {
-                            showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
-                        }
-                    });
-                } else {
-                    String errorMsg = (response != null && response.error != null) ? response.error : "";
-                    Log.e(TAG, "Sales load failed code: " + (response != null ? response.code : -1) + ", error: " + errorMsg);
-                    mainHandler.post(() -> {
-                        if (!isAdded()) return;
-                        showEmptyState(isArabic ? "⚠️ تعذر تحميل المبيعات (" + (response != null ? response.code : "Error") + ")" : "⚠️ Failed to load sales");
-                    });
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "Exception loading sales", e);
+
+                List<MiraSaleItem> items = new ArrayList<>();
+
+                if (sales != null && sales.length() > 0) {
+                    for (int i = 0; i < sales.length(); i++) {
+                        JSONObject sale = sales.optJSONObject(i);
+                        if (sale == null) continue;
+
+                        MiraSaleItem item = new MiraSaleItem();
+                        item.saleId = sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")));
+                        item.customerName = sale.optString("customer_name", sale.optString("client_name", isArabic ? "عميل" : "Customer"));
+                        item.amount = sale.optDouble("final_amount", sale.optDouble("total_amount", sale.optDouble("amount", 0)));
+                        item.itemCount = sale.optInt("item_count", sale.optInt("total_items", sale.optInt("count", 0)));
+                        item.paymentMethod = sale.optString("payment_method", sale.optString("pay_type", "CASH"));
+                        item.date = sale.optString("created_at", sale.optString("date", ""));
+                        item.rawJson = sale.toString();
+                        items.add(item);
+                    }
+                    
+                    // ✅ حفظ محلي
+                    saveSalesOffline(sales);
+                }
+
                 mainHandler.post(() -> {
                     if (!isAdded()) return;
-                    showEmptyState(isArabic ? "⚠️ خطأ في الاتصال بالخادم" : "⚠️ Connection error");
+                    saleList.clear();
+                    saleList.addAll(items);
+                    
+                    String currentQuery = etSearch != null ? etSearch.getText().toString() : "";
+                    filterSales(currentQuery);
+
+                    if (saleList.isEmpty()) {
+                        showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
+                    }
+                });
+            } else {
+                // ✅ API فشل - البيانات المحلية محملة مسبقاً
+                mainHandler.post(() -> {
+                    if (!isAdded()) return;
+                    if (saleList.isEmpty()) {
+                        showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
+                    }
                 });
             }
-        });
-    }
-
+        } catch (Exception e) {
+            Log.e(TAG, "Exception loading sales", e);
+        }
+    });
+}
     private void filterSales(String query) {
         filteredList.clear();
         if (query == null || query.trim().isEmpty()) {
