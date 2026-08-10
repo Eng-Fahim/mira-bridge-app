@@ -1,5 +1,7 @@
 package com.example.uhf.fragment;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -8,7 +10,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -32,6 +33,7 @@ import java.util.concurrent.Executors;
 public class MiraDashboardFragment extends Fragment {
 
     private static final String TAG = "MiraDashboardFragment";
+    private static final String OFFLINE_PREFS = "dashboard_cache";
 
     private TextView tvGreeting, tvDate, tvLocation, tvLiveStatus;
     private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
@@ -47,6 +49,7 @@ public class MiraDashboardFragment extends Fragment {
     private MiraOrgProfileManager orgProfile;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isArabic;
+    private SharedPreferences offlineCache;
 
     @Nullable
     @Override
@@ -65,10 +68,15 @@ public class MiraDashboardFragment extends Fragment {
             branchesManager = MiraBranchesManager.getInstance(requireContext());
             orgProfile = MiraOrgProfileManager.getInstance(requireContext());
             isArabic = Locale.getDefault().getLanguage().equals("ar");
+            offlineCache = requireContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
 
             initViews(view);
             setupListeners();
             updateHeader();
+            
+            // ✅ تحميل البيانات المخزنة محلياً أولاً
+            loadOfflineData();
+            // ✅ ثم جلب من API
             fetchData();
 
         } catch (Throwable e) {
@@ -140,6 +148,57 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
+    // ==================== OFFLINE SUPPORT ====================
+
+    private void loadOfflineData() {
+        try {
+            int items = offlineCache.getInt("total_items", 0);
+            String weight = offlineCache.getString("total_weight", "0.0 g");
+            int sold = offlineCache.getInt("sold_today", 0);
+            String sToday = offlineCache.getString("sales_today", "—");
+            String sMonth = offlineCache.getString("sales_month", "—");
+            String sYear = offlineCache.getString("sales_year", "—");
+            int k24 = offlineCache.getInt("karat_24", 0);
+            int k21 = offlineCache.getInt("karat_21", 0);
+            int k18 = offlineCache.getInt("karat_18", 0);
+
+            setText(tvTotalItems, String.valueOf(items));
+            setText(tvTotalWeight, weight);
+            setText(tvSoldToday, String.valueOf(sold));
+            setText(tvSalesToday, sToday);
+            setText(tvSalesMonth, sMonth);
+            setText(tvSalesYear, sYear);
+            setKarat(tvKarat24, "24K", k24);
+            setKarat(tvKarat21, "21K", k21);
+            setKarat(tvKarat18, "18K", k18);
+        } catch (Exception e) {
+            // لا توجد بيانات مخزنة - طبيعي
+        }
+    }
+
+    private void saveOfflineData(JSONObject data) {
+        try {
+            JSONObject inv = data.optJSONObject("inventory");
+            JSONObject sales = data.optJSONObject("sales");
+            JSONObject w = inv != null ? inv.optJSONObject("weights") : null;
+
+            offlineCache.edit()
+                .putInt("total_items", inv != null ? inv.optInt("total_items", 0) : 0)
+                .putString("total_weight", String.format(Locale.US, "%.1f g", inv != null ? inv.optDouble("total_weight", 0.0) : 0))
+                .putInt("sold_today", sales != null ? sales.optInt("count_today", 0) : 0)
+                .putString("sales_today", sales != null ? cleanAmount(sales.optString("today", "0")) : "—")
+                .putString("sales_month", sales != null ? cleanAmount(sales.optString("month", "0")) : "—")
+                .putString("sales_year", sales != null ? cleanAmount(sales.optString("year", "0")) : "—")
+                .putInt("karat_24", w != null ? w.optInt("k24", 0) : 0)
+                .putInt("karat_21", w != null ? w.optInt("k21", 0) : 0)
+                .putInt("karat_18", w != null ? w.optInt("k18", 0) : 0)
+                .putLong("last_update", System.currentTimeMillis())
+                .apply();
+        } catch (Exception e) {
+            Log.e(TAG, "saveOfflineData error", e);
+        }
+    }
+
     private void fetchData() {
         try {
             if (tvLiveStatus != null) {
@@ -157,21 +216,20 @@ public class MiraDashboardFragment extends Fragment {
                         try {
                             showShimmer(false);
                             if (response != null && response.isSuccess && response.data != null) {
+                                // ✅ حفظ محلي + عرض
+                                saveOfflineData(response.data);
                                 processData(response.data);
-                            } else {
-                                showOffline();
                             }
+                            // ✅ حتى لو API فشل، البيانات المحلية محملة مسبقاً
                             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                         } catch (Throwable e) {
                             Log.e(TAG, "processData callback error", e);
-                            showOffline();
                         }
                     });
                 } catch (Throwable e) {
                     mainHandler.post(() -> {
                         Log.e(TAG, "Network request error", e);
                         showShimmer(false); 
-                        showOffline(); 
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false); 
                     });
                 }
