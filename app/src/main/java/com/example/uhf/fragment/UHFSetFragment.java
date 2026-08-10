@@ -340,7 +340,12 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
             int target = (spTarget != null) ? spTarget.getSelectedItemPosition() : 0;
             
             // ضبط جلسة القراءة (Session / Target)
-            mContext.mReader.setGen2(session, target, 0);
+            com.rscja.deviceapi.entity.Gen2Entity gen2Entity = new com.rscja.deviceapi.entity.Gen2Entity();
+gen2Entity.setQuerySession(session);
+gen2Entity.setQueryTarget(target);
+
+boolean result = mContext.mReader.setGen2(gen2Entity);
+
             Toast.makeText(mContext, "✅ تم تطبيق إعدادات RF البرتوكول", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             Toast.makeText(mContext, "❌ تعذر ضبط معلمات RF", Toast.LENGTH_SHORT).show();
