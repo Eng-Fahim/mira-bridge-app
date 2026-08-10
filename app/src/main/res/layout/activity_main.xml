@@ -119,13 +119,21 @@
 
     <!-- Bottom Navigation (5 buttons) -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
-        android:id="@+id/bottomQuickNav"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:background="?attr/colorSurface"
-        app:menu="@menu/bottom_nav_menu"
-        app:labelVisibilityMode="labeled"
-        app:itemIconTint="@color/bottom_nav_tint"
-        app:itemTextColor="@color/bottom_nav_tint" />
+    android:id="@+id/bottom_navigation"
+    android:layout_width="match_parent"
+    android:layout_height="72dp"
+    android:layout_gravity="bottom"
+    android:layout_marginStart="16dp"
+    android:layout_marginEnd="16dp"
+    android:layout_marginBottom="16dp"
+    android:background="@drawable/bg_bottom_nav"
+    android:elevation="12dp"
+    app:itemIconSize="22dp"
+    app:itemIconTint="@color/bottom_nav_colors"
+    app:itemTextColor="@color/bottom_nav_colors"
+    app:itemRippleColor="#20C5A059"
+    app:itemActiveIndicatorStyle="@style/CustomNavIndicator"
+    app:labelVisibilityMode="labeled"
+    app:menu="@menu/bottom_nav_menu" />
 
 </LinearLayout>
