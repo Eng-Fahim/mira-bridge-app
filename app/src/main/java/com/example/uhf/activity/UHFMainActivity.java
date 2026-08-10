@@ -183,7 +183,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void showRadialMenu() {
-    private void showRadialMenu() {
     try {
         com.google.android.material.bottomsheet.BottomSheetDialog bottomSheet = 
             new com.google.android.material.bottomsheet.BottomSheetDialog(this);
@@ -591,4 +590,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private String ar(String arabic, String english) { return isArabic ? arabic : english; }
-}
+            }
