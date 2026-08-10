@@ -572,13 +572,6 @@ private void syncPendingSales() {
     }).start();
 }
 
-    private void checkPendingSales() {
-        if (getContext() == null) return;
-        try {
-            JSONArray arr = new JSONArray(getContext().getSharedPreferences(PENDING_SALES_PREFS, Context.MODE_PRIVATE).getString("pending", "[]"));
-            if (arr.length() > 0) safeRun(() -> { if (tvCartStatus != null) { tvCartStatus.setText("⚠️ " + arr.length() + " " + (isArabic ? "معلقة" : "pending")); tvCartStatus.setTextColor(Color.parseColor("#F59E0B")); } });
-        } catch (Exception ignored) {}
-    }
 
     private void playAlertSound(int id) { if (getActivity() instanceof UHFMainActivity) ((UHFMainActivity) getActivity()).playSound(id); }
     private void showToast(String m) { if (getContext() != null && isAdded()) Toast.makeText(getContext(), m, Toast.LENGTH_SHORT).show(); }
