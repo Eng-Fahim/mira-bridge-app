@@ -251,80 +251,187 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
     // ==================== ⚙️ حفظ جميع الإعدادات ====================
 
     private void saveAllSettings() {
-        SharedPreferences.Editor editor = prefs.edit();
+    SharedPreferences.Editor editor = prefs.edit();
 
-        // اللغة
-        String lang = (rbLangAr != null && rbLangAr.isChecked()) ? "ar" : "en";
-        editor.putString("language", lang);
+    // 1. القراءة من الواجهة
+    String lang = (rbLangAr != null && rbLangAr.isChecked()) ? "ar" : "en";
+    int workingMode = spWorkingMode != null ? spWorkingMode.getSelectedItemPosition() : 0;
+    
+    boolean soundOnScan = isChecked(cbSoundOnScan);
+    boolean showMiraCard = isChecked(cbShowMiraCard);
+    boolean radarSim = isChecked(cbRadarSimulation);
+    boolean autoQueryMira = isChecked(cbAutoQueryMira);
 
-        // نمط العمل
-        if (spWorkingMode != null) editor.putInt("working_mode", spWorkingMode.getSelectedItemPosition());
+    String scanMode = getScanMode();
+    boolean autoScan = isChecked(cbAutoScan);
+    boolean autoOpenCamera = isChecked(cbAutoOpenCamera);
+    boolean showScanFrame = isChecked(cbShowScanFrame);
+    boolean parseGS1 = isChecked(cbParseGS1);
+    boolean vibrateOnScan = isChecked(cbVibrateOnScan);
 
-        // إعدادات التطبيق
-        editor.putBoolean("sound_on_scan", isChecked(cbSoundOnScan));
-        editor.putBoolean("show_mira_card", isChecked(cbShowMiraCard));
-        editor.putBoolean("radar_simulation", isChecked(cbRadarSimulation));
-        editor.putBoolean("auto_query_mira", isChecked(cbAutoQueryMira));
+    String inventoryMode = spInventoryMode != null ? String.valueOf(spInventoryMode.getSelectedItemPosition()) : "0";
+    boolean inventorySound = isChecked(cbInventorySound);
+    boolean inventoryVibrate = isChecked(cbInventoryVibrate);
+    boolean inventoryAutoStop = isChecked(cbInventoryAutoStop);
+    boolean inventoryShowImages = isChecked(cbInventoryShowImages);
+    boolean inventorySortLocation = isChecked(cbInventorySortByLocation);
 
-        // المسح
-        editor.putString("scan_mode", getScanMode());
-        editor.putBoolean("auto_scan", isChecked(cbAutoScan));
-        editor.putBoolean("auto_open_camera", isChecked(cbAutoOpenCamera));
-        editor.putBoolean("show_scan_frame", isChecked(cbShowScanFrame));
-        editor.putBoolean("parse_gs1", isChecked(cbParseGS1));
-        editor.putBoolean("vibrate_on_scan", isChecked(cbVibrateOnScan));
+    // 2. الحفظ المحلي (SharedPreferences)
+    editor.putString("language", lang);
+    editor.putInt("working_mode", workingMode);
+    editor.putBoolean("sound_on_scan", soundOnScan);
+    editor.putBoolean("show_mira_card", showMiraCard);
+    editor.putBoolean("radar_simulation", radarSim);
+    editor.putBoolean("auto_query_mira", autoQueryMira);
 
-        // الجرد
-        editor.putString("inventory_mode", spInventoryMode != null ? String.valueOf(spInventoryMode.getSelectedItemPosition()) : "0");
-        editor.putBoolean("inventory_sound", isChecked(cbInventorySound));
-        editor.putBoolean("inventory_vibrate", isChecked(cbInventoryVibrate));
-        editor.putBoolean("inventory_auto_stop", isChecked(cbInventoryAutoStop));
-        editor.putBoolean("inventory_show_images", isChecked(cbInventoryShowImages));
-        editor.putBoolean("inventory_sort_location", isChecked(cbInventorySortByLocation));
+    editor.putString("scan_mode", scanMode);
+    editor.putBoolean("auto_scan", autoScan);
+    editor.putBoolean("auto_open_camera", autoOpenCamera);
+    editor.putBoolean("show_scan_frame", showScanFrame);
+    editor.putBoolean("parse_gs1", parseGS1);
+    editor.putBoolean("vibrate_on_scan", vibrateOnScan);
 
-        editor.apply();
+    editor.putString("inventory_mode", inventoryMode);
+    editor.putBoolean("inventory_sound", inventorySound);
+    editor.putBoolean("inventory_vibrate", inventoryVibrate);
+    editor.putBoolean("inventory_auto_stop", inventoryAutoStop);
+    editor.putBoolean("inventory_show_images", inventoryShowImages);
+    editor.putBoolean("inventory_sort_location", inventorySortLocation);
 
-        // تطبيق اللغة فوراً
-        applyLanguageNow(lang);
+    editor.apply();
 
-        Toast.makeText(mContext, "✅ تم حفظ جميع الإعدادات وتطبيقها فوراً", Toast.LENGTH_SHORT).show();
-    }
+    // 3. 🟢 إرسال البيانات وإصدار أمر الحفظ للسيرفر
+    new Thread(() -> {
+        try {
+            org.json.JSONObject payload = new org.json.JSONObject();
+            payload.put("language", lang);
+            payload.put("working_mode", workingMode);
+            payload.put("sound_on_scan", soundOnScan);
+            payload.put("show_mira_card", showMiraCard);
+            payload.put("radar_simulation", radarSim);
+            payload.put("auto_query_mira", autoQueryMira);
+            
+            payload.put("scan_mode", scanMode);
+            payload.put("auto_scan", autoScan);
+            payload.put("auto_open_camera", autoOpenCamera);
+            payload.put("show_scan_frame", showScanFrame);
+            payload.put("parse_gs1", parseGS1);
+            payload.put("vibrate_on_scan", vibrateOnScan);
+
+            payload.put("inventory_mode", inventoryMode);
+            payload.put("inventory_sound", inventorySound);
+            payload.put("inventory_vibrate", inventoryVibrate);
+            payload.put("inventory_auto_stop", inventoryAutoStop);
+            payload.put("inventory_show_images", inventoryShowImages);
+            payload.put("inventory_sort_location", inventorySortLocation);
+
+            com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
+            com.example.uhf.api.MiraApiClient.ApiResponse response = client.saveSettings(payload);
+
+            if (mContext != null) {
+                mContext.runOnUiThread(() -> {
+                    if (response.isSuccess) {
+                        Toast.makeText(mContext, "✅ تم الحفظ محلياً وعلى السيرفر بنجاح!", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(mContext, "⚠️ تم الحفظ محلياً وفشل الحفظ السحابي", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }).start();
+
+    // تطبيق اللغة فوراً
+    applyLanguageNow(lang);
+}
+
 
     // ==================== 📥 تحميل الإعدادات ====================
 
     private void loadAllSettings() {
-        // لغة
-        String lang = prefs.getString("language", "ar");
-        if (rbLangAr != null && rbLangEn != null) {
-            if (lang.equals("ar")) rbLangAr.setChecked(true);
-            else rbLangEn.setChecked(true);
+    // أ) التحميل السريع المبدئي من SharedPreferences لعدم تأخير الواجهة
+    loadSettingsFromLocal();
+
+    // ب) 🟢 الجلب المباشر من السيرفر لتحديث القيم بأحدث بيانات من قاعدة البيانات
+    new Thread(() -> {
+        com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
+        com.example.uhf.api.MiraApiClient.ApiResponse response = client.getSettings();
+
+        if (response.isSuccess && response.data != null) {
+            org.json.JSONObject serverSettings = response.data.optJSONObject("settings");
+            if (serverSettings != null && mContext != null) {
+                mContext.runOnUiThread(() -> {
+                    applySettingsToUI(serverSettings);
+                });
+            }
         }
+    }).start();
 
-        // نمط العمل
-        if (spWorkingMode != null) spWorkingMode.setSelection(prefs.getInt("working_mode", 0));
+    loadOrgProfile();
+}
 
-        // تطبيق
-        if (cbSoundOnScan != null) cbSoundOnScan.setChecked(prefs.getBoolean("sound_on_scan", true));
-        if (cbShowMiraCard != null) cbShowMiraCard.setChecked(prefs.getBoolean("show_mira_card", true));
-        if (cbRadarSimulation != null) cbRadarSimulation.setChecked(prefs.getBoolean("radar_simulation", true));
-        if (cbAutoQueryMira != null) cbAutoQueryMira.setChecked(prefs.getBoolean("auto_query_mira", true));
+// دالة مساعدة لتطبيق البيانات القادمة من السيرفر على الواجهة
+private void applySettingsToUI(org.json.JSONObject s) {
+    try {
+        if (s.has("sound_on_scan") && cbSoundOnScan != null) cbSoundOnScan.setChecked(s.optBoolean("sound_on_scan"));
+        if (s.has("show_mira_card") && cbShowMiraCard != null) cbShowMiraCard.setChecked(s.optBoolean("show_mira_card"));
+        if (s.has("radar_simulation") && cbRadarSimulation != null) cbRadarSimulation.setChecked(s.optBoolean("radar_simulation"));
+        if (s.has("auto_query_mira") && cbAutoQueryMira != null) cbAutoQueryMira.setChecked(s.optBoolean("auto_query_mira"));
 
-        setScanMode(prefs.getString("scan_mode", "rfid"));
-        if (cbAutoScan != null) cbAutoScan.setChecked(prefs.getBoolean("auto_scan", false));
-        if (cbAutoOpenCamera != null) cbAutoOpenCamera.setChecked(prefs.getBoolean("auto_open_camera", true));
-        if (cbShowScanFrame != null) cbShowScanFrame.setChecked(prefs.getBoolean("show_scan_frame", true));
-        if (cbParseGS1 != null) cbParseGS1.setChecked(prefs.getBoolean("parse_gs1", true));
-        if (cbVibrateOnScan != null) cbVibrateOnScan.setChecked(prefs.getBoolean("vibrate_on_scan", true));
+        if (s.has("scan_mode")) setScanMode(s.optString("scan_mode"));
+        if (s.has("auto_scan") && cbAutoScan != null) cbAutoScan.setChecked(s.optBoolean("auto_scan"));
+        if (s.has("auto_open_camera") && cbAutoOpenCamera != null) cbAutoOpenCamera.setChecked(s.optBoolean("auto_open_camera"));
+        if (s.has("show_scan_frame") && cbShowScanFrame != null) cbShowScanFrame.setChecked(s.optBoolean("show_scan_frame"));
+        if (s.has("parse_gs1") && cbParseGS1 != null) cbParseGS1.setChecked(s.optBoolean("parse_gs1"));
+        if (s.has("vibrate_on_scan") && cbVibrateOnScan != null) cbVibrateOnScan.setChecked(s.optBoolean("vibrate_on_scan"));
 
-        if (spInventoryMode != null) spInventoryMode.setSelection(Integer.parseInt(prefs.getString("inventory_mode", "0")));
-        if (cbInventorySound != null) cbInventorySound.setChecked(prefs.getBoolean("inventory_sound", true));
-        if (cbInventoryVibrate != null) cbInventoryVibrate.setChecked(prefs.getBoolean("inventory_vibrate", true));
-        if (cbInventoryAutoStop != null) cbInventoryAutoStop.setChecked(prefs.getBoolean("inventory_auto_stop", false));
-        if (cbInventoryShowImages != null) cbInventoryShowImages.setChecked(prefs.getBoolean("inventory_show_images", false));
-        if (cbInventorySortByLocation != null) cbInventorySortByLocation.setChecked(prefs.getBoolean("inventory_sort_location", true));
+        if (s.has("inventory_mode") && spInventoryMode != null) {
+            try {
+                spInventoryMode.setSelection(Integer.parseInt(s.optString("inventory_mode", "0")));
+            } catch (Exception ignored) {}
+        }
+        if (s.has("inventory_sound") && cbInventorySound != null) cbInventorySound.setChecked(s.optBoolean("inventory_sound"));
+        if (s.has("inventory_vibrate") && cbInventoryVibrate != null) cbInventoryVibrate.setChecked(s.optBoolean("inventory_vibrate"));
+        if (s.has("inventory_auto_stop") && cbInventoryAutoStop != null) cbInventoryAutoStop.setChecked(s.optBoolean("inventory_auto_stop"));
+        if (s.has("inventory_show_images") && cbInventoryShowImages != null) cbInventoryShowImages.setChecked(s.optBoolean("inventory_show_images"));
+        if (s.has("inventory_sort_location") && cbInventorySortByLocation != null) cbInventorySortByLocation.setChecked(s.optBoolean("inventory_sort_location"));
 
-        loadOrgProfile();
+    } catch (Exception e) {
+        e.printStackTrace();
     }
+}
+
+// دالة التحميل المحلي السريع
+private void loadSettingsFromLocal() {
+    String lang = prefs.getString("language", "ar");
+    if (rbLangAr != null && rbLangEn != null) {
+        if (lang.equals("ar")) rbLangAr.setChecked(true);
+        else rbLangEn.setChecked(true);
+    }
+
+    if (spWorkingMode != null) spWorkingMode.setSelection(prefs.getInt("working_mode", 0));
+
+    if (cbSoundOnScan != null) cbSoundOnScan.setChecked(prefs.getBoolean("sound_on_scan", true));
+    if (cbShowMiraCard != null) cbShowMiraCard.setChecked(prefs.getBoolean("show_mira_card", true));
+    if (cbRadarSimulation != null) cbRadarSimulation.setChecked(prefs.getBoolean("radar_simulation", true));
+    if (cbAutoQueryMira != null) cbAutoQueryMira.setChecked(prefs.getBoolean("auto_query_mira", true));
+
+    setScanMode(prefs.getString("scan_mode", "rfid"));
+    if (cbAutoScan != null) cbAutoScan.setChecked(prefs.getBoolean("auto_scan", false));
+    if (cbAutoOpenCamera != null) cbAutoOpenCamera.setChecked(prefs.getBoolean("auto_open_camera", true));
+    if (cbShowScanFrame != null) cbShowScanFrame.setChecked(prefs.getBoolean("show_scan_frame", true));
+    if (cbParseGS1 != null) cbParseGS1.setChecked(prefs.getBoolean("parse_gs1", true));
+    if (cbVibrateOnScan != null) cbVibrateOnScan.setChecked(prefs.getBoolean("vibrate_on_scan", true));
+
+    if (spInventoryMode != null) spInventoryMode.setSelection(Integer.parseInt(prefs.getString("inventory_mode", "0")));
+    if (cbInventorySound != null) cbInventorySound.setChecked(prefs.getBoolean("inventory_sound", true));
+    if (cbInventoryVibrate != null) cbInventoryVibrate.setChecked(prefs.getBoolean("inventory_vibrate", true));
+    if (cbInventoryAutoStop != null) cbInventoryAutoStop.setChecked(prefs.getBoolean("inventory_auto_stop", false));
+    if (cbInventoryShowImages != null) cbInventoryShowImages.setChecked(prefs.getBoolean("inventory_show_images", false));
+    if (cbInventorySortByLocation != null) cbInventorySortByLocation.setChecked(prefs.getBoolean("inventory_sort_location", true));
+}
+
 
     private void loadOrgProfile() {
         SharedPreferences orgPrefs = mContext.getSharedPreferences(ORG_PREFS, Context.MODE_PRIVATE);
@@ -402,4 +509,4 @@ public class UHFSetFragment extends KeyDwonFragment implements View.OnClickListe
             tv.postDelayed(() -> tv.setText(""), 3000);
         }
     }
-                }
+}
