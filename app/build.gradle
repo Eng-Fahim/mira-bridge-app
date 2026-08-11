@@ -14,6 +14,28 @@ android {
         versionName "1.4.6"
         buildConfigField "boolean", "Test", "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        // 🎯 1. حصر النواتج لمعماريات معالجات أجهزة ARM الفعلية فقط (إزالة x86/x86_64 للمحاكيات)
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a'
+        }
+    }
+
+    // 🎯 2. منع حزم ملفات الـ Native غير المستخدمة وتقليل تكرار الـ DLLs/SO
+    packagingOptions {
+        resources {
+            excludes += [
+                'META-INF/DEPENDENCIES',
+                'META-INF/LICENSE',
+                'META-INF/LICENSE.txt',
+                'META-INF/license.txt',
+                'META-INF/NOTICE',
+                'META-INF/NOTICE.txt',
+                'META-INF/notice.txt',
+                'META-INF/ASL2.0',
+                'META-INF/*.kotlin_module'
+            ]
+        }
     }
 
     signingConfigs {
@@ -34,14 +56,17 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.release
-            minifyEnabled false
-            shrinkResources false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+
+            minifyEnabled true
+            shrinkResources true
+
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                    'proguard-rules.pro'
         }
+
         debug {
             signingConfig signingConfigs.debug
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
 
@@ -62,16 +87,21 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.biometric:biometric:1.2.0-alpha05'
-    implementation fileTree(dir: 'libs', include: ['*.*'])
+    implementation files('libs/DeviceAPI_ver20251103_release.aar')
     implementation files('libs/jxl.jar')
+    implementation files('libs/poi-3.12-android-a.jar')
+    implementation files('libs/poi-ooxml-schemas-3.12-20150511-a.jar')
+    implementation files('libs/xUtils-2.5.5.jar')
+    
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
+    
     implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
     implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
     implementation 'com.google.mlkit:barcode-scanning:17.2.0'
@@ -79,9 +109,9 @@ dependencies {
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
     implementation 'com.google.code.gson:gson:2.10.1'
+    
     def camerax_version = "1.3.0"
     implementation "androidx.camera:camera-core:${camerax_version}"
-    
     implementation "androidx.camera:camera-camera2:${camerax_version}"
     implementation "androidx.camera:camera-lifecycle:${camerax_version}"
     implementation "androidx.camera:camera-view:${camerax_version}"
