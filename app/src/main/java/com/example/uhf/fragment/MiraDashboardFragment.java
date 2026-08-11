@@ -50,6 +50,7 @@ public class MiraDashboardFragment extends Fragment {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isArabic;
     private SharedPreferences offlineCache;
+    private final StringBuilder debugLog = new StringBuilder();
 
     @Nullable
     @Override
@@ -73,10 +74,8 @@ public class MiraDashboardFragment extends Fragment {
             initViews(view);
             setupListeners();
             updateHeader();
-            
-            // ✅ تحميل البيانات المخزنة محلياً أولاً
+
             loadOfflineData();
-            // ✅ ثم جلب من API
             fetchData();
 
         } catch (Throwable e) {
@@ -105,13 +104,22 @@ public class MiraDashboardFragment extends Fragment {
 
             btnGate = v.findViewById(R.id.btnGateSecurity);
             btnInventory = v.findViewById(R.id.btnRfidAudit);
-            
+
             shimmerLayout = v.findViewById(R.id.shimmerLayout);
             swipeRefresh = v.findViewById(R.id.swipeRefresh);
 
             if (swipeRefresh != null) {
                 swipeRefresh.setOnRefreshListener(this::fetchData);
             }
+
+            if (tvGreeting != null) {
+                tvGreeting.setOnLongClickListener(view -> {
+                    showDebugDialog("🔍 تشخيص الداشبورد");
+                    return true;
+                });
+                addDebug("✅ تم تجهيز زر التشخيص - اضغط مطولاً على رسالة الترحيب");
+            }
+
         } catch (Throwable e) {
             Log.e(TAG, "initViews error", e);
         }
@@ -148,8 +156,6 @@ public class MiraDashboardFragment extends Fragment {
         }
     }
 
-    // ==================== OFFLINE SUPPORT ====================
-
     private void loadOfflineData() {
         try {
             int items = offlineCache.getInt("total_items", 0);
@@ -171,9 +177,7 @@ public class MiraDashboardFragment extends Fragment {
             setKarat(tvKarat24, "24K", k24);
             setKarat(tvKarat21, "21K", k21);
             setKarat(tvKarat18, "18K", k18);
-        } catch (Exception e) {
-            // لا توجد بيانات مخزنة - طبيعي
-        }
+        } catch (Exception ignored) {}
     }
 
     private void saveOfflineData(JSONObject data) {
@@ -201,40 +205,98 @@ public class MiraDashboardFragment extends Fragment {
 
     private void fetchData() {
         try {
+            addDebug("🔄 بدء جلب البيانات...");
+
             if (tvLiveStatus != null) {
                 tvLiveStatus.setText("جاري التحديث...");
                 tvLiveStatus.setTextColor(0xFFF59E0B);
             }
-            
+
             final int activeBranchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : -1;
+            addDebug("📋 معرف الفرع النشط: " + activeBranchId);
+            addDebug("📋 branchesManager موجود: " + (branchesManager != null));
 
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
+                    addDebug("📡 إرسال طلب API...");
                     MiraApiClient.ApiResponse response = apiClient.getDashboardFull(activeBranchId);
-                    
+
                     mainHandler.post(() -> {
+                        if (!isAdded()) return;
                         try {
                             showShimmer(false);
+
+                            if (response == null) {
+                                addDebug("❌ الاستجابة فارغة (null)!");
+                            } else {
+                                addDebug("✅ Code: " + response.code);
+                                addDebug("✅ Success: " + response.isSuccess);
+                                addDebug("✅ Data exists: " + (response.data != null));
+
+                                if (response.data != null) {
+                                    String dataPreview = response.data.toString();
+                                    addDebug("📊 البيانات المستلمة:\n" +
+                                        (dataPreview.length() > 300 ?
+                                        dataPreview.substring(0, 300) + "..." :
+                                        dataPreview));
+
+                                    JSONObject inv = response.data.optJSONObject("inventory");
+                                    JSONObject sales = response.data.optJSONObject("sales");
+
+                                    addDebug("📦 inventory: " + (inv != null ? "✅ موجود" : "❌ مفقود"));
+                                    addDebug("💰 sales: " + (sales != null ? "✅ موجود" : "❌ مفقود"));
+
+                                    if (inv != null) {
+                                        addDebug("  ├ total_items: " + inv.optInt("total_items", -999));
+                                        addDebug("  ├ total_weight: " + inv.optDouble("total_weight", -999));
+                                    }
+                                    if (sales != null) {
+                                        addDebug("  ├ count_today: " + sales.optInt("count_today", -999));
+                                        addDebug("  ├ today: " + sales.optString("today", "N/A"));
+                                        addDebug("  ├ month: " + sales.optString("month", "N/A"));
+                                        addDebug("  └ year: " + sales.optString("year", "N/A"));
+                                    }
+                                } else if (response.error != null) {
+                                    addDebug("❌ خطأ: " + response.error);
+                                }
+                            }
+
                             if (response != null && response.isSuccess && response.data != null) {
-                                // ✅ حفظ محلي + عرض
                                 saveOfflineData(response.data);
                                 processData(response.data);
+                                addDebug("✅ تم تحديث الواجهة");
+                            } else {
+                                addDebug("⚠️ لم يتم تحديث الواجهة - البيانات غير صالحة");
                             }
-                            // ✅ حتى لو API فشل، البيانات المحلية محملة مسبقاً
+
                             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+
+                            if (response == null || !response.isSuccess || response.data == null) {
+                                mainHandler.postDelayed(() -> {
+                                    if (isAdded()) showDebugDialog("⚠️ تشخيص المشكلة");
+                                }, 1500);
+                            }
+
                         } catch (Throwable e) {
+                            addDebug("❌ استثناء: " + e.getMessage());
                             Log.e(TAG, "processData callback error", e);
                         }
                     });
                 } catch (Throwable e) {
+                    addDebug("❌ خطأ شبكة: " + e.getMessage());
                     mainHandler.post(() -> {
+                        if (!isAdded()) return;
                         Log.e(TAG, "Network request error", e);
-                        showShimmer(false); 
-                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false); 
+                        showShimmer(false);
+                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                        mainHandler.postDelayed(() -> {
+                            if (isAdded()) showDebugDialog("❌ خطأ في الشبكة");
+                        }, 1000);
                     });
                 }
             });
         } catch (Throwable e) {
+            addDebug("❌ خطأ fetchData: " + e.getMessage());
             Log.e(TAG, "fetchData error", e);
             showShimmer(false);
             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
@@ -248,10 +310,10 @@ public class MiraDashboardFragment extends Fragment {
                 setText(tvTotalItems, String.valueOf(inv.optInt("total_items", 0)));
                 setText(tvTotalWeight, String.format(Locale.US, "%.1f g", inv.optDouble("total_weight", 0.0)));
                 JSONObject w = inv.optJSONObject("weights");
-                if (w != null) { 
-                    setKarat(tvKarat24, "24K", w.optInt("k24", 0)); 
-                    setKarat(tvKarat21, "21K", w.optInt("k21", 0)); 
-                    setKarat(tvKarat18, "18K", w.optInt("k18", 0)); 
+                if (w != null) {
+                    setKarat(tvKarat24, "24K", w.optInt("k24", 0));
+                    setKarat(tvKarat21, "21K", w.optInt("k21", 0));
+                    setKarat(tvKarat18, "18K", w.optInt("k18", 0));
                 }
             }
             JSONObject sales = data.optJSONObject("sales");
@@ -261,12 +323,12 @@ public class MiraDashboardFragment extends Fragment {
                 setText(tvSalesMonth, cleanAmount(sales.optString("month", "0")));
                 setText(tvSalesYear, cleanAmount(sales.optString("year", "0")));
             }
-            if (tvLiveStatus != null) { 
-                tvLiveStatus.setText("متصل"); 
-                tvLiveStatus.setTextColor(0xFF16A34A); 
+            if (tvLiveStatus != null) {
+                tvLiveStatus.setText("متصل");
+                tvLiveStatus.setTextColor(0xFF16A34A);
             }
-        } catch (Throwable e) { 
-            Log.e(TAG, "processData JSON error", e); 
+        } catch (Throwable e) {
+            Log.e(TAG, "processData JSON error", e);
         }
     }
 
@@ -277,22 +339,16 @@ public class MiraDashboardFragment extends Fragment {
 
     private String cleanAmount(String amount) {
         if (amount == null || amount.isEmpty() || amount.equals("$0") || amount.equals("0")) return "—";
-        try { 
-            double val = Double.parseDouble(amount.replace("$", "").replace(",", "").trim()); 
-            return val == 0 ? "—" : String.format(Locale.US, "%,.0f YER", val); 
-        } catch (Exception e) { 
-            return amount; 
+        try {
+            double val = Double.parseDouble(amount.replace("$", "").replace(",", "").trim());
+            return val == 0 ? "—" : String.format(Locale.US, "%,.0f YER", val);
+        } catch (Exception e) {
+            return amount;
         }
     }
 
-    private void setText(TextView tv, String text) { if (tv != null) tv.setText(text); }
-
-    private void showOffline() {
-        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-        if (tvLiveStatus != null) { 
-            tvLiveStatus.setText("غير متصل"); 
-            tvLiveStatus.setTextColor(0xFFDC2626); 
-        }
+    private void setText(TextView tv, String text) {
+        if (tv != null) tv.setText(text);
     }
 
     private void switchTab(String tag) {
@@ -303,6 +359,42 @@ public class MiraDashboardFragment extends Fragment {
             }
         } catch (Exception e) {
             Log.e(TAG, "switchTab error", e);
+        }
+    }
+
+    private void addDebug(String message) {
+        Log.e("DASHBOARD_DEBUG", message);
+        debugLog.append(message).append("\n");
+    }
+
+    private void showDebugDialog(String title) {
+        if (!isAdded()) return;
+        try {
+            String message = debugLog.toString();
+            if (message.isEmpty()) {
+                message = "لا توجد بيانات تشخيص بعد";
+            }
+
+            new android.app.AlertDialog.Builder(requireContext())
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("مسح", (dialog, which) -> debugLog.setLength(0))
+                .setNegativeButton("نسخ", (dialog, which) -> {
+                    if (getContext() != null) {
+                        android.content.ClipboardManager clipboard =
+                            (android.content.ClipboardManager) requireContext()
+                            .getSystemService(Context.CLIPBOARD_SERVICE);
+                        android.content.ClipData clip =
+                            android.content.ClipData.newPlainText("debug", message);
+                        clipboard.setPrimaryClip(clip);
+                        android.widget.Toast.makeText(requireContext(),
+                            "تم النسخ", android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNeutralButton("إغلاق", null)
+                .show();
+        } catch (Exception e) {
+            Log.e(TAG, "Error showing debug", e);
         }
     }
 
