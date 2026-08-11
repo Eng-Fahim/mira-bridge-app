@@ -929,6 +929,34 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         toast = Toast.makeText(this, text, Toast.LENGTH_SHORT);
         toast.show();
     }
+    
+        public void startUHFScan() {
+        try {
+            if (mReader != null && !loopFlag) {
+                boolean result = mReader.startInventoryTag();
+                if (result) {
+                    loopFlag = true;
+                } else {
+                    ToastUtil.showShort(this, isArabic ? "فشل بدء تشغيل قارئ الـ RFID" : "Failed to start RFID Reader");
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error starting UHF scan: " + e.getMessage());
+        }
+    }
+
+    public void stopUHFScan() {
+        try {
+            if (mReader != null && loopFlag) {
+                mReader.stopInventory();
+                loopFlag = false;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error stopping UHF scan: " + e.getMessage());
+        }
+    }
+
+
 
     public void showToast(int resId) {
         showToast(getString(resId));
