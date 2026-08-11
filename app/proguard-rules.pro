@@ -30,3 +30,5 @@
 -keep class org.**{*;}
 -keep class schemaorg_apache_xmlbeans.system.**{*;}
 -keep interface org.**{*;}
+-keep class androidx.biometric.** { *; }
+-dontwarn androidx.biometric.**
