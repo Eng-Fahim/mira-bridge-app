@@ -23,6 +23,7 @@ import android.widget.LinearLayout;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.view.ViewParent;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDelegate;
@@ -217,10 +218,11 @@ private void updateTopTabsContainerVisibility() {
     }
     
     // إخفاء الـ HorizontalScrollView بالكامل إذا لا توجد تبويبات
-    View parent = container.getParent();
-    if (parent != null) {
-        parent.setVisibility(anyVisible ? View.VISIBLE : View.GONE);
-    }
+    // إخفاء الـ HorizontalScrollView بالكامل إذا لا توجد تبويبات
+ViewParent vp = container.getParent();
+if (vp instanceof View) {
+    ((View) vp).setVisibility(anyVisible ? View.VISIBLE : View.GONE);
+}
 }
 private void setTopTabVisibility(int tabId, boolean visible) {
     View tab = findViewById(tabId);
@@ -839,4 +841,4 @@ if (isAnyAdmin || isBranchManager) {
     }
 
     private String ar(String arabic, String english) { return isArabic ? arabic : english; }
-    }
+                                         }
