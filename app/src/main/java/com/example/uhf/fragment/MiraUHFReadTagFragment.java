@@ -229,7 +229,7 @@ public class MiraUHFReadTagFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_mira_uhf_read_tag, container, false); 
+        return inflater.inflate(R.layout.fragment_mira_uhf_readtag, container, false);
     }
 
     @Override
@@ -1712,7 +1712,36 @@ public class MiraUHFReadTagFragment extends Fragment {
                     break;
             }
         }
+        
+        public boolean onBackPressed() {
+    if (currentState == InventoryState.SCANNING || currentState == InventoryState.PAUSED) {
+        showExitWarningDialog();
+        return true;
+    }
+    return false;
+}
 
+private void showExitWarningDialog() {
+    new AlertDialog.Builder(requireContext())
+            .setTitle("⚠️ تحذير")
+            .setMessage("جلسة الجرد نشطة حالياً. هل تريد إيقاف الجرد والخروج؟")
+            .setPositiveButton("⏹ إيقاف وخروج", (d, w) -> {
+                stopScanning();
+                if (getActivity() != null) {
+                    getActivity().onBackPressed();
+                }
+            })
+            .setNegativeButton("متابعة الجرد", null)
+            .setCancelable(false)
+            .show();
+}
+public void onKeyDownTrigger() {
+    if (currentState == InventoryState.SCANNING) {
+        stopScanning();
+    } else if (currentState == InventoryState.IDLE || currentState == InventoryState.COMPLETED) {
+        startScanning();
+    }
+}
         @Override
         public int getItemCount() {
             return list.size();
