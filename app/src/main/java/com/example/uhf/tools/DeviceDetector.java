@@ -12,7 +12,7 @@ public class DeviceDetector {
 
     private static final String TAG = "MIRA.DeviceDetector";
     
-    // ==================== حالة والجهاز ====================
+    // ==================== حالة الجهاز ====================
     
     public enum DeviceModel { C5, C72, UNKNOWN }
     
@@ -38,7 +38,9 @@ public class DeviceDetector {
         public DeviceModel model = DeviceModel.UNKNOWN;
         public String modelName = "UNKNOWN";
         public boolean isConfigured = false;
+        public boolean ready = false;         // ✅ مطلوب لـ TestActivity
         public int defaultPower = 30;
+        public int appliedPower = 30;         // ✅ مطلوب لـ TestActivity
 
         public DeviceProfile(DeviceModel model, String modelName) {
             this.model = model;
@@ -92,6 +94,21 @@ public class DeviceDetector {
         }
     }
 
+    // ✅ دالة مفقودة استدعاها الكود
+    public static String getDeviceInfo() {
+        return "Model: " + getDeviceModelName() + " | Status: " + profileStatus.name() + " | OS: Android " + Build.VERSION.RELEASE;
+    }
+
+    // ✅ دالة إعادة الضبط المفقودة
+    public static void reset() {
+        cachedModel = null;
+        profileStatus = ProfileStatus.UNKNOWN;
+        activeProfile = null;
+        lastError = null;
+        detectionTime = 0;
+        Log.d(TAG, "DeviceDetector reset complete.");
+    }
+
     // ==================== Configuration Method ====================
 
     public static DeviceProfile configure(RFIDWithUHFUART rfidReader) {
@@ -103,12 +120,15 @@ public class DeviceDetector {
                 // ضبط الإعدادات الافتراضية للـ UHF Reader
                 rfidReader.setPower(30);
                 activeProfile.isConfigured = true;
+                activeProfile.ready = true;
+                activeProfile.appliedPower = 30;
                 profileStatus = ProfileStatus.READY;
                 Log.d(TAG, "Successfully configured RFID Reader for: " + activeProfile.modelName);
             }
         } catch (Exception e) {
             lastError = e.getMessage();
             profileStatus = ProfileStatus.FAILED;
+            activeProfile.ready = false;
             Log.e(TAG, "Failed to configure device: " + e.getMessage(), e);
         }
 
