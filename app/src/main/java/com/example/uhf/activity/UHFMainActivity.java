@@ -241,60 +241,95 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ==================== BOTTOM NAVIGATION & QUICK ACTIONS ====================
 
     private void setupQuickNav() {
-        try {
-            BottomNavigationView quickNav = findViewById(R.id.bottomQuickNav);
-            if (quickNav == null) return;
+    try {
+        BottomNavigationView quickNav = findViewById(R.id.bottomQuickNav);
+        if (quickNav == null) return;
 
-            quickNav.setOnItemSelectedListener(item -> {
-                int id = item.getItemId();
-                if (id == R.id.nav_quick_dashboard) switchToTabSafely("Dashboard");
-                else if (id == R.id.nav_quick_menu) showRadialMenu();
-                else if (id == R.id.nav_quick_inventory) switchToTabSafely("Scan");
-                else if (id == R.id.nav_quick_pos) switchToTabSafely("POS Mode");
+        quickNav.setOnItemSelectedListener(item -> {
+            int id = item.getItemId();
+            if (id == R.id.nav_quick_dashboard) {
+                switchToTabSafely("Dashboard");
                 return true;
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
-        }
+            } else if (id == R.id.nav_quick_menu) {
+                showRadialMenu(); // إظهار قائمة الإجراءات المنسدلة
+                return true;
+            } else if (id == R.id.nav_quick_inventory) {
+                switchToTabSafely("Scan");
+                return true;
+            } else if (id == R.id.nav_quick_pos) {
+                switchToTabSafely("POS Mode");
+                return true;
+            }
+            return false;
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
     }
+}
+
 
     private void showRadialMenu() {
-        try {
-            SessionManager.Role role = sessionManager.getUserRole();
-            String roleStr = sessionManager.getRoleString();
-            boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
-            boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
-            boolean isAdmin = (role == SessionManager.Role.ADMIN) || "ADMIN".equals(roleStr);
-            boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
-            boolean isAnyAdmin = isSystemAdmin || isOrgAdmin || isAdmin;
-            boolean isManager = isAnyAdmin || isBranchManager;
-            boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
-            boolean isPosOperator = (role == SessionManager.Role.POS_OPERATOR);
-            boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
+    try {
+        if (sessionManager == null) return;
 
-            BottomSheetDialog bottomSheet = new BottomSheetDialog(this);
-            View view = getLayoutInflater().inflate(R.layout.dialog_quick_menu, null);
-            bottomSheet.setContentView(view);
+        SessionManager.Role role = sessionManager.getUserRole();
+        String roleStr = sessionManager.getRoleString();
+        boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
+        boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
+        boolean isAdmin = (role == SessionManager.Role.ADMIN) || "ADMIN".equals(roleStr);
+        boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
+        boolean isAnyAdmin = isSystemAdmin || isOrgAdmin || isAdmin;
+        boolean isManager = isAnyAdmin || isBranchManager;
+        boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
+        boolean isPosOperator = (role == SessionManager.Role.POS_OPERATOR);
+        boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
 
-            setMenuVisibility(view, R.id.btnMenuRadar, isManager || isInventoryMgr || isPosOperator || isGateSecurity);
-            setMenuVisibility(view, R.id.btnMenuGate, isManager || isGateSecurity || isPosOperator);
-            setMenuVisibility(view, R.id.btnMenuAccounting, isManager);
-            setMenuVisibility(view, R.id.btnMenuReports, isManager);
-            setMenuVisibility(view, R.id.btnMenuSales, isManager || isPosOperator);
-            setMenuVisibility(view, R.id.btnMenuInventory, isManager || isInventoryMgr);
+        BottomSheetDialog bottomSheet = new BottomSheetDialog(this);
+        View view = getLayoutInflater().inflate(R.layout.dialog_quick_menu, null);
+        bottomSheet.setContentView(view);
 
-            bindMenuAction(view, R.id.btnMenuRadar, bottomSheet, "RadarLocation");
-            bindMenuAction(view, R.id.btnMenuGate, bottomSheet, "SecureGate");
-            bindMenuAction(view, R.id.btnMenuAccounting, bottomSheet, "Accounting");
-            bindMenuAction(view, R.id.btnMenuReports, bottomSheet, "ReportsPro");
-            bindMenuAction(view, R.id.btnMenuSales, bottomSheet, "SalesHistory");
-            bindMenuAction(view, R.id.btnMenuInventory, bottomSheet, "Inventory Pro");
+        // تحديد صلاحية كل عنصر
+        boolean showRadar = isManager || isInventoryMgr || isPosOperator || isGateSecurity;
+        boolean showGate = isManager || isGateSecurity || isPosOperator;
+        boolean showAccounting = isManager;
+        boolean showReports = isManager;
+        boolean showSales = isManager || isPosOperator;
+        boolean showInventory = isManager || isInventoryMgr;
 
-            bottomSheet.show();
-        } catch (Exception e) {
-            Log.e(TAG, "BottomSheet Error: " + e.getMessage());
+        // ضبط رؤية الأزرار
+        setMenuVisibility(view, R.id.btnMenuRadar, showRadar);
+        setMenuVisibility(view, R.id.btnMenuGate, showGate);
+        setMenuVisibility(view, R.id.btnMenuAccounting, showAccounting);
+
+        setMenuVisibility(view, R.id.btnMenuReports, showReports);
+        setMenuVisibility(view, R.id.btnMenuSales, showSales);
+        setMenuVisibility(view, R.id.btnMenuInventory, showInventory);
+
+        // إخفاء الصف الأول إذا كانت كل أزراره مخفية
+        View row1 = view.findViewById(R.id.menuRow1);
+        if (row1 != null) {
+            row1.setVisibility((showRadar || showGate || showAccounting) ? View.VISIBLE : View.GONE);
         }
+
+        // إخفاء الصف الثاني إذا كانت كل أزراره مخفية
+        View row2 = view.findViewById(R.id.menuRow2);
+        if (row2 != null) {
+            row2.setVisibility((showReports || showSales || showInventory) ? View.VISIBLE : View.GONE);
+        }
+
+        // ربط الأحداث والأوامر عند الضغط
+        bindMenuAction(view, R.id.btnMenuRadar, bottomSheet, "RadarLocation");
+        bindMenuAction(view, R.id.btnMenuGate, bottomSheet, "SecureGate");
+        bindMenuAction(view, R.id.btnMenuAccounting, bottomSheet, "Accounting");
+        bindMenuAction(view, R.id.btnMenuReports, bottomSheet, "ReportsPro");
+        bindMenuAction(view, R.id.btnMenuSales, bottomSheet, "SalesHistory");
+        bindMenuAction(view, R.id.btnMenuInventory, bottomSheet, "Inventory Pro");
+
+        bottomSheet.show();
+    } catch (Exception e) {
+        Log.e(TAG, "BottomSheet Display Error: " + e.getMessage(), e);
     }
+}
 
     private void bindMenuAction(View root, int viewId, BottomSheetDialog dialog, String targetTab) {
         View btn = root.findViewById(viewId);
@@ -851,4 +886,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, errorMessage + ": " + e.getMessage());
         }
     }
-}
+            }
