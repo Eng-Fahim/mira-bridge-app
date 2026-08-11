@@ -14,10 +14,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import okhttp3.MediaType;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
+
 public class MiraApiClient {
 
     private static final String TAG = "MiraApiClient";
@@ -35,7 +32,7 @@ public class MiraApiClient {
 
     private static MiraApiClient instance;
 
-    public static MiraApiClient getInstance(Context context) {
+    public static synchronized MiraApiClient getInstance(Context context) {
         if (instance == null) {
             instance = new MiraApiClient(context.getApplicationContext());
         }
@@ -66,16 +63,13 @@ public class MiraApiClient {
         return post("/auth/login", payload);
     }
 
-    /**
- * إضافة قطع إلى تحويل موجود
- */
-public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
-    JSONObject payload = new JSONObject();
-    try {
-        payload.put("items", epcs);
-    } catch (Exception ignored) {}
-    return postWithAuth("/transfers/" + transferId + "/items", payload);
-}
+    public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("items", epcs);
+        } catch (Exception ignored) {}
+        return postWithAuth("/transfers/" + transferId + "/items", payload);
+    }
 
     public ApiResponse validateToken(String token) {
         JSONObject payload = new JSONObject();
@@ -114,7 +108,7 @@ public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
         return postWithAuth("/auth/refresh-token", payload);
     }
 
-        // ===================== 📦 TRANSFERS AUDIT & DETAILS =====================
+    // ===================== 📦 TRANSFERS AUDIT & DETAILS =====================
 
     public ApiResponse receiveTransferWithAudit(JSONObject payload) {
         return postWithAuth("/transfers/receive-audit", payload);
@@ -123,8 +117,6 @@ public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
     public ApiResponse getTransferDetails(int transferId) {
         return getWithAuth("/transfers/" + transferId);
     }
-
-
 
     public ApiResponse registerBiometric(String token, String deviceId, String publicKey) {
         JSONObject payload = new JSONObject();
@@ -160,7 +152,7 @@ public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
     public ApiResponse getOrgProfile() {
         return get("/org-profile/get");
     }
-    
+
     // ===================== 👥 USERS MANAGEMENT =====================
 
     public ApiResponse getUsers() {
@@ -199,20 +191,17 @@ public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
         } catch (Exception ignored) {}
         return post("/authorize", payload);
     }
+
     // ===================== 📡 PING & TEST CONNECTION =====================
 
-    /**
-     * اختبار الاتصال بالسيرفر مع إمكانية تحديد رابط ومفتاح API مخصصين
-     */
     public boolean pingApi(String targetUrl, String targetApiKey) {
         HttpURLConnection conn = null;
         try {
             String baseUrl = (targetUrl != null && !targetUrl.isEmpty()) ? targetUrl : this.apiUrl;
-            // تنظيف الرابط والتأكد من توجيهه لنقطة نهاية الفحص أو الـ Root
             if (baseUrl.endsWith("/")) {
                 baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
             }
-            
+
             URL url = new URL(baseUrl + "/heartbeat");
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
@@ -231,42 +220,37 @@ public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
         }
     }
 
-    /**
-     * Overload لاختبار الاتصال باستخدام الرابط والمفتاح الافتراضيين
-     */
     public boolean pingApi() {
         return pingApi(this.apiUrl, this.apiKey);
     }
 
-
     // ===================== 📊 DASHBOARD =====================
-
-       // ===================== 📊 DASHBOARD =====================
 
     public ApiResponse getDashboardSummary() {
         return getWithAuth("/dashboard/summary");
     }
 
-    /**
-     * جلب بيانات الداشبورد كاملة مفلترة حسب الفرع النشط
-     * @param branchId معرف الفرع المراد عرض بياناته (إذا كان > 0 يتم إرساله للـ API)
-     */
     public ApiResponse getDashboardFull(int branchId) {
         String endpoint = "/dashboard/full";
         if (branchId > 0) {
             endpoint += "?branch_id=" + branchId;
         }
-        return getWithAuth(endpoint); // 👈 التعديل هنا: استخدام getWithAuth بدلاً من get
+
+        Log.e("DASHBOARD_DEBUG", "═══════════════════════════════");
+        Log.e("DASHBOARD_DEBUG", "Request URL: " + apiUrl + endpoint);
+        Log.e("DASHBOARD_DEBUG", "Branch ID sent: " + branchId);
+        Log.e("DASHBOARD_DEBUG", "Token exists: " + !getAuthToken().isEmpty());
+        if (!getAuthToken().isEmpty()) {
+            Log.e("DASHBOARD_DEBUG", "Token: " + getAuthToken().substring(0, Math.min(20, getAuthToken().length())) + "...");
+        }
+        Log.e("DASHBOARD_DEBUG", "═══════════════════════════════");
+
+        return getWithAuth(endpoint);
     }
 
-    /**
-     * Overload للتوافق السابق (جلب بيانات الداشبورد دون تحديد فرع معين)
-     */
     public ApiResponse getDashboardFull() {
         return getDashboardFull(0);
     }
-
-
 
     // ===================== 🛒 POS =====================
 
@@ -324,17 +308,15 @@ public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
     }
 
     public ApiResponse startInventorySession(String location, String type) {
-    JSONObject payload = new JSONObject();
-    try {
-        payload.put("location", location != null ? location : "default");
-        payload.put("type", type != null ? type : "full");
-        
-        // ✅ أضف branch_id من الـ context
-        MiraBranchesManager bm = MiraBranchesManager.getInstance(context);
-        payload.put("branch_id", bm.getActiveBranchId());
-    } catch (Exception ignored) {}
-    return post("/inventory/start-session", payload);
-}
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("location", location != null ? location : "default");
+            payload.put("type", type != null ? type : "full");
+            MiraBranchesManager bm = MiraBranchesManager.getInstance(context);
+            payload.put("branch_id", bm.getActiveBranchId());
+        } catch (Exception ignored) {}
+        return post("/inventory/start-session", payload);
+    }
 
     public ApiResponse startBlindInventory(String location, String category) {
         JSONObject payload = new JSONObject();
@@ -510,7 +492,6 @@ public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
     }
 
     public ApiResponse saveBranchSettings(int branchId, JSONObject settings) {
-
         return postWithAuth("/branches/" + branchId + "/settings", settings);
     }
 
@@ -523,12 +504,10 @@ public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
         }
         return getWithAuth(url);
     }
-    /**
- * جلب قائمة القطع في الفرع (EPC/GTIN) لاستخدامها في الجرد والمحاكاة
- */
-public ApiResponse getBranchItemsList(int branchId) {
-    return getWithAuth("/branches/" + branchId + "/inventory/items");
-}
+
+    public ApiResponse getBranchItemsList(int branchId) {
+        return getWithAuth("/branches/" + branchId + "/inventory/items");
+    }
 
     public ApiResponse createTransfer(JSONObject payload) {
         return postWithAuth("/transfers", payload);
@@ -614,13 +593,13 @@ public ApiResponse getBranchItemsList(int branchId) {
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-            
+
             String token = getAuthToken();
             if (!token.isEmpty()) {
                 conn.setRequestProperty("Authorization", "Bearer " + token);
                 conn.setRequestProperty("X-MIRA-Auth-Token", token);
             }
-            
+
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(15000);
 
@@ -645,13 +624,13 @@ public ApiResponse getBranchItemsList(int branchId) {
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-            
+
             String token = getAuthToken();
             if (!token.isEmpty()) {
                 conn.setRequestProperty("Authorization", "Bearer " + token);
                 conn.setRequestProperty("X-MIRA-Auth-Token", token);
             }
-            
+
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(15000);
             conn.setDoOutput(true);
@@ -733,28 +712,6 @@ public ApiResponse getBranchItemsList(int branchId) {
         }
     }
 
-    // ✅ PUT with Auth
-    private ApiResponse putWithAuth(String endpoint, JSONObject payload) {
-        HttpURLConnection conn = null;
-        try {
-            URL url = new URL(apiUrl + endpoint);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("PUT");
-            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-            String token = getAuthToken();
-            if (!token.isEmpty()) conn.setRequestProperty("X-MIRA-Auth-Token", token);
-            conn.setConnectTimeout(15000); conn.setReadTimeout(15000); conn.setDoOutput(true);
-            if (payload != null) {
-                String jsonString = payload.toString();
-                try (OutputStream os = conn.getOutputStream()) { os.write(jsonString.getBytes("utf-8")); }
-            }
-            return buildResponse(conn);
-        } catch (Exception e) { return new ApiResponse(-1, null, e.getMessage()); }
-        finally { if (conn != null) conn.disconnect(); }
-    }
-
-
     private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
         int responseCode = conn.getResponseCode();
         InputStream is = (responseCode >= 200 && responseCode < 300) ?
@@ -769,22 +726,23 @@ public ApiResponse getBranchItemsList(int branchId) {
         reader.close();
 
         String responseBody = response.toString();
-        Log.d(TAG, "Response [" + responseCode + "]: " + responseBody);
+
+        Log.e("DASHBOARD_DEBUG", "Response Code: " + responseCode);
+        Log.e("DASHBOARD_DEBUG", "Response Body: " + responseBody);
+        Log.e("DASHBOARD_DEBUG", "═══════════════════════════════");
 
         JSONObject json = null;
         try {
             json = new JSONObject(responseBody);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            Log.e("DASHBOARD_DEBUG", "Failed to parse JSON: " + ignored.getMessage());
+        }
 
         return new ApiResponse(responseCode, json, null);
     }
 
-    // ===================== GETTERS =====================
-
     public String getGateId() { return gateId; }
     public String getApiUrl() { return apiUrl; }
-
-    // ===================== API RESPONSE CLASS =====================
 
     public static class ApiResponse {
         public final int code;
