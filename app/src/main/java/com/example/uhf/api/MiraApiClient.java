@@ -782,11 +782,8 @@ public class MiraApiClient {
 public void submitInventoryAuditReport(JSONObject payload) {
     // يمكنك إضافة كود إرسال الـ API هنا، أو تركها هيكلية للتجميع
 }
-
-// دالة جلب تفاصيل القطعة عبر الـ EPC
-public ApiResponse getItemDetailsByEPC(String epc) {
-    return get("/item/" + epc);
-}
+MiraApiClient.ApiResponse response = api.getBranchItemsList(
+    branchesManager != null ? branchesManager.getActiveBranchId() : 1);
 
 
 }
