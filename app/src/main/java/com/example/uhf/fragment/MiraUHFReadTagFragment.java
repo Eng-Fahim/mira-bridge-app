@@ -33,6 +33,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.AppCompatSpinner;
 import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
+import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -71,6 +72,13 @@ public class MiraUHFReadTagFragment extends Fragment {
     private static final int REQUEST_CAMERA_SCAN = 49374;
     private static final String OFFLINE_PREFS = "uhf_inventory_cache";
     
+    // Dynamic Settings Key Constants (from wp_mira_jewelry_settings)
+    private static final String KEY_RFID_POWER = "rfid_power";
+    private static final String KEY_SCAN_SOUND = "scan_sound";
+    private static final String KEY_RSSI_THRESHOLD = "rssi_threshold";
+    private static final String KEY_RFID_ENABLED = "rfid_enabled";
+    private static final String KEY_RFID_SCENARIO = "rfid_scenario";
+
     private final ExecutorService queryExecutor = Executors.newFixedThreadPool(4);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Handler timerHandler = new Handler(Looper.getMainLooper());
@@ -103,6 +111,14 @@ public class MiraUHFReadTagFragment extends Fragment {
     private String sessionId;
     private String currentFilter = "all";
     private boolean isReaderConnected = false;
+
+    // Dynamic Hardware Settings Configuration
+    private SharedPreferences globalSettings;
+    private boolean isSoundEnabled = true;
+    private int configuredPowerDbm = 28;
+    private int configuredRssiThreshold = -100;
+    private boolean rfidEnabledConfig = true;
+    private String rfidScenarioConfig = "real";
 
     private ScheduledExecutorService batchScheduler;
     private SharedPreferences offlineCache;
@@ -144,7 +160,7 @@ public class MiraUHFReadTagFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_mira_uhf_readtag, container, false);
     }
-    
+
     public boolean onBackPressed() {
         if (isScanning || isSimulating) {
             showExitWarningDialog();
@@ -160,16 +176,8 @@ public class MiraUHFReadTagFragment extends Fragment {
         new AlertDialog.Builder(requireContext())
             .setTitle(ar("⚠️ تحذير: جرد قيد التشغيل", "⚠️ Warning: Inventory Active"))
             .setMessage(ar(
-                "هناك عملية جرد نشطة حالياً.\n" +
-                "الخروج الآن سيؤدي إلى:\n" +
-                "• إيقاف المسح الحالي\n" +
-                "• فقدان تقدم الجلسة الحالية\n\n" +
-                "هل أنت متأكد من الخروج؟",
-                "An inventory session is active.\n" +
-                "Exiting will:\n" +
-                "• Stop current scanning\n" +
-                "• Lose current session progress\n\n" +
-                "Are you sure you want to exit?"))
+                "هناك عملية جرد نشطة حالياً.\nالخروج الآن سيؤدي إلى:\n• إيقاف المسح الحالي\n• فقدان تقدم الجلسة الحالية\n\nهل أنت متأكد من الخروج؟",
+                "An inventory session is active.\nExiting will:\n• Stop current scanning\n• Lose current session progress\n\nAre you sure you want to exit?"))
             .setPositiveButton(ar("⏹ إيقاف وخروج", "⏹ Stop & Exit"), (d, w) -> {
                 stopInventory();
                 exitWarningShown = false;
@@ -197,6 +205,8 @@ public class MiraUHFReadTagFragment extends Fragment {
             offlineCache = ctx.getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
             isArabic = Locale.getDefault().getLanguage().equals("ar");
             sessionId = "INV-" + System.currentTimeMillis();
+            
+            loadGlobalSettings();
             initSoundPool();
             if (!initViews(view)) return;
             setupRecyclerView();
@@ -207,6 +217,62 @@ public class MiraUHFReadTagFragment extends Fragment {
             startReaderMonitoring();
             loadOfflineGtins();
         } catch (Exception e) { Log.e(TAG, "onViewCreated error: " + e.getMessage()); }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        loadGlobalSettings();
+        checkReaderStatus();
+    }
+
+    // ==================== SETTINGS INTEGRATION ====================
+
+    private void loadGlobalSettings() {
+        if (getContext() == null) return;
+        try {
+            globalSettings = PreferenceManager.getDefaultSharedPreferences(requireContext());
+            
+            // 1. Sound settings
+            String soundVal = globalSettings.getString(KEY_SCAN_SOUND, "1");
+            isSoundEnabled = "1".equals(soundVal) || globalSettings.getBoolean(KEY_SCAN_SOUND, true);
+
+            // 2. Power Settings (dBm)
+            try {
+                String powerStr = globalSettings.getString(KEY_RFID_POWER, "28");
+                configuredPowerDbm = Integer.parseInt(powerStr);
+            } catch (Exception e) {
+                configuredPowerDbm = globalSettings.getInt(KEY_RFID_POWER, 28);
+            }
+
+            // 3. RSSI Threshold
+            try {
+                String rssiStr = globalSettings.getString(KEY_RSSI_THRESHOLD, "-100");
+                configuredRssiThreshold = Integer.parseInt(rssiStr);
+            } catch (Exception e) {
+                configuredRssiThreshold = globalSettings.getInt(KEY_RSSI_THRESHOLD, -100);
+            }
+
+            // 4. Scenario and RFID State
+            String rfidEnabledVal = globalSettings.getString(KEY_RFID_ENABLED, "1");
+            rfidEnabledConfig = "1".equals(rfidEnabledVal) || globalSettings.getBoolean(KEY_RFID_ENABLED, true);
+            rfidScenarioConfig = globalSettings.getString(KEY_RFID_SCENARIO, "real");
+
+            Log.i(TAG, "⚙️ Global Settings Loaded -> Power: " + configuredPowerDbm + "dBm, Sound: " + isSoundEnabled + ", RSSI: " + configuredRssiThreshold);
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading global settings: " + e.getMessage());
+        }
+    }
+
+    private void applyHardwareSettings() {
+        try {
+            if (getActivity() instanceof UHFMainActivity && isReaderConnected) {
+                ((UHFMainActivity) getActivity()).mReader.setPower(configuredPowerDbm);
+                Log.i(TAG, "⚡ Applied Hardware RFID Power: " + configuredPowerDbm + " dBm");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to apply hardware power settings: " + e.getMessage());
+        }
     }
 
     private void initSoundPool() {
@@ -225,7 +291,7 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     private void playSound(int soundId) {
-        if (soundId == 0) return;
+        if (!isSoundEnabled || soundId == 0) return;
         mainHandler.post(() -> { 
             try { 
                 if (soundPool != null && soundLoaded) soundPool.play(soundId, 0.7f, 0.7f, 1, 0, 1f); 
@@ -258,18 +324,15 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     private void setupRecyclerView() {
-    if (getContext() == null || rvRecentTags == null) return;
-    
-    // 1. إعداد الـ LayoutManager والـ Adapter
-    rvRecentTags.setLayoutManager(new LinearLayoutManager(getContext()));
-    recentAdapter = new RecentTagsAdapter(filteredTags);
-    rvRecentTags.setAdapter(recentAdapter);
+        if (getContext() == null || rvRecentTags == null) return;
+        
+        rvRecentTags.setLayoutManager(new LinearLayoutManager(getContext()));
+        recentAdapter = new RecentTagsAdapter(filteredTags);
+        rvRecentTags.setAdapter(recentAdapter);
 
-    // 2. أسطر تحسين الأداء والتمرير (بلغة Java) ⬇️
-    rvRecentTags.setNestedScrollingEnabled(true);
-    rvRecentTags.setHasFixedSize(true);
-}
-
+        rvRecentTags.setNestedScrollingEnabled(true);
+        rvRecentTags.setHasFixedSize(true);
+    }
 
     private void setupListeners() {
         if (btnStartInventory != null) btnStartInventory.setOnClickListener(v -> startInventory());
@@ -357,7 +420,7 @@ public class MiraUHFReadTagFragment extends Fragment {
                     if (isReaderConnected) {
                         DeviceDetector.DeviceProfile profile = DeviceDetector.getProfile();
                         String name = profile != null ? profile.modelName : DeviceDetector.getDeviceModelName();
-                        tvReaderStatus.setText("🟢 " + name + " | " + DeviceDetector.getCurrentPower() + "dBm");
+                        tvReaderStatus.setText("🟢 " + name + " | " + configuredPowerDbm + "dBm");
                         tvReaderStatus.setTextColor(Color.parseColor("#16A34A"));
                     } else {
                         tvReaderStatus.setText(ar("🟡 Simulation / Camera Ready", "🟡 Simulation / Camera Ready"));
@@ -476,14 +539,23 @@ public class MiraUHFReadTagFragment extends Fragment {
     private void startInventory() { startInventoryAndExec(null); }
 
     private void startInventoryAndExec(Runnable postAction) {
+        loadGlobalSettings();
+        applyHardwareSettings();
+
         isScanning = true; isPaused = false; exitWarningShown = false; startTime = System.currentTimeMillis(); totalPausedDuration = 0;
         totalScanned.set(0); uniqueTags.set(0); recentTags.clear(); scannedEPCs.clear(); scannedEPCSet.clear(); batchQueue.clear(); filteredTags.clear();
         sessionId = "INV-" + System.currentTimeMillis();
         if (recentAdapter != null) recentAdapter.notifyDataSetChanged(); updateUIForScanning();
         if (getActivity() instanceof UHFMainActivity && isReaderConnected) ((UHFMainActivity) getActivity()).loopFlag = true;
+        
         startBatchScheduler(); startTimer();
         if (layoutZoneSelector != null) layoutZoneSelector.setVisibility(View.VISIBLE);
         if (layoutFilterTabs != null) layoutFilterTabs.setVisibility(View.VISIBLE);
+
+        if (!rfidEnabledConfig || "simulate".equalsIgnoreCase(rfidScenarioConfig)) {
+            toggleSimulation();
+        }
+
         loadExpectedInventory(postAction);
     }
 
@@ -708,6 +780,17 @@ public class MiraUHFReadTagFragment extends Fragment {
 
     public void onTagScanned(String epc, String rssi) {
         if (!isScanning || isPaused || epc == null || epc.isEmpty()) return;
+
+        // RSSI Threshold Filter Check
+        if (rssi != null && rssi.contains("dBm")) {
+            try {
+                int parsedRssi = Integer.parseInt(rssi.replace("dBm", "").trim());
+                if (parsedRssi < configuredRssiThreshold) {
+                    return; // Ignore tag below signal strength cutoff
+                }
+            } catch (Exception ignored) {}
+        }
+
         String cleanEpc = epc.trim();
         
         if (!scannedEPCSet.add(cleanEpc)) { 
@@ -1019,7 +1102,6 @@ public class MiraUHFReadTagFragment extends Fragment {
                 if (h.tvTime != null) h.tvTime.setText(t.timestamp); 
             } 
         }
-        
 
         @Override 
         public int getItemCount() { 
@@ -1039,4 +1121,3 @@ public class MiraUHFReadTagFragment extends Fragment {
         }
     }
 }
-
