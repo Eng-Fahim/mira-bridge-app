@@ -157,8 +157,73 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
+    // ==================== INVENTORY LOCK PROTECTION ====================
+
+    /**
+     * التحقق مما إذا كانت هناك عملية جرد أو مسح RFID نشطة حالياً.
+     */
+    public boolean isInventoryActive() {
+        if (loopFlag) {
+            return true;
+        }
+        if (mTabHost != null) {
+            Fragment current = getSupportFragmentManager().findFragmentByTag(mTabHost.getCurrentTabTag());
+            if (current instanceof MiraUHFReadTagFragment && current.isVisible()) {
+                return ((MiraUHFReadTagFragment) current).isScanning();
+            }
+        }
+        return false;
+    }
+
+    /**
+     * حماية التنقل: إذا كان الجرد نشطاً يتم حظر الإجراء وإظهار تنبيه للمستخدم.
+     * @param onConfirmed الإجراء المراد تنفيذه في حال الموافقة على الخروج/الإيقاف
+     */
+    private void checkInventoryLockAndExecute(Runnable onConfirmed) {
+        if (isInventoryActive()) {
+            new AlertDialog.Builder(this)
+                    .setTitle(isArabic ? "⚠️ الجرد قيد التشغيل" : "⚠️ Inventory In Progress")
+                    .setMessage(isArabic ? "عملية الجرد تعمل حالياً. هل تريد إيقاف الجرد والانتقال؟"
+                            : "Active scanning in progress. Do you want to stop inventory and proceed?")
+                    .setPositiveButton(isArabic ? "إيقاف والانتقال" : "Stop & Proceed", (dialog, which) -> {
+                        stopActiveInventory();
+                        if (onConfirmed != null) {
+                            onConfirmed.run();
+                        }
+                    })
+                    .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                    .show();
+        } else {
+            if (onConfirmed != null) {
+                onConfirmed.run();
+            }
+        }
+    }
+
+    /**
+     * إيقاف عملية المسح/الجرد النشطة فوراً.
+     */
+    private void stopActiveInventory() {
+        try {
+            loopFlag = false;
+            if (mTabHost != null) {
+                Fragment current = getSupportFragmentManager().findFragmentByTag(mTabHost.getCurrentTabTag());
+                if (current instanceof MiraUHFReadTagFragment && current.isVisible()) {
+                    ((MiraUHFReadTagFragment) current).stopScanning();
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error stopping active inventory: " + e.getMessage());
+        }
+    }
+
     @Override
     public void onBackPressed() {
+        if (isInventoryActive()) {
+            checkInventoryLockAndExecute(super::onBackPressed);
+            return;
+        }
+
         if (mTabHost != null) {
             Fragment current = getSupportFragmentManager().findFragmentById(R.id.realtabcontent);
             if (current instanceof MiraUHFReadTagFragment && ((MiraUHFReadTagFragment) current).onBackPressed()) {
@@ -234,109 +299,119 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private void setupTopTab(int tabId, String tag) {
         View tab = findViewById(tabId);
         if (tab != null) {
-            tab.setOnClickListener(v -> switchToTabSafely(tag));
+            tab.setOnClickListener(v -> checkInventoryLockAndExecute(() -> switchToTabSafely(tag)));
         }
     }
 
     // ==================== BOTTOM NAVIGATION & QUICK ACTIONS ====================
 
     private void setupQuickNav() {
-    try {
-        BottomNavigationView quickNav = findViewById(R.id.bottomQuickNav);
-        if (quickNav == null) return;
+        try {
+            BottomNavigationView quickNav = findViewById(R.id.bottomQuickNav);
+            if (quickNav == null) return;
 
-        quickNav.setOnItemSelectedListener(item -> {
-            int id = item.getItemId();
-            if (id == R.id.nav_quick_dashboard) {
-                switchToTabSafely("Dashboard");
-                return true;
-            } else if (id == R.id.nav_quick_menu) {
-                showRadialMenu(); // إظهار قائمة الإجراءات المنسدلة
-                return true;
-            } else if (id == R.id.nav_quick_inventory) {
-                switchToTabSafely("Scan");
-                return true;
-            } else if (id == R.id.nav_quick_pos) {
-                switchToTabSafely("POS Mode");
-                return true;
-            }
-            return false;
-        });
-    } catch (Exception e) {
-        Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
+            quickNav.setOnItemSelectedListener(item -> {
+                int id = item.getItemId();
+                
+                // عدم التبديل إذا كان بنفس التبويب الحالي
+                String targetTag = null;
+                if (id == R.id.nav_quick_dashboard) targetTag = "Dashboard";
+                else if (id == R.id.nav_quick_inventory) targetTag = "Scan";
+                else if (id == R.id.nav_quick_pos) targetTag = "POS Mode";
+
+                if (targetTag != null && mTabHost != null && targetTag.equals(mTabHost.getCurrentTabTag())) {
+                    return true;
+                }
+
+                if (id == R.id.nav_quick_dashboard) {
+                    checkInventoryLockAndExecute(() -> switchToTabSafely("Dashboard"));
+                    return true;
+                } else if (id == R.id.nav_quick_menu) {
+                    checkInventoryLockAndExecute(this::showRadialMenu);
+                    return true;
+                } else if (id == R.id.nav_quick_inventory) {
+                    checkInventoryLockAndExecute(() -> switchToTabSafely("Scan"));
+                    return true;
+                } else if (id == R.id.nav_quick_pos) {
+                    checkInventoryLockAndExecute(() -> switchToTabSafely("POS Mode"));
+                    return true;
+                }
+                return false;
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
+        }
     }
-}
-
 
     private void showRadialMenu() {
-    try {
-        if (sessionManager == null) return;
+        try {
+            if (sessionManager == null) return;
 
-        SessionManager.Role role = sessionManager.getUserRole();
-        String roleStr = sessionManager.getRoleString();
-        boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
-        boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
-        boolean isAdmin = (role == SessionManager.Role.ADMIN) || "ADMIN".equals(roleStr);
-        boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
-        boolean isAnyAdmin = isSystemAdmin || isOrgAdmin || isAdmin;
-        boolean isManager = isAnyAdmin || isBranchManager;
-        boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
-        boolean isPosOperator = (role == SessionManager.Role.POS_OPERATOR);
-        boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
+            SessionManager.Role role = sessionManager.getUserRole();
+            String roleStr = sessionManager.getRoleString();
+            boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
+            boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
+            boolean isAdmin = (role == SessionManager.Role.ADMIN) || "ADMIN".equals(roleStr);
+            boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
+            boolean isAnyAdmin = isSystemAdmin || isOrgAdmin || isAdmin;
+            boolean isManager = isAnyAdmin || isBranchManager;
+            boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
+            boolean isPosOperator = (role == SessionManager.Role.POS_OPERATOR);
+            boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
 
-        BottomSheetDialog bottomSheet = new BottomSheetDialog(this);
-        View view = getLayoutInflater().inflate(R.layout.dialog_quick_menu, null);
-        bottomSheet.setContentView(view);
+            BottomSheetDialog bottomSheet = new BottomSheetDialog(this);
+            View view = getLayoutInflater().inflate(R.layout.dialog_quick_menu, null);
+            bottomSheet.setContentView(view);
 
-        // تحديد صلاحية كل عنصر
-        boolean showRadar = isManager || isInventoryMgr || isPosOperator || isGateSecurity;
-        boolean showGate = isManager || isGateSecurity || isPosOperator;
-        boolean showAccounting = isManager;
-        boolean showReports = isManager;
-        boolean showSales = isManager || isPosOperator;
-        boolean showInventory = isManager || isInventoryMgr;
+            // تحديد صلاحية كل عنصر
+            boolean showRadar = isManager || isInventoryMgr || isPosOperator || isGateSecurity;
+            boolean showGate = isManager || isGateSecurity || isPosOperator;
+            boolean showAccounting = isManager;
+            boolean showReports = isManager;
+            boolean showSales = isManager || isPosOperator;
+            boolean showInventory = isManager || isInventoryMgr;
 
-        // ضبط رؤية الأزرار
-        setMenuVisibility(view, R.id.btnMenuRadar, showRadar);
-        setMenuVisibility(view, R.id.btnMenuGate, showGate);
-        setMenuVisibility(view, R.id.btnMenuAccounting, showAccounting);
+            // ضبط رؤية الأزرار
+            setMenuVisibility(view, R.id.btnMenuRadar, showRadar);
+            setMenuVisibility(view, R.id.btnMenuGate, showGate);
+            setMenuVisibility(view, R.id.btnMenuAccounting, showAccounting);
 
-        setMenuVisibility(view, R.id.btnMenuReports, showReports);
-        setMenuVisibility(view, R.id.btnMenuSales, showSales);
-        setMenuVisibility(view, R.id.btnMenuInventory, showInventory);
+            setMenuVisibility(view, R.id.btnMenuReports, showReports);
+            setMenuVisibility(view, R.id.btnMenuSales, showSales);
+            setMenuVisibility(view, R.id.btnMenuInventory, showInventory);
 
-        // إخفاء الصف الأول إذا كانت كل أزراره مخفية
-        View row1 = view.findViewById(R.id.menuRow1);
-        if (row1 != null) {
-            row1.setVisibility((showRadar || showGate || showAccounting) ? View.VISIBLE : View.GONE);
+            // إخفاء الصف الأول إذا كانت كل أزراره مخفية
+            View row1 = view.findViewById(R.id.menuRow1);
+            if (row1 != null) {
+                row1.setVisibility((showRadar || showGate || showAccounting) ? View.VISIBLE : View.GONE);
+            }
+
+            // إخفاء الصف الثاني إذا كانت كل أزراره مخفية
+            View row2 = view.findViewById(R.id.menuRow2);
+            if (row2 != null) {
+                row2.setVisibility((showReports || showSales || showInventory) ? View.VISIBLE : View.GONE);
+            }
+
+            // ربط الأحداث والأوامر عند الضغط
+            bindMenuAction(view, R.id.btnMenuRadar, bottomSheet, "RadarLocation");
+            bindMenuAction(view, R.id.btnMenuGate, bottomSheet, "SecureGate");
+            bindMenuAction(view, R.id.btnMenuAccounting, bottomSheet, "Accounting");
+            bindMenuAction(view, R.id.btnMenuReports, bottomSheet, "ReportsPro");
+            bindMenuAction(view, R.id.btnMenuSales, bottomSheet, "SalesHistory");
+            bindMenuAction(view, R.id.btnMenuInventory, bottomSheet, "Inventory Pro");
+
+            bottomSheet.show();
+        } catch (Exception e) {
+            Log.e(TAG, "BottomSheet Display Error: " + e.getMessage(), e);
         }
-
-        // إخفاء الصف الثاني إذا كانت كل أزراره مخفية
-        View row2 = view.findViewById(R.id.menuRow2);
-        if (row2 != null) {
-            row2.setVisibility((showReports || showSales || showInventory) ? View.VISIBLE : View.GONE);
-        }
-
-        // ربط الأحداث والأوامر عند الضغط
-        bindMenuAction(view, R.id.btnMenuRadar, bottomSheet, "RadarLocation");
-        bindMenuAction(view, R.id.btnMenuGate, bottomSheet, "SecureGate");
-        bindMenuAction(view, R.id.btnMenuAccounting, bottomSheet, "Accounting");
-        bindMenuAction(view, R.id.btnMenuReports, bottomSheet, "ReportsPro");
-        bindMenuAction(view, R.id.btnMenuSales, bottomSheet, "SalesHistory");
-        bindMenuAction(view, R.id.btnMenuInventory, bottomSheet, "Inventory Pro");
-
-        bottomSheet.show();
-    } catch (Exception e) {
-        Log.e(TAG, "BottomSheet Display Error: " + e.getMessage(), e);
     }
-}
 
     private void bindMenuAction(View root, int viewId, BottomSheetDialog dialog, String targetTab) {
         View btn = root.findViewById(viewId);
         if (btn != null) {
             btn.setOnClickListener(v -> {
                 dialog.dismiss();
-                switchToTabSafely(targetTab);
+                checkInventoryLockAndExecute(() -> switchToTabSafely(targetTab));
             });
         }
     }
@@ -482,14 +557,32 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
-        if (id == R.id.action_change_language) { toggleLanguage(); return true; }
-        if (id == R.id.action_logout) { showLogoutConfirmation(); return true; }
-        if (id == R.id.action_profile) { showProfileDialog(); return true; }
-        if (id == R.id.action_branches) { showBranchPicker(); return true; }
-        if (id == R.id.export) { exportData(); return true; }
-        if (id == R.id.UHF_ver) { getUHFVersion(); return true; }
+        if (id == R.id.action_change_language) { 
+            checkInventoryLockAndExecute(this::toggleLanguage); 
+            return true; 
+        }
+        if (id == R.id.action_logout) { 
+            checkInventoryLockAndExecute(this::showLogoutConfirmation); 
+            return true; 
+        }
+        if (id == R.id.action_profile) { 
+            showProfileDialog(); 
+            return true; 
+        }
+        if (id == R.id.action_branches) { 
+            checkInventoryLockAndExecute(this::showBranchPicker); 
+            return true; 
+        }
+        if (id == R.id.export) { 
+            exportData(); 
+            return true; 
+        }
+        if (id == R.id.UHF_ver) { 
+            getUHFVersion(); 
+            return true; 
+        }
         if (id == R.id.speed) {
-            safeExecute(() -> startActivity(new Intent(this, TestActivity.class)), "Test Activity Launch Failed");
+            checkInventoryLockAndExecute(() -> safeExecute(() -> startActivity(new Intent(this, TestActivity.class)), "Test Activity Launch Failed"));
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -714,6 +807,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     public void performLogout() {
         try {
+            stopActiveInventory();
             if (sessionManager != null) sessionManager.logout();
             if (branchesManager != null) branchesManager.clear();
             navigateToLogin();
@@ -734,6 +828,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     @Override
     protected void onDestroy() {
         try {
+            stopActiveInventory();
             mainHandler.removeCallbacksAndMessages(null);
             if (playSoundThread != null) playSoundThread.stopPlay();
             releaseSoundPool();
@@ -748,7 +843,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public void exportData() {
         try {
             checkReadWritePermission();
-            if (loopFlag) {
+            if (isInventoryActive()) {
                 UIHelper.ToastMessage(this, R.string.uhf_msg_scaning);
                 return;
             }
@@ -886,4 +981,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, errorMessage + ": " + e.getMessage());
         }
     }
-            }
+}
