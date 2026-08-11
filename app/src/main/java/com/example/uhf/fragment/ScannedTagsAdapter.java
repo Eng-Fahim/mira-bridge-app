@@ -38,7 +38,7 @@ public class ScannedTagsAdapter extends RecyclerView.Adapter<ScannedTagsAdapter.
             if (position < itemList.size()) {
                 ScannedItemModel item = itemList.get(position);
                 holder.tvTagTitle.setText(item.getCategory());
-                holder.tvTagEPC.setText(item.getEpc());
+                holder.tvTagEPc.setText(item.getEpc());
                 holder.tvTagDetails.setText("الوزن: " + item.getWeight() + " جم | التكرار: " + item.getReadCount());
                 holder.tvTagStatus.setText(item.getStatus());
                 holder.tvTagTime.setText("--:--");
@@ -54,12 +54,12 @@ public class ScannedTagsAdapter extends RecyclerView.Adapter<ScannedTagsAdapter.
     }
 
     static class TagViewHolder extends RecyclerView.ViewHolder {
-        TextView tvTagTitle, tvTagEPC, tvTagDetails, tvTagStatus, tvTagTime;
+        TextView tvTagTitle, tvTagEPc, tvTagDetails, tvTagStatus, tvTagTime;
 
         public TagViewHolder(@NonNull View itemView) {
             super(itemView);
             tvTagTitle = itemView.findViewById(R.id.tvTagTitle);
-            tvTagEPC = itemView.findViewById(R.id.tvTagEPC);
+            tvTagEPc = itemView.findViewById(R.id.tvTagEPc);
             tvTagDetails = itemView.findViewById(R.id.tvTagDetails);
             tvTagStatus = itemView.findViewById(R.id.tvTagStatus);
             tvTagTime = itemView.findViewById(R.id.tvTagTime);
