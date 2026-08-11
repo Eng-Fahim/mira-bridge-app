@@ -3,11 +3,7 @@ package com.example.uhf.fragment;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
 import android.graphics.Color;
-import android.media.AudioAttributes;
-import android.media.SoundPool;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -23,13 +19,11 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -74,12 +68,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class MiraUHFReadTagFragment extends Fragment {
     private static final String TAG = "MiraUHFInventory";
-    private static final int REQUEST_CAMERA_SCAN = 49374;
     private static final String OFFLINE_PREFS = "uhf_inventory_cache";
     private static final String PREF_LAST_AUDIT_MISSING = "last_audit_missing_epcs";
     
     private MiraSoundManager soundManager;
-
 
     private static final String KEY_RFID_POWER = "rfid_power";
     private static final String KEY_SCAN_SOUND = "scan_sound";
@@ -90,8 +82,8 @@ public class MiraUHFReadTagFragment extends Fragment {
     public enum InventoryState {
         IDLE,           // جاهز للبدء
         LOADING,        // جاري تحميل المخزون
-        SCANNING,       // المسح نشط (قفل التنقل مفعل)
-        PAUSED,         // معلق مؤقتاً (قفل التنقل مفعل)
+        SCANNING,       // المسح نشط
+        PAUSED,         // معلق مؤقتاً
         COMPLETED,      // اكتمل القراءة
         FINALIZED       // اعُتمد رسمياً وأُغلق الجرد
     }
@@ -170,9 +162,6 @@ public class MiraUHFReadTagFragment extends Fragment {
     private MiraOrgProfileManager orgProfile;
     private boolean isArabic;
 
-    private SoundPool soundPool;
-    private int soundMatch = 0, soundUnmatch = 0, soundSoldAlert = 0;
-    private boolean soundLoaded = false;
     private Vibrator vibrator;
 
     private View rootLayout;
@@ -269,7 +258,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         try {
             Context ctx = requireContext();
             apiClient = MiraApiClient.getInstance(ctx);
-            soundManager = new MiraSoundManager(requireContext());
+            soundManager = new MiraSoundManager(ctx);
 
             branchesManager = MiraBranchesManager.getInstance(ctx);
             orgProfile = MiraOrgProfileManager.getInstance(ctx);
@@ -277,8 +266,11 @@ public class MiraUHFReadTagFragment extends Fragment {
             isArabic = Locale.getDefault().getLanguage().equals("ar");
             sessionId = "AUDIT-" + System.currentTimeMillis();
 
+            if (getContext() != null) {
+                vibrator = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
+            }
+
             loadGlobalSettings();
-            initSoundPool();
             if (!initViews(view)) return;
             setupRecyclerView();
             setupListeners();
@@ -367,6 +359,14 @@ public class MiraUHFReadTagFragment extends Fragment {
         });
     }
 
+    public boolean isScanning() {
+        return isScanning;
+    }
+
+    public void stopScanning() {
+        stopInventory();
+    }
+
     public void onTagScanned(String epc, String rssi) {
         if (currentState != InventoryState.SCANNING || epc == null || epc.isEmpty()) return;
 
@@ -427,8 +427,7 @@ public class MiraUHFReadTagFragment extends Fragment {
 
                     mainHandler.post(() -> {
                         updateLastTagDisplay(cleanEpc, item.title, item.karat, String.format(Locale.US, "%.2fg", item.weight), ItemStatus.FOUND);
-                        //playSound(soundMatch);
-                        soundManager.playSuccess();
+                        if (soundManager != null) soundManager.playSuccess();
                     });
                 }
             }
@@ -441,8 +440,7 @@ public class MiraUHFReadTagFragment extends Fragment {
 
             mainHandler.post(() -> {
                 updateLastTagDisplay(cleanEpc, ar("غير مسجلة", "Unregistered"), "—", "—", ItemStatus.UNEXPECTED);
-                //playSound(soundUnmatch);
-                soundManager.playWarning();
+                if (soundManager != null) soundManager.playWarning();
             });
         }
 
@@ -461,8 +459,8 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     private void triggerSoldItemAlert(String epc, String itemTitle) {
-        if (isSoundEnabled && soundLoaded && soundSoldAlert != 0) {
-            soundPool.play(soundSoldAlert, 1.0f, 1.0f, 1, 0, 1.2f);
+        if (soundManager != null) {
+            soundManager.playSoldAlert();
         }
 
         if (vibrator != null && vibrator.hasVibrator()) {
@@ -949,40 +947,6 @@ public class MiraUHFReadTagFragment extends Fragment {
         }
     }
 
-    private void initSoundPool() {
-        try {
-            AudioAttributes attributes = new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build();
-
-            soundPool = new SoundPool.Builder()
-                    .setMaxStreams(5)
-                    .setAudioAttributes(attributes)
-                    .build();
-
-            soundPool.setOnLoadCompleteListener((sp, sampleId, status) -> {
-                if (status == 0) soundLoaded = true;
-            });
-
-            soundMatch = soundPool.load(requireContext(), R.raw.beep_success, 1);
-            soundUnmatch = soundPool.load(requireContext(), R.raw.beep_warning, 1);
-            soundSoldAlert = soundPool.load(requireContext(), R.raw.alarm_sold_item, 1);
-
-            if (getContext() != null) {
-                vibrator = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "SoundPool init error: " + e.getMessage());
-        }
-    }
-
-    private void playSound(int soundId) {
-        if (isSoundEnabled && soundLoaded && soundId != 0) {
-            soundPool.play(soundId, 0.8f, 0.8f, 1, 0, 1.0f);
-        }
-    }
-
     private boolean initViews(View view) {
         rootLayout = view;
         alertBannerView = view.findViewById(R.id.alertBannerView);
@@ -1109,7 +1073,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         readerCheckRunnable = new Runnable() {
             @Override
             public void run() {
-                isReaderConnected = true; //DeviceDetector.isChainwayC72();
+                isReaderConnected = DeviceDetector.isChainwayC72();
                 if (tvReaderStatus != null) {
                     if (isReaderConnected) {
                         tvReaderStatus.setText(ar("متصل (C72)", "Connected (C72)"));
@@ -1286,7 +1250,6 @@ public class MiraUHFReadTagFragment extends Fragment {
         return isArabic ? arText : enText;
     }
 
-
     @Override
     public void onDestroyView() {
         super.onDestroyView();
@@ -1294,14 +1257,13 @@ public class MiraUHFReadTagFragment extends Fragment {
         stopBatchProcessor();
         stopSimulatedScan();
         if (readerCheckRunnable != null) readerCheckHandler.removeCallbacks(readerCheckRunnable);
-        //if (soundPool != null) soundPool.release();
         if (soundManager != null) {
-        soundManager.release();
-        soundManager = null;
-    }
+            soundManager.release();
+            soundManager = null;
+        }
     }
 
-    // --- Adapter لRecyclerView ---
+    // --- Adapter لـ RecyclerView ---
     private class RecentTagsAdapter extends RecyclerView.Adapter<RecentTagsAdapter.TagViewHolder> {
         private final List<ScannedTag> list;
 
