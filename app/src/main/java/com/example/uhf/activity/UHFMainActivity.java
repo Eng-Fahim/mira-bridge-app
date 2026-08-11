@@ -23,7 +23,6 @@ import android.widget.LinearLayout;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.view.ViewParent;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDelegate;
@@ -295,7 +294,7 @@ private void setTopTabVisibility(int tabId, boolean visible) {
         setMenuVisibility(view, R.id.btnMenuSales, isManager || isPosOperator);
         // 📋 المخزون: المدراء + مديري المخزون
         setMenuVisibility(view, R.id.btnMenuInventory, isManager || isInventoryMgr);
-        reorganizeMenuGrid(view);
+        //reorganizeMenuGrid(view);
 
         view.findViewById(R.id.btnMenuRadar).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("RadarLocation"); });
         view.findViewById(R.id.btnMenuGate).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("SecureGate"); });
@@ -777,51 +776,7 @@ if (isAnyAdmin || isBranchManager) {
             }
         } catch (Exception e) { Log.e(TAG, "Permission check error: " + e.getMessage()); }
     }
-    private void reorganizeMenuGrid(View view) {
-    LinearLayout row1 = view.findViewById(R.id.menuRow1);
-    LinearLayout row2 = view.findViewById(R.id.menuRow2);
-    if (row1 == null || row2 == null) return;
-    
-    // جمع كل العناصر المرئية
-    List<View> visibleItems = new ArrayList<>();
-    int[] menuIds = {
-        R.id.btnMenuRadar, R.id.btnMenuGate, R.id.btnMenuAccounting,
-        R.id.btnMenuReports, R.id.btnMenuSales, R.id.btnMenuInventory
-    };
-    
-    for (int id : menuIds) {
-        View item = view.findViewById(id);
-        if (item != null && item.getVisibility() == View.VISIBLE) {
-            visibleItems.add(item);
-        }
-    }
-    
-    // إفراغ الصفين
-    row1.removeAllViews();
-    row2.removeAllViews();
-    
-    // توزيع العناصر: أول ٣ في الصف الأول، الباقي في الثاني
-    for (int i = 0; i < visibleItems.size(); i++) {
-        View item = visibleItems.get(i);
-        if (item.getParent() != null) {
-            ((ViewGroup) item.getParent()).removeView(item);
-        }
-        
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, 
-            LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        params.setMargins(4, 4, 4, 4);
-        item.setLayoutParams(params);
-        
-        if (i < 3) {
-            row1.addView(item);
-        } else {
-            row2.addView(item);
-        }
-    }
-    
-    // إخفاء الصف الثاني إذا كان فارغاً
-    row2.setVisibility(visibleItems.size() > 3 ? View.VISIBLE : View.GONE);
-}
+   
 
     private Toast toast;
     public void showToast(String text) { if (toast != null) toast.cancel(); toast = Toast.makeText(this, text, Toast.LENGTH_SHORT); toast.show(); }
@@ -841,4 +796,4 @@ if (isAnyAdmin || isBranchManager) {
     }
 
     private String ar(String arabic, String english) { return isArabic ? arabic : english; }
-                                         }
+    }
