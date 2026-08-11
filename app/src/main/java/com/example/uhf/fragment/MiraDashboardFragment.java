@@ -367,13 +367,11 @@ public class MiraDashboardFragment extends Fragment {
         debugLog.append(message).append("\n");
     }
 
-    private void showDebugDialog(String title) {
+        private void showDebugDialog(String title) {
         if (!isAdded()) return;
         try {
-            String message = debugLog.toString();
-            if (message.isEmpty()) {
-                message = "لا توجد بيانات تشخيص بعد";
-            }
+            String rawMessage = debugLog.toString();
+            final String message = rawMessage.isEmpty() ? "لا توجد بيانات تشخيص بعد" : rawMessage;
 
             new android.app.AlertDialog.Builder(requireContext())
                 .setTitle(title)
@@ -397,6 +395,7 @@ public class MiraDashboardFragment extends Fragment {
             Log.e(TAG, "Error showing debug", e);
         }
     }
+
 
     @Override
     public void onDestroyView() {
