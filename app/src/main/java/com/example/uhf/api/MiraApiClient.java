@@ -777,4 +777,16 @@ public class MiraApiClient {
             return null;
         }
     }
+    
+    // دالة إرسال تقرير الجرد
+public void submitInventoryAuditReport(JSONObject payload) {
+    // يمكنك إضافة كود إرسال الـ API هنا، أو تركها هيكلية للتجميع
+}
+
+// دالة جلب تفاصيل القطعة عبر الـ EPC
+public ApiResponse getItemDetailsByEPC(String epc) {
+    // ضع كود استدعاء API جلب القطعة هنا
+    return new ApiResponse(true, "OK", null);
+}
+
 }
