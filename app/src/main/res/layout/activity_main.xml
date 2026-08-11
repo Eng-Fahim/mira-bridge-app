@@ -167,7 +167,7 @@
     app:itemRippleColor="?attr/colorControlHighlight"
     app:itemTextColor="@color/bottom_nav_colors"
     app:labelVisibilityMode="labeled"
-    app:menu="@menu/bottom_quick_nav_menu" /> <!-- تم تعديل اسم الملف هنا -->
+    app:menu="@menu/bottom_quick_menu" /> <!-- تم تعديل اسم الملف هنا -->
 
 
     </LinearLayout>
