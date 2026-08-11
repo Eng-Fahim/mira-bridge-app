@@ -669,7 +669,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 if (currentTabTag != null) {
                     Fragment fragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
                     if (fragment instanceof MiraUHFReadTagFragment && fragment.isVisible()) {
-                        ((MiraUHFReadTagFragment) fragment).onTagScanned(epc, "—");
+                        ((MiraUHFReadTagFragment) fragment).onTagScanned(epc, -50.0);
                     }
                 }
             }
@@ -1009,4 +1009,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, errorMessage + ": " + e.getMessage());
         }
     }
-}
+                           }
