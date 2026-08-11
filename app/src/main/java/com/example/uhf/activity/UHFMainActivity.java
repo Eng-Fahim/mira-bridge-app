@@ -149,6 +149,17 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Toast.makeText(this, "حدث خطأ أثناء تحميل الواجهة، تم التشغيل بالنمط الآمن", Toast.LENGTH_LONG).show();
         }
     }
+    
+    @Override
+public void onBackPressed() {
+    Fragment current = getSupportFragmentManager().findFragmentById(R.id.realtabcontent);
+    if (current instanceof MiraUHFReadTagFragment) {
+        if (((MiraUHFReadTagFragment) current).onBackPressed()) {
+            return; // امنع الخروج
+        }
+    }
+    super.onBackPressed();
+}
 
     // ==================== TOP TABS ====================
 
@@ -675,4 +686,4 @@ private void setTopTabLabel(int viewId, String text) {
     }
 
     private String ar(String arabic, String english) { return isArabic ? arabic : english; }
-}
+                                      }
