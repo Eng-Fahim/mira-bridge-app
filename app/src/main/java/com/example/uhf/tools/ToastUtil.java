@@ -224,12 +224,23 @@ public class ToastUtil {
     @Deprecated
     public static void showInfo(CharSequence text) { info(text.toString()); }
 
-    /**
-     * Simple text-only toast
-     */
-    public static void show(String message) {
-        if (appContext != null) {
-            Toast.makeText(appContext, message, Toast.LENGTH_SHORT).show();
+
+        // ==================== Compatibility Additions ====================
+
+    public static void showLong(Context context, String message) {
+        if (context != null) {
+            Toast.makeText(context.getApplicationContext(), message, Toast.LENGTH_LONG).show();
+        } else {
+            show(message);
         }
     }
+
+    public static void showShort(Context context, String message) {
+        if (context != null) {
+            Toast.makeText(context.getApplicationContext(), message, Toast.LENGTH_SHORT).show();
+        } else {
+            show(message);
+        }
+    }
+
 }
