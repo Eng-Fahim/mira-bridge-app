@@ -348,15 +348,15 @@
 
             <!-- Progress Bar -->
             <ProgressBar
-    android:id="@+id/pbScanProgress"
-    style="?android:attr/progressBarStyleHorizontal"
-    android:layout_width="match_parent"
-    android:layout_height="6dp"
-    android:max="100"
-    android:progress="0"
-    android:visibility="gone"
-    android:progressTint="#16A34A"
-    android:progressBackgroundTint="#E5E7EB" />
+                android:id="@+id/pbScanProgress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:max="100"
+                android:progress="0"
+                android:progressBackgroundTint="#E5E7EB"
+                android:progressTint="#16A34A"
+                android:visibility="gone" />
 
             <!-- Current Tag Card -->
             <com.google.android.material.card.MaterialCardView
@@ -495,7 +495,7 @@
             <!-- Tags List -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
-                android:layout_height="160dp"
+                android:layout_height="200dp"
                 android:layout_marginBottom="12dp"
                 app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="14dp"
@@ -508,6 +508,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:clipToPadding="false"
+                    android:nestedScrollingEnabled="true"
                     android:padding="8dp" />
             </com.google.android.material.card.MaterialCardView>
 
