@@ -1,4 +1,4 @@
-package com.mira.inventory.ui.uhf;
+package com.example.uhf.fragment;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -10,7 +10,6 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.media.SoundPool;
-import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -39,12 +38,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.AppCompatSpinner;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.mira.inventory.R;
-import com.mira.inventory.api.MiraApiClient;
+import com.example.uhf.R;
+import com.example.uhf.api.MiraApiClient;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -73,7 +73,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MiraUHFReadTagFragment extends Fragment {
 
-    private static final String TAG = "MiraUHFInventory";
+    private static final String TAG = "MiraUHFReadTagFragment";
     
     // إعدادات زمنية
     private static final long DEFAULT_INACTIVITY_TIMEOUT_MS = 180000; // 3 دقائق
@@ -82,7 +82,6 @@ public class MiraUHFReadTagFragment extends Fragment {
     
     // إعدادات البلوتوث
     private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
-    private static final String DEFAULT_UHF_DEVICE_NAME = "CHAINWAY_C72";
     
     // ثوابت الحالة
     private static final String OFFLINE_PREFS = "uhf_inventory_cache";
@@ -91,11 +90,9 @@ public class MiraUHFReadTagFragment extends Fragment {
     // عناصر الواجهة
     private LinearLayout alertBannerView;
     private TextView tvAlertMessage;
-    private TextView tvConnectionType, tvConnectionDetails;
     private Button btnDisconnectReader, btnExportCSV, btnPrintReport, btnShareReport;
     private com.google.android.material.card.MaterialCardView cardConnectionInfo;
-    private LinearLayout layoutExportButtons;
-    private TextView tvBranchName, tvReaderStatus;
+    private TextView tvReaderStatus;
     private AppCompatSpinner spinnerZone;
     private TextView tvTotalScanned, tvUniqueTags, tvScanRate, tvElapsed;
     private TextView tvExpectedTotal, tvFoundCount, tvMissingCount, tvUnexpectedCount, tvReconciliationResult;
@@ -232,7 +229,7 @@ public class MiraUHFReadTagFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_mira_uhf_readtag, container, false);
+        return inflater.inflate(R.layout.fragment_mira_uhf_read_tag, container, false); 
     }
 
     @Override
@@ -283,14 +280,10 @@ public class MiraUHFReadTagFragment extends Fragment {
         }
     }
 
-    /**
-     * اكتشاف نوع الاتصال المتاح تلقائياً
-     */
     private void detectAndSetConnectionType() {
         if (isChainwayC72Device()) {
             activeConnectionType = ConnectionType.BUILT_IN;
         } else if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
-            // محاولة الاتصال بآخر جهاز مقترن
             String lastDevice = offlineCache.getString(PREF_LAST_CONNECTED_DEVICE, null);
             if (lastDevice != null) {
                 activeConnectionType = ConnectionType.BLUETOOTH;
@@ -316,7 +309,6 @@ public class MiraUHFReadTagFragment extends Fragment {
     private void initViews(View view) {
         alertBannerView = view.findViewById(R.id.alertBannerView);
         tvAlertMessage = view.findViewById(R.id.tvAlertMessage);
-        tvBranchName = view.findViewById(R.id.tvBranchName);
         tvReaderStatus = view.findViewById(R.id.tvReaderStatus);
         spinnerZone = view.findViewById(R.id.spinnerZone);
 
@@ -343,6 +335,12 @@ public class MiraUHFReadTagFragment extends Fragment {
         btnClearInventory = view.findViewById(R.id.btnClearInventory);
         btnFinalizeAudit = view.findViewById(R.id.btnFinalizeAudit);
         btnConnectReader = view.findViewById(R.id.btnConnectReader);
+        btnDisconnectReader = view.findViewById(R.id.btnDisconnectReader);
+        btnExportCSV = view.findViewById(R.id.btnExportCSV);
+        btnPrintReport = view.findViewById(R.id.btnPrintReport);
+        btnShareReport = view.findViewById(R.id.btnShareReport);
+        cardConnectionInfo = view.findViewById(R.id.cardConnectionInfo);
+        
         pbScanProgress = view.findViewById(R.id.pbScanProgress);
 
         tabFilterAll = view.findViewById(R.id.tabFilterAll);
@@ -352,7 +350,6 @@ public class MiraUHFReadTagFragment extends Fragment {
 
         rvRecentTags = view.findViewById(R.id.rvRecentTags);
         
-        // إظهار/إخفاء زر الاتصال حسب نوع القارئ
         if (btnConnectReader != null) {
             btnConnectReader.setVisibility(
                 activeConnectionType == ConnectionType.BLUETOOTH || 
@@ -374,22 +371,11 @@ public class MiraUHFReadTagFragment extends Fragment {
         btnClearInventory.setOnClickListener(v -> clearScanData());
         btnFinalizeAudit.setOnClickListener(v -> finalizeAndUploadAudit());
         
-        if (btnConnectReader != null) {
-            btnConnectReader.setOnClickListener(v -> showConnectionDialog());
-        }
-        if (btnDisconnectReader != null) {
-        btnDisconnectReader.setOnClickListener(v -> disconnectExternalReader());
-        }
-        if (btnExportCSV != null) {
-        btnExportCSV.setOnClickListener(v -> exportInventoryReport());
-        }
-if (btnPrintReport != null) {
-    btnPrintReport.setOnClickListener(v -> printInventoryReport());
-}
-if (btnShareReport != null) {
-    btnShareReport.setOnClickListener(v -> shareInventoryReport());
-}
-
+        if (btnConnectReader != null) btnConnectReader.setOnClickListener(v -> showConnectionDialog());
+        if (btnDisconnectReader != null) btnDisconnectReader.setOnClickListener(v -> disconnectExternalReader());
+        if (btnExportCSV != null) btnExportCSV.setOnClickListener(v -> exportInventoryReport());
+        if (btnPrintReport != null) btnPrintReport.setOnClickListener(v -> printInventoryReport());
+        if (btnShareReport != null) btnShareReport.setOnClickListener(v -> shareInventoryReport());
 
         tabFilterAll.setOnClickListener(v -> applyFilter("ALL"));
         tabFilterFound.setOnClickListener(v -> applyFilter("FOUND"));
@@ -398,61 +384,61 @@ if (btnShareReport != null) {
     }
     
     private void disconnectExternalReader() {
-    closeBluetoothConnection();
-    closeWifiConnection();
-    switchToSimulator();
-    if (cardConnectionInfo != null) cardConnectionInfo.setVisibility(View.GONE);
-}
+        closeBluetoothConnection();
+        closeWifiConnection();
+        switchToSimulator();
+        if (cardConnectionInfo != null) cardConnectionInfo.setVisibility(View.GONE);
+    }
 
     private void setupRecyclerView() {
         tagAdapter = new TagAdapter(filteredTagList);
         rvRecentTags.setLayoutManager(new LinearLayoutManager(getContext()));
         rvRecentTags.setAdapter(tagAdapter);
     }
-private void shareInventoryReport() {
-    // تصدير التقرير أولاً ثم مشاركته
-    networkExecutor.execute(() -> {
-        try {
-            StringBuilder csv = new StringBuilder();
-            csv.append("EPC,Title,Karat,Weight,Status,Timestamp\n");
 
-            for (TagModel tag : tagList) {
-                csv.append(tag.epc).append(",")
-                   .append("\"").append(tag.title != null ? tag.title : "").append("\",")
-                   .append(tag.karat != null ? tag.karat : "").append(",")
-                   .append(String.format(Locale.US, "%.2f", tag.weight)).append(",")
-                   .append(tag.status != null ? tag.status : "").append(",")
-                   .append(new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date()))
-                   .append("\n");
+    private void shareInventoryReport() {
+        networkExecutor.execute(() -> {
+            try {
+                StringBuilder csv = new StringBuilder();
+                csv.append("EPC,Title,Karat,Weight,Status,Timestamp\n");
+
+                for (TagModel tag : tagList) {
+                    csv.append(tag.epc).append(",")
+                       .append("\"").append(tag.title != null ? tag.title : "").append("\",")
+                       .append(tag.karat != null ? tag.karat : "").append(",")
+                       .append(String.format(Locale.US, "%.2f", tag.weight)).append(",")
+                       .append(tag.status != null ? tag.status : "").append(",")
+                       .append(new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date()))
+                       .append("\n");
+                }
+
+                File exportDir = new File(requireContext().getExternalFilesDir(
+                        Environment.DIRECTORY_DOCUMENTS), "AuditReports");
+                if (!exportDir.exists()) exportDir.mkdirs();
+
+                String filename = "Audit_Report_" + System.currentTimeMillis() + ".csv";
+                File file = new File(exportDir, filename);
+
+                FileOutputStream out = new FileOutputStream(file);
+                out.write(csv.toString().getBytes());
+                out.close();
+
+                mainHandler.post(() -> {
+                    Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                    shareIntent.setType("text/csv");
+                    shareIntent.putExtra(Intent.EXTRA_STREAM, 
+                            FileProvider.getUriForFile(requireContext(),
+                                    requireContext().getPackageName() + ".fileprovider", file));
+                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(shareIntent, "مشاركة تقرير الجرد"));
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Share error: " + e.getMessage());
             }
+        });
+    }
 
-            File exportDir = new File(requireContext().getExternalFilesDir(
-                    Environment.DIRECTORY_DOCUMENTS), "AuditReports");
-            if (!exportDir.exists()) exportDir.mkdirs();
-
-            String filename = "Audit_Report_" + System.currentTimeMillis() + ".csv";
-            File file = new File(exportDir, filename);
-
-            FileOutputStream out = new FileOutputStream(file);
-            out.write(csv.toString().getBytes());
-            out.close();
-
-            // مشاركة الملف
-            mainHandler.post(() -> {
-                Intent shareIntent = new Intent(Intent.ACTION_SEND);
-                shareIntent.setType("text/csv");
-                shareIntent.putExtra(Intent.EXTRA_STREAM, 
-                        androidx.core.content.FileProvider.getUriForFile(requireContext(),
-                                requireContext().getPackageName() + ".fileprovider", file));
-                shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                startActivity(Intent.createChooser(shareIntent, "مشاركة تقرير الجرد"));
-            });
-
-        } catch (Exception e) {
-            Log.e(TAG, "Share error: " + e.getMessage());
-        }
-    });
-}
     private void setupZoneSpinner() {
         List<String> zones = new ArrayList<>();
         zones.add("الكل");
@@ -585,7 +571,6 @@ private void shareInventoryReport() {
             return;
         }
 
-        // الحصول على الأجهزة المقترنة
         Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
         List<String> deviceNames = new ArrayList<>();
         List<BluetoothDevice> deviceList = new ArrayList<>();
@@ -626,7 +611,6 @@ private void shareInventoryReport() {
                 btOutputStream = bluetoothSocket.getOutputStream();
                 connectedDevice = device;
 
-                // حفظ عنوان الجهاز للاستخدام المستقبلي
                 offlineCache.edit().putString(PREF_LAST_CONNECTED_DEVICE, device.getAddress()).apply();
 
                 activeConnectionType = ConnectionType.BLUETOOTH;
@@ -637,7 +621,6 @@ private void shareInventoryReport() {
                     Toast.makeText(getContext(), "✅ تم الاتصال بالقارئ عبر البلوتوث", Toast.LENGTH_SHORT).show();
                 });
 
-                // بدء قراءة البيانات من البلوتوث
                 startBluetoothReading();
 
             } catch (IOException e) {
@@ -668,7 +651,6 @@ private void shareInventoryReport() {
                 }
             }
 
-            // إذا وصلنا هنا، الاتصال انقطع
             handleBluetoothDisconnection();
         });
     }
@@ -751,7 +733,6 @@ private void shareInventoryReport() {
                     Toast.makeText(getContext(), "✅ تم الاتصال بالقارئ عبر WiFi", Toast.LENGTH_SHORT).show();
                 });
 
-                // بدء قراءة البيانات
                 startWifiReading();
 
             } catch (IOException e) {
@@ -817,21 +798,9 @@ private void shareInventoryReport() {
         Toast.makeText(getContext(), "تم التحويل إلى وضع المحاكاة", Toast.LENGTH_SHORT).show();
     }
 
-    /**
-     * تحليل بيانات الشرائح الواردة من القارئ
-     * يدعم صيغ متعددة من أجهزة UHF المختلفة
-     */
     private void parseAndProcessTagData(String rawData) {
         try {
-            // تنظيف البيانات
             String cleanData = rawData.replaceAll("[\\r\\n\\s]+", " ").trim();
-            
-            // الصيغ المدعومة:
-            // 1. EPC,RSSI (مثال: E2003412013B020115220C0E4,-45)
-            // 2. EPC فقط (مثال: E2003412013B020115220C0E4)
-            // 3. Chainway R2000: EPC=XXX,RSSI=YYY
-            // 4. JSON: {"epc":"XXX","rssi":YYY}
-            
             String[] parts = cleanData.split("[,;\\s]+");
             
             for (String part : parts) {
@@ -839,14 +808,12 @@ private void shareInventoryReport() {
                 double rssi = -50;
                 
                 if (part.startsWith("{")) {
-                    // صيغة JSON
                     try {
                         JSONObject json = new JSONObject(part);
                         epc = json.optString("epc", json.optString("tag", null));
                         rssi = json.optDouble("rssi", -50);
                     } catch (Exception ignored) {}
                 } else if (part.contains("=")) {
-                    // صيغة Key=Value
                     String[] kv = part.split("=");
                     if (kv.length >= 2) {
                         if (kv[0].toUpperCase().contains("EPC")) {
@@ -857,7 +824,6 @@ private void shareInventoryReport() {
                         }
                     }
                 } else if (part.length() >= 24 && part.matches("[A-Fa-f0-9]+")) {
-                    // صيغة EPC سداسية عشرية
                     epc = part;
                 }
                 
@@ -972,7 +938,6 @@ private void shareInventoryReport() {
         mainHandler.post(timerRunnable);
         resetInactivityTimer();
 
-        // تشغيل القارئ حسب نوع الاتصال
         switch (activeConnectionType) {
             case BUILT_IN:
                 startBuiltInReader();
@@ -1034,7 +999,6 @@ private void shareInventoryReport() {
         mainHandler.removeCallbacks(timerRunnable);
         mainHandler.removeCallbacks(inactivityRunnable);
         
-        // معالجة آخر دفعة
         processPendingBatch();
 
         setInventoryState(InventoryState.COMPLETED);
@@ -1048,7 +1012,6 @@ private void shareInventoryReport() {
         stopBuiltInReader();
         stopSimulation();
         
-        // إرسال أمر إيقاف للقارئ الخارجي
         if (btOutputStream != null && activeConnectionType == ConnectionType.BLUETOOTH) {
             try {
                 btOutputStream.write("STOP\r\n".getBytes());
@@ -1112,38 +1075,20 @@ private void shareInventoryReport() {
         Toast.makeText(getContext(), "🗑 تم مسح بيانات الجلسة", Toast.LENGTH_SHORT).show();
     }
 
-    // ==================== أوامر القارئ المدمج (Chainway C72 SDK) ====================
+    // ==================== أوامر القارئ المدمج ====================
     
     private void startBuiltInReader() {
-        hardwareExecutor.execute(() -> {
-            try {
-                // TODO: استبدل هذا بالكود الفعلي لـ Chainway R2000 SDK
-                // مثال:
-                // RFIDWithUHFSDK.getInstance().setPower(30);
-                // RFIDWithUHFSDK.getInstance().startInventory(new RFIDWithUHFSDK.OnInventoryListener() {
-                //     @Override
-                //     public void onTagRead(String epc, int rssi) {
-                //         onTagScanned(epc, (double) rssi);
-                //     }
-                // });
-                
-                Log.d(TAG, "Chainway R2000: بدء المسح المدمج");
-            } catch (Exception e) {
-                Log.e(TAG, "خطأ في تشغيل القارئ المدمج: " + e.getMessage());
-            }
-        });
+        hardwareExecutor.execute(() -> Log.d(TAG, "Chainway R2000: بدء المسح المدمج"));
     }
 
     private void stopBuiltInReader() {
         try {
-            // TODO: RFIDWithUHFSDK.getInstance().stopInventory();
             Log.d(TAG, "Chainway R2000: إيقاف المسح المدمج");
         } catch (Exception e) {
             Log.e(TAG, "خطأ في إيقاف القارئ المدمج: " + e.getMessage());
         }
     }
 
-    // أوامر البلوتوث للقارئ الخارجي
     private void startBluetoothScan() {
         if (btOutputStream != null) {
             hardwareExecutor.execute(() -> {
@@ -1172,16 +1117,12 @@ private void shareInventoryReport() {
 
     // ==================== معالجة الشرائح مع التجميع ====================
 
-    /**
-     * استدعاء عند التقاط شريحة RFID
-     */
     public void onTagScanned(String epc, double rssi) {
         if (currentState != InventoryState.SCANNING || epc == null || epc.isEmpty()) return;
 
         resetInactivityTimer();
         totalScannedCount++;
 
-        // إضافة للقائمة المعلقة
         synchronized (pendingTagsQueue) {
             TagModel model = new TagModel();
             model.epc = epc.trim();
@@ -1189,7 +1130,6 @@ private void shareInventoryReport() {
             pendingTagsQueue.add(model);
         }
 
-        // تحديث العداد فوراً (خفيف)
         mainHandler.post(() -> {
             tvTotalScanned.setText(String.valueOf(totalScannedCount));
             
@@ -1199,28 +1139,21 @@ private void shareInventoryReport() {
             }
         });
 
-        // جدولة تحديث الواجهة المجمع
         scheduleUiUpdate();
         
-        // تفريغ فوري إذا تجاوز الحد
         if (pendingTagsQueue.size() >= BATCH_SIZE_THRESHOLD) {
             mainHandler.post(this::processPendingBatch);
         }
     }
 
-    /**
-     * جدولة تحديث الواجهة بطريقة مجمعة لمنع البطء
-     */
     private void scheduleUiUpdate() {
         long now = System.currentTimeMillis();
         long timeSinceLastUpdate = now - lastUiUpdateTime;
 
         if (!isUiUpdateScheduled) {
             if (timeSinceLastUpdate >= UI_UPDATE_INTERVAL_MS) {
-                // تحديث فوري
                 mainHandler.post(uiBatchUpdateRunnable);
             } else {
-                // جدولة بعد المدة المتبقية
                 isUiUpdateScheduled = true;
                 long delay = UI_UPDATE_INTERVAL_MS - timeSinceLastUpdate;
                 mainHandler.postDelayed(uiBatchUpdateRunnable, delay);
@@ -1228,9 +1161,6 @@ private void shareInventoryReport() {
         }
     }
 
-    /**
-     * معالجة الشرائح المعلقة دفعة واحدة
-     */
     private void processPendingBatch() {
         if (isProcessingBatch.get() || pendingTagsQueue.isEmpty()) return;
         
@@ -1247,16 +1177,12 @@ private void shareInventoryReport() {
 
             if (batch.isEmpty()) return;
 
-            // معالجة كل شريحة في الدفعة
             for (TagModel model : batch) {
                 processSingleTag(model);
             }
 
-            // تحديث الكل مرة واحدة
             updateReconciliationStats();
             applyFilter(currentFilter);
-            
-            // التحقق من الاكتمال
             checkInventoryCompletion();
             
         } finally {
@@ -1380,9 +1306,6 @@ private void shareInventoryReport() {
         }
     }
 
-    /**
-     * تطبيق الفلتر مع استخدام الكاش للعجز لتجنب إعادة الإنشاء
-     */
     private void applyFilter(String filter) {
         currentFilter = filter;
         filteredTagList.clear();
@@ -1398,7 +1321,6 @@ private void shareInventoryReport() {
                 
             case "MISSING":
                 tabFilterMissing.setTextColor(Color.parseColor("#0284C7"));
-                // استخدام الكاش إذا كان متاحاً
                 if (isMissingCacheDirty) {
                     buildMissingItemsCache();
                 }
@@ -1423,9 +1345,6 @@ private void shareInventoryReport() {
         tagAdapter.notifyDataSetChanged();
     }
 
-    /**
-     * بناء كاش العناصر المفقودة مرة واحدة فقط عند تغير البيانات
-     */
     private void buildMissingItemsCache() {
         missingItemsCache.clear();
         for (Map.Entry<String, ExpectedItem> entry : expectedItemsMap.entrySet()) {
@@ -1442,13 +1361,6 @@ private void shareInventoryReport() {
         }
         isMissingCacheDirty = false;
     }
-
-    // ==================== باقي الدوال المساعدة ====================
-    // (showCompletionDialog, triggerSoldAlert, updateLastTagCard, resetTabStyles,
-    //  finalizeAndUploadAudit, exportInventoryReport, printInventoryReport,
-    //  startSimulation, stopSimulation, generateSimulatedTag, startReaderMonitoring,
-    //  playSuccessSound, playWarningSound, playAlertSound, onDestroyView)
-    // ... نفس الدوال من النسخة السابقة مع تعديل startReaderMonitoring
 
     private void showCompletionDialog() {
         new AlertDialog.Builder(requireContext())
@@ -1704,21 +1616,15 @@ private void shareInventoryReport() {
     }
 
     private void playSuccessSound() {
-        if (soundPool != null) {
-            soundPool.play(soundSuccessId, 0.7f, 0.7f, 1, 0, 1.0f);
-        }
+        if (soundPool != null) soundPool.play(soundSuccessId, 0.7f, 0.7f, 1, 0, 1.0f);
     }
 
     private void playWarningSound() {
-        if (soundPool != null) {
-            soundPool.play(soundWarningId, 0.7f, 0.7f, 1, 0, 1.0f);
-        }
+        if (soundPool != null) soundPool.play(soundWarningId, 0.7f, 0.7f, 1, 0, 1.0f);
     }
 
     private void playAlertSound() {
-        if (soundPool != null) {
-            soundPool.play(soundAlertId, 1.0f, 1.0f, 1, 0, 1.0f);
-        }
+        if (soundPool != null) soundPool.play(soundAlertId, 1.0f, 1.0f, 1, 0, 1.0f);
     }
 
     @Override
@@ -1731,12 +1637,8 @@ private void shareInventoryReport() {
         closeBluetoothConnection();
         closeWifiConnection();
 
-        if (networkExecutor != null && !networkExecutor.isShutdown()) {
-            networkExecutor.shutdown();
-        }
-        if (hardwareExecutor != null && !hardwareExecutor.isShutdown()) {
-            hardwareExecutor.shutdown();
-        }
+        if (networkExecutor != null && !networkExecutor.isShutdown()) networkExecutor.shutdown();
+        if (hardwareExecutor != null && !hardwareExecutor.isShutdown()) hardwareExecutor.shutdown();
         if (soundPool != null) {
             soundPool.release();
             soundPool = null;
