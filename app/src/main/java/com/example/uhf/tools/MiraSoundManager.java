@@ -81,6 +81,15 @@ public class MiraSoundManager {
             fallbackToneGen.startTone(ToneGenerator.TONE_CDMA_EMERGENCY_RINGBACK, 300);
         }
     }
+    
+    // الدالة الجديدة المطلوبة للحل
+    public void playSoldAlert() {
+        if (isLoaded && soundAlarm != 0) {
+            playAlarm();
+        } else {
+            playWarning();
+        }
+    }
 
     public void release() {
         try {
