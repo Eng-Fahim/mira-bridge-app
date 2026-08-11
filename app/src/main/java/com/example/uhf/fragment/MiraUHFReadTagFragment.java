@@ -91,6 +91,10 @@ public class MiraUHFReadTagFragment extends Fragment {
     // عناصر الواجهة
     private LinearLayout alertBannerView;
     private TextView tvAlertMessage;
+    private TextView tvConnectionType, tvConnectionDetails;
+    private Button btnDisconnectReader, btnExportCSV, btnPrintReport, btnShareReport;
+    private com.google.android.material.card.MaterialCardView cardConnectionInfo;
+    private LinearLayout layoutExportButtons;
     private TextView tvBranchName, tvReaderStatus;
     private AppCompatSpinner spinnerZone;
     private TextView tvTotalScanned, tvUniqueTags, tvScanRate, tvElapsed;
@@ -373,19 +377,82 @@ public class MiraUHFReadTagFragment extends Fragment {
         if (btnConnectReader != null) {
             btnConnectReader.setOnClickListener(v -> showConnectionDialog());
         }
+        if (btnDisconnectReader != null) {
+        btnDisconnectReader.setOnClickListener(v -> disconnectExternalReader());
+        }
+        if (btnExportCSV != null) {
+        btnExportCSV.setOnClickListener(v -> exportInventoryReport());
+        }
+if (btnPrintReport != null) {
+    btnPrintReport.setOnClickListener(v -> printInventoryReport());
+}
+if (btnShareReport != null) {
+    btnShareReport.setOnClickListener(v -> shareInventoryReport());
+}
+
 
         tabFilterAll.setOnClickListener(v -> applyFilter("ALL"));
         tabFilterFound.setOnClickListener(v -> applyFilter("FOUND"));
         tabFilterMissing.setOnClickListener(v -> applyFilter("MISSING"));
         tabFilterUnexpected.setOnClickListener(v -> applyFilter("UNEXPECTED"));
     }
+    
+    private void disconnectExternalReader() {
+    closeBluetoothConnection();
+    closeWifiConnection();
+    switchToSimulator();
+    if (cardConnectionInfo != null) cardConnectionInfo.setVisibility(View.GONE);
+}
 
     private void setupRecyclerView() {
         tagAdapter = new TagAdapter(filteredTagList);
         rvRecentTags.setLayoutManager(new LinearLayoutManager(getContext()));
         rvRecentTags.setAdapter(tagAdapter);
     }
+private void shareInventoryReport() {
+    // تصدير التقرير أولاً ثم مشاركته
+    networkExecutor.execute(() -> {
+        try {
+            StringBuilder csv = new StringBuilder();
+            csv.append("EPC,Title,Karat,Weight,Status,Timestamp\n");
 
+            for (TagModel tag : tagList) {
+                csv.append(tag.epc).append(",")
+                   .append("\"").append(tag.title != null ? tag.title : "").append("\",")
+                   .append(tag.karat != null ? tag.karat : "").append(",")
+                   .append(String.format(Locale.US, "%.2f", tag.weight)).append(",")
+                   .append(tag.status != null ? tag.status : "").append(",")
+                   .append(new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date()))
+                   .append("\n");
+            }
+
+            File exportDir = new File(requireContext().getExternalFilesDir(
+                    Environment.DIRECTORY_DOCUMENTS), "AuditReports");
+            if (!exportDir.exists()) exportDir.mkdirs();
+
+            String filename = "Audit_Report_" + System.currentTimeMillis() + ".csv";
+            File file = new File(exportDir, filename);
+
+            FileOutputStream out = new FileOutputStream(file);
+            out.write(csv.toString().getBytes());
+            out.close();
+
+            // مشاركة الملف
+            mainHandler.post(() -> {
+                Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                shareIntent.setType("text/csv");
+                shareIntent.putExtra(Intent.EXTRA_STREAM, 
+                        androidx.core.content.FileProvider.getUriForFile(requireContext(),
+                                requireContext().getPackageName() + ".fileprovider", file));
+                shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(Intent.createChooser(shareIntent, "مشاركة تقرير الجرد"));
+            });
+
+        } catch (Exception e) {
+            Log.e(TAG, "Share error: " + e.getMessage());
+        }
+    });
+}
     private void setupZoneSpinner() {
         List<String> zones = new ArrayList<>();
         zones.add("الكل");
@@ -1761,4 +1828,4 @@ public class MiraUHFReadTagFragment extends Fragment {
             }
         }
     }
-                                              }
+}
