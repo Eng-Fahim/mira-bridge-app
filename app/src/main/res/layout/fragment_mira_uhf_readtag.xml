@@ -41,7 +41,7 @@
             android:padding="16dp">
 
             <!-- هيدر معلومات الفرع والقارئ -->
-            <CardView
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
@@ -74,7 +74,7 @@
                         android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-            </CardView>
+            </com.google.android.material.card.MaterialCardView>
 
             <!-- محدد المنطقة (Zone Selector) -->
             <LinearLayout
@@ -108,7 +108,7 @@
                 android:layout_marginBottom="12dp"
                 android:orientation="horizontal">
 
-                <CardView
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="6dp"
@@ -139,9 +139,9 @@
                             android:textSize="18sp"
                             android:textStyle="bold" />
                     </LinearLayout>
-                </CardView>
+                </com.google.android.material.card.MaterialCardView>
 
-                <CardView
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="6dp"
@@ -172,9 +172,9 @@
                             android:textSize="18sp"
                             android:textStyle="bold" />
                     </LinearLayout>
-                </CardView>
+                </com.google.android.material.card.MaterialCardView>
 
-                <CardView
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="6dp"
@@ -205,9 +205,9 @@
                             android:textSize="18sp"
                             android:textStyle="bold" />
                     </LinearLayout>
-                </CardView>
+                </com.google.android.material.card.MaterialCardView>
 
-                <CardView
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -237,11 +237,11 @@
                             android:textSize="18sp"
                             android:textStyle="bold" />
                     </LinearLayout>
-                </CardView>
+                </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
 
             <!-- ملخص المطابقة والجرد (Reconciliation Summary) -->
-            <CardView
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
@@ -333,10 +333,10 @@
                         android:textSize="14sp"
                         android:textStyle="bold" />
                 </LinearLayout>
-            </CardView>
+            </com.google.android.material.card.MaterialCardView>
 
             <!-- بطاقة إظهار آخر قطعة ممسوحة -->
-            <CardView
+            <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardLastTag"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -407,7 +407,7 @@
                             android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
-            </CardView>
+            </com.google.android.material.card.MaterialCardView>
 
             <!-- أزرار العمليات الرئيسية للجرد -->
             <LinearLayout
@@ -499,7 +499,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:gravity="center"
+                    android:gravity`="center"
                     android:padding="8dp"
                     android:text="المطابق"
                     android:textStyle="bold" />
