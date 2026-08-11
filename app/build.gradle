@@ -1,129 +1,175 @@
 plugins {
-    id 'com.android.application'
+
+id 'com.android.application'
+
 }
 
 android {
-    namespace 'com.example.uhf'
-    compileSdk 34
 
-    defaultConfig {
-        applicationId "com.mira.jewelry.enterprise"
-        minSdk 26
-        targetSdk 33
-        versionCode 2
-        versionName "1.4.6"
-        buildConfigField "boolean", "Test", "false"
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+namespace 'com.example.uhf'
 
-        // 🎯 1. حصر النواتج لمعماريات معالجات أجهزة ARM الفعلية فقط (إزالة x86/x86_64 الخاصة بالمحاكيات)
-        ndk {
-            abiFilters 'armeabi-v7a', 'arm64-v8a'
-        }
+compileSdk 34
+
+
+
+defaultConfig {
+
+    applicationId "com.mira.jewelry.enterprise"
+
+    minSdk 26
+
+    targetSdk 33
+
+    versionCode 2
+
+    versionName "1.4.6"
+
+    buildConfigField "boolean", "Test", "false"
+
+    testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+}
+
+
+
+signingConfigs {
+
+    debug {
+
+        storeFile file("uhf-serial_release.jks")
+
+        storePassword "123456"
+
+        keyPassword "123456"
+
+        keyAlias "uhf-serial-key"
+
     }
 
-    // 🎯 2. إستبعاد ملفات الـ Meta والتراخيص المكررة لمنع التعارض وتقليل الحجم
-    packagingOptions {
-        resources {
-            excludes += [
-                'META-INF/DEPENDENCIES',
-                'META-INF/LICENSE',
-                'META-INF/LICENSE.txt',
-                'META-INF/license.txt',
-                'META-INF/NOTICE',
-                'META-INF/NOTICE.txt',
-                'META-INF/notice.txt',
-                'META-INF/ASL2.0',
-                'META-INF/*.kotlin_module'
-            ]
-        }
+    release {
+
+        storeFile file("uhf-serial_release.jks")
+
+        storePassword "123456"
+
+        keyPassword "123456"
+
+        keyAlias "uhf-serial-key"
+
     }
 
-    signingConfigs {
-        debug {
-            storeFile file("uhf-serial_release.jks")
-            storePassword "123456"
-            keyPassword "123456"
-            keyAlias "uhf-serial-key"
-        }
-        release {
-            storeFile file("uhf-serial_release.jks")
-            storePassword "123456"
-            keyPassword "123456"
-            keyAlias "uhf-serial-key"
-        }
+}
+
+
+
+buildTypes {
+
+    release {
+
+        signingConfig signingConfigs.release
+
+        minifyEnabled false
+
+        shrinkResources false
+
+        proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+
     }
 
-    buildTypes {
-        release {
-            signingConfig signingConfigs.release
+    debug {
 
-            // تفعيل ضغط وتقليص الكود والموارد
-            minifyEnabled true
-            shrinkResources true
+        signingConfig signingConfigs.debug
 
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
-                    'proguard-rules.pro'
-        }
+        minifyEnabled false
 
-        debug {
-            signingConfig signingConfigs.debug
-            minifyEnabled false
-        }
+        proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+
     }
 
-    buildFeatures {
-        viewBinding true
-        buildConfig true
-    }
+}
 
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
 
-    lintOptions {
-        checkReleaseBuilds false
-        abortOnError false
-    }
+
+buildFeatures {
+
+    viewBinding true
+
+    buildConfig true
+
+}
+
+
+
+compileOptions {
+
+    sourceCompatibility JavaVersion.VERSION_1_8
+
+    targetCompatibility JavaVersion.VERSION_1_8
+
+}
+
+
+
+lintOptions {
+
+    checkReleaseBuilds false
+
+    abortOnError false
+
+}
+
 }
 
 dependencies {
-    // 🎯 مكتبات الأجهزة والمستندات المخزنة محلياً
-    implementation files('libs/DeviceAPI_ver20251103_release.aar')
-    implementation files('libs/jxl.jar')
-    implementation files('libs/poi-3.12-android-a.jar')
-    implementation files('libs/poi-ooxml-schemas-3.12-20150511-a.jar')
-    implementation files('libs/xUtils-2.5.5.jar')
-    
-    // 🔐 🎯 حل مشكلة Biometrics (تم إضافة المكتبة هنا لمنع خطأ compilation)
-    implementation 'androidx.biometric:biometric:1.1.0'
 
-    // AndroidX & UI Components
-    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
-    implementation 'androidx.appcompat:appcompat:1.7.0'
-    implementation 'com.google.android.material:material:1.12.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-    implementation 'androidx.preference:preference:1.2.1'
-    
-    // Testing
-    testImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
-    
-    // Scanning & Charts
-    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
-    implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
-    implementation 'com.google.mlkit:barcode-scanning:17.2.0'
+implementation 'androidx.biometric:biometric:1.2.0-alpha05'
 
-    // Network & API
-    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
-    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
-    implementation 'com.google.code.gson:gson:2.10.1'
-    
-    // CameraX
-    def camerax_version = "1.3.0"
-    implementation "androidx.camera:camera-core:${camerax_version}"
-    implementation "androidx.camera:camera-camera2:${camerax_version}"
-    implementation "androidx.camera:camera-lifecycle:${camerax_version}"
-    implementation "androidx.camera:camera-view:${camerax_version}"
+implementation fileTree(dir: 'libs', include: ['*.*'])
+
+implementation files('libs/jxl.jar')
+
+implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+
+implementation 'androidx.appcompat:appcompat:1.7.0'
+
+implementation 'com.google.android.material:material:1.12.0'
+
+implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+
+testImplementation 'junit:junit:4.13.2'
+
+androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+
+androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
+
+implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+
+implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
+
+implementation 'com.google.mlkit:barcode-scanning:17.2.0'
+
+
+
+implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+
+implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+
+implementation 'com.google.code.gson:gson:2.10.1'
+
+def camerax_version = "1.3.0"
+
+implementation "androidx.camera:camera-core:${camerax_version}"
+
+
+
+implementation "androidx.camera:camera-camera2:${camerax_version}"
+
+implementation "androidx.camera:camera-lifecycle:${camerax_version}"
+
+implementation "androidx.camera:camera-view:${camerax_version}"
+
+
+
+implementation 'androidx.preference:preference:1.2.1'
+
 }
