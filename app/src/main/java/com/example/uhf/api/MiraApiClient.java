@@ -785,8 +785,8 @@ public void submitInventoryAuditReport(JSONObject payload) {
 
 // دالة جلب تفاصيل القطعة عبر الـ EPC
 public ApiResponse getItemDetailsByEPC(String epc) {
-    // ضع كود استدعاء API جلب القطعة هنا
-    return new ApiResponse(true, "OK", null);
+    return get("/item/" + epc);
 }
+
 
 }
