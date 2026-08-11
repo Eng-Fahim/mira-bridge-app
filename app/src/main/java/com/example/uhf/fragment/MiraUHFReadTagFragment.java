@@ -1,5 +1,5 @@
 package com.example.uhf.fragment;
-private boolean exitWarningShown = false;
+
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -69,7 +69,7 @@ public class MiraUHFReadTagFragment extends Fragment {
     private static final String TAG = "MiraUHFInventory";
     private static final int REQUEST_CAMERA_SCAN = 49374;
     private static final String OFFLINE_PREFS = "uhf_inventory_cache";
-
+    
     private final ExecutorService queryExecutor = Executors.newFixedThreadPool(4);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Handler timerHandler = new Handler(Looper.getMainLooper());
@@ -89,6 +89,8 @@ public class MiraUHFReadTagFragment extends Fragment {
     private final AtomicInteger unexpectedCount = new AtomicInteger(0);
 
     private boolean isScanning = false;
+    private boolean exitWarningShown = false;
+
     private boolean isPaused = false;
     private boolean isSimulating = false;
     private long startTime = 0;
@@ -730,4 +732,4 @@ private void showExitWarningDialog() {
         @Override public int getItemCount() { synchronized (list) { return list.size(); } }
         class VH extends RecyclerView.ViewHolder { TextView tvEPC, tvTitle, tvDetails, tvStatus, tvTime; VH(View v) { super(v); tvEPC = v.findViewById(R.id.tvTagEPC); tvTitle = v.findViewById(R.id.tvTagTitle); tvDetails = v.findViewById(R.id.tvTagDetails); tvStatus = v.findViewById(R.id.tvTagStatus); tvTime = v.findViewById(R.id.tvTagTime); } }
     }
-}
+                                  }
