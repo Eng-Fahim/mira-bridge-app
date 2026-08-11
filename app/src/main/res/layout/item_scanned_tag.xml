@@ -32,9 +32,9 @@
                 android:textSize="13sp"
                 android:textStyle="bold" />
 
-            <!-- ID: tvTagEPC -->
+            <!-- ID: tvTagEpc (تم تصحيح الحرف الأخير إلى c صغيرة لتطابق الجافا) -->
             <TextView
-                android:id="@+id/tvTagEPC"
+                android:id="@+id/tvTagEpc"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="E2801191A00000000000"
@@ -76,6 +76,16 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="10:45:12"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="10sp"
+                android:layout_marginTop="2dp" />
+
+            <!-- ID: tvTagRssi (مضاف حديثاً لتجنب خطأ الكومبايلر) -->
+            <TextView
+                android:id="@+id/tvTagRssi"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="-55 dBm"
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="10sp"
                 android:layout_marginTop="2dp" />
