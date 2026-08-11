@@ -7,17 +7,9 @@ import com.rscja.deviceapi.RFIDWithUHFUART;
 
 /**
  * نظام ذكي لاكتشاف وتكوين أجهزة Chainway RFID
- * 
- * التدفق:
- * 1. اكتشاف الجهاز
- * 2. قراءة قدراته الفعلية (Version, Power Range, Frequency)
- * 3. تطبيق Profile مناسب
- * 4. التحقق من نجاح الإعداد
- * 5. تسجيل النتيجة
- * 6. السماح للتطبيق بالعمل
  */
 public class DeviceDetector {
-    
+
     private static final String TAG = "MIRA.DeviceDetector";
     
     // ==================== حالة الجهاز ====================
@@ -39,83 +31,22 @@ public class DeviceDetector {
     private static DeviceProfile activeProfile = null;
     private static String lastError = null;
     private static long detectionTime = 0;
-    
-    // ==================== Device Profile ====================
-    
-    public static class DeviceProfile {
-        public String modelName;
-        public DeviceModel model;
-        public String softwareVersion;
-        public String hardwareVersion;
+
+    // ==================== Check Methods ====================
+
+    /**
+     * التحقق الشامل هل الجهاز هو Chainway C72 سواء من الاسم، المصنّع، أو الـ Model
+     */
+    public static boolean isChainwayC72() {
+        String model = Build.MODEL != null ? Build.MODEL.toUpperCase() : "";
+        String manufacturer = Build.MANUFACTURER != null ? Build.MANUFACTURER.toUpperCase() : "";
         
-        // Capabilities
-        public int minPower;
-        public int maxPower;
-        public int appliedPower;
-        public int temperature;
-        public int frequencyMode;
-        public String frequencyRange;
-        
-        // Status
-        public boolean powerVerified;
-        public boolean frequencyVerified;
-        public boolean temperatureOK;
-        public boolean ready;
-        
-        // Metadata
-        public long timestamp;
-        public String androidVersion;
-        public int sdkInt;
-        
-        @Override
-        public String toString() {
-            return String.format(
-                "MIRA Device Profile\n" +
-                "═══════════════════\n" +
-                "Model: %s (%s)\n" +
-                "SW: %s | HW: %s\n" +
-                "Power: %d/%d dBm (Set: %d) %s\n" +
-                "Frequency: %s %s\n" +
-                "Temperature: %d°C %s\n" +
-                "Status: %s\n" +
-                "Android: %s (SDK %d)\n" +
-                "═══════════════════",
-                modelName, model.name(),
-                softwareVersion, hardwareVersion,
-                minPower, maxPower, appliedPower, powerVerified ? "✓" : "✗",
-                frequencyRange, frequencyVerified ? "✓" : "✗",
-                temperature, temperatureOK ? "✓" : "✗",
-                ready ? "✅ READY" : "❌ NOT READY",
-                androidVersion, sdkInt
-            );
-        }
+        return model.contains("C72") || model.contains("CHAINWAY") || manufacturer.contains("CHAINWAY") || getDeviceModel() == DeviceModel.C72;
     }
-    
-    // ==================== Detection ====================
-    
-    public static String getDeviceModelName() {
-        return Build.MODEL;
-    }
-    
-    public static DeviceModel getDeviceModel() {
-        if (cachedModel != null) return cachedModel;
-        
-        String model = getDeviceModelName().toLowerCase().replace(" ", "").replace("_", "");
-        
-        if (model.contains("c5")) {
-            cachedModel = DeviceModel.C5;
-        } else if (model.contains("c72")) {
-            cachedModel = DeviceModel.C72;
-        } else {
-            cachedModel = DeviceModel.UNKNOWN;
-        }
-        
-        Log.i(TAG, "Device detected: " + getDeviceModelName() + " → " + cachedModel.name());
-        return cachedModel;
-    }
-    
+
     public static boolean isC5() { return getDeviceModel() == DeviceModel.C5; }
-    public static boolean isC72() { return getDeviceModel() == DeviceModel.C72; }
+    public static boolean isC72() { return isChainwayC72(); }
+
     public static ProfileStatus getStatus() { return profileStatus; }
     public static DeviceProfile getProfile() { return activeProfile; }
     public static String getLastError() { return lastError; }
