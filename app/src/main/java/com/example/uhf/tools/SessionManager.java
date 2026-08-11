@@ -26,15 +26,16 @@ public class SessionManager {
     private final SharedPreferences.Editor editor;
 
     public enum Role {
-        SYSTEM_ADMIN,
-        ORG_ADMIN,
-        BRANCH_MANAGER,
-        INVENTORY_MGR,
-        POS_OPERATOR,
-        SECURITY,
-        GATE_SECURITY,
-        AUDITOR
-    }
+    SYSTEM_ADMIN,
+    ORG_ADMIN,
+    ADMIN,           // ← تأكد من وجوده
+    BRANCH_MANAGER,
+    INVENTORY_MGR,
+    POS_OPERATOR,
+    SECURITY,
+    GATE_SECURITY,
+    AUDITOR
+}
 
     public SessionManager(Context context) {
         pref = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
@@ -62,14 +63,14 @@ public class SessionManager {
     public boolean isSystemAdmin() { return "SYSTEM_ADMIN".equals(getRoleString()); }
 
     public boolean isAnyAdmin() {
-        String role = getRoleString();
-        return "SYSTEM_ADMIN".equals(role) || "ORG_ADMIN".equals(role);
-    }
+    String role = getRoleString();
+    return "SYSTEM_ADMIN".equals(role) || "ORG_ADMIN".equals(role) || "ADMIN".equals(role);
+}
 
-    public boolean isManager() {
-        String role = getRoleString();
-        return "SYSTEM_ADMIN".equals(role) || "ORG_ADMIN".equals(role) || "BRANCH_MANAGER".equals(role);
-    }
+public boolean isManager() {
+    String role = getRoleString();
+    return "SYSTEM_ADMIN".equals(role) || "ORG_ADMIN".equals(role) || "ADMIN".equals(role) || "BRANCH_MANAGER".equals(role);
+}
 
     public String getUsername()   { return pref.getString(KEY_USERNAME, ""); }
     public String getUserName()   { return pref.getString(KEY_USERNAME, ""); }
