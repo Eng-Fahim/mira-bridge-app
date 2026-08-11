@@ -502,7 +502,6 @@ public class MiraUHFReadTagFragment extends Fragment {
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray items = response.data.optJSONArray("items");
                     if (items != null && items.length() > 0) {
-                        List<String> gtins = new ArrayList<>();
                         for (int i = 0; i < items.length(); i++) {
                             JSONObject obj = items.getJSONObject(i);
                             ExpectedItem item = new ExpectedItem();
@@ -527,7 +526,6 @@ public class MiraUHFReadTagFragment extends Fragment {
                                 }
 
                                 expectedItemsMap.put(item.epc, item);
-                                gtins.add(item.epc);
                             }
                         }
                     }
@@ -1043,6 +1041,13 @@ public class MiraUHFReadTagFragment extends Fragment {
         if (btnStopInventory != null) btnStopInventory.setOnClickListener(v -> stopInventory());
         if (btnClearInventory != null) btnClearInventory.setOnClickListener(v -> clearInventory());
         if (btnFinalizeAudit != null) btnFinalizeAudit.setOnClickListener(v -> finalizeAuditSession());
+
+        if (btnExportInventory != null) btnExportInventory.setOnClickListener(v -> exportInventoryReport(false));
+        if (btnExportMissing != null) btnExportMissing.setOnClickListener(v -> exportInventoryReport(true));
+        if (btnScreenshot != null) btnScreenshot.setOnClickListener(v -> printInventoryReport());
+        if (btnScanCamera != null) btnScanCamera.setOnClickListener(v -> openManualBarcodeInputDialog());
+        if (btnHelpGuide != null) btnHelpGuide.setOnClickListener(v -> showUserGuideDialog());
+        if (btnSimulateScan != null) btnSimulateScan.setOnClickListener(v -> generateSimulatedTag());
     }
 
     private void setupZoneSpinner() {
@@ -1140,6 +1145,132 @@ public class MiraUHFReadTagFragment extends Fragment {
             item.weight = 8.5;
             item.status = ItemStatus.TRULY_MISSING;
             expectedItemsMap.put(epc, item);
+        }
+    }
+
+    private void openManualBarcodeInputDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle(ar("مسح / إدخال كود يدوي", "Scan / Manual EPC"));
+
+        final EditText input = new EditText(requireContext());
+        input.setHint(ar("أدخل رمز EPC أو باركود القطعة", "Enter EPC or Barcode"));
+        builder.setView(input);
+
+        builder.setPositiveButton(ar("إضافة للجرد", "Add"), (dialog, which) -> {
+            String barcode = input.getText().toString().trim();
+            if (!barcode.isEmpty()) {
+                onTagScanned(barcode, "-50dBm");
+            }
+        });
+        builder.setNegativeButton(ar("إلغاء", "Cancel"), (dialog, which) -> dialog.cancel());
+        builder.show();
+    }
+
+    private void showUserGuideDialog() {
+        new AlertDialog.Builder(requireContext())
+                .setTitle(ar("دليل الجرد الذكي", "Smart Audit Guide"))
+                .setMessage(ar(
+                        "• اضغط لبدء القراءة عبر القارئ C72 أو المحاكي.\n" +
+                        "• التنبيه الأحمر 🚨 يشير لقطعة مباعة رسمياً بالنظام وموجودة بالرف.\n" +
+                        "• يتم تصفية العجز وتأكيد مطابقة الرف بناءً على السجلات السحابية.",
+                        "• Press start to scan with C72 or Simulator.\n" +
+                        "• Red alert 🚨 indicates an item sold in DB but found on shelf.\n" +
+                        "• Reconciles missing items against cloud backend."))
+                .setPositiveButton(ar("حسناً", "OK"), null)
+                .show();
+    }
+
+    private void exportInventoryReport(boolean missingOnly) {
+        queryExecutor.execute(() -> {
+            try {
+                StringBuilder csv = new StringBuilder();
+                csv.append("EPC,Title,Karat,Weight,Status,ScanTime\n");
+
+                if (missingOnly) {
+                    for (ExpectedItem item : expectedItemsMap.values()) {
+                        if (!item.isFound && item.status == ItemStatus.TRULY_MISSING) {
+                            csv.append(item.epc).append(",")
+                               .append("\"").append(item.title).append("\",")
+                               .append(item.karat).append(",")
+                               .append(item.weight).append(",")
+                               .append(item.status.label).append(",")
+                               .append("N/A\n");
+                        }
+                    }
+                } else {
+                    synchronized (recentTags) {
+                        for (ScannedTag tag : recentTags) {
+                            csv.append(tag.epc).append(",")
+                               .append("\"").append(tag.title != null ? tag.title : "").append("\",")
+                               .append(tag.karat != null ? tag.karat : "").append(",")
+                               .append(tag.weight != null ? tag.weight : "").append(",")
+                               .append(tag.status != null ? tag.status.label : "").append(",")
+                               .append(tag.timestamp).append("\n");
+                        }
+                    }
+                }
+
+                File exportDir = new File(requireContext().getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "AuditReports");
+                if (!exportDir.exists()) exportDir.mkdirs();
+
+                String filename = (missingOnly ? "Missing_Report_" : "Full_Audit_") + System.currentTimeMillis() + ".csv";
+                File file = new File(exportDir, filename);
+
+                FileOutputStream out = new FileOutputStream(file);
+                out.write(csv.toString().getBytes());
+                out.close();
+
+                mainHandler.post(() -> ToastUtil.showLong(requireContext(), 
+                    ar("تم تصدير التقرير: ", "Report Exported: ") + file.getAbsolutePath()));
+
+            } catch (Exception e) {
+                Log.e(TAG, "Export error: " + e.getMessage());
+                mainHandler.post(() -> ToastUtil.showShort(requireContext(), ar("فشل التصدير", "Export Failed")));
+            }
+        });
+    }
+
+    private void printInventoryReport() {
+        try {
+            WebView webView = new WebView(requireContext());
+            StringBuilder html = new StringBuilder();
+            html.append("<html><head><style>")
+                .append("body { font-family: sans-serif; direction: rtl; text-align: right; padding: 20px; }")
+                .append("table { width: 100%; border-collapse: collapse; margin-top: 15px; }")
+                .append("th, td { border: 1px solid #ccc; padding: 8px; text-align: right; }")
+                .append("th { background-color: #f2f2f2; }")
+                .append("</style></head><body>")
+                .append("<h2>تقرير جرد المخزون - ").append(sessionId).append("</h2>")
+                .append("<p>إجمالي المتوقع: ").append(expectedTotal.get()).append(" | المطابق: ").append(foundCount.get()).append(" | العجز: ").append(trulyMissingCount.get()).append("</p>")
+                .append("<table><tr><th>EPC</th><th>البيان</th><th>العيار</th><th>الوزن</th><th>الحالة</th></tr>");
+
+            synchronized (recentTags) {
+                for (ScannedTag tag : recentTags) {
+                    html.append("<tr>")
+                        .append("<td>").append(tag.epc).append("</td>")
+                        .append("<td>").append(tag.title != null ? tag.title : "—").append("</td>")
+                        .append("<td>").append(tag.karat != null ? tag.karat : "—").append("</td>")
+                        .append("<td>").append(tag.weight != null ? tag.weight : "—").append("</td>")
+                        .append("<td>").append(tag.status != null ? tag.status.label : "—").append("</td>")
+                        .append("</tr>");
+                }
+            }
+            html.append("</table></body></html>");
+
+            webView.setWebViewClient(new WebViewClient() {
+                @Override
+                public void onPageFinished(WebView view, String url) {
+                    PrintManager printManager = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
+                    if (printManager != null) {
+                        printManager.print("Mira_Audit_Report", webView.createPrintDocumentAdapter("MiraAuditAdapter"), new PrintAttributes.Builder().build());
+                    }
+                }
+            });
+
+            webView.loadDataWithBaseURL(null, html.toString(), "text/html", "UTF-8", null);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Print error: " + e.getMessage());
         }
     }
 
