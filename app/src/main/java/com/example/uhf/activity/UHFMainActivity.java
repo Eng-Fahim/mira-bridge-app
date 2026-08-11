@@ -165,28 +165,30 @@ public void onBackPressed() {
 
     private void setupTopTabs() {
     SessionManager.Role role = sessionManager.getUserRole();
+    String roleStr = sessionManager.getRoleString();
     boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
     boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
+    boolean isAdmin = (role == SessionManager.Role.ADMIN) || "ADMIN".equals(roleStr);
     boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
-    boolean isAnyAdmin = isSystemAdmin || isOrgAdmin;
+    boolean isAnyAdmin = isSystemAdmin || isOrgAdmin || isAdmin;
     boolean isManager = isAnyAdmin || isBranchManager;
     boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
-    boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
-    boolean isPosOperator = (role == SessionManager.Role.POS_OPERATOR);
-    boolean isAuditor = (role == SessionManager.Role.AUDITOR);
     
-    // ⚙️ الإعدادات - للمدراء ومديري المخزون
+    // ⚙️ الإعدادات - المدراء + مديري المخزون
     setTopTabVisibility(R.id.tabTopSettings, isManager || isInventoryMgr);
-    // 🆔 التكويد - للمدراء ومديري المخزون
+    // 🆔 التكويد - المدراء + مديري المخزون
     setTopTabVisibility(R.id.tabTopIdentity, isManager || isInventoryMgr);
-    // 📦 التحويلات - للمدراء ومديري المخزون
+    // 📦 التحويلات - المدراء + مديري المخزون
     setTopTabVisibility(R.id.tabTopTransfers, isManager || isInventoryMgr);
-    // 🏢 الفروع - للمدراء فقط
+    // 🏢 الفروع - المدراء فقط
     setTopTabVisibility(R.id.tabTopBranches, isManager);
-    // 👥 المستخدمين - للمدراء فقط
-    setTopTabVisibility(R.id.tabTopUsers, isManager);
-    // 🔧 RFID - للمدراء ومديري المخزون
+   // 👥 المستخدمين - مدراء النظام + مديري الفروع
+setTopTabVisibility(R.id.tabTopUsers, isAnyAdmin || isBranchManager);
+    // 🔧 RFID - المدراء + مديري المخزون
     setTopTabVisibility(R.id.tabTopRfid, isManager || isInventoryMgr);
+    
+    // ✅ إخفاء الـ ScrollView بالكامل إذا كانت كل التبويبات مخفية
+    updateTopTabsContainerVisibility();
     
     setupTopTab(R.id.tabTopSettings, "Settings");
     setupTopTab(R.id.tabTopIdentity, "IdentityStudio");
@@ -196,6 +198,28 @@ public void onBackPressed() {
     setupTopTab(R.id.tabTopRfid, "ReadWrite");
 }
 
+private void updateTopTabsContainerVisibility() {
+    View container = findViewById(R.id.topTabsContainer);
+    if (container == null) return;
+    
+    // تحقق إذا كانت كل التبويبات مخفية
+    boolean anyVisible = false;
+    int[] tabIds = {R.id.tabTopSettings, R.id.tabTopIdentity, R.id.tabTopTransfers, 
+                    R.id.tabTopBranches, R.id.tabTopUsers, R.id.tabTopRfid};
+    for (int id : tabIds) {
+        View tab = findViewById(id);
+        if (tab != null && tab.getVisibility() == View.VISIBLE) {
+            anyVisible = true;
+            break;
+        }
+    }
+    
+    // إخفاء الـ HorizontalScrollView بالكامل إذا لا توجد تبويبات
+    View parent = container.getParent();
+    if (parent != null) {
+        parent.setVisibility(anyVisible ? View.VISIBLE : View.GONE);
+    }
+}
 private void setTopTabVisibility(int tabId, boolean visible) {
     View tab = findViewById(tabId);
     if (tab != null) tab.setVisibility(visible ? View.VISIBLE : View.GONE);
@@ -237,12 +261,15 @@ private void setTopTabVisibility(int tabId, boolean visible) {
     private void showRadialMenu() {
     try {
         SessionManager.Role role = sessionManager.getUserRole();
+        String roleStr = sessionManager.getRoleString();
         boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
         boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
+        boolean isAdmin = (role == SessionManager.Role.ADMIN) || "ADMIN".equals(roleStr);
         boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
-        boolean isAnyAdmin = isSystemAdmin || isOrgAdmin;
+        boolean isAnyAdmin = isSystemAdmin || isOrgAdmin || isAdmin;
         boolean isManager = isAnyAdmin || isBranchManager;
         boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
+        boolean isPosOperator = (role == SessionManager.Role.POS_OPERATOR);
         boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
         
         com.google.android.material.bottomsheet.BottomSheetDialog bottomSheet = 
@@ -251,12 +278,18 @@ private void setTopTabVisibility(int tabId, boolean visible) {
         View view = getLayoutInflater().inflate(R.layout.dialog_quick_menu, null);
         bottomSheet.setContentView(view);
 
-        // ✅ إخفاء الخيارات حسب الصلاحية
-        setMenuVisibility(view, R.id.btnMenuRadar, isManager || isInventoryMgr);
-        setMenuVisibility(view, R.id.btnMenuGate, isManager || isGateSecurity);
+        // ✅ توزيع الصلاحيات
+        // 🎯 الرادار: المدراء + مديري المخزون + البائعين + أمن البوابات
+        setMenuVisibility(view, R.id.btnMenuRadar, isManager || isInventoryMgr || isPosOperator || isGateSecurity);
+        // 🚪 البوابات: المدراء + أمن البوابات + البائعين
+        setMenuVisibility(view, R.id.btnMenuGate, isManager || isGateSecurity || isPosOperator);
+        // 💰 المحاسبة: المدراء فقط
         setMenuVisibility(view, R.id.btnMenuAccounting, isManager);
+        // 📊 التقارير: المدراء فقط
         setMenuVisibility(view, R.id.btnMenuReports, isManager);
-        setMenuVisibility(view, R.id.btnMenuSales, isManager);
+        // 📜 المبيعات: المدراء + البائعين
+        setMenuVisibility(view, R.id.btnMenuSales, isManager || isPosOperator);
+        // 📋 المخزون: المدراء + مديري المخزون
         setMenuVisibility(view, R.id.btnMenuInventory, isManager || isInventoryMgr);
 
         view.findViewById(R.id.btnMenuRadar).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("RadarLocation"); });
@@ -509,10 +542,12 @@ private void setTopTabLabel(int viewId, String text) {
         mTabHost.setup(this, fm, R.id.realtabcontent);
 
         SessionManager.Role role = (sessionManager != null) ? sessionManager.getUserRole() : SessionManager.Role.POS_OPERATOR;
+        String roleStr = sessionManager.getRoleString();
         boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
         boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
+        boolean isAdmin = (role == SessionManager.Role.ADMIN) || "ADMIN".equals(roleStr);
         boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
-        boolean isAnyAdmin = isSystemAdmin || isOrgAdmin;
+        boolean isAnyAdmin = isSystemAdmin || isOrgAdmin || isAdmin;
         boolean isManager = isAnyAdmin || isBranchManager;
         boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
         boolean isPosOperator = (role == SessionManager.Role.POS_OPERATOR);
@@ -521,18 +556,24 @@ private void setTopTabLabel(int viewId, String text) {
 
         // 🌍 الجميع
         safeAddTab("Dashboard", isArabic ? "🏠 الرئيسية" : "🏠 Dashboard", MiraDashboardFragment.class);
+        safeAddTab("Scan", isArabic ? "📡 الجرد" : "📡 Inventory", MiraUHFReadTagFragment.class);
         
         // 🛒 المدراء + البائعين
         if (isManager || isPosOperator) {
-            safeAddTab("JewelryDashboard", isArabic ? "💎 المجوهرات" : "💎 Jewelry", JewelryDashboardFragment.class);
             safeAddTab("POS Mode", isArabic ? "🛒 البيع" : "🛒 POS", MiraPosFragment.class);
+        }
+        
+        // 📜 سجل المبيعات - المدراء + البائعين + المدققين
+        if (isManager || isPosOperator || isAuditor) {
             safeAddTab("SalesHistory", isArabic ? "📜 المبيعات" : "📜 Sales", MiraSalesHistoryFragment.class);
         }
         
-        // 📡 الجميع
-        safeAddTab("Scan", isArabic ? "📡 الجرد" : "📡 Inventory", MiraUHFReadTagFragment.class);
+        // 💎 المجوهرات - المدراء فقط
+        if (isManager) {
+            safeAddTab("JewelryDashboard", isArabic ? "💎 المجوهرات" : "💎 Jewelry", JewelryDashboardFragment.class);
+        }
         
-        // 🆔 المدراء + مديري المخزون
+        // 🆔 التكويد - المدراء + مديري المخزون
         if (isManager || isInventoryMgr) {
             safeAddTab("IdentityStudio", isArabic ? "🆔 التكويد" : "🆔 ID", MiraIdentityStudioFragment.class);
             safeAddTab("Inventory Pro", isArabic ? "📊 المخزون" : "📊 Inventory", MiraInventoryProFragment.class);
@@ -541,6 +582,10 @@ private void setTopTabLabel(int viewId, String text) {
         // 🔧 RFID - المدراء + مديري المخزون
         if (isManager || isInventoryMgr) {
             safeAddTab("ReadWrite", isArabic ? "📝 قراءة/كتابة" : "📝 Read/Write", UHFReadWriteFragment.class);
+        }
+        
+        // 🎯 الرادار - المدراء + مديري المخزون + البائعين + أمن البوابات
+        if (isManager || isInventoryMgr || isPosOperator || isGateSecurity) {
             safeAddTab("RadarLocation", isArabic ? "🎯 الرادار" : "🎯 Radar", UHFRadarLocationFragment.class);
         }
         
@@ -549,24 +594,32 @@ private void setTopTabLabel(int viewId, String text) {
             safeAddTab("Settings", isArabic ? "⚙️ إعدادات القارئ" : "⚙️ Reader Settings", UHFSetFragment.class);
         }
 
-        // 🚪 المدراء + أمن البوابات
-        if (isManager || isGateSecurity) {
+        // 🚪 البوابات - المدراء + أمن البوابات + البائعين (للمراقبة)
+        if (isManager || isGateSecurity || isPosOperator) {
             safeAddTab("SecureGate", isArabic ? "🚪 البوابات" : "🚪 Gate", MiraSecureGateFragment.class);
         }
         
-        // 🏢 المدراء فقط
+        // 🏢 الفروع - المدراء فقط
         if (isManager) {
             safeAddTab("BranchesManagement", isArabic ? "🏢 الفروع" : "🏢 Branches", MiraBranchesManagementFragment.class);
-            safeAddTab("UsersManagement", isArabic ? "👥 المستخدمين" : "👥 Users", UsersManagementFragment.class);
+        }
+        
+        // 👥 المستخدمين - مدراء النظام + مديري الفروع (لإدارة مستخدمي فرعهم فقط)
+if (isAnyAdmin || isBranchManager) {
+    safeAddTab("UsersManagement", isArabic ? "👥 المستخدمين" : "👥 Users", UsersManagementFragment.class);
+}
+        
+        // 📊 التقارير - المدراء + المدققين
+        if (isManager || isAuditor) {
             safeAddTab("ReportsPro", isArabic ? "📊 التقارير" : "📊 Reports", MiraReportsProFragment.class);
         }
         
-        // 💰 المدراء + المدققين
+        // 💰 المحاسبة - المدراء + المدققين
         if (isManager || isAuditor) {
             safeAddTab("Accounting", isArabic ? "💰 المحاسبة" : "💰 Accounting", MiraAccountingFragment.class);
         }
         
-        // 📦 المدراء + مديري المخزون
+        // 📦 التحويلات - المدراء + مديري المخزون
         if (isManager || isInventoryMgr) {
             safeAddTab("Transfers", isArabic ? "📦 التحويلات" : "📦 Transfers", MiraTransferFragment.class);
         }
@@ -738,4 +791,4 @@ private void setTopTabLabel(int viewId, String text) {
     }
 
     private String ar(String arabic, String english) { return isArabic ? arabic : english; }
-        }
+    }
