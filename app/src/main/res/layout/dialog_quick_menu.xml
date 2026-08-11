@@ -6,7 +6,6 @@
     android:orientation="vertical"
     android:padding="20dp">
 
-    <!-- مقبض السحب العلوي (يتكيف مع اللون) -->
     <View
         android:layout_width="40dp"
         android:layout_height="4dp"
@@ -15,7 +14,6 @@
         android:background="?attr/colorOutline"
         android:alpha="0.4" />
 
-    <!-- عنوان القائمة -->
     <TextView
         android:id="@+id/tvQuickMenuTitle"
         android:layout_width="wrap_content"
@@ -27,61 +25,78 @@
         android:textSize="18sp"
         android:textStyle="bold" />
 
-    <!-- شبكة الخيارات 2x3 -->
-    <GridLayout
+    <!-- صف ١ -->
+    <LinearLayout
+        android:id="@+id/menuRow1"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:columnCount="3"
-        android:rowCount="2">
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:weightSum="3">
 
-        <!-- الرادار -->
         <LinearLayout
             android:id="@+id/btnMenuRadar"
-            style="@style/QuickMenuItemStyle">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🎯" android:textSize="26sp" />
-            <TextView android:id="@+id/tvLabelRadar" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الرادار" style="@style/QuickMenuTextStyle" />
+            style="@style/QuickMenuItemStyle"
+            android:layout_width="0dp"
+            android:layout_weight="1">
+            <TextView android:text="🎯" android:textSize="26sp" />
+            <TextView android:id="@+id/tvLabelRadar" android:text="الرادار" style="@style/QuickMenuTextStyle" />
         </LinearLayout>
 
-        <!-- البوابات -->
         <LinearLayout
             android:id="@+id/btnMenuGate"
-            style="@style/QuickMenuItemStyle">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🚪" android:textSize="26sp" />
-            <TextView android:id="@+id/tvLabelGate" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="البوابات" style="@style/QuickMenuTextStyle" />
+            style="@style/QuickMenuItemStyle"
+            android:layout_width="0dp"
+            android:layout_weight="1">
+            <TextView android:text="🚪" android:textSize="26sp" />
+            <TextView android:id="@+id/tvLabelGate" android:text="البوابات" style="@style/QuickMenuTextStyle" />
         </LinearLayout>
 
-        <!-- المحاسبة -->
         <LinearLayout
             android:id="@+id/btnMenuAccounting"
-            style="@style/QuickMenuItemStyle">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="💰" android:textSize="26sp" />
-            <TextView android:id="@+id/tvLabelAccounting" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="المحاسبة" style="@style/QuickMenuTextStyle" />
+            style="@style/QuickMenuItemStyle"
+            android:layout_width="0dp"
+            android:layout_weight="1">
+            <TextView android:text="💰" android:textSize="26sp" />
+            <TextView android:id="@+id/tvLabelAccounting" android:text="المحاسبة" style="@style/QuickMenuTextStyle" />
         </LinearLayout>
+    </LinearLayout>
 
-        <!-- التقارير -->
+    <!-- صف ٢ -->
+    <LinearLayout
+        android:id="@+id/menuRow2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:weightSum="3">
+
         <LinearLayout
             android:id="@+id/btnMenuReports"
-            style="@style/QuickMenuItemStyle">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="📊" android:textSize="26sp" />
-            <TextView android:id="@+id/tvLabelReports" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="التقارير" style="@style/QuickMenuTextStyle" />
+            style="@style/QuickMenuItemStyle"
+            android:layout_width="0dp"
+            android:layout_weight="1">
+            <TextView android:text="📊" android:textSize="26sp" />
+            <TextView android:id="@+id/tvLabelReports" android:text="التقارير" style="@style/QuickMenuTextStyle" />
         </LinearLayout>
 
-        <!-- المبيعات -->
         <LinearLayout
             android:id="@+id/btnMenuSales"
-            style="@style/QuickMenuItemStyle">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="📜" android:textSize="26sp" />
-            <TextView android:id="@+id/tvLabelSales" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="المبيعات" style="@style/QuickMenuTextStyle" />
+            style="@style/QuickMenuItemStyle"
+            android:layout_width="0dp"
+            android:layout_weight="1">
+            <TextView android:text="📜" android:textSize="26sp" />
+            <TextView android:id="@+id/tvLabelSales" android:text="المبيعات" style="@style/QuickMenuTextStyle" />
         </LinearLayout>
 
-        <!-- المخزون -->
         <LinearLayout
             android:id="@+id/btnMenuInventory"
-            style="@style/QuickMenuItemStyle">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="📋" android:textSize="26sp" />
-            <TextView android:id="@+id/tvLabelInventory" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="المخزون" style="@style/QuickMenuTextStyle" />
+            style="@style/QuickMenuItemStyle"
+            android:layout_width="0dp"
+            android:layout_weight="1">
+            <TextView android:text="📋" android:textSize="26sp" />
+            <TextView android:id="@+id/tvLabelInventory" android:text="المخزون" style="@style/QuickMenuTextStyle" />
         </LinearLayout>
-
-    </GridLayout>
+    </LinearLayout>
 
 </LinearLayout>
