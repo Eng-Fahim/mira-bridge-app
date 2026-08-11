@@ -225,7 +225,14 @@ public class ToastUtil {
     public static void showInfo(CharSequence text) { info(text.toString()); }
 
 
-        // ==================== Compatibility Additions ====================
+    // ==================== Compatibility Additions ====================
+
+    /**
+     * دالة عامة لإظهار الرسائل باللون الافتراضي
+     */
+    public static void show(String message) {
+        info(message); // أو يمكنك استخدام success(message) حسب رغبتك
+    }
 
     public static void showLong(Context context, String message) {
         if (context != null) {
@@ -242,5 +249,6 @@ public class ToastUtil {
             show(message);
         }
     }
+
 
 }
