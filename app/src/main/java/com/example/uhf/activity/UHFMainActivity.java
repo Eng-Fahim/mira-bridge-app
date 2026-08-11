@@ -164,12 +164,41 @@ public void onBackPressed() {
     // ==================== TOP TABS ====================
 
     private void setupTopTabs() {
-    setupTopTab(R.id.tabTopSettings, "Settings");       // إعدادات القارئ
-    setupTopTab(R.id.tabTopIdentity, "IdentityStudio"); // التكويد
-    setupTopTab(R.id.tabTopTransfers, "Transfers");      // التحويلات
-    setupTopTab(R.id.tabTopBranches, "BranchesManagement"); // الفروع
-    setupTopTab(R.id.tabTopUsers, "UsersManagement");   // المستخدمين
-    setupTopTab(R.id.tabTopRfid, "ReadWrite");          // قراءة وكتابة RFID
+    SessionManager.Role role = sessionManager.getUserRole();
+    boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
+    boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
+    boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
+    boolean isAnyAdmin = isSystemAdmin || isOrgAdmin;
+    boolean isManager = isAnyAdmin || isBranchManager;
+    boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
+    boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
+    boolean isPosOperator = (role == SessionManager.Role.POS_OPERATOR);
+    boolean isAuditor = (role == SessionManager.Role.AUDITOR);
+    
+    // ⚙️ الإعدادات - للمدراء ومديري المخزون
+    setTopTabVisibility(R.id.tabTopSettings, isManager || isInventoryMgr);
+    // 🆔 التكويد - للمدراء ومديري المخزون
+    setTopTabVisibility(R.id.tabTopIdentity, isManager || isInventoryMgr);
+    // 📦 التحويلات - للمدراء ومديري المخزون
+    setTopTabVisibility(R.id.tabTopTransfers, isManager || isInventoryMgr);
+    // 🏢 الفروع - للمدراء فقط
+    setTopTabVisibility(R.id.tabTopBranches, isManager);
+    // 👥 المستخدمين - للمدراء فقط
+    setTopTabVisibility(R.id.tabTopUsers, isManager);
+    // 🔧 RFID - للمدراء ومديري المخزون
+    setTopTabVisibility(R.id.tabTopRfid, isManager || isInventoryMgr);
+    
+    setupTopTab(R.id.tabTopSettings, "Settings");
+    setupTopTab(R.id.tabTopIdentity, "IdentityStudio");
+    setupTopTab(R.id.tabTopTransfers, "Transfers");
+    setupTopTab(R.id.tabTopBranches, "BranchesManagement");
+    setupTopTab(R.id.tabTopUsers, "UsersManagement");
+    setupTopTab(R.id.tabTopRfid, "ReadWrite");
+}
+
+private void setTopTabVisibility(int tabId, boolean visible) {
+    View tab = findViewById(tabId);
+    if (tab != null) tab.setVisibility(visible ? View.VISIBLE : View.GONE);
 }
 
 
@@ -206,41 +235,47 @@ public void onBackPressed() {
 
 
     private void showRadialMenu() {
-        try {
-            com.google.android.material.bottomsheet.BottomSheetDialog bottomSheet = 
-                new com.google.android.material.bottomsheet.BottomSheetDialog(this);
-            
-            View view = getLayoutInflater().inflate(R.layout.dialog_quick_menu, null);
-            bottomSheet.setContentView(view);
+    try {
+        SessionManager.Role role = sessionManager.getUserRole();
+        boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
+        boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
+        boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
+        boolean isAnyAdmin = isSystemAdmin || isOrgAdmin;
+        boolean isManager = isAnyAdmin || isBranchManager;
+        boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
+        boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
+        
+        com.google.android.material.bottomsheet.BottomSheetDialog bottomSheet = 
+            new com.google.android.material.bottomsheet.BottomSheetDialog(this);
+        
+        View view = getLayoutInflater().inflate(R.layout.dialog_quick_menu, null);
+        bottomSheet.setContentView(view);
 
-            TextView tvTitle = view.findViewById(R.id.tvQuickMenuTitle);
-            TextView tvRadar = view.findViewById(R.id.tvLabelRadar);
-            TextView tvGate = view.findViewById(R.id.tvLabelGate);
-            TextView tvAccounting = view.findViewById(R.id.tvLabelAccounting);
-            TextView tvReports = view.findViewById(R.id.tvLabelReports);
-            TextView tvSales = view.findViewById(R.id.tvLabelSales);
-            TextView tvInventory = view.findViewById(R.id.tvLabelInventory);
+        // ✅ إخفاء الخيارات حسب الصلاحية
+        setMenuVisibility(view, R.id.btnMenuRadar, isManager || isInventoryMgr);
+        setMenuVisibility(view, R.id.btnMenuGate, isManager || isGateSecurity);
+        setMenuVisibility(view, R.id.btnMenuAccounting, isManager);
+        setMenuVisibility(view, R.id.btnMenuReports, isManager);
+        setMenuVisibility(view, R.id.btnMenuSales, isManager);
+        setMenuVisibility(view, R.id.btnMenuInventory, isManager || isInventoryMgr);
 
-            if (tvTitle != null) tvTitle.setText(ar("⚡ القائمة السريعة", "⚡ Quick Menu"));
-            if (tvRadar != null) tvRadar.setText(ar("الرادار", "Radar"));
-            if (tvGate != null) tvGate.setText(ar("البوابات", "Gates"));
-            if (tvAccounting != null) tvAccounting.setText(ar("المحاسبة", "Accounting"));
-            if (tvReports != null) tvReports.setText(ar("التقارير", "Reports"));
-            if (tvSales != null) tvSales.setText(ar("المبيعات", "Sales"));
-            if (tvInventory != null) tvInventory.setText(ar("المخزون", "Inventory"));
+        view.findViewById(R.id.btnMenuRadar).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("RadarLocation"); });
+        view.findViewById(R.id.btnMenuGate).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("SecureGate"); });
+        view.findViewById(R.id.btnMenuAccounting).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("Accounting"); });
+        view.findViewById(R.id.btnMenuReports).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("ReportsPro"); });
+        view.findViewById(R.id.btnMenuSales).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("SalesHistory"); });
+        view.findViewById(R.id.btnMenuInventory).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("Inventory Pro"); });
 
-            view.findViewById(R.id.btnMenuRadar).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("RadarLocation"); });
-            view.findViewById(R.id.btnMenuGate).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("SecureGate"); });
-            view.findViewById(R.id.btnMenuAccounting).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("Accounting"); });
-            view.findViewById(R.id.btnMenuReports).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("ReportsPro"); });
-            view.findViewById(R.id.btnMenuSales).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("SalesHistory"); });
-            view.findViewById(R.id.btnMenuInventory).setOnClickListener(v -> { bottomSheet.dismiss(); switchToTabSafely("Inventory Pro"); });
-
-            bottomSheet.show();
-        } catch (Exception e) {
-            Log.e(TAG, "BottomSheet Error: " + e.getMessage());
-        }
+        bottomSheet.show();
+    } catch (Exception e) {
+        Log.e(TAG, "BottomSheet Error: " + e.getMessage());
     }
+}
+
+private void setMenuVisibility(View parent, int viewId, boolean visible) {
+    View v = parent.findViewById(viewId);
+    if (v != null) v.setVisibility(visible ? View.VISIBLE : View.GONE);
+}
 
     private void switchToTabSafely(String tag) {
         if (mTabHost != null) {
@@ -474,47 +509,64 @@ private void setTopTabLabel(int viewId, String text) {
         mTabHost.setup(this, fm, R.id.realtabcontent);
 
         SessionManager.Role role = (sessionManager != null) ? sessionManager.getUserRole() : SessionManager.Role.POS_OPERATOR;
-        boolean isManager = (role == SessionManager.Role.SYSTEM_ADMIN || role == SessionManager.Role.ORG_ADMIN || role == SessionManager.Role.BRANCH_MANAGER);
+        boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
+        boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
+        boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
+        boolean isAnyAdmin = isSystemAdmin || isOrgAdmin;
+        boolean isManager = isAnyAdmin || isBranchManager;
         boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
         boolean isPosOperator = (role == SessionManager.Role.POS_OPERATOR);
         boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
+        boolean isAuditor = (role == SessionManager.Role.AUDITOR);
 
-        // --- 1. الواجهات الرئيسية للعمليات ---
+        // 🌍 الجميع
         safeAddTab("Dashboard", isArabic ? "🏠 الرئيسية" : "🏠 Dashboard", MiraDashboardFragment.class);
+        
+        // 🛒 المدراء + البائعين
         if (isManager || isPosOperator) {
             safeAddTab("JewelryDashboard", isArabic ? "💎 المجوهرات" : "💎 Jewelry", JewelryDashboardFragment.class);
             safeAddTab("POS Mode", isArabic ? "🛒 البيع" : "🛒 POS", MiraPosFragment.class);
             safeAddTab("SalesHistory", isArabic ? "📜 المبيعات" : "📜 Sales", MiraSalesHistoryFragment.class);
         }
         
-        // --- 2. تبويبات عمليات الجرد والتكويد ---
+        // 📡 الجميع
         safeAddTab("Scan", isArabic ? "📡 الجرد" : "📡 Inventory", MiraUHFReadTagFragment.class);
+        
+        // 🆔 المدراء + مديري المخزون
         if (isManager || isInventoryMgr) {
             safeAddTab("IdentityStudio", isArabic ? "🆔 التكويد" : "🆔 ID", MiraIdentityStudioFragment.class);
             safeAddTab("Inventory Pro", isArabic ? "📊 المخزون" : "📊 Inventory", MiraInventoryProFragment.class);
         }
 
-        // --- 3. تبويبات الشريحة والقارئ (UHF / RFID Hardware Tabs) ---
-        safeAddTab("ReadWrite", isArabic ? "📝 قراءة/كتابة" : "📝 Read/Write", UHFReadWriteFragment.class);
-        safeAddTab("RadarLocation", isArabic ? "🎯 الرادار" : "🎯 Radar", UHFRadarLocationFragment.class);
-        safeAddTab("Lock", isArabic ? "🔒 قفل التاج" : "🔒 Lock Tag", UHFLockFragment.class);
-        safeAddTab("Kill", isArabic ? "💀 إتلاف التاج" : "💀 Kill Tag", UHFKillFragment.class);
+        // 🔧 RFID - المدراء + مديري المخزون
+        if (isManager || isInventoryMgr) {
+            safeAddTab("ReadWrite", isArabic ? "📝 قراءة/كتابة" : "📝 Read/Write", UHFReadWriteFragment.class);
+            safeAddTab("RadarLocation", isArabic ? "🎯 الرادار" : "🎯 Radar", UHFRadarLocationFragment.class);
+        }
+        
+        // ⚙️ الإعدادات - المدراء + مديري المخزون
+        if (isManager || isInventoryMgr) {
+            safeAddTab("Settings", isArabic ? "⚙️ إعدادات القارئ" : "⚙️ Reader Settings", UHFSetFragment.class);
+        }
 
-        // --- 4. تبويب إعدادات القارئ RFID (مهم جداً لتفعيل زر الإعدادات) ---
-        safeAddTab("Settings", isArabic ? "⚙️ إعدادات القارئ" : "⚙️ Reader Settings", UHFSetFragment.class);
-
-        // --- 5. الإدارة والخدمات اللوجستية ---
+        // 🚪 المدراء + أمن البوابات
         if (isManager || isGateSecurity) {
             safeAddTab("SecureGate", isArabic ? "🚪 البوابات" : "🚪 Gate", MiraSecureGateFragment.class);
         }
+        
+        // 🏢 المدراء فقط
         if (isManager) {
             safeAddTab("BranchesManagement", isArabic ? "🏢 الفروع" : "🏢 Branches", MiraBranchesManagementFragment.class);
             safeAddTab("UsersManagement", isArabic ? "👥 المستخدمين" : "👥 Users", UsersManagementFragment.class);
             safeAddTab("ReportsPro", isArabic ? "📊 التقارير" : "📊 Reports", MiraReportsProFragment.class);
         }
-        if (isManager || role == SessionManager.Role.AUDITOR) {
+        
+        // 💰 المدراء + المدققين
+        if (isManager || isAuditor) {
             safeAddTab("Accounting", isArabic ? "💰 المحاسبة" : "💰 Accounting", MiraAccountingFragment.class);
         }
+        
+        // 📦 المدراء + مديري المخزون
         if (isManager || isInventoryMgr) {
             safeAddTab("Transfers", isArabic ? "📦 التحويلات" : "📦 Transfers", MiraTransferFragment.class);
         }
@@ -686,4 +738,4 @@ private void setTopTabLabel(int viewId, String text) {
     }
 
     private String ar(String arabic, String english) { return isArabic ? arabic : english; }
-                                      }
+        }
