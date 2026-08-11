@@ -152,22 +152,23 @@
 
         <!-- القائمة السفلية المتوافقة مع الثيم -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
-            android:id="@+id/bottomQuickNav"
-            android:layout_width="match_parent"
-            android:layout_height="68dp"
-            android:layout_gravity="bottom"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
-            android:layout_marginBottom="12dp"
-            android:background="@drawable/bg_bottom_nav_dynamic"
-            android:elevation="8dp"
-            app:itemActiveIndicatorStyle="@style/CustomNavIndicator"
-            app:itemIconSize="22dp"
-            app:itemIconTint="@color/bottom_nav_colors"
-            app:itemRippleColor="?attr/colorControlHighlight"
-            app:itemTextColor="@color/bottom_nav_colors"
-            app:labelVisibilityMode="labeled"
-            app:menu="@menu/bottom_nav_menu" />
+    android:id="@+id/bottomQuickNav"
+    android:layout_width="match_parent"
+    android:layout_height="68dp"
+    android:layout_gravity="bottom"
+    android:layout_marginStart="12dp"
+    android:layout_marginEnd="12dp"
+    android:layout_marginBottom="12dp"
+    android:background="@drawable/bg_bottom_nav_dynamic"
+    android:elevation="8dp"
+    app:itemActiveIndicatorStyle="@style/CustomNavIndicator"
+    app:itemIconSize="22dp"
+    app:itemIconTint="@color/bottom_nav_colors"
+    app:itemRippleColor="?attr/colorControlHighlight"
+    app:itemTextColor="@color/bottom_nav_colors"
+    app:labelVisibilityMode="labeled"
+    app:menu="@menu/bottom_quick_nav_menu" /> <!-- تم تعديل اسم الملف هنا -->
+
 
     </LinearLayout>
 
