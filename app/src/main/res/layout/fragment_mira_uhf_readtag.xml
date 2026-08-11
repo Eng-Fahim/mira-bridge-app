@@ -81,7 +81,7 @@
                             android:textSize="13sp"
                             android:textStyle="bold" />
 
-                        <!-- 🆕 زر إدارة الاتصال بالقارئ -->
+                        <!-- زر إدارة الاتصال بالقارئ -->
                         <Button
                             android:id="@+id/btnConnectReader"
                             android:layout_width="36dp"
@@ -431,16 +431,16 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- 🆕 بطاقة حالة الاتصال ونوع القارئ -->
+            <!-- بطاقة حالة الاتصال ونوع القارئ -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardConnectionInfo"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
+                android:visibility="gone"
                 app:cardBackgroundColor="#EFF6FF"
                 app:cardCornerRadius="8dp"
-                app:cardElevation="1dp"
-                android:visibility="gone">
+                app:cardElevation="1dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -541,14 +541,14 @@
                     android:textColor="#FFFFFF" />
             </LinearLayout>
 
-            <!-- 🆕 أزرار إضافية للتصدير والطباعة -->
+            <!-- أزرار إضافية للتصدير والطباعة -->
             <LinearLayout
+                android:id="@+id/layoutExportButtons"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
                 android:orientation="horizontal"
-                android:visibility="gone"
-                android:id="@+id/layoutExportButtons">
+                android:visibility="gone">
 
                 <Button
                     android:id="@+id/btnExportCSV"
