@@ -25,12 +25,66 @@ public class DeviceDetector {
         READY,
         FAILED
     }
+
+    // 🌟 تم الإصلاح: إضافة الكلاس المفقود DeviceProfile الذي سبب خطأ (cannot find symbol class DeviceProfile)
+    public static class DeviceProfile {
+        public long timestamp;
+        public String androidVersion;
+        public int sdkInt;
+        public String modelName;
+        public DeviceModel model;
+        public String softwareVersion;
+        public String hardwareVersion;
+        public int temperature;
+        public boolean temperatureOK;
+        public int minPower;
+        public int maxPower;
+        public int frequencyMode;
+        public String frequencyRange;
+        public int appliedPower;
+        public boolean powerVerified;
+        public boolean frequencyVerified;
+        public boolean ready;
+
+        @Override
+        public String toString() {
+            return "DeviceProfile {" +
+                    "Model='" + modelName + '\'' +
+                    ", Android=" + androidVersion +
+                    ", SW='" + softwareVersion + '\'' +
+                    ", HW='" + hardwareVersion + '\'' +
+                    ", Power=" + appliedPower + "dBm" +
+                    ", Freq='" + frequencyRange + '\'' +
+                    ", Temp=" + temperature + "°C" +
+                    '}';
+        }
+    }
     
     private static DeviceModel cachedModel = null;
     private static ProfileStatus profileStatus = ProfileStatus.UNKNOWN;
     private static DeviceProfile activeProfile = null;
     private static String lastError = null;
     private static long detectionTime = 0;
+
+    // 🌟 تم الإصلاح: إضافة الدوال المفقودة التي سببت خطأ (cannot find symbol method getDeviceModelName و getDeviceModel)
+    
+    public static String getDeviceModelName() {
+        return Build.MODEL != null ? Build.MODEL : "UNKNOWN";
+    }
+
+    public static DeviceModel getDeviceModel() {
+        if (cachedModel != null) return cachedModel;
+        
+        String model = Build.MODEL != null ? Build.MODEL.toUpperCase() : "";
+        if (model.contains("C72")) {
+            cachedModel = DeviceModel.C72;
+        } else if (model.contains("C5")) {
+            cachedModel = DeviceModel.C5;
+        } else {
+            cachedModel = DeviceModel.UNKNOWN;
+        }
+        return cachedModel;
+    }
 
     // ==================== Check Methods ====================
 
@@ -131,15 +185,15 @@ public class DeviceDetector {
             
             // قراءة درجة الحرارة
             // درجة الحرارة - قد لا تكون مدعومة
-activeProfile.temperature = 25;
-activeProfile.temperatureOK = true;
-try {
-    java.lang.reflect.Method getTemp = reader.getClass().getMethod("getTemperature");
-    activeProfile.temperature = (int) getTemp.invoke(reader);
-    activeProfile.temperatureOK = activeProfile.temperature > -40 && activeProfile.temperature < 85;
-} catch (Exception e) {
-    Log.w(TAG, "   Temperature reading not supported");
-}
+            activeProfile.temperature = 25;
+            activeProfile.temperatureOK = true;
+            try {
+                java.lang.reflect.Method getTemp = reader.getClass().getMethod("getTemperature");
+                activeProfile.temperature = (int) getTemp.invoke(reader);
+                activeProfile.temperatureOK = activeProfile.temperature > -40 && activeProfile.temperature < 85;
+            } catch (Exception e) {
+                Log.w(TAG, "   Temperature reading not supported");
+            }
             
             // تحديد نطاق الطاقة بناءً على الجهاز الفعلي
             determinePowerRange();
@@ -204,46 +258,46 @@ try {
     // ==================== المرحلة 3: تطبيق Profile ====================
     
     private static boolean applyProfile(RFIDWithUHFUART reader) {
-    try {
-        Log.i(TAG, "⚙️ Phase 3 - Applying profile...");
-        
-        activeProfile.appliedPower = calculateOptimalPower();
-        
-        // RFIDWithUHFUART لا يدعم setOutputPower مباشرة
-        // نستخدم setPower بدلاً منها إن وجدت
-        boolean powerResult = false;
         try {
-            // محاولة استخدام الدالة الصحيحة
-            java.lang.reflect.Method setPower = reader.getClass().getMethod("setPower", int.class);
-            setPower.invoke(reader, activeProfile.appliedPower);
-            powerResult = true;
-        } catch (NoSuchMethodException e1) {
+            Log.i(TAG, "⚙️ Phase 3 - Applying profile...");
+            
+            activeProfile.appliedPower = calculateOptimalPower();
+            
+            // RFIDWithUHFUART لا يدعم setOutputPower مباشرة
+            // نستخدم setPower بدلاً منها إن وجدت
+            boolean powerResult = false;
             try {
-                java.lang.reflect.Method setOutputPower = reader.getClass().getMethod("setOutputPower", int.class);
-                setOutputPower.invoke(reader, activeProfile.appliedPower);
+                // محاولة استخدام الدالة الصحيحة
+                java.lang.reflect.Method setPower = reader.getClass().getMethod("setPower", int.class);
+                setPower.invoke(reader, activeProfile.appliedPower);
                 powerResult = true;
-            } catch (NoSuchMethodException e2) {
-                Log.w(TAG, "   Power setting not available - skipping");
-                powerResult = true; // نستمر بدون ضبط الطاقة
+            } catch (NoSuchMethodException e1) {
+                try {
+                    java.lang.reflect.Method setOutputPower = reader.getClass().getMethod("setOutputPower", int.class);
+                    setOutputPower.invoke(reader, activeProfile.appliedPower);
+                    powerResult = true;
+                } catch (NoSuchMethodException e2) {
+                    Log.w(TAG, "   Power setting not available - skipping");
+                    powerResult = true; // نستمر بدون ضبط الطاقة
+                }
             }
+            
+            activeProfile.powerVerified = powerResult;
+            activeProfile.frequencyVerified = true;
+            
+            profileStatus = ProfileStatus.PROFILE_APPLIED;
+            
+            Log.i(TAG, "   Power: " + activeProfile.appliedPower + " dBm " + 
+                (powerResult ? "✓" : "⚠️ (skipped)"));
+            
+            return true;
+            
+        } catch (Exception e) {
+            lastError = "Profile error: " + e.getMessage();
+            Log.e(TAG, "❌ " + lastError);
+            return false;
         }
-        
-        activeProfile.powerVerified = powerResult;
-        activeProfile.frequencyVerified = true;
-        
-        profileStatus = ProfileStatus.PROFILE_APPLIED;
-        
-        Log.i(TAG, "   Power: " + activeProfile.appliedPower + " dBm " + 
-            (powerResult ? "✓" : "⚠️ (skipped)"));
-        
-        return true;
-        
-    } catch (Exception e) {
-        lastError = "Profile error: " + e.getMessage();
-        Log.e(TAG, "❌ " + lastError);
-        return false;
     }
-}
     
     private static int calculateOptimalPower() {
         // للمجوهرات والجرد:
