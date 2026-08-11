@@ -49,7 +49,7 @@ import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.DeviceDetector;
 import com.example.uhf.tools.ToastUtil;
-
+import com.example.uhf.tools.MiraSoundManager;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -77,6 +77,9 @@ public class MiraUHFReadTagFragment extends Fragment {
     private static final int REQUEST_CAMERA_SCAN = 49374;
     private static final String OFFLINE_PREFS = "uhf_inventory_cache";
     private static final String PREF_LAST_AUDIT_MISSING = "last_audit_missing_epcs";
+    
+    private MiraSoundManager soundManager;
+
 
     private static final String KEY_RFID_POWER = "rfid_power";
     private static final String KEY_SCAN_SOUND = "scan_sound";
@@ -262,9 +265,12 @@ public class MiraUHFReadTagFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        
         try {
             Context ctx = requireContext();
             apiClient = MiraApiClient.getInstance(ctx);
+            soundManager = new MiraSoundManager(requireContext());
+
             branchesManager = MiraBranchesManager.getInstance(ctx);
             orgProfile = MiraOrgProfileManager.getInstance(ctx);
             offlineCache = ctx.getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
@@ -421,7 +427,8 @@ public class MiraUHFReadTagFragment extends Fragment {
 
                     mainHandler.post(() -> {
                         updateLastTagDisplay(cleanEpc, item.title, item.karat, String.format(Locale.US, "%.2fg", item.weight), ItemStatus.FOUND);
-                        playSound(soundMatch);
+                        //playSound(soundMatch);
+                        soundManager.playSuccess();
                     });
                 }
             }
@@ -434,7 +441,8 @@ public class MiraUHFReadTagFragment extends Fragment {
 
             mainHandler.post(() -> {
                 updateLastTagDisplay(cleanEpc, ar("غير مسجلة", "Unregistered"), "—", "—", ItemStatus.UNEXPECTED);
-                playSound(soundUnmatch);
+                //playSound(soundUnmatch);
+                soundManager.playWarning();
             });
         }
 
@@ -1278,6 +1286,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         return isArabic ? arText : enText;
     }
 
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();
@@ -1285,7 +1294,11 @@ public class MiraUHFReadTagFragment extends Fragment {
         stopBatchProcessor();
         stopSimulatedScan();
         if (readerCheckRunnable != null) readerCheckHandler.removeCallbacks(readerCheckRunnable);
-        if (soundPool != null) soundPool.release();
+        //if (soundPool != null) soundPool.release();
+        if (soundManager != null) {
+        soundManager.release();
+        soundManager = null;
+    }
     }
 
     // --- Adapter لRecyclerView ---
