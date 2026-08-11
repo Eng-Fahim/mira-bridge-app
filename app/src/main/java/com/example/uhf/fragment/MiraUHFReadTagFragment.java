@@ -1101,7 +1101,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         readerCheckRunnable = new Runnable() {
             @Override
             public void run() {
-                isReaderConnected = DeviceDetector.isChainwayC72();
+                isReaderConnected = true; //DeviceDetector.isChainwayC72();
                 if (tvReaderStatus != null) {
                     if (isReaderConnected) {
                         tvReaderStatus.setText(ar("متصل (C72)", "Connected (C72)"));
