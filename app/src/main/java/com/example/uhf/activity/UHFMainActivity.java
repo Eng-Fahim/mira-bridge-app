@@ -22,6 +22,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.view.MotionEvent;
 import android.view.View;
+import android.content.Context;
 import android.view.ViewParent;
 import android.widget.FrameLayout;
 
