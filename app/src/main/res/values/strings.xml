@@ -198,7 +198,7 @@
     <string name="button_scan">مسح/بحث</string>
     <string name="title_activity_uhfmain">UHF</string>
     
-    <-- التكويد -->
+    <!-- التكويد -->
    
     <string name="identity_step_title">الخطوة 1 من 4: الربط والتصنيف</string>
     <string name="identity_epc_hint">رمز الشريحة (EPC / GTIN)</string>
