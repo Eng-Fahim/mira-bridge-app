@@ -4,8 +4,6 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
-import android.widget.Spinner;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -15,7 +13,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
-import com.example.uhf.MiraRfid.IRFIDReader.ReaderType;
+import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.RFIDManager;
 import com.example.uhf.MiraRfid.model.RFIDDevice;
 import com.google.android.material.button.MaterialButton;
@@ -23,13 +21,8 @@ import com.google.android.material.textfield.TextInputEditText;
 
 import java.util.List;
 
-/**
- * شاشة إعداد وتعريف قارئ RFID
- */
 public class MiraReaderSetupFragment extends MiraBaseFragment {
 
-    private static final String TAG = "MiraReaderSetup";
-    
     private RecyclerView rvDevices;
     private MaterialButton btnAddDevice;
     private MaterialButton btnTestConnection;
@@ -65,11 +58,8 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         btnDetectAuto.setOnClickListener(v -> autoDetectDevice());
     }
     
-    /**
-     * عرض Dialog إضافة جهاز جديد
-     */
     private void showAddDeviceDialog() {
-        ReaderType[] types = ReaderType.values();
+        MiraIRFIDReader.ReaderType[] types = MiraIRFIDReader.ReaderType.values();
         String[] names = new String[types.length];
         for (int i = 0; i < types.length; i++) {
             names[i] = types[i].displayName + " (" + types[i].description + ")";
@@ -78,8 +68,7 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle(isArabic ? "إضافة جهاز RFID" : "Add RFID Device");
         builder.setItems(names, (d, which) -> {
-            ReaderType selected = types[which];
-            
+            MiraIRFIDReader.ReaderType selected = types[which];
             if (selected.isBuiltIn) {
                 saveNewDevice(selected, "");
             } else {
@@ -90,10 +79,7 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         builder.show();
     }
     
-    /**
-     * إدخال عنوان الجهاز الخارجي
-     */
-    private void showAddressInputDialog(ReaderType type) {
+    private void showAddressInputDialog(MiraIRFIDReader.ReaderType type) {
         TextInputEditText input = new TextInputEditText(requireContext());
         input.setHint(isArabic ? "MAC Address أو IP:Port" : "MAC Address or IP:Port");
         
@@ -108,13 +94,9 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         builder.show();
     }
     
-    /**
-     * حفظ جهاز جديد
-     */
-    private void saveNewDevice(ReaderType type, String address) {
+    private void saveNewDevice(MiraIRFIDReader.ReaderType type, String address) {
         RFIDDevice device = new RFIDDevice(type, address);
         device.setCustomName(type.displayName);
-        
         boolean saved = rfidManager.saveDevice(device);
         if (saved) {
             refreshDeviceList();
@@ -122,16 +104,15 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         }
     }
     
-    /**
-     * اكتشاف تلقائي
-     */
     private void autoDetectDevice() {
-        ReaderType detected = rfidManager.detectDeviceType();
+        MiraIRFIDReader.ReaderType detected = rfidManager.detectDeviceType();
+        
+        String message = isArabic ? "تم اكتشاف: " + detected.displayName 
+            : "Detected: " + detected.displayName;
         
         new AlertDialog.Builder(requireContext())
             .setTitle(isArabic ? "نتيجة الاكتشاف" : "Detection Result")
-            .setMessage(isArabic ? "تم اكتشاف: " + detected.displayName 
-                : "Detected: " + detected.displayName)
+            .setMessage(message)
             .setPositiveButton(isArabic ? "استخدام هذا الجهاز" : "Use This Device", (d, w) -> {
                 saveNewDevice(detected, "");
             })
@@ -139,9 +120,6 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
             .show();
     }
     
-    /**
-     * اختبار الاتصال بالجهاز النشط
-     */
     private void testActiveConnection() {
         RFIDDevice active = rfidManager.getActiveDevice();
         if (active == null) {
@@ -159,9 +137,6 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         }).start();
     }
     
-    /**
-     * خيارات الجهاز المحفوظ
-     */
     private void showDeviceOptions(RFIDDevice device) {
         new AlertDialog.Builder(requireContext())
             .setTitle(device.getDisplayName())
@@ -171,16 +146,9 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
                 isArabic ? "حذف" : "Delete"
             }, (d, which) -> {
                 switch (which) {
-                    case 0:
-                        setDefaultDevice(device);
-                        break;
-                    case 1:
-                        testDevice(device);
-                        break;
-                    case 2:
-                        rfidManager.deleteDevice(device);
-                        refreshDeviceList();
-                        break;
+                    case 0: setDefaultDevice(device); break;
+                    case 1: testDevice(device); break;
+                    case 2: rfidManager.deleteDevice(device); refreshDeviceList(); break;
                 }
             })
             .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
@@ -223,16 +191,14 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         }
     }
     
-    // ==================== Adapter ====================
+    private interface OnDeviceClickListener {
+        void onDeviceClick(RFIDDevice device);
+    }
     
     private class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.ViewHolder> {
         
         private List<RFIDDevice> devices;
         private final OnDeviceClickListener clickListener;
-        
-        interface OnDeviceClickListener {
-            void onDeviceClick(RFIDDevice device);
-        }
         
         DeviceAdapter(List<RFIDDevice> devices, OnDeviceClickListener listener) {
             this.devices = devices;
@@ -275,4 +241,4 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
             }
         }
     }
-      }
+}
