@@ -56,7 +56,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Executors;
 
-public class MiraIdentityStudioFragment extends Fragment {
+import com.example.uhf.tools.MiraDialogHelper;
+
+public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     private static final String TAG = "MiraIdentityStudio";
     private static final String OFFLINE_PREFS = "identity_studio_cache";
@@ -65,7 +67,7 @@ public class MiraIdentityStudioFragment extends Fragment {
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
-    private boolean isArabic;
+    
     private SharedPreferences offlineCache;
 
     private final Map<String, String[]> typeSuggestions = new HashMap<>();
