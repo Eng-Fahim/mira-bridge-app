@@ -44,7 +44,11 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
+import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.MiraRfid.MiraIRFIDReader;
+import com.example.uhf.MiraRfid.RFIDManager;
+import com.example.uhf.MiraRfid.model.RFIDDevice;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -71,24 +75,23 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class MiraUHFReadTagFragment extends Fragment {
+public class MiraUHFReadTagFragment extends MiraBaseFragment {
 
     private static final String TAG = "MiraUHFReadTagFragment";
-    private boolean isArabic;
+    
     private TextView tvConnectionType, tvConnectionDetails;
     private LinearLayout layoutExportButtons;
     private com.google.android.material.card.MaterialCardView cardConnectionInfo;
+    
     // إعدادات زمنية
-    private static final long DEFAULT_INACTIVITY_TIMEOUT_MS = 180000; // 3 دقائق
-    
-    
-    private static final long UI_UPDATE_INTERVAL_MS = 300; // تحديث الواجهة كل 300ms للتجميع
-    private static final int BATCH_SIZE_THRESHOLD = 50; // تفريغ الدفعة عند 50 شريحة
+    private static final long DEFAULT_INACTIVITY_TIMEOUT_MS = 180000;
+    private static final long UI_UPDATE_INTERVAL_MS = 300;
+    private static final int BATCH_SIZE_THRESHOLD = 50;
     
     // إعدادات البلوتوث
     private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     
-    // ثوابت الحالة
+    // ثوابت
     private static final String OFFLINE_PREFS = "uhf_inventory_cache";
     private static final String PREF_LAST_CONNECTED_DEVICE = "last_bt_device";
 
@@ -96,7 +99,7 @@ public class MiraUHFReadTagFragment extends Fragment {
     private LinearLayout alertBannerView;
     private TextView tvAlertMessage;
     private Button btnDisconnectReader, btnExportCSV, btnPrintReport, btnShareReport;
-    
+    private com.google.android.material.card.MaterialCardView cardConnectionInfoView;
     private TextView tvReaderStatus;
     private AppCompatSpinner spinnerZone;
     private TextView tvTotalScanned, tvUniqueTags, tvScanRate, tvElapsed;
@@ -108,6 +111,10 @@ public class MiraUHFReadTagFragment extends Fragment {
     private TextView tabFilterAll, tabFilterFound, tabFilterMissing, tabFilterUnexpected;
     private RecyclerView rvRecentTags;
 
+    // RFID Manager
+    private RFIDManager rfidManager;
+    private IRFIDReader activeReader;
+
     // المكونات الداخلية
     private TagAdapter tagAdapter;
     private final List<TagModel> tagList = new ArrayList<>();
@@ -115,33 +122,26 @@ public class MiraUHFReadTagFragment extends Fragment {
     private final Set<String> scannedEpcSet = new HashSet<>();
     private final Map<String, ExpectedItem> expectedItemsMap = new HashMap<>();
     
-    // قائمة انتظار للتجميع (Batching)
     private final Queue<TagModel> pendingTagsQueue = new LinkedList<>();
     private final List<TagModel> missingItemsCache = new ArrayList<>();
     private boolean isMissingCacheDirty = true;
 
-    // معالجات الخيوط
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Handler uiUpdateHandler = new Handler(Looper.getMainLooper());
     private ExecutorService networkExecutor;
     private ExecutorService hardwareExecutor;
     
-    // الصوت والاهتزاز
     private SoundPool soundPool;
     private int soundSuccessId, soundWarningId, soundAlertId;
     private Vibrator vibrator;
     private SharedPreferences offlineCache;
 
-    // حالة المسح والجلسة
     public enum InventoryState {
         IDLE, LOADING, SCANNING, PAUSED, COMPLETED, FINALIZED
     }
     
     public enum ConnectionType {
-        BUILT_IN,      // قارئ مدمج (Chainway C72)
-        BLUETOOTH,     // بلوتوث خارجي
-        WIFI,          // WiFi TCP
-        SIMULATOR      // محاكي
+        RFID_MANAGER, BLUETOOTH, WIFI, SIMULATOR
     }
 
     private InventoryState currentState = InventoryState.IDLE;
@@ -159,7 +159,6 @@ public class MiraUHFReadTagFragment extends Fragment {
     private long lastUiUpdateTime = 0;
     private final AtomicBoolean isProcessingBatch = new AtomicBoolean(false);
 
-    // البلوتوث
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothSocket bluetoothSocket;
     private BluetoothDevice connectedDevice;
@@ -168,20 +167,17 @@ public class MiraUHFReadTagFragment extends Fragment {
     private final BroadcastReceiver bluetoothReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
+            if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(intent.getAction())) {
                 handleBluetoothDisconnection();
             }
         }
     };
 
-    // WiFi
     private WifiManager wifiManager;
     private java.net.Socket wifiSocket;
     private InputStream wifiInputStream;
     private OutputStream wifiOutputStream;
 
-    // Runnables
     private final Runnable timerRunnable = new Runnable() {
         @Override
         public void run() {
@@ -190,14 +186,11 @@ public class MiraUHFReadTagFragment extends Fragment {
                 long seconds = elapsedMs / 1000;
                 long minutes = seconds / 60;
                 long secs = seconds % 60;
-
                 tvElapsed.setText(String.format(Locale.US, "%02d:%02d", minutes, secs));
-
                 int currentTotal = (int) totalScannedCount;
                 int rate = currentTotal - lastSecondCount;
                 lastSecondCount = currentTotal;
                 tvScanRate.setText(String.format(Locale.US, "%d/s", Math.max(0, rate)));
-
                 mainHandler.postDelayed(this, 1000);
             }
         }
@@ -215,7 +208,6 @@ public class MiraUHFReadTagFragment extends Fragment {
         }
     };
     
-    // تحديث الواجهة المجمع
     private final Runnable uiBatchUpdateRunnable = new Runnable() {
         @Override
         public void run() {
@@ -247,31 +239,48 @@ public class MiraUHFReadTagFragment extends Fragment {
             hardwareExecutor = Executors.newSingleThreadExecutor();
             offlineCache = ctx.getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
             
-            // تهيئة البلوتوث
             bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-            
-            // تهيئة WiFi
             wifiManager = (WifiManager) ctx.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
             
-            // تسجيل مستقبل البث للبلوتوث
             IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED);
             ctx.registerReceiver(bluetoothReceiver, filter);
             
-            // تهيئة الصوت
             soundPool = new SoundPool.Builder().setMaxStreams(3).build();
             soundSuccessId = soundPool.load(ctx, R.raw.beep_success, 1);
             soundWarningId = soundPool.load(ctx, R.raw.beep_warning, 1);
             soundAlertId = soundPool.load(ctx, R.raw.alarm_sold_item, 1);
             
-            // تهيئة الاهتزاز
             vibrator = (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
+
+            // تهيئة RFID Manager
+            rfidManager = RFIDManager.getInstance(ctx);
+            rfidManager.setListener(new IRFIDReader.OnTagReadListener() {
+                @Override
+                public void onTagRead(String epc, int rssi) {
+                    onTagScanned(epc, rssi);
+                }
+                @Override
+                public void onScanStarted() {
+                    Log.i(TAG, "RFID Scan Started");
+                }
+                @Override
+                public void onScanStopped() {
+                    Log.i(TAG, "RFID Scan Stopped");
+                }
+                @Override
+                public void onConnectionChanged(boolean connected) {
+                    Log.i(TAG, "RFID Connection: " + connected);
+                }
+                @Override
+                public void onError(String error) {
+                    Log.e(TAG, "RFID Error: " + error);
+                }
+            });
 
             sessionId = "AUDIT-" + System.currentTimeMillis();
             isArabic = Locale.getDefault().getLanguage().equals("ar");
-            
-            // تحديد نوع الاتصال
-            detectAndSetConnectionType();
 
+            detectAndSetConnectionType();
             initViews(view);
             setupListeners();
             setupRecyclerView();
@@ -287,8 +296,10 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     private void detectAndSetConnectionType() {
-        if (isChainwayC72Device()) {
-            activeConnectionType = ConnectionType.BUILT_IN;
+        RFIDDevice activeDevice = rfidManager.getActiveDevice();
+        if (activeDevice != null && activeDevice.getType() != null && 
+            activeDevice.getType() != IRFIDReader.ReaderType.SIMULATOR) {
+            activeConnectionType = ConnectionType.RFID_MANAGER;
         } else if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
             String lastDevice = offlineCache.getString(PREF_LAST_CONNECTED_DEVICE, null);
             if (lastDevice != null) {
@@ -345,7 +356,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         btnExportCSV = view.findViewById(R.id.btnExportCSV);
         btnPrintReport = view.findViewById(R.id.btnPrintReport);
         btnShareReport = view.findViewById(R.id.btnShareReport);
-        cardConnectionInfo = view.findViewById(R.id.cardConnectionInfo);
+        cardConnectionInfoView = view.findViewById(R.id.cardConnectionInfo);
         
         pbScanProgress = view.findViewById(R.id.pbScanProgress);
 
@@ -393,7 +404,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         closeBluetoothConnection();
         closeWifiConnection();
         switchToSimulator();
-        if (cardConnectionInfo != null) cardConnectionInfo.setVisibility(View.GONE);
+        if (cardConnectionInfoView != null) cardConnectionInfoView.setVisibility(View.GONE);
     }
 
     private void setupRecyclerView() {
@@ -462,7 +473,6 @@ public class MiraUHFReadTagFragment extends Fragment {
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 selectedZone = zones.get(position);
             }
-
             @Override
             public void onNothingSelected(AdapterView<?> parent) {}
         });
@@ -541,8 +551,6 @@ public class MiraUHFReadTagFragment extends Fragment {
         });
     }
 
-    // ==================== إدارة الاتصال ====================
-    
     private void showConnectionDialog() {
         String[] options;
         if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
@@ -844,8 +852,6 @@ public class MiraUHFReadTagFragment extends Fragment {
         }
     }
 
-    // ==================== إدارة المسح ====================
-
     private void loadDynamicInventorySettings() {
         networkExecutor.execute(() -> {
             try {
@@ -862,58 +868,58 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     private void loadExpectedInventory() {
-    setInventoryState(InventoryState.LOADING);
-    
-    networkExecutor.execute(() -> {
-        try {
-            MiraApiClient api = MiraApiClient.getInstance(requireContext());
-            MiraApiClient.ApiResponse response = api.getBranchItemsList(1); // الفرع رقم 1
-            
-            expectedItemsMap.clear();
+        setInventoryState(InventoryState.LOADING);
+        
+        networkExecutor.execute(() -> {
+            try {
+                MiraApiClient api = MiraApiClient.getInstance(requireContext());
+                MiraApiClient.ApiResponse response = api.getBranchItemsList(1);
+                
+                expectedItemsMap.clear();
 
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONArray items = response.data.optJSONArray("items");
-                if (items != null) {
-                    for (int i = 0; i < items.length(); i++) {
-                        JSONObject obj = items.getJSONObject(i);
-                        String epc = obj.optString("serial_number", 
-                                obj.optString("gtin13", obj.optString("epc", "")));
-                        
-                        if (!epc.isEmpty()) {
-                            ExpectedItem item = new ExpectedItem(
-                                    epc,
-                                    obj.optString("item_title", obj.optString("title", "قطعة غير معنونة")),
-                                    obj.optString("gold_karat", obj.optString("karat", "21k")),
-                                    obj.optDouble("gross_weight_grams", obj.optDouble("weight", 0.0)),
-                                    "SOLD".equalsIgnoreCase(obj.optString("status", ""))
-                            );
-                            expectedItemsMap.put(epc, item);
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONArray items = response.data.optJSONArray("items");
+                    if (items != null) {
+                        for (int i = 0; i < items.length(); i++) {
+                            JSONObject obj = items.getJSONObject(i);
+                            String epc = obj.optString("serial_number", 
+                                    obj.optString("gtin13", obj.optString("epc", "")));
+                            
+                            if (!epc.isEmpty()) {
+                                ExpectedItem item = new ExpectedItem(
+                                        epc,
+                                        obj.optString("item_title", obj.optString("title", "قطعة غير معنونة")),
+                                        obj.optString("gold_karat", obj.optString("karat", "21k")),
+                                        obj.optDouble("gross_weight_grams", obj.optDouble("weight", 0.0)),
+                                        "SOLD".equalsIgnoreCase(obj.optString("status", ""))
+                                );
+                                expectedItemsMap.put(epc, item);
+                            }
                         }
                     }
                 }
+
+                if (expectedItemsMap.isEmpty()) {
+                    loadDemoData();
+                }
+
+                mainHandler.post(() -> {
+                    isMissingCacheDirty = true;
+                    updateReconciliationStats();
+                    setInventoryState(InventoryState.IDLE);
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "فشل جلب قائمة القطع المتوقعة: " + e.getMessage());
+                mainHandler.post(() -> {
+                    loadDemoData();
+                    isMissingCacheDirty = true;
+                    updateReconciliationStats();
+                    setInventoryState(InventoryState.IDLE);
+                });
             }
-
-            if (expectedItemsMap.isEmpty()) {
-                loadDemoData();
-            }
-
-            mainHandler.post(() -> {
-                isMissingCacheDirty = true;
-                updateReconciliationStats();
-                setInventoryState(InventoryState.IDLE);
-            });
-
-        } catch (Exception e) {
-            Log.e(TAG, "فشل جلب قائمة القطع المتوقعة: " + e.getMessage());
-            mainHandler.post(() -> {
-                loadDemoData();
-                isMissingCacheDirty = true;
-                updateReconciliationStats();
-                setInventoryState(InventoryState.IDLE);
-            });
-        }
-    });
-}
+        });
+    }
 
     private void loadDemoData() {
         for (int i = 1; i <= 15; i++) {
@@ -945,8 +951,8 @@ public class MiraUHFReadTagFragment extends Fragment {
         resetInactivityTimer();
 
         switch (activeConnectionType) {
-            case BUILT_IN:
-                startBuiltInReader();
+            case RFID_MANAGER:
+                rfidManager.startScan();
                 break;
             case BLUETOOTH:
                 startBluetoothScan();
@@ -986,7 +992,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         resetInactivityTimer();
         
         switch (activeConnectionType) {
-            case BUILT_IN: startBuiltInReader(); break;
+            case RFID_MANAGER: rfidManager.startScan(); break;
             case BLUETOOTH: startBluetoothScan(); break;
             case WIFI: startWifiScan(); break;
             case SIMULATOR: startSimulation(); break;
@@ -1015,8 +1021,8 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     private void stopAllReaders() {
-        stopBuiltInReader();
         stopSimulation();
+        rfidManager.stopScan();
         
         if (btOutputStream != null && activeConnectionType == ConnectionType.BLUETOOTH) {
             try {
@@ -1081,20 +1087,6 @@ public class MiraUHFReadTagFragment extends Fragment {
         Toast.makeText(getContext(), "🗑 تم مسح بيانات الجلسة", Toast.LENGTH_SHORT).show();
     }
 
-    // ==================== أوامر القارئ المدمج ====================
-    
-    private void startBuiltInReader() {
-        hardwareExecutor.execute(() -> Log.d(TAG, "Chainway R2000: بدء المسح المدمج"));
-    }
-
-    private void stopBuiltInReader() {
-        try {
-            Log.d(TAG, "Chainway R2000: إيقاف المسح المدمج");
-        } catch (Exception e) {
-            Log.e(TAG, "خطأ في إيقاف القارئ المدمج: " + e.getMessage());
-        }
-    }
-
     private void startBluetoothScan() {
         if (btOutputStream != null) {
             hardwareExecutor.execute(() -> {
@@ -1120,8 +1112,6 @@ public class MiraUHFReadTagFragment extends Fragment {
             });
         }
     }
-
-    // ==================== معالجة الشرائح مع التجميع ====================
 
     public void onTagScanned(String epc, double rssi) {
         if (currentState != InventoryState.SCANNING || epc == null || epc.isEmpty()) return;
@@ -1249,12 +1239,11 @@ public class MiraUHFReadTagFragment extends Fragment {
         }
     }
 
-    // ==================== تحديث الواجهة ====================
-
     private void updateReaderStatusDisplay() {
         switch (activeConnectionType) {
-            case BUILT_IN:
-                tvReaderStatus.setText("متصل (C72)");
+            case RFID_MANAGER:
+                RFIDDevice device = rfidManager.getActiveDevice();
+                tvReaderStatus.setText(device != null ? device.getDisplayName() : "RFID Manager");
                 tvReaderStatus.setTextColor(Color.parseColor("#16A34A"));
                 break;
             case BLUETOOTH:
@@ -1445,295 +1434,145 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     private void uploadAuditToCloud() {
-    networkExecutor.execute(() -> {
-        try {
-            // حساب found/missing/unexpected
-            int found = 0;
-            int unexpected = 0;
-            int soldCount = 0;
-            for (ExpectedItem item : expectedItemsMap.values()) {
-                if (item.isSold) soldCount++;
-            }
-            for (String epc : scannedEpcSet) {
-                ExpectedItem item = expectedItemsMap.get(epc);
-                if (item != null) {
-                    if (!item.isSold) found++;
-                } else {
-                    unexpected++;
+        networkExecutor.execute(() -> {
+            try {
+                int found = 0;
+                int unexpected = 0;
+                int soldCount = 0;
+                for (ExpectedItem item : expectedItemsMap.values()) {
+                    if (item.isSold) soldCount++;
                 }
-            }
-            int missing = Math.max(0, expectedItemsMap.size() - soldCount - found);
-            
-            JSONObject payload = new JSONObject();
-            payload.put("session_id", sessionId);
-            payload.put("zone", selectedZone);
-            payload.put("total_scanned", totalScannedCount);
-            payload.put("unique_count", scannedEpcSet.size());
-            payload.put("expected_count", expectedItemsMap.size());
-            payload.put("found_count", found);
-            payload.put("missing_count", missing);
-            payload.put("unexpected_count", unexpected);
-            payload.put("connection_type", activeConnectionType.name());
-            payload.put("branch_id", 1);
-
-            // إرسال قائمة EPCs المقروءة
-            JSONArray scannedArray = new JSONArray();
-            for (String epc : scannedEpcSet) {
-                scannedArray.put(epc);
-            }
-            payload.put("scanned_epcs", scannedArray);
-
-            Log.e(TAG, "══════════ CLOSE INVENTORY ══════════");
-            Log.e(TAG, "Payload: " + payload.toString(2));
-
-            MiraApiClient api = MiraApiClient.getInstance(requireContext());
-            MiraApiClient.ApiResponse res = api.closeInventorySession(payload);
-
-            Log.e(TAG, "Response Code: " + (res != null ? res.code : "NULL"));
-            Log.e(TAG, "Response Success: " + (res != null ? res.isSuccess : "NULL"));
-
-            final JSONObject reportData = (res != null && res.data != null) ? res.data : null;
-            
-            mainHandler.post(() -> {
-                if (res != null && res.isSuccess) {
-                    setInventoryState(InventoryState.FINALIZED);
-                    
-                    if (reportData != null) {
-                        showAuditResultDialog(reportData);
+                for (String epc : scannedEpcSet) {
+                    ExpectedItem item = expectedItemsMap.get(epc);
+                    if (item != null) {
+                        if (!item.isSold) found++;
                     } else {
-                        Toast.makeText(getContext(), "✅ تم اعتماد الجرد بنجاح", Toast.LENGTH_LONG).show();
+                        unexpected++;
                     }
-                } else {
-                    String errorMsg = "❌ فشل رفع الجرد";
-                    if (res != null && res.data != null) {
-                        errorMsg = res.data.optString("message", errorMsg);
-                    }
-                    showErrorDialog(errorMsg);
                 }
-            });
+                int missing = Math.max(0, expectedItemsMap.size() - soldCount - found);
+                
+                JSONObject payload = new JSONObject();
+                payload.put("session_id", sessionId);
+                payload.put("zone", selectedZone);
+                payload.put("total_scanned", totalScannedCount);
+                payload.put("unique_count", scannedEpcSet.size());
+                payload.put("expected_count", expectedItemsMap.size());
+                payload.put("found_count", found);
+                payload.put("missing_count", missing);
+                payload.put("unexpected_count", unexpected);
+                payload.put("connection_type", activeConnectionType.name());
+                payload.put("branch_id", 1);
+
+                JSONArray scannedArray = new JSONArray();
+                for (String epc : scannedEpcSet) {
+                    scannedArray.put(epc);
+                }
+                payload.put("scanned_epcs", scannedArray);
+
+                MiraApiClient api = MiraApiClient.getInstance(requireContext());
+                MiraApiClient.ApiResponse res = api.closeInventorySession(payload);
+
+                final JSONObject reportData = (res != null && res.data != null) ? res.data : null;
+                
+                mainHandler.post(() -> {
+                    if (res != null && res.isSuccess) {
+                        setInventoryState(InventoryState.FINALIZED);
+                        if (reportData != null) {
+                            showAuditResultDialog(reportData);
+                        } else {
+                            Toast.makeText(getContext(), "✅ تم اعتماد الجرد بنجاح", Toast.LENGTH_LONG).show();
+                        }
+                    } else {
+                        String errorMsg = "❌ فشل رفع الجرد";
+                        if (res != null && res.data != null) {
+                            errorMsg = res.data.optString("message", errorMsg);
+                        }
+                        showErrorDialog(errorMsg);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Upload error: " + e.getMessage());
+                mainHandler.post(() -> showErrorDialog("❌ خطأ: " + e.getMessage()));
+            }
+        });
+    }
+
+    private void showAuditResultDialog(JSONObject data) {
+        try {
+            JSONObject report = data.optJSONObject("report");
+            JSONObject inventoryUpdate = data.optJSONObject("inventory_update");
+            JSONObject riskAssessment = data.optJSONObject("risk_assessment");
+            
+            String riskLevel = riskAssessment != null ? riskAssessment.optString("level", "none") : "none";
+            String icon = getRiskIcon(riskLevel);
+            int iconColor = getRiskColor(riskLevel);
+            
+            List<String[]> details = new ArrayList<>();
+            if (report != null) {
+                details.add(new String[]{"📦 المتوقع", String.valueOf(report.optInt("expected_count", 0))});
+                details.add(new String[]{"✅ المطابق", String.valueOf(report.optInt("found_count", 0))});
+                details.add(new String[]{"🔍 إجمالي المسح", String.valueOf(report.optInt("total_scanned", 0))});
+                details.add(new String[]{"❌ عجز", String.valueOf(report.optInt("missing_count", 0))});
+                details.add(new String[]{"⚠️ زائد", String.valueOf(report.optInt("unexpected_count", 0))});
+                double accuracy = report.optDouble("accuracy", 0);
+                details.add(new String[]{"🎯 نسبة التطابق", accuracy + "%"});
+            }
+            if (inventoryUpdate != null && inventoryUpdate.optBoolean("updated", false)) {
+                details.add(new String[]{"✅ تم التحقق", String.valueOf(inventoryUpdate.optInt("verified", 0))});
+                details.add(new String[]{"🔍 غير مقروء", String.valueOf(inventoryUpdate.optInt("unverified", 0))});
+            }
+            
+            String riskMsg = riskAssessment != null ? riskAssessment.optString("message", "") : "";
+            
+            showDetailsDialog(
+                icon + " " + (isArabic ? "تقرير اعتماد الجرد" : "Audit Report"),
+                details.toArray(new String[0][])
+            );
+            
+            if (riskMsg != null && !riskMsg.isEmpty()) {
+                showToast(riskMsg);
+            }
         } catch (Exception e) {
-            Log.e(TAG, "Upload error: " + e.getMessage());
-            mainHandler.post(() -> showErrorDialog("❌ خطأ: " + e.getMessage()));
+            Log.e(TAG, "showAuditResultDialog error: " + e.getMessage());
+            Toast.makeText(getContext(), "✅ تم اعتماد الجرد بنجاح", Toast.LENGTH_LONG).show();
         }
-    });
-}
-
-/**
- * 🟢 عرض Dialog نتائج الجرد بشكل احترافي
- */
-private void showAuditResultDialog(JSONObject data) {
-    if (getContext() == null || !isAdded()) return;
-    
-    try {
-        JSONObject report = data.optJSONObject("report");
-        JSONObject inventoryUpdate = data.optJSONObject("inventory_update");
-        JSONObject riskAssessment = data.optJSONObject("risk_assessment");
-        
-        // إنشاء المحتوى
-        LinearLayout layout = new LinearLayout(requireContext());
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(20, 20, 20, 10);
-        
-        // ✅ أيقونة حسب مستوى الخطورة
-        String riskLevel = riskAssessment != null ? riskAssessment.optString("level", "none") : "none";
-        String icon = getRiskIcon(riskLevel);
-        int iconColor = getRiskColor(riskLevel);
-        
-        TextView tvIcon = new TextView(requireContext());
-        tvIcon.setText(icon);
-        tvIcon.setTextSize(48);
-        tvIcon.setGravity(android.view.Gravity.CENTER);
-        tvIcon.setTextColor(iconColor);
-        layout.addView(tvIcon);
-        
-        // ✅ العنوان
-        TextView tvTitle = new TextView(requireContext());
-        tvTitle.setText(isArabic ? "📊 تقرير اعتماد الجرد" : "📊 Audit Report");
-        tvTitle.setTextColor(Color.parseColor("#0F172A"));
-        tvTitle.setTextSize(18);
-        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        tvTitle.setGravity(android.view.Gravity.CENTER);
-        tvTitle.setPadding(0, 10, 0, 5);
-        layout.addView(tvTitle);
-        
-        // ✅ رسالة تقييم المخاطر
-        if (riskAssessment != null) {
-            TextView tvRiskMsg = new TextView(requireContext());
-            tvRiskMsg.setText(riskAssessment.optString("message", ""));
-            tvRiskMsg.setTextColor(iconColor);
-            tvRiskMsg.setTextSize(13);
-            tvRiskMsg.setGravity(android.view.Gravity.CENTER);
-            tvRiskMsg.setPadding(0, 0, 0, 15);
-            layout.addView(tvRiskMsg);
-        }
-        
-        // ✅ بطاقة الإحصائيات
-        com.google.android.material.card.MaterialCardView cardStats = 
-            new com.google.android.material.card.MaterialCardView(requireContext());
-        cardStats.setCardBackgroundColor(Color.parseColor("#F8FAFC"));
-        cardStats.setRadius(12);
-        cardStats.setCardElevation(2);
-        cardStats.setPadding(16, 12, 16, 12);
-        
-        LinearLayout statsLayout = new LinearLayout(requireContext());
-        statsLayout.setOrientation(LinearLayout.VERTICAL);
-        
-        if (report != null) {
-            addStatRow(statsLayout, isArabic ? "📦 المتوقع" : "📦 Expected", 
-                String.valueOf(report.optInt("expected_count", 0)), "#64748B");
-            addStatRow(statsLayout, isArabic ? "✅ المطابق" : "✅ Found", 
-                String.valueOf(report.optInt("found_count", 0)), "#16A34A");
-            addStatRow(statsLayout, isArabic ? "🔍 إجمالي المسح" : "🔍 Total Scanned", 
-                String.valueOf(report.optInt("total_scanned", 0)), "#0284C7");
-            addStatRow(statsLayout, isArabic ? "🆕 فريد" : "🆕 Unique", 
-                String.valueOf(report.optInt("unique_count", 0)), "#7C3AED");
-            addStatRow(statsLayout, isArabic ? "❌ عجز" : "❌ Missing", 
-                String.valueOf(report.optInt("missing_count", 0)), "#DC2626");
-            addStatRow(statsLayout, isArabic ? "⚠️ زائد" : "⚠️ Unexpected", 
-                String.valueOf(report.optInt("unexpected_count", 0)), "#F59E0B");
-            
-            // ✅ نسبة الدقة
-            double accuracy = report.optDouble("accuracy", 0);
-            addStatRow(statsLayout, isArabic ? "🎯 نسبة التطابق" : "🎯 Accuracy", 
-                accuracy + "%", accuracy >= 98 ? "#16A34A" : accuracy >= 90 ? "#F59E0B" : "#DC2626");
-        }
-        
-        cardStats.addView(statsLayout);
-        layout.addView(cardStats);
-        
-        // ✅ تحديث المخزون
-        if (inventoryUpdate != null && inventoryUpdate.optBoolean("updated", false)) {
-            TextView tvInvTitle = new TextView(requireContext());
-            tvInvTitle.setText(isArabic ? "📋 تحديث المخزون:" : "📋 Inventory Update:");
-            tvInvTitle.setTextColor(Color.parseColor("#475569"));
-            tvInvTitle.setTextSize(12);
-            tvInvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-            tvInvTitle.setPadding(0, 12, 0, 4);
-            layout.addView(tvInvTitle);
-            
-            com.google.android.material.card.MaterialCardView cardInv = 
-                new com.google.android.material.card.MaterialCardView(requireContext());
-            cardInv.setCardBackgroundColor(Color.parseColor("#F0FDF4"));
-            cardInv.setRadius(8);
-            cardInv.setPadding(12, 8, 12, 8);
-            
-            LinearLayout invLayout = new LinearLayout(requireContext());
-            invLayout.setOrientation(LinearLayout.VERTICAL);
-            
-            addStatRow(invLayout, isArabic ? "✅ تم التحقق" : "✅ Verified", 
-                String.valueOf(inventoryUpdate.optInt("verified", 0)), "#16A34A");
-            addStatRow(invLayout, isArabic ? "🔍 غير مقروء" : "🔍 Unverified", 
-                String.valueOf(inventoryUpdate.optInt("unverified", 0)), "#F59E0B");
-            
-            cardInv.addView(invLayout);
-            layout.addView(cardInv);
-        }
-        
-        // ✅ التوصية
-        if (riskAssessment != null) {
-            TextView tvRecTitle = new TextView(requireContext());
-            tvRecTitle.setText(isArabic ? "💡 التوصية:" : "💡 Recommendation:");
-            tvRecTitle.setTextColor(Color.parseColor("#475569"));
-            tvRecTitle.setTextSize(12);
-            tvRecTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-            tvRecTitle.setPadding(0, 12, 0, 4);
-            layout.addView(tvRecTitle);
-            
-            TextView tvRec = new TextView(requireContext());
-            tvRec.setText(riskAssessment.optString("recommendation", ""));
-            tvRec.setTextColor(iconColor);
-            tvRec.setTextSize(13);
-            tvRec.setPadding(0, 0, 0, 8);
-            layout.addView(tvRec);
-        }
-        
-        // ✅ بناء الـ Dialog
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setView(layout);
-        builder.setPositiveButton(isArabic ? "🎉 حسناً" : "🎉 OK", (d, w) -> d.dismiss());
-        
-        if (report != null && report.optDouble("accuracy", 0) < 100) {
-            builder.setNegativeButton(isArabic ? "📊 تصدير التقرير" : "📊 Export Report", (d, w) -> {
-                exportInventoryReport();
-            });
-        }
-        
-        builder.setCancelable(false);
-        builder.show();
-        
-    } catch (Exception e) {
-        Log.e(TAG, "showAuditResultDialog error: " + e.getMessage());
-        Toast.makeText(getContext(), "✅ تم اعتماد الجرد بنجاح", Toast.LENGTH_LONG).show();
     }
-}
 
-/**
- * 🟢 أيقونة مستوى الخطورة
- */
-private String getRiskIcon(String level) {
-    switch (level) {
-        case "none": return "✅";
-        case "low": return "👍";
-        case "medium": return "⚠️";
-        case "high": return "🚨";
-        case "critical": return "🔴";
-        default: return "✅";
+    private String getRiskIcon(String level) {
+        switch (level) {
+            case "none": return "✅";
+            case "low": return "👍";
+            case "medium": return "⚠️";
+            case "high": return "🚨";
+            case "critical": return "🔴";
+            default: return "✅";
+        }
     }
-}
 
-/**
- * 🟢 لون مستوى الخطورة
- */
-private int getRiskColor(String level) {
-    switch (level) {
-        case "none": return Color.parseColor("#16A34A");
-        case "low": return Color.parseColor("#16A34A");
-        case "medium": return Color.parseColor("#F59E0B");
-        case "high": return Color.parseColor("#EA580C");
-        case "critical": return Color.parseColor("#DC2626");
-        default: return Color.parseColor("#16A34A");
+    private int getRiskColor(String level) {
+        switch (level) {
+            case "none": return Color.parseColor("#16A34A");
+            case "low": return Color.parseColor("#16A34A");
+            case "medium": return Color.parseColor("#F59E0B");
+            case "high": return Color.parseColor("#EA580C");
+            case "critical": return Color.parseColor("#DC2626");
+            default: return Color.parseColor("#16A34A");
+        }
     }
-}
 
-/**
- * 🟢 إضافة صف إحصائية
- */
-private void addStatRow(LinearLayout parent, String label, String value, String colorHex) {
-    LinearLayout row = new LinearLayout(requireContext());
-    row.setOrientation(LinearLayout.HORIZONTAL);
-    row.setPadding(0, 4, 0, 4);
-    
-    TextView tvLabel = new TextView(requireContext());
-    tvLabel.setText(label);
-    tvLabel.setTextColor(Color.parseColor("#64748B"));
-    tvLabel.setTextSize(12);
-    tvLabel.setMinWidth(140);
-    row.addView(tvLabel);
-    
-    TextView tvValue = new TextView(requireContext());
-    tvValue.setText(value);
-    tvValue.setTextColor(Color.parseColor(colorHex));
-    tvValue.setTextSize(13);
-    tvValue.setTypeface(null, android.graphics.Typeface.BOLD);
-    tvValue.setPadding(8, 0, 0, 0);
-    row.addView(tvValue);
-    
-    parent.addView(row);
-}
-
-/**
- * 🟢 عرض Dialog خطأ
- */
-private void showErrorDialog(String message) {
-    if (getContext() == null || !isAdded()) return;
-    
-    new AlertDialog.Builder(requireContext())
-            .setTitle(isArabic ? "❌ فشل اعتماد الجرد" : "❌ Audit Finalization Failed")
-            .setMessage(message)
-            .setPositiveButton(isArabic ? "حسناً" : "OK", (d, w) -> d.dismiss())
-            .show();
-}
-
+    private void showErrorDialog(String message) {
+        try {
+            if (getContext() == null || !isAdded()) return;
+            new AlertDialog.Builder(requireContext())
+                    .setTitle(isArabic ? "❌ فشل اعتماد الجرد" : "❌ Audit Finalization Failed")
+                    .setMessage(message)
+                    .setPositiveButton(isArabic ? "حسناً" : "OK", (d, w) -> d.dismiss())
+                    .show();
+        } catch (Exception e) {
+            Log.e(TAG, "showErrorDialog error: " + e.getMessage());
+        }
+    }
 
     private void exportInventoryReport() {
         networkExecutor.execute(() -> {
@@ -1890,7 +1729,6 @@ private void showErrorDialog(String message) {
         if (soundPool != null) soundPool.play(soundAlertId, 1.0f, 1.0f, 1, 0, 1.0f);
     }
 
-
     @Override
     public void onDestroyView() {
         super.onDestroyView();
@@ -1900,6 +1738,7 @@ private void showErrorDialog(String message) {
 
         closeBluetoothConnection();
         closeWifiConnection();
+        rfidManager.release();
 
         if (networkExecutor != null && !networkExecutor.isShutdown()) networkExecutor.shutdown();
         if (hardwareExecutor != null && !hardwareExecutor.isShutdown()) hardwareExecutor.shutdown();
@@ -1913,8 +1752,6 @@ private void showErrorDialog(String message) {
         } catch (Exception ignored) {}
     }
 
-    // ==================== دوال عامة للاستخدام الخارجي ====================
-    
     public boolean isScanning() {
         return currentState == InventoryState.SCANNING || currentState == InventoryState.PAUSED;
     }
@@ -1952,8 +1789,6 @@ private void showErrorDialog(String message) {
         }
     }
 
-    // ==================== النماذج الداخلية ====================
-    
     private static class ExpectedItem {
         String epc, title, karat;
         double weight;
@@ -2033,4 +1868,4 @@ private void showErrorDialog(String message) {
             }
         }
     }
-}
+                                           }
