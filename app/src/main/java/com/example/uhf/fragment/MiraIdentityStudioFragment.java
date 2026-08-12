@@ -82,11 +82,17 @@ private double makingChargePerGram = 10.0;
 private double profitMarginPercent = 90.0;
 private boolean goldRatesLoaded = false;
 
-// ==================== دوال جديدة ====================
+// ✅ ضع الدالة هنا
+private double getGoldPriceByKarat() {
+    int checkedId = binding.chipGroupKarat.getCheckedChipId();
+    if (checkedId == binding.chip24K.getId()) return goldPrice24K;
+    else if (checkedId == binding.chip21K.getId()) return goldPrice21K;
+    else if (checkedId == binding.chip18K.getId()) return goldPrice18K;
+    else if (checkedId == binding.chip14K.getId()) return goldPrice14K;
+    return goldPrice21K;
+}
 
-/**
- * 🟢 جلب أسعار الذهب والمصنعية من السيرفر
- */
+// ==================== دوال جديدة ====================
 private void loadGoldRates() {
     if (apiClient == null) return;
     
@@ -677,7 +683,9 @@ private void showSuccessDialog(String epc, String title, String karat, double we
     tvTitle.setText(isArabic ? "تم التكويد بنجاح!" : "Encoding Successful!");
     tvTitle.setTextColor(Color.parseColor("#16A34A"));
     tvTitle.setTextSize(18);
-    tvTitle.setTextStyle(android.graphics.Typeface.BOLD);
+    // ✅ صحيح
+tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+
     tvTitle.setGravity(android.view.Gravity.CENTER);
     tvTitle.setPadding(0, 10, 0, 20);
     layout.addView(tvTitle);
@@ -737,7 +745,7 @@ private void addDetailRow(LinearLayout parent, String label, String value) {
     tvLabel.setText(label);
     tvLabel.setTextColor(Color.parseColor("#475569"));
     tvLabel.setTextSize(12);
-    tvLabel.setTextStyle(android.graphics.Typeface.BOLD);
+    tvLabel.setTypeface(null, android.graphics.Typeface.BOLD);
     tvLabel.setMinWidth(120);
     row.addView(tvLabel);
     
@@ -874,4 +882,4 @@ private void addDetailRow(LinearLayout parent, String label, String value) {
         super.onDestroyView();
         binding = null;
     }
-}
+        }
