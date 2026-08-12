@@ -5,7 +5,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.util.Log;
 
-import com.example.uhf.MiraRfid.IRFIDReader;
+import com.example.uhf.MiraRfid.MiraIRFIDReader;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,7 +15,7 @@ import java.util.UUID;
 /**
  * قارئ Bluetooth عام يستخدم بروتوكول SPP
  */
-public class GenericBluetoothReader implements IRFIDReader {
+public class GenericBluetoothReader implements MiraIRFIDReader {
     
     private static final String TAG = "GenericBluetoothReader";
     private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
