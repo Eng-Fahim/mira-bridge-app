@@ -6,7 +6,8 @@ import android.content.SharedPreferences;
 /**
  * 🎨 ThemeHelper - إدارة ثيم التطبيق وألوانه
  */
-public class ThemeHelper {
+// ✅ صحيح
+public class MiraThemeHelper {
 
     private static final String PREFS_NAME = "mira_theme_settings";
 
