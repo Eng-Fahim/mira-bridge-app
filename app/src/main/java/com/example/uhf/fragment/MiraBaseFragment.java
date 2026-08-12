@@ -25,7 +25,7 @@ import java.util.Locale;
  * - دوال Dialog موحدة
  * - دعم اللغة العربية
  */
-public abstract class BaseFragment extends Fragment {
+public abstract class MiraBaseFragment extends Fragment {
 
     protected boolean isArabic;
     protected MiraDialogHelper dialogHelper;
