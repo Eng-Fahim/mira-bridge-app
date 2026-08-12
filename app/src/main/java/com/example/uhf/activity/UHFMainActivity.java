@@ -328,6 +328,7 @@ private void hideKeyboard(View view) {
         setTopTabVisibility(R.id.tabTopBranches, isManager);
         setTopTabVisibility(R.id.tabTopUsers, isAnyAdmin || isBranchManager);
         setTopTabVisibility(R.id.tabTopRfid, isManager || isInventoryMgr);
+        setTopTabVisibility(R.id.tabTopReader, isManager || isInventoryMgr);
 
         updateTopTabsContainerVisibility();
 
@@ -337,6 +338,7 @@ private void hideKeyboard(View view) {
         setupTopTab(R.id.tabTopBranches, "BranchesManagement");
         setupTopTab(R.id.tabTopUsers, "UsersManagement");
         setupTopTab(R.id.tabTopRfid, "ReadWrite");
+        setupTopTab(R.id.tabTopReader, "ReaderSetup");
     }
 
     private void updateTopTabsContainerVisibility() {
@@ -543,11 +545,13 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
             }
 
             setTopTabLabel(R.id.tabTopSettings, isArabic ? "⚙️ الإعدادات" : "⚙️ Settings");
+            
             setTopTabLabel(R.id.tabTopIdentity, isArabic ? "🆔 التكويد" : "🆔 Identity");
             setTopTabLabel(R.id.tabTopTransfers, isArabic ? "📦 التحويلات" : "📦 Transfers");
             setTopTabLabel(R.id.tabTopBranches, isArabic ? "🏢 الفروع" : "🏢 Branches");
             setTopTabLabel(R.id.tabTopUsers, isArabic ? "👥 المستخدمين" : "👥 Users");
             setTopTabLabel(R.id.tabTopRfid, isArabic ? "🔧 RFID" : "🔧 RFID");
+            setTopTabLabel(R.id.tabTopReader, isArabic ? "🔌 القارئ" : "🔌 Reader");
 
         } catch (Exception e) {
             Log.e(TAG, "Dynamic UI Translation Error: " + e.getMessage());
@@ -793,12 +797,9 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
             if (isManager || isInventoryMgr || isPosOperator || isGateSecurity) {
                 safeAddTab("RadarLocation", isArabic ? "🎯 الرادار" : "🎯 Radar", UHFRadarLocationFragment.class);
             }
+           
             if (isManager || isInventoryMgr) {
-                safeAddTab("Settings", isArabic ? "⚙️ إعدادات القارئ" : "⚙️ Reader Settings", UHFSetFragment.class);
-            }
-            if (isManager || isInventoryMgr) {
-            safeAddTab("ReaderSetup", isArabic ? "🔌 القارئ" : "🔌 Reader", MiraReaderSetupFragment.class);
-            }
+            safeAddTab("ReaderSetup", isArabic ? "🔌 القارئ" : "🔌 Reader", MiraReaderSetupFragment.class);}
             
             if (isManager || isGateSecurity || isPosOperator) {
                 safeAddTab("SecureGate", isArabic ? "🚪 البوابات" : "🚪 Gate", MiraSecureGateFragment.class);
@@ -816,10 +817,7 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
             if (isManager || isInventoryMgr) {
                 safeAddTab("Transfers", isArabic ? "📦 التحويلات" : "📦 Transfers", MiraTransferFragment.class);
             }
-            // بعد باقي التبويبات
-          /*  if (isManager || isInventoryMgr) {
-            safeAddTab("ReaderSetup", isArabic ? "🔌 القارئ" : "🔌 Reader", MiraReaderSetupFragment.class);
-            }*/
+           
             
 
             mTabHost.setOnTabChangedListener(tabId -> {
@@ -1092,4 +1090,4 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
             Log.e(TAG, errorMessage + ": " + e.getMessage());
         }
     }
-    }
+                }
