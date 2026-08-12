@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/bg_bottom_sheet"
+    android:background="?attr/colorSurface"
     android:orientation="vertical"
     android:padding="20dp">
 
@@ -15,7 +15,6 @@
         android:alpha="0.4" />
 
     <TextView
-        android:id="@+id/tvQuickMenuTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
@@ -31,34 +30,87 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center"
-        android:weightSum="3">
+        android:gravity="center">
 
         <LinearLayout
             android:id="@+id/btnMenuRadar"
-            style="@style/QuickMenuItemStyle"
             android:layout_width="0dp"
-            android:layout_weight="1">
-            <TextView android:text="🎯" android:textSize="26sp" />
-            <TextView android:id="@+id/tvLabelRadar" android:text="الرادار" style="@style/QuickMenuTextStyle" />
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🎯"
+                android:textSize="26sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="الرادار"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="12sp"
+                android:layout_marginTop="6dp" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/btnMenuGate"
-            style="@style/QuickMenuItemStyle"
             android:layout_width="0dp"
-            android:layout_weight="1">
-            <TextView android:text="🚪" android:textSize="26sp" />
-            <TextView android:id="@+id/tvLabelGate" android:text="البوابات" style="@style/QuickMenuTextStyle" />
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🚪"
+                android:textSize="26sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="البوابات"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="12sp"
+                android:layout_marginTop="6dp" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/btnMenuAccounting"
-            style="@style/QuickMenuItemStyle"
             android:layout_width="0dp"
-            android:layout_weight="1">
-            <TextView android:text="💰" android:textSize="26sp" />
-            <TextView android:id="@+id/tvLabelAccounting" android:text="المحاسبة" style="@style/QuickMenuTextStyle" />
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="💰"
+                android:textSize="26sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="المحاسبة"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="12sp"
+                android:layout_marginTop="6dp" />
         </LinearLayout>
     </LinearLayout>
 
@@ -69,33 +121,87 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center"
-        android:weightSum="3">
+        android:layout_marginTop="8dp">
 
         <LinearLayout
             android:id="@+id/btnMenuReports"
-            style="@style/QuickMenuItemStyle"
             android:layout_width="0dp"
-            android:layout_weight="1">
-            <TextView android:text="📊" android:textSize="26sp" />
-            <TextView android:id="@+id/tvLabelReports" android:text="التقارير" style="@style/QuickMenuTextStyle" />
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📊"
+                android:textSize="26sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="التقارير"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="12sp"
+                android:layout_marginTop="6dp" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/btnMenuSales"
-            style="@style/QuickMenuItemStyle"
             android:layout_width="0dp"
-            android:layout_weight="1">
-            <TextView android:text="📜" android:textSize="26sp" />
-            <TextView android:id="@+id/tvLabelSales" android:text="المبيعات" style="@style/QuickMenuTextStyle" />
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📜"
+                android:textSize="26sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="المبيعات"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="12sp"
+                android:layout_marginTop="6dp" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/btnMenuInventory"
-            style="@style/QuickMenuItemStyle"
             android:layout_width="0dp"
-            android:layout_weight="1">
-            <TextView android:text="📋" android:textSize="26sp" />
-            <TextView android:id="@+id/tvLabelInventory" android:text="المخزون" style="@style/QuickMenuTextStyle" />
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📋"
+                android:textSize="26sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="المخزون"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="12sp"
+                android:layout_marginTop="6dp" />
         </LinearLayout>
     </LinearLayout>
 
