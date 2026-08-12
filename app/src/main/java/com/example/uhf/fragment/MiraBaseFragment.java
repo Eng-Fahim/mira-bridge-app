@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 
@@ -17,14 +18,12 @@ import androidx.fragment.app.Fragment;
 import com.example.uhf.tools.MiraDialogHelper;
 import com.example.uhf.tools.MiraLanguageHelper;
 
-import java.util.Locale;
-
 /**
  * 🏗️ MiraBaseFragment - الفрагмент الأساسي لجميع صفحات التطبيق
  * يوفر:
  * - إخفاء لوحة المفاتيح تلقائياً
  * - دوال Dialog موحدة مع حماية من null
- * - دعم اللغة العربية
+ * - دعم اللغة العربية مع اتجاه RTL/LTR
  */
 public abstract class MiraBaseFragment extends Fragment {
 
@@ -37,7 +36,15 @@ public abstract class MiraBaseFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
+        // ✅ استخدام MiraLanguageHelper
+        try {
+            isArabic = MiraLanguageHelper.isArabic(requireContext());
+        } catch (Exception e) {
+            isArabic = java.util.Locale.getDefault().getLanguage().equals("ar");
+        }
+        
+        // ✅ تطبيق اتجاه اللغة على الـ View
+        applyLanguageDirection(view);
         
         // ✅ تهيئة آمنة لـ dialogHelper
         try {
@@ -52,18 +59,34 @@ public abstract class MiraBaseFragment extends Fragment {
         setupAutoHideKeyboard(view);
     }
 
-    // ==================== دوال Dialog المساعدة (مع حماية null) ====================
+    // ==================== اتجاه اللغة ====================
+
+    /**
+     * تطبيق اتجاه اللغة على جميع العناصر
+     */
+    protected void applyLanguageDirection(View view) {
+        if (view == null) return;
+        
+        view.setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
+        
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                applyLanguageDirection(group.getChildAt(i));
+            }
+        }
+    }
+
+    // ==================== دوال Dialog المساعدة ====================
 
     protected AlertDialog showSuccessDialog(String title, String message) {
         return showSuccessDialog(title, message, null);
     }
+
     protected AlertDialog showSuccessDialog(String title, String message,
                                              DialogInterface.OnClickListener listener) {
         try {
-            if (dialogHelper == null) {
-                Log.e(TAG, "dialogHelper is null - cannot show success dialog");
-                return null;
-            }
+            if (dialogHelper == null) return null;
             return dialogHelper.builder()
                     .setType(MiraDialogHelper.DialogType.SUCCESS)
                     .setTitle(title)
@@ -83,10 +106,7 @@ public abstract class MiraBaseFragment extends Fragment {
     protected AlertDialog showErrorDialog(String title, String message,
                                            DialogInterface.OnClickListener listener) {
         try {
-            if (dialogHelper == null) {
-                Log.e(TAG, "dialogHelper is null - cannot show error dialog");
-                return null;
-            }
+            if (dialogHelper == null) return null;
             return dialogHelper.builder()
                     .setType(MiraDialogHelper.DialogType.ERROR)
                     .setTitle(title)
@@ -147,8 +167,6 @@ public abstract class MiraBaseFragment extends Fragment {
     protected AlertDialog showLoadingDialog(String message) {
         try {
             if (dialogHelper == null || getContext() == null || !isAdded()) {
-                Log.e(TAG, "Cannot show loading dialog - dialogHelper=" + dialogHelper + 
-                    ", context=" + (getContext() != null) + ", isAdded=" + isAdded());
                 return null;
             }
             return dialogHelper.showLoading(message);
@@ -161,7 +179,6 @@ public abstract class MiraBaseFragment extends Fragment {
     protected AlertDialog showDetailsDialog(String title, String[][] details) {
         try {
             if (dialogHelper == null || getContext() == null || !isAdded()) {
-                Log.e(TAG, "Cannot show details dialog");
                 return null;
             }
             return dialogHelper.showDetails(title, details);
@@ -170,51 +187,7 @@ public abstract class MiraBaseFragment extends Fragment {
             return null;
         }
     }
-public abstract class MiraBaseFragment extends Fragment {
 
-    protected boolean isArabic;
-    protected MiraDialogHelper dialogHelper;
-
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        
-        // ✅ استخدام MiraLanguageHelper
-        isArabic = MiraLanguageHelper.isArabic(requireContext());
-        
-        // ✅ تطبيق اتجاه اللغة على الـ View
-        applyLanguageDirection(view);
-        
-        // تهيئة dialogHelper
-        try {
-            if (getContext() != null) {
-                dialogHelper = MiraDialogHelper.getInstance(getContext());
-                dialogHelper.setArabic(isArabic);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "dialogHelper init error: " + e.getMessage());
-        }
-        
-        setupAutoHideKeyboard(view);
-    }
-
-    /**
-     * تطبيق اتجاه اللغة على جميع العناصر
-     */
-    private void applyLanguageDirection(View view) {
-        if (view == null) return;
-        
-        // تطبيق الاتجاه على الـ View نفسه
-        view.setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
-        
-        // تطبيق على جميع العناصر الفرعية
-        if (view instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) view;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                applyLanguageDirection(group.getChildAt(i));
-            }
-        }
-    }
     protected void dismissDialog(AlertDialog dialog) {
         try {
             if (dialogHelper != null) {
@@ -227,7 +200,7 @@ public abstract class MiraBaseFragment extends Fragment {
         }
     }
 
-    // ==================== إخفاء لوحة المفاتيح تلقائياً ====================
+    // ==================== إخفاء لوحة المفاتيح ====================
 
     private void setupAutoHideKeyboard(View view) {
         if (view == null) return;
@@ -242,8 +215,8 @@ public abstract class MiraBaseFragment extends Fragment {
             });
         }
 
-        if (view instanceof android.view.ViewGroup) {
-            android.view.ViewGroup group = (android.view.ViewGroup) view;
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
             for (int i = 0; i < group.getChildCount(); i++) {
                 setupAutoHideKeyboard(group.getChildAt(i));
             }
