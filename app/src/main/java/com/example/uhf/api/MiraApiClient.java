@@ -5,10 +5,13 @@ import android.content.SharedPreferences;
 import android.util.Log;
 
 import com.example.uhf.manager.MiraBranchesManager;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.File;              // ✅ أضف هذا
+import java.io.FileInputStream;    // ✅ أضف هذا
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -442,6 +445,77 @@ public class MiraApiClient {
         } catch (Exception ignored) {}
         return post("/program", payload);
     }
+    /**
+ * 🟢 رفع صورة قطعة إلى السيرفر
+ */
+public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary, String altText) {
+    HttpURLConnection conn = null;
+    try {
+        String fullUrl = apiUrl + "/items/" + itemId + "/images";
+        URL url = new URL(fullUrl);
+        conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("X-MIRA-API-Key", apiKey);
+        
+        String token = getAuthToken();
+        if (!token.isEmpty()) {
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+        }
+        
+        conn.setConnectTimeout(30000);
+        conn.setReadTimeout(30000);
+        conn.setDoOutput(true);
+        
+        // بناء multipart data
+        String boundary = "----MiraBoundary" + System.currentTimeMillis();
+        conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+        
+        try (OutputStream os = conn.getOutputStream()) {
+            // جزء الصورة
+            StringBuilder sb = new StringBuilder();
+            sb.append("--").append(boundary).append("\r\n");
+            sb.append("Content-Disposition: form-data; name=\"image\"; filename=\"")
+              .append(imageFile.getName()).append("\"\r\n");
+            sb.append("Content-Type: image/jpeg\r\n\r\n");
+            os.write(sb.toString().getBytes("utf-8"));
+            
+            // كتابة بيانات الصورة
+            java.io.FileInputStream fis = new java.io.FileInputStream(imageFile);
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                os.write(buffer, 0, bytesRead);
+            }
+            fis.close();
+            
+            // جزء is_primary
+            sb = new StringBuilder();
+            sb.append("\r\n--").append(boundary).append("\r\n");
+            sb.append("Content-Disposition: form-data; name=\"is_primary\"\r\n\r\n");
+            sb.append(isPrimary ? "1" : "0");
+            os.write(sb.toString().getBytes("utf-8"));
+            
+            // جزء alt_text
+            sb = new StringBuilder();
+            sb.append("\r\n--").append(boundary).append("\r\n");
+            sb.append("Content-Disposition: form-data; name=\"alt_text\"\r\n\r\n");
+            sb.append(altText != null ? altText : "");
+            os.write(sb.toString().getBytes("utf-8"));
+            
+            // نهاية multipart
+            os.write(("\r\n--" + boundary + "--\r\n").getBytes("utf-8"));
+            os.flush();
+        }
+        
+        return buildResponse(conn);
+        
+    } catch (Exception e) {
+        Log.e(TAG, "Upload image error: " + e.getMessage());
+        return new ApiResponse(-1, null, e.getMessage());
+    } finally {
+        if (conn != null) conn.disconnect();
+    }
+}
 
     public ApiResponse lockTag(String serial) {
         JSONObject payload = new JSONObject();
