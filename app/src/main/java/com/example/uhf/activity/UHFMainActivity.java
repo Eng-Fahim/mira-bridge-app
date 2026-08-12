@@ -107,15 +107,32 @@ public void setActiveRfidListener(OnRfidScannedListener listener) {
     this.activeRfidListener = listener;
 }
 
-/**
- * بدء مسح UHF
- */
-/*public void startUHFScan() {
-    // TODO: استبدل بالكود الفعلي لتشغيل قارئ RFID
-    Log.d("UHFMainActivity", "startUHFScan called");
-    // مثال: RFIDWithUHFSDK.getInstance().startInventory();
-}*/
 
+@Override
+public boolean dispatchTouchEvent(MotionEvent ev) {
+    if (ev.getAction() == MotionEvent.ACTION_DOWN) {
+        View view = getCurrentFocus();
+        if (view != null && view instanceof EditText) {
+            int[] location = new int[2];
+            view.getLocationOnScreen(location);
+            float x = ev.getRawX() + view.getLeft() - location[0];
+            float y = ev.getRawY() + view.getTop() - location[1];
+
+            if (x < view.getLeft() || x > view.getRight() || y < view.getTop() || y > view.getBottom()) {
+                hideKeyboard(view);
+                view.clearFocus();
+            }
+        }
+    }
+    return super.dispatchTouchEvent(ev);
+}
+
+private void hideKeyboard(View view) {
+    InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+    if (imm != null) {
+        imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+    }
+}
 
 /**
  * إيقاف مسح UHF
