@@ -28,9 +28,9 @@ public class RFIDManager {
     
     private static RFIDManager instance;
     private final Context context;
-    private IRFIDReader activeReader;
+    private MiraIRFIDReader activeReader;
     private RFIDDevice activeDevice;
-    private IRFIDReader.OnTagReadListener listener;
+    private MiraIRFIDReader.OnTagReadListener listener;
     
     private RFIDManager(Context context) {
         this.context = context.getApplicationContext();
@@ -46,19 +46,19 @@ public class RFIDManager {
     /**
      * اكتشاف تلقائي لنوع الجهاز
      */
-    public IRFIDReader.ReaderType detectDeviceType() {
+    public MiraIRFIDReader.ReaderType detectDeviceType() {
         String model = Build.MODEL != null ? Build.MODEL.toUpperCase() : "";
         String manufacturer = Build.MANUFACTURER != null ? Build.MANUFACTURER.toUpperCase() : "";
         
         Log.i(TAG, "Detecting device: " + manufacturer + " " + model);
         
-        if (model.contains("C72")) return IRFIDReader.ReaderType.CHAINWAY_C72;
-        if (model.contains("C61")) return IRFIDReader.ReaderType.CHAINWAY_C61;
-        if (model.contains("MC33") || model.contains("MC32")) return IRFIDReader.ReaderType.ZEBRA_MC3300;
-        if (model.contains("EDA5") || model.contains("CT40")) return IRFIDReader.ReaderType.HONEYWELL_EDA50;
-        if (model.contains("RP90")) return IRFIDReader.ReaderType.UNITECH_RP902;
+        if (model.contains("C72")) return MiraIRFIDReader.ReaderType.CHAINWAY_C72;
+        if (model.contains("C61")) return MiraIRFIDReader.ReaderType.CHAINWAY_C61;
+        if (model.contains("MC33") || model.contains("MC32")) return MiraIRFIDReader.ReaderType.ZEBRA_MC3300;
+        if (model.contains("EDA5") || model.contains("CT40")) return MiraIRFIDReader.ReaderType.HONEYWELL_EDA50;
+        if (model.contains("RP90")) return MiraIRFIDReader.ReaderType.UNITECH_RP902;
         
-        return IRFIDReader.ReaderType.SIMULATOR;
+        return MiraIRFIDReader.ReaderType.SIMULATOR;
     }
     
     /**
@@ -128,7 +128,7 @@ public class RFIDManager {
                 String typeName = obj.optString("type", "");
                 if (!typeName.isEmpty()) {
                     try {
-                        device.setType(IRFIDReader.ReaderType.valueOf(typeName));
+                        device.setType(MiraIRFIDReader.ReaderType.valueOf(typeName));
                     } catch (Exception ignored) {}
                 }
                 
@@ -203,7 +203,7 @@ public class RFIDManager {
     /**
      * الحصول على القارئ النشط
      */
-    public IRFIDReader getActiveReader() {
+    public MiraIRFIDReader getActiveReader() {
         if (activeReader == null) {
             setActiveDevice(getActiveDevice());
         }
@@ -213,7 +213,7 @@ public class RFIDManager {
     /**
      * تعيين المستمع
      */
-    public void setListener(IRFIDReader.OnTagReadListener listener) {
+    public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
         this.listener = listener;
         if (activeReader != null) {
             activeReader.setOnTagReadListener(listener);
@@ -224,7 +224,7 @@ public class RFIDManager {
      * بدء المسح
      */
     public boolean startScan() {
-        IRFIDReader reader = getActiveReader();
+        MiraIRFIDReader reader = getActiveReader();
         if (reader == null) return false;
         if (!reader.isConnected()) {
             reader.connect();
@@ -255,7 +255,7 @@ public class RFIDManager {
      * اختبار الاتصال
      */
     public boolean testConnection(RFIDDevice device) {
-        IRFIDReader reader = RFIDReaderFactory.create(device.getType(), device.getAddress());
+        MiraIRFIDReader reader = RFIDReaderFactory.create(device.getType(), device.getAddress());
         boolean initSuccess = reader.initialize();
         if (!initSuccess) return false;
         
