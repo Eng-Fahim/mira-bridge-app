@@ -92,18 +92,23 @@ public class ChainwayReader implements MiraIRFIDReader {
                 isScanning = true;
                 if (listener != null) listener.onScanStarted();
                 
-                // بدء قراءة النتائج
+                // ✅ بدء قراءة النتائج - readTagFromBuffer ترجع UHFTAGInfo واحد
                 scanThread = new Thread(() -> {
                     while (isScanning) {
                         try {
-                            UHFTAGInfo[] tags = reader.readTagFromBuffer();
-                            if (tags != null) {
-                                for (UHFTAGInfo tag : tags) {
-                                    String epc = tag.getEPC();
-                                    int rssi = tag.getRssi();
-                                    if (epc != null && !epc.isEmpty() && listener != null) {
-                                        listener.onTagRead(epc, rssi);
-                                    }
+                            UHFTAGInfo tag = reader.readTagFromBuffer();
+                            if (tag != null) {
+                                String epc = tag.getEPC();
+                                // ✅ getRssi ترجع String
+                                String rssiStr = tag.getRssi();
+                                int rssi = -50;
+                                if (rssiStr != null) {
+                                    try { 
+                                        rssi = Integer.parseInt(rssiStr.trim()); 
+                                    } catch (NumberFormatException ignored) {}
+                                }
+                                if (epc != null && !epc.isEmpty() && listener != null) {
+                                    listener.onTagRead(epc, rssi);
                                 }
                             }
                             Thread.sleep(100);
@@ -146,7 +151,8 @@ public class ChainwayReader implements MiraIRFIDReader {
     public void setPower(int powerDbm) {
         try {
             if (reader != null) {
-                reader.setOutputPower(powerDbm);
+                // ✅ استخدام الدالة الصحيحة من SDK
+                reader.setPower(powerDbm);
             }
         } catch (Exception e) {
             Log.e(TAG, "Set power error: " + e.getMessage());
@@ -155,13 +161,11 @@ public class ChainwayReader implements MiraIRFIDReader {
     
     @Override
     public void setRssiThreshold(int threshold) {
-        // Chainway SDK قد لا يدعم هذا مباشرة
         Log.i(TAG, "RSSI threshold: " + threshold);
     }
     
     @Override
     public void setScanInterval(int intervalMs) {
-        // Chainway SDK يدير الفواصل تلقائياً
         Log.i(TAG, "Scan interval: " + intervalMs);
     }
     
