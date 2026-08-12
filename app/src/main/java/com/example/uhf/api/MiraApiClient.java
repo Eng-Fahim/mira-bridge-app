@@ -357,8 +357,8 @@ public class MiraApiClient {
     // ===================== 🏷️ ENCODE ITEM =====================
 
     public ApiResponse encodeItem(JSONObject itemPayload) {
-        return post("/encode-item", itemPayload);
-    }
+    return postWithAuth("/encode-item", itemPayload);
+}
 
     public ApiResponse encodeItem(String epc, String barcode, String title, String purityCode,
                                   double grossWeight, double netWeight, double makingPerGram,
