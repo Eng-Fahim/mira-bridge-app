@@ -74,9 +74,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class MiraUHFReadTagFragment extends Fragment {
 
     private static final String TAG = "MiraUHFReadTagFragment";
-    
+    private TextView tvConnectionType, tvConnectionDetails;
+    private LinearLayout layoutExportButtons;
+    private com.google.android.material.card.MaterialCardView cardConnectionInfo;
     // إعدادات زمنية
     private static final long DEFAULT_INACTIVITY_TIMEOUT_MS = 180000; // 3 دقائق
+    
+    
     private static final long UI_UPDATE_INTERVAL_MS = 300; // تحديث الواجهة كل 300ms للتجميع
     private static final int BATCH_SIZE_THRESHOLD = 50; // تفريغ الدفعة عند 50 شريحة
     
@@ -91,7 +95,7 @@ public class MiraUHFReadTagFragment extends Fragment {
     private LinearLayout alertBannerView;
     private TextView tvAlertMessage;
     private Button btnDisconnectReader, btnExportCSV, btnPrintReport, btnShareReport;
-    private com.google.android.material.card.MaterialCardView cardConnectionInfo;
+    
     private TextView tvReaderStatus;
     private AppCompatSpinner spinnerZone;
     private TextView tvTotalScanned, tvUniqueTags, tvScanRate, tvElapsed;
@@ -1439,38 +1443,280 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     private void uploadAuditToCloud() {
-        networkExecutor.execute(() -> {
-            try {
-                JSONObject payload = new JSONObject();
-                payload.put("session_id", sessionId);
-                payload.put("zone", selectedZone);
-                payload.put("total_scanned", totalScannedCount);
-                payload.put("unique_count", scannedEpcSet.size());
-                payload.put("expected_count", expectedItemsMap.size());
-                payload.put("connection_type", activeConnectionType.name());
+    networkExecutor.execute(() -> {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("session_id", sessionId);
+            payload.put("zone", selectedZone);
+            payload.put("total_scanned", totalScannedCount);
+            payload.put("unique_count", scannedEpcSet.size());
+            payload.put("expected_count", expectedItemsMap.size());
+            payload.put("found_count", foundCount.get());
+            payload.put("missing_count", trulyMissingCount.get());
+            payload.put("unexpected_count", unexpectedCount.get());
+            payload.put("connection_type", activeConnectionType.name());
+            payload.put("branch_id", branchesManager != null ? branchesManager.getActiveBranchId() : 1);
 
-                JSONArray scannedArray = new JSONArray();
-                for (String epc : scannedEpcSet) {
-                    scannedArray.put(epc);
-                }
-                payload.put("scanned_epcs", scannedArray);
-
-                MiraApiClient api = MiraApiClient.getInstance(requireContext());
-                MiraApiClient.ApiResponse res = api.closeInventorySession(payload);
-
-                mainHandler.post(() -> {
-                    if (res != null && res.isSuccess) {
-                        setInventoryState(InventoryState.FINALIZED);
-                        Toast.makeText(getContext(), "✅ تم اعتماد الجرد بنجاح", Toast.LENGTH_LONG).show();
-                    } else {
-                        Toast.makeText(getContext(), "❌ فشل رفع الجرد", Toast.LENGTH_LONG).show();
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Upload error: " + e.getMessage());
+            // إرسال قائمة EPCs المقروءة
+            JSONArray scannedArray = new JSONArray();
+            for (String epc : scannedEpcSet) {
+                scannedArray.put(epc);
             }
-        });
+            payload.put("scanned_epcs", scannedArray);
+
+            Log.e(TAG, "══════════ CLOSE INVENTORY ══════════");
+            Log.e(TAG, "Payload: " + payload.toString(2));
+
+            MiraApiClient api = MiraApiClient.getInstance(requireContext());
+            MiraApiClient.ApiResponse res = api.closeInventorySession(payload);
+
+            Log.e(TAG, "Response Code: " + (res != null ? res.code : "NULL"));
+            Log.e(TAG, "Response Success: " + (res != null ? res.isSuccess : "NULL"));
+
+            // ✅ استخراج بيانات التقرير من الرد
+            final JSONObject reportData = (res != null && res.data != null) ? res.data : null;
+            
+            mainHandler.post(() -> {
+                if (res != null && res.isSuccess) {
+                    setInventoryState(InventoryState.FINALIZED);
+                    
+                    // ✅ عرض Dialog النتائج الاحترافي
+                    if (reportData != null) {
+                        showAuditResultDialog(reportData);
+                    } else {
+                        Toast.makeText(getContext(), "✅ تم اعتماد الجرد بنجاح", Toast.LENGTH_LONG).show();
+                    }
+                } else {
+                    String errorMsg = "❌ فشل رفع الجرد";
+                    if (res != null && res.data != null) {
+                        errorMsg = res.data.optString("message", errorMsg);
+                    }
+                    showErrorDialog(errorMsg);
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Upload error: " + e.getMessage());
+            mainHandler.post(() -> showErrorDialog("❌ خطأ: " + e.getMessage()));
+        }
+    });
+}
+
+/**
+ * 🟢 عرض Dialog نتائج الجرد بشكل احترافي
+ */
+private void showAuditResultDialog(JSONObject data) {
+    if (getContext() == null || !isAdded()) return;
+    
+    try {
+        JSONObject report = data.optJSONObject("report");
+        JSONObject inventoryUpdate = data.optJSONObject("inventory_update");
+        JSONObject riskAssessment = data.optJSONObject("risk_assessment");
+        
+        // إنشاء المحتوى
+        LinearLayout layout = new LinearLayout(requireContext());
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(20, 20, 20, 10);
+        
+        // ✅ أيقونة حسب مستوى الخطورة
+        String riskLevel = riskAssessment != null ? riskAssessment.optString("level", "none") : "none";
+        String icon = getRiskIcon(riskLevel);
+        int iconColor = getRiskColor(riskLevel);
+        
+        TextView tvIcon = new TextView(requireContext());
+        tvIcon.setText(icon);
+        tvIcon.setTextSize(48);
+        tvIcon.setGravity(android.view.Gravity.CENTER);
+        tvIcon.setTextColor(iconColor);
+        layout.addView(tvIcon);
+        
+        // ✅ العنوان
+        TextView tvTitle = new TextView(requireContext());
+        tvTitle.setText(isArabic ? "📊 تقرير اعتماد الجرد" : "📊 Audit Report");
+        tvTitle.setTextColor(Color.parseColor("#0F172A"));
+        tvTitle.setTextSize(18);
+        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvTitle.setGravity(android.view.Gravity.CENTER);
+        tvTitle.setPadding(0, 10, 0, 5);
+        layout.addView(tvTitle);
+        
+        // ✅ رسالة تقييم المخاطر
+        if (riskAssessment != null) {
+            TextView tvRiskMsg = new TextView(requireContext());
+            tvRiskMsg.setText(riskAssessment.optString("message", ""));
+            tvRiskMsg.setTextColor(iconColor);
+            tvRiskMsg.setTextSize(13);
+            tvRiskMsg.setGravity(android.view.Gravity.CENTER);
+            tvRiskMsg.setPadding(0, 0, 0, 15);
+            layout.addView(tvRiskMsg);
+        }
+        
+        // ✅ بطاقة الإحصائيات
+        com.google.android.material.card.MaterialCardView cardStats = 
+            new com.google.android.material.card.MaterialCardView(requireContext());
+        cardStats.setCardBackgroundColor(Color.parseColor("#F8FAFC"));
+        cardStats.setRadius(12);
+        cardStats.setCardElevation(2);
+        cardStats.setPadding(16, 12, 16, 12);
+        
+        LinearLayout statsLayout = new LinearLayout(requireContext());
+        statsLayout.setOrientation(LinearLayout.VERTICAL);
+        
+        if (report != null) {
+            addStatRow(statsLayout, isArabic ? "📦 المتوقع" : "📦 Expected", 
+                String.valueOf(report.optInt("expected_count", 0)), "#64748B");
+            addStatRow(statsLayout, isArabic ? "✅ المطابق" : "✅ Found", 
+                String.valueOf(report.optInt("found_count", 0)), "#16A34A");
+            addStatRow(statsLayout, isArabic ? "🔍 إجمالي المسح" : "🔍 Total Scanned", 
+                String.valueOf(report.optInt("total_scanned", 0)), "#0284C7");
+            addStatRow(statsLayout, isArabic ? "🆕 فريد" : "🆕 Unique", 
+                String.valueOf(report.optInt("unique_count", 0)), "#7C3AED");
+            addStatRow(statsLayout, isArabic ? "❌ عجز" : "❌ Missing", 
+                String.valueOf(report.optInt("missing_count", 0)), "#DC2626");
+            addStatRow(statsLayout, isArabic ? "⚠️ زائد" : "⚠️ Unexpected", 
+                String.valueOf(report.optInt("unexpected_count", 0)), "#F59E0B");
+            
+            // ✅ نسبة الدقة
+            double accuracy = report.optDouble("accuracy", 0);
+            addStatRow(statsLayout, isArabic ? "🎯 نسبة التطابق" : "🎯 Accuracy", 
+                accuracy + "%", accuracy >= 98 ? "#16A34A" : accuracy >= 90 ? "#F59E0B" : "#DC2626");
+        }
+        
+        cardStats.addView(statsLayout);
+        layout.addView(cardStats);
+        
+        // ✅ تحديث المخزون
+        if (inventoryUpdate != null && inventoryUpdate.optBoolean("updated", false)) {
+            TextView tvInvTitle = new TextView(requireContext());
+            tvInvTitle.setText(isArabic ? "📋 تحديث المخزون:" : "📋 Inventory Update:");
+            tvInvTitle.setTextColor(Color.parseColor("#475569"));
+            tvInvTitle.setTextSize(12);
+            tvInvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+            tvInvTitle.setPadding(0, 12, 0, 4);
+            layout.addView(tvInvTitle);
+            
+            com.google.android.material.card.MaterialCardView cardInv = 
+                new com.google.android.material.card.MaterialCardView(requireContext());
+            cardInv.setCardBackgroundColor(Color.parseColor("#F0FDF4"));
+            cardInv.setRadius(8);
+            cardInv.setPadding(12, 8, 12, 8);
+            
+            LinearLayout invLayout = new LinearLayout(requireContext());
+            invLayout.setOrientation(LinearLayout.VERTICAL);
+            
+            addStatRow(invLayout, isArabic ? "✅ تم التحقق" : "✅ Verified", 
+                String.valueOf(inventoryUpdate.optInt("verified", 0)), "#16A34A");
+            addStatRow(invLayout, isArabic ? "🔍 غير مقروء" : "🔍 Unverified", 
+                String.valueOf(inventoryUpdate.optInt("unverified", 0)), "#F59E0B");
+            
+            cardInv.addView(invLayout);
+            layout.addView(cardInv);
+        }
+        
+        // ✅ التوصية
+        if (riskAssessment != null) {
+            TextView tvRecTitle = new TextView(requireContext());
+            tvRecTitle.setText(isArabic ? "💡 التوصية:" : "💡 Recommendation:");
+            tvRecTitle.setTextColor(Color.parseColor("#475569"));
+            tvRecTitle.setTextSize(12);
+            tvRecTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+            tvRecTitle.setPadding(0, 12, 0, 4);
+            layout.addView(tvRecTitle);
+            
+            TextView tvRec = new TextView(requireContext());
+            tvRec.setText(riskAssessment.optString("recommendation", ""));
+            tvRec.setTextColor(iconColor);
+            tvRec.setTextSize(13);
+            tvRec.setPadding(0, 0, 0, 8);
+            layout.addView(tvRec);
+        }
+        
+        // ✅ بناء الـ Dialog
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setView(layout);
+        builder.setPositiveButton(isArabic ? "🎉 حسناً" : "🎉 OK", (d, w) -> d.dismiss());
+        
+        if (report != null && report.optDouble("accuracy", 0) < 100) {
+            builder.setNegativeButton(isArabic ? "📊 تصدير التقرير" : "📊 Export Report", (d, w) -> {
+                exportInventoryReport();
+            });
+        }
+        
+        builder.setCancelable(false);
+        builder.show();
+        
+    } catch (Exception e) {
+        Log.e(TAG, "showAuditResultDialog error: " + e.getMessage());
+        Toast.makeText(getContext(), "✅ تم اعتماد الجرد بنجاح", Toast.LENGTH_LONG).show();
     }
+}
+
+/**
+ * 🟢 أيقونة مستوى الخطورة
+ */
+private String getRiskIcon(String level) {
+    switch (level) {
+        case "none": return "✅";
+        case "low": return "👍";
+        case "medium": return "⚠️";
+        case "high": return "🚨";
+        case "critical": return "🔴";
+        default: return "✅";
+    }
+}
+
+/**
+ * 🟢 لون مستوى الخطورة
+ */
+private int getRiskColor(String level) {
+    switch (level) {
+        case "none": return Color.parseColor("#16A34A");
+        case "low": return Color.parseColor("#16A34A");
+        case "medium": return Color.parseColor("#F59E0B");
+        case "high": return Color.parseColor("#EA580C");
+        case "critical": return Color.parseColor("#DC2626");
+        default: return Color.parseColor("#16A34A");
+    }
+}
+
+/**
+ * 🟢 إضافة صف إحصائية
+ */
+private void addStatRow(LinearLayout parent, String label, String value, String colorHex) {
+    LinearLayout row = new LinearLayout(requireContext());
+    row.setOrientation(LinearLayout.HORIZONTAL);
+    row.setPadding(0, 4, 0, 4);
+    
+    TextView tvLabel = new TextView(requireContext());
+    tvLabel.setText(label);
+    tvLabel.setTextColor(Color.parseColor("#64748B"));
+    tvLabel.setTextSize(12);
+    tvLabel.setMinWidth(140);
+    row.addView(tvLabel);
+    
+    TextView tvValue = new TextView(requireContext());
+    tvValue.setText(value);
+    tvValue.setTextColor(Color.parseColor(colorHex));
+    tvValue.setTextSize(13);
+    tvValue.setTypeface(null, android.graphics.Typeface.BOLD);
+    tvValue.setPadding(8, 0, 0, 0);
+    row.addView(tvValue);
+    
+    parent.addView(row);
+}
+
+/**
+ * 🟢 عرض Dialog خطأ
+ */
+private void showErrorDialog(String message) {
+    if (getContext() == null || !isAdded()) return;
+    
+    new AlertDialog.Builder(requireContext())
+            .setTitle(isArabic ? "❌ فشل اعتماد الجرد" : "❌ Audit Finalization Failed")
+            .setMessage(message)
+            .setPositiveButton(isArabic ? "حسناً" : "OK", (d, w) -> d.dismiss())
+            .show();
+}
+
 
     private void exportInventoryReport() {
         networkExecutor.execute(() -> {
