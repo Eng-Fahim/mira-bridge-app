@@ -799,6 +799,7 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
             }
            
             if (isManager || isInventoryMgr) {
+            safeAddTab("Settings", isArabic ? "⚙️ الإعدادات" : "⚙️ Settings", UHFSetFragment.class);
             safeAddTab("ReaderSetup", isArabic ? "🔌 القارئ" : "🔌 Reader", MiraReaderSetupFragment.class);}
             
             if (isManager || isGateSecurity || isPosOperator) {
