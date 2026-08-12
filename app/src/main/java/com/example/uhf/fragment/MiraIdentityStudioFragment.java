@@ -492,13 +492,19 @@ private void finalizeItemIdentity() {
                 binding.btnSaveIdentity.setText(isArabic ? "اعتماد الموزون وتصدير MIRA ID" : "Approve & Export MIRA ID");
 
                 if (success) {
-                    // ========== نجاح - عرض Dialog النجاح مع التفاصيل ==========
-                    removePendingEncode(finalEpc);
-                    playSuccessSound();
-                    showSuccessDialog(finalEpc, finalTitle, selectedKarat, finalGrossWeight, 
-                                      finalServerBarcode, finalServerSerial, finalServerItemId);
-                    resetFormForNextScan();
-                } else {
+    // ========== نجاح - عرض Dialog النجاح مع التفاصيل ==========
+    removePendingEncode(finalEpc);
+    playSuccessSound();
+    showSuccessDialog(finalEpc, finalTitle, selectedKarat, finalGrossWeight, 
+                      finalServerBarcode, finalServerSerial, finalServerItemId);
+    
+    // ✅ رفع الصور بعد نجاح التكويد
+    if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
+        uploadItemImages(finalServerItemId, finalPhotoPaths);
+    }
+    
+    resetFormForNextScan();
+} else {
                     // ========== فشل - حفظ محلي ==========
                     saveEncodeOffline(payload);
                     showToast(isArabic ? "💾 تم حفظ التكويد محلياً للمزامنة لاحقاً" : "💾 Encoding saved locally for later sync");
@@ -520,6 +526,82 @@ private void finalizeItemIdentity() {
             });
         }
     });
+}
+
+// ==================== رفع الصور ====================
+
+/**
+ * 🟢 رفع الصور إلى السيرفر بعد نجاح التكويد
+ */
+private void uploadItemImages(int itemId, List<String> imagePaths) {
+    if (imagePaths == null || imagePaths.isEmpty() || itemId <= 0) return;
+    if (apiClient == null) return;
+    
+    new Thread(() -> {
+        int uploaded = 0;
+        int failed = 0;
+        
+        for (int i = 0; i < imagePaths.size(); i++) {
+            String path = imagePaths.get(i);
+            File imageFile = new File(path);
+            if (!imageFile.exists()) {
+                failed++;
+                continue;
+            }
+            
+            try {
+                boolean isPrimary = (i == 0); // أول صورة هي الأساسية
+                MiraApiClient.ApiResponse response = apiClient.uploadItemImage(
+                    itemId, imageFile, isPrimary, 
+                    isArabic ? "صورة " + (i + 1) : "Image " + (i + 1)
+                );
+                
+                if (response != null && response.isSuccess) {
+                    uploaded++;
+                    Log.i(TAG, "✅ Image uploaded: " + path);
+                } else {
+                    failed++;
+                    Log.w(TAG, "❌ Failed to upload: " + path);
+                }
+            } catch (Exception e) {
+                failed++;
+                Log.e(TAG, "Upload error: " + e.getMessage());
+            }
+        }
+        
+        final int finalUploaded = uploaded;
+        final int finalFailed = failed;
+        safeRun(() -> {
+            if (finalUploaded > 0) {
+                String msg = isArabic ? 
+                    "📷 تم رفع " + finalUploaded + " صورة" : 
+                    "📷 " + finalUploaded + " images uploaded";
+                if (finalFailed > 0) {
+                    msg += isArabic ? 
+                        " (فشل " + finalFailed + ")" : 
+                        " (" + finalFailed + " failed)";
+                }
+                showToast(msg);
+            }
+        });
+    }).start();
+}
+
+/**
+ * 🟢 رفع الصور للقطعة المخزنة محلياً عند المزامنة
+ */
+private void uploadPendingImages(int itemId, JSONArray imagePathsArray) {
+    if (imagePathsArray == null || imagePathsArray.length() == 0 || itemId <= 0) return;
+    
+    List<String> paths = new ArrayList<>();
+    for (int i = 0; i < imagePathsArray.length(); i++) {
+        try {
+            String path = imagePathsArray.optString(i, "");
+            if (!path.isEmpty()) paths.add(path);
+        } catch (Exception ignored) {}
+    }
+    
+    uploadItemImages(itemId, paths);
 }
 
 // ==================== DIALOGS ====================
@@ -714,11 +796,20 @@ private void addDetailRow(LinearLayout parent, String label, String value) {
                     
                     MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
                     if (response != null && response.isSuccess) {
-                        synced++;
-                        // ✅ إزالة من المحلي إذا نجحت
-                        String epc = payload.optString("epc", "");
-                        if (!epc.isEmpty()) removePendingEncode(epc);
-                    } else {
+    synced++;
+    String epc = payload.optString("epc", "");
+    
+    // ✅ رفع الصور المخزنة محلياً
+    if (response.data != null) {
+        int syncedItemId = response.data.optInt("item_id", 0);
+        JSONArray imagePaths = payload.optJSONArray("image_paths");
+        if (syncedItemId > 0 && imagePaths != null && imagePaths.length() > 0) {
+            uploadPendingImages(syncedItemId, imagePaths);
+        }
+    }
+    
+    if (!epc.isEmpty()) removePendingEncode(epc);
+} else {
                         remainingArr.put(payload);
                     }
                 } catch (Exception e) { 
