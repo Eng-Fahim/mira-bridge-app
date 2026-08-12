@@ -4,14 +4,14 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
-import com.example.uhf.MiraRfid.IRFIDReader;
+import com.example.uhf.MiraRfid.MiraIRFIDReader;
 
 import java.util.Random;
 
 /**
  * قارئ محاكي - للاختبار بدون جهاز فعلي
  */
-public class SimulatorReader implements IRFIDReader {
+public class SimulatorReader implements MiraIRFIDReader {
     
     private static final String TAG = "SimulatorReader";
     private final Handler handler = new Handler(Looper.getMainLooper());
