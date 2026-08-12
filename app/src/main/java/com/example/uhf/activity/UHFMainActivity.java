@@ -401,9 +401,10 @@ private void hideKeyboard(View view) {
                     checkInventoryLockAndExecute(() -> switchToTabSafely("Dashboard"));
                     return true;
                 } else if (id == R.id.nav_quick_menu) {
-                    checkInventoryLockAndExecute(this::showRadialMenu);
-                    return true;
-                } else if (id == R.id.nav_quick_inventory) {
+    // ✅ استدعاء مباشر بدون checkInventoryLockAndExecute
+    showRadialMenu();
+    return true;
+} else if (id == R.id.nav_quick_inventory) {
                     checkInventoryLockAndExecute(() -> switchToTabSafely("Scan"));
                     return true;
                 } else if (id == R.id.nav_quick_pos) {
@@ -418,67 +419,49 @@ private void hideKeyboard(View view) {
     }
 
     private void showRadialMenu() {
-        try {
-            if (sessionManager == null) return;
-
-            SessionManager.Role role = sessionManager.getUserRole();
-            String roleStr = sessionManager.getRoleString();
-            boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
-            boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
-            boolean isAdmin = (role == SessionManager.Role.ADMIN) || "ADMIN".equals(roleStr);
-            boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
-            boolean isAnyAdmin = isSystemAdmin || isOrgAdmin || isAdmin;
-            boolean isManager = isAnyAdmin || isBranchManager;
-            boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
-            boolean isPosOperator = (role == SessionManager.Role.POS_OPERATOR);
-            boolean isGateSecurity = (role == SessionManager.Role.GATE_SECURITY);
-
-            BottomSheetDialog bottomSheet = new BottomSheetDialog(this);
-            View view = getLayoutInflater().inflate(R.layout.dialog_quick_menu, null);
-            bottomSheet.setContentView(view);
-
-            // تحديد صلاحية كل عنصر
-            boolean showRadar = isManager || isInventoryMgr || isPosOperator || isGateSecurity;
-            boolean showGate = isManager || isGateSecurity || isPosOperator;
-            boolean showAccounting = isManager;
-            boolean showReports = isManager;
-            boolean showSales = isManager || isPosOperator;
-            boolean showInventory = isManager || isInventoryMgr;
-
-            // ضبط رؤية الأزرار
-            setMenuVisibility(view, R.id.btnMenuRadar, showRadar);
-            setMenuVisibility(view, R.id.btnMenuGate, showGate);
-            setMenuVisibility(view, R.id.btnMenuAccounting, showAccounting);
-
-            setMenuVisibility(view, R.id.btnMenuReports, showReports);
-            setMenuVisibility(view, R.id.btnMenuSales, showSales);
-            setMenuVisibility(view, R.id.btnMenuInventory, showInventory);
-
-            // إخفاء الصف الأول إذا كانت كل أزراره مخفية
-            View row1 = view.findViewById(R.id.menuRow1);
-            if (row1 != null) {
-                row1.setVisibility((showRadar || showGate || showAccounting) ? View.VISIBLE : View.GONE);
-            }
-
-            // إخفاء الصف الثاني إذا كانت كل أزراره مخفية
-            View row2 = view.findViewById(R.id.menuRow2);
-            if (row2 != null) {
-                row2.setVisibility((showReports || showSales || showInventory) ? View.VISIBLE : View.GONE);
-            }
-
-            // ربط الأحداث والأوامر عند الضغط
-            bindMenuAction(view, R.id.btnMenuRadar, bottomSheet, "RadarLocation");
-            bindMenuAction(view, R.id.btnMenuGate, bottomSheet, "SecureGate");
-            bindMenuAction(view, R.id.btnMenuAccounting, bottomSheet, "Accounting");
-            bindMenuAction(view, R.id.btnMenuReports, bottomSheet, "ReportsPro");
-            bindMenuAction(view, R.id.btnMenuSales, bottomSheet, "SalesHistory");
-            bindMenuAction(view, R.id.btnMenuInventory, bottomSheet, "Inventory Pro");
-
-            bottomSheet.show();
-        } catch (Exception e) {
-            Log.e(TAG, "BottomSheet Display Error: " + e.getMessage(), e);
-        }
+    try {
+        BottomSheetDialog bottomSheet = new BottomSheetDialog(this);
+        View view = getLayoutInflater().inflate(R.layout.dialog_quick_menu, null);
+        bottomSheet.setContentView(view);
+        
+        // ✅ إظهار جميع الأزرار دائماً (بدون فحص صلاحيات معقد)
+        View row1 = view.findViewById(R.id.menuRow1);
+        View row2 = view.findViewById(R.id.menuRow2);
+        if (row1 != null) row1.setVisibility(View.VISIBLE);
+        if (row2 != null) row2.setVisibility(View.VISIBLE);
+        
+        // ✅ ربط مباشر بدون checkInventoryLockAndExecute
+        bindMenuDirect(view, R.id.btnMenuRadar, bottomSheet, "RadarLocation");
+        bindMenuDirect(view, R.id.btnMenuGate, bottomSheet, "SecureGate");
+        bindMenuDirect(view, R.id.btnMenuAccounting, bottomSheet, "Accounting");
+        bindMenuDirect(view, R.id.btnMenuReports, bottomSheet, "ReportsPro");
+        bindMenuDirect(view, R.id.btnMenuSales, bottomSheet, "SalesHistory");
+        bindMenuDirect(view, R.id.btnMenuInventory, bottomSheet, "Inventory Pro");
+        
+        bottomSheet.show();
+        
+    } catch (Exception e) {
+        Log.e(TAG, "RadialMenu Error: " + e.getMessage(), e);
+        Toast.makeText(this, "خطأ: " + e.getMessage(), Toast.LENGTH_SHORT).show();
     }
+}
+
+private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, String tabTag) {
+    View btn = root.findViewById(viewId);
+    if (btn != null) {
+        btn.setVisibility(View.VISIBLE);
+        btn.setClickable(true);
+        btn.setFocusable(true);
+        btn.setOnClickListener(v -> {
+            try {
+                dialog.dismiss();
+                switchToTabSafely(tabTag);
+            } catch (Exception e) {
+                Log.e(TAG, "Menu click error: " + e.getMessage());
+            }
+        });
+    }
+}
 
     private void bindMenuAction(View root, int viewId, BottomSheetDialog dialog, String targetTab) {
         View btn = root.findViewById(viewId);
@@ -1104,4 +1087,4 @@ private void hideKeyboard(View view) {
             Log.e(TAG, errorMessage + ": " + e.getMessage());
         }
     }
-                           }
+                }
