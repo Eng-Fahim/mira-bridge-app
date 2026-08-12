@@ -1007,7 +1007,7 @@ public void stopUHFScan() {
         }
     }
 
-    public void stopUHFScan() {
+   /* public void stopUHFScan() {
         try {
             if (mReader != null && loopFlag) {
                 mReader.stopInventory();
@@ -1016,7 +1016,8 @@ public void stopUHFScan() {
         } catch (Exception e) {
             Log.e(TAG, "Error stopping UHF scan: " + e.getMessage());
         }
-    }
+    }*/
+    
 
 
 
