@@ -1701,6 +1701,35 @@
 
     
     <!-- ============Inventory الجرد ======////-->
+      <string name="inventory_alert_sold">🚨 تحذير: قطعة مباعة وموجودة بالرف!</string>
+<string name="inventory_branch_default">الفرع الرئيسي - صنعاء</string>
+<string name="inventory_reader_connected">متصل (C72)</string>
+<string name="inventory_zone_label">منطقة الجرد:</string>
+<string name="inventory_total_scanned">إجمالي المسح</string>
+<string name="inventory_unique_tags">قطع فريدة</string>
+<string name="inventory_scan_rate">سرعة المسح</string>
+<string name="inventory_elapsed">الزمن</string>
+<string name="inventory_expected">متوقع</string>
+<string name="inventory_found">مطابق</string>
+<string name="inventory_missing">عجز</string>
+<string name="inventory_unexpected">زائد</string>
+<string name="inventory_ready">جاهز لبدء الجرد</string>
+<string name="inventory_last_tag">آخر قطعة ممسوحة:</string>
+<string name="inventory_start">▶ بدء الجرد</string>
+<string name="inventory_pause">⏸ تعليق</string>
+<string name="inventory_stop">⏹ إيقاف</string>
+<string name="inventory_clear">🗑 مسح</string>
+<string name="inventory_finalize">✅ حفظ واعتماد الجرد السحابي</string>
+<string name="inventory_export_csv">📊 تصدير CSV</string>
+<string name="inventory_print">🖨️ طباعة</string>
+<string name="inventory_share">📤 مشاركة</string>
+<string name="inventory_filter_all">الكل</string>
+<string name="inventory_filter_found">المطابق</string>
+<string name="inventory_filter_missing">العجز</string>
+<string name="inventory_filter_unexpected">التحذيرات / الزائد</string>
+<string name="inventory_connection_type">نوع الاتصال:</string>
+<string name="inventory_disconnect">قطع</string>
+      
       <string name="app_title_inventory">📡 جرد MIRA RFID</string>
     <string name="branch_label">📍 الفرع</string>
     <string name="metric_total_scans">إجمالي القراءات</string>
