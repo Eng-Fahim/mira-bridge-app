@@ -1,21 +1,29 @@
 package com.example.uhf.MiraRfid.readers;
 
-import android.os.Handler;
-import android.os.Looper;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothSocket;
 import android.util.Log;
 
 import com.example.uhf.MiraRfid.IRFIDReader;
 
-import java.util.Random;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.UUID;
 
 /**
- * قارئ محاكي - للاختبار بدون جهاز فعلي
+ * قارئ Bluetooth عام يستخدم بروتوكول SPP
  */
-public class SimulatorReader implements IRFIDReader {
+public class GenericBluetoothReader implements IRFIDReader {
     
-    private static final String TAG = "SimulatorReader";
-    private final Handler handler = new Handler(Looper.getMainLooper());
-    private final Random random = new Random();
+    private static final String TAG = "GenericBluetoothReader";
+    private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+    
+    private final String deviceAddress;
+    private BluetoothSocket socket;
+    private InputStream inputStream;
+    private OutputStream outputStream;
     
     private OnTagReadListener listener;
     private boolean isScanning = false;
@@ -23,25 +31,45 @@ public class SimulatorReader implements IRFIDReader {
     private int powerDbm = 28;
     private int rssiThreshold = -70;
     private int scanIntervalMs = 200;
-    private Runnable scanRunnable;
+    private Thread readThread;
+    
+    public GenericBluetoothReader(String deviceAddress) {
+        this.deviceAddress = deviceAddress;
+    }
     
     @Override
     public boolean initialize() {
-        Log.i(TAG, "Simulator initialized");
-        return true;
+        return deviceAddress != null && !deviceAddress.isEmpty();
     }
     
     @Override
     public boolean connect() {
-        isConnected = true;
-        Log.i(TAG, "Simulator connected");
-        if (listener != null) listener.onConnectionChanged(true);
-        return true;
+        try {
+            BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+            if (adapter == null) return false;
+            
+            BluetoothDevice device = adapter.getRemoteDevice(deviceAddress);
+            socket = device.createRfcommSocketToServiceRecord(SPP_UUID);
+            socket.connect();
+            
+            inputStream = socket.getInputStream();
+            outputStream = socket.getOutputStream();
+            isConnected = true;
+            
+            if (listener != null) listener.onConnectionChanged(true);
+            return true;
+        } catch (IOException e) {
+            Log.e(TAG, "Connection failed: " + e.getMessage());
+            return false;
+        }
     }
     
     @Override
     public void disconnect() {
         stopScan();
+        try {
+            if (socket != null) socket.close();
+        } catch (IOException ignored) {}
         isConnected = false;
         if (listener != null) listener.onConnectionChanged(false);
     }
@@ -58,28 +86,31 @@ public class SimulatorReader implements IRFIDReader {
     
     @Override
     public boolean startScan() {
-        if (isScanning) return true;
-        if (!isConnected) connect();
+        if (!isConnected && !connect()) return false;
         
         isScanning = true;
         if (listener != null) listener.onScanStarted();
         
-        scanRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (!isScanning) return;
-                
-                String epc = "076" + String.format("%011d", random.nextInt(1000000000));
-                int rssi = -30 - random.nextInt(40);
-                
-                if (listener != null) {
-                    listener.onTagRead(epc, rssi);
+        sendCommand("START\r\n");
+        
+        readThread = new Thread(() -> {
+            byte[] buffer = new byte[1024];
+            while (isScanning) {
+                try {
+                    int bytes = inputStream.read(buffer);
+                    if (bytes > 0) {
+                        String data = new String(buffer, 0, bytes).trim();
+                        parseData(data);
+                    }
+                } catch (IOException e) {
+                    if (isScanning && listener != null) {
+                        listener.onError(e.getMessage());
+                    }
+                    break;
                 }
-                
-                handler.postDelayed(this, scanIntervalMs);
             }
-        };
-        handler.post(scanRunnable);
+        });
+        readThread.start();
         
         return true;
     }
@@ -87,9 +118,7 @@ public class SimulatorReader implements IRFIDReader {
     @Override
     public void stopScan() {
         isScanning = false;
-        if (scanRunnable != null) {
-            handler.removeCallbacks(scanRunnable);
-        }
+        sendCommand("STOP\r\n");
         if (listener != null) listener.onScanStopped();
     }
     
@@ -101,12 +130,13 @@ public class SimulatorReader implements IRFIDReader {
     @Override
     public void setPower(int powerDbm) {
         this.powerDbm = powerDbm;
-        Log.i(TAG, "Power: " + powerDbm);
+        sendCommand("POWER " + powerDbm + "\r\n");
     }
     
     @Override
     public void setRssiThreshold(int threshold) {
         this.rssiThreshold = threshold;
+        sendCommand("RSSI " + threshold + "\r\n");
     }
     
     @Override
@@ -116,21 +146,57 @@ public class SimulatorReader implements IRFIDReader {
     
     @Override
     public String getDeviceName() {
-        return "Simulator Reader";
+        return "Bluetooth Reader";
     }
     
     @Override
     public String getFirmwareVersion() {
-        return "1.0.0";
+        return "Unknown";
     }
     
     @Override
     public int getBatteryLevel() {
-        return 100;
+        return -1;
     }
     
     @Override
     public void setOnTagReadListener(OnTagReadListener listener) {
         this.listener = listener;
+    }
+    
+    private void sendCommand(String command) {
+        try {
+            if (outputStream != null) {
+                outputStream.write(command.getBytes());
+                outputStream.flush();
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "Send failed: " + e.getMessage());
+        }
+    }
+    
+    private void parseData(String data) {
+        String[] lines = data.split("[\\r\\n]+");
+        for (String line : lines) {
+            line = line.trim();
+            if (line.isEmpty()) continue;
+            
+            String epc;
+            int rssi = -50;
+            
+            if (line.contains(",")) {
+                String[] parts = line.split(",");
+                epc = parts[0].trim();
+                if (parts.length > 1) {
+                    try { rssi = Integer.parseInt(parts[1].trim()); } catch (Exception ignored) {}
+                }
+            } else {
+                epc = line;
+            }
+            
+            if (listener != null && !epc.isEmpty()) {
+                listener.onTagRead(epc, rssi);
+            }
+        }
     }
 }
