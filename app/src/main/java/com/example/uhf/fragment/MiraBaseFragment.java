@@ -1,10 +1,9 @@
 package com.example.uhf.fragment;
 
-
-import android.app.Activity;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
@@ -20,15 +19,16 @@ import com.example.uhf.tools.MiraDialogHelper;
 import java.util.Locale;
 
 /**
- * 🏗️ BaseFragment - الفрагмент الأساسي لجميع صفحات التطبيق
+ * 🏗️ MiraBaseFragment - الفрагмент الأساسي لجميع صفحات التطبيق
  * يوفر:
  * - إخفاء لوحة المفاتيح تلقائياً
- * - دوال Dialog موحدة
+ * - دوال Dialog موحدة مع حماية من null
  * - دعم اللغة العربية
  */
-// ✅ صحيح - اسم الكلاس يطابق اسم الملف
-
 public abstract class MiraBaseFragment extends Fragment {
+
+    private static final String TAG = "MiraBaseFragment";
+
     protected boolean isArabic;
     protected MiraDialogHelper dialogHelper;
 
@@ -37,81 +37,154 @@ public abstract class MiraBaseFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         
         isArabic = Locale.getDefault().getLanguage().equals("ar");
-        dialogHelper = MiraDialogHelper.getInstance(requireContext());
-        dialogHelper.setArabic(isArabic);
+        
+        // ✅ تهيئة آمنة لـ dialogHelper
+        try {
+            if (getContext() != null) {
+                dialogHelper = MiraDialogHelper.getInstance(getContext());
+                dialogHelper.setArabic(isArabic);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "dialogHelper init error: " + e.getMessage());
+        }
         
         setupAutoHideKeyboard(view);
     }
 
-    // ==================== دوال Dialog المساعدة ====================
+    // ==================== دوال Dialog المساعدة (مع حماية null) ====================
 
     protected AlertDialog showSuccessDialog(String title, String message) {
-        return dialogHelper.showSuccess(title, message);
+        return showSuccessDialog(title, message, null);
     }
 
     protected AlertDialog showSuccessDialog(String title, String message,
                                              DialogInterface.OnClickListener listener) {
-        return dialogHelper.builder()
-                .setType(MiraDialogHelper.DialogType.SUCCESS)
-                .setTitle(title)
-                .setMessage(message)
-                .setPositiveButton(isArabic ? "حسناً" : "OK", listener)
-                .show();
+        try {
+            if (dialogHelper == null) {
+                Log.e(TAG, "dialogHelper is null - cannot show success dialog");
+                return null;
+            }
+            return dialogHelper.builder()
+                    .setType(MiraDialogHelper.DialogType.SUCCESS)
+                    .setTitle(title)
+                    .setMessage(message)
+                    .setPositiveButton(isArabic ? "حسناً" : "OK", listener)
+                    .show();
+        } catch (Exception e) {
+            Log.e(TAG, "showSuccessDialog error: " + e.getMessage());
+            return null;
+        }
     }
 
     protected AlertDialog showErrorDialog(String title, String message) {
-        return dialogHelper.showError(title, message);
+        return showErrorDialog(title, message, null);
     }
 
     protected AlertDialog showErrorDialog(String title, String message,
                                            DialogInterface.OnClickListener listener) {
-        return dialogHelper.builder()
-                .setType(MiraDialogHelper.DialogType.ERROR)
-                .setTitle(title)
-                .setMessage(message)
-                .setPositiveButton(isArabic ? "حسناً" : "OK", listener)
-                .show();
+        try {
+            if (dialogHelper == null) {
+                Log.e(TAG, "dialogHelper is null - cannot show error dialog");
+                return null;
+            }
+            return dialogHelper.builder()
+                    .setType(MiraDialogHelper.DialogType.ERROR)
+                    .setTitle(title)
+                    .setMessage(message)
+                    .setPositiveButton(isArabic ? "حسناً" : "OK", listener)
+                    .show();
+        } catch (Exception e) {
+            Log.e(TAG, "showErrorDialog error: " + e.getMessage());
+            return null;
+        }
     }
 
     protected AlertDialog showWarningDialog(String title, String message) {
-        return dialogHelper.showWarning(title, message);
+        try {
+            if (dialogHelper == null) return null;
+            return dialogHelper.showWarning(title, message);
+        } catch (Exception e) {
+            Log.e(TAG, "showWarningDialog error: " + e.getMessage());
+            return null;
+        }
     }
 
     protected AlertDialog showInfoDialog(String title, String message) {
-        return dialogHelper.showInfo(title, message);
+        try {
+            if (dialogHelper == null) return null;
+            return dialogHelper.showInfo(title, message);
+        } catch (Exception e) {
+            Log.e(TAG, "showInfoDialog error: " + e.getMessage());
+            return null;
+        }
     }
 
     protected AlertDialog showConfirmDialog(String title, String message,
                                              DialogInterface.OnClickListener positiveListener) {
-        return dialogHelper.showConfirm(title, message, positiveListener);
+        try {
+            if (dialogHelper == null) return null;
+            return dialogHelper.showConfirm(title, message, positiveListener);
+        } catch (Exception e) {
+            Log.e(TAG, "showConfirmDialog error: " + e.getMessage());
+            return null;
+        }
     }
 
     protected AlertDialog showConfirmDialog(String title, String message,
                                              String positiveText, String negativeText,
                                              DialogInterface.OnClickListener positiveListener,
                                              DialogInterface.OnClickListener negativeListener) {
-        return dialogHelper.showConfirm(title, message, positiveText, negativeText,
-                positiveListener, negativeListener);
+        try {
+            if (dialogHelper == null) return null;
+            return dialogHelper.showConfirm(title, message, positiveText, negativeText,
+                    positiveListener, negativeListener);
+        } catch (Exception e) {
+            Log.e(TAG, "showConfirmDialog error: " + e.getMessage());
+            return null;
+        }
     }
 
     protected AlertDialog showLoadingDialog(String message) {
-        return dialogHelper.showLoading(message);
+        try {
+            if (dialogHelper == null || getContext() == null || !isAdded()) {
+                Log.e(TAG, "Cannot show loading dialog - dialogHelper=" + dialogHelper + 
+                    ", context=" + (getContext() != null) + ", isAdded=" + isAdded());
+                return null;
+            }
+            return dialogHelper.showLoading(message);
+        } catch (Exception e) {
+            Log.e(TAG, "showLoadingDialog error: " + e.getMessage());
+            return null;
+        }
     }
 
     protected AlertDialog showDetailsDialog(String title, String[][] details) {
-        return dialogHelper.showDetails(title, details);
+        try {
+            if (dialogHelper == null || getContext() == null || !isAdded()) {
+                Log.e(TAG, "Cannot show details dialog");
+                return null;
+            }
+            return dialogHelper.showDetails(title, details);
+        } catch (Exception e) {
+            Log.e(TAG, "showDetailsDialog error: " + e.getMessage());
+            return null;
+        }
     }
 
     protected void dismissDialog(AlertDialog dialog) {
-        dialogHelper.dismiss(dialog);
+        try {
+            if (dialogHelper != null) {
+                dialogHelper.dismiss(dialog);
+            } else if (dialog != null && dialog.isShowing()) {
+                dialog.dismiss();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "dismissDialog error: " + e.getMessage());
+        }
     }
 
     // ==================== إخفاء لوحة المفاتيح تلقائياً ====================
 
-    /**
-     * إعداد إخفاء لوحة المفاتيح عند النقر خارج EditText
-     * يعمل بشكل متكرر على جميع العناصر الفرعية
-     */
     private void setupAutoHideKeyboard(View view) {
         if (view == null) return;
 
@@ -133,35 +206,37 @@ public abstract class MiraBaseFragment extends Fragment {
         }
     }
 
-    /**
-     * إخفاء لوحة المفاتيح
-     */
     protected void hideKeyboard() {
-        if (getActivity() == null) return;
-        View view = getActivity().getCurrentFocus();
-        if (view != null) {
-            InputMethodManager imm = (InputMethodManager) 
-                getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
-            if (imm != null) {
-                imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
-                view.clearFocus();
+        try {
+            if (getActivity() == null) return;
+            View view = getActivity().getCurrentFocus();
+            if (view != null) {
+                InputMethodManager imm = (InputMethodManager) 
+                    getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+                    view.clearFocus();
+                }
             }
+        } catch (Exception e) {
+            Log.e(TAG, "hideKeyboard error: " + e.getMessage());
         }
     }
 
-    /**
-     * إظهار لوحة المفاتيح لحقل معين
-     */
     protected void showKeyboard(EditText editText) {
-        if (editText == null) return;
-        editText.requestFocus();
-        editText.postDelayed(() -> {
-            InputMethodManager imm = (InputMethodManager) 
-                editText.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-            if (imm != null) {
-                imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT);
-            }
-        }, 200);
+        try {
+            if (editText == null) return;
+            editText.requestFocus();
+            editText.postDelayed(() -> {
+                InputMethodManager imm = (InputMethodManager) 
+                    editText.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT);
+                }
+            }, 200);
+        } catch (Exception e) {
+            Log.e(TAG, "showKeyboard error: " + e.getMessage());
+        }
     }
 
     @Override
