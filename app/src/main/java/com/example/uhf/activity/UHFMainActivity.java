@@ -67,6 +67,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+
+
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private static final String TAG = "UHFMainActivity";
@@ -78,6 +80,51 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private FragmentManager fragmentManager;
     public Fragment currentFragment;
     private MiraPosFragment activePOSFragment = null;
+    
+// ==================== متغيرات جديدة في UHFMainActivity ====================
+
+private MiraIdentityStudioFragment activeEncodingFragment;
+private OnRfidScannedListener activeRfidListener;
+
+// Interface للمستمعين
+public interface OnRfidScannedListener {
+    void onRfidScanned(String epc);
+}
+
+// ==================== دوال التسجيل ====================
+
+/**
+ * تسجيل Fragment التكويد كمستقبل RFID
+ */
+public void setActiveEncodingFragment(MiraIdentityStudioFragment fragment) {
+    this.activeEncodingFragment = fragment;
+}
+
+/**
+ * تسجيل مستمع عام لمسح RFID
+ */
+public void setActiveRfidListener(OnRfidScannedListener listener) {
+    this.activeRfidListener = listener;
+}
+
+/**
+ * بدء مسح UHF
+ */
+public void startUHFScan() {
+    // TODO: استبدل بالكود الفعلي لتشغيل قارئ RFID
+    Log.d("UHFMainActivity", "startUHFScan called");
+    // مثال: RFIDWithUHFSDK.getInstance().startInventory();
+}
+
+/**
+ * إيقاف مسح UHF
+ */
+public void stopUHFScan() {
+    // TODO: استبدل بالكود الفعلي لإيقاف قارئ RFID
+    Log.d("UHFMainActivity", "stopUHFScan called");
+    // مثال: RFIDWithUHFSDK.getInstance().stopInventory();
+}
+
 
     // Managers & State
     private SessionManager sessionManager;
@@ -659,24 +706,39 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     public void onTagRead(String epc) {
-        try {
-            if (activePOSFragment != null && activePOSFragment.isVisible()) {
-                activePOSFragment.onRingScanned(epc);
-                return;
-            }
-            if (mTabHost != null) {
-                String currentTabTag = mTabHost.getCurrentTabTag();
-                if (currentTabTag != null) {
-                    Fragment fragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
-                    if (fragment instanceof MiraUHFReadTagFragment && fragment.isVisible()) {
-                        ((MiraUHFReadTagFragment) fragment).onTagScanned(epc, -50.0);
-                    }
+    try {
+        // 1. إرسال لـ Fragment التكويد
+        if (activeEncodingFragment != null && activeEncodingFragment.isAdded()) {
+            activeEncodingFragment.onRfidScanned(epc);
+            return;
+        }
+        
+        // 2. إرسال للمستمع العام
+        if (activeRfidListener != null) {
+            activeRfidListener.onRfidScanned(epc);
+            return;
+        }
+        
+        // 3. إرسال لـ Fragment البيع
+        if (activePOSFragment != null && activePOSFragment.isVisible()) {
+            activePOSFragment.onRingScanned(epc);
+            return;
+        }
+        
+        // 4. إرسال لـ Fragment الجرد
+        if (mTabHost != null) {
+            String currentTabTag = mTabHost.getCurrentTabTag();
+            if (currentTabTag != null) {
+                Fragment fragment = getSupportFragmentManager().findFragmentByTag(currentTabTag);
+                if (fragment instanceof MiraUHFReadTagFragment && fragment.isVisible()) {
+                    ((MiraUHFReadTagFragment) fragment).onTagScanned(epc, -50.0);
                 }
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Tag Read Processing Error: " + e.getMessage());
         }
+    } catch (Exception e) {
+        Log.e(TAG, "Tag Read Processing Error: " + e.getMessage());
     }
+}
 
     // ==================== TAB INITIALIZATION & ROUTING ====================
 
