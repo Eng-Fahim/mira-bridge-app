@@ -15,6 +15,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.tools.MiraDialogHelper;
+import com.example.uhf.tools.MiraLanguageHelper;
 
 import java.util.Locale;
 
@@ -56,7 +57,6 @@ public abstract class MiraBaseFragment extends Fragment {
     protected AlertDialog showSuccessDialog(String title, String message) {
         return showSuccessDialog(title, message, null);
     }
-
     protected AlertDialog showSuccessDialog(String title, String message,
                                              DialogInterface.OnClickListener listener) {
         try {
@@ -170,7 +170,51 @@ public abstract class MiraBaseFragment extends Fragment {
             return null;
         }
     }
+public abstract class MiraBaseFragment extends Fragment {
 
+    protected boolean isArabic;
+    protected MiraDialogHelper dialogHelper;
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        
+        // ✅ استخدام MiraLanguageHelper
+        isArabic = MiraLanguageHelper.isArabic(requireContext());
+        
+        // ✅ تطبيق اتجاه اللغة على الـ View
+        applyLanguageDirection(view);
+        
+        // تهيئة dialogHelper
+        try {
+            if (getContext() != null) {
+                dialogHelper = MiraDialogHelper.getInstance(getContext());
+                dialogHelper.setArabic(isArabic);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "dialogHelper init error: " + e.getMessage());
+        }
+        
+        setupAutoHideKeyboard(view);
+    }
+
+    /**
+     * تطبيق اتجاه اللغة على جميع العناصر
+     */
+    private void applyLanguageDirection(View view) {
+        if (view == null) return;
+        
+        // تطبيق الاتجاه على الـ View نفسه
+        view.setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
+        
+        // تطبيق على جميع العناصر الفرعية
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                applyLanguageDirection(group.getChildAt(i));
+            }
+        }
+    }
     protected void dismissDialog(AlertDialog dialog) {
         try {
             if (dialogHelper != null) {
