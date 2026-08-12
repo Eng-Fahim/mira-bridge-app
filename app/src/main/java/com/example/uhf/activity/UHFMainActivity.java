@@ -110,21 +110,22 @@ public void setActiveRfidListener(OnRfidScannedListener listener) {
 /**
  * بدء مسح UHF
  */
-public void startUHFScan() {
+/*public void startUHFScan() {
     // TODO: استبدل بالكود الفعلي لتشغيل قارئ RFID
     Log.d("UHFMainActivity", "startUHFScan called");
     // مثال: RFIDWithUHFSDK.getInstance().startInventory();
-}
+}*/
+
 
 /**
  * إيقاف مسح UHF
  */
-public void stopUHFScan() {
+/*public void stopUHFScan() {
     // TODO: استبدل بالكود الفعلي لإيقاف قارئ RFID
     Log.d("UHFMainActivity", "stopUHFScan called");
     // مثال: RFIDWithUHFSDK.getInstance().stopInventory();
 }
-
+*/
 
     // Managers & State
     private SessionManager sessionManager;
@@ -1007,7 +1008,7 @@ public void stopUHFScan() {
         }
     }
 
-   /* public void stopUHFScan() {
+    public void stopUHFScan() {
         try {
             if (mReader != null && loopFlag) {
                 mReader.stopInventory();
@@ -1016,7 +1017,7 @@ public void stopUHFScan() {
         } catch (Exception e) {
             Log.e(TAG, "Error stopping UHF scan: " + e.getMessage());
         }
-    }*/
+    }
     
 
 
