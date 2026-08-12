@@ -11,14 +11,13 @@ public class RFIDReaderFactory {
     /**
      * إنشاء القارئ المناسب حسب النوع
      */
-    public static IRFIDReader create(IRFIDReader.ReaderType type, String address) {
+    public static MiraIRFIDReader create(MiraIRFIDReader.ReaderType type, String address) {
         switch (type) {
             case GENERIC_BLUETOOTH:
                 return new GenericBluetoothReader(address);
                 
             case SIMULATOR:
             default:
-                // جميع الأنواع غير المنفذة بعد تستخدم المحاكي
                 return new SimulatorReader();
         }
     }
