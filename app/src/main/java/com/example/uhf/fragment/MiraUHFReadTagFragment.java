@@ -113,7 +113,7 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
 
     // RFID Manager
     private RFIDManager rfidManager;
-    private IRFIDReader activeReader;
+    private MiraIRFIDReader activeReader;
 
     // المكونات الداخلية
     private TagAdapter tagAdapter;
@@ -142,6 +142,16 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     
     public enum ConnectionType {
         RFID_MANAGER, BLUETOOTH, WIFI, SIMULATOR
+    }
+    
+    private void showToast(String msg) {
+    try {
+        if (getContext() != null && isAdded()) {
+            Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "showToast error: " + e.getMessage());
+    }
     }
 
     private InventoryState currentState = InventoryState.IDLE;
@@ -254,7 +264,7 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
 
             // تهيئة RFID Manager
             rfidManager = RFIDManager.getInstance(ctx);
-            rfidManager.setListener(new IRFIDReader.OnTagReadListener() {
+            rfidManager.setListener(new MiraIRFIDReader.OnTagReadListener() {
                 @Override
                 public void onTagRead(String epc, int rssi) {
                     onTagScanned(epc, rssi);
@@ -298,7 +308,7 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     private void detectAndSetConnectionType() {
         RFIDDevice activeDevice = rfidManager.getActiveDevice();
         if (activeDevice != null && activeDevice.getType() != null && 
-            activeDevice.getType() != IRFIDReader.ReaderType.SIMULATOR) {
+            activeDevice.getType() != MiraIRFIDReader.ReaderType.SIMULATOR) {
             activeConnectionType = ConnectionType.RFID_MANAGER;
         } else if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
             String lastDevice = offlineCache.getString(PREF_LAST_CONNECTED_DEVICE, null);
@@ -1868,4 +1878,4 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
             }
         }
     }
-                                           }
+                             }
