@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F8FAFC">
+    android:background="?attr/colorBackground">
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
@@ -17,12 +17,12 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- 📡 بطاقة الحالة والتقدم -->
+            <!-- 📡 بطاقة الحالة -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="#FFFFFF"
-                app:strokeColor="#E2E8F0"
+                app:cardBackgroundColor="?attr/colorSurface"
+                app:strokeColor="?attr/colorOutline"
                 app:strokeWidth="1dp"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="2dp"
@@ -34,7 +34,6 @@
                     android:orientation="vertical"
                     android:padding="16dp">
 
-                    <!-- العنوان والحالة -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -47,7 +46,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="@string/identity_step_title"
-                            android:textColor="#0284C7"
+                            android:textColor="?attr/colorPrimary"
                             android:textSize="13sp"
                             android:textStyle="bold" />
 
@@ -56,15 +55,15 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/identity_waiting"
-                            android:background="@drawable/bg_status_badge"
-                            android:textColor="#64748B"
+                            android:background="?attr/colorSurfaceVariant"
+                            android:textColor="?attr/colorOnSurfaceVariant"
                             android:paddingHorizontal="10dp"
                             android:paddingVertical="4dp"
                             android:textSize="10sp"
                             android:textStyle="bold" />
                     </LinearLayout>
 
-                    <!-- حقل EPC -->
+                    <!-- ✅ حقل EPC -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/tilEpc"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -72,21 +71,19 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
                         android:hint="@string/identity_epc_hint"
-                        app:boxBackgroundColor="#FFFFFF"
-                        app:boxStrokeColor="#0284C7"
+                        app:boxBackgroundColor="?attr/colorSurface"
+                        app:boxStrokeColor="?attr/colorPrimary"
                         app:boxStrokeWidth="1.5dp"
-                        app:hintTextColor="#64748B"
+                        app:hintTextColor="?attr/colorOnSurfaceVariant"
                         app:endIconMode="custom"
                         app:endIconDrawable="@android:drawable/ic_menu_camera"
-                        app:endIconTint="#0284C7"
-                        app:startIconDrawable="@drawable/ic_rfid"
-                        app:startIconTint="#7C3AED">
+                        app:endIconTint="?attr/colorPrimary">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etEpc"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:textColor="#0F172A"
+                            android:textColor="?attr/colorOnSurface"
                             android:textSize="14sp"
                             android:textDirection="ltr"
                             android:inputType="text"
@@ -100,19 +97,16 @@
                         android:layout_height="46dp"
                         android:layout_marginTop="10dp"
                         android:text="@string/identity_scan_rfid"
-                        android:textColor="#FFFFFF"
+                        android:textColor="?attr/colorOnPrimary"
                         android:textSize="13sp"
                         android:textStyle="bold"
-                        app:backgroundTint="#7C3AED"
-                        app:cornerRadius="10dp"
-                        app:icon="@drawable/ic_rfid"
-                        app:iconTint="#FFFFFF"
-                        app:iconGravity="textStart" />
+                        app:backgroundTint="?attr/colorPrimary"
+                        app:cornerRadius="10dp" />
 
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ==================== الخطوة 1: التصنيف والوصف ==================== -->
+            <!-- ==================== الخطوة 1: التصنيف ==================== -->
             <LinearLayout
                 android:id="@+id/step1Layout"
                 android:layout_width="match_parent"
@@ -123,7 +117,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/identity_category_title"
-                    android:textColor="#0F172A"
+                    android:textColor="?attr/colorOnBackground"
                     android:textSize="15sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="10dp"/>
@@ -142,7 +136,6 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/identity_ring"
-                        android:textColor="#334155"
                         android:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
@@ -151,7 +144,6 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/identity_set"
-                        android:textColor="#334155"
                         android:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
@@ -160,7 +152,6 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/identity_bracelet"
-                        android:textColor="#334155"
                         android:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
@@ -169,7 +160,6 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/identity_necklace"
-                        android:textColor="#334155"
                         android:checkedIconVisible="true" />
                 </com.google.android.material.chip.ChipGroup>
 
@@ -180,16 +170,16 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:hint="@string/identity_title_hint"
-                    app:boxBackgroundColor="#FFFFFF"
-                    app:boxStrokeColor="#CBD5E1"
+                    app:boxBackgroundColor="?attr/colorSurface"
+                    app:boxStrokeColor="?attr/colorOutline"
                     app:boxStrokeWidth="1dp"
-                    app:hintTextColor="#64748B">
+                    app:hintTextColor="?attr/colorOnSurfaceVariant">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etTitle"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textColor="#0F172A"
+                        android:textColor="?attr/colorOnSurface"
                         android:inputType="text"
                         android:maxLines="2" />
                 </com.google.android.material.textfield.TextInputLayout>
@@ -210,7 +200,7 @@
                 </HorizontalScrollView>
             </LinearLayout>
 
-            <!-- ==================== الخطوة 2: مواصفات الذهب ==================== -->
+            <!-- ==================== الخطوة 2: المعدن والوزن ==================== -->
             <LinearLayout
                 android:id="@+id/step2Layout"
                 android:layout_width="match_parent"
@@ -222,17 +212,16 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/identity_metal_specs"
-                    android:textColor="#0F172A"
+                    android:textColor="?attr/colorOnBackground"
                     android:textSize="15sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="10dp"/>
 
-                <!-- لون المعدن -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/identity_metal_type"
-                    android:textColor="#64748B"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp" />
 
                 <com.google.android.material.chip.ChipGroup
@@ -250,7 +239,6 @@
                         android:layout_height="wrap_content"
                         android:text="@string/identity_yellow_gold"
                         android:checked="true"
-                        android:textColor="#334155"
                         android:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
@@ -259,7 +247,6 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/identity_white_gold"
-                        android:textColor="#334155"
                         android:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
@@ -268,16 +255,14 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/identity_rose_gold"
-                        android:textColor="#334155"
                         android:checkedIconVisible="true" />
                 </com.google.android.material.chip.ChipGroup>
 
-                <!-- العيار -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/identity_karat_label"
-                    android:textColor="#64748B"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp"
                     android:layout_marginTop="10dp"/>
 
@@ -294,7 +279,6 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="24K"
-                        android:textColor="#334155"
                         android:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
@@ -304,7 +288,6 @@
                         android:layout_height="wrap_content"
                         android:text="21K"
                         android:checked="true"
-                        android:textColor="#334155"
                         android:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
@@ -313,7 +296,6 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="18K"
-                        android:textColor="#334155"
                         android:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
@@ -322,16 +304,15 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="14K"
-                        android:textColor="#334155"
                         android:checkedIconVisible="true" />
                 </com.google.android.material.chip.ChipGroup>
 
-                <!-- الوزن والقيمة -->
+                <!-- الوزن -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    app:cardBackgroundColor="#FFFFFF"
+                    app:cardBackgroundColor="?attr/colorSurface"
                     app:cardCornerRadius="14dp"
                     app:cardElevation="2dp">
 
@@ -345,7 +326,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/identity_weight_label"
-                            android:textColor="#0F172A"
+                            android:textColor="?attr/colorOnSurface"
                             android:textStyle="bold"
                             android:textSize="13sp" />
 
@@ -355,10 +336,10 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
                             android:hint="@string/identity_weight_hint"
-                            app:boxBackgroundColor="#F8FAFC"
-                            app:boxStrokeColor="#0284C7"
+                            app:boxBackgroundColor="?attr/colorSurfaceVariant"
+                            app:boxStrokeColor="?attr/colorPrimary"
                             app:boxStrokeWidth="1.5dp"
-                            app:hintTextColor="#94A3B8">
+                            app:hintTextColor="?attr/colorOnSurfaceVariant">
 
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/etGrossWeight"
@@ -366,7 +347,7 @@
                                 android:layout_height="wrap_content"
                                 android:inputType="numberDecimal"
                                 android:textSize="22sp"
-                                android:textColor="#0284C7"
+                                android:textColor="?attr/colorPrimary"
                                 android:gravity="center"
                                 android:textStyle="bold" />
                         </com.google.android.material.textfield.TextInputLayout>
@@ -374,7 +355,7 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:background="#E2E8F0"
+                            android:background="?attr/colorOutline"
                             android:layout_marginVertical="12dp"/>
 
                         <LinearLayout
@@ -387,7 +368,7 @@
                                 android:layout_weight="1"
                                 android:layout_height="wrap_content"
                                 android:text="@string/identity_estimated_value"
-                                android:textColor="#64748B"
+                                android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="12sp" />
 
                             <TextView
@@ -395,7 +376,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/identity_default_value"
-                                android:textColor="#16A34A"
+                                android:textColor="?attr/colorPrimary"
                                 android:textSize="14sp"
                                 android:textStyle="bold" />
                         </LinearLayout>
@@ -415,7 +396,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/identity_stones_title"
-                    android:textColor="#0F172A"
+                    android:textColor="?attr/colorOnBackground"
                     android:textSize="15sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="10dp"/>
@@ -423,7 +404,7 @@
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:cardBackgroundColor="#FFFFFF"
+                    app:cardBackgroundColor="?attr/colorSurface"
                     app:cardCornerRadius="12dp"
                     app:cardElevation="1dp">
 
@@ -439,7 +420,7 @@
                             android:layout_weight="1"
                             android:layout_height="wrap_content"
                             android:text="@string/identity_has_stones"
-                            android:textColor="#0F172A"
+                            android:textColor="?attr/colorOnSurface"
                             android:textSize="13sp" />
 
                         <com.google.android.material.switchmaterial.SwitchMaterial
@@ -449,7 +430,6 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- حقول الأحجار -->
                 <LinearLayout
                     android:id="@+id/layoutStonesDetails"
                     android:layout_width="match_parent"
@@ -463,15 +443,15 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:hint="@string/identity_stone_type_hint"
-                        app:boxBackgroundColor="#FFFFFF"
-                        app:boxStrokeColor="#CBD5E1"
-                        app:hintTextColor="#64748B">
+                        app:boxBackgroundColor="?attr/colorSurface"
+                        app:boxStrokeColor="?attr/colorOutline"
+                        app:hintTextColor="?attr/colorOnSurfaceVariant">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etStoneType"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:textColor="#0F172A"
+                            android:textColor="?attr/colorOnSurface"
                             android:inputType="text" />
                     </com.google.android.material.textfield.TextInputLayout>
 
@@ -488,16 +468,16 @@
                             android:layout_height="wrap_content"
                             android:layout_marginEnd="4dp"
                             android:hint="@string/identity_stone_weight_hint"
-                            app:boxBackgroundColor="#FFFFFF"
-                            app:boxStrokeColor="#CBD5E1"
-                            app:hintTextColor="#64748B">
+                            app:boxBackgroundColor="?attr/colorSurface"
+                            app:boxStrokeColor="?attr/colorOutline"
+                            app:hintTextColor="?attr/colorOnSurfaceVariant">
 
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/etStoneWeight"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:inputType="numberDecimal"
-                                android:textColor="#0F172A" />
+                                android:textColor="?attr/colorOnSurface" />
                         </com.google.android.material.textfield.TextInputLayout>
 
                         <com.google.android.material.textfield.TextInputLayout
@@ -507,16 +487,16 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="4dp"
                             android:hint="@string/identity_stone_count_hint"
-                            app:boxBackgroundColor="#FFFFFF"
-                            app:boxStrokeColor="#CBD5E1"
-                            app:hintTextColor="#64748B">
+                            app:boxBackgroundColor="?attr/colorSurface"
+                            app:boxStrokeColor="?attr/colorOutline"
+                            app:hintTextColor="?attr/colorOnSurfaceVariant">
 
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/etStoneCount"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:inputType="number"
-                                android:textColor="#0F172A" />
+                                android:textColor="?attr/colorOnSurface" />
                         </com.google.android.material.textfield.TextInputLayout>
                     </LinearLayout>
 
@@ -526,21 +506,21 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
                         android:hint="@string/identity_stone_value_hint"
-                        app:boxBackgroundColor="#FFFFFF"
-                        app:boxStrokeColor="#CBD5E1"
-                        app:hintTextColor="#64748B">
+                        app:boxBackgroundColor="?attr/colorSurface"
+                        app:boxStrokeColor="?attr/colorOutline"
+                        app:hintTextColor="?attr/colorOnSurfaceVariant">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etStoneValue"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:inputType="numberDecimal"
-                            android:textColor="#0F172A" />
+                            android:textColor="?attr/colorOnSurface" />
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- ==================== الخطوة 4: الصور والاعتماد ==================== -->
+            <!-- ==================== الخطوة 4: الصور ==================== -->
             <LinearLayout
                 android:id="@+id/step4Layout"
                 android:layout_width="match_parent"
@@ -553,7 +533,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/identity_photos_title"
-                    android:textColor="#0F172A"
+                    android:textColor="?attr/colorOnBackground"
                     android:textSize="15sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="10dp"/>
@@ -564,20 +544,20 @@
                     android:layout_width="match_parent"
                     android:layout_height="50dp"
                     android:text="@string/identity_add_photos"
-                    android:textColor="#0284C7"
+                    android:textColor="?attr/colorPrimary"
                     android:textStyle="bold"
-                    app:strokeColor="#0284C7"
+                    app:strokeColor="?attr/colorPrimary"
                     app:strokeWidth="2dp"
                     app:cornerRadius="10dp"
                     app:icon="@android:drawable/ic_menu_camera"
-                    app:iconTint="#0284C7" />
+                    app:iconTint="?attr/colorPrimary" />
 
                 <TextView
                     android:id="@+id/tvPhotosCount"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/identity_no_photos"
-                    android:textColor="#64748B"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="11sp"
                     android:layout_gravity="center"
                     android:layout_marginTop="6dp" />
@@ -590,11 +570,11 @@
                     android:text="@string/identity_save_btn"
                     android:textSize="16sp"
                     android:textStyle="bold"
-                    android:textColor="#FFFFFF"
-                    app:backgroundTint="#16A34A"
+                    android:textColor="?attr/colorOnPrimary"
+                    app:backgroundTint="?attr/colorPrimary"
                     app:cornerRadius="12dp"
                     app:icon="@android:drawable/ic_menu_save"
-                    app:iconTint="#FFFFFF" />
+                    app:iconTint="?attr/colorOnPrimary" />
             </LinearLayout>
 
         </LinearLayout>
