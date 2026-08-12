@@ -777,13 +777,41 @@ public class MiraApiClient {
             return null;
         }
     }
-    
-    // دالة إرسال تقرير الجرد
-public void submitInventoryAuditReport(JSONObject payload) {
-    // يمكنك إضافة كود إرسال الـ API هنا، أو تركها هيكلية للتجميع
-}
-MiraApiClient.ApiResponse response = api.getBranchItemsList(
-    branchesManager != null ? branchesManager.getActiveBranchId() : 1);
+        // دالة إرسال تقرير الجرد
+    public void submitInventoryAuditReport(JSONObject payload) {
+        HttpURLConnection conn = null;
+        try {
+            String fullUrl = apiUrl + "/inventory/submit-audit";
+            URL url = new URL(fullUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
+            
+            String token = getAuthToken();
+            if (!token.isEmpty()) {
+                conn.setRequestProperty("Authorization", "Bearer " + token);
+            }
+            
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            conn.setDoOutput(true);
 
-
+            if (payload != null) {
+                String jsonString = payload.toString();
+                try (OutputStream os = conn.getOutputStream()) {
+                    byte[] input = jsonString.getBytes("utf-8");
+                    os.write(input, 0, input.length);
+                }
+            }
+            
+            int responseCode = conn.getResponseCode();
+            Log.d(TAG, "submitInventoryAuditReport response: " + responseCode);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "submitInventoryAuditReport error: " + e.getMessage());
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
 }
