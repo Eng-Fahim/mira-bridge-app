@@ -992,7 +992,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         Toast.makeText(getContext(), "▶ تم استئناف الجلسة", Toast.LENGTH_SHORT).show();
     }
 
-    private void stopScanning() {
+    public void stopScanning() {
         if (currentState != InventoryState.SCANNING && currentState != InventoryState.PAUSED) return;
 
         stopAllReaders();
@@ -1770,4 +1770,4 @@ public class MiraUHFReadTagFragment extends Fragment {
             }
         }
     }
-    }
+}
