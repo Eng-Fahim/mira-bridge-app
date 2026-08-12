@@ -60,6 +60,8 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     private final Map<String, String[]> typeSuggestions = new HashMap<>();
     
+    
+    
     private String currentPhotoPath;
     private final List<String> photoPaths = new ArrayList<>();
     private ActivityResultLauncher<Uri> takePhotoLauncher;
@@ -74,7 +76,15 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private double makingChargePerGram = 10.0;
     private double profitMarginPercent = 90.0;
     private boolean goldRatesLoaded = false;
-
+    private void applyLanguage() {
+    if (binding == null) return;
+    
+    // ✅ تطبيق اتجاه اللغة
+    applyLanguageDirection(binding.getRoot());
+    
+    // تغيير النصوص
+    if (isArabic) setArabicTexts(); else setEnglishTexts();
+    }
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
