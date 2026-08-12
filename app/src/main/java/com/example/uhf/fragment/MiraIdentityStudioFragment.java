@@ -289,10 +289,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     // ==================== اللغة ====================
 
-    private void applyLanguage() {
-        if (binding == null) return;
-        if (isArabic) setArabicTexts(); else setEnglishTexts();
-    }
+   
 
     private void setArabicTexts() {
         try {
@@ -891,4 +888,4 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         super.onDestroyView();
         binding = null;
     }
-}
+                                            }
