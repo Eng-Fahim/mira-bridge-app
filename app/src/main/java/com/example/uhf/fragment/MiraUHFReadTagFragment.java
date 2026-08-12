@@ -1447,17 +1447,34 @@ public class MiraUHFReadTagFragment extends Fragment {
     private void uploadAuditToCloud() {
     networkExecutor.execute(() -> {
         try {
+            // حساب found/missing/unexpected
+            int found = 0;
+            int unexpected = 0;
+            int soldCount = 0;
+            for (ExpectedItem item : expectedItemsMap.values()) {
+                if (item.isSold) soldCount++;
+            }
+            for (String epc : scannedEpcSet) {
+                ExpectedItem item = expectedItemsMap.get(epc);
+                if (item != null) {
+                    if (!item.isSold) found++;
+                } else {
+                    unexpected++;
+                }
+            }
+            int missing = Math.max(0, expectedItemsMap.size() - soldCount - found);
+            
             JSONObject payload = new JSONObject();
             payload.put("session_id", sessionId);
             payload.put("zone", selectedZone);
             payload.put("total_scanned", totalScannedCount);
             payload.put("unique_count", scannedEpcSet.size());
             payload.put("expected_count", expectedItemsMap.size());
-            payload.put("found_count", foundCount.get());
-            payload.put("missing_count", trulyMissingCount.get());
-            payload.put("unexpected_count", unexpectedCount.get());
+            payload.put("found_count", found);
+            payload.put("missing_count", missing);
+            payload.put("unexpected_count", unexpected);
             payload.put("connection_type", activeConnectionType.name());
-            payload.put("branch_id", branchesManager != null ? branchesManager.getActiveBranchId() : 1);
+            payload.put("branch_id", 1);
 
             // إرسال قائمة EPCs المقروءة
             JSONArray scannedArray = new JSONArray();
@@ -1475,14 +1492,12 @@ public class MiraUHFReadTagFragment extends Fragment {
             Log.e(TAG, "Response Code: " + (res != null ? res.code : "NULL"));
             Log.e(TAG, "Response Success: " + (res != null ? res.isSuccess : "NULL"));
 
-            // ✅ استخراج بيانات التقرير من الرد
             final JSONObject reportData = (res != null && res.data != null) ? res.data : null;
             
             mainHandler.post(() -> {
                 if (res != null && res.isSuccess) {
                     setInventoryState(InventoryState.FINALIZED);
                     
-                    // ✅ عرض Dialog النتائج الاحترافي
                     if (reportData != null) {
                         showAuditResultDialog(reportData);
                     } else {
