@@ -37,6 +37,7 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTabHost;
 
+import com.example.uhf.fragment.MiraReaderSetupFragment;
 import com.example.uhf.tools.MiraLanguageHelper;
 import com.example.uhf.R;
 import com.example.uhf.fragment.JewelryDashboardFragment;
@@ -828,6 +829,10 @@ private void hideKeyboard(View view) {
             if (isManager || isInventoryMgr) {
                 safeAddTab("Transfers", isArabic ? "📦 التحويلات" : "📦 Transfers", MiraTransferFragment.class);
             }
+            // بعد باقي التبويبات
+            if (isManager || isInventoryMgr) {
+            safeAddTab("ReaderSetup", isArabic ? "🔌 القارئ" : "🔌 Reader", MiraReaderSetupFragment.class);
+            }
 
             mTabHost.setOnTabChangedListener(tabId -> {
                 try {
@@ -1077,6 +1082,7 @@ private void hideKeyboard(View view) {
                 }
             }
         }
+        
 
         public void play(int speed) {
             interval = speed > 85 ? 3 : speed > 66 ? 100 - speed : speed > 33 ? (100 - speed) * 2 : (100 - speed) * 3;
