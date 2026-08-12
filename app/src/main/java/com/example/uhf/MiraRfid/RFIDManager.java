@@ -37,10 +37,11 @@ public class RFIDManager {
     }
     
     public static synchronized RFIDManager getInstance(Context context) {
-        if (instance == null) {
-            instance = new RFIDManager(context);
-        }
-        return instance;
+    if (instance == null) {
+        instance = new RFIDManager(context);
+        RFIDReaderFactory.init(context); // ✅ تهيئة الـ Factory
+    }
+    return instance;
     }
     
     /**
