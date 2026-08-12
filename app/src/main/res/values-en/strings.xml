@@ -1496,6 +1496,34 @@
     <string name="btn_export_inventory">📤 Export</string>
 
 <!-- Inventory Fragment -->
+    <string name="inventory_alert_sold">🚨 Alert: Sold item found on shelf!</string>
+<string name="inventory_branch_default">Main Branch - Sanaa</string>
+<string name="inventory_reader_connected">Connected (C72)</string>
+<string name="inventory_zone_label">Inventory Zone:</string>
+<string name="inventory_total_scanned">Total Scanned</string>
+<string name="inventory_unique_tags">Unique Tags</string>
+<string name="inventory_scan_rate">Scan Rate</string>
+<string name="inventory_elapsed">Elapsed</string>
+<string name="inventory_expected">Expected</string>
+<string name="inventory_found">Found</string>
+<string name="inventory_missing">Missing</string>
+<string name="inventory_unexpected">Extra</string>
+<string name="inventory_ready">Ready to start</string>
+<string name="inventory_last_tag">Last Scanned Item:</string>
+<string name="inventory_start">▶ Start</string>
+<string name="inventory_pause">⏸ Pause</string>
+<string name="inventory_stop">⏹ Stop</string>
+<string name="inventory_clear">🗑 Clear</string>
+<string name="inventory_finalize">✅ Save &amp; Approve Cloud Audit</string>
+<string name="inventory_export_csv">📊 Export CSV</string>
+<string name="inventory_print">🖨️ Print</string>
+<string name="inventory_share">📤 Share</string>
+<string name="inventory_filter_all">All</string>
+<string name="inventory_filter_found">Found</string>
+<string name="inventory_filter_missing">Missing</string>
+<string name="inventory_filter_unexpected">Warnings / Extra</string>
+<string name="inventory_connection_type">Connection:</string>
+<string name="inventory_disconnect">Disconnect</string>
 <string name="simulation_mode_available">Simulation / Camera Available</string>
 <string name="total">Total</string>
 <string name="unique">Unique</string>
