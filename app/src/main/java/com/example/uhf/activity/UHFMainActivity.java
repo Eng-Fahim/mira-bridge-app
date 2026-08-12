@@ -796,6 +796,10 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
             if (isManager || isInventoryMgr) {
                 safeAddTab("Settings", isArabic ? "⚙️ إعدادات القارئ" : "⚙️ Reader Settings", UHFSetFragment.class);
             }
+            if (isManager || isInventoryMgr) {
+            safeAddTab("ReaderSetup", isArabic ? "🔌 القارئ" : "🔌 Reader", MiraReaderSetupFragment.class);
+            }
+            
             if (isManager || isGateSecurity || isPosOperator) {
                 safeAddTab("SecureGate", isArabic ? "🚪 البوابات" : "🚪 Gate", MiraSecureGateFragment.class);
             }
@@ -813,9 +817,10 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
                 safeAddTab("Transfers", isArabic ? "📦 التحويلات" : "📦 Transfers", MiraTransferFragment.class);
             }
             // بعد باقي التبويبات
-            if (isManager || isInventoryMgr) {
+          /*  if (isManager || isInventoryMgr) {
             safeAddTab("ReaderSetup", isArabic ? "🔌 القارئ" : "🔌 Reader", MiraReaderSetupFragment.class);
-            }
+            }*/
+            
 
             mTabHost.setOnTabChangedListener(tabId -> {
                 try {
@@ -1087,4 +1092,4 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
             Log.e(TAG, errorMessage + ": " + e.getMessage());
         }
     }
-                }
+    }
