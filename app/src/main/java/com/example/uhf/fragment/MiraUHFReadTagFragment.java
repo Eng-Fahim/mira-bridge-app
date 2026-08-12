@@ -74,6 +74,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class MiraUHFReadTagFragment extends Fragment {
 
     private static final String TAG = "MiraUHFReadTagFragment";
+    private boolean isArabic;
     private TextView tvConnectionType, tvConnectionDetails;
     private LinearLayout layoutExportButtons;
     private com.google.android.material.card.MaterialCardView cardConnectionInfo;
@@ -266,6 +267,7 @@ public class MiraUHFReadTagFragment extends Fragment {
             vibrator = (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
 
             sessionId = "AUDIT-" + System.currentTimeMillis();
+            isArabic = Locale.getDefault().getLanguage().equals("ar");
             
             // تحديد نوع الاتصال
             detectAndSetConnectionType();
