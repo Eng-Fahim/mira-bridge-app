@@ -81,7 +81,7 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     
     private TextView tvConnectionType, tvConnectionDetails;
     private LinearLayout layoutExportButtons;
-    private com.google.android.material.card.MaterialCardView cardConnectionInfo;
+    
     
     // إعدادات زمنية
     private static final long DEFAULT_INACTIVITY_TIMEOUT_MS = 180000;
@@ -1878,4 +1878,4 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
             }
         }
     }
-                             }
+        }
