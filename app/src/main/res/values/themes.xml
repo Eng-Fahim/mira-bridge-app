@@ -2,7 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
 
     <style name="Base.Theme.Uhfuartdemo" parent="Theme.Material3.DayNight.NoActionBar">
-
+<!-- داخل Base.Theme.Uhfuartdemo -->
+<item name="textInputStyle">@style/AppTextInputStyle</item>
         <!-- 🔤 الخطوط -->
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
@@ -119,6 +120,18 @@
     <item name="android:height">32dp</item>
     <item name="marginHorizontal">4dp</item>
     <item name="shapeAppearance">@style/ShapeAppearance.Material3.Corner.Full</item>
+</style>
+
+    <style name="AppTextInputStyle" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+    <item name="boxBackgroundColor">?attr/colorSurface</item>
+    <item name="boxStrokeColor">?attr/colorPrimary</item>
+    <item name="hintTextColor">?attr/colorOnSurfaceVariant</item>
+    <item name="boxStrokeWidth">1dp</item>
+    <item name="boxStrokeWidthFocused">2dp</item>
+    <item name="boxCornerRadiusTopStart">12dp</item>
+    <item name="boxCornerRadiusTopEnd">12dp</item>
+    <item name="boxCornerRadiusBottomStart">12dp</item>
+    <item name="boxCornerRadiusBottomEnd">12dp</item>
 </style>
 
 </resources>
