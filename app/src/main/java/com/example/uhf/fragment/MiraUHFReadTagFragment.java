@@ -856,58 +856,58 @@ public class MiraUHFReadTagFragment extends Fragment {
     }
 
     private void loadExpectedInventory() {
-        setInventoryState(InventoryState.LOADING);
-        
-        networkExecutor.execute(() -> {
-            try {
-                MiraApiClient api = MiraApiClient.getInstance(requireContext());
-                MiraApiClient.ApiResponse response = api.getExpectedInventoryList(selectedZone);
-                
-                expectedItemsMap.clear();
+    setInventoryState(InventoryState.LOADING);
+    
+    networkExecutor.execute(() -> {
+        try {
+            MiraApiClient api = MiraApiClient.getInstance(requireContext());
+            MiraApiClient.ApiResponse response = api.getBranchItemsList(1); // الفرع رقم 1
+            
+            expectedItemsMap.clear();
 
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONArray items = response.data.optJSONArray("items");
-                    if (items != null) {
-                        for (int i = 0; i < items.length(); i++) {
-                            JSONObject obj = items.getJSONObject(i);
-                            String epc = obj.optString("serial_number", 
-                                    obj.optString("gtin13", obj.optString("epc", "")));
-                            
-                            if (!epc.isEmpty()) {
-                                ExpectedItem item = new ExpectedItem(
-                                        epc,
-                                        obj.optString("item_title", obj.optString("title", "قطعة غير معنونة")),
-                                        obj.optString("gold_karat", obj.optString("karat", "21k")),
-                                        obj.optDouble("gross_weight_grams", obj.optDouble("weight", 0.0)),
-                                        "SOLD".equalsIgnoreCase(obj.optString("status", ""))
-                                );
-                                expectedItemsMap.put(epc, item);
-                            }
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONArray items = response.data.optJSONArray("items");
+                if (items != null) {
+                    for (int i = 0; i < items.length(); i++) {
+                        JSONObject obj = items.getJSONObject(i);
+                        String epc = obj.optString("serial_number", 
+                                obj.optString("gtin13", obj.optString("epc", "")));
+                        
+                        if (!epc.isEmpty()) {
+                            ExpectedItem item = new ExpectedItem(
+                                    epc,
+                                    obj.optString("item_title", obj.optString("title", "قطعة غير معنونة")),
+                                    obj.optString("gold_karat", obj.optString("karat", "21k")),
+                                    obj.optDouble("gross_weight_grams", obj.optDouble("weight", 0.0)),
+                                    "SOLD".equalsIgnoreCase(obj.optString("status", ""))
+                            );
+                            expectedItemsMap.put(epc, item);
                         }
                     }
                 }
-
-                if (expectedItemsMap.isEmpty()) {
-                    loadDemoData();
-                }
-
-                mainHandler.post(() -> {
-                    isMissingCacheDirty = true;
-                    updateReconciliationStats();
-                    setInventoryState(InventoryState.IDLE);
-                });
-
-            } catch (Exception e) {
-                Log.e(TAG, "فشل جلب قائمة القطع المتوقعة: " + e.getMessage());
-                mainHandler.post(() -> {
-                    loadDemoData();
-                    isMissingCacheDirty = true;
-                    updateReconciliationStats();
-                    setInventoryState(InventoryState.IDLE);
-                });
             }
-        });
-    }
+
+            if (expectedItemsMap.isEmpty()) {
+                loadDemoData();
+            }
+
+            mainHandler.post(() -> {
+                isMissingCacheDirty = true;
+                updateReconciliationStats();
+                setInventoryState(InventoryState.IDLE);
+            });
+
+        } catch (Exception e) {
+            Log.e(TAG, "فشل جلب قائمة القطع المتوقعة: " + e.getMessage());
+            mainHandler.post(() -> {
+                loadDemoData();
+                isMissingCacheDirty = true;
+                updateReconciliationStats();
+                setInventoryState(InventoryState.IDLE);
+            });
+        }
+    });
+}
 
     private void loadDemoData() {
         for (int i = 1; i <= 15; i++) {
@@ -1627,6 +1627,7 @@ public class MiraUHFReadTagFragment extends Fragment {
         if (soundPool != null) soundPool.play(soundAlertId, 1.0f, 1.0f, 1, 0, 1.0f);
     }
 
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();
@@ -1647,6 +1648,45 @@ public class MiraUHFReadTagFragment extends Fragment {
         try {
             requireContext().unregisterReceiver(bluetoothReceiver);
         } catch (Exception ignored) {}
+    }
+
+    // ==================== دوال عامة للاستخدام الخارجي ====================
+    
+    public boolean isScanning() {
+        return currentState == InventoryState.SCANNING || currentState == InventoryState.PAUSED;
+    }
+
+    public boolean onBackPressed() {
+        if (currentState == InventoryState.SCANNING || currentState == InventoryState.PAUSED) {
+            showExitWarningDialog();
+            return true;
+        }
+        return false;
+    }
+
+    private void showExitWarningDialog() {
+        if (getContext() == null) return;
+        
+        new AlertDialog.Builder(requireContext())
+                .setTitle("⚠️ تحذير: جرد محمي قيد التشغيل")
+                .setMessage("جلسة الجرد نشطة حالياً.\nهل ترغب في إيقاف الجرد والخروج؟")
+                .setPositiveButton("⏹ إيقاف وخروج", (d, w) -> {
+                    stopScanning();
+                    if (getActivity() != null) {
+                        getActivity().onBackPressed();
+                    }
+                })
+                .setNegativeButton("متابعة الجرد", null)
+                .setCancelable(false)
+                .show();
+    }
+
+    public void onKeyDownTrigger() {
+        if (currentState == InventoryState.SCANNING || currentState == InventoryState.PAUSED) {
+            stopScanning();
+        } else if (currentState == InventoryState.IDLE || currentState == InventoryState.COMPLETED) {
+            startScanning();
+        }
     }
 
     // ==================== النماذج الداخلية ====================
@@ -1712,36 +1752,7 @@ public class MiraUHFReadTagFragment extends Fragment {
                     break;
             }
         }
-        
-        public boolean onBackPressed() {
-    if (currentState == InventoryState.SCANNING || currentState == InventoryState.PAUSED) {
-        showExitWarningDialog();
-        return true;
-    }
-    return false;
-}
 
-private void showExitWarningDialog() {
-    new AlertDialog.Builder(requireContext())
-            .setTitle("⚠️ تحذير")
-            .setMessage("جلسة الجرد نشطة حالياً. هل تريد إيقاف الجرد والخروج؟")
-            .setPositiveButton("⏹ إيقاف وخروج", (d, w) -> {
-                stopScanning();
-                if (getActivity() != null) {
-                    getActivity().onBackPressed();
-                }
-            })
-            .setNegativeButton("متابعة الجرد", null)
-            .setCancelable(false)
-            .show();
-}
-public void onKeyDownTrigger() {
-    if (currentState == InventoryState.SCANNING) {
-        stopScanning();
-    } else if (currentState == InventoryState.IDLE || currentState == InventoryState.COMPLETED) {
-        startScanning();
-    }
-}
         @Override
         public int getItemCount() {
             return list.size();
@@ -1759,4 +1770,4 @@ public void onKeyDownTrigger() {
             }
         }
     }
-}
+    }
