@@ -5,17 +5,15 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.graphics.Color;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AlertDialog;
 
-import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 
 import java.util.Locale;
@@ -25,6 +23,10 @@ import java.util.Locale;
  * 
  * الاستخدام:
  * MiraDialogHelper.getInstance(context)
+ *     .showSuccess("نجح!", "تمت العملية بنجاح");
+ * 
+ * أو:
+ * MiraDialogHelper.getInstance(context).builder()
  *     .setType(MiraDialogHelper.DialogType.SUCCESS)
  *     .setTitle("نجح!")
  *     .setMessage("تمت العملية بنجاح")
@@ -34,19 +36,13 @@ public class MiraDialogHelper {
 
     // ==================== الألوان الموحدة ====================
     public static final String COLOR_PRIMARY = "#0284C7";
-    public static final String COLOR_PRIMARY_DARK = "#0369A1";
     public static final String COLOR_SUCCESS = "#16A34A";
-    public static final String COLOR_SUCCESS_DARK = "#15803D";
     public static final String COLOR_WARNING = "#F59E0B";
-    public static final String COLOR_WARNING_DARK = "#D97706";
     public static final String COLOR_DANGER = "#DC2626";
-    public static final String COLOR_DANGER_DARK = "#B91C1C";
     public static final String COLOR_INFO = "#7C3AED";
     public static final String COLOR_DARK = "#0F172A";
     public static final String COLOR_GRAY = "#64748B";
-    public static final String COLOR_LIGHT = "#94A3B8";
     public static final String COLOR_BG = "#F8FAFC";
-    public static final String COLOR_CARD = "#FFFFFF";
     public static final String COLOR_SUCCESS_BG = "#F0FDF4";
     public static final String COLOR_ERROR_BG = "#FEF2F2";
     public static final String COLOR_WARNING_BG = "#FFFBEB";
@@ -61,8 +57,8 @@ public class MiraDialogHelper {
         INFO("ℹ️", COLOR_INFO, COLOR_INFO_BG),
         CONFIRM("❓", COLOR_PRIMARY, COLOR_PRIMARY_BG),
         LOADING("⏳", COLOR_PRIMARY, COLOR_PRIMARY_BG),
-        DETAILS("📋", COLOR_INFO, COLOR_LIGHT_BG),
-        CUSTOM("", COLOR_PRIMARY, COLOR_LIGHT_BG);
+        DETAILS("📋", COLOR_INFO, COLOR_BG),
+        CUSTOM("", COLOR_PRIMARY, COLOR_BG);
 
         public final String icon;
         public final String color;
@@ -104,23 +100,42 @@ public class MiraDialogHelper {
     // ==================== دوال سريعة ====================
 
     public AlertDialog showSuccess(String title, String message) {
-        return builder().setType(DialogType.SUCCESS).setTitle(title).setMessage(message).show();
+        return builder().setType(DialogType.SUCCESS)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(isArabic ? "حسناً" : "OK", null)
+                .show();
     }
 
     public AlertDialog showError(String title, String message) {
-        return builder().setType(DialogType.ERROR).setTitle(title).setMessage(message).show();
+        return builder().setType(DialogType.ERROR)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(isArabic ? "حسناً" : "OK", null)
+                .show();
     }
 
     public AlertDialog showWarning(String title, String message) {
-        return builder().setType(DialogType.WARNING).setTitle(title).setMessage(message).show();
+        return builder().setType(DialogType.WARNING)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(isArabic ? "حسناً" : "OK", null)
+                .show();
     }
 
     public AlertDialog showInfo(String title, String message) {
-        return builder().setType(DialogType.INFO).setTitle(title).setMessage(message).show();
+        return builder().setType(DialogType.INFO)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(isArabic ? "حسناً" : "OK", null)
+                .show();
     }
 
     public AlertDialog showLoading(String message) {
-        return builder().setType(DialogType.LOADING).setMessage(message).setCancelable(false).show();
+        return builder().setType(DialogType.LOADING)
+                .setMessage(message)
+                .setCancelable(false)
+                .show();
     }
 
     public AlertDialog showConfirm(String title, String message,
@@ -149,6 +164,7 @@ public class MiraDialogHelper {
         return builder().setType(DialogType.DETAILS)
                 .setTitle(title)
                 .setDetails(details)
+                .setPositiveButton(isArabic ? "حسناً" : "OK", null)
                 .show();
     }
 
@@ -167,6 +183,7 @@ public class MiraDialogHelper {
     }
 
     public class MiraDialogBuilder {
+        private final Context context;
         private DialogType type = DialogType.INFO;
         private String title;
         private String message;
@@ -177,6 +194,10 @@ public class MiraDialogHelper {
         private DialogInterface.OnClickListener negativeListener;
         private boolean cancelable = true;
         private View customView;
+
+        public MiraDialogBuilder(Context context) {
+            this.context = context;
+        }
 
         public MiraDialogBuilder setType(DialogType type) {
             this.type = type;
@@ -227,18 +248,15 @@ public class MiraDialogHelper {
             AlertDialog.Builder builder = new AlertDialog.Builder(context);
             builder.setCancelable(cancelable);
 
-            // بناء المحتوى
             View contentView = buildContentView();
-            builder.setView(contentView);
+            if (contentView != null) {
+                builder.setView(contentView);
+            }
 
-            // الأزرار
             if (type != DialogType.LOADING) {
                 if (positiveText != null) {
                     builder.setPositiveButton(positiveText, positiveListener);
-                } else if (positiveListener != null) {
-                    builder.setPositiveButton(isArabic ? "حسناً" : "OK", positiveListener);
                 }
-
                 if (negativeText != null) {
                     builder.setNegativeButton(negativeText, negativeListener);
                 }
@@ -246,7 +264,6 @@ public class MiraDialogHelper {
 
             AlertDialog dialog = builder.create();
 
-            // تخصيص ألوان الأزرار بعد الإنشاء
             dialog.setOnShowListener(d -> {
                 Button btnPositive = dialog.getButton(DialogInterface.BUTTON_POSITIVE);
                 Button btnNegative = dialog.getButton(DialogInterface.BUTTON_NEGATIVE);
@@ -270,28 +287,49 @@ public class MiraDialogHelper {
         private View buildContentView() {
             LinearLayout rootLayout = new LinearLayout(context);
             rootLayout.setOrientation(LinearLayout.VERTICAL);
-            rootLayout.setPadding(dp(30), dp(25), dp(30), dp(10));
+            rootLayout.setPadding(dp(28), dp(22), dp(28), dp(8));
             rootLayout.setGravity(Gravity.CENTER);
 
-            if (type == DialogType.LOADING) {
-                buildLoadingContent(rootLayout);
-            } else if (customView != null) {
-                rootLayout.addView(customView);
-            } else if (type == DialogType.DETAILS && details != null) {
-                buildDetailsContent(rootLayout);
-            } else {
-                buildStandardContent(rootLayout);
+            switch (type) {
+                case LOADING:
+                    buildLoadingContent(rootLayout);
+                    break;
+                case DETAILS:
+                    if (customView != null) {
+                        rootLayout.addView(customView);
+                    } else if (details != null) {
+                        buildDetailsContent(rootLayout);
+                    } else {
+                        buildStandardContent(rootLayout);
+                    }
+                    break;
+                case CUSTOM:
+                    if (customView != null) {
+                        rootLayout.addView(customView);
+                    } else {
+                        buildStandardContent(rootLayout);
+                    }
+                    break;
+                default:
+                    buildStandardContent(rootLayout);
+                    break;
             }
 
             return rootLayout;
         }
 
         private void buildStandardContent(LinearLayout root) {
-            // أيقونة
+            // أيقونة في دائرة ملونة
             TextView tvIcon = new TextView(context);
             tvIcon.setText(type.icon);
-            tvIcon.setTextSize(sp(44));
+            tvIcon.setTextSize(sp(40));
             tvIcon.setGravity(Gravity.CENTER);
+            tvIcon.setBackground(createCircleBackground(type.bgColor));
+            tvIcon.setWidth(dp(72));
+            tvIcon.setHeight(dp(72));
+            LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(72), dp(72));
+            iconParams.gravity = Gravity.CENTER;
+            tvIcon.setLayoutParams(iconParams);
             root.addView(tvIcon);
 
             // عنوان
@@ -302,7 +340,7 @@ public class MiraDialogHelper {
                 tvTitle.setTextSize(sp(17));
                 tvTitle.setTypeface(null, Typeface.BOLD);
                 tvTitle.setGravity(Gravity.CENTER);
-                tvTitle.setPadding(0, dp(8), 0, dp(4));
+                tvTitle.setPadding(0, dp(12), 0, dp(6));
                 root.addView(tvTitle);
             }
 
@@ -313,8 +351,8 @@ public class MiraDialogHelper {
                 tvMessage.setTextColor(Color.parseColor(COLOR_GRAY));
                 tvMessage.setTextSize(sp(13));
                 tvMessage.setGravity(Gravity.CENTER);
-                tvMessage.setLineSpacing(dp(3), 1);
-                tvMessage.setPadding(0, dp(4), 0, dp(10));
+                tvMessage.setLineSpacing(dp(4), 1f);
+                tvMessage.setPadding(0, dp(4), 0, dp(8));
                 root.addView(tvMessage);
             }
         }
@@ -323,8 +361,12 @@ public class MiraDialogHelper {
             // أيقونة
             TextView tvIcon = new TextView(context);
             tvIcon.setText(type.icon);
-            tvIcon.setTextSize(sp(40));
+            tvIcon.setTextSize(sp(36));
             tvIcon.setGravity(Gravity.CENTER);
+            tvIcon.setBackground(createCircleBackground(type.bgColor));
+            LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(64), dp(64));
+            iconParams.gravity = Gravity.CENTER;
+            tvIcon.setLayoutParams(iconParams);
             root.addView(tvIcon);
 
             // عنوان
@@ -332,25 +374,27 @@ public class MiraDialogHelper {
                 TextView tvTitle = new TextView(context);
                 tvTitle.setText(title);
                 tvTitle.setTextColor(Color.parseColor(type.color));
-                tvTitle.setTextSize(sp(17));
+                tvTitle.setTextSize(sp(16));
                 tvTitle.setTypeface(null, Typeface.BOLD);
                 tvTitle.setGravity(Gravity.CENTER);
-                tvTitle.setPadding(0, dp(8), 0, dp(10));
+                tvTitle.setPadding(0, dp(10), 0, dp(8));
                 root.addView(tvTitle);
             }
 
             // بطاقة التفاصيل
             MaterialCardView card = new MaterialCardView(context);
             card.setCardBackgroundColor(Color.parseColor(type.bgColor));
-            card.setRadius(dp(14));
-            card.setCardElevation(dp(2));
-            card.setPadding(dp(16), dp(12), dp(16), dp(12));
+            card.setRadius(dp(12));
+            card.setCardElevation(dp(1));
+            card.setPadding(dp(14), dp(10), dp(14), dp(10));
 
             LinearLayout cardLayout = new LinearLayout(context);
             cardLayout.setOrientation(LinearLayout.VERTICAL);
 
             for (String[] detail : details) {
-                addDetailRow(cardLayout, detail[0], detail[1]);
+                if (detail != null && detail.length >= 2) {
+                    addDetailRow(cardLayout, detail[0], detail[1]);
+                }
             }
 
             card.addView(cardLayout);
@@ -360,9 +404,7 @@ public class MiraDialogHelper {
         private void buildLoadingContent(LinearLayout root) {
             ProgressBar progressBar = new ProgressBar(context);
             progressBar.setIndeterminate(true);
-            progressBar.setPadding(0, 0, 0, dp(10));
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    dp(50), dp(50));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(48), dp(48));
             params.gravity = Gravity.CENTER;
             progressBar.setLayoutParams(params);
             root.addView(progressBar);
@@ -374,7 +416,7 @@ public class MiraDialogHelper {
                 tvMsg.setTextSize(sp(14));
                 tvMsg.setTypeface(null, Typeface.BOLD);
                 tvMsg.setGravity(Gravity.CENTER);
-                tvMsg.setPadding(0, dp(8), 0, 0);
+                tvMsg.setPadding(0, dp(14), 0, 0);
                 root.addView(tvMsg);
             }
         }
@@ -383,13 +425,14 @@ public class MiraDialogHelper {
             LinearLayout row = new LinearLayout(context);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setPadding(0, dp(5), 0, dp(5));
+            row.setGravity(Gravity.CENTER_VERTICAL);
 
             TextView tvLabel = new TextView(context);
             tvLabel.setText(label);
             tvLabel.setTextColor(Color.parseColor(COLOR_GRAY));
             tvLabel.setTextSize(sp(12));
             tvLabel.setTypeface(null, Typeface.BOLD);
-            tvLabel.setMinWidth(dp(140));
+            tvLabel.setMinWidth(dp(130));
             row.addView(tvLabel);
 
             TextView tvValue = new TextView(context);
@@ -402,12 +445,19 @@ public class MiraDialogHelper {
             parent.addView(row);
         }
 
-        private int dp(int dp) {
-            return Math.round(dp * context.getResources().getDisplayMetrics().density);
+        private android.graphics.drawable.GradientDrawable createCircleBackground(String colorHex) {
+            android.graphics.drawable.GradientDrawable drawable = new android.graphics.drawable.GradientDrawable();
+            drawable.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            drawable.setColor(Color.parseColor(colorHex));
+            return drawable;
         }
 
-        private int sp(int sp) {
-            return Math.round(sp * context.getResources().getDisplayMetrics().scaledDensity);
+        private int dp(int value) {
+            return Math.round(value * context.getResources().getDisplayMetrics().density);
+        }
+
+        private int sp(int value) {
+            return Math.round(value * context.getResources().getDisplayMetrics().scaledDensity);
         }
     }
-                                              }
+}
