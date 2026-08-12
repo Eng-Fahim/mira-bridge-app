@@ -30,12 +30,15 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
+import android.os.Handler;
 
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.databinding.FragmentMiraIdentityStudioBinding;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
+import com.example.uhf.fragment.MiraBarcodeScannerFragment;
+
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 
@@ -173,8 +176,7 @@ private void calculateEstimatedGoldValue() {
         binding = FragmentMiraIdentityStudioBinding.inflate(inflater, container, false);
         return binding.getRoot();
     }
-
-    @Override
+@Override
 public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
     super.onViewCreated(view, savedInstanceState);
 
@@ -190,14 +192,33 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
     setupPhotoLaunchers();
     applyLanguage();
     setupListeners();
-    loadGoldRates();  // ✅ أضف هذا السطر
+    loadGoldRates();
+    
+    // ✅ تسجيل هذا الـ fragment كمستقبل RFID
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
+    }
 }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        syncPendingEncodes();
+@Override
+public void onResume() {
+    super.onResume();
+    syncPendingEncodes();
+    // ✅ إعادة تسجيل كمستقبل RFID
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
     }
+}
+
+@Override
+public void onPause() {
+    super.onPause();
+    // ✅ إلغاء التسجيل
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(null);
+    }
+}
+
 
     // ==================== Photo Launchers ====================
 
@@ -317,6 +338,22 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
             }
             @Override public void afterTextChanged(Editable s) {}
         });
+        
+        // ==================== في setupListeners() - أضف هذا ====================
+
+// ✅ تفعيل أيقونة الكاميرا في حقل EPC لفتح ماسح الباركود
+if (binding.tilEpc != null) {
+    binding.tilEpc.setEndIconOnClickListener(v -> {
+        openBarcodeScannerForEPC();
+    });
+}
+
+// ✅ زر إضافي لتفعيل وضع RFID (إذا كان موجوداً في الواجهة)
+if (binding.btnScanRfid != null) {
+    binding.btnScanRfid.setOnClickListener(v -> {
+        activateRFIDModeForEncoding();
+    });
+}
 
         binding.switchHasStones.setOnCheckedChangeListener((buttonView, isChecked) -> {
             binding.layoutStonesDetails.setVisibility(isChecked ? View.VISIBLE : View.GONE);
@@ -342,6 +379,87 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
         binding.btnAddPhotos.setOnClickListener(v -> checkCameraPermissionAndTakePhoto());
         binding.btnSaveIdentity.setOnClickListener(v -> finalizeItemIdentity());
     }
+// ==================== دوال المسح للتكويد ====================
+
+/**
+ * 🟢 فتح ماسح الباركود لقراءة EPC
+ */
+private void openBarcodeScannerForEPC() {
+    if (!isAdded()) return;
+    
+    try {
+        MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
+        sf.setOnBarcodeScannedListener((data, format) -> {
+            // وضع الـ EPC المقروء في الحقل
+            if (binding.etEpc != null) {
+                binding.etEpc.setText(data);
+                binding.tvStatusBadge.setText("BOUND");
+            }
+            // الرجوع من الماسح
+            if (getParentFragmentManager().getBackStackEntryCount() > 0) {
+                getParentFragmentManager().popBackStack();
+            }
+        });
+        
+        View view = getView();
+        int cid = (view != null && view.getParent() instanceof View) ? 
+                ((View) view.getParent()).getId() : android.R.id.content;
+        getParentFragmentManager().beginTransaction()
+                .replace(cid, sf)
+                .addToBackStack("barcode_scanner_encode")
+                .commit();
+    } catch (Exception e) {
+        Log.e(TAG, "Barcode scanner error: " + e.getMessage());
+        showToast(isArabic ? "❌ خطأ في فتح الماسح" : "❌ Scanner error");
+    }
+}
+
+/**
+ * 🟢 تفعيل وضع RFID لاستقبال الشرائح الممسوحة
+ */
+private void activateRFIDModeForEncoding() {
+    if (getActivity() instanceof UHFMainActivity) {
+        UHFMainActivity activity = (UHFMainActivity) getActivity();
+        
+        // تسجيل هذا الـ fragment كمستقبل لمسح RFID
+        activity.setActiveRfidListener(epc -> {
+            if (binding.etEpc != null) {
+                binding.etEpc.setText(epc);
+                binding.tvStatusBadge.setText("BOUND");
+            }
+            if (activity != null) activity.playSound(1);
+        });
+        
+        // تفعيل وضع RFID
+        activity.startUHFScan();
+        
+        showToast(isArabic ? "📡 جاهز لمسح RFID - امسح الشريحة" : "📡 Ready for RFID scan");
+        
+        // إيقاف تلقائي بعد 30 ثانية
+        new Handler().postDelayed(() -> {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).stopUHFScan();
+                ((UHFMainActivity) getActivity()).setActiveRfidListener(null);
+            }
+        }, 30000);
+    } else {
+        showToast(isArabic ? "❌ القارئ غير متاح" : "❌ Reader not available");
+    }
+}
+
+/**
+ * 🟢 استقبال RFID (يُستدعى من UHFMainActivity)
+ */
+public void onRfidScanned(String epc) {
+    if (getActivity() == null) return;
+    getActivity().runOnUiThread(() -> {
+        binding.etEpc.setText(epc);
+        binding.tvStatusBadge.setText("BOUND");
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).playSound(1);
+        }
+    });
+}
 
     
     /**
@@ -354,14 +472,7 @@ private boolean isValidEPC(String epc) {
 
    
 
-    public void onRfidScanned(String epc) {
-        if (getActivity() == null) return;
-        getActivity().runOnUiThread(() -> {
-            binding.etEpc.setText(epc);
-            binding.tvStatusBadge.setText("BOUND");
-            if (getActivity() instanceof UHFMainActivity) ((UHFMainActivity) getActivity()).playSound(1);
-        });
-    }
+    
 
     private void populateSuggestions(String typeKey) {
         binding.chipGroupSuggestions.removeAllViews();
