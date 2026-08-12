@@ -37,6 +37,7 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTabHost;
 
+import com.example.uhf.tools.MiraLanguageHelper;
 import com.example.uhf.R;
 import com.example.uhf.fragment.JewelryDashboardFragment;
 import com.example.uhf.fragment.MiraAccountingFragment;
@@ -170,7 +171,9 @@ private void hideKeyboard(View view) {
     protected void onCreate(Bundle savedInstanceState) {
         try {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-            super.onCreate(savedInstanceState);
+               String savedLang = MiraLanguageHelper.getSavedLanguage(this);
+               MiraLanguageHelper.applyLanguage(this, savedLang);
+               super.onCreate(savedInstanceState);
 
             ToastUtil.init(getApplicationContext());
             initializeLanguageState();
