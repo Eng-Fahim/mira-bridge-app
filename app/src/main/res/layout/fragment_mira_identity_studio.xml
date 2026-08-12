@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorBackground">
+    android:background="?android:attr/colorBackground">
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
@@ -63,7 +63,7 @@
                             android:textStyle="bold" />
                     </LinearLayout>
 
-                    <!-- ✅ حقل EPC -->
+                    <!-- حقل EPC -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/tilEpc"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -136,7 +136,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/identity_ring"
-                        android:checkedIconVisible="true" />
+                        app:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chipSet"
@@ -144,7 +144,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/identity_set"
-                        android:checkedIconVisible="true" />
+                        app:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chipBracelet"
@@ -152,7 +152,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/identity_bracelet"
-                        android:checkedIconVisible="true" />
+                        app:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chipNecklace"
@@ -160,7 +160,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/identity_necklace"
-                        android:checkedIconVisible="true" />
+                        app:checkedIconVisible="true" />
                 </com.google.android.material.chip.ChipGroup>
 
                 <!-- حقل العنوان -->
@@ -239,7 +239,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/identity_yellow_gold"
                         android:checked="true"
-                        android:checkedIconVisible="true" />
+                        app:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chipWhiteGold"
@@ -247,7 +247,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/identity_white_gold"
-                        android:checkedIconVisible="true" />
+                        app:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chipRoseGold"
@@ -255,7 +255,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/identity_rose_gold"
-                        android:checkedIconVisible="true" />
+                        app:checkedIconVisible="true" />
                 </com.google.android.material.chip.ChipGroup>
 
                 <TextView
@@ -279,7 +279,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="24K"
-                        android:checkedIconVisible="true" />
+                        app:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chip21K"
@@ -288,7 +288,7 @@
                         android:layout_height="wrap_content"
                         android:text="21K"
                         android:checked="true"
-                        android:checkedIconVisible="true" />
+                        app:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chip18K"
@@ -296,7 +296,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="18K"
-                        android:checkedIconVisible="true" />
+                        app:checkedIconVisible="true" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chip14K"
@@ -304,7 +304,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="14K"
-                        android:checkedIconVisible="true" />
+                        app:checkedIconVisible="true" />
                 </com.google.android.material.chip.ChipGroup>
 
                 <!-- الوزن -->
