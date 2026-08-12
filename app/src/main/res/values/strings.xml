@@ -197,6 +197,41 @@
     <string name="title_other_devices">أجهزة أخرى</string>
     <string name="button_scan">مسح/بحث</string>
     <string name="title_activity_uhfmain">UHF</string>
+    
+    <-- التكويد -->
+   
+    <string name="identity_step_title">الخطوة 1 من 4: الربط والتصنيف</string>
+    <string name="identity_epc_hint">رمز الشريحة (EPC / GTIN)</string>
+    <string name="identity_scan_rfid">📡 مسح RFID تلقائي</string>
+    <string name="identity_category_title">تصنيف القطعة</string>
+    <string name="identity_ring">💍 خاتم</string>
+    <string name="identity_set">💎 طقم</string>
+    <string name="identity_bracelet">📿 سوار</string>
+    <string name="identity_necklace">📐 عقد</string>
+    <string name="identity_title_hint">عنوان ووصف القطعة</string>
+    <string name="identity_metal_specs">مواصفات المعدن والوزن</string>
+    <string name="identity_metal_type">معدن القطعة:</string>
+    <string name="identity_yellow_gold">🟡 ذهب أصفر</string>
+    <string name="identity_white_gold">⚪ ذهب أبيض</string>
+    <string name="identity_rose_gold">🔴 ذهب وردي</string>
+    <string name="identity_karat_label">العيار:</string>
+    <string name="identity_weight_label">الوزن القائم (جرام)</string>
+    <string name="identity_weight_hint">0.000</string>
+    <string name="identity_estimated_value">القيمة التقديرية للذهب:</string>
+    <string name="identity_stones_title">الأحجار والتطعيم</string>
+    <string name="identity_has_stones">هل القطعة مرصعة بأحجار / زركون؟</string>
+    <string name="identity_stone_type_hint">نوع الأحجار (مثال: ألماس، زركون)</string>
+    <string name="identity_stone_weight_hint">وزن الأحجار</string>
+    <string name="identity_stone_count_hint">عدد الأحجار</string>
+    <string name="identity_stone_value_hint">القيمة الإضافية للأحجار (ريال)</string>
+    <string name="identity_photos_title">صور القطعة والاعتماد النهائي</string>
+    <string name="identity_add_photos">📷 التقاط / إرفاق صور القطعة</string>
+    <string name="identity_no_photos">لم يتم إرفاق صور بعد</string>
+    <string name="identity_save_btn">اعتماد الموزون وتصدير MIRA ID</string>
+    <string name="identity_waiting">WAITING</string>
+    <string name="identity_default_value">0.00 ريال</string>
+
+    
 
     <!-- inventorytag -->
     <string name="tvInventoryName">جرد الشريحة</string>
