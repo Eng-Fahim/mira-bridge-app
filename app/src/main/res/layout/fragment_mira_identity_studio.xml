@@ -114,6 +114,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
+                app:checkedIconVisible="true"
+                app:checkedIconEnabled="true"
                 android:text="@string/ring" />
 
             <com.google.android.material.chip.Chip
@@ -121,6 +123,8 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                app:checkedIconVisible="true"
+                app:checkedIconEnabled="true"
                 android:text="@string/set" />
 
             <com.google.android.material.chip.Chip
@@ -128,6 +132,8 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                app:checkedIconVisible="true"
+                app:checkedIconEnabled="true"
                 android:text="@string/bracelet" />
 
             <com.google.android.material.chip.Chip
@@ -135,6 +141,8 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                app:checkedIconVisible="true"
+                app:checkedIconEnabled="true"
                 android:text="@string/necklace" />
         </com.google.android.material.chip.ChipGroup>
 
@@ -199,14 +207,18 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/yellow_gold"
-                android:checked="true" />
+                android:checked="true"
+                app:checkedIconVisible="true"
+                app:checkedIconEnabled="true"
+                android:text="@string/yellow_gold" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipWhiteGold"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                app:checkedIconVisible="true"
+                app:checkedIconEnabled="true"
                 android:text="@string/white_gold" />
 
             <com.google.android.material.chip.Chip
@@ -214,6 +226,8 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                app:checkedIconVisible="true"
+                app:checkedIconEnabled="true"
                 android:text="@string/rose_gold" />
         </com.google.android.material.chip.ChipGroup>
 
@@ -239,6 +253,8 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                app:checkedIconVisible="true"
+                app:checkedIconEnabled="true"
                 android:text="24K" />
 
             <com.google.android.material.chip.Chip
@@ -246,14 +262,18 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="21K"
-                android:checked="true" />
+                android:checked="true"
+                app:checkedIconVisible="true"
+                app:checkedIconEnabled="true"
+                android:text="21K" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chip18K"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                app:checkedIconVisible="true"
+                app:checkedIconEnabled="true"
                 android:text="18K" />
 
             <com.google.android.material.chip.Chip
@@ -261,6 +281,8 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                app:checkedIconVisible="true"
+                app:checkedIconEnabled="true"
                 android:text="14K" />
         </com.google.android.material.chip.ChipGroup>
 
