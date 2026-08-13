@@ -82,7 +82,6 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     private TextView tvConnectionType, tvConnectionDetails;
     private LinearLayout layoutExportButtons;
     
-    
     // إعدادات زمنية
     private static final long DEFAULT_INACTIVITY_TIMEOUT_MS = 180000;
     private static final long UI_UPDATE_INTERVAL_MS = 300;
@@ -111,7 +110,6 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     private TextView tabFilterAll, tabFilterFound, tabFilterMissing, tabFilterUnexpected;
     private RecyclerView rvRecentTags;
     private boolean isZoneSpinnerInitialized = false;
-    
 
     // RFID Manager
     private RFIDManager rfidManager;
@@ -147,13 +145,13 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     }
     
     private void showToast(String msg) {
-    try {
-        if (getContext() != null && isAdded()) {
-            Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+        try {
+            if (getContext() != null && isAdded()) {
+                Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "showToast error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.e(TAG, "showToast error: " + e.getMessage());
-    }
     }
 
     private InventoryState currentState = InventoryState.IDLE;
@@ -264,7 +262,6 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
             
             vibrator = (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
 
-            // تهيئة RFID Manager
             rfidManager = RFIDManager.getInstance(ctx);
             rfidManager.setListener(new MiraIRFIDReader.OnTagReadListener() {
                 @Override
@@ -321,17 +318,6 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
             }
         } else {
             activeConnectionType = ConnectionType.SIMULATOR;
-        }
-    }
-
-    private boolean isChainwayC72Device() {
-        try {
-            String model = Build.MODEL;
-            String manufacturer = Build.MANUFACTURER;
-            return (model != null && model.toUpperCase().contains("C72")) ||
-                   (manufacturer != null && manufacturer.toUpperCase().contains("CHAINWAY"));
-        } catch (Exception e) {
-            return false;
         }
     }
 
@@ -468,43 +454,42 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
         });
     }
     
-private void setupZoneSpinner() {
-    List<String> zones = new ArrayList<>();
-    zones.add(isArabic ? "الكل" : "All");
-    zones.add(isArabic ? "خواتم" : "Rings");
-    zones.add(isArabic ? "أساور" : "Bracelets");
-    zones.add(isArabic ? "أطقم" : "Sets");
-    zones.add(isArabic ? "عقود" : "Necklaces");
-    zones.add(isArabic ? "سلاسل" : "Chains");
-    zones.add(isArabic ? "أقراط" : "Earrings");
-    zones.add(isArabic ? "مشغولات أخرى" : "Other Jewelry");
+    private void setupZoneSpinner() {
+        List<String> zones = new ArrayList<>();
+        zones.add(isArabic ? "الكل" : "All");
+        zones.add(isArabic ? "خواتم" : "Rings");
+        zones.add(isArabic ? "أساور" : "Bracelets");
+        zones.add(isArabic ? "أطقم" : "Sets");
+        zones.add(isArabic ? "عقود" : "Necklaces");
+        zones.add(isArabic ? "سلاسل" : "Chains");
+        zones.add(isArabic ? "أقراط" : "Earrings");
+        zones.add(isArabic ? "مشغولات أخرى" : "Other Jewelry");
 
-    ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), 
-            android.R.layout.simple_spinner_item, zones);
-    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-    spinnerZone.setAdapter(adapter);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), 
+                android.R.layout.simple_spinner_item, zones);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerZone.setAdapter(adapter);
 
-    spinnerZone.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-        @Override
-        public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-            // ✅ تجاهل أول استدعاء تلقائي
-            if (!isZoneSpinnerInitialized) {
-                isZoneSpinnerInitialized = true;
-                return;
+        spinnerZone.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (!isZoneSpinnerInitialized) {
+                    isZoneSpinnerInitialized = true;
+                    return;
+                }
+                
+                selectedZone = zones.get(position);
+                
+                if (currentState == InventoryState.IDLE || currentState == InventoryState.COMPLETED) {
+                    loadExpectedInventory();
+                }
             }
             
-            selectedZone = zones.get(position);
-            
-            // ✅ تأكد من أن الحالة مناسبة
-            if (currentState == InventoryState.IDLE || currentState == InventoryState.COMPLETED) {
-                loadExpectedInventory();
-            }
-        }
-        
-        @Override
-        public void onNothingSelected(AdapterView<?> parent) {}
-    });
-}
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+    }
+
     private void setInventoryState(InventoryState newState) {
         this.currentState = newState;
 
@@ -610,6 +595,13 @@ private void setupZoneSpinner() {
         if (bluetoothAdapter == null) {
             Toast.makeText(getContext(), "الجهاز لا يدعم البلوتوث", Toast.LENGTH_SHORT).show();
             return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 1001);
+                return;
+            }
         }
 
         Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
@@ -894,110 +886,101 @@ private void setupZoneSpinner() {
         });
     }
 
-private void loadExpectedInventory() {
-    setInventoryState(InventoryState.LOADING);
-    
-    networkExecutor.execute(() -> {
-        try {
-            MiraApiClient api = MiraApiClient.getInstance(requireContext());
-            
-            int branchId = 1;
+    private void loadExpectedInventory() {
+        setInventoryState(InventoryState.LOADING);
+        
+        networkExecutor.execute(() -> {
             try {
-                com.example.uhf.manager.MiraBranchesManager bm = 
-                    com.example.uhf.manager.MiraBranchesManager.getInstance(requireContext());
-                branchId = bm.getActiveBranchId();
-            } catch (Exception ignored) {}
-            
-            // ✅ استخدم دالة واحدة فقط
-            String categoryFilter = null;
-            if (!selectedZone.equals("الكل") && !selectedZone.equals("All")) {
-                categoryFilter = getEnglishCategory(selectedZone);
-            }
-            
-            MiraApiClient.ApiResponse response;
-            if (categoryFilter != null) {
-                // ✅ إذا تم تحديد نوع معين - استخدم الدالة الجديدة
-                response = api.getBranchItemsByCategory(branchId, categoryFilter);
-            } else {
-                // ✅ إذا "الكل" - استخدم الدالة الأصلية
-                response = api.getBranchItemsList(branchId);
-            }
-            
-            expectedItemsMap.clear();
+                MiraApiClient api = MiraApiClient.getInstance(requireContext());
+                
+                int branchId = 1;
+                try {
+                    com.example.uhf.manager.MiraBranchesManager bm = 
+                        com.example.uhf.manager.MiraBranchesManager.getInstance(requireContext());
+                    branchId = bm.getActiveBranchId();
+                } catch (Exception ignored) {}
+                
+                String categoryFilter = null;
+                if (!selectedZone.equals("الكل") && !selectedZone.equals("All")) {
+                    categoryFilter = getEnglishCategory(selectedZone);
+                }
+                
+                MiraApiClient.ApiResponse response;
+                if (categoryFilter != null) {
+                    response = api.getBranchItemsByCategory(branchId, categoryFilter);
+                } else {
+                    response = api.getBranchItemsList(branchId);
+                }
+                
+                expectedItemsMap.clear();
 
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONArray items = response.data.optJSONArray("items");
-                if (items != null) {
-                    for (int i = 0; i < items.length(); i++) {
-                        JSONObject obj = items.getJSONObject(i);
-                        String epc = obj.optString("serial_number", 
-                                obj.optString("gtin13", obj.optString("epc", "")));
-                        
-                        if (!epc.isEmpty()) {
-                            ExpectedItem item = new ExpectedItem(
-                                    epc,
-                                    obj.optString("item_title", obj.optString("title", "قطعة غير معنونة")),
-                                    obj.optString("gold_karat", obj.optString("karat", "21k")),
-                                    obj.optDouble("gross_weight_grams", obj.optDouble("weight", 0.0)),
-                                    "SOLD".equalsIgnoreCase(obj.optString("status", ""))
-                            );
-                            expectedItemsMap.put(epc, item);
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONArray items = response.data.optJSONArray("items");
+                    if (items != null) {
+                        for (int i = 0; i < items.length(); i++) {
+                            JSONObject obj = items.getJSONObject(i);
+                            String epc = obj.optString("serial_number", 
+                                    obj.optString("gtin13", obj.optString("epc", "")));
+                            
+                            if (!epc.isEmpty()) {
+                                ExpectedItem item = new ExpectedItem(
+                                        epc,
+                                        obj.optString("item_title", obj.optString("title", "قطعة غير معنونة")),
+                                        obj.optString("gold_karat", obj.optString("karat", "21k")),
+                                        obj.optDouble("gross_weight_grams", obj.optDouble("weight", 0.0)),
+                                        "SOLD".equalsIgnoreCase(obj.optString("status", ""))
+                                );
+                                expectedItemsMap.put(epc, item);
+                            }
                         }
                     }
                 }
+
+                if (expectedItemsMap.isEmpty()) {
+                    loadDemoData();
+                }
+
+                mainHandler.post(() -> {
+                    isMissingCacheDirty = true;
+                    updateReconciliationStats();
+                    setInventoryState(InventoryState.IDLE);
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "فشل جلب قائمة القطع المتوقعة: " + e.getMessage());
+                mainHandler.post(() -> {
+                    loadDemoData();
+                    isMissingCacheDirty = true;
+                    updateReconciliationStats();
+                    setInventoryState(InventoryState.IDLE);
+                });
             }
+        });
+    }
 
-            if (expectedItemsMap.isEmpty()) {
-                loadDemoData();
-            }
-
-            mainHandler.post(() -> {
-                isMissingCacheDirty = true;
-                updateReconciliationStats();
-                setInventoryState(InventoryState.IDLE);
-            });
-
-        } catch (Exception e) {
-            Log.e(TAG, "فشل جلب قائمة القطع المتوقعة: " + e.getMessage());
-            mainHandler.post(() -> {
-                loadDemoData();
-                isMissingCacheDirty = true;
-                updateReconciliationStats();
-                setInventoryState(InventoryState.IDLE);
-            });
+    private String getEnglishCategory(String arabicName) {
+        switch (arabicName) {
+            case "خواتم": return "Rings";
+            case "أساور": return "Bracelets";
+            case "أطقم": return "Sets";
+            case "عقود": return "Necklaces";
+            case "سلاسل": return "Chains";
+            case "أقراط": return "Earrings";
+            default: return arabicName;
         }
-    });
-}
-
-/**
- * تحويل اسم النوع من العربية إلى الإنجليزية للبحث في API
- */
-private String getEnglishCategory(String arabicName) {
-    switch (arabicName) {
-        case "خواتم": return "Rings";
-        case "أساور": return "Bracelets";
-        case "أطقم": return "Sets";
-        case "عقود": return "Necklaces";
-        case "سلاسل": return "Chains";
-        case "أقراط": return "Earrings";
-        default: return arabicName;
     }
-}
 
-/**
- * تحويل اسم النوع من الإنجليزية إلى العربية للبحث في API
- */
-private String getArabicCategory(String englishName) {
-    switch (englishName) {
-        case "Rings": return "خواتم";
-        case "Bracelets": return "أساور";
-        case "Sets": return "أطقم";
-        case "Necklaces": return "عقود";
-        case "Chains": return "سلاسل";
-        case "Earrings": return "أقراط";
-        default: return englishName;
+    private String getArabicCategory(String englishName) {
+        switch (englishName) {
+            case "Rings": return "خواتم";
+            case "Bracelets": return "أساور";
+            case "Sets": return "أطقم";
+            case "Necklaces": return "عقود";
+            case "Chains": return "سلاسل";
+            case "Earrings": return "أقراط";
+            default: return englishName;
+        }
     }
-}
 
     private void loadDemoData() {
         for (int i = 1; i <= 15; i++) {
@@ -1264,33 +1247,54 @@ private String getArabicCategory(String englishName) {
         }
     }
 
+    /**
+     * ✅ تم التعديل: تجنب إضافة نفس الـ EPC مراراً في القائمة
+     */
     private void processSingleTag(TagModel model) {
-        ExpectedItem expected = expectedItemsMap.get(model.epc);
-        
-        if (expected != null) {
-            model.title = expected.title;
-            model.karat = expected.karat;
-            model.weight = expected.weight;
-
-            if (expected.isSold) {
-                model.status = "SOLD_WARNING";
-                triggerSoldAlert(expected.title, model.epc);
-                playAlertSound();
-            } else {
-                model.status = "FOUND";
-                playSuccessSound();
+        // 1. تحقق مما إذا كان EPC موجوداً مسبقاً في القائمة
+        boolean alreadyExists = false;
+        for (TagModel existingTag : tagList) {
+            if (existingTag.epc.equalsIgnoreCase(model.epc)) {
+                // تحديث قوة الإشارة وعدد القراءات فقط
+                existingTag.rssi = model.rssi;
+                existingTag.readCount++;
+                alreadyExists = true;
+                break;
             }
-        } else {
-            model.title = "قطعة غير مسجلة بالفرع";
-            model.karat = "—";
-            model.weight = 0.0;
-            model.status = "UNEXPECTED";
-            playWarningSound();
         }
 
-        tagList.add(0, model);
+        // 2. إذا لم يكن موجوداً، أضفه للقائمة وحدث الإحصائيات
+        if (!alreadyExists) {
+            ExpectedItem expected = expectedItemsMap.get(model.epc);
+            
+            if (expected != null) {
+                model.title = expected.title;
+                model.karat = expected.karat;
+                model.weight = expected.weight;
+
+                if (expected.isSold) {
+                    model.status = "SOLD_WARNING";
+                    triggerSoldAlert(expected.title, model.epc);
+                    playAlertSound();
+                } else {
+                    model.status = "FOUND";
+                    playSuccessSound();
+                }
+            } else {
+                model.title = "قطعة غير مسجلة بالفرع";
+                model.karat = "—";
+                model.weight = 0.0;
+                model.status = "UNEXPECTED";
+                playWarningSound();
+            }
+
+            model.readCount = 1;
+            tagList.add(0, model);
+            isMissingCacheDirty = true;
+        }
+
+        // 3. تحديث بطاقة آخر وسم مقروء دائماً
         updateLastTagCard(model);
-        isMissingCacheDirty = true;
     }
 
     private void checkInventoryCompletion() {
@@ -1429,6 +1433,7 @@ private String getArabicCategory(String englishName) {
                 missingItem.weight = entry.getValue().weight;
                 missingItem.status = "MISSING";
                 missingItem.rssi = 0;
+                missingItem.readCount = 0;
                 missingItemsCache.add(missingItem);
             }
         }
@@ -1512,100 +1517,96 @@ private String getArabicCategory(String englishName) {
     }
 
     private void uploadAuditToCloud() {
-    networkExecutor.execute(() -> {
-        try {
-            // ✅ حساب الإحصائيات
-            int found = 0;
-            int unexpected = 0;
-            int soldCount = 0;
-            for (ExpectedItem item : expectedItemsMap.values()) {
-                if (item.isSold) soldCount++;
-            }
-            for (String epc : scannedEpcSet) {
-                ExpectedItem item = expectedItemsMap.get(epc);
-                if (item != null) {
-                    if (!item.isSold) found++;
-                } else {
-                    unexpected++;
-                }
-            }
-            int missing = Math.max(0, expectedItemsMap.size() - soldCount - found);
-            
-            // ✅ جلب branch_id الفعلي
-            int branchId = 1;
+        networkExecutor.execute(() -> {
             try {
-                com.example.uhf.manager.MiraBranchesManager bm = 
-                    com.example.uhf.manager.MiraBranchesManager.getInstance(requireContext());
-                branchId = bm.getActiveBranchId();
-            } catch (Exception ignored) {}
-            
-            // ✅ بناء payload
-            JSONObject payload = new JSONObject();
-            payload.put("session_id", sessionId);
-            payload.put("zone", selectedZone);
-            payload.put("total_scanned", totalScannedCount);
-            payload.put("unique_count", scannedEpcSet.size());
-            payload.put("expected_count", expectedItemsMap.size());
-            payload.put("found_count", found);
-            payload.put("missing_count", missing);
-            payload.put("unexpected_count", unexpected);
-            payload.put("connection_type", activeConnectionType.name());
-            payload.put("branch_id", branchId);
-
-            // ✅ إرسال قائمة EPCs المقروءة
-            JSONArray scannedArray = new JSONArray();
-            for (String epc : scannedEpcSet) {
-                scannedArray.put(epc);
-            }
-            payload.put("scanned_epcs", scannedArray);
-
-            Log.e(TAG, "══════════ CLOSE INVENTORY ══════════");
-            Log.e(TAG, "Branch ID: " + branchId);
-            Log.e(TAG, "Zone: " + selectedZone);
-            Log.e(TAG, "Expected: " + expectedItemsMap.size());
-            Log.e(TAG, "Found: " + found);
-            Log.e(TAG, "Missing: " + missing);
-            Log.e(TAG, "Unexpected: " + unexpected);
-            Log.e(TAG, "Payload: " + payload.toString());
-
-            MiraApiClient api = MiraApiClient.getInstance(requireContext());
-            MiraApiClient.ApiResponse res = api.closeInventorySession(payload);
-
-            Log.e(TAG, "Response Code: " + (res != null ? res.code : "NULL"));
-            Log.e(TAG, "Response Success: " + (res != null ? res.isSuccess : "NULL"));
-            Log.e(TAG, "Response Data: " + (res != null && res.data != null ? res.data.toString() : "NULL"));
-
-            final JSONObject reportData = (res != null && res.data != null) ? res.data : null;
-            final int finalBranchId = branchId;
-            
-            mainHandler.post(() -> {
-                if (res != null && res.isSuccess) {
-                    setInventoryState(InventoryState.FINALIZED);
-                    
-                    // ✅ عرض التقرير
-                    if (reportData != null) {
-                        showAuditResultDialog(reportData);
-                    } else {
-                        showToast("✅ تم اعتماد الجرد بنجاح - الفرع: " + finalBranchId);
-                    }
-                } else {
-                    String errorMsg = "❌ فشل رفع الجرد";
-                    if (res != null && res.data != null) {
-                        errorMsg = res.data.optString("message", errorMsg);
-                    }
-                    if (res != null && res.error != null) {
-                        errorMsg += "\n" + res.error;
-                    }
-                    showErrorDialog(errorMsg);
+                int found = 0;
+                int unexpected = 0;
+                int soldCount = 0;
+                for (ExpectedItem item : expectedItemsMap.values()) {
+                    if (item.isSold) soldCount++;
                 }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Upload error: " + e.getMessage());
-            e.printStackTrace();
-            mainHandler.post(() -> showErrorDialog("❌ خطأ: " + e.getMessage()));
-        }
-    });
-}
+                for (String epc : scannedEpcSet) {
+                    ExpectedItem item = expectedItemsMap.get(epc);
+                    if (item != null) {
+                        if (!item.isSold) found++;
+                    } else {
+                        unexpected++;
+                    }
+                }
+                int missing = Math.max(0, expectedItemsMap.size() - soldCount - found);
+                
+                int branchId = 1;
+                try {
+                    com.example.uhf.manager.MiraBranchesManager bm = 
+                        com.example.uhf.manager.MiraBranchesManager.getInstance(requireContext());
+                    branchId = bm.getActiveBranchId();
+                } catch (Exception ignored) {}
+                
+                JSONObject payload = new JSONObject();
+                payload.put("session_id", sessionId);
+                payload.put("zone", selectedZone);
+                payload.put("total_scanned", totalScannedCount);
+                payload.put("unique_count", scannedEpcSet.size());
+                payload.put("expected_count", expectedItemsMap.size());
+                payload.put("found_count", found);
+                payload.put("missing_count", missing);
+                payload.put("unexpected_count", unexpected);
+                payload.put("connection_type", activeConnectionType.name());
+                payload.put("branch_id", branchId);
+
+                JSONArray scannedArray = new JSONArray();
+                for (String epc : scannedEpcSet) {
+                    scannedArray.put(epc);
+                }
+                payload.put("scanned_epcs", scannedArray);
+
+                Log.e(TAG, "══════════ CLOSE INVENTORY ══════════");
+                Log.e(TAG, "Branch ID: " + branchId);
+                Log.e(TAG, "Zone: " + selectedZone);
+                Log.e(TAG, "Expected: " + expectedItemsMap.size());
+                Log.e(TAG, "Found: " + found);
+                Log.e(TAG, "Missing: " + missing);
+                Log.e(TAG, "Unexpected: " + unexpected);
+                Log.e(TAG, "Payload: " + payload.toString());
+
+                MiraApiClient api = MiraApiClient.getInstance(requireContext());
+                MiraApiClient.ApiResponse res = api.closeInventorySession(payload);
+
+                Log.e(TAG, "Response Code: " + (res != null ? res.code : "NULL"));
+                Log.e(TAG, "Response Success: " + (res != null ? res.isSuccess : "NULL"));
+                Log.e(TAG, "Response Data: " + (res != null && res.data != null ? res.data.toString() : "NULL"));
+
+                final JSONObject reportData = (res != null && res.data != null) ? res.data : null;
+                final int finalBranchId = branchId;
+                
+                mainHandler.post(() -> {
+                    if (res != null && res.isSuccess) {
+                        setInventoryState(InventoryState.FINALIZED);
+                        
+                        if (reportData != null) {
+                            showAuditResultDialog(reportData);
+                        } else {
+                            showToast("✅ تم اعتماد الجرد بنجاح - الفرع: " + finalBranchId);
+                        }
+                    } else {
+                        String errorMsg = "❌ فشل رفع الجرد";
+                        if (res != null && res.data != null) {
+                            errorMsg = res.data.optString("message", errorMsg);
+                        }
+                        if (res != null && res.error != null) {
+                            errorMsg += "\n" + res.error;
+                        }
+                        showErrorDialog(errorMsg);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Upload error: " + e.getMessage());
+                e.printStackTrace();
+                mainHandler.post(() -> showErrorDialog("❌ خطأ: " + e.getMessage()));
+            }
+        });
+    }
+
     private void showAuditResultDialog(JSONObject data) {
         try {
             JSONObject report = data.optJSONObject("report");
@@ -1686,7 +1687,7 @@ private String getArabicCategory(String englishName) {
         networkExecutor.execute(() -> {
             try {
                 StringBuilder csv = new StringBuilder();
-                csv.append("EPC,Title,Karat,Weight,Status,Timestamp\n");
+                csv.append("EPC,Title,Karat,Weight,Status,ReadCount,Timestamp\n");
 
                 for (TagModel tag : tagList) {
                     csv.append(tag.epc).append(",")
@@ -1694,6 +1695,7 @@ private String getArabicCategory(String englishName) {
                        .append(tag.karat != null ? tag.karat : "").append(",")
                        .append(String.format(Locale.US, "%.2f", tag.weight)).append(",")
                        .append(tag.status != null ? tag.status : "").append(",")
+                       .append(tag.readCount).append(",")
                        .append(new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date()))
                        .append("\n");
                 }
@@ -1750,7 +1752,7 @@ private String getArabicCategory(String englishName) {
                 .append(" | العجز: ").append(tvMissingCount.getText())
                 .append(" | الزائد: ").append(tvUnexpectedCount.getText()).append("</p>")
                 .append("</div>")
-                .append("<table><tr><th>#</th><th>EPC</th><th>البيان</th><th>العيار</th><th>الوزن</th><th>الحالة</th></tr>");
+                .append("<table><tr><th>#</th><th>EPC</th><th>البيان</th><th>العيار</th><th>الوزن</th><th>مرات القراءة</th><th>الحالة</th></tr>");
 
             int index = 1;
             for (TagModel tag : tagList) {
@@ -1764,6 +1766,7 @@ private String getArabicCategory(String englishName) {
                     .append("<td>").append(tag.title != null ? tag.title : "—").append("</td>")
                     .append("<td>").append(tag.karat != null ? tag.karat : "—").append("</td>")
                     .append("<td>").append(String.format(Locale.US, "%.2f جرام", tag.weight)).append("</td>")
+                    .append("<td>").append(tag.readCount).append("</td>")
                     .append("<td class='").append(cssClass).append("'>").append(tag.status).append("</td>")
                     .append("</tr>");
             }
@@ -1914,6 +1917,7 @@ private String getArabicCategory(String englishName) {
     private static class TagModel {
         String epc, title, karat, status;
         double weight, rssi;
+        int readCount = 0; // ✅ جديد: عدد مرات القراءة
     }
 
     private class TagAdapter extends RecyclerView.Adapter<TagAdapter.ViewHolder> {
@@ -1937,7 +1941,7 @@ private String getArabicCategory(String englishName) {
             
             holder.tvEpc.setText(item.epc);
             holder.tvTitle.setText(item.title != null ? item.title : "جاري التحميل...");
-            holder.tvRssi.setText(String.format(Locale.US, "%.0f dBm", item.rssi));
+            holder.tvRssi.setText(String.format(Locale.US, "%.0f dBm (×%d)", item.rssi, item.readCount));
 
             switch (item.status) {
                 case "FOUND":
@@ -1976,4 +1980,4 @@ private String getArabicCategory(String englishName) {
             }
         }
     }
-        }
+}
