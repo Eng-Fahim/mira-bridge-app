@@ -1976,4 +1976,4 @@ private String getArabicCategory(String englishName) {
             }
         }
     }
-                    }
+        }
