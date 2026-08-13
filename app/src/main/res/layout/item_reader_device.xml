@@ -1,145 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/cardDevice"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="?android:attr/colorBackground"
-    android:orientation="vertical">
+    android:layout_height="wrap_content"
+    android:layout_margin="4dp"
+    app:cardBackgroundColor="?attr/colorSurface"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp"
+    app:strokeColor="?attr/colorOutline"
+    app:strokeWidth="1dp">
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="16dp"
-        android:text="🔌 إعدادات قارئ RFID"
-        android:textColor="?attr/colorOnBackground"
-        android:textSize="18sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:id="@+id/tvActiveDeviceStatus"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingHorizontal="16dp"
-        android:paddingBottom="8dp"
-        android:text="لا يوجد جهاز نشط"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="12sp" />
-
-    <!-- الصف الأول: اكتشاف وإضافة -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="8dp">
+        android:orientation="vertical"
+        android:padding="12dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnDetectAuto"
-            android:layout_width="0dp"
-            android:layout_height="46dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:text="🔍 اكتشاف تلقائي"
-            android:textColor="?attr/colorOnPrimary"
-            app:backgroundTint="?attr/colorPrimary"
-            app:cornerRadius="8dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnAddReader"
-            android:layout_width="0dp"
-            android:layout_height="46dp"
-            android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:text="➕ إضافة"
-            android:textColor="?attr/colorOnPrimary"
-            app:backgroundTint="?attr/colorPrimary"
-            app:cornerRadius="8dp" />
-    </LinearLayout>
+            <TextView
+                android:id="@+id/tvDeviceName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Chainway C72"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="14sp"
+                android:textStyle="bold" />
 
-    <!-- الصف الثاني: اختبار وبحث بلوتوث -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingBottom="8dp">
+            <TextView
+                android:id="@+id/tvDefaultBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="?attr/colorPrimaryContainer"
+                android:text="✓ افتراضي"
+                android:textColor="?attr/colorOnPrimaryContainer"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp"
+                android:textSize="10sp"
+                android:visibility="gone" />
+        </LinearLayout>
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnTestConnection"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:text="📡 اختبار اتصال"
-            android:textColor="?attr/colorPrimary"
-            app:strokeColor="?attr/colorPrimary"
-            app:cornerRadius="8dp" />
+        <TextView
+            android:id="@+id/tvDeviceType"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="قارئ مدمج"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="11sp" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnBluetoothScan"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:text="🔗 بحث بلوتوث"
-            android:textColor="?attr/colorPrimary"
-            app:strokeColor="?attr/colorPrimary"
-            app:cornerRadius="8dp" />
-    </LinearLayout>
-
-    <!-- الصف الثالث: الصوت والاهتزاز -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingBottom="8dp">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnSoundToggle"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:text="🔊 الصوت: مفعل"
+        <TextView
+            android:id="@+id/tvDevicePower"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="28 dBm"
             android:textColor="?attr/colorPrimary"
             android:textSize="11sp"
-            app:strokeColor="?attr/colorPrimary"
-            app:cornerRadius="8dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnVibrationToggle"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:text="📳 الاهتزاز: مفعل"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="11sp"
-            app:strokeColor="?attr/colorPrimary"
-            app:cornerRadius="8dp" />
+            android:textStyle="bold" />
     </LinearLayout>
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="4dp"
-        android:text="الأجهزة المحفوظة"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="12sp"
-        android:textStyle="bold" />
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvReaderDevices"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:paddingHorizontal="8dp" />
-
-</LinearLayout>
+</com.google.android.material.card.MaterialCardView>
