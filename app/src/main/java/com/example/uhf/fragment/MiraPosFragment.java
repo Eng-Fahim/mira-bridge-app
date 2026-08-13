@@ -5,9 +5,11 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -18,6 +20,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -56,9 +59,10 @@ public class MiraPosFragment extends MiraBaseFragment {
     private double makingChargePerGram = 10.0;
     private double profitMarginPercent = 90.0;
 
-    // RFID Manager
+    // RFID Manager & Locks
     private RFIDManager rfidManager;
     private boolean isRFIDScanActive = false;
+    private final Set<String> pendingEpcs = new HashSet<>(); // منع الطلبات المكررة أثناء المعالجة
 
     // UI Elements
     private TextView tvScaleStatus, tvItemCount, tvTotalAmount, tvCartStatus;
@@ -66,6 +70,7 @@ public class MiraPosFragment extends MiraBaseFragment {
     private Button btnAddManual, btnCheckout, btnClearCart;
     private Button btnOpenScanner, btnPosRFIDMode;
     private RecyclerView rvCartItems;
+    private View layoutCartEmptyState;
 
     private boolean isRFIDModeActive = false;
     private boolean isArabic;
@@ -111,7 +116,7 @@ public class MiraPosFragment extends MiraBaseFragment {
         branchesManager = MiraBranchesManager.getInstance(ctx);
         isArabic = Locale.getDefault().getLanguage().equals("ar");
 
-        // ✅ تهيئة RFID Manager
+        // ✅ تهيئة RFID Manager مع الاستجابة لحالة الاتصال
         rfidManager = RFIDManager.getInstance(ctx);
         rfidManager.setListener(new MiraIRFIDReader.OnTagReadListener() {
             @Override
@@ -130,7 +135,11 @@ public class MiraPosFragment extends MiraBaseFragment {
             }
             @Override
             public void onConnectionChanged(boolean connected) {
-                Log.i(TAG, "RFID Connection: " + connected);
+                safeRun(() -> {
+                    if (btnPosRFIDMode != null && isRFIDModeActive) {
+                        btnPosRFIDMode.setAlpha(connected ? 1.0f : 0.5f);
+                    }
+                });
             }
             @Override
             public void onError(String error) {
@@ -154,9 +163,8 @@ public class MiraPosFragment extends MiraBaseFragment {
         if (getActivity() instanceof UHFMainActivity)
             ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
 
-        if (tvCartStatus != null) {
-            tvCartStatus.setText(isArabic ? "جاهز لمسح القطع..." : "Ready to scan items...");
-            tvCartStatus.setTextColor(Color.parseColor("#94A3B8"));
+        if (tvCartStatus != null && cartList.isEmpty()) {
+            tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan items...");
         }
 
         syncPendingSales();
@@ -211,7 +219,7 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    // ==================== 🟢 جلب أسعار الذهب ====================
+    // ==================== جلب أسعار الذهب ====================
 
     private void loadGoldRates() {
         new Thread(() -> {
@@ -257,17 +265,18 @@ public class MiraPosFragment extends MiraBaseFragment {
         btnOpenScanner = view.findViewById(R.id.btnOpenScanner);
         btnPosRFIDMode = view.findViewById(R.id.btnPosRFIDMode);
         rvCartItems = view.findViewById(R.id.rvPosCartItems);
+        layoutCartEmptyState = view.findViewById(R.id.layoutCartEmptyState);
         applyLanguage();
     }
 
     private void applyLanguage() {
         if (isArabic) {
-            if (etManualEpc != null) etManualEpc.setHint("أدخل كود EPC أو الباركود يدوياً...");
-            if (btnCheckout != null) btnCheckout.setText("إتمام البيع");
-            if (btnClearCart != null) btnClearCart.setText("تفريغ");
-            if (btnOpenScanner != null) btnOpenScanner.setText("📷 مسح GS1");
-            if (btnPosRFIDMode != null && !isRFIDModeActive) btnPosRFIDMode.setText("📡 مسح RFID");
-            if (btnAddManual != null) btnAddManual.setText("إضافة");
+            if (etManualEpc != null) etManualEpc.setHint(R.string.pos_manual_hint);
+            if (btnCheckout != null) btnCheckout.setText(R.string.pos_checkout);
+            if (btnClearCart != null) btnClearCart.setText(R.string.pos_clear);
+            if (btnOpenScanner != null) btnOpenScanner.setText(R.string.pos_scan_gs1);
+            if (btnPosRFIDMode != null && !isRFIDModeActive) btnPosRFIDMode.setText(R.string.pos_scan_rfid);
+            if (btnAddManual != null) btnAddManual.setText(R.string.pos_add);
         } else {
             if (etManualEpc != null) etManualEpc.setHint("Enter EPC or barcode manually...");
             if (btnCheckout != null) btnCheckout.setText("Checkout");
@@ -287,17 +296,20 @@ public class MiraPosFragment extends MiraBaseFragment {
     }
 
     private void setupListeners() {
-        if (btnAddManual != null) {
-            btnAddManual.setOnClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                String epc = etManualEpc != null ? etManualEpc.getText().toString().trim() : "";
-                if (!epc.isEmpty()) {
-                    processRingEpc(epc, "manual");
-                    if (etManualEpc != null) etManualEpc.setText("");
-                } else {
-                    showToast(isArabic ? "أدخل EPC أو باركود" : "Enter EPC or barcode");
+        // ✅ إضافة دعم زر Enter لمسح قارئ الباركود السلكي
+        if (etManualEpc != null) {
+            etManualEpc.setOnEditorActionListener((v, actionId, event) -> {
+                if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_SEARCH
+                        || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_DOWN)) {
+                    submitManualEpc();
+                    return true;
                 }
+                return false;
             });
+        }
+
+        if (btnAddManual != null) {
+            btnAddManual.setOnClickListener(v -> submitManualEpc());
         }
         if (btnClearCart != null) {
             btnClearCart.setOnClickListener(v -> {
@@ -325,6 +337,17 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
+    private void submitManualEpc() {
+        UIHelper.hideKeyboard(getActivity());
+        String epc = etManualEpc != null ? etManualEpc.getText().toString().trim() : "";
+        if (!epc.isEmpty()) {
+            processRingEpc(epc, "manual");
+            if (etManualEpc != null) etManualEpc.setText("");
+        } else {
+            showToast(isArabic ? "أدخل EPC أو باركود" : "Enter EPC or barcode");
+        }
+    }
+
     // ==================== الميزان الذكي ====================
 
     private void initSmartScale() {
@@ -336,7 +359,6 @@ public class MiraPosFragment extends MiraBaseFragment {
                 safeRun(() -> {
                     if (tvScaleStatus != null) {
                         tvScaleStatus.setText(String.format(Locale.US, "⚖️ %.2fg", w));
-                        tvScaleStatus.setTextColor(Color.parseColor("#4ADE80"));
                     }
                 });
             }
@@ -345,7 +367,6 @@ public class MiraPosFragment extends MiraBaseFragment {
                 safeRun(() -> {
                     if (tvScaleStatus != null) {
                         tvScaleStatus.setText("⚖️ " + n);
-                        tvScaleStatus.setTextColor(Color.parseColor("#38BDF8"));
                     }
                 });
             }
@@ -355,7 +376,6 @@ public class MiraPosFragment extends MiraBaseFragment {
                 safeRun(() -> {
                     if (tvScaleStatus != null) {
                         tvScaleStatus.setText(isArabic ? "⚖️ غير متصل" : "⚖️ Offline");
-                        tvScaleStatus.setTextColor(Color.parseColor("#94A3B8"));
                     }
                 });
             }
@@ -390,41 +410,31 @@ public class MiraPosFragment extends MiraBaseFragment {
 
     private void toggleRFIDMode() {
         isRFIDModeActive = !isRFIDModeActive;
-        
+
         if (isRFIDModeActive) {
             startRFIDScan();
             if (btnPosRFIDMode != null) {
                 btnPosRFIDMode.setText(isArabic ? "📡 RFID نشط" : "📡 RFID Active");
-                btnPosRFIDMode.setTextColor(Color.WHITE);
             }
             if (tvCartStatus != null) {
                 tvCartStatus.setText(isArabic ? "📡 جاهز لمسح RFID..." : "📡 Ready for RFID scan...");
-                tvCartStatus.setTextColor(Color.parseColor("#4ADE80"));
             }
         } else {
             stopRFIDScan();
             if (btnPosRFIDMode != null) {
-                btnPosRFIDMode.setText(isArabic ? "📡 مسح RFID" : "📡 Scan RFID");
-                btnPosRFIDMode.setTextColor(Color.WHITE);
+                btnPosRFIDMode.setText(isArabic ? getString(R.string.pos_scan_rfid) : "📡 Scan RFID");
             }
             if (tvCartStatus != null) {
-                tvCartStatus.setText(isArabic ? "جاهز لمسح القطع..." : "Ready to scan items...");
-                tvCartStatus.setTextColor(Color.parseColor("#94A3B8"));
+                tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan items...");
             }
         }
     }
 
-    /**
-     * ✅ بدء مسح RFID الفعلي
-     */
     private void startRFIDScan() {
         isRFIDScanActive = true;
         rfidManager.startScan();
     }
 
-    /**
-     * ✅ إيقاف مسح RFID
-     */
     private void stopRFIDScan() {
         isRFIDScanActive = false;
         rfidManager.stopScan();
@@ -434,9 +444,7 @@ public class MiraPosFragment extends MiraBaseFragment {
 
     public void onRingScanned(String epc) {
         if (scannedEpcs.contains(epc)) {
-            playAlertSound(2);
-            showToast(isArabic ? "مضافة مسبقاً: " + epc : "Already added: " + epc);
-            return;
+            return; // تجاهل الصامت للتكرار عند استخدام RFID
         }
         processRingEpc(epc, "rfid");
     }
@@ -451,12 +459,17 @@ public class MiraPosFragment extends MiraBaseFragment {
     }
 
     private void processRingEpc(final String code, final String source) {
+        // ✅ حماية ضد الطلبات المكررة أثناء استجابة الـ API
+        synchronized (pendingEpcs) {
+            if (pendingEpcs.contains(code)) return;
+            pendingEpcs.add(code);
+        }
+
         playAlertSound(1);
 
         safeRun(() -> {
             if (tvCartStatus != null) {
                 tvCartStatus.setText(isArabic ? "🔍 جاري الاستعلام..." : "🔍 Querying...");
-                tvCartStatus.setTextColor(Color.parseColor("#F59E0B"));
             }
         });
 
@@ -481,6 +494,10 @@ public class MiraPosFragment extends MiraBaseFragment {
             } catch (Exception e) {
                 Log.e(TAG, "Error: " + e.getMessage());
                 handleItemNotFound(code);
+            } finally {
+                synchronized (pendingEpcs) {
+                    pendingEpcs.remove(code);
+                }
             }
         }).start();
     }
@@ -555,19 +572,22 @@ public class MiraPosFragment extends MiraBaseFragment {
         final boolean fb = bad;
 
         safeRun(() -> {
+            // ✅ إدارة الشاشة الفارغة ديناميكياً
+            if (layoutCartEmptyState != null) {
+                layoutCartEmptyState.setVisibility(fc == 0 ? View.VISIBLE : View.GONE);
+            }
+
             if (tvItemCount != null) tvItemCount.setText(String.valueOf(fc));
             if (tvTotalAmount != null)
                 tvTotalAmount.setText(String.format(Locale.US, "%,.0f YER", fs));
             if (tvCartStatus != null) {
                 if (fc == 0) {
-                    tvCartStatus.setText(isArabic ? "جاهز لمسح القطع..." : "Ready to scan...");
+                    tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
                 } else if (fb) {
                     tvCartStatus.setText(isArabic ? "⚠️ قطعة غير متاحة!" : "⚠️ Unavailable item!");
                 } else {
                     tvCartStatus.setText(isArabic ? "✓ جاهز للبيع" : "✓ Ready for sale");
                 }
-                tvCartStatus.setTextColor(fc == 0 ? Color.parseColor("#94A3B8")
-                        : fb ? Color.parseColor("#EF4444") : Color.parseColor("#4ADE80"));
             }
             if (btnCheckout != null) {
                 btnCheckout.setEnabled(fc > 0 && !fb);
@@ -703,7 +723,6 @@ public class MiraPosFragment extends MiraBaseFragment {
                     } else {
                         if (tvCartStatus != null) {
                             tvCartStatus.setText("❌ " + (response != null ? response.code : "Error"));
-                            tvCartStatus.setTextColor(Color.RED);
                         }
                         if (btnCheckout != null) {
                             btnCheckout.setEnabled(true);
@@ -784,7 +803,6 @@ public class MiraPosFragment extends MiraBaseFragment {
                     if (tvCartStatus != null) {
                         tvCartStatus.setText("⚠️ " + arr.length() + " "
                                 + (isArabic ? "عملية معلقة" : "pending sales"));
-                        tvCartStatus.setTextColor(Color.parseColor("#F59E0B"));
                     }
                 });
             }
@@ -854,12 +872,10 @@ public class MiraPosFragment extends MiraBaseFragment {
                     if (r > 0) {
                         if (tvCartStatus != null) {
                             tvCartStatus.setText("⚠️ " + r + " " + (isArabic ? "معلقة" : "pending"));
-                            tvCartStatus.setTextColor(Color.parseColor("#F59E0B"));
                         }
                     } else {
                         if (tvCartStatus != null) {
-                            tvCartStatus.setText(isArabic ? "جاهز لمسح القطع..." : "Ready to scan...");
-                            tvCartStatus.setTextColor(Color.parseColor("#94A3B8"));
+                            tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
                         }
                     }
                 });
@@ -887,7 +903,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         TextView tvLoading = new TextView(requireContext());
         tvLoading.setText(isArabic ? "🔄 جاري إتمام البيع والترحيل المحاسبي..."
                 : "🔄 Processing sale & journal entry...");
-        tvLoading.setTextColor(Color.parseColor("#1E40AF"));
         tvLoading.setTextSize(14);
         tvLoading.setPadding(0, 16, 0, 0);
         tvLoading.setGravity(android.view.Gravity.CENTER);
@@ -896,7 +911,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         TextView tvSubtext = new TextView(requireContext());
         tvSubtext.setText(isArabic ? "يرجى الانتظار، يتم تحديث المخزون وتسجيل القيود"
                 : "Please wait, updating inventory and ledger");
-        tvSubtext.setTextColor(Color.parseColor("#64748B"));
         tvSubtext.setTextSize(11);
         tvSubtext.setPadding(0, 4, 0, 0);
         tvSubtext.setGravity(android.view.Gravity.CENTER);
@@ -925,7 +939,6 @@ public class MiraPosFragment extends MiraBaseFragment {
 
         TextView tvTitle = new TextView(requireContext());
         tvTitle.setText(isArabic ? "تم البيع بنجاح!" : "Sale Completed!");
-        tvTitle.setTextColor(Color.parseColor("#16A34A"));
         tvTitle.setTextSize(18);
         tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         tvTitle.setGravity(android.view.Gravity.CENTER);
@@ -934,7 +947,6 @@ public class MiraPosFragment extends MiraBaseFragment {
 
         com.google.android.material.card.MaterialCardView card =
                 new com.google.android.material.card.MaterialCardView(requireContext());
-        card.setCardBackgroundColor(Color.parseColor("#F0FDF4"));
         card.setRadius(12);
         card.setCardElevation(2);
         card.setPadding(16, 16, 16, 16);
@@ -964,7 +976,6 @@ public class MiraPosFragment extends MiraBaseFragment {
 
         TextView tvLabel = new TextView(requireContext());
         tvLabel.setText(label);
-        tvLabel.setTextColor(Color.parseColor("#475569"));
         tvLabel.setTextSize(12);
         tvLabel.setTypeface(null, android.graphics.Typeface.BOLD);
         tvLabel.setMinWidth(150);
@@ -972,7 +983,6 @@ public class MiraPosFragment extends MiraBaseFragment {
 
         TextView tvValue = new TextView(requireContext());
         tvValue.setText(value);
-        tvValue.setTextColor(Color.parseColor("#0F172A"));
         tvValue.setTextSize(12);
         tvValue.setPadding(8, 0, 0, 0);
         row.addView(tvValue);
@@ -1027,10 +1037,8 @@ public class MiraPosFragment extends MiraBaseFragment {
             if (h.tvStatus != null) {
                 if (item.isAvailable) {
                     h.tvStatus.setText(isArabic ? "✅ متاحة" : "✅ Available");
-                    h.tvStatus.setTextColor(Color.parseColor("#4ADE80"));
                 } else {
                     h.tvStatus.setText(isArabic ? "❌ غير متاحة" : "❌ Unavailable");
-                    h.tvStatus.setTextColor(Color.parseColor("#EF4444"));
                 }
             }
             if (h.btnRemove != null) h.btnRemove.setOnClickListener(v -> {
