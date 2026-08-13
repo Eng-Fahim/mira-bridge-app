@@ -339,16 +339,18 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     }
     
     private void updateSoundButtonText() {
-        if (btnSoundToggle != null) {
-            if (isSoundEnabled) {
-                btnSoundToggle.setText(isArabic ? "🔊 الصوت: مفعل" : "🔊 Sound: ON");
-                btnSoundToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_ENABLED)));
-btnSoundToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_DISABLED)));
-btnVibrationToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_ENABLED)));
-btnVibrationToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_DISABLED)));
-            }
+    if (btnSoundToggle != null) {
+        if (isSoundEnabled) {
+            btnSoundToggle.setText(isArabic ? "🔊 الصوت: مفعل" : "🔊 Sound: ON");
+            btnSoundToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_ENABLED)));
+            btnSoundToggle.setTextColor(Color.parseColor(COLOR_ENABLED));
+        } else {
+            btnSoundToggle.setText(isArabic ? "🔇 الصوت: معطل" : "🔇 Sound: OFF");
+            btnSoundToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_DISABLED)));
+            btnSoundToggle.setTextColor(Color.parseColor(COLOR_DISABLED));
         }
     }
+}
     
     private void updateVibrationButtonText() {
         if (btnVibrationToggle != null) {
@@ -1056,4 +1058,4 @@ btnVibrationToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_
             }
         }
     }
-                    }
+                    
