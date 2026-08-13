@@ -1,6 +1,6 @@
 package com.example.uhf.fragment;
 
-import android.content.Context; // ✅ إضافة استيراد Context لحل المشكلة
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
@@ -13,6 +13,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -20,8 +21,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
@@ -36,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.Executors;
 
 public class MiraSalesHistoryFragment extends Fragment {
@@ -43,9 +47,15 @@ public class MiraSalesHistoryFragment extends Fragment {
     private static final String TAG = "MiraSalesHistory";
 
     private RecyclerView rvSales;
+    private View layoutEmptyState;
     private TextView tvEmpty;
+    private ProgressBar pbLoading;
     private EditText etSearch;
-    private ImageView btnRefresh;
+    private View btnRefresh;
+    private SwipeRefreshLayout swipeRefresh;
+
+    private TextView tvTotalRevenue;
+    private TextView tvInvoicesCount;
 
     private MiraSalesAdapter adapter;
     private final List<MiraSaleItem> saleList = new ArrayList<>();
@@ -59,12 +69,9 @@ public class MiraSalesHistoryFragment extends Fragment {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isArabic;
 
-    private boolean isArabic() {
-        return getResources().getConfiguration().getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
-    }
-
-    private String ar(String arabic, String english) {
-        return isArabic() ? arabic : english;
+    private boolean checkIsArabic() {
+        return AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar") ||
+                getResources().getConfiguration().getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
     }
 
     @Nullable
@@ -73,7 +80,67 @@ public class MiraSalesHistoryFragment extends Fragment {
         return inflater.inflate(R.layout.fragment_mira_sales_history, container, false);
     }
 
-    // ==================== OFFLINE ====================
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        isArabic = checkIsArabic();
+
+        if (getContext() != null) {
+            apiClient = MiraApiClient.getInstance(getContext());
+            branchesManager = MiraBranchesManager.getInstance(getContext());
+            offlineCache = requireContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
+        }
+
+        initViews(view);
+        setupRecyclerView();
+        setupListeners();
+
+        // تحميل فوري أوفلاين ثم استدعاء السيرفر
+        loadSalesOffline();
+        loadSalesHistory(true);
+    }
+
+    private void initViews(View view) {
+        rvSales = view.findViewById(R.id.rvMiraSalesHistory);
+        layoutEmptyState = view.findViewById(R.id.layoutEmptyState);
+        tvEmpty = view.findViewById(R.id.tvMiraEmptySales);
+        pbLoading = view.findViewById(R.id.pbSalesLoading);
+        etSearch = view.findViewById(R.id.etMiraSearchSales);
+        btnRefresh = view.findViewById(R.id.btnMiraRefreshSales);
+        swipeRefresh = view.findViewById(R.id.swipeRefreshSales);
+
+        tvTotalRevenue = view.findViewById(R.id.tvTotalRevenue);
+        tvInvoicesCount = view.findViewById(R.id.tvInvoicesCount);
+    }
+
+    private void setupRecyclerView() {
+        if (rvSales != null) {
+            rvSales.setLayoutManager(new LinearLayoutManager(getContext()));
+            adapter = new MiraSalesAdapter(filteredList, this::openReceipt, isArabic);
+            rvSales.setAdapter(adapter);
+        }
+    }
+
+    private void setupListeners() {
+        if (btnRefresh != null) {
+            btnRefresh.setOnClickListener(v -> loadSalesHistory(true));
+        }
+
+        if (swipeRefresh != null) {
+            swipeRefresh.setOnRefreshListener(() -> loadSalesHistory(false));
+        }
+
+        if (etSearch != null) {
+            etSearch.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) { filterSales(s.toString()); }
+                @Override public void afterTextChanged(Editable s) {}
+            });
+        }
+    }
+
+    // ==================== OFFLINE CACHE ====================
 
     private void saveSalesOffline(JSONArray sales) {
         try {
@@ -92,22 +159,7 @@ public class MiraSalesHistoryFragment extends Fragment {
             if (json.isEmpty()) return;
 
             JSONArray sales = new JSONArray(json);
-            List<MiraSaleItem> items = new ArrayList<>();
-
-            for (int i = 0; i < sales.length(); i++) {
-                JSONObject sale = sales.optJSONObject(i);
-                if (sale == null) continue;
-
-                MiraSaleItem item = new MiraSaleItem();
-                item.saleId = sale.optString("sale_id", sale.optString("id", "—"));
-                item.customerName = sale.optString("customer_name", isArabic ? "عميل" : "Customer");
-                item.amount = sale.optDouble("final_amount", sale.optDouble("amount", 0));
-                item.itemCount = sale.optInt("item_count", 0);
-                item.paymentMethod = sale.optString("payment_method", "CASH");
-                item.date = sale.optString("created_at", "");
-                item.rawJson = sale.toString();
-                items.add(item);
-            }
+            List<MiraSaleItem> items = parseSalesJson(sales);
 
             saleList.clear();
             saleList.addAll(items);
@@ -115,60 +167,17 @@ public class MiraSalesHistoryFragment extends Fragment {
             String currentQuery = etSearch != null ? etSearch.getText().toString() : "";
             filterSales(currentQuery);
 
-            if (tvEmpty != null && !saleList.isEmpty()) {
-                tvEmpty.setVisibility(View.GONE);
-            }
         } catch (Exception ignored) {}
     }
 
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+    // ==================== DATA LOADING ====================
 
-        isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
-
-        if (getContext() != null) {
-            apiClient = MiraApiClient.getInstance(getContext());
-            branchesManager = MiraBranchesManager.getInstance(getContext());
-            offlineCache = requireContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
-        }
-
-        rvSales = view.findViewById(R.id.rvMiraSalesHistory);
-        tvEmpty = view.findViewById(R.id.tvMiraEmptySales);
-        etSearch = view.findViewById(R.id.etMiraSearchSales);
-        btnRefresh = view.findViewById(R.id.btnMiraRefreshSales);
-
-        if (rvSales != null) {
-            rvSales.setLayoutManager(new LinearLayoutManager(getContext()));
-            adapter = new MiraSalesAdapter(filteredList, this::openReceipt, isArabic);
-            rvSales.setAdapter(adapter);
-        }
-
-        if (btnRefresh != null) {
-            btnRefresh.setOnClickListener(v -> loadSalesHistory());
-        }
-
-        if (etSearch != null) {
-            etSearch.addTextChangedListener(new TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) { filterSales(s.toString()); }
-                @Override public void afterTextChanged(Editable s) {}
-            });
-        }
-
-        loadSalesHistory();
-    }
-
-    private void loadSalesHistory() {
+    private void loadSalesHistory(boolean showProgress) {
         if (!isAdded()) return;
 
-        if (tvEmpty != null) {
-            tvEmpty.setVisibility(View.VISIBLE);
-            tvEmpty.setText(isArabic ? "جاري تحميل المبيعات..." : "Loading sales...");
+        if (showProgress) {
+            showLoadingState();
         }
-
-        // ✅ تحميل محلي فوري أولاً
-        loadSalesOffline();
 
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
@@ -177,7 +186,12 @@ public class MiraSalesHistoryFragment extends Fragment {
                 }
 
                 if (apiClient == null) {
-                    mainHandler.post(() -> showEmptyState(isArabic ? "⚠️ خطأ في تهيئة النظام" : "⚠️ System initialization error"));
+                    mainHandler.post(() -> {
+                        hideLoadingState();
+                        if (saleList.isEmpty()) {
+                            showEmptyState(isArabic ? "⚠️ خطأ في تهيئة النظام" : "⚠️ System initialization error");
+                        }
+                    });
                     return;
                 }
 
@@ -197,30 +211,16 @@ public class MiraSalesHistoryFragment extends Fragment {
                         }
                     }
 
-                    List<MiraSaleItem> items = new ArrayList<>();
+                    final List<MiraSaleItem> items = (sales != null) ? parseSalesJson(sales) : new ArrayList<>();
 
                     if (sales != null && sales.length() > 0) {
-                        for (int i = 0; i < sales.length(); i++) {
-                            JSONObject sale = sales.optJSONObject(i);
-                            if (sale == null) continue;
-
-                            MiraSaleItem item = new MiraSaleItem();
-                            item.saleId = sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")));
-                            item.customerName = sale.optString("customer_name", sale.optString("client_name", isArabic ? "عميل" : "Customer"));
-                            item.amount = sale.optDouble("final_amount", sale.optDouble("total_amount", sale.optDouble("amount", 0)));
-                            item.itemCount = sale.optInt("item_count", sale.optInt("total_items", sale.optInt("count", 0)));
-                            item.paymentMethod = sale.optString("payment_method", sale.optString("pay_type", "CASH"));
-                            item.date = sale.optString("created_at", sale.optString("date", ""));
-                            item.rawJson = sale.toString();
-                            items.add(item);
-                        }
-
-                        // ✅ حفظ محلي
                         saveSalesOffline(sales);
                     }
 
                     mainHandler.post(() -> {
                         if (!isAdded()) return;
+                        hideLoadingState();
+
                         saleList.clear();
                         saleList.addAll(items);
 
@@ -232,9 +232,9 @@ public class MiraSalesHistoryFragment extends Fragment {
                         }
                     });
                 } else {
-                    // ✅ API فشل - البيانات المحلية محملة مسبقاً
                     mainHandler.post(() -> {
                         if (!isAdded()) return;
+                        hideLoadingState();
                         if (saleList.isEmpty()) {
                             showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
                         }
@@ -242,39 +242,106 @@ public class MiraSalesHistoryFragment extends Fragment {
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Exception loading sales", e);
+                mainHandler.post(() -> {
+                    if (!isAdded()) return;
+                    hideLoadingState();
+                });
             }
         });
     }
 
+    private List<MiraSaleItem> parseSalesJson(JSONArray sales) {
+        List<MiraSaleItem> items = new ArrayList<>();
+        for (int i = 0; i < sales.length(); i++) {
+            JSONObject sale = sales.optJSONObject(i);
+            if (sale == null) continue;
+
+            MiraSaleItem item = new MiraSaleItem();
+            item.saleId = sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")));
+            item.customerName = sale.optString("customer_name", sale.optString("client_name", isArabic ? "عميل افتراضي" : "Customer"));
+            item.amount = sale.optDouble("final_amount", sale.optDouble("total_amount", sale.optDouble("amount", 0)));
+            item.itemCount = sale.optInt("item_count", sale.optInt("total_items", sale.optInt("count", 0)));
+            item.paymentMethod = sale.optString("payment_method", sale.optString("pay_type", "CASH"));
+            item.date = sale.optString("created_at", sale.optString("date", ""));
+            item.rawJson = sale.toString();
+            items.add(item);
+        }
+        return items;
+    }
+
+    // ==================== FILTER & SUMMARY ====================
+
     private void filterSales(String query) {
-        filteredList.clear();
+        List<MiraSaleItem> newFiltered = new ArrayList<>();
         if (query == null || query.trim().isEmpty()) {
-            filteredList.addAll(saleList);
+            newFiltered.addAll(saleList);
         } else {
             String q = query.toLowerCase(Locale.ROOT);
             for (MiraSaleItem item : saleList) {
                 if ((item.customerName != null && item.customerName.toLowerCase(Locale.ROOT).contains(q)) ||
                         (item.saleId != null && item.saleId.toLowerCase(Locale.ROOT).contains(q))) {
-                    filteredList.add(item);
+                    newFiltered.add(item);
                 }
             }
         }
+
         if (adapter != null) {
-            adapter.notifyDataSetChanged();
+            adapter.updateData(newFiltered);
         }
-        if (tvEmpty != null) {
-            tvEmpty.setVisibility(filteredList.isEmpty() ? View.VISIBLE : View.GONE);
-            if (filteredList.isEmpty() && !saleList.isEmpty()) {
-                tvEmpty.setText(isArabic ? "📭 لا توجد نتائج مطابقة" : "📭 No matching results");
+
+        updateSummaryCards(newFiltered);
+
+        if (newFiltered.isEmpty()) {
+            if (!saleList.isEmpty()) {
+                showEmptyState(isArabic ? "📭 لا توجد نتائج مطابقة للبحث" : "📭 No matching results");
+            } else {
+                showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
             }
+        } else {
+            hideEmptyState();
         }
     }
 
+    private void updateSummaryCards(List<MiraSaleItem> list) {
+        double totalRevenue = 0;
+        for (MiraSaleItem item : list) {
+            totalRevenue += item.amount;
+        }
+
+        if (tvTotalRevenue != null) {
+            tvTotalRevenue.setText(String.format(Locale.US, "%,.0f YER", totalRevenue));
+        }
+        if (tvInvoicesCount != null) {
+            tvInvoicesCount.setText(String.valueOf(list.size()));
+        }
+    }
+
+    // ==================== UI STATE HELPERS ====================
+
+    private void showLoadingState() {
+        if (layoutEmptyState != null) layoutEmptyState.setVisibility(View.VISIBLE);
+        if (pbLoading != null) pbLoading.setVisibility(View.VISIBLE);
+        if (tvEmpty != null) {
+            tvEmpty.setVisibility(View.VISIBLE);
+            tvEmpty.setText(isArabic ? "جاري تحميل المبيعات..." : "Loading sales...");
+        }
+    }
+
+    private void hideLoadingState() {
+        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+        if (pbLoading != null) pbLoading.setVisibility(View.GONE);
+    }
+
     private void showEmptyState(String message) {
+        if (layoutEmptyState != null) layoutEmptyState.setVisibility(View.VISIBLE);
         if (tvEmpty != null) {
             tvEmpty.setVisibility(View.VISIBLE);
             tvEmpty.setText(message);
         }
+    }
+
+    private void hideEmptyState() {
+        if (layoutEmptyState != null) layoutEmptyState.setVisibility(View.GONE);
     }
 
     private void openReceipt(MiraSaleItem sale) {
@@ -295,21 +362,67 @@ public class MiraSalesHistoryFragment extends Fragment {
         }
     }
 
+    // ==================== MODEL CLASS ====================
+
     static class MiraSaleItem {
         String saleId, customerName, paymentMethod, date, rawJson;
         double amount;
         int itemCount;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            MiraSaleItem item = (MiraSaleItem) o;
+            return Double.compare(item.amount, amount) == 0 &&
+                    itemCount == item.itemCount &&
+                    Objects.equals(saleId, item.saleId) &&
+                    Objects.equals(customerName, item.customerName) &&
+                    Objects.equals(paymentMethod, item.paymentMethod) &&
+                    Objects.equals(date, item.date);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(saleId, customerName, paymentMethod, date, amount, itemCount);
+        }
     }
 
-    class MiraSalesAdapter extends RecyclerView.Adapter<MiraSalesAdapter.VH> {
-        final List<MiraSaleItem> items;
-        final OnMiraSaleClickListener listener;
-        final boolean isArabic;
+    // ==================== ADAPTER WITH DIFFUTIL ====================
+
+    static class MiraSalesAdapter extends RecyclerView.Adapter<MiraSalesAdapter.VH> {
+        private final List<MiraSaleItem> items;
+        private final OnMiraSaleClickListener listener;
+        private final boolean isArabic;
 
         MiraSalesAdapter(List<MiraSaleItem> items, OnMiraSaleClickListener listener, boolean isArabic) {
-            this.items = items;
+            this.items = new ArrayList<>(items);
             this.listener = listener;
             this.isArabic = isArabic;
+        }
+
+        public void updateData(List<MiraSaleItem> newItems) {
+            DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+                @Override
+                public int getOldListSize() { return items.size(); }
+
+                @Override
+                public int getNewListSize() { return newItems.size(); }
+
+                @Override
+                public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
+                    return Objects.equals(items.get(oldItemPosition).saleId, newItems.get(newItemPosition).saleId);
+                }
+
+                @Override
+                public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
+                    return items.get(oldItemPosition).equals(newItems.get(newItemPosition));
+                }
+            });
+
+            items.clear();
+            items.addAll(newItems);
+            diffResult.dispatchUpdatesTo(this);
         }
 
         @NonNull
@@ -322,39 +435,45 @@ public class MiraSalesHistoryFragment extends Fragment {
         public void onBindViewHolder(@NonNull VH h, int pos) {
             MiraSaleItem s = items.get(pos);
 
+            if (h.tvSaleId != null) h.tvSaleId.setText("#" + (s.saleId != null ? s.saleId : "—"));
             if (h.tvCustomer != null) h.tvCustomer.setText(s.customerName);
             if (h.tvAmount != null) h.tvAmount.setText(String.format(Locale.US, "%,.0f YER", s.amount));
-            if (h.tvItems != null) h.tvItems.setText(s.itemCount + " " + (isArabic ? "قطعة" : "pcs"));
+            if (h.tvItems != null) h.tvItems.setText(s.itemCount + " " + (isArabic ? "قطع" : "pcs"));
+
             if (h.tvPayment != null) {
-                String paymentAr;
-                switch (s.paymentMethod != null ? s.paymentMethod.toUpperCase() : "") {
-                    case "CASH": paymentAr = isArabic ? "نقداً" : "Cash"; break;
-                    case "CARD": paymentAr = isArabic ? "بطاقة" : "Card"; break;
-                    case "TRANSFER": paymentAr = isArabic ? "تحويل" : "Transfer"; break;
-                    default: paymentAr = s.paymentMethod != null ? s.paymentMethod : "—";
+                String paymentText;
+                switch (s.paymentMethod != null ? s.paymentMethod.toUpperCase(Locale.ROOT) : "") {
+                    case "CASH": paymentText = isArabic ? "نقداً" : "Cash"; break;
+                    case "CARD": paymentText = isArabic ? "بطاقة" : "Card"; break;
+                    case "TRANSFER": paymentText = isArabic ? "تحويل" : "Transfer"; break;
+                    default: paymentText = s.paymentMethod != null ? s.paymentMethod : "—";
                 }
-                h.tvPayment.setText(paymentAr);
+                h.tvPayment.setText(paymentText);
             }
+
             if (h.tvDate != null) {
                 try {
                     SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
                     Date d = sdf.parse(s.date);
-                    SimpleDateFormat display = new SimpleDateFormat("dd/MM/yyyy HH:mm", isArabic ? new Locale("ar") : Locale.US);
+                    SimpleDateFormat display = new SimpleDateFormat("dd/MM/yyyy hh:mm a", isArabic ? new Locale("ar") : Locale.US);
                     h.tvDate.setText(d != null ? display.format(d) : s.date);
                 } catch (Exception e) {
                     h.tvDate.setText(s.date != null ? s.date : "—");
                 }
             }
+
             h.itemView.setOnClickListener(v -> listener.onClick(s));
         }
 
         @Override
         public int getItemCount() { return items.size(); }
 
-        class VH extends RecyclerView.ViewHolder {
-            TextView tvCustomer, tvAmount, tvItems, tvPayment, tvDate;
+        static class VH extends RecyclerView.ViewHolder {
+            TextView tvSaleId, tvCustomer, tvAmount, tvItems, tvPayment, tvDate;
+
             VH(View v) {
                 super(v);
+                tvSaleId = v.findViewById(R.id.tvMiraSaleId);
                 tvCustomer = v.findViewById(R.id.tvMiraSaleCustomer);
                 tvAmount = v.findViewById(R.id.tvMiraSaleAmount);
                 tvItems = v.findViewById(R.id.tvMiraSaleItems);
