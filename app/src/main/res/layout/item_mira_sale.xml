@@ -49,14 +49,25 @@
                     android:layout_marginStart="10dp"
                     android:orientation="vertical">
 
+                    <!-- ✅ إضافة tvMiraSaleId المعرّف المفقود -->
+                    <TextView
+                        android:id="@+id/tvMiraSaleId"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="?attr/colorPrimary"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        tools:text="#INV-001" />
+
                     <TextView
                         android:id="@+id/tvMiraSaleCustomer"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="1dp"
                         android:ellipsize="end"
                         android:maxLines="1"
                         android:textColor="?attr/colorOnSurface"
-                        android:textSize="15sp"
+                        android:textSize="14sp"
                         android:textStyle="bold"
                         tools:text="اسم العميل" />
 
