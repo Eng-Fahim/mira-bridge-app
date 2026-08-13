@@ -16,6 +16,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -26,11 +27,14 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
+import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.databinding.FragmentMiraIdentityStudioBinding;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 
 import org.json.JSONArray;
@@ -487,6 +491,78 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
+    // ==================== نافذة النجاح الهجين والخيارات الثلاثة ====================
+
+    private void showEncodingSuccessDialog(String title, String epc, String weight) {
+        if (!isAdded() || getContext() == null) return;
+
+        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(requireContext());
+        View view = getLayoutInflater().inflate(R.layout.dialog_encoding_success, null);
+        bottomSheetDialog.setContentView(view);
+
+        TextView tvTitle = view.findViewById(R.id.tvSummaryTitle);
+        TextView tvEpc = view.findViewById(R.id.tvSummaryEpc);
+        TextView tvWeight = view.findViewById(R.id.tvSummaryWeight);
+
+        MaterialButton btnViewDigitalIdentity = view.findViewById(R.id.btnViewDigitalIdentity);
+        MaterialButton btnNewEncode = view.findViewById(R.id.btnNewEncode);
+        MaterialButton btnClose = view.findViewById(R.id.btnCloseDialog);
+
+        if (tvTitle != null) tvTitle.setText(title);
+        if (tvEpc != null) tvEpc.setText(epc);
+        if (tvWeight != null) tvWeight.setText(weight + (isArabic ? " جرام" : " g"));
+
+        // 1. خيار عرض الهوية الرقمية للقطعة
+        if (btnViewDigitalIdentity != null) {
+            btnViewDigitalIdentity.setOnClickListener(v -> {
+                bottomSheetDialog.dismiss();
+                showDigitalIdentityDialog(title, epc, weight);
+            });
+        }
+
+        // 2. خيار تكويد قطعة جديدة (إعادة ضبط الحقول)
+        if (btnNewEncode != null) {
+            btnNewEncode.setOnClickListener(v -> {
+                bottomSheetDialog.dismiss();
+                resetFormForNextScan();
+            });
+        }
+
+        // 3. خيار إغلاق / إلغاء
+        if (btnClose != null) {
+            btnClose.setOnClickListener(v -> bottomSheetDialog.dismiss());
+        }
+
+        bottomSheetDialog.show();
+    }
+
+    // ==================== واجهة الهوية الرقمية الشاملة ====================
+
+    private void showDigitalIdentityDialog(String title, String epc, String weight) {
+        if (!isAdded() || getContext() == null) return;
+
+        BottomSheetDialog identityDialog = new BottomSheetDialog(requireContext());
+        View view = getLayoutInflater().inflate(R.layout.dialog_digital_identity, null);
+        identityDialog.setContentView(view);
+
+        TextView tvIdTitle = view.findViewById(R.id.tvIdTitle);
+        TextView tvEpcCode = view.findViewById(R.id.tvEpcCode);
+        TextView tvIdWeight = view.findViewById(R.id.tvIdWeight);
+        TextView tvIdMetalKarat = view.findViewById(R.id.tvIdMetalKarat);
+        MaterialButton btnClose = view.findViewById(R.id.btnCloseIdentity);
+
+        if (tvIdTitle != null) tvIdTitle.setText(title);
+        if (tvEpcCode != null) tvEpcCode.setText("EPC: " + epc);
+        if (tvIdWeight != null) tvIdWeight.setText(weight + (isArabic ? " جرام" : " g"));
+        if (tvIdMetalKarat != null) tvIdMetalKarat.setText(getSelectedKaratCode());
+
+        if (btnClose != null) {
+            btnClose.setOnClickListener(v -> identityDialog.dismiss());
+        }
+
+        identityDialog.show();
+    }
+
     // ==================== حفظ التكويد واكتمال العملية ====================
 
     private void finalizeItemIdentity() {
@@ -604,8 +680,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     }
 
                     final boolean success = apiSuccess;
-                    final String finalServerBarcode = serverBarcode;
-                    final String finalServerSerial = serverSerial;
                     final int finalServerItemId = serverItemId;
 
                     safeRun(() -> {
@@ -626,32 +700,17 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                                 removePendingEncode(finalEpc);
                                 playSuccessSound();
 
-                                List<String[]> details = new ArrayList<>();
-                                details.add(new String[]{"🔖 RFID", finalEpc});
-                                details.add(new String[]{"📝 البيان", finalTitle});
-                                details.add(new String[]{"🏅 العيار", selectedKarat});
-                                details.add(new String[]{"⚖️ الوزن",
-                                        String.format(Locale.US, "%.2f جرام", finalGrossWeight)});
-                                if (finalServerBarcode != null && !finalServerBarcode.isEmpty()) {
-                                    details.add(new String[]{"📊 باركود", finalServerBarcode});
-                                }
-                                if (finalServerSerial != null && !finalServerSerial.isEmpty()) {
-                                    details.add(new String[]{"🔢 الرقم التسلسلي", finalServerSerial});
-                                }
-                                if (finalServerItemId > 0) {
-                                    details.add(new String[]{"🆔 معرف القطعة", String.valueOf(finalServerItemId)});
-                                }
-
-                                showDetailsDialog(
-                                        isArabic ? "✅ تم التكويد بنجاح!" : "✅ Encoding Successful!",
-                                        details.toArray(new String[0][])
+                                // 🎯 استدعاء موديل النجاح والخيارات الثلاثة
+                                showEncodingSuccessDialog(
+                                        finalTitle,
+                                        finalEpc,
+                                        String.format(Locale.US, "%.2f", finalGrossWeight)
                                 );
 
                                 if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
                                     uploadItemImages(finalServerItemId, finalPhotoPaths);
                                 }
 
-                                resetFormForNextScan();
                             } else {
                                 saveEncodeOffline(payload);
                                 showToast(isArabic ? "💾 تم حفظ التكويد محلياً للمزامنة لاحقاً"
