@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="true"
+    android:background="?attr/colorSurface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- هيدر البطاقة الرقمية -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="?attr/colorPrimary"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="4dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="18dp"
+                android:gravity="center">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="MIRA DIGITAL IDENTITY"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.2"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvIdTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="عنوان القطعة"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvIdCategory"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💍 خاتم مجوهرات"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:alpha="0.8"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- تفاصيل الأكواد والـ QR -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardBackgroundColor="?attr/colorSurfaceVariant"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:gravity="center">
+
+                <!-- هنا يمكن استخدام مكتبة ZXing أو صورة QR مسندة -->
+                <ImageView
+                    android:id="@+id/ivQrCode"
+                    android:layout_width="120dp"
+                    android:layout_height="120dp"
+                    android:src="@android:drawable/ic_menu_camera"
+                    app:tint="?attr/colorOnSurface" />
+
+                <TextView
+                    android:id="@+id/tvEpcCode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="EPC: E20000001234"
+                    android:fontFamily="monospace"
+                    android:textColor="?attr/colorPrimary"
+                    android:textStyle="bold"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- مواصفات القطعة -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="المواصفات الفنية المعتمدة"
+            android:textColor="?attr/colorOnSurface"
+            android:textStyle="bold"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="4dp">
+                <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="نوع المعدن والعيار:" android:textColor="?attr/colorOnSurfaceVariant"/>
+                <TextView android:id="@+id/tvIdMetalKarat" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ذهب أصفر - 21K" android:textStyle="bold" android:textColor="?attr/colorOnSurface"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="4dp">
+                <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="الوزن القائم:" android:textColor="?attr/colorOnSurfaceVariant"/>
+                <TextView android:id="@+id/tvIdWeight" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="4.520 جرام" android:textStyle="bold" android:textColor="?attr/colorOnSurface"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="4dp">
+                <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="الأحجار / التطعيم:" android:textColor="?attr/colorOnSurfaceVariant"/>
+                <TextView android:id="@+id/tvIdStones" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="زركون (4 قطع)" android:textStyle="bold" android:textColor="?attr/colorOnSurface"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- زر الإغلاق -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCloseIdentity"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="20dp"
+            android:text="تم / إغلاق"
+            app:cornerRadius="10dp"
+            app:backgroundTint="?attr/colorPrimary"/>
+
+    </LinearLayout>
+</ScrollView>
