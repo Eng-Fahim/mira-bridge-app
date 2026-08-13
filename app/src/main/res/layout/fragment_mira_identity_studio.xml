@@ -12,7 +12,7 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- بطاقة الحالة -->
+        <!-- بطاقة الحالة والـ RFID -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -38,7 +38,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/identity_step_title"
+                        android:text="@string/step_title"
                         android:textColor="?attr/colorPrimary"
                         android:textSize="14sp"
                         android:textStyle="bold" />
@@ -47,21 +47,21 @@
                         android:id="@+id/tvStatusBadge"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/identity_waiting"
-                        android:background="?attr/colorSurfaceVariant"
+                        android:text="@string/waiting"
+                        android:background="@drawable/bg_status_badge"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:paddingHorizontal="10dp"
                         android:paddingVertical="4dp"
                         android:textSize="10sp" />
                 </LinearLayout>
 
-                <!-- ✅ حقل EPC -->
+                <!-- حقل EPC -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilEpc"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:hint="@string/identity_epc_hint"
+                    android:hint="@string/hint_epc"
                     app:endIconMode="custom"
                     app:endIconDrawable="@android:drawable/ic_menu_camera"
                     app:endIconTint="?attr/colorPrimary">
@@ -76,7 +76,7 @@
                         android:maxLines="1" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- ✅ زر RFID -->
+                <!-- زر المسح الفعلي الـ RFID -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnScanRfid"
                     android:layout_width="match_parent"
@@ -94,7 +94,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/identity_category_title"
+            android:text="@string/classify_item"
             android:textColor="?attr/colorOnBackground"
             android:textSize="14sp"
             android:textStyle="bold"
@@ -105,6 +105,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:singleSelection="true"
+            app:selectionRequired="true"
             app:chipSpacingHorizontal="4dp">
 
             <com.google.android.material.chip.Chip
@@ -112,36 +113,37 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/identity_ring" />
+                android:checked="true"
+                android:text="@string/ring" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipSet"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/identity_set" />
+                android:text="@string/set" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipBracelet"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/identity_bracelet" />
+                android:text="@string/bracelet" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipNecklace"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/identity_necklace" />
+                android:text="@string/necklace" />
         </com.google.android.material.chip.ChipGroup>
 
-        <!-- العنوان -->
+        <!-- العنوان والتسمية -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:hint="@string/identity_title_hint">
+            android:hint="@string/hint_title">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etTitle"
@@ -151,7 +153,7 @@
                 android:maxLines="2" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- الاقتراحات -->
+        <!-- الاقتراحات السريعة -->
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -166,11 +168,11 @@
                 app:chipSpacingHorizontal="4dp" />
         </HorizontalScrollView>
 
-        <!-- المعدن -->
+        <!-- مواصفات المعدن -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/identity_metal_specs"
+            android:text="@string/metal_specs"
             android:textColor="?attr/colorOnBackground"
             android:textSize="14sp"
             android:textStyle="bold"
@@ -180,7 +182,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/identity_metal_type"
+            android:text="@string/metal_type"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp" />
 
@@ -189,6 +191,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:singleSelection="true"
+            app:selectionRequired="true"
             app:chipSpacingHorizontal="4dp">
 
             <com.google.android.material.chip.Chip
@@ -196,7 +199,7 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/identity_yellow_gold"
+                android:text="@string/yellow_gold"
                 android:checked="true" />
 
             <com.google.android.material.chip.Chip
@@ -204,21 +207,21 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/identity_white_gold" />
+                android:text="@string/white_gold" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipRoseGold"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/identity_rose_gold" />
+                android:text="@string/rose_gold" />
         </com.google.android.material.chip.ChipGroup>
 
         <!-- العيار -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/identity_karat_label"
+            android:text="@string/karat"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp"
             android:layout_marginTop="8dp"/>
@@ -228,6 +231,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:singleSelection="true"
+            app:selectionRequired="true"
             app:chipSpacingHorizontal="4dp">
 
             <com.google.android.material.chip.Chip
@@ -260,7 +264,7 @@
                 android:text="14K" />
         </com.google.android.material.chip.ChipGroup>
 
-        <!-- الوزن -->
+        <!-- الوزن والقيمة -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -278,7 +282,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/identity_weight_label"
+                    android:text="@string/gross_weight_label"
                     android:textColor="?attr/colorOnSurface"
                     android:textStyle="bold"
                     android:textSize="13sp" />
@@ -287,7 +291,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:hint="@string/identity_weight_hint">
+                    android:hint="@string/gross_weight_label">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etGrossWeight"
@@ -315,7 +319,7 @@
                         android:layout_width="0dp"
                         android:layout_weight="1"
                         android:layout_height="wrap_content"
-                        android:text="@string/identity_estimated_value"
+                        android:text="@string/estimated_gold_value"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="12sp" />
 
@@ -331,11 +335,11 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- الأحجار -->
+        <!-- تفاصيل الأحجار -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/identity_stones_title"
+            android:text="@string/stones_title"
             android:textColor="?attr/colorOnBackground"
             android:textSize="14sp"
             android:textStyle="bold"
@@ -360,7 +364,7 @@
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:text="@string/identity_has_stones"
+                    android:text="@string/has_stones"
                     android:textColor="?attr/colorOnSurface"
                     android:textSize="13sp" />
 
@@ -371,7 +375,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- حقول الأحجار -->
         <LinearLayout
             android:id="@+id/layoutStonesDetails"
             android:layout_width="match_parent"
@@ -383,7 +386,7 @@
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="@string/identity_stone_type_hint">
+                android:hint="@string/stone_type_hint">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etStoneType"
@@ -403,7 +406,7 @@
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="4dp"
-                    android:hint="@string/identity_stone_weight_hint">
+                    android:hint="@string/stone_weight_hint">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etStoneWeight"
@@ -418,7 +421,7 @@
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="4dp"
-                    android:hint="@string/identity_stone_count_hint">
+                    android:hint="@string/stone_count_hint">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etStoneCount"
@@ -444,11 +447,11 @@
             </com.google.android.material.textfield.TextInputLayout>
         </LinearLayout>
 
-        <!-- الصور والاعتماد -->
+        <!-- الصور والاعتماد النهائي -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/identity_photos_title"
+            android:text="@string/photos_title"
             android:textColor="?attr/colorOnBackground"
             android:textSize="14sp"
             android:textStyle="bold"
@@ -460,7 +463,7 @@
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:text="@string/identity_add_photos"
+            android:text="@string/btn_add_photos"
             android:textColor="?attr/colorPrimary"
             app:strokeColor="?attr/colorPrimary"
             app:cornerRadius="8dp"
@@ -471,7 +474,7 @@
             android:id="@+id/tvPhotosCount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/identity_no_photos"
+            android:text="@string/no_photos"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="11sp"
             android:layout_gravity="center"
@@ -483,7 +486,7 @@
             android:layout_height="54dp"
             android:layout_marginTop="14dp"
             android:layout_marginBottom="20dp"
-            android:text="@string/identity_save_btn"
+            android:text="@string/btn_save_identity"
             android:textSize="15sp"
             android:textStyle="bold"
             android:textColor="?attr/colorOnPrimary"
