@@ -766,11 +766,26 @@ public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary
 
         } catch (Exception e) {
             Log.e(TAG, "POST Error: " + e.getMessage());
-            return new ApiResponse(-1, null, e.getMessage());
+            return new ApiResponse(-1, null, e.getMessage()); 
         } finally {
             if (conn != null) conn.disconnect();
         }
     }
+    
+      // ===================== 📊 REPORTS API =====================
+
+    /**
+     * جلب بيانات التقارير المتقدمة حسب النوع، الفترة الزمنية، والفرع
+     */
+    public ApiResponse getReportData(String reportType, String fromDate, String toDate, int branchId) {
+        String endpoint = "/reports/data?type=" + (reportType != null ? reportType : "")
+                + "&from=" + (fromDate != null ? fromDate : "")
+                + "&to=" + (toDate != null ? toDate : "")
+                + "&branch_id=" + branchId;
+        return getWithAuth(endpoint);
+    }
+
+
 
     private ApiResponse get(String endpoint) {
         HttpURLConnection conn = null;
@@ -898,4 +913,4 @@ public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary
             if (conn != null) conn.disconnect();
         }
     }
-}
+                }
