@@ -111,124 +111,130 @@ public class MiraReportsProFragment extends Fragment {
 
     // ==================== DIALOG & REPORT DISPLAY ====================
 
-    private void openReportDialog(ReportItem item) {
-        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
+ private void openReportDialog(ReportItem item) {
+    View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
 
-        TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
-        WebView webView = dialogView.findViewById(R.id.webReportView);
-        MaterialButton btnFrom = dialogView.findViewById(R.id.btnReportDateFrom);
-        MaterialButton btnTo = dialogView.findViewById(R.id.btnReportDateTo);
-        MaterialButton btnApply = dialogView.findViewById(R.id.btnReportApplyFilter);
-        MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
-        MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
-        MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
+    TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
+    WebView webView = dialogView.findViewById(R.id.webReportView);
+    MaterialButton btnFrom = dialogView.findViewById(R.id.btnReportDateFrom);
+    MaterialButton btnTo = dialogView.findViewById(R.id.btnReportDateTo);
+    MaterialButton btnApply = dialogView.findViewById(R.id.btnReportApplyFilter);
+    MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
+    MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
+    MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
 
-        // أزرار الفترات السريعة
-        View btnToday = dialogView.findViewById(R.id.btnQuickToday);
-        View btnWeek = dialogView.findViewById(R.id.btnQuickWeek);
-        View btnMonth = dialogView.findViewById(R.id.btnQuickMonth);
+    View btnToday = dialogView.findViewById(R.id.btnQuickToday);
+    View btnWeek = dialogView.findViewById(R.id.btnQuickWeek);
+    View btnMonth = dialogView.findViewById(R.id.btnQuickMonth);
 
-        tvTitle.setText(item.icon + " " + item.title);
+    tvTitle.setText(item.icon + " " + item.title);
 
-        WebSettings webSettings = webView.getSettings();
-        webSettings.setJavaScriptEnabled(true);
-        webSettings.setDomStorageEnabled(true);
-        webSettings.setBuiltInZoomControls(true);
-        webSettings.setDisplayZoomControls(false);
-        webView.setWebViewClient(new WebViewClient());
+    // --- تسريع وتحسين أداء الـ WebView ---
+    WebSettings webSettings = webView.getSettings();
+    webSettings.setJavaScriptEnabled(true);
+    webSettings.setDomStorageEnabled(true);
+    webSettings.setAllowFileAccess(false);
+    webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE); // منع التجميد بسبب الكاش التالف
+    webView.setLayerType(View.LAYER_TYPE_HARDWARE, null); // تسريع العرض بالـ Hardware Acceleration
+    webView.setWebViewClient(new WebViewClient());
 
-        final String[] dates = {getDefaultFromDate(), getDefaultToDate()};
-        btnFrom.setText(dates[0]);
-        btnTo.setText(dates[1]);
+    final String[] dates = {getDefaultFromDate(), getDefaultToDate()};
+    btnFrom.setText(dates[0]);
+    btnTo.setText(dates[1]);
 
-        AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar)
-                .setView(dialogView)
-                .create();
+    AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar)
+            .setView(dialogView)
+            .create();
 
-        // إعداد المستمعات للتواريخ
-        btnFrom.setOnClickListener(v -> showDatePicker(date -> {
-            dates[0] = date;
-            btnFrom.setText(date);
-        }));
+    btnFrom.setOnClickListener(v -> showDatePicker(date -> {
+        dates[0] = date;
+        btnFrom.setText(date);
+    }));
 
-        btnTo.setOnClickListener(v -> showDatePicker(date -> {
-            dates[1] = date;
-            btnTo.setText(date);
-        }));
+    btnTo.setOnClickListener(v -> showDatePicker(date -> {
+        dates[1] = date;
+        btnTo.setText(date);
+    }));
 
-        btnToday.setOnClickListener(v -> {
-            String today = getDefaultToDate();
-            dates[0] = today; dates[1] = today;
-            btnFrom.setText(today); btnTo.setText(today);
-            fetchAndRenderReport(item.type, webView, dates[0], dates[1]);
-        });
-
-        btnWeek.setOnClickListener(v -> {
-            dates[0] = getCalculatedDate(-7); dates[1] = getDefaultToDate();
-            btnFrom.setText(dates[0]); btnTo.setText(dates[1]);
-            fetchAndRenderReport(item.type, webView, dates[0], dates[1]);
-        });
-
-        btnMonth.setOnClickListener(v -> {
-            dates[0] = getCalculatedDate(-30); dates[1] = getDefaultToDate();
-            btnFrom.setText(dates[0]); btnTo.setText(dates[1]);
-            fetchAndRenderReport(item.type, webView, dates[0], dates[1]);
-        });
-
-        btnApply.setOnClickListener(v -> fetchAndRenderReport(item.type, webView, dates[0], dates[1]));
-        btnPrint.setOnClickListener(v -> printReportWebView(webView, item.title));
-        btnExport.setOnClickListener(v -> exportReportToCSV(item.type, dates[0], dates[1]));
-        btnClose.setOnClickListener(v -> dialog.dismiss());
-
-        // تحميل أولي للتقرير
+    btnToday.setOnClickListener(v -> {
+        String today = getDefaultToDate();
+        dates[0] = today; dates[1] = today;
+        btnFrom.setText(today); btnTo.setText(today);
         fetchAndRenderReport(item.type, webView, dates[0], dates[1]);
+    });
 
-        dialog.show();
-    }
+    btnWeek.setOnClickListener(v -> {
+        dates[0] = getCalculatedDate(-7); dates[1] = getDefaultToDate();
+        btnFrom.setText(dates[0]); btnTo.setText(dates[1]);
+        fetchAndRenderReport(item.type, webView, dates[0], dates[1]);
+    });
 
-    // ==================== DATA FETCHING & PROCESSING ====================
+    btnMonth.setOnClickListener(v -> {
+        dates[0] = getCalculatedDate(-30); dates[1] = getDefaultToDate();
+        btnFrom.setText(dates[0]); btnTo.setText(dates[1]);
+        fetchAndRenderReport(item.type, webView, dates[0], dates[1]);
+    });
 
-    private void fetchAndRenderReport(String reportType, WebView webView, String fromDate, String toDate) {
-        webView.loadDataWithBaseURL(null, buildLoadingHTML(), "text/html", "UTF-8", null);
+    btnApply.setOnClickListener(v -> fetchAndRenderReport(item.type, webView, dates[0], dates[1]));
+    btnPrint.setOnClickListener(v -> printReportWebView(webView, item.title));
+    btnExport.setOnClickListener(v -> exportReportToCSV(item.type, dates[0], dates[1]));
+    btnClose.setOnClickListener(v -> dialog.dismiss());
 
-        new Thread(() -> {
-            JSONObject reportData = null;
-            String cacheKey = "cache_" + reportType + "_" + fromDate + "_" + toDate;
+    fetchAndRenderReport(item.type, webView, dates[0], dates[1]);
 
-            try {
-                int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-                MiraApiClient.ApiResponse response = apiClient.getReportData(reportType, fromDate, toDate, activeBranchId);
+    dialog.show();
+}
 
-                if (response != null && response.isSuccess && response.data != null) {
-                    reportData = response.data;
-                    // حفظ الكاش
-                    offlineCache.edit().putString(cacheKey, reportData.toString()).apply();
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "API Fetch failed for report " + reportType + ": " + e.getMessage());
+private void fetchAndRenderReport(String reportType, WebView webView, String fromDate, String toDate) {
+    // إظهار واجهة التحميل فوراً مع إفراغ الشاشة
+    webView.loadDataWithBaseURL(null, buildLoadingHTML(), "text/html", "UTF-8", null);
+
+    new Thread(() -> {
+        JSONObject reportData = null;
+        String errorMessage = null;
+        String cacheKey = "cache_" + reportType + "_" + fromDate + "_" + toDate;
+
+        try {
+            int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+            MiraApiClient.ApiResponse response = apiClient.getReportData(reportType, fromDate, toDate, activeBranchId);
+
+            if (response != null && response.isSuccess && response.data != null) {
+                reportData = response.data;
+                offlineCache.edit().putString(cacheKey, reportData.toString()).apply();
+            } else if (response != null && response.message != null) {
+                errorMessage = response.message;
             }
+        } catch (Exception e) {
+            Log.e(TAG, "API Fetch failed for report " + reportType, e);
+            errorMessage = e.getLocalizedMessage();
+        }
 
-            // الاستعانة بالكاش إذا فشل الاتصال بالشبكة
-            if (reportData == null) {
-                String cachedJson = offlineCache.getString(cacheKey, null);
-                if (cachedJson != null) {
-                    try {
-                        reportData = new JSONObject(cachedJson);
-                    } catch (Exception ignored) {}
-                }
+        // استرجاع الكاش عند انقطاع الاتصال
+        if (reportData == null) {
+            String cachedJson = offlineCache.getString(cacheKey, null);
+            if (cachedJson != null) {
+                try {
+                    reportData = new JSONObject(cachedJson);
+                } catch (Exception ignored) {}
             }
+        }
 
-            final JSONObject finalData = reportData;
-            mainHandler.post(() -> {
-                if (finalData != null) {
-                    String htmlContent = generateExecutiveHTML(reportType, finalData, fromDate, toDate);
-                    webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null);
-                } else {
-                    webView.loadDataWithBaseURL(null, buildEmptyOrErrorHTML(reportType), "text/html", "UTF-8", null);
-                }
-            });
-        }).start();
-    }
+        final JSONObject finalData = reportData;
+        final String finalError = errorMessage;
+
+        mainHandler.post(() -> {
+            if (finalData != null) {
+                String htmlContent = generateExecutiveHTML(reportType, finalData, fromDate, toDate);
+                // استخدام Encoding محدد لمنع الشاشة البيضاء في النصوص العربية
+                webView.loadDataWithBaseURL("file:///android_asset/", htmlContent, "text/html", "utf-8", null);
+            } else {
+                String errorHtml = buildEmptyOrErrorHTML(finalError != null ? finalError : "لم يتم استرجاع أي بيانات من السيرفر");
+                webView.loadDataWithBaseURL(null, errorHtml, "text/html", "utf-8", null);
+            }
+        });
+    }).start();
+}
+
 
     // ==================== HTML GENERATOR (GOLD & RFID ENGINE) ====================
 
@@ -509,10 +515,12 @@ public class MiraReportsProFragment extends Fragment {
                 "<div style='text-align:center;'><h2>⏳ جاري معالجة بيانات الذهب والمخزون...</h2><p style='color:#64748B;'>يتم حساب الأوزان والعيارات بدقة عالية</p></div></body></html>";
     }
 
-    private String buildEmptyOrErrorHTML(String type) {
-        return "<html dir='rtl'><body style='display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;background:#F8FAFC;color:#64748B;'>" +
-                "<div style='text-align:center;'><h2>📭 لا توجد بيانات متاحة لهذا التقرير</h2><p>تحقق من الاتصال بالشبكة أو اختر فترة زمنية أخرى</p></div></body></html>";
-    }
+    private String buildEmptyOrErrorHTML(String message) {
+    return "<html dir='rtl'><body style='display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;background:#F8FAFC;color:#64748B;'>" +
+            "<div style='text-align:center;'><h2>📭 لا توجد بيانات متاحة لهذا التقرير</h2><p style='color:#EF4444;'>" + 
+            (message != null ? message : "تحقق من الاتصال بالشبكة أو اختر فترة زمنية أخرى") + 
+            "</p></div></body></html>";
+}
 
     // ==================== PRINT & EXPORT UTILS ====================
 
@@ -666,4 +674,4 @@ public class MiraReportsProFragment extends Fragment {
 
     interface OnReportClickListener { void onClick(ReportItem item); }
     interface DatePickerCallback { void onDate(String date); }
-}
+ }
