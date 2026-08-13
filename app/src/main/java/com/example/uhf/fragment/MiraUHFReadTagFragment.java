@@ -120,8 +120,10 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     private final List<TagModel> tagList = new ArrayList<>();
     private final List<TagModel> filteredTagList = new ArrayList<>();
     private final Set<String> scannedEpcSet = new HashSet<>();
-    private final Map<String, ExpectedItem> expectedItemsMap = new HashMap<>();
-    
+    // إضافة متغير جديد في الكلاس
+private final Map<String, TagModel> tagMap = new HashMap<>();
+
+
     private final Queue<TagModel> pendingTagsQueue = new LinkedList<>();
     private final List<TagModel> missingItemsCache = new ArrayList<>();
     private boolean isMissingCacheDirty = true;
@@ -1114,19 +1116,21 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     }
 
     private void clearScanData() {
-        if (currentState == InventoryState.SCANNING || currentState == InventoryState.PAUSED) {
-            stopScanning();
-        }
+    if (currentState == InventoryState.SCANNING || currentState == InventoryState.PAUSED) {
+        stopScanning();
+    }
 
-        scannedEpcSet.clear();
-        tagList.clear();
-        filteredTagList.clear();
-        pendingTagsQueue.clear();
-        missingItemsCache.clear();
-        isMissingCacheDirty = true;
-        totalScannedCount = 0;
-        startTimeMs = 0;
-        lastSecondCount = 0;
+    scannedEpcSet.clear();
+    tagList.clear();
+    tagMap.clear(); // ✅ مسح الخريطة أيضاً
+    filteredTagList.clear();
+    pendingTagsQueue.clear();
+    missingItemsCache.clear();
+    isMissingCacheDirty = true;
+    totalScannedCount = 0;
+    startTimeMs = 0;
+    lastSecondCount = 0;
+
 
         tvTotalScanned.setText("0");
         tvUniqueTags.setText("0");
@@ -1250,52 +1254,58 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     /**
      * ✅ تم التعديل: تجنب إضافة نفس الـ EPC مراراً في القائمة
      */
-    private void processSingleTag(TagModel model) {
-        // 1. تحقق مما إذا كان EPC موجوداً مسبقاً في القائمة
-        boolean alreadyExists = false;
-        for (TagModel existingTag : tagList) {
-            if (existingTag.epc.equalsIgnoreCase(model.epc)) {
-                // تحديث قوة الإشارة وعدد القراءات فقط
-                existingTag.rssi = model.rssi;
-                existingTag.readCount++;
-                alreadyExists = true;
-                break;
-            }
+    // تعديل processSingleTag
+private void processSingleTag(TagModel model) {
+    // ✅ الوصول المباشر O(1) بدلاً من البحث الخطي O(N)
+    TagModel existingTag = tagMap.get(model.epc);
+    
+    if (existingTag != null) {
+        // تحديث الـ RSSI وعدد القراءات فقط
+        existingTag.rssi = model.rssi;
+        existingTag.readCount++;
+        
+        // ✅ تحديث العنصر في القائمة فقط بدون إعادة رسم الكل
+        int index = tagList.indexOf(existingTag);
+        if (index >= 0 && currentFilter.equals("ALL")) {
+            tagAdapter.notifyItemChanged(index);
         }
-
-        // 2. إذا لم يكن موجوداً، أضفه للقائمة وحدث الإحصائيات
-        if (!alreadyExists) {
-            ExpectedItem expected = expectedItemsMap.get(model.epc);
-            
-            if (expected != null) {
-                model.title = expected.title;
-                model.karat = expected.karat;
-                model.weight = expected.weight;
-
-                if (expected.isSold) {
-                    model.status = "SOLD_WARNING";
-                    triggerSoldAlert(expected.title, model.epc);
-                    playAlertSound();
-                } else {
-                    model.status = "FOUND";
-                    playSuccessSound();
-                }
-            } else {
-                model.title = "قطعة غير مسجلة بالفرع";
-                model.karat = "—";
-                model.weight = 0.0;
-                model.status = "UNEXPECTED";
-                playWarningSound();
-            }
-
-            model.readCount = 1;
-            tagList.add(0, model);
-            isMissingCacheDirty = true;
-        }
-
-        // 3. تحديث بطاقة آخر وسم مقروء دائماً
-        updateLastTagCard(model);
+        
+        // تحديث بطاقة آخر وسم مقروء
+        updateLastTagCard(existingTag);
+        return;
     }
+    
+    // إذا لم يكن موجوداً، أضفه
+    ExpectedItem expected = expectedItemsMap.get(model.epc);
+    
+    if (expected != null) {
+        model.title = expected.title;
+        model.karat = expected.karat;
+        model.weight = expected.weight;
+
+        if (expected.isSold) {
+            model.status = "SOLD_WARNING";
+            triggerSoldAlert(expected.title, model.epc);
+            playAlertSound();
+        } else {
+            model.status = "FOUND";
+            playSuccessSound();
+        }
+    } else {
+        model.title = "قطعة غير مسجلة بالفرع";
+        model.karat = "—";
+        model.weight = 0.0;
+        model.status = "UNEXPECTED";
+        playWarningSound();
+    }
+
+    model.readCount = 1;
+    tagList.add(0, model);
+    tagMap.put(model.epc, model);
+    isMissingCacheDirty = true;
+    
+    updateLastTagCard(model);
+}
 
     private void checkInventoryCompletion() {
         int expectedCount = expectedItemsMap.size();
@@ -1980,4 +1990,4 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
             }
         }
     }
-}
+                        }
