@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.os.Build;
@@ -48,6 +49,10 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     private static final String TAG = "MiraReaderSetup";
     private static final String PREFS_NAME = "mira_reader_ui_settings";
     private static final int PERMISSION_REQUEST_CODE = 100;
+    
+    // ألوان الحالة
+    private static final String COLOR_ENABLED = "#16A34A";
+    private static final String COLOR_DISABLED = "#EF4444";
     
     private RecyclerView rvDevices;
     private MaterialButton btnAddDevice;
@@ -126,31 +131,18 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     
     private void initializeFragment(View view) {
         try {
-            // تهيئة المديرين
             rfidManager = RFIDManager.getInstance(requireContext());
             bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
             uiPrefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             
-            // تحميل الإعدادات
             isSoundEnabled = uiPrefs.getBoolean("sound_enabled", true);
             isVibrationEnabled = uiPrefs.getBoolean("vibration_enabled", true);
             
-            // تهيئة الصوت والاهتزاز
             initSoundAndVibration();
-            
-            // تسجيل مستقبل البلوتوث
             registerBluetoothReceiver();
-            
-            // ربط العناصر
             bindViews(view);
-            
-            // تهيئة القائمة
             setupRecyclerView();
-            
-            // تهيئة الأزرار
             setupButtons();
-            
-            // تحديث حالة الجهاز النشط
             updateActiveDeviceStatus();
             
         } catch (Exception e) {
@@ -347,13 +339,29 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     
     private void updateSoundButtonText() {
         if (btnSoundToggle != null) {
-            btnSoundToggle.setText(isSoundEnabled ? "🔊 الصوت: مفعل" : "🔇 الصوت: معطل");
+            if (isSoundEnabled) {
+                btnSoundToggle.setText(isArabic ? "🔊 الصوت: مفعل" : "🔊 Sound: ON");
+                btnSoundToggle.setStrokeColor(Color.parseColor(COLOR_ENABLED));
+                btnSoundToggle.setTextColor(Color.parseColor(COLOR_ENABLED));
+            } else {
+                btnSoundToggle.setText(isArabic ? "🔇 الصوت: معطل" : "🔇 Sound: OFF");
+                btnSoundToggle.setStrokeColor(Color.parseColor(COLOR_DISABLED));
+                btnSoundToggle.setTextColor(Color.parseColor(COLOR_DISABLED));
+            }
         }
     }
     
     private void updateVibrationButtonText() {
         if (btnVibrationToggle != null) {
-            btnVibrationToggle.setText(isVibrationEnabled ? "📳 الاهتزاز: مفعل" : "📴 الاهتزاز: معطل");
+            if (isVibrationEnabled) {
+                btnVibrationToggle.setText(isArabic ? "📳 الاهتزاز: مفعل" : "📳 Vibration: ON");
+                btnVibrationToggle.setStrokeColor(Color.parseColor(COLOR_ENABLED));
+                btnVibrationToggle.setTextColor(Color.parseColor(COLOR_ENABLED));
+            } else {
+                btnVibrationToggle.setText(isArabic ? "📴 الاهتزاز: معطل" : "📴 Vibration: OFF");
+                btnVibrationToggle.setStrokeColor(Color.parseColor(COLOR_DISABLED));
+                btnVibrationToggle.setTextColor(Color.parseColor(COLOR_DISABLED));
+            }
         }
     }
     
@@ -403,7 +411,6 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
                 return;
             }
             
-            // التحقق من الأذونات للأندرويد 12+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (ContextCompat.checkSelfPermission(requireContext(), 
                     Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
@@ -416,7 +423,6 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
             
             discoveredBtDevices.clear();
             
-            // إضافة الأجهزة المقترنة
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     if (ContextCompat.checkSelfPermission(requireContext(), 
@@ -785,9 +791,18 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
                 .setView(layout)
                 .setPositiveButton(isArabic ? "حفظ" : "Save", (d, w) -> {
                     try {
-                        try { device.setPowerDbm(Integer.parseInt(etPower.getText().toString())); } catch (Exception ignored) {}
-                        try { device.setRssiThreshold(Integer.parseInt(etRssi.getText().toString())); } catch (Exception ignored) {}
-                        try { device.setScanIntervalMs(Integer.parseInt(etInterval.getText().toString())); } catch (Exception ignored) {}
+                        try { 
+                            String powerText = etPower.getText() != null ? etPower.getText().toString().trim() : "";
+                            if (!powerText.isEmpty()) device.setPowerDbm(Integer.parseInt(powerText)); 
+                        } catch (Exception ignored) {}
+                        try { 
+                            String rssiText = etRssi.getText() != null ? etRssi.getText().toString().trim() : "";
+                            if (!rssiText.isEmpty()) device.setRssiThreshold(Integer.parseInt(rssiText)); 
+                        } catch (Exception ignored) {}
+                        try { 
+                            String intervalText = etInterval.getText() != null ? etInterval.getText().toString().trim() : "";
+                            if (!intervalText.isEmpty()) device.setScanIntervalMs(Integer.parseInt(intervalText)); 
+                        } catch (Exception ignored) {}
                         rfidManager.saveDevice(device);
                         playSuccessSound();
                         vibrateSuccess();
@@ -1042,4 +1057,4 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
             }
         }
     }
-                                                                                         }
+                    }
