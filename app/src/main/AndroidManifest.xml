@@ -1,26 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:versionCode="1" 
     android:versionName="1.0">
 
     <!-- أذونات التخزين -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" 
+        tools:ignore="ScopedStorage" />
+    
+    <!-- أذونات البلوتوث -->
+    <uses-permission android:name="android.permission.BLUETOOTH" 
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" 
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" 
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" 
+        tools:targetApi="s" />
+    
+    <!-- أذونات الموقع (مطلوبة للبلوتوث في الأندرويد القديم) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     
     <!-- أذونات الشبكة -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     
-    <!-- ✅ أذونات الكاميرا (جديد) -->
+    <!-- أذونات الكاميرا -->
     <uses-permission android:name="android.permission.CAMERA" />
     
-    <!-- ✅ إذن الكتابة للصور (لأجهزة أندرويد 13+) -->
+    <!-- إذن الكتابة للصور (لأجهزة أندرويد 13+) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    
+    <!-- إذن الاهتزاز -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- ✅ ميزات الجهاز المطلوبة -->
+    <!-- ميزات الجهاز المطلوبة -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -28,18 +54,23 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.Uhfuartdemo"
-        android:requestLegacyExternalStorage="true">
+        android:requestLegacyExternalStorage="true"
+        android:hardwareAccelerated="true"
+        android:largeHeap="true"
+        tools:targetApi="31">
 
         <activity
             android:name=".MainActivity"
-            android:exported="true" />
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name="com.example.uhf.activity.LoginActivity"
             android:screenOrientation="portrait"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.Uhfuartdemo">
+            android:theme="@style/Theme.Uhfuartdemo"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -51,35 +82,41 @@
             android:screenOrientation="portrait"
             android:exported="false"
             android:label="@string/app_name"
-            android:theme="@style/Theme.Uhfuartdemo" />
+            android:theme="@style/Theme.Uhfuartdemo"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <receiver
             android:name="com.example.uhf.BootBroadcastReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:enabled="true">
             <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
 
         <activity
             android:name="com.example.uhf.filebrowser.FileManagerActivity"
             android:screenOrientation="portrait"
-            android:exported="true" />
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name="com.example.uhf.activity.TestActivity"
             android:screenOrientation="portrait"
-            android:exported="true" />
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name="com.example.uhf.activity.ItemStudioActivity"
             android:screenOrientation="portrait"
             android:exported="false"
             android:label="MIRA Identity Studio"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
 
-        <!-- ✅ FileProvider للكاميرا (موجود مسبقاً - تأكد منه) -->
+        <!-- FileProvider للكاميرا -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
