@@ -20,15 +20,14 @@ public class MiraAccountingItem {
     private String currency;
     private String rfidEpc;
     private String dateCreated;
+    private double makingFee; // ✅ مضافة
 
-    // Default Constructor (مهم جداً عند استخدام الموديل مع библиотеки JSON)
     public MiraAccountingItem() {
         this.itemType = ItemType.JOURNAL_ENTRY;
         this.currency = "YER";
         this.dateCreated = "";
     }
 
-    // 1. المنشئ الكامل (للقيود اليومية)
     public MiraAccountingItem(ItemType itemType, String codeOrRef, String nameOrDesc,
                               double fineWeight24Debit, double fineWeight24Credit,
                               double debitCash, double creditCash, String currency, String dateCreated) {
@@ -43,13 +42,22 @@ public class MiraAccountingItem {
         this.dateCreated = dateCreated != null ? dateCreated : "";
     }
 
-    // 2. المنشئ المباشر/المبسط (لدليل الحسابات وميزان المراجعة)
     public MiraAccountingItem(ItemType itemType, String codeOrRef, String nameOrDesc,
                               double fineWeight24Debit, double debitCash, String currency) {
         this(itemType, codeOrRef, nameOrDesc, fineWeight24Debit, 0.0, debitCash, 0.0, currency, "");
     }
 
-    // تنسيق مخرجات الأسطر للـ Adapter
+    // ✅ الدالة التي كان يطلبها الـ ViewModel وحصل بسببها الخطأ
+    public static double convertToFineGold24(double grossWeight, int karat) {
+        if (karat <= 0) return 0.0;
+        return (grossWeight * karat) / 24.0;
+    }
+
+    public static double calculateFineWeight24(double grossWeight, int karat) {
+        return convertToFineGold24(grossWeight, karat);
+    }
+
+    // تنسيق المخرجات
     public String getCol1Text() { return codeOrRef != null ? codeOrRef : ""; }
     public String getCol2Text() { return nameOrDesc != null ? nameOrDesc : ""; }
     
@@ -69,13 +77,7 @@ public class MiraAccountingItem {
         return String.format(Locale.US, "%,.0f %s", debitCash, currency != null ? currency : "");
     }
 
-    public static double calculateFineWeight24(double grossWeight, int karat) {
-        if (karat <= 0) return 0.0;
-        return (grossWeight * karat) / 24.0;
-    }
-
-    // ================= Getters & Setters الكاملة =================
-
+    // Getters & Setters
     public ItemType getItemType() { return itemType; }
     public void setItemType(ItemType itemType) { this.itemType = itemType; }
 
@@ -105,4 +107,7 @@ public class MiraAccountingItem {
 
     public String getDateCreated() { return dateCreated; }
     public void setDateCreated(String dateCreated) { this.dateCreated = dateCreated; }
+
+    public double getMakingFee() { return makingFee; }
+    public void setMakingFee(double makingFee) { this.makingFee = makingFee; } // ✅ مضافة
 }
