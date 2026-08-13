@@ -154,6 +154,17 @@
     <string name="msg_mac_change">Changed</string>
     <string name="msg_mac_unmatched">Unmatched</string>
     
+    
+    <!--pos -->
+    <!-- MIRA Sales History Section -->
+<string name="sales_title">Sales History</string>
+<string name="sales_history_title">Sales History</string>
+<string name="total_sales">Total Sales</string>
+<string name="invoices_count">Invoices</string>
+<string name="sales_search_hint">Search by customer or invoice #...</string>
+<string name="search_sales_hint">Search by customer or invoice #...</string>
+<string name="sales_empty">📭 No sales recorded</string>
+
     <!-- App Center -->
     <string name="app_title">App Center</string>
     <string name="app_msg_exit_confirm">Press again to exit</string>
