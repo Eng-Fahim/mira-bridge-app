@@ -1,9 +1,11 @@
 package com.example.uhf.adapter;
 
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -15,18 +17,20 @@ import java.util.List;
 
 public class MiraAccountingAdapter extends RecyclerView.Adapter<MiraAccountingAdapter.AccountingViewHolder> {
 
-    private List<MiraAccountingItem> itemList = new ArrayList<>();
+    private final List<MiraAccountingItem> itemList = new ArrayList<>();
 
     public void setItems(List<MiraAccountingItem> items) {
-        this.itemList = items != null ? items : new ArrayList<>();
+        this.itemList.clear();
+        if (items != null) {
+            this.itemList.addAll(items);
+        }
         notifyDataSetChanged();
     }
 
     @NonNull
     @Override
     public AccountingViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_mira_accounting_row, parent, false);
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_mira_accounting_row, parent, false);
         return new AccountingViewHolder(view);
     }
 
@@ -34,10 +38,35 @@ public class MiraAccountingAdapter extends RecyclerView.Adapter<MiraAccountingAd
     public void onBindViewHolder(@NonNull AccountingViewHolder holder, int position) {
         MiraAccountingItem item = itemList.get(position);
 
-        if (holder.tvRowCol1 != null) holder.tvRowCol1.setText(item.getCol1Text());
-        if (holder.tvRowCol2 != null) holder.tvRowCol2.setText(item.getCol2Text());
-        if (holder.tvRowCol3 != null) holder.tvRowCol3.setText(item.getCol3Text());
-        if (holder.tvRowCol4 != null) holder.tvRowCol4.setText(item.getCol4Text());
+        // 1. تعبئة النصوص الرئيسية للأعمدة
+        holder.tvCol1.setText(item.getCol1Text());
+        holder.tvCol2.setText(item.getCol2Text());
+        holder.tvCol3.setText(item.getCol3Text());
+        holder.tvCol4.setText(item.getCol4Text());
+
+        // 2. التحكم بشارة الـ RFID بشكل ديناميكي
+        String rfid = item.getRfidEpc();
+        if (rfid != null && !rfid.trim().isEmpty()) {
+            holder.tvRfidTag.setText("RFID: " + rfid);
+            holder.tvRfidTag.setVisibility(View.VISIBLE);
+        } else {
+            holder.tvRfidTag.setVisibility(View.GONE);
+        }
+
+        // 3. تنسيق ألوان الأرقام المالية (ذهب ونقد) حسب طبيعة الحركة
+        if (item.getItemType() == MiraAccountingItem.ItemType.JOURNAL_ENTRY) {
+            double netGold = item.getFineWeight24Debit() - item.getFineWeight24Credit();
+            double netCash = item.getDebitCash() - item.getCreditCash();
+
+            // لون الذهب (ذهبي للمدين / أحمر للدائن)
+            holder.tvCol3.setTextColor(netGold >= 0 ? Color.parseColor("#D35400") : Color.parseColor("#E74C3C"));
+            // لون النقدية (أخضر للمدين / أحمر للدائن)
+            holder.tvCol4.setTextColor(netCash >= 0 ? Color.parseColor("#27AE60") : Color.parseColor("#E74C3C"));
+        } else {
+            // القيم الثابتة في دليل الحسابات والميزان
+            holder.tvCol3.setTextColor(Color.parseColor("#D35400"));
+            holder.tvCol4.setTextColor(Color.parseColor("#27AE60"));
+        }
     }
 
     @Override
@@ -46,14 +75,15 @@ public class MiraAccountingAdapter extends RecyclerView.Adapter<MiraAccountingAd
     }
 
     static class AccountingViewHolder extends RecyclerView.ViewHolder {
-        TextView tvRowCol1, tvRowCol2, tvRowCol3, tvRowCol4;
+        TextView tvCol1, tvCol2, tvCol3, tvCol4, tvRfidTag;
 
         public AccountingViewHolder(@NonNull View itemView) {
             super(itemView);
-            tvRowCol1 = itemView.findViewById(R.id.tvRowCol1);
-            tvRowCol2 = itemView.findViewById(R.id.tvRowCol2);
-            tvRowCol3 = itemView.findViewById(R.id.tvRowCol3);
-            tvRowCol4 = itemView.findViewById(R.id.tvRowCol4);
+            tvCol1 = itemView.findViewById(R.id.tvRowCol1);
+            tvCol2 = itemView.findViewById(R.id.tvRowCol2);
+            tvCol3 = itemView.findViewById(R.id.tvRowCol3);
+            tvCol4 = itemView.findViewById(R.id.tvRowCol4);
+            tvRfidTag = itemView.findViewById(R.id.tvRowRfidTag);
         }
     }
 }
