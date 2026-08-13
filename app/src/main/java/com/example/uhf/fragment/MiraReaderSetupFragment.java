@@ -6,13 +6,18 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.media.SoundPool;
+import android.media.AudioManager;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -34,24 +39,36 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * شاشة إعدادات قارئ RFID - نسخة متطورة
- * تدعم: اكتشاف تلقائي، إضافة يدوي، اختبار اتصال، إعدادات متقدمة، ماسح بلوتوث
+ * شاشة إعدادات قارئ RFID - نسخة متطورة كاملة
+ * تدعم: اكتشاف تلقائي، إضافة يدوي، اختبار اتصال، إعدادات متقدمة،
+ * ماسح بلوتوث، أصوات واهتزازات، بطاقات مخصصة
  */
 public class MiraReaderSetupFragment extends MiraBaseFragment {
 
     private static final String TAG = "MiraReaderSetup";
+    private static final String PREFS_NAME = "mira_reader_ui_settings";
     
     private RecyclerView rvDevices;
     private MaterialButton btnAddDevice;
     private MaterialButton btnTestConnection;
     private MaterialButton btnDetectAuto;
     private MaterialButton btnBluetoothScan;
+    private MaterialButton btnSoundToggle;
+    private MaterialButton btnVibrationToggle;
     private TextView tvActiveDeviceStatus;
     
     private RFIDManager rfidManager;
     private DeviceAdapter deviceAdapter;
     private BluetoothAdapter bluetoothAdapter;
     private final List<BluetoothDevice> discoveredBtDevices = new ArrayList<>();
+    
+    // 🔊 الصوت والاهتزاز
+    private SoundPool soundPool;
+    private int soundSuccessId, soundErrorId, soundClickId;
+    private Vibrator vibrator;
+    private boolean isSoundEnabled = true;
+    private boolean isVibrationEnabled = true;
+    private SharedPreferences uiPrefs;
     
     private final BroadcastReceiver bluetoothDiscoveryReceiver = new BroadcastReceiver() {
         @Override
@@ -81,13 +98,17 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         
         rfidManager = RFIDManager.getInstance(requireContext());
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        uiPrefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         
-        rvDevices = view.findViewById(R.id.rvReaderDevices);
-        btnAddDevice = view.findViewById(R.id.btnAddReader);
-        btnTestConnection = view.findViewById(R.id.btnTestConnection);
-        btnDetectAuto = view.findViewById(R.id.btnDetectAuto);
-        btnBluetoothScan = view.findViewById(R.id.btnBluetoothScan);
-        tvActiveDeviceStatus = view.findViewById(R.id.tvActiveDeviceStatus);
+        // ✅ تحميل إعدادات الصوت والاهتزاز
+        isSoundEnabled = uiPrefs.getBoolean("sound_enabled", true);
+        isVibrationEnabled = uiPrefs.getBoolean("vibration_enabled", true);
+        
+        // ✅ تهيئة الصوت
+        initSound();
+        
+        // ✅ تهيئة الاهتزاز
+        vibrator = (Vibrator) requireContext().getSystemService(Context.VIBRATOR_SERVICE);
         
         // ✅ تسجيل مستقبل اكتشاف البلوتوث
         IntentFilter filter = new IntentFilter();
@@ -95,24 +116,131 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
         requireContext().registerReceiver(bluetoothDiscoveryReceiver, filter);
         
+        // ✅ ربط العناصر
+        rvDevices = view.findViewById(R.id.rvReaderDevices);
+        btnAddDevice = view.findViewById(R.id.btnAddReader);
+        btnTestConnection = view.findViewById(R.id.btnTestConnection);
+        btnDetectAuto = view.findViewById(R.id.btnDetectAuto);
+        btnBluetoothScan = view.findViewById(R.id.btnBluetoothScan);
+        btnSoundToggle = view.findViewById(R.id.btnSoundToggle);
+        btnVibrationToggle = view.findViewById(R.id.btnVibrationToggle);
+        tvActiveDeviceStatus = view.findViewById(R.id.tvActiveDeviceStatus);
+        
         deviceAdapter = new DeviceAdapter(rfidManager.getAllDevices(), this::showDeviceOptions);
         rvDevices.setLayoutManager(new LinearLayoutManager(requireContext()));
         rvDevices.setAdapter(deviceAdapter);
         
-        btnAddDevice.setOnClickListener(v -> showAddDeviceDialog());
-        btnTestConnection.setOnClickListener(v -> testActiveConnection());
-        btnDetectAuto.setOnClickListener(v -> autoDetectDevice());
+        // ✅ الأزرار
+        btnAddDevice.setOnClickListener(v -> { playClickSound(); vibrateShort(); showAddDeviceDialog(); });
+        btnTestConnection.setOnClickListener(v -> { playClickSound(); vibrateShort(); testActiveConnection(); });
+        btnDetectAuto.setOnClickListener(v -> { playClickSound(); vibrateShort(); autoDetectDevice(); });
         
         if (btnBluetoothScan != null) {
-            btnBluetoothScan.setOnClickListener(v -> startBluetoothDiscovery());
+            btnBluetoothScan.setOnClickListener(v -> { playClickSound(); vibrateShort(); startBluetoothDiscovery(); });
+        }
+        
+        // ✅ أزرار الصوت والاهتزاز
+        updateSoundButtonText();
+        updateVibrationButtonText();
+        
+        if (btnSoundToggle != null) {
+            btnSoundToggle.setOnClickListener(v -> {
+                isSoundEnabled = !isSoundEnabled;
+                uiPrefs.edit().putBoolean("sound_enabled", isSoundEnabled).apply();
+                updateSoundButtonText();
+                playClickSound();
+            });
+        }
+        
+        if (btnVibrationToggle != null) {
+            btnVibrationToggle.setOnClickListener(v -> {
+                isVibrationEnabled = !isVibrationEnabled;
+                uiPrefs.edit().putBoolean("vibration_enabled", isVibrationEnabled).apply();
+                updateVibrationButtonText();
+                if (isVibrationEnabled) vibrateShort();
+            });
         }
         
         updateActiveDeviceStatus();
     }
     
-    /**
-     * ✅ تحديث حالة الجهاز النشط في الواجهة
-     */
+    // ==================== 🔊 الصوت والاهتزاز ====================
+    
+    private void initSound() {
+        try {
+            soundPool = new SoundPool.Builder().setMaxStreams(3).build();
+            soundSuccessId = soundPool.load(requireContext(), R.raw.barcodebeep, 1);
+            soundErrorId = soundPool.load(requireContext(), R.raw.serror, 1);
+            soundClickId = soundPool.load(requireContext(), R.raw.barcodebeep, 2);
+        } catch (Exception e) {
+            Log.e(TAG, "Sound init error: " + e.getMessage());
+        }
+    }
+    
+    private void playSuccessSound() {
+        if (soundPool != null && isSoundEnabled) {
+            soundPool.play(soundSuccessId, 0.7f, 0.7f, 1, 0, 1.0f);
+        }
+    }
+    
+    private void playErrorSound() {
+        if (soundPool != null && isSoundEnabled) {
+            soundPool.play(soundErrorId, 0.8f, 0.8f, 1, 0, 1.0f);
+        }
+    }
+    
+    private void playClickSound() {
+        if (soundPool != null && isSoundEnabled) {
+            soundPool.play(soundClickId, 0.5f, 0.5f, 1, 0, 1.0f);
+        }
+    }
+    
+    private void vibrateShort() {
+        if (vibrator != null && vibrator.hasVibrator() && isVibrationEnabled) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE));
+            } else {
+                vibrator.vibrate(50);
+            }
+        }
+    }
+    
+    private void vibrateSuccess() {
+        if (vibrator != null && vibrator.hasVibrator() && isVibrationEnabled) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createWaveform(
+                    new long[]{0, 50, 50, 50}, -1));
+            } else {
+                vibrator.vibrate(new long[]{0, 50, 50, 50}, -1);
+            }
+        }
+    }
+    
+    private void vibrateError() {
+        if (vibrator != null && vibrator.hasVibrator() && isVibrationEnabled) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createWaveform(
+                    new long[]{0, 100, 100, 100, 100, 100}, -1));
+            } else {
+                vibrator.vibrate(new long[]{0, 100, 100, 100, 100, 100}, -1);
+            }
+        }
+    }
+    
+    private void updateSoundButtonText() {
+        if (btnSoundToggle != null) {
+            btnSoundToggle.setText(isSoundEnabled ? "🔊 الصوت: مفعل" : "🔇 الصوت: معطل");
+        }
+    }
+    
+    private void updateVibrationButtonText() {
+        if (btnVibrationToggle != null) {
+            btnVibrationToggle.setText(isVibrationEnabled ? "📳 الاهتزاز: مفعل" : "📴 الاهتزاز: معطل");
+        }
+    }
+    
+    // ==================== حالة الجهاز النشط ====================
+    
     private void updateActiveDeviceStatus() {
         if (tvActiveDeviceStatus == null) return;
         
@@ -128,50 +256,52 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         }
     }
     
-    /**
-     * ✅ البحث عن أجهزة البلوتوث القريبة
-     */
+    // ==================== البحث عن البلوتوث ====================
+    
     private void startBluetoothDiscovery() {
         if (bluetoothAdapter == null) {
+            playErrorSound();
+            vibrateError();
             showToast(isArabic ? "الجهاز لا يدعم البلوتوث" : "Bluetooth not supported");
             return;
         }
         
         if (!bluetoothAdapter.isEnabled()) {
+            playErrorSound();
+            vibrateError();
             showToast(isArabic ? "يرجى تفعيل البلوتوث أولاً" : "Please enable Bluetooth first");
             return;
         }
         
         discoveredBtDevices.clear();
-        
-        // ✅ الأجهزة المقترنة أولاً
         Set<BluetoothDevice> paired = bluetoothAdapter.getBondedDevices();
         discoveredBtDevices.addAll(paired);
         
-        // ✅ بدء البحث
         bluetoothAdapter.startDiscovery();
         showLoadingDialog(isArabic ? "🔍 جاري البحث عن أجهزة البلوتوث..." : "🔍 Searching for Bluetooth devices...");
     }
     
-    /**
-     * ✅ عرض الأجهزة المكتشفة
-     */
     private void showDiscoveredBluetoothDevices() {
         dismissDialog(null);
         
         if (discoveredBtDevices.isEmpty()) {
+            playErrorSound();
+            vibrateError();
             showToast(isArabic ? "لم يتم العثور على أجهزة" : "No devices found");
             return;
         }
         
+        playSuccessSound();
+        
         String[] names = new String[discoveredBtDevices.size()];
         for (int i = 0; i < discoveredBtDevices.size(); i++) {
             BluetoothDevice d = discoveredBtDevices.get(i);
-            names[i] = d.getName() + " (" + d.getAddress() + ")";
+            String name = d.getName() != null ? d.getName() : "Unknown";
+            names[i] = name + " (" + d.getAddress() + ")";
         }
         
         new AlertDialog.Builder(requireContext())
-            .setTitle(isArabic ? "الأجهزة المكتشفة" : "Discovered Devices")
+            .setTitle(isArabic ? "الأجهزة المكتشفة (" + discoveredBtDevices.size() + ")" : "Discovered Devices (" + discoveredBtDevices.size() + ")")
             .setItems(names, (d, which) -> {
                 BluetoothDevice selected = discoveredBtDevices.get(which);
                 showAddressInputDialog(MiraIRFIDReader.ReaderType.GENERIC_BLUETOOTH, selected.getAddress());
@@ -180,9 +310,8 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
             .show();
     }
     
-    /**
-     * ✅ إضافة جهاز مع إعدادات متقدمة
-     */
+    // ==================== إضافة جهاز ====================
+    
     private void showAddDeviceDialog() {
         MiraIRFIDReader.ReaderType[] types = MiraIRFIDReader.ReaderType.values();
         String[] names = new String[types.length];
@@ -204,9 +333,6 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         builder.show();
     }
     
-    /**
-     * ✅ إدخال عنوان الجهاز
-     */
     private void showAddressInputDialog(MiraIRFIDReader.ReaderType type, String prefillAddress) {
         LinearLayout layout = new LinearLayout(requireContext());
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -228,32 +354,25 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         builder.show();
     }
     
-    /**
-     * ✅ إعدادات متقدمة للجهاز
-     */
     private void showAdvancedSettingsDialog(MiraIRFIDReader.ReaderType type, String address) {
         LinearLayout layout = new LinearLayout(requireContext());
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(40, 20, 40, 10);
         
-        // الاسم المخصص
         TextInputEditText etName = new TextInputEditText(requireContext());
         etName.setHint(isArabic ? "اسم مخصص (اختياري)" : "Custom name (optional)");
         layout.addView(etName);
         
-        // قوة الإرسال
         TextInputEditText etPower = new TextInputEditText(requireContext());
         etPower.setHint(isArabic ? "قوة الإرسال (dBm) - افتراضي 28" : "Power (dBm) - default 28");
         etPower.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         layout.addView(etPower);
         
-        // حساسية RSSI
         TextInputEditText etRssi = new TextInputEditText(requireContext());
         etRssi.setHint(isArabic ? "عتبة RSSI - افتراضي -70" : "RSSI Threshold - default -70");
         etRssi.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
         layout.addView(etRssi);
         
-        // فترة المسح
         TextInputEditText etInterval = new TextInputEditText(requireContext());
         etInterval.setHint(isArabic ? "فترة المسح (ms) - افتراضي 200" : "Scan interval (ms) - default 200");
         etInterval.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
@@ -266,23 +385,11 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
             RFIDDevice device = new RFIDDevice(type, address);
             
             String customName = etName.getText() != null ? etName.getText().toString().trim() : "";
-            if (!customName.isEmpty()) device.setCustomName(customName);
-            else device.setCustomName(type.displayName);
+            device.setCustomName(!customName.isEmpty() ? customName : type.displayName);
             
-            try {
-                int power = Integer.parseInt(etPower.getText().toString().trim());
-                device.setPowerDbm(power);
-            } catch (Exception ignored) {}
-            
-            try {
-                int rssi = Integer.parseInt(etRssi.getText().toString().trim());
-                device.setRssiThreshold(rssi);
-            } catch (Exception ignored) {}
-            
-            try {
-                int interval = Integer.parseInt(etInterval.getText().toString().trim());
-                device.setScanIntervalMs(interval);
-            } catch (Exception ignored) {}
+            try { device.setPowerDbm(Integer.parseInt(etPower.getText().toString().trim())); } catch (Exception ignored) {}
+            try { device.setRssiThreshold(Integer.parseInt(etRssi.getText().toString().trim())); } catch (Exception ignored) {}
+            try { device.setScanIntervalMs(Integer.parseInt(etInterval.getText().toString().trim())); } catch (Exception ignored) {}
             
             saveNewDevice(device);
         });
@@ -293,9 +400,15 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     private void saveNewDevice(RFIDDevice device) {
         boolean saved = rfidManager.saveDevice(device);
         if (saved) {
+            playSuccessSound();
+            vibrateSuccess();
             refreshDeviceList();
             updateActiveDeviceStatus();
             showToast(isArabic ? "✅ تم حفظ الجهاز" : "✅ Device saved");
+        } else {
+            playErrorSound();
+            vibrateError();
+            showToast(isArabic ? "❌ فشل الحفظ" : "❌ Save failed");
         }
     }
     
@@ -307,6 +420,9 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     
     private void autoDetectDevice() {
         MiraIRFIDReader.ReaderType detected = rfidManager.detectDeviceType();
+        
+        playSuccessSound();
+        vibrateShort();
         
         String message = isArabic ? "تم اكتشاف: " + detected.displayName 
             : "Detected: " + detected.displayName;
@@ -328,6 +444,8 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     private void testActiveConnection() {
         RFIDDevice active = rfidManager.getActiveDevice();
         if (active == null) {
+            playErrorSound();
+            vibrateError();
             showToast(isArabic ? "لا يوجد جهاز محفوظ" : "No saved device");
             return;
         }
@@ -338,13 +456,24 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
             boolean success = rfidManager.testConnection(active);
             safeRun(() -> {
                 dismissDialog(null);
-                showToast(success ? "✅ الاتصال ناجح" : "❌ فشل الاتصال");
+                if (success) {
+                    playSuccessSound();
+                    vibrateSuccess();
+                    showToast("✅ " + (isArabic ? "الاتصال ناجح" : "Connected"));
+                } else {
+                    playErrorSound();
+                    vibrateError();
+                    showToast("❌ " + (isArabic ? "فشل الاتصال" : "Connection failed"));
+                }
                 updateActiveDeviceStatus();
             });
         }).start();
     }
     
     private void showDeviceOptions(RFIDDevice device) {
+        playClickSound();
+        vibrateShort();
+        
         String[] options = {
             isArabic ? "تعيين كجهاز افتراضي" : "Set as Default",
             isArabic ? "اختبار الاتصال" : "Test Connection",
@@ -361,16 +490,19 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
                     case 1: testDevice(device); break;
                     case 2: showEditDeviceDialog(device); break;
                     case 3: showDeviceInfo(device); break;
-                    case 4: rfidManager.deleteDevice(device); refreshDeviceList(); updateActiveDeviceStatus(); break;
+                    case 4: 
+                        rfidManager.deleteDevice(device); 
+                        playClickSound();
+                        vibrateShort();
+                        refreshDeviceList(); 
+                        updateActiveDeviceStatus(); 
+                        break;
                 }
             })
             .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
             .show();
     }
     
-    /**
-     * ✅ تعديل إعدادات جهاز موجود
-     */
     private void showEditDeviceDialog(RFIDDevice device) {
         LinearLayout layout = new LinearLayout(requireContext());
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -399,15 +531,14 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
                 try { device.setRssiThreshold(Integer.parseInt(etRssi.getText().toString())); } catch (Exception ignored) {}
                 try { device.setScanIntervalMs(Integer.parseInt(etInterval.getText().toString())); } catch (Exception ignored) {}
                 rfidManager.saveDevice(device);
+                playSuccessSound();
+                vibrateSuccess();
                 refreshDeviceList();
             })
             .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
             .show();
     }
     
-    /**
-     * ✅ عرض معلومات الجهاز
-     */
     private void showDeviceInfo(RFIDDevice device) {
         String info = 
             (isArabic ? "النوع: " : "Type: ") + device.getType().displayName + "\n" +
@@ -429,6 +560,8 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         for (RFIDDevice d : rfidManager.getAllDevices()) {
             d.setDefault(d == device);
         }
+        playSuccessSound();
+        vibrateSuccess();
         refreshDeviceList();
         updateActiveDeviceStatus();
         showToast(isArabic ? "✅ تم التعيين كافتراضي" : "✅ Set as default");
@@ -440,7 +573,15 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
             boolean success = rfidManager.testConnection(device);
             safeRun(() -> {
                 dismissDialog(null);
-                showToast(success ? "✅ متصل" : "❌ غير متصل");
+                if (success) {
+                    playSuccessSound();
+                    vibrateSuccess();
+                    showToast("✅ " + (isArabic ? "متصل" : "Connected"));
+                } else {
+                    playErrorSound();
+                    vibrateError();
+                    showToast("❌ " + (isArabic ? "غير متصل" : "Disconnected"));
+                }
             });
         }).start();
     }
@@ -471,6 +612,10 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         } catch (Exception ignored) {}
         if (bluetoothAdapter != null) {
             bluetoothAdapter.cancelDiscovery();
+        }
+        if (soundPool != null) {
+            soundPool.release();
+            soundPool = null;
         }
     }
     
@@ -538,4 +683,4 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
             }
         }
     }
-}
+    }
