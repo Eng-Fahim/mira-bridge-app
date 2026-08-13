@@ -465,28 +465,35 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
             }
         });
     }
-
     private void setupZoneSpinner() {
-        List<String> zones = new ArrayList<>();
-        zones.add("الكل");
-        zones.add("واجهة العرض A");
-        zones.add("الخزينة الرئيسية");
-        zones.add("منطقة الصيانة");
+    List<String> zones = new ArrayList<>();
+    zones.add(isArabic ? "الكل" : "All");
+    zones.add(isArabic ? "خواتم" : "Rings");
+    zones.add(isArabic ? "أساور" : "Bracelets");
+    zones.add(isArabic ? "أطقم" : "Sets");
+    zones.add(isArabic ? "عقود" : "Necklaces");
+    zones.add(isArabic ? "سلاسل" : "Chains");
+    zones.add(isArabic ? "أقراط" : "Earrings");
+    zones.add(isArabic ? "مشغولات أخرى" : "Other Jewelry");
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), 
-                android.R.layout.simple_spinner_item, zones);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerZone.setAdapter(adapter);
+    ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), 
+            android.R.layout.simple_spinner_item, zones);
+    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    spinnerZone.setAdapter(adapter);
 
-        spinnerZone.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                selectedZone = zones.get(position);
+    spinnerZone.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        @Override
+        public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+            selectedZone = zones.get(position);
+            // ✅ إعادة تحميل المخزون حسب النوع المحدد
+            if (currentState == InventoryState.IDLE || currentState == InventoryState.COMPLETED) {
+                loadExpectedInventory();
             }
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {}
-        });
-    }
+        }
+        @Override
+        public void onNothingSelected(AdapterView<?> parent) {}
+    });
+}
 
     private void setInventoryState(InventoryState newState) {
         this.currentState = newState;
@@ -877,59 +884,113 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
         });
     }
 
-    private void loadExpectedInventory() {
-        setInventoryState(InventoryState.LOADING);
-        
-        networkExecutor.execute(() -> {
-            try {
-                MiraApiClient api = MiraApiClient.getInstance(requireContext());
-                MiraApiClient.ApiResponse response = api.getBranchItemsList(1);
-                
-                expectedItemsMap.clear();
 
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONArray items = response.data.optJSONArray("items");
-                    if (items != null) {
-                        for (int i = 0; i < items.length(); i++) {
-                            JSONObject obj = items.getJSONObject(i);
-                            String epc = obj.optString("serial_number", 
-                                    obj.optString("gtin13", obj.optString("epc", "")));
-                            
-                            if (!epc.isEmpty()) {
-                                ExpectedItem item = new ExpectedItem(
-                                        epc,
-                                        obj.optString("item_title", obj.optString("title", "قطعة غير معنونة")),
-                                        obj.optString("gold_karat", obj.optString("karat", "21k")),
-                                        obj.optDouble("gross_weight_grams", obj.optDouble("weight", 0.0)),
-                                        "SOLD".equalsIgnoreCase(obj.optString("status", ""))
-                                );
-                                expectedItemsMap.put(epc, item);
+private void loadExpectedInventory() {
+    setInventoryState(InventoryState.LOADING);
+    
+    networkExecutor.execute(() -> {
+        try {
+            MiraApiClient api = MiraApiClient.getInstance(requireContext());
+            
+            // ✅ استخدام الفرع النشط الفعلي
+            int branchId = 1;
+            try {
+                com.example.uhf.manager.MiraBranchesManager bm = 
+                    com.example.uhf.manager.MiraBranchesManager.getInstance(requireContext());
+                branchId = bm.getActiveBranchId();
+            } catch (Exception ignored) {}
+            
+            MiraApiClient.ApiResponse response = api.getBranchItemsList(branchId);
+            
+            expectedItemsMap.clear();
+
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONArray items = response.data.optJSONArray("items");
+                if (items != null) {
+                    for (int i = 0; i < items.length(); i++) {
+                        JSONObject obj = items.getJSONObject(i);
+                        String epc = obj.optString("serial_number", 
+                                obj.optString("gtin13", obj.optString("epc", "")));
+                        String category = obj.optString("jewelry_category", 
+                                obj.optString("category", ""));
+                        
+                        // ✅ تصفية حسب المنطقة (النوع) المحدد
+                        if (!selectedZone.equals("الكل") && !selectedZone.equals("All")) {
+                            String zoneArabic = getArabicCategory(selectedZone);
+                            String zoneEnglish = getEnglishCategory(selectedZone);
+                            if (!category.equalsIgnoreCase(zoneArabic) && 
+                                !category.equalsIgnoreCase(zoneEnglish) &&
+                                !category.contains(zoneArabic) &&
+                                !category.contains(zoneEnglish)) {
+                                continue; // تخطي هذا العنصر
                             }
+                        }
+                        
+                        if (!epc.isEmpty()) {
+                            ExpectedItem item = new ExpectedItem(
+                                    epc,
+                                    obj.optString("item_title", obj.optString("title", "قطعة غير معنونة")),
+                                    obj.optString("gold_karat", obj.optString("karat", "21k")),
+                                    obj.optDouble("gross_weight_grams", obj.optDouble("weight", 0.0)),
+                                    "SOLD".equalsIgnoreCase(obj.optString("status", ""))
+                            );
+                            expectedItemsMap.put(epc, item);
                         }
                     }
                 }
-
-                if (expectedItemsMap.isEmpty()) {
-                    loadDemoData();
-                }
-
-                mainHandler.post(() -> {
-                    isMissingCacheDirty = true;
-                    updateReconciliationStats();
-                    setInventoryState(InventoryState.IDLE);
-                });
-
-            } catch (Exception e) {
-                Log.e(TAG, "فشل جلب قائمة القطع المتوقعة: " + e.getMessage());
-                mainHandler.post(() -> {
-                    loadDemoData();
-                    isMissingCacheDirty = true;
-                    updateReconciliationStats();
-                    setInventoryState(InventoryState.IDLE);
-                });
             }
-        });
+
+            if (expectedItemsMap.isEmpty()) {
+                loadDemoData();
+            }
+
+            mainHandler.post(() -> {
+                isMissingCacheDirty = true;
+                updateReconciliationStats();
+                setInventoryState(InventoryState.IDLE);
+            });
+
+        } catch (Exception e) {
+            Log.e(TAG, "فشل جلب قائمة القطع المتوقعة: " + e.getMessage());
+            mainHandler.post(() -> {
+                loadDemoData();
+                isMissingCacheDirty = true;
+                updateReconciliationStats();
+                setInventoryState(InventoryState.IDLE);
+            });
+        }
+    });
+}
+
+/**
+ * تحويل اسم النوع من العربية إلى الإنجليزية للبحث في API
+ */
+private String getEnglishCategory(String arabicName) {
+    switch (arabicName) {
+        case "خواتم": return "Rings";
+        case "أساور": return "Bracelets";
+        case "أطقم": return "Sets";
+        case "عقود": return "Necklaces";
+        case "سلاسل": return "Chains";
+        case "أقراط": return "Earrings";
+        default: return arabicName;
     }
+}
+
+/**
+ * تحويل اسم النوع من الإنجليزية إلى العربية للبحث في API
+ */
+private String getArabicCategory(String englishName) {
+    switch (englishName) {
+        case "Rings": return "خواتم";
+        case "Bracelets": return "أساور";
+        case "Sets": return "أطقم";
+        case "Necklaces": return "عقود";
+        case "Chains": return "سلاسل";
+        case "Earrings": return "أقراط";
+        default: return englishName;
+    }
+}
 
     private void loadDemoData() {
         for (int i = 1; i <= 15; i++) {
@@ -1444,70 +1505,100 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     }
 
     private void uploadAuditToCloud() {
-        networkExecutor.execute(() -> {
-            try {
-                int found = 0;
-                int unexpected = 0;
-                int soldCount = 0;
-                for (ExpectedItem item : expectedItemsMap.values()) {
-                    if (item.isSold) soldCount++;
-                }
-                for (String epc : scannedEpcSet) {
-                    ExpectedItem item = expectedItemsMap.get(epc);
-                    if (item != null) {
-                        if (!item.isSold) found++;
-                    } else {
-                        unexpected++;
-                    }
-                }
-                int missing = Math.max(0, expectedItemsMap.size() - soldCount - found);
-                
-                JSONObject payload = new JSONObject();
-                payload.put("session_id", sessionId);
-                payload.put("zone", selectedZone);
-                payload.put("total_scanned", totalScannedCount);
-                payload.put("unique_count", scannedEpcSet.size());
-                payload.put("expected_count", expectedItemsMap.size());
-                payload.put("found_count", found);
-                payload.put("missing_count", missing);
-                payload.put("unexpected_count", unexpected);
-                payload.put("connection_type", activeConnectionType.name());
-                payload.put("branch_id", 1);
-
-                JSONArray scannedArray = new JSONArray();
-                for (String epc : scannedEpcSet) {
-                    scannedArray.put(epc);
-                }
-                payload.put("scanned_epcs", scannedArray);
-
-                MiraApiClient api = MiraApiClient.getInstance(requireContext());
-                MiraApiClient.ApiResponse res = api.closeInventorySession(payload);
-
-                final JSONObject reportData = (res != null && res.data != null) ? res.data : null;
-                
-                mainHandler.post(() -> {
-                    if (res != null && res.isSuccess) {
-                        setInventoryState(InventoryState.FINALIZED);
-                        if (reportData != null) {
-                            showAuditResultDialog(reportData);
-                        } else {
-                            Toast.makeText(getContext(), "✅ تم اعتماد الجرد بنجاح", Toast.LENGTH_LONG).show();
-                        }
-                    } else {
-                        String errorMsg = "❌ فشل رفع الجرد";
-                        if (res != null && res.data != null) {
-                            errorMsg = res.data.optString("message", errorMsg);
-                        }
-                        showErrorDialog(errorMsg);
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Upload error: " + e.getMessage());
-                mainHandler.post(() -> showErrorDialog("❌ خطأ: " + e.getMessage()));
+    networkExecutor.execute(() -> {
+        try {
+            // ✅ حساب الإحصائيات
+            int found = 0;
+            int unexpected = 0;
+            int soldCount = 0;
+            for (ExpectedItem item : expectedItemsMap.values()) {
+                if (item.isSold) soldCount++;
             }
-        });
-    }
+            for (String epc : scannedEpcSet) {
+                ExpectedItem item = expectedItemsMap.get(epc);
+                if (item != null) {
+                    if (!item.isSold) found++;
+                } else {
+                    unexpected++;
+                }
+            }
+            int missing = Math.max(0, expectedItemsMap.size() - soldCount - found);
+            
+            // ✅ جلب branch_id الفعلي
+            int branchId = 1;
+            try {
+                com.example.uhf.manager.MiraBranchesManager bm = 
+                    com.example.uhf.manager.MiraBranchesManager.getInstance(requireContext());
+                branchId = bm.getActiveBranchId();
+            } catch (Exception ignored) {}
+            
+            // ✅ بناء payload
+            JSONObject payload = new JSONObject();
+            payload.put("session_id", sessionId);
+            payload.put("zone", selectedZone);
+            payload.put("total_scanned", totalScannedCount);
+            payload.put("unique_count", scannedEpcSet.size());
+            payload.put("expected_count", expectedItemsMap.size());
+            payload.put("found_count", found);
+            payload.put("missing_count", missing);
+            payload.put("unexpected_count", unexpected);
+            payload.put("connection_type", activeConnectionType.name());
+            payload.put("branch_id", branchId);
 
+            // ✅ إرسال قائمة EPCs المقروءة
+            JSONArray scannedArray = new JSONArray();
+            for (String epc : scannedEpcSet) {
+                scannedArray.put(epc);
+            }
+            payload.put("scanned_epcs", scannedArray);
+
+            Log.e(TAG, "══════════ CLOSE INVENTORY ══════════");
+            Log.e(TAG, "Branch ID: " + branchId);
+            Log.e(TAG, "Zone: " + selectedZone);
+            Log.e(TAG, "Expected: " + expectedItemsMap.size());
+            Log.e(TAG, "Found: " + found);
+            Log.e(TAG, "Missing: " + missing);
+            Log.e(TAG, "Unexpected: " + unexpected);
+            Log.e(TAG, "Payload: " + payload.toString());
+
+            MiraApiClient api = MiraApiClient.getInstance(requireContext());
+            MiraApiClient.ApiResponse res = api.closeInventorySession(payload);
+
+            Log.e(TAG, "Response Code: " + (res != null ? res.code : "NULL"));
+            Log.e(TAG, "Response Success: " + (res != null ? res.isSuccess : "NULL"));
+            Log.e(TAG, "Response Data: " + (res != null && res.data != null ? res.data.toString() : "NULL"));
+
+            final JSONObject reportData = (res != null && res.data != null) ? res.data : null;
+            final int finalBranchId = branchId;
+            
+            mainHandler.post(() -> {
+                if (res != null && res.isSuccess) {
+                    setInventoryState(InventoryState.FINALIZED);
+                    
+                    // ✅ عرض التقرير
+                    if (reportData != null) {
+                        showAuditResultDialog(reportData);
+                    } else {
+                        showToast("✅ تم اعتماد الجرد بنجاح - الفرع: " + finalBranchId);
+                    }
+                } else {
+                    String errorMsg = "❌ فشل رفع الجرد";
+                    if (res != null && res.data != null) {
+                        errorMsg = res.data.optString("message", errorMsg);
+                    }
+                    if (res != null && res.error != null) {
+                        errorMsg += "\n" + res.error;
+                    }
+                    showErrorDialog(errorMsg);
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Upload error: " + e.getMessage());
+            e.printStackTrace();
+            mainHandler.post(() -> showErrorDialog("❌ خطأ: " + e.getMessage()));
+        }
+    });
+}
     private void showAuditResultDialog(JSONObject data) {
         try {
             JSONObject report = data.optJSONObject("report");
@@ -1878,4 +1969,4 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
             }
         }
     }
-        }
+                }
