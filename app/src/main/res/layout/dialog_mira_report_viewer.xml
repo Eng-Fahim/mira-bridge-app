@@ -110,12 +110,46 @@
             app:cornerRadius="6dp" />
     </LinearLayout>
 
-    <!-- WebView Content -->
-    <WebView
-        android:id="@+id/webReportView"
+    <!-- Content Container (WebView + Native Loading View) -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1">
+
+        <!-- WebView Content -->
+        <WebView
+            android:id="@+id/webReportView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Native Loading Overlay Container -->
+        <LinearLayout
+            android:id="@+id/layoutLoadingContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <ProgressBar
+                android:id="@+id/progressReportLoading"
+                android:layout_width="48dp"
+                android:layout_height="48dp" />
+
+            <TextView
+                android:id="@+id/tvLoadingStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="جاري معالجة بيانات الذهب والمخزون..."
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+    </FrameLayout>
 
     <!-- Footer Actions -->
     <LinearLayout
