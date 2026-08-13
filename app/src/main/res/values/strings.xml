@@ -1146,8 +1146,11 @@
     <string name="volum_title_voice_alarm">المنبه</string>
     <string name="app_msg_init">جاري التهيئة...</string>
 
-    <string name="app_msg_Upgrade">جاري التحديث...\nلا تخرج لتجنب تلف الجهاز</string>
-
+    <string name="app_msg_Upgrade">جاري التحديث...\nلا تخرج لتجنب تلف الجهاز</stri
+    
+    <string name="total_sales">إجمالي المبيعات</string>
+    <string name="invoices_count">عدد الفواتير</string>
+    
 
     <string name="title_activity_light_and_psensor">المستشعر</string>
     <string name="lp_btn_open">فتح</string>
