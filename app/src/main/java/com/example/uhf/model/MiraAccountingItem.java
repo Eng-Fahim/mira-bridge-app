@@ -1,196 +1,75 @@
-package com.example.uhf.model;
+package com.example.uhf.adapter;
 
-import java.io.Serializable;
-import java.text.DecimalFormat;
+import android.graphics.Color;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
 
-public class MiraAccountingItem implements Serializable {
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
 
-    public enum ItemType {
-        JOURNAL_ENTRY,     
-        CHART_OF_ACCOUNT,  
-        TRIAL_BALANCE,     
-        GOLD_TRANSFER      
+import com.example.uhf.R;
+import com.example.uhf.model.MiraAccountingItem;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class MiraAccountingAdapter extends RecyclerView.Adapter<MiraAccountingAdapter.AccountingViewHolder> {
+
+    private final List<MiraAccountingItem> itemList = new ArrayList<>();
+
+    public void setItems(List<MiraAccountingItem> items) {
+        this.itemList.clear();
+        if (items != null) {
+            this.itemList.addAll(items);
+        }
+        notifyDataSetChanged();
     }
 
-    public enum AccountCategory {
-        ASSET_CASH,        
-        ASSET_GOLD,        
-        LIABILITY,         
-        EQUITY,            
-        REVENUE,           
-        EXPENSE            
+    @NonNull
+    @Override
+    public AccountingViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_mira_accounting_row, parent, false);
+        return new AccountingViewHolder(view);
     }
 
-    private String id;
-    private ItemType itemType = ItemType.JOURNAL_ENTRY;
-    private String accountCode = "";
-    private String accountName = "";
-    private String description = "";
-    private String referenceNo = "";     
-    private String date = "";
+    @Override
+    public void onBindViewHolder(@NonNull AccountingViewHolder holder, int position) {
+        MiraAccountingItem item = itemList.get(position);
 
-    private double debitCash = 0.0;
-    private double creditCash = 0.0;
-    private double balanceCash = 0.0;
-    private String currency = "YER";
+        holder.tvCol1.setText(item.getCol1Text());
+        holder.tvCol2.setText(item.getCol2Text());
+        holder.tvCol3.setText(item.getCol3Text());
+        holder.tvCol4.setText(item.getCol4Text());
 
-    private double grossWeight = 0.0;     
-    private int karat = 0;                
-    private double fineWeight24Debit = 0.0;  
-    private double fineWeight24Credit = 0.0; 
-    private double netGoldBalance = 0.0;     
+        // تمييز ألوان القيم المحاسبية (الذهب الصافي والأموال)
+        if (item.getItemType() == MiraAccountingItem.ItemType.JOURNAL_ENTRY) {
+            double netGold = item.getFineWeight24Debit() - item.getFineWeight24Credit();
+            double netCash = item.getDebitCash() - item.getCreditCash();
 
-    private double makingFee = 0.0;       
-    private String rfidEpc = "";         
-    private AccountCategory category;
-
-    private static final DecimalFormat dfGold = new DecimalFormat("#,##0.000");
-    private static final DecimalFormat dfCash = new DecimalFormat("#,##0.00");
-
-    public MiraAccountingItem() {}
-
-    // Constructor 1: القيود اليومية مع التاريخ
-    public MiraAccountingItem(ItemType itemType, String referenceNo, String description,
-                                double fineWeight24Debit, double fineWeight24Credit,
-                                double debitCash, double creditCash, String currency, String date) {
-        this.itemType = itemType;
-        this.referenceNo = referenceNo;
-        this.description = description;
-        this.fineWeight24Debit = fineWeight24Debit;
-        this.fineWeight24Credit = fineWeight24Credit;
-        this.debitCash = debitCash;
-        this.creditCash = creditCash;
-        this.currency = currency != null ? currency : "YER";
-        this.date = date;
-    }
-
-    // Constructor 2: القيود بدون تاريخ
-    public MiraAccountingItem(ItemType itemType, String referenceNo, String description,
-                                double debitCash, double creditCash,
-                                double fineWeight24Debit, double fineWeight24Credit,
-                                String currency) {
-        this(itemType, referenceNo, description, fineWeight24Debit, fineWeight24Credit, debitCash, creditCash, currency, "");
-    }
-
-    // Constructor 3: دليل الحسابات وميزان المراجعة
-    public MiraAccountingItem(ItemType itemType, String accountCode, String accountName,
-                                double netGoldBalance, double balanceCash, String currency) {
-        this.itemType = itemType;
-        this.accountCode = accountCode;
-        this.accountName = accountName;
-        this.netGoldBalance = netGoldBalance;
-        this.balanceCash = balanceCash;
-        this.currency = currency != null ? currency : "YER";
-    }
-
-    public static double calculateFineWeight24(double grossWeight, int karat) {
-        if (karat <= 0) return 0.0;
-        return (grossWeight * karat) / 24.0;
-    }
-
-    public static double convertToFineGold24(double grossWeight, int karat) {
-        return calculateFineWeight24(grossWeight, karat);
-    }
-
-    // Getters and Setters
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-
-    public ItemType getItemType() { return itemType != null ? itemType : ItemType.JOURNAL_ENTRY; }
-    public void setItemType(ItemType itemType) { this.itemType = itemType; }
-
-    public String getAccountCode() { return accountCode != null ? accountCode : ""; }
-    public void setAccountCode(String accountCode) { this.accountCode = accountCode; }
-
-    public String getAccountName() { return accountName != null ? accountName : ""; }
-    public void setAccountName(String accountName) { this.accountName = accountName; }
-
-    public String getDescription() { return description != null ? description : ""; }
-    public void setDescription(String description) { this.description = description; }
-
-    public String getReferenceNo() { return referenceNo != null ? referenceNo : ""; }
-    public void setReferenceNo(String referenceNo) { this.referenceNo = referenceNo; }
-
-    public String getDate() { return date != null ? date : ""; }
-    public void setDate(String date) { this.date = date; }
-
-    public double getDebitCash() { return debitCash; }
-    public void setDebitCash(double debitCash) { this.debitCash = debitCash; }
-
-    public double getCreditCash() { return creditCash; }
-    public void setCreditCash(double creditCash) { this.creditCash = creditCash; }
-
-    public double getBalanceCash() { return balanceCash; }
-    public double getCashBalance() { return balanceCash; }
-    public void setBalanceCash(double balanceCash) { this.balanceCash = balanceCash; }
-
-    public String getCurrency() { return currency != null ? currency : "YER"; }
-    public void setCurrency(String currency) { this.currency = currency; }
-
-    public double getGrossWeight() { return grossWeight; }
-    public void setGrossWeight(double grossWeight) {
-        this.grossWeight = grossWeight;
-        if (this.karat > 0) {
-            this.fineWeight24Debit = calculateFineWeight24(grossWeight, this.karat);
+            holder.tvCol3.setTextColor(netGold >= 0 ? Color.parseColor("#F1C40F") : Color.parseColor("#E74C3C"));
+            holder.tvCol4.setTextColor(netCash >= 0 ? Color.parseColor("#2ECC71") : Color.parseColor("#E74C3C"));
+        } else {
+            holder.tvCol3.setTextColor(Color.parseColor("#F1C40F"));
+            holder.tvCol4.setTextColor(Color.parseColor("#2ECC71"));
         }
     }
 
-    public int getKarat() { return karat; }
-    public void setKarat(int karat) {
-        this.karat = karat;
-        if (this.grossWeight > 0) {
-            this.fineWeight24Debit = calculateFineWeight24(this.grossWeight, karat);
+    @Override
+    public int getItemCount() {
+        return itemList.size();
+    }
+
+    static class AccountingViewHolder extends RecyclerView.ViewHolder {
+        TextView tvCol1, tvCol2, tvCol3, tvCol4;
+
+        public AccountingViewHolder(@NonNull View itemView) {
+            super(itemView);
+            tvCol1 = itemView.findViewById(R.id.tvRowCol1);
+            tvCol2 = itemView.findViewById(R.id.tvRowCol2);
+            tvCol3 = itemView.findViewById(R.id.tvRowCol3);
+            tvCol4 = itemView.findViewById(R.id.tvRowCol4);
         }
-    }
-
-    public double getFineWeight24Debit() { return fineWeight24Debit; }
-    public double getFineGold24Debit() { return fineWeight24Debit; }
-    public void setFineWeight24Debit(double fineWeight24Debit) { this.fineWeight24Debit = fineWeight24Debit; }
-
-    public double getFineWeight24Credit() { return fineWeight24Credit; }
-    public double getFineGold24Credit() { return fineWeight24Credit; }
-    public void setFineWeight24Credit(double fineWeight24Credit) { this.fineWeight24Credit = fineWeight24Credit; }
-
-    public double getNetGoldBalance() { return netGoldBalance; }
-    public double getFineGoldBalance() { return netGoldBalance; }
-    public void setNetGoldBalance(double netGoldBalance) { this.netGoldBalance = netGoldBalance; }
-
-    public double getMakingFee() { return makingFee; }
-    public void setMakingFee(double makingFee) { this.makingFee = makingFee; }
-
-    public String getRfidEpc() { return rfidEpc != null ? rfidEpc : ""; }
-    public String getRfidTag() { return getRfidEpc(); }
-    public void setRfidEpc(String rfidEpc) { this.rfidEpc = rfidEpc; }
-    public void setRfidTag(String rfidTag) { setRfidEpc(rfidTag); }
-
-    public AccountCategory getCategory() { return category; }
-    public void setCategory(AccountCategory category) { this.category = category; }
-
-    // Getters متوافقة مع الـ Adapter
-    public String getCodeOrRef() { 
-        return !getAccountCode().isEmpty() ? getAccountCode() : getReferenceNo(); 
-    }
-    
-    public String getNameOrDesc() { 
-        return !getAccountName().isEmpty() ? getAccountName() : getDescription(); 
-    }
-
-    public String getCol1Text() { return getCodeOrRef(); }
-    public String getCol2Text() { return getNameOrDesc(); }
-    
-    public String getCol3Text() { 
-        if (getItemType() == ItemType.JOURNAL_ENTRY) {
-            double netGold = fineWeight24Debit - fineWeight24Credit;
-            return dfGold.format(netGold) + " جم";
-        }
-        return dfGold.format(netGoldBalance) + " جم 24";
-    }
-    
-    public String getCol4Text() { 
-        if (getItemType() == ItemType.JOURNAL_ENTRY) {
-            double netCash = debitCash - creditCash;
-            return dfCash.format(netCash) + " " + getCurrency();
-        }
-        return dfCash.format(balanceCash) + " " + getCurrency();
     }
 }
