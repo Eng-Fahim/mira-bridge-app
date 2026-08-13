@@ -20,7 +20,7 @@ public class MiraAccountingItem {
     private String currency;
     private String rfidEpc;
     private String dateCreated;
-    private double makingFee; // ✅ مضافة
+    private double makingFee;
 
     public MiraAccountingItem() {
         this.itemType = ItemType.JOURNAL_ENTRY;
@@ -47,7 +47,6 @@ public class MiraAccountingItem {
         this(itemType, codeOrRef, nameOrDesc, fineWeight24Debit, 0.0, debitCash, 0.0, currency, "");
     }
 
-    // ✅ الدالة التي كان يطلبها الـ ViewModel وحصل بسببها الخطأ
     public static double convertToFineGold24(double grossWeight, int karat) {
         if (karat <= 0) return 0.0;
         return (grossWeight * karat) / 24.0;
@@ -57,12 +56,21 @@ public class MiraAccountingItem {
         return convertToFineGold24(grossWeight, karat);
     }
 
+    // ✅ دوال المحاسبة ورصيد الذهب والنقدية المضافة لحل الخطأ
+    public double getCashBalance() {
+        return debitCash - creditCash;
+    }
+
+    public double getFineGoldBalance() {
+        return fineWeight24Debit - fineWeight24Credit;
+    }
+
     // تنسيق المخرجات
     public String getCol1Text() { return codeOrRef != null ? codeOrRef : ""; }
     public String getCol2Text() { return nameOrDesc != null ? nameOrDesc : ""; }
     
     public String getCol3Text() {
-        double netGold = fineWeight24Debit - fineWeight24Credit;
+        double netGold = getFineGoldBalance();
         if (itemType == ItemType.JOURNAL_ENTRY) {
             return String.format(Locale.US, "%.3f جم", netGold);
         }
@@ -70,7 +78,7 @@ public class MiraAccountingItem {
     }
 
     public String getCol4Text() {
-        double netCash = debitCash - creditCash;
+        double netCash = getCashBalance();
         if (itemType == ItemType.JOURNAL_ENTRY) {
             return String.format(Locale.US, "%,.0f %s", netCash, currency != null ? currency : "");
         }
@@ -105,9 +113,13 @@ public class MiraAccountingItem {
     public String getRfidEpc() { return rfidEpc; }
     public void setRfidEpc(String rfidEpc) { this.rfidEpc = rfidEpc; }
 
+    // ✅ اسم تجميعي مضاف ليعالج setRfidTag
+    public void setRfidTag(String tag) { this.rfidEpc = tag; }
+    public String getRfidTag() { return rfidEpc; }
+
     public String getDateCreated() { return dateCreated; }
     public void setDateCreated(String dateCreated) { this.dateCreated = dateCreated; }
 
     public double getMakingFee() { return makingFee; }
-    public void setMakingFee(double makingFee) { this.makingFee = makingFee; } // ✅ مضافة
+    public void setMakingFee(double makingFee) { this.makingFee = makingFee; }
 }
