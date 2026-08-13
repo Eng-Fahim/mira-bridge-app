@@ -110,6 +110,8 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     private ProgressBar pbScanProgress;
     private TextView tabFilterAll, tabFilterFound, tabFilterMissing, tabFilterUnexpected;
     private RecyclerView rvRecentTags;
+    private boolean isZoneSpinnerInitialized = false;
+    
 
     // RFID Manager
     private RFIDManager rfidManager;
@@ -465,7 +467,8 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
             }
         });
     }
-    private void setupZoneSpinner() {
+    
+private void setupZoneSpinner() {
     List<String> zones = new ArrayList<>();
     zones.add(isArabic ? "الكل" : "All");
     zones.add(isArabic ? "خواتم" : "Rings");
@@ -484,17 +487,24 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     spinnerZone.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
         @Override
         public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+            // ✅ تجاهل أول استدعاء تلقائي
+            if (!isZoneSpinnerInitialized) {
+                isZoneSpinnerInitialized = true;
+                return;
+            }
+            
             selectedZone = zones.get(position);
-            // ✅ إعادة تحميل المخزون حسب النوع المحدد
+            
+            // ✅ تأكد من أن الحالة مناسبة
             if (currentState == InventoryState.IDLE || currentState == InventoryState.COMPLETED) {
                 loadExpectedInventory();
             }
         }
+        
         @Override
         public void onNothingSelected(AdapterView<?> parent) {}
     });
 }
-
     private void setInventoryState(InventoryState newState) {
         this.currentState = newState;
 
@@ -884,7 +894,6 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
         });
     }
 
-
 private void loadExpectedInventory() {
     setInventoryState(InventoryState.LOADING);
     
@@ -892,7 +901,6 @@ private void loadExpectedInventory() {
         try {
             MiraApiClient api = MiraApiClient.getInstance(requireContext());
             
-            // ✅ استخدام الفرع النشط الفعلي
             int branchId = 1;
             try {
                 com.example.uhf.manager.MiraBranchesManager bm = 
@@ -900,7 +908,20 @@ private void loadExpectedInventory() {
                 branchId = bm.getActiveBranchId();
             } catch (Exception ignored) {}
             
-            MiraApiClient.ApiResponse response = api.getBranchItemsList(branchId);
+            // ✅ استخدم دالة واحدة فقط
+            String categoryFilter = null;
+            if (!selectedZone.equals("الكل") && !selectedZone.equals("All")) {
+                categoryFilter = getEnglishCategory(selectedZone);
+            }
+            
+            MiraApiClient.ApiResponse response;
+            if (categoryFilter != null) {
+                // ✅ إذا تم تحديد نوع معين - استخدم الدالة الجديدة
+                response = api.getBranchItemsByCategory(branchId, categoryFilter);
+            } else {
+                // ✅ إذا "الكل" - استخدم الدالة الأصلية
+                response = api.getBranchItemsList(branchId);
+            }
             
             expectedItemsMap.clear();
 
@@ -911,20 +932,6 @@ private void loadExpectedInventory() {
                         JSONObject obj = items.getJSONObject(i);
                         String epc = obj.optString("serial_number", 
                                 obj.optString("gtin13", obj.optString("epc", "")));
-                        String category = obj.optString("jewelry_category", 
-                                obj.optString("category", ""));
-                        
-                        // ✅ تصفية حسب المنطقة (النوع) المحدد
-                        if (!selectedZone.equals("الكل") && !selectedZone.equals("All")) {
-                            String zoneArabic = getArabicCategory(selectedZone);
-                            String zoneEnglish = getEnglishCategory(selectedZone);
-                            if (!category.equalsIgnoreCase(zoneArabic) && 
-                                !category.equalsIgnoreCase(zoneEnglish) &&
-                                !category.contains(zoneArabic) &&
-                                !category.contains(zoneEnglish)) {
-                                continue; // تخطي هذا العنصر
-                            }
-                        }
                         
                         if (!epc.isEmpty()) {
                             ExpectedItem item = new ExpectedItem(
@@ -1969,4 +1976,4 @@ private String getArabicCategory(String englishName) {
             }
         }
     }
-                }
+                    }
