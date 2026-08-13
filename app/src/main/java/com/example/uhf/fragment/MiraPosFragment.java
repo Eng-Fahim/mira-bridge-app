@@ -18,7 +18,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -30,6 +29,8 @@ import com.example.uhf.dialog.POSCheckoutDialog;
 import com.example.uhf.engine.SmartScaleConnector;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.tools.UIHelper;
+import com.example.uhf.MiraRfid.MiraIRFIDReader;
+import com.example.uhf.MiraRfid.RFIDManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -42,7 +43,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-public class MiraPosFragment extends Fragment {
+public class MiraPosFragment extends MiraBaseFragment {
 
     private static final String TAG = "MiraPosFragment";
     private static final String PENDING_SALES_PREFS = "pos_pending_sales";
@@ -54,6 +55,10 @@ public class MiraPosFragment extends Fragment {
     private double goldPrice18K = 56.25;
     private double makingChargePerGram = 10.0;
     private double profitMarginPercent = 90.0;
+
+    // RFID Manager
+    private RFIDManager rfidManager;
+    private boolean isRFIDScanActive = false;
 
     // UI Elements
     private TextView tvScaleStatus, tvItemCount, tvTotalAmount, tvCartStatus;
@@ -106,6 +111,33 @@ public class MiraPosFragment extends Fragment {
         branchesManager = MiraBranchesManager.getInstance(ctx);
         isArabic = Locale.getDefault().getLanguage().equals("ar");
 
+        // ✅ تهيئة RFID Manager
+        rfidManager = RFIDManager.getInstance(ctx);
+        rfidManager.setListener(new MiraIRFIDReader.OnTagReadListener() {
+            @Override
+            public void onTagRead(String epc, int rssi) {
+                if (isRFIDScanActive) {
+                    onRingScanned(epc);
+                }
+            }
+            @Override
+            public void onScanStarted() {
+                Log.i(TAG, "RFID Scan Started");
+            }
+            @Override
+            public void onScanStopped() {
+                Log.i(TAG, "RFID Scan Stopped");
+            }
+            @Override
+            public void onConnectionChanged(boolean connected) {
+                Log.i(TAG, "RFID Connection: " + connected);
+            }
+            @Override
+            public void onError(String error) {
+                Log.e(TAG, "RFID Error: " + error);
+            }
+        });
+
         bindViews(view);
         setupRecyclerView();
         setupListeners();
@@ -133,6 +165,7 @@ public class MiraPosFragment extends Fragment {
     @Override
     public void onPause() {
         super.onPause();
+        stopRFIDScan();
         if (getActivity() instanceof UHFMainActivity)
             ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
     }
@@ -178,7 +211,7 @@ public class MiraPosFragment extends Fragment {
         }
     }
 
-    // ==================== 🟢 جلب أسعار الذهب من السيرفر ====================
+    // ==================== 🟢 جلب أسعار الذهب ====================
 
     private void loadGoldRates() {
         new Thread(() -> {
@@ -203,7 +236,6 @@ public class MiraPosFragment extends Fragment {
                     if (margins != null) {
                         profitMarginPercent = margins.optDouble("21K", 90.0);
                     }
-                    Log.i(TAG, "Gold rates loaded successfully");
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error loading gold rates: " + e.getMessage());
@@ -308,7 +340,6 @@ public class MiraPosFragment extends Fragment {
                     }
                 });
             }
-
             @Override
             public void onScaleConnected(String n) {
                 safeRun(() -> {
@@ -318,7 +349,6 @@ public class MiraPosFragment extends Fragment {
                     }
                 });
             }
-
             @Override
             public void onScaleDisconnected() {
                 liveScaleWeight = 0.0;
@@ -329,7 +359,6 @@ public class MiraPosFragment extends Fragment {
                     }
                 });
             }
-
             @Override
             public void onScaleError(String e) {
                 Log.e(TAG, "Scale: " + e);
@@ -357,9 +386,13 @@ public class MiraPosFragment extends Fragment {
                 .commit();
     }
 
+    // ==================== RFID ====================
+
     private void toggleRFIDMode() {
         isRFIDModeActive = !isRFIDModeActive;
+        
         if (isRFIDModeActive) {
+            startRFIDScan();
             if (btnPosRFIDMode != null) {
                 btnPosRFIDMode.setText(isArabic ? "📡 RFID نشط" : "📡 RFID Active");
                 btnPosRFIDMode.setTextColor(Color.WHITE);
@@ -368,9 +401,8 @@ public class MiraPosFragment extends Fragment {
                 tvCartStatus.setText(isArabic ? "📡 جاهز لمسح RFID..." : "📡 Ready for RFID scan...");
                 tvCartStatus.setTextColor(Color.parseColor("#4ADE80"));
             }
-            if (getActivity() instanceof UHFMainActivity)
-                ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
         } else {
+            stopRFIDScan();
             if (btnPosRFIDMode != null) {
                 btnPosRFIDMode.setText(isArabic ? "📡 مسح RFID" : "📡 Scan RFID");
                 btnPosRFIDMode.setTextColor(Color.WHITE);
@@ -379,9 +411,23 @@ public class MiraPosFragment extends Fragment {
                 tvCartStatus.setText(isArabic ? "جاهز لمسح القطع..." : "Ready to scan items...");
                 tvCartStatus.setTextColor(Color.parseColor("#94A3B8"));
             }
-            if (getActivity() instanceof UHFMainActivity)
-                ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
         }
+    }
+
+    /**
+     * ✅ بدء مسح RFID الفعلي
+     */
+    private void startRFIDScan() {
+        isRFIDScanActive = true;
+        rfidManager.startScan();
+    }
+
+    /**
+     * ✅ إيقاف مسح RFID
+     */
+    private void stopRFIDScan() {
+        isRFIDScanActive = false;
+        rfidManager.stopScan();
     }
 
     // ==================== مسح القطع ====================
@@ -594,14 +640,12 @@ public class MiraPosFragment extends Fragment {
                 payload.put("gate_id", client.getGateId());
                 payload.put("branch_id", getActiveBranchId());
 
-                // بيانات العميل
                 JSONObject customer = new JSONObject();
                 customer.put("name", data.customerName);
                 customer.put("phone", data.customerPhone);
                 customer.put("payment_method", data.paymentMethod);
                 payload.put("customer", customer);
 
-                // أصناف الفاتورة
                 JSONArray itemsArr = new JSONArray();
                 for (CartItem item : cartList) {
                     JSONObject obj = new JSONObject();
@@ -617,7 +661,6 @@ public class MiraPosFragment extends Fragment {
                 }
                 payload.put("items", itemsArr);
 
-                // التفاصيل المالية والمحاسبية
                 JSONObject payment = new JSONObject();
                 payment.put("subtotal", getCartTotal());
                 payment.put("discount_percent", data.discount);
@@ -942,7 +985,9 @@ public class MiraPosFragment extends Fragment {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        stopRFIDScan();
         if (scaleConnector != null) scaleConnector.disconnect();
+        if (rfidManager != null) rfidManager.release();
     }
 
     // ==================== Adapter ====================
@@ -1014,4 +1059,4 @@ public class MiraPosFragment extends Fragment {
             }
         }
     }
-        }
+}
