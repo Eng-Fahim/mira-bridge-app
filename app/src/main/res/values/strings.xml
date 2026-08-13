@@ -386,12 +386,6 @@
         <item>24</item>
     </string-array>
 
-<!-- المبيعات  -->
-<string name="sales_history_title">سجل المبيعات</string>
-<string name="total_sales">إجمالي المبيعات</string>
-<string name="invoices_count">عدد الفواتير</string>
-<string name="search_sales_hint">بحث باسم العميل أو رقم الفاتورة...</string>
-
 
     <!-- chooseuii -->
     <string name="tvChooseInfo">يرجى تحديد وجهة UII</string>
