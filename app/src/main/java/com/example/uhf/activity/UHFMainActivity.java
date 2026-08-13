@@ -650,16 +650,19 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
     }
 
     private void toggleLanguage() {
-        isArabic = !isArabic;
-        getSharedPreferences("app_settings", MODE_PRIVATE)
-                .edit()
-                .putString("language", isArabic ? "ar" : "en")
-                .apply();
-
-        applyLanguage();
-        updateDynamicUIStrings();
-        updateToolbarTitle();
-    }
+    isArabic = !isArabic;
+    
+    // ✅ حفظ اللغة
+    MiraLanguageHelper.saveLanguage(this, isArabic ? "ar" : "en");
+    
+    // ✅ تطبيق اللغة
+    applyLanguage();
+    updateDynamicUIStrings();
+    updateToolbarTitle();
+    
+    // ✅ إعادة بناء النشاط بالكامل لتحديث جميع النصوص في كل الشاشات
+    recreate();
+}
 
     private void applyLanguage() {
         try {
@@ -1091,4 +1094,4 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
             Log.e(TAG, errorMessage + ": " + e.getMessage());
         }
     }
-                }
+            }
