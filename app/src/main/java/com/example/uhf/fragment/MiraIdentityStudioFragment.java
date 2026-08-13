@@ -59,16 +59,14 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private SharedPreferences offlineCache;
 
     private final Map<String, String[]> typeSuggestions = new HashMap<>();
-    
-    
-    
+
     private String currentPhotoPath;
     private final List<String> photoPaths = new ArrayList<>();
     private ActivityResultLauncher<Uri> takePhotoLauncher;
     private ActivityResultLauncher<String> requestPermissionLauncher;
     private Uri photoUri;
-    
-    // متغيرات أسعار الذهب
+
+    // أسعار الذهب والإعدادات
     private double goldPrice24K = 75.0;
     private double goldPrice21K = 65.62;
     private double goldPrice18K = 56.25;
@@ -76,15 +74,13 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private double makingChargePerGram = 10.0;
     private double profitMarginPercent = 90.0;
     private boolean goldRatesLoaded = false;
+
     private void applyLanguage() {
-    if (binding == null) return;
-    
-    // ✅ تطبيق اتجاه اللغة
-    applyLanguageDirection(binding.getRoot());
-    
-    // تغيير النصوص
-    if (isArabic) setArabicTexts(); else setEnglishTexts();
+        if (binding == null) return;
+        applyLanguageDirection(binding.getRoot());
+        if (isArabic) setArabicTexts(); else setEnglishTexts();
     }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -111,7 +107,10 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             applyLanguage();
             setupListeners();
             loadGoldRates();
-            
+
+            // إعطاء الاقتراحات المبدئية للنوع المختار افتراضياً (الخواتم)
+            populateSuggestions("rings");
+
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
             }
@@ -137,11 +136,11 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
-    // ==================== أسعار الذهب ====================
+    // ==================== أسعار الذهب وحسابه ====================
 
     private void loadGoldRates() {
         if (apiClient == null) return;
-        
+
         new Thread(() -> {
             try {
                 MiraApiClient.ApiResponse response = apiClient.getGoldRatesAndSettings();
@@ -153,17 +152,17 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                         goldPrice18K = rates.optDouble("18K", 56.25);
                         goldPrice14K = rates.optDouble("14K", 43.75);
                     }
-                    
+
                     JSONObject makings = response.data.optJSONObject("default_making_charges");
                     if (makings != null) {
                         makingChargePerGram = makings.optDouble("21K", 10.0);
                     }
-                    
+
                     JSONObject margins = response.data.optJSONObject("default_profit_margins");
                     if (margins != null) {
                         profitMarginPercent = margins.optDouble("21K", 90.0);
                     }
-                    
+
                     goldRatesLoaded = true;
                     safeRun(this::calculateEstimatedGoldValue);
                 }
@@ -176,25 +175,25 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private void calculateEstimatedGoldValue() {
         try {
             if (binding == null || binding.etGrossWeight == null) return;
-            
-            String weightStr = binding.etGrossWeight.getText() != null ? 
-                               binding.etGrossWeight.getText().toString().trim() : "";
-            
-            if (weightStr.isEmpty()) { 
-                binding.tvEstimatedGoldValue.setText(isArabic ? "0.00 ريال" : "0.00 YER"); 
-                return; 
+
+            String weightStr = binding.etGrossWeight.getText() != null ?
+                    binding.etGrossWeight.getText().toString().trim() : "";
+
+            if (weightStr.isEmpty()) {
+                binding.tvEstimatedGoldValue.setText(isArabic ? "0.00 ريال" : "0.00 YER");
+                return;
             }
-            
+
             double weight = Double.parseDouble(weightStr);
             double gramPrice = getGoldPriceByKarat();
             double baseGoldCost = weight * gramPrice;
             double totalMakingCost = weight * makingChargePerGram;
             double subtotal = baseGoldCost + totalMakingCost;
             double finalPrice = subtotal * (profitMarginPercent / 100.0);
-            
-            binding.tvEstimatedGoldValue.setText(String.format(Locale.US, 
-                "%,.0f %s", finalPrice, isArabic ? "ريال" : "YER"));
-                
+
+            binding.tvEstimatedGoldValue.setText(String.format(Locale.US,
+                    "%,.0f %s", finalPrice, isArabic ? "ريال" : "YER"));
+
         } catch (Exception e) {
             Log.e(TAG, "calculateEstimatedGoldValue error: " + e.getMessage());
         }
@@ -213,32 +212,32 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         return goldPrice21K;
     }
 
-    // ==================== الكاميرا ====================
+    // ==================== الكاميرا والالتقاط ====================
 
     private void setupPhotoLaunchers() {
         requestPermissionLauncher = registerForActivityResult(
-            new ActivityResultContracts.RequestPermission(),
-            isGranted -> {
-                if (isGranted) openCamera();
-                else showToast(isArabic ? "صلاحية الكاميرا مطلوبة" : "Camera permission required");
-            }
+                new ActivityResultContracts.RequestPermission(),
+                isGranted -> {
+                    if (isGranted) openCamera();
+                    else showToast(isArabic ? "صلاحية الكاميرا مطلوبة" : "Camera permission required");
+                }
         );
 
         takePhotoLauncher = registerForActivityResult(
-            new ActivityResultContracts.TakePicture(),
-            success -> {
-                if (success && currentPhotoPath != null) {
-                    photoPaths.add(currentPhotoPath);
-                    updatePhotosCount();
+                new ActivityResultContracts.TakePicture(),
+                success -> {
+                    if (success && currentPhotoPath != null) {
+                        photoPaths.add(currentPhotoPath);
+                        updatePhotosCount();
+                    }
                 }
-            }
         );
     }
 
     private void checkCameraPermissionAndTakePhoto() {
         try {
             if (getContext() == null) return;
-            if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.CAMERA) 
+            if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.CAMERA)
                     == PackageManager.PERMISSION_GRANTED) {
                 openCamera();
             } else {
@@ -257,8 +256,8 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 File photoFile = createImageFile();
                 if (photoFile != null) {
                     photoUri = FileProvider.getUriForFile(getContext(),
-                        getContext().getApplicationContext().getPackageName() + ".fileprovider", 
-                        photoFile);
+                            getContext().getApplicationContext().getPackageName() + ".fileprovider",
+                            photoFile);
                     takePhotoLauncher.launch(photoUri);
                 }
             }
@@ -279,27 +278,26 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         try {
             if (binding == null || binding.tvPhotosCount == null) return;
             int count = photoPaths.size();
-            binding.tvPhotosCount.setText(count == 0 ? 
-                (isArabic ? "لم يتم إرفاق صور بعد" : "No photos attached yet") :
-                (isArabic ? "تم إرفاق (" + count + ") صور" : "Attached (" + count + ") photos"));
+            binding.tvPhotosCount.setText(count == 0 ?
+                    (isArabic ? "لم يتم إرفاق صور بعد" : "No photos attached yet") :
+                    (isArabic ? "تم إرفاق (" + count + ") صور" : "Attached (" + count + ") photos"));
         } catch (Exception e) {
             Log.e(TAG, "updatePhotosCount error: " + e.getMessage());
         }
     }
 
-    // ==================== اللغة ====================
-
-   
+    // ==================== إعداد اللغة والنصوص ====================
 
     private void setArabicTexts() {
         try {
             binding.tvStepTitle.setText("الخطوة 1 من 4: الربط والتصنيف");
-            binding.etEpc.setHint("رمز الشريحة (EPC / GTIN)...");
+            binding.tilEpc.setHint("رمز الشريحة (EPC / GTIN)...");
+            binding.btnScanRfid.setText("مسح رمز RFID");
             binding.etTitle.setHint("عنوان ووصف القطعة");
             binding.btnSaveIdentity.setText("اعتماد الموزون وتصدير MIRA ID");
             binding.btnAddPhotos.setText("📷 التقاط / إرفاق صور القطعة");
-            binding.tvPhotosCount.setText("لم يتم إرفاق صور بعد");
-            binding.tvEstimatedGoldValue.setText("0.00 ريال");
+            binding.tvPhotosCount.setText(photoPaths.isEmpty() ? "لم يتم إرفاق صور بعد" : "تم إرفاق (" + photoPaths.size() + ") صور");
+            calculateEstimatedGoldValue();
         } catch (Exception e) {
             Log.e(TAG, "setArabicTexts error: " + e.getMessage());
         }
@@ -308,25 +306,27 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private void setEnglishTexts() {
         try {
             binding.tvStepTitle.setText("Step 1 of 4: Bind & Classify");
-            binding.etEpc.setHint("EPC / GTIN Code...");
+            binding.tilEpc.setHint("EPC / GTIN Code...");
+            binding.btnScanRfid.setText("Scan RFID Tag");
             binding.etTitle.setHint("Item Title & Description");
             binding.btnSaveIdentity.setText("Approve & Export MIRA ID");
             binding.btnAddPhotos.setText("📷 Capture / Attach Photos");
-            binding.tvPhotosCount.setText("No photos attached yet");
-            binding.tvEstimatedGoldValue.setText("0.00 YER");
+            binding.tvPhotosCount.setText(photoPaths.isEmpty() ? "No photos attached yet" : "Attached (" + photoPaths.size() + ") photos");
+            calculateEstimatedGoldValue();
         } catch (Exception e) {
             Log.e(TAG, "setEnglishTexts error: " + e.getMessage());
         }
     }
 
     private void initSuggestionsData() {
+        typeSuggestions.clear();
         if (isArabic) {
             typeSuggestions.put("rings", new String[]{"خاتم سوليتير ألماسي", "خاتم محبس كلاسيك", "خاتم توينز راقي"});
             typeSuggestions.put("sets", new String[]{"طقم شبكة عروس كامل", "طقم ملكي مرصع بالألماس"});
             typeSuggestions.put("bracelets", new String[]{"بناجر / أساور خليجي", "سوار تنادي عصري"});
             typeSuggestions.put("necklaces", new String[]{"عقد شوكر عصري", "سلسلة ذهبية ناعمة"});
         } else {
-            typeSuggestions.put("rings", new String[]{"Diamond Solitaire Ring", "Classic Band Ring"});
+            typeSuggestions.put("rings", new String[]{"Diamond Solitaire Ring", "Classic Band Ring", "Twins Ring"});
             typeSuggestions.put("sets", new String[]{"Complete Bridal Set", "Royal Diamond Set"});
             typeSuggestions.put("bracelets", new String[]{"Khaleeji Bangle", "Modern Tennis Bracelet"});
             typeSuggestions.put("necklaces", new String[]{"Modern Choker", "Fine Gold Chain"});
@@ -342,7 +342,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 }
                 @Override public void afterTextChanged(Editable s) {}
             });
-            
+
             if (binding.tilEpc != null) {
                 binding.tilEpc.setEndIconOnClickListener(v -> openBarcodeScannerForEPC());
             }
@@ -357,14 +357,14 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
             binding.etGrossWeight.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) { 
-                    calculateEstimatedGoldValue(); 
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    calculateEstimatedGoldValue();
                 }
                 @Override public void afterTextChanged(Editable s) {}
             });
 
-            binding.chipGroupKarat.setOnCheckedStateChangeListener((group, checkedIds) -> 
-                calculateEstimatedGoldValue());
+            binding.chipGroupKarat.setOnCheckedStateChangeListener((group, checkedIds) ->
+                    calculateEstimatedGoldValue());
 
             binding.chipGroupTypes.setOnCheckedStateChangeListener((group, checkedIds) -> {
                 try {
@@ -384,12 +384,12 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
-    // ==================== المسح ====================
+    // ==================== المسح الضوئي و RFID ====================
 
     private void openBarcodeScannerForEPC() {
         try {
             if (!isAdded()) return;
-            
+
             MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
             sf.setOnBarcodeScannedListener((data, format) -> {
                 try {
@@ -402,9 +402,9 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     }
                 } catch (Exception ignored) {}
             });
-            
+
             View view = getView();
-            int cid = (view != null && view.getParent() instanceof View) ? 
+            int cid = (view != null && view.getParent() instanceof View) ?
                     ((View) view.getParent()).getId() : android.R.id.content;
             getParentFragmentManager().beginTransaction()
                     .replace(cid, sf)
@@ -420,7 +420,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         try {
             if (getActivity() instanceof UHFMainActivity) {
                 UHFMainActivity activity = (UHFMainActivity) getActivity();
-                
+
                 activity.setActiveRfidListener(epc -> {
                     try {
                         if (binding != null && binding.etEpc != null) {
@@ -430,10 +430,10 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                         if (activity != null) activity.playSound(1);
                     } catch (Exception ignored) {}
                 });
-                
+
                 activity.startUHFScan();
                 showToast(isArabic ? "📡 جاهز لمسح RFID" : "📡 Ready for RFID scan");
-                
+
                 new Handler().postDelayed(() -> {
                     try {
                         if (getActivity() instanceof UHFMainActivity) {
@@ -487,12 +487,12 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
-    // ==================== حفظ التكويد ====================
+    // ==================== حفظ التكويد واكتمال العملية ====================
 
     private void finalizeItemIdentity() {
         try {
             if (binding == null) return;
-            
+
             String epc = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
             String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
             String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
@@ -515,7 +515,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             double stoneWeight = 0;
             int stoneCount = 0;
             double stoneValue = 0;
-            
+
             if (binding.switchHasStones.isChecked()) {
                 try { stoneType = binding.etStoneType.getText().toString().trim(); } catch (Exception ignored) {}
                 try { stoneWeight = Double.parseDouble(binding.etStoneWeight.getText().toString().trim()); } catch (Exception ignored) {}
@@ -524,9 +524,9 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             }
 
             final AlertDialog loadingDialog = showLoadingDialog(
-                isArabic ? "🔄 جاري التكويد والربط السحابي..." : "🔄 Encoding & Cloud Linking..."
+                    isArabic ? "🔄 جاري التكويد والربط السحابي..." : "🔄 Encoding & Cloud Linking..."
             );
-            
+
             try {
                 binding.btnSaveIdentity.setEnabled(false);
                 binding.btnAddPhotos.setEnabled(false);
@@ -550,11 +550,10 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
-                    // ✅ تأكد من apiClient
                     if (apiClient == null && getContext() != null) {
                         apiClient = MiraApiClient.getInstance(getContext());
                     }
-                    
+
                     if (apiClient == null) {
                         safeRun(() -> {
                             dismissDialog(loadingDialog);
@@ -562,7 +561,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                         });
                         return;
                     }
-                    
+
                     JSONObject payload = new JSONObject();
                     payload.put("epc", finalEpc);
                     payload.put("title", finalTitle);
@@ -573,12 +572,12 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     payload.put("stone_count", finalStoneCount);
                     payload.put("stone_value", finalStoneValue);
                     payload.put("stone_type", finalStoneType);
-                    payload.put("making_per_gram", 0);
-                    payload.put("profit_margin", 0);
+                    payload.put("making_per_gram", makingChargePerGram);
+                    payload.put("profit_margin", profitMarginPercent);
                     payload.put("category", selectedCategory);
                     payload.put("location", location);
                     payload.put("branch_id", branchId);
-                    
+
                     if (!finalPhotoPaths.isEmpty()) {
                         JSONArray imagesArray = new JSONArray();
                         for (String path : finalPhotoPaths) {
@@ -591,7 +590,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     String serverBarcode = "";
                     String serverSerial = "";
                     int serverItemId = 0;
-                    
+
                     try {
                         MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
                         apiSuccess = (response != null && response.isSuccess);
@@ -612,27 +611,27 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     safeRun(() -> {
                         try {
                             dismissDialog(loadingDialog);
-                            
+
                             if (binding != null) {
                                 binding.btnSaveIdentity.setEnabled(true);
                                 binding.btnAddPhotos.setEnabled(true);
                                 binding.etEpc.setEnabled(true);
                                 binding.etTitle.setEnabled(true);
                                 binding.etGrossWeight.setEnabled(true);
-                                binding.btnSaveIdentity.setText(isArabic ? 
-                                    "اعتماد الموزون وتصدير MIRA ID" : "Approve & Export MIRA ID");
+                                binding.btnSaveIdentity.setText(isArabic ?
+                                        "اعتماد الموزون وتصدير MIRA ID" : "Approve & Export MIRA ID");
                             }
 
                             if (success) {
                                 removePendingEncode(finalEpc);
                                 playSuccessSound();
-                                
+
                                 List<String[]> details = new ArrayList<>();
                                 details.add(new String[]{"🔖 RFID", finalEpc});
                                 details.add(new String[]{"📝 البيان", finalTitle});
                                 details.add(new String[]{"🏅 العيار", selectedKarat});
-                                details.add(new String[]{"⚖️ الوزن", 
-                                    String.format(Locale.US, "%.2f جرام", finalGrossWeight)});
+                                details.add(new String[]{"⚖️ الوزن",
+                                        String.format(Locale.US, "%.2f جرام", finalGrossWeight)});
                                 if (finalServerBarcode != null && !finalServerBarcode.isEmpty()) {
                                     details.add(new String[]{"📊 باركود", finalServerBarcode});
                                 }
@@ -642,21 +641,21 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                                 if (finalServerItemId > 0) {
                                     details.add(new String[]{"🆔 معرف القطعة", String.valueOf(finalServerItemId)});
                                 }
-                                
+
                                 showDetailsDialog(
-                                    isArabic ? "✅ تم التكويد بنجاح!" : "✅ Encoding Successful!",
-                                    details.toArray(new String[0][])
+                                        isArabic ? "✅ تم التكويد بنجاح!" : "✅ Encoding Successful!",
+                                        details.toArray(new String[0][])
                                 );
-                                
+
                                 if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
                                     uploadItemImages(finalServerItemId, finalPhotoPaths);
                                 }
-                                
+
                                 resetFormForNextScan();
                             } else {
                                 saveEncodeOffline(payload);
-                                showToast(isArabic ? "💾 تم حفظ التكويد محلياً للمزامنة لاحقاً" 
-                                    : "💾 Encoding saved locally for later sync");
+                                showToast(isArabic ? "💾 تم حفظ التكويد محلياً للمزامنة لاحقاً"
+                                        : "💾 Encoding saved locally for later sync");
                                 resetFormForNextScan();
                             }
                         } catch (Exception e) {
@@ -667,8 +666,8 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     Log.e(TAG, "Background error: " + e.getMessage());
                     safeRun(() -> {
                         dismissDialog(loadingDialog);
-                        showErrorDialog(isArabic ? "❌ فشل التكويد" : "❌ Encoding Failed", 
-                            e.getMessage());
+                        showErrorDialog(isArabic ? "❌ فشل التكويد" : "❌ Encoding Failed",
+                                e.getMessage());
                     });
                 }
             });
@@ -683,25 +682,24 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private void uploadItemImages(int itemId, List<String> imagePaths) {
         if (imagePaths == null || imagePaths.isEmpty() || itemId <= 0) return;
         if (apiClient == null) return;
-        
+
         new Thread(() -> {
             int uploaded = 0;
             int failed = 0;
-            
+
             for (String path : imagePaths) {
                 File imageFile = new File(path);
                 if (!imageFile.exists()) { failed++; continue; }
                 try {
                     boolean isPrimary = (imagePaths.indexOf(path) == 0);
                     MiraApiClient.ApiResponse response = apiClient.uploadItemImage(
-                        itemId, imageFile, isPrimary, "Image");
+                            itemId, imageFile, isPrimary, "Image");
                     if (response != null && response.isSuccess) uploaded++;
                     else failed++;
                 } catch (Exception e) { failed++; }
             }
-            
+
             final int fUploaded = uploaded;
-            final int fFailed = failed;
             safeRun(() -> {
                 if (fUploaded > 0) {
                     showToast(isArabic ? "📷 تم رفع " + fUploaded + " صورة" : "📷 " + fUploaded + " images uploaded");
@@ -714,7 +712,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         if (imagePathsArray == null || imagePathsArray.length() == 0 || itemId <= 0) return;
         List<String> paths = new ArrayList<>();
         for (int i = 0; i < imagePathsArray.length(); i++) {
-            try { 
+            try {
                 String path = imagePathsArray.optString(i, "");
                 if (!path.isEmpty()) paths.add(path);
             } catch (Exception ignored) {}
@@ -722,7 +720,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         uploadItemImages(itemId, paths);
     }
 
-    // ==================== Offline ====================
+    // ==================== المعالجة و المزامنة المحلية (Offline) ====================
 
     private void saveEncodeOffline(JSONObject payload) {
         try {
@@ -732,8 +730,8 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             arr.put(payload);
             while (arr.length() > 100) arr.remove(0);
             offlineCache.edit().putString("pending_encodes", arr.toString()).apply();
-        } catch (Exception e) { 
-            Log.e(TAG, "Save encode offline error: " + e.getMessage()); 
+        } catch (Exception e) {
+            Log.e(TAG, "Save encode offline error: " + e.getMessage());
         }
     }
 
@@ -754,13 +752,13 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private void syncPendingEncodes() {
         if (apiClient == null || offlineCache == null) return;
         final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
-        
+
         new Thread(() -> {
             try {
                 String json = offlineCache.getString("pending_encodes", "[]");
                 JSONArray arr = new JSONArray(json);
                 if (arr.length() == 0) return;
-                
+
                 JSONArray remainingArr = new JSONArray();
                 int synced = 0;
                 for (int i = 0; i < arr.length(); i++) {
@@ -769,7 +767,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                         if (!payload.has("branch_id") || payload.optInt("branch_id", 0) <= 0) {
                             payload.put("branch_id", branchId);
                         }
-                        
+
                         MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
                         if (response != null && response.isSuccess) {
                             synced++;
@@ -785,25 +783,25 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                         } else {
                             remainingArr.put(payload);
                         }
-                    } catch (Exception e) { 
-                        remainingArr.put(arr.getJSONObject(i)); 
+                    } catch (Exception e) {
+                        remainingArr.put(arr.getJSONObject(i));
                     }
                 }
                 offlineCache.edit().putString("pending_encodes", remainingArr.toString()).apply();
-                
+
                 final int s = synced;
-                safeRun(() -> { 
-                    if (s > 0) showToast(isArabic ? "✅ تمت مزامنة " + s + " تكويد" : "✅ Synced " + s + " encodings"); 
+                safeRun(() -> {
+                    if (s > 0) showToast(isArabic ? "✅ تمت مزامنة " + s + " تكويد" : "✅ Synced " + s + " encodings");
                 });
-            } catch (Exception e) { 
-                Log.e(TAG, "Sync encodes error: " + e.getMessage()); 
+            } catch (Exception e) {
+                Log.e(TAG, "Sync encodes error: " + e.getMessage());
             }
         }).start();
     }
 
-    // ==================== Helpers ====================
+    // ==================== المساعدات والدوال الفرعية ====================
 
-    private void safeRun(Runnable r) { 
+    private void safeRun(Runnable r) {
         try {
             if (isAdded() && getActivity() != null) {
                 getActivity().runOnUiThread(() -> {
@@ -818,20 +816,20 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             Log.e(TAG, "safeRun outer error: " + e.getMessage());
         }
     }
-    
-    private void playSuccessSound() { 
+
+    private void playSuccessSound() {
         try {
-            if (getActivity() instanceof UHFMainActivity) 
-                ((UHFMainActivity) getActivity()).playSound(1); 
+            if (getActivity() instanceof UHFMainActivity)
+                ((UHFMainActivity) getActivity()).playSound(1);
         } catch (Exception e) {
             Log.e(TAG, "playSuccessSound error: " + e.getMessage());
         }
     }
-    
-    private void showToast(String msg) { 
+
+    private void showToast(String msg) {
         try {
-            if (getContext() != null && isAdded()) 
-                Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show(); 
+            if (getContext() != null && isAdded())
+                Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             Log.e(TAG, "showToast error: " + e.getMessage());
         }
@@ -853,17 +851,21 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private void resetFormForNextScan() {
         try {
             if (binding == null) return;
-            binding.etEpc.setText(""); 
-            binding.etTitle.setText(""); 
+            binding.etEpc.setText("");
+            binding.etTitle.setText("");
             binding.etGrossWeight.setText("");
-            binding.etStoneWeight.setText(""); 
-            binding.etStoneCount.setText(""); 
+            binding.etStoneType.setText("");
+            binding.etStoneWeight.setText("");
+            binding.etStoneCount.setText("");
             binding.etStoneValue.setText("");
             binding.tvStatusBadge.setText("WAITING");
             binding.tvEstimatedGoldValue.setText(isArabic ? "0.00 ريال" : "0.00 YER");
             binding.switchHasStones.setChecked(false);
+            binding.chipRing.setChecked(true);
+            binding.chipYellowGold.setChecked(true);
+            binding.chip21K.setChecked(true);
             binding.etEpc.requestFocus();
-            photoPaths.clear(); 
+            photoPaths.clear();
             updatePhotosCount();
         } catch (Exception e) {
             Log.e(TAG, "resetFormForNextScan error: " + e.getMessage());
@@ -888,4 +890,4 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         super.onDestroyView();
         binding = null;
     }
-                                            }
+}
