@@ -78,16 +78,19 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
                 String action = intent.getAction();
                 if (BluetoothDevice.ACTION_FOUND.equals(action)) {
                     BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                    if (device != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        // للأندرويد 12+ نحتاج إذن
-                        if (ContextCompat.checkSelfPermission(context, 
-                            Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                    if (device != null) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            if (ContextCompat.checkSelfPermission(context, 
+                                Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                                if (!discoveredBtDevices.contains(device)) {
+                                    discoveredBtDevices.add(device);
+                                }
+                            }
+                        } else {
                             if (!discoveredBtDevices.contains(device)) {
                                 discoveredBtDevices.add(device);
                             }
                         }
-                    } else if (device != null && !discoveredBtDevices.contains(device)) {
-                        discoveredBtDevices.add(device);
                     }
                 } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                     showDiscoveredBluetoothDevices();
@@ -158,7 +161,6 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     
     private void initSoundAndVibration() {
         try {
-            // استخدام ToneGenerator بدلاً من SoundPool لتجنب مشاكل الملفات
             toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 80);
             vibrator = (Vibrator) requireContext().getSystemService(Context.VIBRATOR_SERVICE);
         } catch (Exception e) {
@@ -208,23 +210,29 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     
     private void setupButtons() {
         try {
-            btnAddDevice.setOnClickListener(v -> {
-                playClickSound();
-                vibrateShort();
-                showAddDeviceDialog();
-            });
+            if (btnAddDevice != null) {
+                btnAddDevice.setOnClickListener(v -> {
+                    playClickSound();
+                    vibrateShort();
+                    showAddDeviceDialog();
+                });
+            }
             
-            btnTestConnection.setOnClickListener(v -> {
-                playClickSound();
-                vibrateShort();
-                testActiveConnection();
-            });
+            if (btnTestConnection != null) {
+                btnTestConnection.setOnClickListener(v -> {
+                    playClickSound();
+                    vibrateShort();
+                    testActiveConnection();
+                });
+            }
             
-            btnDetectAuto.setOnClickListener(v -> {
-                playClickSound();
-                vibrateShort();
-                autoDetectDevice();
-            });
+            if (btnDetectAuto != null) {
+                btnDetectAuto.setOnClickListener(v -> {
+                    playClickSound();
+                    vibrateShort();
+                    autoDetectDevice();
+                });
+            }
             
             if (btnBluetoothScan != null) {
                 btnBluetoothScan.setOnClickListener(v -> {
@@ -410,15 +418,33 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
             
             // إضافة الأجهزة المقترنة
             try {
-                Set<BluetoothDevice> paired = bluetoothAdapter.getBondedDevices();
-                if (paired != null) {
-                    discoveredBtDevices.addAll(paired);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    if (ContextCompat.checkSelfPermission(requireContext(), 
+                        Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                        Set<BluetoothDevice> paired = bluetoothAdapter.getBondedDevices();
+                        if (paired != null) {
+                            discoveredBtDevices.addAll(paired);
+                        }
+                    }
+                } else {
+                    Set<BluetoothDevice> paired = bluetoothAdapter.getBondedDevices();
+                    if (paired != null) {
+                        discoveredBtDevices.addAll(paired);
+                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Get paired devices error: " + e.getMessage());
             }
             
-            bluetoothAdapter.startDiscovery();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (ContextCompat.checkSelfPermission(requireContext(), 
+                    Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
+                    bluetoothAdapter.startDiscovery();
+                }
+            } else {
+                bluetoothAdapter.startDiscovery();
+            }
+            
             showLoadingDialog(isArabic ? "🔍 جاري البحث عن أجهزة البلوتوث..." : "🔍 Searching for Bluetooth devices...");
             
         } catch (Exception e) {
@@ -467,7 +493,8 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
                 .setItems(names, (d, which) -> {
                     try {
                         BluetoothDevice selected = discoveredBtDevices.get(which);
-                        showAddressInputDialog(MiraIRFIDReader.ReaderType.GENERIC_BLUETOOTH, selected.getAddress());
+                        String address = selected.getAddress();
+                        showAddressInputDialog(MiraIRFIDReader.ReaderType.GENERIC_BLUETOOTH, address);
                     } catch (Exception e) {
                         Log.e(TAG, "Select device error: " + e.getMessage());
                     }
@@ -915,7 +942,14 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
             
             if (bluetoothAdapter != null) {
                 try {
-                    bluetoothAdapter.cancelDiscovery();
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        if (ContextCompat.checkSelfPermission(requireContext(), 
+                            Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
+                            bluetoothAdapter.cancelDiscovery();
+                        }
+                    } else {
+                        bluetoothAdapter.cancelDiscovery();
+                    }
                 } catch (Exception e) {
                     Log.e(TAG, "Cancel discovery error: " + e.getMessage());
                 }
@@ -1008,4 +1042,4 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
             }
         }
     }
-    }
+                                                                                         }
