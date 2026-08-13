@@ -1698,7 +1698,19 @@
 <string name="print_inventory">طباعة الجرد</string>
 <string name="print_missing">طباعة النواقص</string>
 <string name="screenshot">لقطة شاشة</string>
-
+<!-- POS -->
+<string name="pos_title">🛒 نظام البيع - MIRA POS</string>
+<string name="pos_scale_searching">⚖️ الميزان: جاري البحث...</string>
+<string name="pos_scan_gs1">📷 مسح GS1</string>
+<string name="pos_scan_rfid">📡 مسح RFID</string>
+<string name="pos_ready_scan">جاهز لمسح القطع والخواتم...</string>
+<string name="pos_manual_hint">أدخل كود EPC أو الباركود يدوياً...</string>
+<string name="pos_add">إضافة</string>
+<string name="pos_item_count">عدد القطع</string>
+<string name="pos_total_amount">المبلغ الإجمالي</string>
+<string name="pos_default_amount">0 YER</string>
+<string name="pos_clear">تفريغ</string>
+<string name="pos_checkout">إتمام البيع وتحديث المخزون</string>
     
     <!-- ============Inventory الجرد ======////-->
       <string name="inventory_alert_sold">🚨 تحذير: قطعة مباعة وموجودة بالرف!</string>
