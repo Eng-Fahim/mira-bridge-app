@@ -6,7 +6,6 @@
     android:background="?android:attr/colorBackground"
     android:orientation="vertical">
 
-    <!-- العنوان -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -16,17 +15,16 @@
         android:textSize="18sp"
         android:textStyle="bold" />
 
-    <!-- وصف -->
     <TextView
+        android:id="@+id/tvActiveDeviceStatus"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingHorizontal="16dp"
         android:paddingBottom="8dp"
-        android:text="قم بتعريف جهاز المسح الخاص بك ليتصل التطبيق به تلقائياً"
+        android:text="لا يوجد جهاز نشط"
         android:textColor="?attr/colorOnSurfaceVariant"
         android:textSize="12sp" />
 
-    <!-- الأزرار -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -51,30 +49,49 @@
             android:layout_height="46dp"
             android:layout_weight="1"
             android:layout_marginStart="4dp"
-            android:text="➕ إضافة جهاز"
+            android:text="➕ إضافة"
             android:textColor="?attr/colorOnPrimary"
             app:backgroundTint="?attr/colorPrimary"
             app:cornerRadius="8dp" />
     </LinearLayout>
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnTestConnection"
-        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginTop="4dp"
-        android:text="📡 اختبار اتصال الجهاز النشط"
-        android:textColor="?attr/colorPrimary"
-        app:strokeColor="?attr/colorPrimary"
-        app:cornerRadius="8dp" />
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="8dp">
 
-    <!-- قائمة الأجهزة -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnTestConnection"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:text="📡 اختبار اتصال"
+            android:textColor="?attr/colorPrimary"
+            app:strokeColor="?attr/colorPrimary"
+            app:cornerRadius="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnBluetoothScan"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:text="🔗 بحث بلوتوث"
+            android:textColor="?attr/colorPrimary"
+            app:strokeColor="?attr/colorPrimary"
+            app:cornerRadius="8dp" />
+    </LinearLayout>
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingHorizontal="16dp"
-        android:paddingTop="16dp"
+        android:paddingTop="12dp"
         android:paddingBottom="4dp"
         android:text="الأجهزة المحفوظة"
         android:textColor="?attr/colorOnSurfaceVariant"
