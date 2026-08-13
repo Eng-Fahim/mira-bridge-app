@@ -30,7 +30,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
 import com.example.uhf.adapter.MiraAccountingAdapter;
-import com.example.uhf.model.MiraAccountingItem;
+import com.example.uhf.model.MiraAccountingItem; // <<< السطر المسؤول عن حل مشكلة الـ Build
 import com.example.uhf.viewmodel.MiraAccountingViewModel;
 
 import java.util.ArrayList;
@@ -131,7 +131,7 @@ public class MiraAccountingFragment extends Fragment {
             loadAccountingData();
         } catch (Exception e) {
             e.printStackTrace();
-            loadMockEnterpriseData(); // تحميل بيانات نموذجية عالمية في حال عدم توفر الـ API حالياً
+            loadMockEnterpriseData();
         }
     }
 
@@ -204,12 +204,10 @@ public class MiraAccountingFragment extends Fragment {
 
     private void updateHeaderSummary(List<MiraAccountingItem> items) {
         double totalCash = 0;
-        double totalGold24 = 0;
         double debitCashSum = 0, creditCashSum = 0;
 
         for (MiraAccountingItem item : items) {
             totalCash += item.getDebitCash();
-            totalGold24 += (item.getFineWeight24Debit() - item.getFineWeight24Credit());
             debitCashSum += item.getDebitCash();
             creditCashSum += item.getCreditCash();
         }
@@ -235,8 +233,6 @@ public class MiraAccountingFragment extends Fragment {
         tvEmptyData.setVisibility(show ? View.VISIBLE : View.GONE);
         if (rvAccountingData != null) rvAccountingData.setVisibility(show ? View.GONE : View.VISIBLE);
     }
-
-    // ==================== NAVIGATE & DIALOGS ====================
 
     private void showCreateEntryDialog() {
         Context ctx = requireContext();
@@ -293,16 +289,13 @@ public class MiraAccountingFragment extends Fragment {
 
     private void loadMockEnterpriseData() {
         rawDataList.clear();
-        // قيود يومية نموذجية
         rawDataList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.JOURNAL_ENTRY, "JV-2026-001", "شراء طقم ذهب - توريد صندوق", 0.0, 52.410, 0.0, 3500000, "YER", "2026-08-14"));
         rawDataList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.JOURNAL_ENTRY, "JV-2026-002", "مبيعات ذهب عيار 21 نقداً", 28.500, 0.0, 2100000, 0.0, "YER", "2026-08-14"));
         
-        // دليل حسابات نموذجي
         rawDataList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.CHART_OF_ACCOUNT, "110101", "خزينة الذهب الخام (24K)", 1520.450, 0.0, "YER"));
         rawDataList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.CHART_OF_ACCOUNT, "110102", "الصندوق النقدي الرئيسي", 0.0, 48500000.0, "YER"));
         rawDataList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.CHART_OF_ACCOUNT, "110201", "خزينة فروع الذهب الصافي", 840.120, 0.0, "YER"));
 
-        // ميزان مراجعة نموذجي
         rawDataList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.TRIAL_BALANCE, "TB-24K", "ميزان كاسر الذهب والمسبوكات", 2360.570, 48500000.0, "YER"));
 
         filterTabAndRender();
