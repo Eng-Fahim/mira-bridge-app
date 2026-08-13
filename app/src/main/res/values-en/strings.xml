@@ -1482,7 +1482,8 @@
     <string name="msg_max_select_tag_8">Maximum 8 tags can be selected for filtering</string>
     <string name="title_stop_read_card">Please stop reading tags!</string>
     <string name="tv_fast_inventory">Fast Inventory</string>
-    
+     <string name="total_sales">Total Sales</string>
+    <string name="invoices_count">Invoices Count</string>
     
     <string name="app_title_inventory">📡 MIRA RFID Inventory</string>
     <string name="branch_label">📍 Branch</string>
