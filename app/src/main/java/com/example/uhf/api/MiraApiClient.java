@@ -65,7 +65,16 @@ public class MiraApiClient {
         }
         return post("/auth/login", payload);
     }
-
+/**
+ * جلب قطع الفرع حسب نوع المجوهرات
+ */
+public ApiResponse getBranchItemsByCategory(int branchId, String category) {
+    String endpoint = "/branches/" + branchId + "/inventory/items";
+    if (category != null && !category.isEmpty() && !category.equals("الكل") && !category.equals("All")) {
+        endpoint += "?category=" + java.net.URLEncoder.encode(category, "UTF-8");
+    }
+    return getWithAuth(endpoint);
+}
     public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
         JSONObject payload = new JSONObject();
         try {
