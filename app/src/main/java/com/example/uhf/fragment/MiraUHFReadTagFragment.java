@@ -36,6 +36,10 @@ import android.widget.Toast;
 import android.Manifest;
 import android.content.pm.PackageManager;
 
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
@@ -605,7 +609,7 @@ private final Map<String, TagModel> tagMap = new HashMap<>();
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 1001);
                 return;
             }
@@ -1269,15 +1273,17 @@ private void processSingleTag(TagModel model) {
         existingTag.rssi = model.rssi;
         existingTag.readCount++;
         
-        // ✅ تحديث الخلية في الواجهة مباشرة بدون Loop أو indexOf وبدون إعادة رسم القائمة كاملة
-        if (currentFilter.equals("ALL") && existingTag.position >= 0) {
-            tagAdapter.notifyItemChanged(existingTag.position);
+        // ✅ تحديث الخلية في الواجهة مباشرة
+        int index = tagList.indexOf(existingTag);
+        if (currentFilter.equals("ALL") && index >= 0) {
+            tagAdapter.notifyItemChanged(index);
         }
         
         // تحديث بطاقة أحدث قطعة ممسوحة
         updateLastTagCard(existingTag);
         return;
     }
+    
     
     // 2️⃣ إعداد بيانات القطعة الجديدة
     ExpectedItem expected = expectedItemsMap.get(model.epc);
@@ -1304,14 +1310,6 @@ private void processSingleTag(TagModel model) {
     }
 
     model.readCount = 1;
-
-    // 3️⃣ إضافة القطعة في مقدمة القائمة وتحديث فهارس (Positions) العناصر المتأثرة
-    // إزاحة المواقع لجميع العناصر السابقة بـ +1 نظراً للإضافة في الفهرس 0
-    for (TagModel tag : tagList) {
-        tag.position++;
-    }
-    
-    model.position = 0; // القطعة الجديدة أصبحت في الأعلى
     tagList.add(0, model);
     tagMap.put(model.epc, model);
     isMissingCacheDirty = true;
@@ -2008,4 +2006,4 @@ private void processSingleTag(TagModel model) {
             }
         }
     }
-}
+                          }
