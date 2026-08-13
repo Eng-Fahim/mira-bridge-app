@@ -339,28 +339,28 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     }
     
     private void updateSoundButtonText() {
-    if (btnSoundToggle != null) {
-        if (isSoundEnabled) {
-            btnSoundToggle.setText(isArabic ? "🔊 الصوت: مفعل" : "🔊 Sound: ON");
-            btnSoundToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_ENABLED)));
-            btnSoundToggle.setTextColor(Color.parseColor(COLOR_ENABLED));
-        } else {
-            btnSoundToggle.setText(isArabic ? "🔇 الصوت: معطل" : "🔇 Sound: OFF");
-            btnSoundToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_DISABLED)));
-            btnSoundToggle.setTextColor(Color.parseColor(COLOR_DISABLED));
+        if (btnSoundToggle != null) {
+            if (isSoundEnabled) {
+                btnSoundToggle.setText(isArabic ? "🔊 الصوت: مفعل" : "🔊 Sound: ON");
+                btnSoundToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_ENABLED)));
+                btnSoundToggle.setTextColor(Color.parseColor(COLOR_ENABLED));
+            } else {
+                btnSoundToggle.setText(isArabic ? "🔇 الصوت: معطل" : "🔇 Sound: OFF");
+                btnSoundToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_DISABLED)));
+                btnSoundToggle.setTextColor(Color.parseColor(COLOR_DISABLED));
+            }
         }
     }
-}
     
     private void updateVibrationButtonText() {
         if (btnVibrationToggle != null) {
             if (isVibrationEnabled) {
                 btnVibrationToggle.setText(isArabic ? "📳 الاهتزاز: مفعل" : "📳 Vibration: ON");
-                btnVibrationToggle.setStrokeColor(Color.parseColor(COLOR_ENABLED));
+                btnVibrationToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_ENABLED)));
                 btnVibrationToggle.setTextColor(Color.parseColor(COLOR_ENABLED));
             } else {
                 btnVibrationToggle.setText(isArabic ? "📴 الاهتزاز: معطل" : "📴 Vibration: OFF");
-                btnVibrationToggle.setStrokeColor(Color.parseColor(COLOR_DISABLED));
+                btnVibrationToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_DISABLED)));
                 btnVibrationToggle.setTextColor(Color.parseColor(COLOR_DISABLED));
             }
         }
@@ -1058,4 +1058,4 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
             }
         }
     }
-                    
+}
