@@ -1494,7 +1494,19 @@
     <string name="btn_stop_inventory">⏹ Stop</string>
     <string name="btn_clear_inventory">🗑️ Clear</string>
     <string name="btn_export_inventory">📤 Export</string>
-
+<!-- POS -->
+<string name="pos_title">🛒 MIRA POS System</string>
+<string name="pos_scale_searching">⚖️ Scale: Searching...</string>
+<string name="pos_scan_gs1">📷 Scan GS1</string>
+<string name="pos_scan_rfid">📡 Scan RFID</string>
+<string name="pos_ready_scan">Ready to scan items...</string>
+<string name="pos_manual_hint">Enter EPC or barcode manually...</string>
+<string name="pos_add">Add</string>
+<string name="pos_item_count">Item Count</string>
+<string name="pos_total_amount">Total Amount</string>
+<string name="pos_default_amount">0 YER</string>
+<string name="pos_clear">Clear</string>
+<string name="pos_checkout">Checkout &amp; Update Stock</string>
 <!-- Inventory Fragment -->
     <string name="inventory_alert_sold">🚨 Alert: Sold item found on shelf!</string>
 <string name="inventory_branch_default">Main Branch - Sanaa</string>
