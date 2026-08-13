@@ -70,11 +70,12 @@ public class MiraApiClient {
  */
 public ApiResponse getBranchItemsByCategory(int branchId, String category) {
     String endpoint = "/branches/" + branchId + "/inventory/items";
-    if (category != null && !category.isEmpty() && !category.equals("الكل") && !category.equals("All")) {
-        endpoint += "?category=" + java.net.URLEncoder.encode(category, "UTF-8");
+    if (category != null && !category.isEmpty()) {
+        endpoint += "?category=" + category;
     }
     return getWithAuth(endpoint);
 }
+    
     public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
         JSONObject payload = new JSONObject();
         try {
