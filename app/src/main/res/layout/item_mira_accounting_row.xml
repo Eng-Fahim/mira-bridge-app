@@ -1,99 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="?android:attr/selectableItemBackground"
-    android:layoutDirection="rtl"
-    android:minHeight="52dp"
-    android:orientation="vertical"
-    android:paddingVertical="6dp">
+    android:orientation="horizontal"
+    android:paddingVertical="10dp"
+    android:paddingHorizontal="4dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
+    <TextView
+        android:id="@+id/tvRowCol1"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="4dp">
+        android:layout_weight="1"
+        android:gravity="center"
+        android:textColor="#2C3E50"
+        android:textSize="11sp"
+        android:textStyle="bold" />
 
-        <!-- العمود 1: رقم القيد / مرجع الحركة -->
-        <TextView
-            android:id="@+id/tvRowCol1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1.3"
-            android:gravity="center"
-            android:textColor="#2C3E50"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            tools:text="JV-2026-801" />
+    <TextView
+        android:id="@+id/tvRowCol2"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1.8"
+        android:paddingStart="6dp"
+        android:textColor="#34495E"
+        android:textSize="11sp" />
 
-        <!-- العمود 2: البيان / اسم الحساب مع شارة الـ RFID إن وجدت -->
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="2.2"
-            android:orientation="vertical"
-            android:paddingStart="6dp"
-            android:paddingEnd="4dp">
+    <TextView
+        android:id="@+id/tvRowCol3"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1.2"
+        android:gravity="center"
+        android:textColor="#F1C40F"
+        android:textSize="11sp"
+        android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/tvRowCol2"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="2"
-                android:textColor="#34495E"
-                android:textSize="12sp"
-                tools:text="مبيعات طقم مجوهرات عيار 21" />
-
-            <!-- شارة كود RFID المصاحب للسطر (اختياري) -->
-            <TextView
-                android:id="@+id/tvRowRfidTag"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:background="#EAECEE"
-                android:paddingHorizontal="4dp"
-                android:paddingVertical="1dp"
-                android:textColor="#7F8C8D"
-                android:textSize="9sp"
-                android:visibility="gone"
-                tools:text="RFID: E280117000"
-                tools:visibility="visible" />
-        </LinearLayout>
-
-        <!-- العمود 3: وزن الذهب الصافي (24k) -->
-        <TextView
-            android:id="@+id/tvRowCol3"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1.3"
-            android:gravity="center"
-            android:textColor="#D35400"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            tools:text="16.187 جم" />
-
-        <!-- العمود 4: الحركة النقدية والرصيد -->
-        <TextView
-            android:id="@+id/tvRowCol4"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1.4"
-            android:gravity="center"
-            android:textColor="#27AE60"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            tools:text="1,250,000 YER" />
-
-    </LinearLayout>
-
-    <!-- خط فاصل خفيف بين الأسطر -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="6dp"
-        android:background="#ECEFF1" />
+    <TextView
+        android:id="@+id/tvRowCol4"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1.3"
+        android:gravity="center"
+        android:textColor="#2ECC71"
+        android:textSize="11sp"
+        android:textStyle="bold" />
 
 </LinearLayout>
