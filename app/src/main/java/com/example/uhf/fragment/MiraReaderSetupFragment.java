@@ -1,6 +1,7 @@
 package com.example.uhf.fragment;
 
 import android.Manifest;
+import android.content.res.ColorStateList;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
@@ -341,12 +342,10 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         if (btnSoundToggle != null) {
             if (isSoundEnabled) {
                 btnSoundToggle.setText(isArabic ? "🔊 الصوت: مفعل" : "🔊 Sound: ON");
-                btnSoundToggle.setStrokeColor(Color.parseColor(COLOR_ENABLED));
-                btnSoundToggle.setTextColor(Color.parseColor(COLOR_ENABLED));
-            } else {
-                btnSoundToggle.setText(isArabic ? "🔇 الصوت: معطل" : "🔇 Sound: OFF");
-                btnSoundToggle.setStrokeColor(Color.parseColor(COLOR_DISABLED));
-                btnSoundToggle.setTextColor(Color.parseColor(COLOR_DISABLED));
+                btnSoundToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_ENABLED)));
+btnSoundToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_DISABLED)));
+btnVibrationToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_ENABLED)));
+btnVibrationToggle.setStrokeColor(ColorStateList.valueOf(Color.parseColor(COLOR_DISABLED)));
             }
         }
     }
