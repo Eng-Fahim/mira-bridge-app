@@ -1256,26 +1256,25 @@ private final Map<String, TagModel> tagMap = new HashMap<>();
      */
     // تعديل processSingleTag
 private void processSingleTag(TagModel model) {
-    // ✅ الوصول المباشر O(1) بدلاً من البحث الخطي O(N)
+    // 1️⃣ الوصول المباشر للعنصر الممسوح سابقاً بسرعة O(1)
     TagModel existingTag = tagMap.get(model.epc);
     
     if (existingTag != null) {
-        // تحديث الـ RSSI وعدد القراءات فقط
+        // تحديث إشارة الـ RSSI وعدد القراءات
         existingTag.rssi = model.rssi;
         existingTag.readCount++;
         
-        // ✅ تحديث العنصر في القائمة فقط بدون إعادة رسم الكل
-        int index = tagList.indexOf(existingTag);
-        if (index >= 0 && currentFilter.equals("ALL")) {
-            tagAdapter.notifyItemChanged(index);
+        // ✅ تحديث الخلية في الواجهة مباشرة بدون Loop أو indexOf وبدون إعادة رسم القائمة كاملة
+        if (currentFilter.equals("ALL") && existingTag.position >= 0) {
+            tagAdapter.notifyItemChanged(existingTag.position);
         }
         
-        // تحديث بطاقة آخر وسم مقروء
+        // تحديث بطاقة أحدث قطعة ممسوحة
         updateLastTagCard(existingTag);
         return;
     }
     
-    // إذا لم يكن موجوداً، أضفه
+    // 2️⃣ إعداد بيانات القطعة الجديدة
     ExpectedItem expected = expectedItemsMap.get(model.epc);
     
     if (expected != null) {
@@ -1300,10 +1299,24 @@ private void processSingleTag(TagModel model) {
     }
 
     model.readCount = 1;
+
+    // 3️⃣ إضافة القطعة في مقدمة القائمة وتحديث فهارس (Positions) العناصر المتأثرة
+    // إزاحة المواقع لجميع العناصر السابقة بـ +1 نظراً للإضافة في الفهرس 0
+    for (TagModel tag : tagList) {
+        tag.position++;
+    }
+    
+    model.position = 0; // القطعة الجديدة أصبحت في الأعلى
     tagList.add(0, model);
     tagMap.put(model.epc, model);
     isMissingCacheDirty = true;
     
+    // إشعار الـ Adapter بإضافة عنصر جديد في الأعلى
+    if (currentFilter.equals("ALL")) {
+        tagAdapter.notifyItemInserted(0);
+    }
+    
+    // تحديث بطاقة أحدث قطعة ممسوحة
     updateLastTagCard(model);
 }
 
@@ -1990,4 +2003,4 @@ private void processSingleTag(TagModel model) {
             }
         }
     }
-                        }
+}
