@@ -33,10 +33,23 @@ public class MiraAccountingViewModel extends AndroidViewModel {
         this.apiClient = MiraApiClient.getInstance(application);
     }
 
+    // ✅ دالة للتوافق مع استدعاء الـ Fragment
+    public LiveData<List<MiraAccountingItem>> getAccountingItemsLiveData() { return accountingItems; }
     public LiveData<List<MiraAccountingItem>> getAccountingItems() { return accountingItems; }
     public LiveData<Boolean> getIsLoading() { return isLoading; }
     public LiveData<String> getErrorMessage() { return errorMessage; }
     public LiveData<AccountingStats> getStatsLiveData() { return statsLiveData; }
+
+    // ✅ دالة جلب البيانات الشاملة المباشرة من الـ Fragment حسب التبويب
+    public void fetchAccountingData(MiraAccountingItem.ItemType tab) {
+        if (tab == MiraAccountingItem.ItemType.CHART_OF_ACCOUNT) {
+            fetchChartOfAccounts();
+        } else if (tab == MiraAccountingItem.ItemType.TRIAL_BALANCE) {
+            fetchTrialBalance();
+        } else {
+            fetchJournalEntries();
+        }
+    }
 
     public void fetchJournalEntries() {
         isLoading.setValue(true);
@@ -107,7 +120,6 @@ public class MiraAccountingViewModel extends AndroidViewModel {
                     double fineDebit = obj.optDouble("fine_gold_debit", 0.0);
                     double fineCredit = obj.optDouble("fine_gold_credit", 0.0);
                     
-                    // تحويل آلي إذا تم إرسال وزن قائم وعيار
                     double gross = obj.optDouble("gross_weight", 0.0);
                     int karat = obj.optInt("karat", 0);
                     if (fineDebit == 0.0 && gross > 0 && karat > 0) {
@@ -195,7 +207,8 @@ public class MiraAccountingViewModel extends AndroidViewModel {
         for (MiraAccountingItem item : items) {
             if (item.getItemType() == MiraAccountingItem.ItemType.JOURNAL_ENTRY) {
                 totalCash += item.getDebitCash();
-                totalGold24 += item.getFineGold24Debit();
+                // ✅ تصحيح أخير: استدعاء الميثود الصحيحة getFineWeight24Debit
+                totalGold24 += item.getFineWeight24Debit();
             } else {
                 totalCash += item.getCashBalance();
                 totalGold24 += item.getFineGoldBalance();
@@ -204,12 +217,10 @@ public class MiraAccountingViewModel extends AndroidViewModel {
         statsLiveData.postValue(new AccountingStats(totalCash, totalGold24, balanced));
     }
 
-    // Mock Data مخصص لمجوهرات الذهب
     private void loadMockJournalEntries() {
         List<MiraAccountingItem> mock = new ArrayList<>();
         
-        // 1. بيع طقم ذهب عيار 21 (وزن 18.5 جرام)
-        double fine24_1 = MiraAccountingItem.convertToFineGold24(18.5, 21); // 16.187g
+        double fine24_1 = MiraAccountingItem.convertToFineGold24(18.5, 21);
         MiraAccountingItem item1 = new MiraAccountingItem(
                 MiraAccountingItem.ItemType.JOURNAL_ENTRY,
                 "JV-2026-801", "مبيعات طقم مجوهرات عيار 21",
@@ -219,8 +230,7 @@ public class MiraAccountingViewModel extends AndroidViewModel {
         item1.setMakingFee(85000.0);
         mock.add(item1);
 
-        // 2. شراء ذهب كسر عيار 18 من عميل (وزن 40.0 جرام)
-        double fine24_2 = MiraAccountingItem.convertToFineGold24(40.0, 18); // 30.000g
+        double fine24_2 = MiraAccountingItem.convertToFineGold24(40.0, 18);
         MiraAccountingItem item2 = new MiraAccountingItem(
                 MiraAccountingItem.ItemType.JOURNAL_ENTRY,
                 "JV-2026-802", "شراء ذهب كسر (18k) - توريد خزانة",
