@@ -11,6 +11,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -33,19 +34,14 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/**
- * MIRA Secure Gate™ - Enterprise Security Module
- * 
- * الميزات المتقدمة:
- * - التحقق المحلي بالذاكرة الفائقة (Local In-Memory Cache Verification) لزمن استجابة < 10ms
- * - معالجة متوازية خفيفة الوزن بأحواض الخيوط (ExecutorService ThreadPool)
- * - دعم كامل لنظام الثيمات، اللغات، والاهتزاز الأمني القوي.
- */
 public class MiraSecureGateFragment extends Fragment {
 
     private static final String TAG = "MiraSecureGate";
@@ -53,29 +49,28 @@ public class MiraSecureGateFragment extends Fragment {
     private UHFMainActivity mContext;
     private MiraSettingsManager settingsManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    
-    // Executor للعمليات الأمنية في الخلفية لمنع خنق واجهة المستخدم
     private final ExecutorService gateExecutor = Executors.newFixedThreadPool(4);
 
-    // 🟢 عناصر الواجهة
-    private TextView tvGateIcon, tvGateStatus, tvLastEvent;
+    // عناصر الواجهة
+    private TextView tvGateIcon, tvGateStatus, tvLastEvent, tvDebugConsole;
     private TextView tvPassCount, tvDenyCount, tvTotalCount;
     private View statusIndicator;
-    private Button btnArmGate, btnDisarmGate;
+    private Button btnArmGate, btnDisarmGate, btnSimulateAllowed, btnSimulateDenied;
+    private ScrollView scrollDebugLog;
 
-    // 🟢 حالة البوابة والعدادات
+    // حالة البوابة والعدادات
     private volatile boolean gateActive = false;
     private int passCount = 0;
     private int denyCount = 0;
     private int totalCount = 0;
 
-    // 🟢 ذاكرة الكاش السريعة جداً لمنع التأخير واستعلامات الشبكة المعطلة للإنذار
-    // تحتوي على التاقات المسموح لها بالخروج (المباعة أو التي تحت الإذن)
+    // Cache محلي للتحقق السريع
     private final Set<String> localAllowedEpcCache = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<String, Long> scanDebounceMap = new ConcurrentHashMap<>();
-    private static final long SCAN_COOL_DOWN_MS = 2500; // فترة تهدئة التاق المكرر
+    private static final long SCAN_COOL_DOWN_MS = 2500;
 
     private Vibrator vibrator;
+    private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -85,7 +80,7 @@ public class MiraSecureGateFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        
+
         if (getActivity() instanceof UHFMainActivity) {
             mContext = (UHFMainActivity) getActivity();
             settingsManager = MiraSettingsManager.getInstance(mContext);
@@ -95,6 +90,9 @@ public class MiraSecureGateFragment extends Fragment {
         initViews(view);
         setupClickListeners();
         updateUI();
+
+        logConsole("🚀 تم تشغيل شاشة MIRA Secure Gate");
+        logConsole("ℹ️ وضع المحاكاة جاهز للاختبار بدون هاردوير.");
     }
 
     private void initViews(View view) {
@@ -107,35 +105,53 @@ public class MiraSecureGateFragment extends Fragment {
         statusIndicator = view.findViewById(R.id.statusIndicator);
         btnArmGate = view.findViewById(R.id.btnArmGate);
         btnDisarmGate = view.findViewById(R.id.btnDisarmGate);
+        btnSimulateAllowed = view.findViewById(R.id.btnSimulateAllowed);
+        btnSimulateDenied = view.findViewById(R.id.btnSimulateDenied);
+        tvDebugConsole = view.findViewById(R.id.tvDebugConsole);
+        scrollDebugLog = view.findViewById(R.id.scrollDebugLog);
     }
 
     private void setupClickListeners() {
         btnArmGate.setOnClickListener(v -> armGate());
         btnDisarmGate.setOnClickListener(v -> disarmGate());
+
+        // أزرار المحاكاة
+        btnSimulateAllowed.setOnClickListener(v -> {
+            if (!gateActive) {
+                Toast.makeText(getContext(), "قم بتفعيل البوابة أولاً!", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            // إضافة تاق وهمي مصرح به للكاش واختباره
+            String mockAllowedEpc = "E20041000000000000009999";
+            localAllowedEpcCache.add(mockAllowedEpc);
+            logConsole("🧪 [محاكاة]: تمرير تاق مصرح: " + mockAllowedEpc);
+            processEpcString(mockAllowedEpc);
+        });
+
+        btnSimulateDenied.setOnClickListener(v -> {
+            if (!gateActive) {
+                Toast.makeText(getContext(), "قم بتفعيل البوابة أولاً!", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            // تاق غير مصرح به
+            String mockDeniedEpc = "E20041000000000000001111";
+            logConsole("🧪 [محاكاة]: تمرير تاق غير مصرح: " + mockDeniedEpc);
+            processEpcString(mockDeniedEpc);
+        });
     }
 
-    // ============================================
-    // 🟢 تفعيل البوابة والأمن
-    // ============================================
     private void armGate() {
         gateActive = true;
         updateUI();
-        
-        // 1. مزامنة ذاكرة التصاريح المحلية فوراً في الخلفية
+
+        logConsole("🛡️ تم تفعيل البوابة الأمنية.");
         syncLocalAllowedCache();
-
-        // 2. تشغيل الماسح الضوئي المستمر
         startContinuousScan();
-
-        // 3. إبلاغ السيرفر المركزي بتفعيل البوابة
         updateGateStatusOnServer("armed");
 
         Toast.makeText(mContext, getString(R.string.gate_status_armed), Toast.LENGTH_SHORT).show();
     }
 
-    // ============================================
-    // 🔴 إيقاف البوابة
-    // ============================================
     private void disarmGate() {
         gateActive = false;
         stopContinuousScan();
@@ -148,54 +164,57 @@ public class MiraSecureGateFragment extends Fragment {
         scanDebounceMap.clear();
         updateUI();
 
+        logConsole("🔒 تم إيقاف تفعيل البوابة.");
         updateGateStatusOnServer("offline");
 
         Toast.makeText(mContext, getString(R.string.gate_status_disarmed), Toast.LENGTH_SHORT).show();
     }
 
-    // ============================================
-    // 🟢 التحكم بمسح UHF Reader
-    // ============================================
     private void startContinuousScan() {
         if (mContext != null && mContext.mReader != null) {
-            mContext.mReader.setInventoryCallback(new IUHFInventoryCallback() {
-                @Override
-                public void callback(UHFTAGInfo uhftagInfo) {
-                    if (uhftagInfo != null) {
-                        processGateTag(uhftagInfo);
+            try {
+                mContext.mReader.setPower(15); // خفض المدى للبوابة
+                mContext.mReader.setInventoryCallback(new IUHFInventoryCallback() {
+                    @Override
+                    public void callback(UHFTAGInfo uhftagInfo) {
+                        if (uhftagInfo != null && uhftagInfo.getEPC() != null) {
+                            processEpcString(uhftagInfo.getEPC());
+                        }
                     }
-                }
-            });
-            mContext.mReader.startInventoryTag();
+                });
+                mContext.mReader.startInventoryTag();
+                logConsole("📡 القارئ المادي متصل ويعمل بمدى 15dBm");
+            } catch (Exception e) {
+                logConsole("⚠️ تعذر الاتصال بالقارئ المادي (في انتظار الجهاز): " + e.getMessage());
+            }
+        } else {
+            logConsole("ℹ️ يعمل التطبيق في وضع المحاكاة بدون قارئ C72.");
         }
     }
 
     private void stopContinuousScan() {
         if (mContext != null && mContext.mReader != null) {
-            mContext.mReader.stopInventory();
-            mContext.mReader.setInventoryCallback(null);
+            try {
+                mContext.mReader.stopInventory();
+                mContext.mReader.setInventoryCallback(null);
+                mContext.mReader.setPower(30); // إعادة القوة للوضع المعتاد
+            } catch (Exception e) {
+                logConsole("إيقاف القارئ: " + e.getMessage());
+            }
         }
     }
 
-    // ============================================
-    // ⚡ المعالجة الأمنية اللحظية (Zero-Latency Pipeline)
-    // ============================================
-    private void processGateTag(UHFTAGInfo tagInfo) {
-        if (!gateActive) return;
-
-        final String epc = tagInfo.getEPC();
-        if (epc == null || epc.trim().isEmpty()) return;
+    private void processEpcString(String epc) {
+        if (!gateActive || epc == null || epc.trim().isEmpty()) return;
 
         long currentTime = System.currentTimeMillis();
         Long lastTime = scanDebounceMap.get(epc);
 
-        // تصفية التكرارات السريعة
         if (lastTime != null && (currentTime - lastTime < SCAN_COOL_DOWN_MS)) {
-            return;
+            return; // تصفية القراءات المتكررة
         }
         scanDebounceMap.put(epc, currentTime);
 
-        // تحديث العداد
         mainHandler.post(() -> {
             totalCount++;
             updateCounters();
@@ -203,21 +222,18 @@ public class MiraSecureGateFragment extends Fragment {
             tvLastEvent.setText(getString(R.string.gate_status_verifying) + " (" + shortEpc + ")");
         });
 
-        // 🟢 الفحص الأمني السريع محلياً (In-Memory Check < 5ms)
+        // ⚡ فحص محلي سريع في أقل من 5ms
         boolean isLocallyAllowed = localAllowedEpcCache.contains(epc);
 
         if (isLocallyAllowed) {
-            // خروج مصرح فوري!
-            mainHandler.post(() -> handleGateDecision(true, "قطعة مصرح لها (مباعة)", epc));
+            logConsole("⚡ [LOCAL CACHE MATCH] التاق مصرح به محلياً: " + epc);
+            mainHandler.post(() -> handleGateDecision(true, "قطعة مصرح بها (مباعة)", epc));
         } else {
-            // إرسال استعلام خلفي وفي نفس الوقت إطلاق الإنذار الوقائي إذا تم إعداده للتحقق المباشر
+            logConsole("🌐 [SERVER QUERY] جاري الاستعلام من السيرفر عن: " + epc);
             gateExecutor.execute(() -> queryMiraGateServer(epc));
         }
     }
 
-    // ============================================
-    // 🌐 استعلام السيرفر والتصديق الأمني
-    // ============================================
     private void queryMiraGateServer(String epc) {
         try {
             String apiUrl = settingsManager.getString("mira_api_url", "https://ams.ibreg.org/wp-json/mira-gate/v1/authorize");
@@ -229,8 +245,8 @@ public class MiraSecureGateFragment extends Fragment {
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-            conn.setConnectTimeout(2000); // مهلة استجابة أمنية قصيرة جداً
-            conn.setReadTimeout(2000);
+            conn.setConnectTimeout(2500);
+            conn.setReadTimeout(2500);
             conn.setDoOutput(true);
 
             JSONObject json = new JSONObject();
@@ -242,6 +258,8 @@ public class MiraSecureGateFragment extends Fragment {
             }
 
             int responseCode = conn.getResponseCode();
+            logConsole("🌐 Server Status Code: " + responseCode);
+
             if (responseCode == 200) {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"));
                 StringBuilder response = new StringBuilder();
@@ -257,24 +275,21 @@ public class MiraSecureGateFragment extends Fragment {
                 String serial = item != null ? item.optString("serial", epc) : epc;
 
                 if (allowed) {
-                    localAllowedEpcCache.add(epc); // تحديث الكاش محلياً
+                    localAllowedEpcCache.add(epc);
                 }
 
                 mainHandler.post(() -> handleGateDecision(allowed, itemTitle, serial));
             } else {
-                // في حالة فشل السيرفر، يتم التعامل مع القطعة كغير مصرح بها أمنياً لحماية المعرض
-                mainHandler.post(() -> handleGateDecision(false, "تنبيه أمني (فشل استجابة الخادم)", epc));
+                logConsole("⚠️ السيرفر أعاد استجابة غير 200 -> تفعيل إنذار احترازي");
+                mainHandler.post(() -> handleGateDecision(false, "تنبيه أمني (استجابة سيرفر)", epc));
             }
 
         } catch (Exception e) {
-            Log.e(TAG, "MIRA Security Query Error: " + e.getMessage());
+            logConsole("❌ خطأ بالشبكة: " + e.getMessage() + " -> إنذار أمان محلي!");
             mainHandler.post(() -> handleGateDecision(false, "🚨 تنبيه أمني - خروج غير مصرح", epc));
         }
     }
 
-    // ============================================
-    // 🚨 تنفيذ القرار الأمني والإشارات
-    // ============================================
     private void handleGateDecision(boolean allowed, String itemTitle, String serial) {
         if (!isAdded()) return;
 
@@ -288,8 +303,10 @@ public class MiraSecureGateFragment extends Fragment {
             tvLastEvent.setText("✅ " + itemTitle + " [" + serial + "]");
             tvGateIcon.setText("✅");
 
+            logConsole("✅ قرار البوابة: PASS - " + itemTitle);
+
             if (mContext != null) {
-                mContext.playSound(1); // صوت النجاح
+                mContext.playSound(1); // صوت النحاح
             }
 
         } else {
@@ -302,10 +319,11 @@ public class MiraSecureGateFragment extends Fragment {
             tvLastEvent.setText("🚨 " + itemTitle + " [" + serial + "]");
             tvGateIcon.setText("🚨");
 
+            logConsole("🚨 قرار البوابة: DENY ALARM - " + itemTitle);
+
             triggerSecurityAlarm();
         }
 
-        // إعادة ضبط واجهة المراقبة بعد 3 ثوانٍ
         mainHandler.removeCallbacks(resetUIRunnable);
         mainHandler.postDelayed(resetUIRunnable, 3000);
     }
@@ -318,23 +336,19 @@ public class MiraSecureGateFragment extends Fragment {
 
     private void triggerSecurityAlarm() {
         if (mContext != null) {
-            mContext.playSound(2); // صوت الإنذار القوي alarm_sold_item
+            mContext.playSound(2); // alarm_sold_item.mp3
         }
 
-        // اهتزاز نمط إنذار طوارئ (Alarm Pattern)
         if (vibrator != null && vibrator.hasVibrator()) {
             long[] pattern = {0, 300, 100, 300, 100, 400};
             vibrator.vibrate(pattern, -1);
         }
     }
 
-    // ============================================
-    // 🔄 مزامنة الكاش المحلي مسبقاً (Local Cache Sync)
-    // ============================================
     private void syncLocalAllowedCache() {
         gateExecutor.execute(() -> {
             try {
-                // جلب قائمة التصاريح والمبيعات الحديثة لضمان التحقق الفوري
+                logConsole("🔄 جاري مزامنة القائمة المصرحة من السيرفر...");
                 String apiUrl = settingsManager.getString("mira_api_url", "https://ams.ibreg.org/wp-json/mira-gate/v1/allowed-list");
                 String apiKey = settingsManager.getString("mira_api_key", "mira_gate_test071234567890abcdefghijklmnop");
 
@@ -357,18 +371,17 @@ public class MiraSecureGateFragment extends Fragment {
                         for (int i = 0; i < allowedArray.length(); i++) {
                             localAllowedEpcCache.add(allowedArray.getString(i));
                         }
-                        Log.d(TAG, "Local Security Cache Synced. Count: " + localAllowedEpcCache.size());
+                        logConsole("✅ تم تحميل " + localAllowedEpcCache.size() + " قطعة مصرحة في الكاش السريع.");
                     }
+                } else {
+                    logConsole("⚠️ فشل جلب الكاش من السيرفر HTTP " + conn.getResponseCode());
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Failed to sync local security cache: " + e.getMessage());
+                logConsole("❌ تعذر المزامنة الحالية للكاش: " + e.getMessage());
             }
         });
     }
 
-    // ============================================
-    // 🎨 تحديث الواجهة والعدادات
-    // ============================================
     private void resetGateUI() {
         tvGateIcon.setText("🚪");
         tvGateStatus.setText(R.string.gate_status_armed);
@@ -419,17 +432,24 @@ public class MiraSecureGateFragment extends Fragment {
                 }
                 conn.getResponseCode();
             } catch (Exception e) {
-                Log.e(TAG, "Gate status update error: " + e.getMessage());
+                logConsole("خطأ تحديث حالة البوابة: " + e.getMessage());
             }
         });
     }
 
-    @Override
-    public void onPause() {
-        super.onPause();
-        if (gateActive) {
-            stopContinuousScan();
-        }
+    // 📺 ميزة شاشة سجلات الأخطاء المباشرة المدمجة داخل الواجهة (بديل Logcat)
+    private void logConsole(String message) {
+        mainHandler.post(() -> {
+            String currentTime = timeFormat.format(new Date());
+            String logLine = "[" + currentTime + "] " + message + "\n";
+            if (tvDebugConsole != null) {
+                tvDebugConsole.append(logLine);
+                if (scrollDebugLog != null) {
+                    scrollDebugLog.post(() -> scrollDebugLog.fullScroll(View.FOCUS_DOWN));
+                }
+            }
+            Log.d(TAG, message);
+        });
     }
 
     @Override
