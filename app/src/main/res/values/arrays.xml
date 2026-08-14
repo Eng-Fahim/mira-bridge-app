@@ -198,5 +198,19 @@
         <item>وضع السرعة العالية (Fast Scan)</item>
         <item>وضع التصفية المستمرة (Continuous Filtered)</item>
     </string-array>
+    
+    <string-array name="gold_api_providers">
+    <item>metalprice</item>
+    <item>goldapi</item>
+    <item>metalsdev</item>
+</string-array>
+
+<string-array name="currencies">
+    <item>USD</item>
+    <item>YER</item>
+    <item>EGP</item>
+    <item>SAR</item>
+    <item>AED</item>
+</string-array>
 
 </resources>
