@@ -227,13 +227,20 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 MiraApiClient client = MiraApiClient.getInstance(getContext());
-                JSONObject response = client.getReportData("audit", "", "", branchesManager.getActiveBranchId());
+                ApiResponse apiResponse = client.getReportData("audit", "", "", branchesManager.getActiveBranchId());
+
+                // استخراج الـ JSONObject من الاستجابة بأمان
+                JSONObject response = null;
+                if (apiResponse != null && apiResponse.isSuccess()) {
+                    response = apiResponse.getData(); 
+                }
 
                 if (getActivity() != null) {
+                    JSONObject finalResponse = response; // لضمان استخدام المتغير داخل Lambda
                     getActivity().runOnUiThread(() -> {
                         loading.dismiss();
-                        if (response != null && response.has("audit_summary")) {
-                            parseAndSelectMissingItem(response);
+                        if (finalResponse != null && finalResponse.has("audit_summary")) {
+                            parseAndSelectMissingItem(finalResponse);
                         } else {
                             Toast.makeText(getContext(), isArabic ? "لا توجد قطع مفقودة مسجلة في هذا الفرع" : "No missing items recorded", Toast.LENGTH_SHORT).show();
                         }
@@ -249,6 +256,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
             }
         });
     }
+
 
     private void parseAndSelectMissingItem(JSONObject data) {
         JSONArray missingArray = data.optJSONArray("missing_details");
