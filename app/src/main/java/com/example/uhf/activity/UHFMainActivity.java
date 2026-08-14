@@ -51,6 +51,7 @@ import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.fragment.MiraReceiptFragment;
 import com.example.uhf.fragment.MiraReportsProFragment;
 import com.example.uhf.fragment.MiraSalesHistoryFragment;
+import com.example.uhf.fragment.MiraGoldCurrencyFragment;
 import com.example.uhf.fragment.MiraSecureGateFragment;
 import com.example.uhf.fragment.MiraTransferFragment;
 import com.example.uhf.fragment.MiraUHFReadTagFragment;
@@ -803,7 +804,10 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
            
             if (isManager || isInventoryMgr) {
             safeAddTab("Settings", isArabic ? "⚙️ الإعدادات" : "⚙️ Settings", UHFSetFragment.class);
-            safeAddTab("ReaderSetup", isArabic ? "🔌 القارئ" : "🔌 Reader", MiraReaderSetupFragment.class);}
+            safeAddTab("ReaderSetup", isArabic ? "🔌 القارئ" : "🔌 Reader", MiraReaderSetupFragment.class);
+            // في طريقة safeAddTab أو ما يعادلها
+            safeAddTab("Gold", isArabic ? "💰 الذهب" : "💰 Gold", MiraGoldCurrencyFragment.class);
+            }
             
             if (isManager || isGateSecurity || isPosOperator) {
                 safeAddTab("SecureGate", isArabic ? "🚪 البوابات" : "🚪 Gate", MiraSecureGateFragment.class);
