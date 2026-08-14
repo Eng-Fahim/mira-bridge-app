@@ -939,18 +939,21 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
             Log.e(TAG, "Data Export Error: " + e.getMessage());
         }
     }
-
     // ==================== AUDIO FEEDBACK SYSTEM ====================
 
     private void initSound() {
         soundPool = new SoundPool(10, AudioManager.STREAM_MUSIC, 5);
         soundMap.put(1, soundPool.load(this, R.raw.barcodebeep, 1));
-        soundMap.put(2, soundPool.load(this, R.raw.serror, 2));
+        
+        // 🚨 ربط الصوت الجديد للإنذار ورقم 2 المستدعى من شاشة البوابات
+        soundMap.put(2, soundPool.load(this, R.raw.alarm_breach_security, 2)); 
+        
         audioManager = (AudioManager) this.getSystemService(AUDIO_SERVICE);
         
         playSoundThread = new PlaySoundThread();
         playSoundThread.start();
     }
+
 
     private void releaseSoundPool() {
         if (soundPool != null) {
