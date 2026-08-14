@@ -116,6 +116,25 @@
     <string name="fontGrayscaleName">التدرج الرمادي</string>
     <string name="fontGrayScaleRange">(1~8)</string>
     <string name="PrintContent"> أهلاً بك! \n</string>
+    
+    
+    <!---البوابات الامنية -->
+    
+    <string name="mira_gate_title">MIRA Secure Gate™</string>
+    <string name="mira_gate_subtitle">نظام البوابة الأمنية والوقاية من السرقة</string>
+    <string name="gate_status_armed">🛡️ البوابة مفعلة - المسح الأمني نشط</string>
+    <string name="gate_status_disarmed">🔒 البوابة غير مفعلة</string>
+    <string name="gate_status_verifying">🔍 جاري التحقق من الهوية...</string>
+    <string name="gate_status_alarm">🚨 إنذار سرقة / خروج غير مصرح!</string>
+    <string name="gate_status_passed">✅ خروج مصرح به</string>
+    <string name="btn_arm_gate">🛡️ تفعيل البوابة</string>
+    <string name="btn_disarm_gate">🔒 إيقاف البوابة</string>
+    <string name="stat_authorized">مصرح</string>
+    <string name="stat_unauthorized">غير مصرح</string>
+    <string name="stat_total_scans">الإجمالي</string>
+    <string name="status_waiting">في انتظار التفعيل...</string>
+
+
 
 
     <!-- DASHBOARD -->
