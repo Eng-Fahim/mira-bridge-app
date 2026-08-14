@@ -1,4 +1,5 @@
 package com.example.uhf.fragment;
+import com.example.uhf.api.ApiResponse; // (أو مسار حزمة ApiResponse الصحيح في مشروعك)
 
 import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
