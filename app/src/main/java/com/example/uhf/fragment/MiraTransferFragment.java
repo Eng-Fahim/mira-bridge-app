@@ -1,6 +1,6 @@
 package com.example.uhf.fragment;
 
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.media.AudioManager;
