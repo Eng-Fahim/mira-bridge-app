@@ -6,6 +6,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -32,7 +34,6 @@ import androidx.core.content.FileProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.bumptech.glide.Glide;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
@@ -47,7 +48,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -75,7 +78,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private ActivityResultLauncher<Uri> takePhotoLauncher;
     private ActivityResultLauncher<String[]> pickImageLauncher;
     private ActivityResultLauncher<String> requestPermissionLauncher;
-    private ActivityResultLauncher<Intent> galleryLauncher;
     private Uri photoUri;
 
     // أسعار الذهب والإعدادات
@@ -86,9 +88,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private double makingChargePerGram = 10.0;
     private double profitMarginPercent = 90.0;
     private boolean goldRatesLoaded = false;
-
-    // عداد الطلبات المعلقة
-    private TextView tvPendingBadge;
 
     private void applyLanguage() {
         if (binding == null) return;
@@ -122,7 +121,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             applyLanguage();
             setupListeners();
             loadGoldRates();
-            updatePendingBadge();
 
             populateSuggestions("rings");
 
@@ -138,7 +136,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     public void onResume() {
         super.onResume();
         syncPendingEncodes();
-        updatePendingBadge();
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
         }
@@ -152,7 +149,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
-    // ==================== ✅ أسعار الذهب وحسابه ====================
+    // ==================== أسعار الذهب وحسابه ====================
 
     private void loadGoldRates() {
         if (apiClient == null) return;
@@ -274,7 +271,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     if (success && currentPhotoPath != null) {
                         photoPaths.add(currentPhotoPath);
                         updatePhotosCount();
-                        displayPhotoPreviews();
                     }
                 }
         );
@@ -294,7 +290,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                             }
                         }
                         updatePhotosCount();
-                        displayPhotoPreviews();
                     }
                 }
         );
@@ -378,8 +373,8 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             File storageDir = getContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
             File destFile = new File(storageDir, "MIRA_" + timeStamp + "_" + System.currentTimeMillis() + ".jpg");
             
-            java.io.InputStream inputStream = getContext().getContentResolver().openInputStream(uri);
-            java.io.FileOutputStream outputStream = new java.io.FileOutputStream(destFile);
+            InputStream inputStream = getContext().getContentResolver().openInputStream(uri);
+            FileOutputStream outputStream = new FileOutputStream(destFile);
             
             byte[] buffer = new byte[1024];
             int length;
@@ -406,41 +401,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     (isArabic ? "تم إرفاق (" + count + ") صور" : "Attached (" + count + ") photos"));
         } catch (Exception e) {
             Log.e(TAG, "updatePhotosCount error: " + e.getMessage());
-        }
-    }
-
-    private void displayPhotoPreviews() {
-        try {
-            if (binding == null) return;
-            
-            // إنشاء حاوية للصور إذا لم تكن موجودة
-            LinearLayout photoContainer = binding.getRoot().findViewById(R.id.photoContainer);
-            if (photoContainer == null) {
-                // يمكن إضافة حاوية صور هنا إذا كانت موجودة في التخطيط
-                return;
-            }
-            
-            photoContainer.removeAllViews();
-            
-            for (String path : photoPaths) {
-                ImageView imageView = new ImageView(getContext());
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                        100, 100
-                );
-                params.setMargins(4, 4, 4, 4);
-                imageView.setLayoutParams(params);
-                imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                
-                // استخدام Glide لتحميل الصورة
-                Glide.with(this)
-                        .load(new File(path))
-                        .centerCrop()
-                        .into(imageView);
-                
-                photoContainer.addView(imageView);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "displayPhotoPreviews error: " + e.getMessage());
         }
     }
 
@@ -531,9 +491,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 }
                 @Override public void afterTextChanged(Editable s) {}
             });
-            if (binding.btnViewPending != null) {
-    binding.btnViewPending.setOnClickListener(v -> showPendingSyncDialog());
-}
 
             binding.chipGroupKarat.setOnCheckedStateChangeListener((group, checkedIds) ->
                     calculateEstimatedGoldValue());
@@ -948,7 +905,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
                             } else {
                                 saveEncodeOffline(payload);
-                                updatePendingBadge();
                                 showToast(isArabic ? "💾 تم حفظ التكويد محلياً للمزامنة لاحقاً"
                                         : "💾 Encoding saved locally for later sync");
                                 resetFormForNextScan();
@@ -1037,7 +993,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             arr.put(payload);
             while (arr.length() > 100) arr.remove(0);
             offlineCache.edit().putString("pending_encodes", arr.toString()).apply();
-            updatePendingBadge();
         } catch (Exception e) {
             Log.e(TAG, "Save encode offline error: " + e.getMessage());
         }
@@ -1054,7 +1009,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 if (obj != null && !epc.equals(obj.optString("epc", ""))) newArr.put(obj);
             }
             offlineCache.edit().putString("pending_encodes", newArr.toString()).apply();
-            updatePendingBadge();
         } catch (Exception ignored) {}
     }
 
@@ -1098,183 +1052,12 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
                 final int s = synced;
                 safeRun(() -> {
-                    if (s > 0) {
-                        showToast(isArabic ? "✅ تمت مزامنة " + s + " تكويد" : "✅ Synced " + s + " encodings");
-                    }
-                    updatePendingBadge();
+                    if (s > 0) showToast(isArabic ? "✅ تمت مزامنة " + s + " تكويد" : "✅ Synced " + s + " encodings");
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Sync encodes error: " + e.getMessage());
             }
         }).start();
-    }
-
-    private void updatePendingBadge() {
-        try {
-            if (offlineCache == null || binding == null) return;
-            
-            String json = offlineCache.getString("pending_encodes", "[]");
-            JSONArray arr = new JSONArray(json);
-            final int count = arr.length();
-            
-            safeRun(() -> {
-                try {
-                    // يمكن إضافة شارة على زر المزامنة هنا
-                    if (binding.btnSaveIdentity != null) {
-                        // تحديث النص إذا لزم الأمر
-                    }
-                } catch (Exception ignored) {}
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "updatePendingBadge error: " + e.getMessage());
-        }
-    }
-
-    private void showPendingSyncDialog() {
-        if (getContext() == null || offlineCache == null) return;
-        
-        try {
-            String json = offlineCache.getString("pending_encodes", "[]");
-            JSONArray arr = new JSONArray(json);
-            
-            if (arr.length() == 0) {
-                showToast(isArabic ? "لا توجد طلبات معلقة" : "No pending items");
-                return;
-            }
-            
-            // إنشاء وعرض واجهة الطلبات المعلقة
-            AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-            View dialogView = getLayoutInflater().inflate(R.layout.dialog_pending_sync, null);
-            builder.setView(dialogView);
-            
-            TextView tvCount = dialogView.findViewById(R.id.tvPendingCount);
-            RecyclerView rvItems = dialogView.findViewById(R.id.rvPendingItems);
-            MaterialButton btnSyncAll = dialogView.findViewById(R.id.btnSyncAll);
-            MaterialButton btnClose = dialogView.findViewById(R.id.btnClosePending);
-            
-            tvCount.setText(isArabic ? "عدد الطلبات: " + arr.length() : "Pending count: " + arr.length());
-            
-            rvItems.setLayoutManager(new LinearLayoutManager(getContext()));
-            PendingItemsAdapter adapter = new PendingItemsAdapter(arr);
-            rvItems.setAdapter(adapter);
-            
-            AlertDialog dialog = builder.create();
-            
-            btnSyncAll.setOnClickListener(v -> {
-                dialog.dismiss();
-                syncPendingEncodes();
-            });
-            
-            btnClose.setOnClickListener(v -> dialog.dismiss());
-            
-            dialog.show();
-        } catch (Exception e) {
-            Log.e(TAG, "showPendingSyncDialog error: " + e.getMessage());
-        }
-    }
-
-    // محول عناصر القائمة المعلقة
-    private class PendingItemsAdapter extends RecyclerView.Adapter<PendingItemsAdapter.ViewHolder> {
-        private final JSONArray items;
-        
-        PendingItemsAdapter(JSONArray items) {
-            this.items = items;
-        }
-        
-        @NonNull
-        @Override
-        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_pending_encode, parent, false);
-            return new ViewHolder(view);
-        }
-        
-        @Override
-        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            try {
-                JSONObject item = items.getJSONObject(position);
-                
-                holder.tvTitle.setText(item.optString("title", "—"));
-                holder.tvKarat.setText(item.optString("purity_code", "21K"));
-                holder.tvEpc.setText("EPC: " + item.optString("epc", "—"));
-                holder.tvWeight.setText((isArabic ? "الوزن: " : "Weight: ") + item.optDouble("gross_weight", 0) + (isArabic ? " جم" : " g"));
-                
-                holder.btnSync.setOnClickListener(v -> {
-                    // مزامنة عنصر واحد
-                    syncSingleItem(position, item);
-                });
-                
-                holder.btnDelete.setOnClickListener(v -> {
-                    // حذف عنصر واحد
-                    deletePendingItem(position, item);
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Bind view holder error: " + e.getMessage());
-            }
-        }
-        
-        @Override
-        public int getItemCount() {
-            return items.length();
-        }
-        
-        class ViewHolder extends RecyclerView.ViewHolder {
-            TextView tvTitle, tvKarat, tvEpc, tvWeight;
-            MaterialButton btnSync, btnDelete;
-            
-            ViewHolder(View itemView) {
-                super(itemView);
-                tvTitle = itemView.findViewById(R.id.tvPendingTitle);
-                tvKarat = itemView.findViewById(R.id.tvPendingKarat);
-                tvEpc = itemView.findViewById(R.id.tvPendingEpc);
-                tvWeight = itemView.findViewById(R.id.tvPendingWeight);
-                btnSync = itemView.findViewById(R.id.btnSyncItem);
-                btnDelete = itemView.findViewById(R.id.btnDeleteItem);
-            }
-        }
-    }
-    
-    private void syncSingleItem(int position, JSONObject item) {
-        if (apiClient == null) return;
-        
-        final AlertDialog loadingDialog = showLoadingDialog(
-                isArabic ? "🔄 جاري المزامنة..." : "🔄 Syncing..."
-        );
-        
-        new Thread(() -> {
-            try {
-                MiraApiClient.ApiResponse response = apiClient.encodeItem(item);
-                
-                safeRun(() -> {
-                    dismissDialog(loadingDialog);
-                    
-                    if (response != null && response.isSuccess) {
-                        removePendingEncode(item.optString("epc", ""));
-                        showToast(isArabic ? "✅ تمت المزامنة بنجاح" : "✅ Synced successfully");
-                    } else {
-                        showToast(isArabic ? "❌ فشلت المزامنة" : "❌ Sync failed");
-                    }
-                });
-            } catch (Exception e) {
-                safeRun(() -> {
-                    dismissDialog(loadingDialog);
-                    showToast(isArabic ? "❌ خطأ في المزامنة" : "❌ Sync error");
-                });
-            }
-        }).start();
-    }
-    
-    private void deletePendingItem(int position, JSONObject item) {
-        new AlertDialog.Builder(requireContext())
-                .setTitle(isArabic ? "🗑️ حذف الطلب" : "🗑️ Delete Item")
-                .setMessage(isArabic ? "هل أنت متأكد من حذف هذا الطلب؟" : "Are you sure you want to delete this item?")
-                .setPositiveButton(isArabic ? "نعم" : "Yes", (dialog, which) -> {
-                    removePendingEncode(item.optString("epc", ""));
-                    showToast(isArabic ? "✅ تم الحذف" : "✅ Deleted");
-                    showPendingSyncDialog(); // إعادة فتح النافذة لتحديث القائمة
-                })
-                .setNegativeButton(isArabic ? "لا" : "No", null)
-                .show();
     }
 
     // ==================== المساعدات ====================
