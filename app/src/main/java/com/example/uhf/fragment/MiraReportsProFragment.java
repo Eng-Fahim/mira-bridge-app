@@ -178,73 +178,80 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void fetchAndRenderReport(String reportType, WebView webView, View layoutLoading, TextView tvLoadingStatus, String fromDate, String toDate) {
-        if (getContext() == null) return;
+    if (getContext() == null) return;
+
+    mainHandler.post(() -> {
+        if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
+        if (tvLoadingStatus != null) tvLoadingStatus.setText("جاري معالجة البيانات...");
+    });
+
+    new Thread(() -> {
+        JSONObject reportData = null;
+        String errorMessage = null;
+        String cacheKey = "cache_" + reportType + "_" + fromDate + "_" + toDate;
+
+        try {
+            int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 1;
+            MiraApiClient.ApiResponse response = apiClient.getReportData(reportType, fromDate, toDate, activeBranchId);
+
+            if (response != null && response.isSuccess && response.data != null) {
+                // ✅ الاستخراج الصحيح
+                reportData = response.data.optJSONObject("data");
+                if (reportData == null) reportData = response.data;
+                
+                if (offlineCache != null && reportData != null) {
+                    offlineCache.edit().putString(cacheKey, reportData.toString()).apply();
+                }
+            } else {
+                errorMessage = "فشل الاتصال (code: " + (response != null ? response.code : "NULL") + ")";
+            }
+        } catch (Exception e) {
+            errorMessage = e.getMessage();
+        }
+
+        // كاش احتياطي
+        if (reportData == null && offlineCache != null) {
+            String cached = offlineCache.getString(cacheKey, null);
+            if (cached != null) {
+                try { reportData = new JSONObject(cached); } catch (Exception ignored) {}
+            }
+        }
+
+        final JSONObject finalData = reportData;
+        final String finalError = errorMessage;
 
         mainHandler.post(() -> {
-            if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
-            if (tvLoadingStatus != null) tvLoadingStatus.setText("جاري معالجة البيانات...");
-        });
+            if (getContext() == null) return;
 
-        new Thread(() -> {
-            JSONObject reportData = null;
-            String errorMessage = null;
-            String cacheKey = "cache_" + reportType + "_" + fromDate + "_" + toDate;
-
-            try {
-                int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 1;
-                MiraApiClient.ApiResponse response = apiClient.getReportData(reportType, fromDate, toDate, activeBranchId);
-
-                if (response != null && response.isSuccess && response.data != null) {
-                    // ✅ الاستخراج الصحيح
-                    reportData = response.data.optJSONObject("data");
-                    if (reportData == null) reportData = response.data;
-                    
-                    if (offlineCache != null && reportData != null) {
-                        offlineCache.edit().putString(cacheKey, reportData.toString()).apply();
+            if (finalData != null) {
+                String htmlContent = generateExecutiveHTML(reportType, finalData, fromDate, toDate);
+                
+                webView.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public void onPageFinished(WebView view, String url) {
+                        super.onPageFinished(view, url);
+                        if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
                     }
-                } else {
-                    errorMessage = "فشل الاتصال (code: " + (response != null ? response.code : "NULL") + ")";
-                }
-            } catch (Exception e) {
-                errorMessage = e.getMessage();
+                });
+                
+                // ✅ الإصلاح الحاسم: استخدام loadData بدلاً من loadDataWithBaseURL(null, ...)
+                // هذا يحل مشكلة عدم عرض HTML بالعربية RTL في WebView
+                webView.loadData(htmlContent, "text/html; charset=utf-8", "UTF-8");
+                
+            } else {
+                if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+                
+                String errorHtml = "<html dir='rtl'><head><meta charset='UTF-8'></head>" +
+                    "<body style='text-align:center;padding:40px;font-family:sans-serif;font-size:16px;color:#333;background:#F8FAFC;'>" +
+                    "<h2 style='color:#DC2626;'>❌ لا توجد بيانات</h2>" +
+                    "<p style='color:#64748B;'>" + (finalError != null ? finalError : "تحقق من الاتصال") + "</p>" +
+                    "</body></html>";
+                
+                webView.loadData(errorHtml, "text/html; charset=utf-8", "UTF-8");
             }
-
-            // كاش احتياطي
-            if (reportData == null && offlineCache != null) {
-                String cached = offlineCache.getString(cacheKey, null);
-                if (cached != null) {
-                    try { reportData = new JSONObject(cached); } catch (Exception ignored) {}
-                }
-            }
-
-            final JSONObject finalData = reportData;
-            final String finalError = errorMessage;
-
-            mainHandler.post(() -> {
-                if (getContext() == null) return;
-
-                if (finalData != null) {
-                    String htmlContent = generateExecutiveHTML(reportType, finalData, fromDate, toDate);
-                    
-                    webView.setWebViewClient(new WebViewClient() {
-                        @Override
-                        public void onPageFinished(WebView view, String url) {
-                            super.onPageFinished(view, url);
-                            if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-                        }
-                    });
-                    
-                    webView.loadDataWithBaseURL(null, htmlContent, "text/html", "utf-8", null);
-                } else {
-                    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-                    webView.loadDataWithBaseURL(null, 
-                        "<html dir='rtl'><body style='text-align:center;padding:40px;font-family:sans-serif;'><h2>❌ لا توجد بيانات</h2><p>" + 
-                        (finalError != null ? finalError : "") + "</p></body></html>", 
-                        "text/html", "utf-8", null);
-                }
-            });
-        }).start();
-    }
+        });
+    }).start();
+}
 
     // ==================== HTML GENERATOR ====================
 
@@ -511,4 +518,4 @@ public class MiraReportsProFragment extends Fragment {
 
     interface OnReportClickListener { void onClick(ReportItem item); }
     interface DatePickerCallback { void onDate(String date); }
-}
+            }
