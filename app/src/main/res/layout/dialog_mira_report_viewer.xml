@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFFFFF"
+    android:background="?android:attr/colorBackground"
     android:layoutDirection="rtl"
     android:orientation="vertical">
 
@@ -11,7 +11,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#F8FAFC"
+        android:background="?attr/colorSurface"
         android:elevation="2dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
@@ -23,7 +23,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="📊 عرض التقرير"
-            android:textColor="#1F2937"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -33,14 +33,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="إغلاق ✖"
-            android:textColor="#DC2626" />
+            android:textColor="?attr/colorError" />
     </LinearLayout>
 
     <!-- Quick Date Filters -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#F1F5F9"
+        android:background="?attr/colorSurfaceVariant"
         android:orientation="horizontal"
         android:paddingHorizontal="8dp"
         android:paddingVertical="4dp">
@@ -52,8 +52,7 @@
             android:layout_height="36dp"
             android:layout_weight="1"
             android:text="اليوم"
-            android:textSize="11sp"
-            android:textColor="#1F2937" />
+            android:textSize="11sp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnQuickWeek"
@@ -62,8 +61,7 @@
             android:layout_height="36dp"
             android:layout_weight="1"
             android:text="آخر 7 أيام"
-            android:textSize="11sp"
-            android:textColor="#1F2937" />
+            android:textSize="11sp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnQuickMonth"
@@ -72,8 +70,7 @@
             android:layout_height="36dp"
             android:layout_weight="1"
             android:text="آخر 30 يوم"
-            android:textSize="11sp"
-            android:textColor="#1F2937" />
+            android:textSize="11sp" />
     </LinearLayout>
 
     <!-- Manual Date Pickers -->
@@ -113,29 +110,24 @@
             app:cornerRadius="6dp" />
     </LinearLayout>
 
-    <!-- Content Container -->
+    <!-- Content Container (WebView + Native Loading View) -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:minHeight="400dp"
-        android:background="#FFFFFF">
+        android:layout_weight="1">
 
         <!-- WebView Content -->
         <WebView
             android:id="@+id/webReportView"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="#FFFFFF"
-            android:visibility="visible" />
+            android:layout_height="match_parent" />
 
-        <!-- Loading Overlay -->
+        <!-- Native Loading Overlay Container -->
         <LinearLayout
             android:id="@+id/layoutLoadingContainer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:background="#FFFFFF"
             android:gravity="center"
             android:orientation="vertical"
             android:padding="16dp"
@@ -151,8 +143,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="جاري معالجة البيانات..."
-                android:textColor="#64748B"
+                android:text="جاري معالجة بيانات الذهب والمخزون..."
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="12sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -163,7 +155,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#F8FAFC"
+        android:background="?attr/colorSurface"
         android:elevation="4dp"
         android:orientation="horizontal"
         android:padding="8dp">
