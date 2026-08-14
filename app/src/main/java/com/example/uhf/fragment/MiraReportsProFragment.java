@@ -4,13 +4,11 @@ import android.app.DatePickerDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.net.Uri;
+import android.graphics.Color;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.print.PrintAttributes;
-import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -25,7 +23,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -39,10 +36,6 @@ import com.google.android.material.button.MaterialButton;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.OutputStreamWriter;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -129,6 +122,7 @@ public class MiraReportsProFragment extends Fragment {
         webSettings.setJavaScriptEnabled(true);
         webSettings.setDomStorageEnabled(true);
         webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+        webView.setBackgroundColor(Color.WHITE);
 
         final String[] dates = {getDefaultFromDate(), getDefaultToDate()};
         btnFrom.setText("من: " + dates[0]);
@@ -177,9 +171,12 @@ public class MiraReportsProFragment extends Fragment {
         dialog.show();
     }
 
+    // ==================== FETCH & RENDER (الإصلاح النهائي) ====================
+
     private void fetchAndRenderReport(String reportType, WebView webView, View layoutLoading, TextView tvLoadingStatus, String fromDate, String toDate) {
         if (getContext() == null) return;
 
+        // إظهار التحميل
         mainHandler.post(() -> {
             if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
             if (tvLoadingStatus != null) tvLoadingStatus.setText("جاري معالجة البيانات...");
@@ -195,7 +192,6 @@ public class MiraReportsProFragment extends Fragment {
                 MiraApiClient.ApiResponse response = apiClient.getReportData(reportType, fromDate, toDate, activeBranchId);
 
                 if (response != null && response.isSuccess && response.data != null) {
-                    // ✅ الاستخراج الصحيح
                     reportData = response.data.optJSONObject("data");
                     if (reportData == null) reportData = response.data;
                     
@@ -223,24 +219,25 @@ public class MiraReportsProFragment extends Fragment {
             mainHandler.post(() -> {
                 if (getContext() == null) return;
 
+                // ✅ إخفاء الـ Loading فوراً - هذا هو الإصلاح الحاسم
+                if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+
                 if (finalData != null) {
                     String htmlContent = generateExecutiveHTML(reportType, finalData, fromDate, toDate);
                     
-                    webView.setWebViewClient(new WebViewClient() {
-                        @Override
-                        public void onPageFinished(WebView view, String url) {
-                            super.onPageFinished(view, url);
-                            if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-                        }
-                    });
+                    // ✅ WebViewClient بسيط بدون الاعتماد على onPageFinished
+                    webView.setWebViewClient(new WebViewClient());
                     
-                    webView.loadDataWithBaseURL(null, htmlContent, "text/html", "utf-8", null);
+                    // ✅ تحميل HTML
+                    webView.loadData(htmlContent, "text/html; charset=utf-8", "UTF-8");
                 } else {
-                    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-                    webView.loadDataWithBaseURL(null, 
-                        "<html dir='rtl'><body style='text-align:center;padding:40px;font-family:sans-serif;'><h2>❌ لا توجد بيانات</h2><p>" + 
-                        (finalError != null ? finalError : "") + "</p></body></html>", 
-                        "text/html", "utf-8", null);
+                    String errorHtml = "<html dir='rtl'><head><meta charset='UTF-8'></head>" +
+                        "<body style='text-align:center;padding:40px;font-family:sans-serif;font-size:18px;color:#333;background:#F8FAFC;'>" +
+                        "<h2 style='color:#DC2626;'>❌ لا توجد بيانات</h2>" +
+                        "<p style='color:#64748B;'>" + (finalError != null ? finalError : "تحقق من الاتصال") + "</p>" +
+                        "</body></html>";
+                    
+                    webView.loadData(errorHtml, "text/html; charset=utf-8", "UTF-8");
                 }
             });
         }).start();
@@ -437,7 +434,7 @@ public class MiraReportsProFragment extends Fragment {
         return metricBox(icon, val, lbl, "");
     }
 
-    // ==================== PRINT & EXPORT ====================
+    // ==================== PRINT ====================
 
     private void printReportWebView(WebView webView, String jobTitle) {
         if (getContext() == null) return;
@@ -511,4 +508,4 @@ public class MiraReportsProFragment extends Fragment {
 
     interface OnReportClickListener { void onClick(ReportItem item); }
     interface DatePickerCallback { void onDate(String date); }
-}
+            }
