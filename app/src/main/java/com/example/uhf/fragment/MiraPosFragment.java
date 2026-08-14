@@ -31,6 +31,7 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.dialog.POSCheckoutDialog;
 import com.example.uhf.engine.SmartScaleConnector;
 import com.example.uhf.manager.MiraBranchesManager;
+import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.tools.UIHelper;
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.RFIDManager;
@@ -51,18 +52,13 @@ public class MiraPosFragment extends MiraBaseFragment {
     private static final String TAG = "MiraPosFragment";
     private static final String PENDING_SALES_PREFS = "pos_pending_sales";
 
-    // ==================== متغيرات الأسعار الديناميكية ====================
-    private double goldPrice24K = 75.0;
-    private double goldPrice22K = 68.75;
-    private double goldPrice21K = 65.62;
-    private double goldPrice18K = 56.25;
-    private double makingChargePerGram = 10.0;
-    private double profitMarginPercent = 90.0;
+    // ==================== MiraPriceManager ====================
+    private MiraPriceManager priceManager;
 
     // RFID Manager & Locks
     private RFIDManager rfidManager;
     private boolean isRFIDScanActive = false;
-    private final Set<String> pendingEpcs = new HashSet<>(); // منع الطلبات المكررة أثناء المعالجة
+    private final Set<String> pendingEpcs = new HashSet<>();
 
     // UI Elements
     private TextView tvScaleStatus, tvItemCount, tvTotalAmount, tvCartStatus;
@@ -114,9 +110,9 @@ public class MiraPosFragment extends MiraBaseFragment {
 
         Context ctx = requireContext();
         branchesManager = MiraBranchesManager.getInstance(ctx);
+        priceManager = MiraPriceManager.getInstance(ctx);
         isArabic = Locale.getDefault().getLanguage().equals("ar");
 
-        // ✅ تهيئة RFID Manager مع الاستجابة لحالة الاتصال
         rfidManager = RFIDManager.getInstance(ctx);
         rfidManager.setListener(new MiraIRFIDReader.OnTagReadListener() {
             @Override
@@ -151,7 +147,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         setupRecyclerView();
         setupListeners();
         initSmartScale();
-        loadGoldRates();
         checkPendingSales();
         updateCartSummary();
     }
@@ -188,15 +183,21 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    private double getGoldPriceByKarat(String karat) {
-        if (karat == null) return goldPrice21K;
+    private int getKaratNumber(String karat) {
+        if (karat == null) return 21;
         switch (karat.toUpperCase()) {
-            case "24K": return goldPrice24K;
-            case "22K": return goldPrice22K;
-            case "21K": return goldPrice21K;
-            case "18K": return goldPrice18K;
-            default: return goldPrice21K;
+            case "24K": return 24;
+            case "22K": return 22;
+            case "21K": return 21;
+            case "18K": return 18;
+            case "14K": return 14;
+            default: return 21;
         }
+    }
+
+    private double getGoldPriceByKarat(String karat) {
+        int karatNum = getKaratNumber(karat);
+        return priceManager.getFinalPricePerGram(karatNum);
     }
 
     private void safeRun(Runnable r) {
@@ -217,38 +218,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).playSound(id);
         }
-    }
-
-    // ==================== جلب أسعار الذهب ====================
-
-    private void loadGoldRates() {
-        new Thread(() -> {
-            try {
-                Context ctx = getContext();
-                if (ctx == null) return;
-                MiraApiClient api = MiraApiClient.getInstance(ctx);
-                MiraApiClient.ApiResponse response = api.getGoldRatesAndSettings();
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject rates = response.data.optJSONObject("live_rates");
-                    if (rates != null) {
-                        goldPrice24K = rates.optDouble("24K", 75.0);
-                        goldPrice22K = rates.optDouble("22K", 68.75);
-                        goldPrice21K = rates.optDouble("21K", 65.62);
-                        goldPrice18K = rates.optDouble("18K", 56.25);
-                    }
-                    JSONObject makings = response.data.optJSONObject("default_making_charges");
-                    if (makings != null) {
-                        makingChargePerGram = makings.optDouble("21K", 10.0);
-                    }
-                    JSONObject margins = response.data.optJSONObject("default_profit_margins");
-                    if (margins != null) {
-                        profitMarginPercent = margins.optDouble("21K", 90.0);
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading gold rates: " + e.getMessage());
-            }
-        }).start();
     }
 
     // ==================== تهيئة الواجهة ====================
@@ -290,13 +259,12 @@ public class MiraPosFragment extends MiraBaseFragment {
     private void setupRecyclerView() {
         if (rvCartItems != null) {
             rvCartItems.setLayoutManager(new LinearLayoutManager(getContext()));
-            cartAdapter = new CartAdapter(cartList, this::removeItemFromCart, isArabic);
+            cartAdapter = new CartAdapter(cartList, this::removeItemFromCart, isArabic, priceManager);
             rvCartItems.setAdapter(cartAdapter);
         }
     }
 
     private void setupListeners() {
-        // ✅ إضافة دعم زر Enter لمسح قارئ الباركود السلكي
         if (etManualEpc != null) {
             etManualEpc.setOnEditorActionListener((v, actionId, event) -> {
                 if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_SEARCH
@@ -444,7 +412,7 @@ public class MiraPosFragment extends MiraBaseFragment {
 
     public void onRingScanned(String epc) {
         if (scannedEpcs.contains(epc)) {
-            return; // تجاهل الصامت للتكرار عند استخدام RFID
+            return;
         }
         processRingEpc(epc, "rfid");
     }
@@ -459,7 +427,6 @@ public class MiraPosFragment extends MiraBaseFragment {
     }
 
     private void processRingEpc(final String code, final String source) {
-        // ✅ حماية ضد الطلبات المكررة أثناء استجابة الـ API
         synchronized (pendingEpcs) {
             if (pendingEpcs.contains(code)) return;
             pendingEpcs.add(code);
@@ -517,10 +484,9 @@ public class MiraPosFragment extends MiraBaseFragment {
                     item.optDouble("retail_price", item.optDouble("price", 0))) : 0;
 
             if (price <= 0 && weight > 0) {
-                double gramPrice = getGoldPriceByKarat(karat);
-                double baseGold = weight * gramPrice;
-                double making = weight * makingChargePerGram;
-                price = (baseGold + making) * (profitMarginPercent / 100.0);
+                // ✅ استخدام MiraPriceManager للحساب
+                int karatNum = getKaratNumber(karat);
+                price = priceManager.calculateGoldPrice(karatNum, weight);
             }
 
             CartItem cartItem = new CartItem(code, title, karat, weight,
@@ -572,14 +538,16 @@ public class MiraPosFragment extends MiraBaseFragment {
         final boolean fb = bad;
 
         safeRun(() -> {
-            // ✅ إدارة الشاشة الفارغة ديناميكياً
             if (layoutCartEmptyState != null) {
                 layoutCartEmptyState.setVisibility(fc == 0 ? View.VISIBLE : View.GONE);
             }
 
             if (tvItemCount != null) tvItemCount.setText(String.valueOf(fc));
-            if (tvTotalAmount != null)
-                tvTotalAmount.setText(String.format(Locale.US, "%,.0f YER", fs));
+            if (tvTotalAmount != null) {
+                // ✅ استخدام العملة الافتراضية من MiraPriceManager
+                String formattedTotal = priceManager.formatPriceDefault(fs);
+                tvTotalAmount.setText(formattedTotal);
+            }
             if (tvCartStatus != null) {
                 if (fc == 0) {
                     tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
@@ -956,7 +924,7 @@ public class MiraPosFragment extends MiraBaseFragment {
 
         addDetailRow(cardLayout, isArabic ? "📦 عدد القطع" : "📦 Items", String.valueOf(itemCount));
         addDetailRow(cardLayout, isArabic ? "💰 المبلغ الإجمالي" : "💰 Total Amount",
-                String.format(Locale.US, "%,.0f YER", amount));
+                priceManager.formatPriceDefault(amount));
         addDetailRow(cardLayout, isArabic ? "💳 طريقة الدفع" : "💳 Payment", paymentMethod);
 
         card.addView(cardLayout);
@@ -1010,11 +978,13 @@ public class MiraPosFragment extends MiraBaseFragment {
         private final List<CartItem> items;
         private final OnRemoveListener removeListener;
         private final boolean isArabic;
+        private final MiraPriceManager priceManager;
 
-        CartAdapter(List<CartItem> items, OnRemoveListener listener, boolean isArabic) {
+        CartAdapter(List<CartItem> items, OnRemoveListener listener, boolean isArabic, MiraPriceManager priceManager) {
             this.items = items;
             this.removeListener = listener;
             this.isArabic = isArabic;
+            this.priceManager = priceManager;
         }
 
         @NonNull
@@ -1033,7 +1003,7 @@ public class MiraPosFragment extends MiraBaseFragment {
                 h.tvKaratWeight.setText(String.format(Locale.US, "%s | %.2fg", item.karat,
                         item.scaleWeight > 0 ? item.scaleWeight : item.weight));
             if (h.tvPrice != null)
-                h.tvPrice.setText(String.format(Locale.US, "%,.0f YER", item.price));
+                h.tvPrice.setText(priceManager.formatPriceDefault(item.price));
             if (h.tvStatus != null) {
                 if (item.isAvailable) {
                     h.tvStatus.setText(isArabic ? "✅ متاحة" : "✅ Available");
