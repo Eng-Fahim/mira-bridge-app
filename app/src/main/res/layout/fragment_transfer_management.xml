@@ -7,106 +7,111 @@
     android:background="?attr/colorSurface">
 
     <!-- Header Toolbar -->
-    <LinearLayout
+    <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorPrimaryContainer"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="12dp">
+        app:cardCornerRadius="0dp"
+        app:cardElevation="2dp"
+        app:strokeWidth="0dp"
+        app:cardBackgroundColor="?attr/colorPrimaryContainer">
 
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="14dp">
 
-            <TextView
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="إدارة الشحنات وتحويل القطع"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvTransferCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    android:textSize="12sp"
+                    android:alpha="0.85" />
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnNewTransfer"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="إدارة التحويلات اللوجستية"
-                android:textColor="?attr/colorOnPrimaryContainer"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvTransferCount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="?attr/colorOnPrimaryContainer"
+                android:text="+ تحويل جديد"
                 android:textSize="12sp"
-                android:alpha="0.8" />
+                app:cornerRadius="10dp" />
         </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnNewTransfer"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="+ تحويل جديد"
-            android:textSize="12sp"
-            app:cornerRadius="8dp" />
-    </LinearLayout>
-
-    <!-- Filter Pills -->
+    <!-- Filter Chips using Material 3 -->
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:scrollbars="none"
-        android:padding="8dp">
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp"
+        android:clipToPadding="false">
 
-        <LinearLayout
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chipGroupFilters"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            app:singleSelection="true"
+            app:selectionRequired="true">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnFilterAll"
-                style="@style/Widget.Material3.Button.TonalButton"
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipAll"
+                style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:layout_marginEnd="4dp"
-                android:text="الكل"
-                android:textSize="11sp" />
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="الكل" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnFilterDraft"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipDraft"
+                style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:layout_marginEnd="4dp"
-                android:text="مسودة"
-                android:textSize="11sp" />
+                android:layout_height="wrap_content"
+                android:text="المسودات" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnFilterPending"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipPending"
+                style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:layout_marginEnd="4dp"
-                android:text="معلقة"
-                android:textSize="11sp" />
+                android:layout_height="wrap_content"
+                android:text="قيد التجهيز" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnFilterInTransit"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipInTransit"
+                style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:layout_marginEnd="4dp"
-                android:text="في الطريق"
-                android:textSize="11sp" />
+                android:layout_height="wrap_content"
+                android:text="في الطريق" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnFilterCompleted"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipCompleted"
+                style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:text="مكتملة"
-                android:textSize="11sp" />
-        </LinearLayout>
+                android:layout_height="wrap_content"
+                android:text="المستلمة" />
+        </com.google.android.material.chip.ChipGroup>
     </HorizontalScrollView>
 
-    <!-- RFID Quick Scan Trigger -->
+    <!-- Fast RFID Scan Action Trigger -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -115,12 +120,13 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnScanItems"
-            style="@style/Widget.Material3.Button.IconButton.Filled"
+            style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="match_parent"
-            android:layout_height="42dp"
-            android:text="🔍 تدقيق شحنة عبر RFID"
-            android:textSize="12sp"
-            app:cornerRadius="8dp" />
+            android:layout_height="48dp"
+            android:text="🔍 فتح كاشف المطابقة المسحية (RFID Live Scan)"
+            android:textSize="13sp"
+            app:icon="@android:drawable/ic_menu_search"
+            app:cornerRadius="10dp" />
     </LinearLayout>
 
     <FrameLayout
@@ -140,7 +146,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:text="لا توجد عمليات تحويل مطابقة"
+            android:text="لا توجد بيانات تحويل مطابقة للفلتر المحدد"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="14sp"
             android:visibility="gone" />
