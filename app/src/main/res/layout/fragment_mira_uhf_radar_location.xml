@@ -381,6 +381,12 @@
         android:padding="2dp"
         android:background="?attr/colorSurfaceVariant"
         app:layout_constraintBottom_toTopOf="@id/llButton" />
+        
+    <TextView
+    android:id="@+id/tvRadarMode"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content" />
+
 
     <!-- ========== أزرار التحكم والتشغيل ========== -->
     <LinearLayout
