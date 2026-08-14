@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Shimmer Loading Placeholder -->
+    <!-- Shimmer Placeholder Loading View -->
     <LinearLayout
         android:id="@+id/shimmerLayout"
         android:layout_width="match_parent"
@@ -94,7 +94,7 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- المحتوى الرئيسي مع SwipeRefresh -->
+    <!-- Main Content Area with SwipeRefresh -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
         android:layout_width="match_parent"
