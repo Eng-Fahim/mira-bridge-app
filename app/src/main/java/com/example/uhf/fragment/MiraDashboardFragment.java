@@ -297,45 +297,47 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     private void processData(JSONObject data) {
-        try {
-            JSONObject inv = data.optJSONObject("inventory");
-            if (inv != null) {
-                setText(tvTotalItems, String.valueOf(inv.optInt("total_items", 0)));
+    try {
+        JSONObject inv = data.optJSONObject("inventory");
+        if (inv != null) {
+            setText(tvTotalItems, String.valueOf(inv.optInt("total_items", 0)));
+            double weightVal = inv.optDouble("total_weight", 0.0);
+            setText(tvTotalWeight, String.format(Locale.US, "%.1f g", weightVal));
 
-                double weightVal = inv.optDouble("total_weight", 0.0);
-                if (Double.isNaN(weightVal)) {
-                    try {
-                        weightVal = Double.parseDouble(inv.optString("total_weight", "0.0"));
-                    } catch (Exception e) {
-                        weightVal = 0.0;
-                    }
-                }
-                setText(tvTotalWeight, String.format(Locale.US, "%.1f g", weightVal));
+            JSONObject karats = inv.optJSONObject("karats");
+            if (karats != null) {
+                JSONObject k24 = karats.optJSONObject("24k");
+                JSONObject k21 = karats.optJSONObject("21k");
+                JSONObject k18 = karats.optJSONObject("18k");
 
-                JSONObject w = inv.optJSONObject("weights");
-                if (w != null) {
-                    setKarat(tvKarat24, "24K", w.optInt("k24", 0));
-                    setKarat(tvKarat21, "21K", w.optInt("k21", 0));
-                    setKarat(tvKarat18, "18K", w.optInt("k18", 0));
-                }
+                setKarat(tvKarat24, "24K", k24 != null ? k24.optInt("count", 0) : 0);
+                setKarat(tvKarat21, "21K", k21 != null ? k21.optInt("count", 0) : 0);
+                setKarat(tvKarat18, "18K", k18 != null ? k18.optInt("count", 0) : 0);
             }
-
-            JSONObject sales = data.optJSONObject("sales");
-            if (sales != null) {
-                setText(tvSoldToday, String.valueOf(sales.optInt("count_today", 0)));
-                setText(tvSalesToday, cleanAmount(sales.optString("today", "0")));
-                setText(tvSalesMonth, cleanAmount(sales.optString("month", "0")));
-                setText(tvSalesYear, cleanAmount(sales.optString("year", "0")));
-            }
-
-            if (tvLiveStatus != null) {
-                tvLiveStatus.setText(isArabic ? "متصل" : "Online");
-                tvLiveStatus.setTextColor(0xFF16A34A);
-            }
-        } catch (Throwable e) {
-            Log.e(TAG, "processData JSON error", e);
         }
+
+        JSONObject sales = data.optJSONObject("sales");
+        if (sales != null) {
+            setText(tvSoldToday, String.valueOf(sales.optInt("count_today", 0)));
+            setText(tvSalesToday, formatCurrency(sales.optDouble("today", 0.0)));
+            setText(tvSalesMonth, formatCurrency(sales.optDouble("month", 0.0)));
+            setText(tvSalesYear, formatCurrency(sales.optDouble("year", 0.0)));
+        }
+
+        if (tvLiveStatus != null) {
+            tvLiveStatus.setText(isArabic ? "متصل" : "Online");
+            tvLiveStatus.setTextColor(0xFF16A34A);
+        }
+    } catch (Throwable e) {
+        Log.e(TAG, "processData error", e);
     }
+}
+
+private String formatCurrency(double amount) {
+    if (amount <= 0) return "—";
+    return String.format(Locale.US, "%,.0f YER", amount);
+}
+
 
     private void setKarat(TextView tv, String label, int count) {
         if (tv == null) return;
@@ -446,4 +448,4 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         super.onDestroyView();
         mainHandler.removeCallbacksAndMessages(null);
     }
-}
+                                                                                      }
