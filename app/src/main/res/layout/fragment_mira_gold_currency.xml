@@ -1,0 +1,560 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F5F5">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- 💰 قسم أسعار الذهب -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="💰 أسعار الذهب العالمية"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#1A237E"
+            android:layout_marginBottom="16dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:id="@+id/tvGoldPriceStatus"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="جاهز للتحديث"
+                android:textSize="14sp"/>
+
+            <TextView
+                android:id="@+id/tvLastUpdate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="12sp"
+                android:textColor="#666"/>
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/pbGoldLoading"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            style="?android:attr/progressBarStyleHorizontal"/>
+
+        <!-- مزود API -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="مزود API:"
+                android:textSize="16sp"/>
+
+            <Spinner
+                android:id="@+id/spGoldApiProvider"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"/>
+        </LinearLayout>
+
+        <!-- مفتاح API -->
+        <EditText
+            android:id="@+id/etGoldApiKey"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="مفتاح API"
+            android:inputType="textPassword"
+            android:layout_marginBottom="8dp"/>
+
+        <!-- أزرار -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <Button
+                android:id="@+id/btnFetchGoldPrice"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🔄 جلب الأسعار"
+                android:layout_marginEnd="8dp"/>
+
+            <Button
+                android:id="@+id/btnSaveGoldSettings"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="💾 حفظ"/>
+        </LinearLayout>
+
+        <!-- أسعار الذهب -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="أسعار الذهب (دولار/جرام)"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="24 قيراط"/>
+
+            <EditText
+                android:id="@+id/etGoldPrice24k"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="numberDecimal"
+                android:hint="0.00"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="22 قيراط"/>
+
+            <EditText
+                android:id="@+id/etGoldPrice22k"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="numberDecimal"
+                android:hint="0.00"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="21 قيراط"/>
+
+            <EditText
+                android:id="@+id/etGoldPrice21k"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="numberDecimal"
+                android:hint="0.00"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="18 قيراط"/>
+
+            <EditText
+                android:id="@+id/etGoldPrice18k"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="numberDecimal"
+                android:hint="0.00"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="14 قيراط"/>
+
+            <EditText
+                android:id="@+id/etGoldPrice14k"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="numberDecimal"
+                android:hint="0.00"/>
+        </LinearLayout>
+
+        <!-- هوامش الربح -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="هوامش الربح (%)"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="24 قيراط"/>
+
+            <EditText
+                android:id="@+id/etMargin24k"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="numberDecimal"
+                android:hint="95.00"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="22 قيراط"/>
+
+            <EditText
+                android:id="@+id/etMargin22k"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="numberDecimal"
+                android:hint="88.00"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="21 قيراط"/>
+
+            <EditText
+                android:id="@+id/etMargin21k"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="numberDecimal"
+                android:hint="90.00"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="18 قيراط"/>
+
+            <EditText
+                android:id="@+id/etMargin18k"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="numberDecimal"
+                android:hint="100.80"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="14 قيراط"/>
+
+            <EditText
+                android:id="@+id/etMargin14k"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="numberDecimal"
+                android:hint="105.80"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="12 قيراط"/>
+
+            <EditText
+                android:id="@+id/etMargin12k"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="numberDecimal"
+                android:hint="110.00"/>
+        </LinearLayout>
+
+        <!-- الأسعار المباشرة -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="الأسعار النهائية (مع الهوامش)"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:id="@+id/tvLiveGold24k"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="24k: $0.00/g"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:id="@+id/tvLiveGold22k"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="22k: $0.00/g"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:id="@+id/tvLiveGold21k"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="21k: $0.00/g"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:id="@+id/tvLiveGold18k"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="18k: $0.00/g"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- 💱 قسم العملات -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="💱 أسعار الصرف والعملات"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#1A237E"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- العملة الافتراضية -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="العملة الافتراضية:"
+                android:textSize="16sp"/>
+
+            <Spinner
+                android:id="@+id/spDefaultCurrency"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"/>
+        </LinearLayout>
+
+        <!-- أسعار الصرف الرسمية -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="أسعار الصرف الرسمية"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="YER"/>
+
+            <EditText
+                android:id="@+id/etExchangeYER"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="numberDecimal"
+                android:hint="250.00"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="EGP"/>
+
+            <EditText
+                android:id="@+id/etExchangeEGP"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="numberDecimal"
+                android:hint="30.90"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="SAR"/>
+
+            <EditText
+                android:id="@+id/etExchangeSAR"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="numberDecimal"
+                android:hint="3.75"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="AED"/>
+
+            <EditText
+                android:id="@+id/etExchangeAED"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:inputType="numberDecimal"
+                android:hint="3.67"/>
+        </LinearLayout>
+
+        <!-- الأسعار المباشرة -->
+        <TextView
+            android:id="@+id/tvLiveUSD_YER"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="1 USD = 250.00 YER"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:id="@+id/tvLiveUSD_EGP"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="1 USD = 30.90 EGP"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:id="@+id/tvLiveUSD_SAR"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="1 USD = 3.75 SAR"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:id="@+id/tvLiveUSD_AED"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="1 USD = 3.67 AED"
+            android:layout_marginBottom="16dp"/>
+
+        <!-- أزرار الحفظ -->
+        <Button
+            android:id="@+id/btnSaveCurrencySettings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="💾 حفظ إعدادات العملات"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/btnRefreshRates"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🔄 تحديث الأسعار المباشرة"/>
+
+    </LinearLayout>
+</ScrollView>
