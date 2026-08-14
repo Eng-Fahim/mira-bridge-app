@@ -381,6 +381,15 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:padding="12dp">
+                
+                <TextView
+    android:id="@+id/tvSummaryPrice"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text=""
+    android:textSize="14sp"
+    android:textStyle="bold"
+    android:textColor="?attr/colorPrimary" />
 
                 <TextView
                     android:layout_width="0dp"
