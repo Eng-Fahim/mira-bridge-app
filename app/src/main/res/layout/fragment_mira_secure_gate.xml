@@ -1,177 +1,221 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="#0D1B2A"
-    android:gravity="center_horizontal"
-    android:padding="16dp">
+    android:fillViewport="true"
+    android:background="?android:attr/colorBackground">
 
-    <!-- أيقونة البوابة -->
-    <TextView
-        android:id="@+id/tvGateIcon"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="🚪"
-        android:textSize="72sp"
-        android:layout_marginTop="20dp"
-        android:layout_marginBottom="8dp" />
-
-    <!-- عنوان -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="MIRA Secure Gate™"
-        android:textColor="#FFFFFF"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="4dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="البوابة الأمنية الذكية"
-        android:textColor="#90A4AE"
-        android:textSize="13sp"
-        android:layout_marginBottom="20dp" />
-
-    <!-- مؤشر الحالة الدائري -->
-    <View
-        android:id="@+id/statusIndicator"
-        android:layout_width="80dp"
-        android:layout_height="80dp"
-        android:background="@drawable/circle_indicator_red"
-        android:layout_marginBottom="12dp" />
-
-    <!-- نص الحالة -->
-    <TextView
-        android:id="@+id/tvGateStatus"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="🔒 البوابة غير مفعلة"
-        android:textColor="#FFFFFF"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:layout_marginBottom="8dp" />
-
-    <!-- آخر حدث -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:layout_marginBottom="20dp"
-        android:background="#1B2838"
-        android:padding="10dp">
+        android:orientation="vertical"
+        android:padding="20dp"
+        android:gravity="center_horizontal">
+
+        <!-- الأيقونة العلوية مع حلقة الحالة -->
+        <FrameLayout
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp">
+
+            <View
+                android:id="@+id/statusIndicator"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/circle_indicator_red" />
+
+            <TextView
+                android:id="@+id/tvGateIcon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="🚪"
+                android:textSize="54sp" />
+        </FrameLayout>
+
+        <!-- عناوين البوابة -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/mira_gate_title"
+            android:textAppearance="?attr/textAppearanceHeadlineMedium"
+            android:textColor="?attr/colorOnBackground"
+            android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/tvLastEvent"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="في انتظار التفعيل..."
-            android:textColor="#B0BEC5"
-            android:textSize="14sp"
-            android:gravity="center" />
+            android:text="@string/mira_gate_subtitle"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:layout_marginBottom="24dp" />
+
+        <!-- نص الحالة الرئيسي -->
+        <TextView
+            android:id="@+id/tvGateStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/gate_status_disarmed"
+            android:textAppearance="?attr/textAppearanceTitleLarge"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:padding="12dp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- بطاقة تفاصيل آخر حدث -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="?attr/colorOutline">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:gravity="center">
+
+                <TextView
+                    android:id="@+id/tvLastEvent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/status_waiting"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnSurface"
+                    android:gravity="center"
+                    tools:text="🔍 جاري التحقق من التاق: ...E200410" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- لوحة الإحصائيات (3 أرقام) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="32dp"
+            android:weightSum="3">
+
+            <!-- مصرح -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                app:cardCornerRadius="10dp"
+                app:cardElevation="1dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp"
+                    android:gravity="center">
+                    <TextView
+                        android:id="@+id/tvPassCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textColor="#2E7D32"
+                        android:textSize="28sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/stat_authorized"
+                        android:textAppearance="?attr/textAppearanceLabelSmall" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- غير مصرح (إنذارات) -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="3dp"
+                android:layout_marginEnd="3dp"
+                app:cardCornerRadius="10dp"
+                app:cardElevation="1dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp"
+                    android:gravity="center">
+                    <TextView
+                        android:id="@+id/tvDenyCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textColor="#C62828"
+                        android:textSize="28sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/stat_unauthorized"
+                        android:textAppearance="?attr/textAppearanceLabelSmall" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- الإجمالي -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                app:cardCornerRadius="10dp"
+                app:cardElevation="1dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp"
+                    android:gravity="center">
+                    <TextView
+                        android:id="@+id/tvTotalCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="28sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/stat_total_scans"
+                        android:textAppearance="?attr/textAppearanceLabelSmall" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+
+        <!-- أزرار التحكم بالبوابة -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnArmGate"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="@string/btn_arm_gate"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:cornerRadius="10dp"
+            android:layout_marginBottom="12dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDisarmGate"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="@string/btn_disarm_gate"
+            android:textColor="#C62828"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:strokeColor="#C62828"
+            app:cornerRadius="10dp" />
+
     </LinearLayout>
-
-    <!-- إحصائيات -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="20dp"
-        android:background="#1B2838"
-        android:padding="12dp">
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center">
-            <TextView
-                android:id="@+id/tvPassCount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0"
-                android:textColor="#4CAF50"
-                android:textSize="32sp"
-                android:textStyle="bold" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="✅ مصرح"
-                android:textColor="#81C784"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center">
-            <TextView
-                android:id="@+id/tvDenyCount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0"
-                android:textColor="#F44336"
-                android:textSize="32sp"
-                android:textStyle="bold" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🚨 ممنوع"
-                android:textColor="#EF9A9A"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center">
-            <TextView
-                android:id="@+id/tvTotalCount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0"
-                android:textColor="#FFFFFF"
-                android:textSize="32sp"
-                android:textStyle="bold" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="📊 المجموع"
-                android:textColor="#B0BEC5"
-                android:textSize="12sp" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <!-- أزرار التحكم -->
-    <Button
-        android:id="@+id/btnArmGate"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:text="🛡️ تفعيل البوابة"
-        android:background="#4CAF50"
-        android:textColor="#FFFFFF"
-        android:textStyle="bold"
-        android:textSize="16sp"
-        android:layout_marginBottom="10dp" />
-
-    <Button
-        android:id="@+id/btnDisarmGate"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:text="🔒 إيقاف البوابة"
-        android:background="#F44336"
-        android:textColor="#FFFFFF"
-        android:textStyle="bold"
-        android:textSize="16sp" />
-
-</LinearLayout>
+</ScrollView>
