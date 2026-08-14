@@ -230,10 +230,12 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 MiraApiClient client = MiraApiClient.getInstance(getContext());
                 ApiResponse apiResponse = client.getReportData("audit", "", "", branchesManager.getActiveBranchId());
 
-                // استخراج الـ JSONObject من الاستجابة بأمان
+                                // استخدام الأسماء الصحيحة للمتغيرات كما هي معرّفة في كلاس ApiResponse
                 JSONObject response = null;
-                if (apiResponse != null && apiResponse.isSuccess()) {
-                    response = apiResponse.getData(); 
+                if (apiResponse != null && apiResponse.isSuccess) {
+                    response = apiResponse.data; 
+                
+ 
                 }
 
                 if (getActivity() != null) {
@@ -688,4 +690,4 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         ft.detach(this).attach(this).commit();
         getView().post(this::restoreState);
     }
-}
+            }
