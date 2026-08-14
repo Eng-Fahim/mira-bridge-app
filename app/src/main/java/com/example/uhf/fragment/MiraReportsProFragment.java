@@ -203,23 +203,36 @@ public class MiraReportsProFragment extends Fragment {
         String cacheKey = "cache_" + reportType + "_" + fromDate + "_" + toDate;
 
         try {
-            int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-            MiraApiClient.ApiResponse response = apiClient != null ? apiClient.getReportData(reportType, fromDate, toDate, activeBranchId) : null;
+            int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 1;
+            
+            MiraApiClient.ApiResponse response = apiClient != null ? 
+                apiClient.getReportData(reportType, fromDate, toDate, activeBranchId) : null;
 
             if (response != null && response.isSuccess && response.data != null) {
-                reportData = response.data;
-                if (offlineCache != null) {
+                // ✅ التصحيح: البيانات داخل response.data.data وليس response.data مباشرة
+                JSONObject fullResponse = response.data;
+                
+                // استخراج "data" الداخلية
+                reportData = fullResponse.optJSONObject("data");
+                
+                // إذا لم يوجد "data" داخلي، استخدم fullResponse مباشرة
+                if (reportData == null) {
+                    reportData = fullResponse;
+                }
+                
+                // حفظ في الكاش
+                if (offlineCache != null && reportData != null) {
                     offlineCache.edit().putString(cacheKey, reportData.toString()).apply();
                 }
             } else {
-                errorMessage = "خطأ في الاتصال أو عدم توفر بيانات لهذه الفترة";
+                errorMessage = "خطأ في الاتصال أو عدم توفر بيانات";
             }
         } catch (Exception e) {
-            Log.e(TAG, "API Fetch failed for report " + reportType, e);
+            Log.e(TAG, "API Fetch failed: " + e.getMessage());
             errorMessage = e.getLocalizedMessage();
         }
 
-        // استرجاع الكاش عند الانقطاع عن الشبكة
+        // استرجاع الكاش
         if (reportData == null && offlineCache != null) {
             String cachedJson = offlineCache.getString(cacheKey, null);
             if (cachedJson != null) {
@@ -247,10 +260,10 @@ public class MiraReportsProFragment extends Fragment {
                     }
                 });
 
-                webView.loadDataWithBaseURL("file:///android_asset/", htmlContent, "text/html", "utf-8", null);
+                webView.loadDataWithBaseURL(null, htmlContent, "text/html", "utf-8", null);
             } else {
-                String errorHtml = buildEmptyOrErrorHTML(finalError != null ? finalError : "تحقق من الاتصال بالشبكة أو اختر فترة زمنية أخرى");
-
+                String errorHtml = buildEmptyOrErrorHTML(finalError != null ? finalError : "تحقق من الاتصال بالشبكة");
+                
                 if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
                 webView.loadDataWithBaseURL(null, errorHtml, "text/html", "utf-8", null);
                 webView.animate().alpha(1f).setDuration(200).start();
@@ -698,4 +711,4 @@ public class MiraReportsProFragment extends Fragment {
 
     interface OnReportClickListener { void onClick(ReportItem item); }
     interface DatePickerCallback { void onDate(String date); }
-}
+                    }
