@@ -4,97 +4,119 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="20dp"
-    android:background="?attr/colorSurface">
+    android:padding="16dp">
 
+    <!-- Header Info -->
     <TextView
         android:id="@+id/tvScanTransferInfo"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="تحويل #..."
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="12sp"
-        android:layout_marginBottom="4dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="مسح وتدقيق العهدة (RFID)"
+        android:text="TR-1002 | الفرع الرئيسي ➔ الفرع الثاني"
         android:textColor="?attr/colorOnSurface"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="12dp" />
+        android:textSize="15sp"
+        android:textStyle="bold" />
 
+    <!-- Big Counter Box -->
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginVertical="12dp"
+        app:cardBackgroundColor="?attr/colorSecondaryContainer"
+        app:cardCornerRadius="12dp"
+        app:strokeWidth="0dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="إجمالي القطع الممسوحة"
+                android:textColor="?attr/colorOnSecondaryContainer"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvScanCounter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="?attr/colorOnSecondaryContainer"
+                android:textSize="36sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- EPC Manual Input Row -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="12dp">
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-        <EditText
-            android:id="@+id/etScanEpc"
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="رمز القطعة / EPC..."
-            android:textSize="12sp"
-            android:inputType="text"
-            android:paddingHorizontal="10dp"
-            android:background="?attr/colorSurfaceContainer" />
+            android:hint="أدخل أو امسح كود EPC">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etScanEpc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:textSize="12sp" />
+        </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnScanEpc"
             android:layout_width="wrap_content"
-            android:layout_height="44dp"
-            android:text="إضافة"
+            android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            app:backgroundTint="?attr/colorPrimary"
-            android:textColor="?attr/colorOnPrimary" />
+            android:text="فحص" />
     </LinearLayout>
 
+    <!-- Scanned List Screen Box -->
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="180dp"
-        android:background="?attr/colorSurfaceContainerLow"
-        android:padding="10dp"
-        android:layout_marginBottom="12dp">
+        android:layout_height="160dp"
+        android:layout_marginVertical="10dp"
+        android:background="?attr/colorSurfaceContainerLowest"
+        android:padding="8dp">
 
         <TextView
             android:id="@+id/tvScannedItems"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="سجل القطع المطابقة:"
+            android:text="قائمة المسح الضوئي فارغة..."
             android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp"
-            android:fontFamily="monospace" />
+            android:textSize="12sp" />
     </ScrollView>
 
+    <!-- Dialog Actions -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:weightSum="2">
+        android:gravity="end"
+        android:orientation="horizontal">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnScanClear"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="4dp"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text="مسح القائمة"
-            android:textSize="12sp"
-            app:strokeColor="?attr/colorError" />
+            android:textColor="?attr/colorError" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnScanSave"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:text="💾 حفظ في التحويل"
-            android:textSize="12sp"
-            app:backgroundTint="#16A34A"
-            android:textColor="#FFFFFF" />
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="حفظ وتثبيت الشحنة" />
     </LinearLayout>
 </LinearLayout>
