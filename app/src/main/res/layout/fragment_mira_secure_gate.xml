@@ -14,10 +14,10 @@
         android:padding="16dp"
         android:gravity="center_horizontal">
 
-        <!-- الأيقونة العلوية مع حلقة الحالة -->
+        <!-- مؤشر حالة البوابة مع الأيقونة -->
         <FrameLayout
-            android:layout_width="100dp"
-            android:layout_height="100dp"
+            android:layout_width="90dp"
+            android:layout_height="90dp"
             android:layout_marginTop="8dp"
             android:layout_marginBottom="12dp">
 
@@ -33,7 +33,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:text="🚪"
-                android:textSize="48sp" />
+                android:textSize="42sp" />
         </FrameLayout>
 
         <!-- عناوين البوابة -->
@@ -51,9 +51,9 @@
             android:text="@string/mira_gate_subtitle"
             android:textAppearance="?attr/textAppearanceBodySmall"
             android:textColor="?attr/colorOnSurfaceVariant"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="12dp" />
 
-        <!-- نص الحالة الرئيسي -->
+        <!-- نص حالة البوابة الرئيسي -->
         <TextView
             android:id="@+id/tvGateStatus"
             android:layout_width="match_parent"
@@ -62,14 +62,14 @@
             android:textAppearance="?attr/textAppearanceTitleLarge"
             android:textStyle="bold"
             android:gravity="center"
-            android:padding="8dp"
-            android:layout_marginBottom="12dp" />
+            android:padding="6dp"
+            android:layout_marginBottom="8dp" />
 
         <!-- بطاقة تفاصيل آخر حدث -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="12dp"
             app:cardCornerRadius="12dp"
             app:cardElevation="2dp"
             app:strokeWidth="1dp"
@@ -79,7 +79,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="12dp"
+                android:padding="10dp"
                 android:gravity="center">
 
                 <TextView
@@ -90,16 +90,16 @@
                     android:textAppearance="?attr/textAppearanceBodyMedium"
                     android:textColor="?attr/colorOnSurface"
                     android:gravity="center"
-                    tools:text="🔍 جاري التحقق..." />
+                    tools:text="🔍 في انتظار الفحص..." />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- لوحة الإحصائيات (3 أرقام) -->
+        <!-- لوحة الإحصائيات (مصرح / غير مصرح / الإجمالي) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="12dp"
             android:weightSum="3">
 
             <com.google.android.material.card.MaterialCardView
@@ -121,7 +121,7 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="#2E7D32"
-                        android:textSize="24sp"
+                        android:textSize="22sp"
                         android:textStyle="bold" />
                     <TextView
                         android:layout_width="wrap_content"
@@ -151,7 +151,7 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="#C62828"
-                        android:textSize="24sp"
+                        android:textSize="22sp"
                         android:textStyle="bold" />
                     <TextView
                         android:layout_width="wrap_content"
@@ -180,7 +180,7 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="?attr/colorOnSurface"
-                        android:textSize="24sp"
+                        android:textSize="22sp"
                         android:textStyle="bold" />
                     <TextView
                         android:layout_width="wrap_content"
@@ -191,7 +191,7 @@
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
 
-        <!-- أزرار التحكم بالبوابة -->
+        <!-- أزرار تفعيل وإيقاف البوابة -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -201,7 +201,7 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnArmGate"
                 android:layout_width="0dp"
-                android:layout_height="50dp"
+                android:layout_height="48dp"
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
                 android:text="@string/btn_arm_gate"
@@ -213,7 +213,7 @@
                 android:id="@+id/btnDisarmGate"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="50dp"
+                android:layout_height="48dp"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
                 android:text="@string/btn_disarm_gate"
@@ -224,62 +224,102 @@
                 app:cornerRadius="8dp" />
         </LinearLayout>
 
-        <!-- 🧪 قسم المحاكاة للاختبار بدون قارئ هاردوير -->
+        <!-- 🔍 قسم الإدخال متعدد الطرق (يدوي / باركود بالكاميرا / محاكاة) -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="#111827"
-            app:strokeColor="#374151"
-            app:cardCornerRadius="8dp">
+            app:cardCornerRadius="8dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="?attr/colorOutline">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="10dp">
+                android:padding="12dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="🧪 محاكي البوابة (اختبار بدون القارئ)"
-                    android:textColor="#9CA3AF"
-                    android:textSize="12sp"
+                    android:text="🔍 إدخال واختبار القطع (يدوي / باركود / RFID)"
+                    android:textAppearance="?attr/textAppearanceLabelMedium"
                     android:textStyle="bold"
-                    android:layout_marginBottom="6dp" />
+                    android:layout_marginBottom="8dp"/>
 
+                <!-- 1️⃣ الإدخال اليدوي -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="أدخل رقم الـ EPC / السيريال"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etManualEpc"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textCapCharacters"
+                            android:maxLines="1"/>
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSubmitManual"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginStart="8dp"
+                        android:text="فحص" />
+                </LinearLayout>
+
+                <!-- 2️⃣ الكاميرا وأزرار المحاكاة -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
 
-                    <Button
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnScanBarcode"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="4dp"
+                        android:text="📷 كاميرا"
+                        app:icon="@android:drawable/ic_menu_camera" />
+
+                    <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnSimulateAllowed"
                         style="@style/Widget.MaterialComponents.Button.TextButton"
                         android:layout_width="0dp"
-                        android:layout_height="40dp"
+                        android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="✅ مسح قطعة مسموحة"
-                        android:textColor="#10B981"
-                        android:textSize="12sp" />
+                        android:text="✅ مسموح"
+                        android:textColor="#10B981" />
 
-                    <Button
+                    <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnSimulateDenied"
                         style="@style/Widget.MaterialComponents.Button.TextButton"
                         android:layout_width="0dp"
-                        android:layout_height="40dp"
+                        android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="🚨 مسح قطعة مسروقة"
-                        android:textColor="#EF4444"
-                        android:textSize="12sp" />
+                        android:text="🚨 مسروق"
+                        android:textColor="#EF4444" />
                 </LinearLayout>
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 📺 لوحة تحكم السجلات المباشرة البديلة لـ Logcat -->
+        <!-- 📺 لوحة التحكم والسجلات المباشرة المدمجة (Console) -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
-            android:layout_height="120dp"
+            android:layout_height="130dp"
             app:cardBackgroundColor="#000000"
             app:cardCornerRadius="6dp">
 
@@ -293,7 +333,7 @@
                     android:id="@+id/tvDebugConsole"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="[System Console Ready...]"
+                    android:text="[System Console Initialized...]\n"
                     android:textColor="#00FF66"
                     android:textSize="11sp"
                     android:fontFamily="monospace" />
