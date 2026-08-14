@@ -240,12 +240,12 @@
                             android:layout_height="1dp"
                             android:background="?attr/colorOutlineVariant" />
 
-                        <!-- Gold Prices -->
+                        <!-- Gold Karats Breakdown -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
-                            android:paddingHorizontal="16dp"
+                            android:paddingHorizontal="12dp"
                             android:paddingVertical="12dp"
                             android:weightSum="3">
 
@@ -259,7 +259,7 @@
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="@string/karat_18"
+                                    android:text="عيار 18"
                                     android:textColor="?attr/colorOnSurfaceVariant"
                                     android:textSize="11sp" />
 
@@ -267,8 +267,8 @@
                                     android:id="@+id/tvGoldPrice18"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:layout_marginTop="2dp"
-                                    android:text="$--.--/g"
+                                    android:layout_marginTop="4dp"
+                                    android:text="18K | —"
                                     android:textColor="?attr/colorOnSurface"
                                     android:textSize="13sp"
                                     android:textStyle="bold" />
@@ -289,7 +289,7 @@
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="@string/karat_21"
+                                    android:text="عيار 21"
                                     android:textColor="?attr/colorOnSurfaceVariant"
                                     android:textSize="11sp" />
 
@@ -297,8 +297,8 @@
                                     android:id="@+id/tvGoldPrice21"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:layout_marginTop="2dp"
-                                    android:text="$--.--/g"
+                                    android:layout_marginTop="4dp"
+                                    android:text="21K | —"
                                     android:textColor="?attr/colorOnSurface"
                                     android:textSize="13sp"
                                     android:textStyle="bold" />
@@ -319,7 +319,7 @@
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="@string/karat_24"
+                                    android:text="عيار 24"
                                     android:textColor="?attr/colorOnSurfaceVariant"
                                     android:textSize="11sp" />
 
@@ -327,8 +327,8 @@
                                     android:id="@+id/tvGoldPrice24"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:layout_marginTop="2dp"
-                                    android:text="$--.--/g"
+                                    android:layout_marginTop="4dp"
+                                    android:text="24K | —"
                                     android:textColor="?attr/colorOnSurface"
                                     android:textSize="13sp"
                                     android:textStyle="bold" />
@@ -379,7 +379,7 @@
                                 android:text="@string/sold_today"
                                 android:textAlignment="center"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="10sp" />
+                                android:textSize="11sp" />
 
                             <TextView
                                 android:id="@+id/tvSoldToday"
@@ -417,7 +417,7 @@
                                 android:text="@string/total_weight"
                                 android:textAlignment="center"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="10sp" />
+                                android:textSize="11sp" />
 
                             <TextView
                                 android:id="@+id/tvTotalWeight"
@@ -455,7 +455,7 @@
                                 android:text="@string/total_items"
                                 android:textAlignment="center"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="10sp" />
+                                android:textSize="11sp" />
 
                             <TextView
                                 android:id="@+id/tvTotalItems"
