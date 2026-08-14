@@ -559,7 +559,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         TextView tvTitle = view.findViewById(R.id.tvSummaryTitle);
         TextView tvEpc = view.findViewById(R.id.tvSummaryEpc);
         TextView tvWeight = view.findViewById(R.id.tvSummaryWeight);
-        TextView tvPrice = view.findViewById(R.id.tvSummaryPrice);
+        //TextView tvPrice = view.findViewById(R.id.tvSummaryPrice);
 
         MaterialButton btnViewDigitalIdentity = view.findViewById(R.id.btnViewDigitalIdentity);
         MaterialButton btnNewEncode = view.findViewById(R.id.btnNewEncode);
@@ -602,7 +602,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         TextView tvEpcCode = view.findViewById(R.id.tvEpcCode);
         TextView tvIdWeight = view.findViewById(R.id.tvIdWeight);
         TextView tvIdMetalKarat = view.findViewById(R.id.tvIdMetalKarat);
-        TextView tvIdPrice = view.findViewById(R.id.tvIdPrice);
+        //TextView tvIdPrice = view.findViewById(R.id.tvIdPrice);
         MaterialButton btnClose = view.findViewById(R.id.btnCloseIdentity);
 
         if (tvIdTitle != null) tvIdTitle.setText(title);
@@ -1020,4 +1020,4 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         super.onDestroyView();
         binding = null;
     }
-}
+                }
