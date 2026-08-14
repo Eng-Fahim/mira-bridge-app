@@ -54,7 +54,7 @@ import com.example.uhf.fragment.MiraSalesHistoryFragment;
 import com.example.uhf.fragment.MiraSecureGateFragment;
 import com.example.uhf.fragment.MiraTransferFragment;
 import com.example.uhf.fragment.MiraUHFReadTagFragment;
-import com.example.uhf.fragment.UHFRadarLocationFragment;
+import com.example.uhf.fragment.MiraUHFRadarLocationFragment;
 import com.example.uhf.fragment.UHFReadWriteFragment;
 import com.example.uhf.fragment.UHFSetFragment;
 import com.example.uhf.fragment.UsersManagementFragment;
@@ -798,7 +798,7 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
                 safeAddTab("ReadWrite", isArabic ? "📝 قراءة/كتابة" : "📝 Read/Write", UHFReadWriteFragment.class);
             }
             if (isManager || isInventoryMgr || isPosOperator || isGateSecurity) {
-                safeAddTab("RadarLocation", isArabic ? "🎯 الرادار" : "🎯 Radar", UHFRadarLocationFragment.class);
+                safeAddTab("RadarLocation", isArabic ? "🎯 الرادار" : "🎯 Radar", MiraUHFRadarLocationFragment.class);
             }
            
             if (isManager || isInventoryMgr) {
@@ -1094,4 +1094,4 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
             Log.e(TAG, errorMessage + ": " + e.getMessage());
         }
     }
-            }
+                }
