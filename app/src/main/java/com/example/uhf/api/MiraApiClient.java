@@ -913,4 +913,111 @@ public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary
             if (conn != null) conn.disconnect();
         }
     }
-                }
+    // ============================================
+// 💰 Gold & Currency API Endpoints
+// ============================================
+
+/**
+ * جلب جميع إعدادات الذهب والعملات
+ */
+public ApiResponse getGoldCurrencySettings() {
+    return getWithAuth("/gold-currency/settings");
+}
+
+/**
+ * جلب إعدادات الذهب فقط
+ */
+public ApiResponse getGoldSettings() {
+    return getWithAuth("/gold/settings");
+}
+
+/**
+ * حفظ إعدادات الذهب
+ */
+public ApiResponse saveGoldSettings(JSONObject goldSettings) {
+    return postWithAuth("/gold/settings", goldSettings);
+}
+
+/**
+ * جلب إعدادات العملات فقط
+ */
+public ApiResponse getCurrencySettings() {
+    return getWithAuth("/currency/settings");
+}
+
+/**
+ * حفظ إعدادات العملات
+ */
+public ApiResponse saveCurrencySettings(JSONObject currencySettings) {
+    return postWithAuth("/currency/settings", currencySettings);
+}
+
+/**
+ * حفظ جميع إعدادات الذهب والعملات معاً
+ */
+public ApiResponse saveGoldCurrencySettings(JSONObject goldSettings, JSONObject currencySettings) {
+    JSONObject payload = new JSONObject();
+    try {
+        if (goldSettings != null) {
+            payload.put("gold", goldSettings);
+        }
+        if (currencySettings != null) {
+            payload.put("currency", currencySettings);
+        }
+    } catch (Exception ignored) {}
+    return postWithAuth("/gold-currency/settings", payload);
+}
+
+/**
+ * جلب سعر الذهب من API خارجي
+ */
+public ApiResponse fetchGoldPrice(String provider, String apiKey) {
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("provider", provider);
+        payload.put("api_key", apiKey);
+    } catch (Exception ignored) {}
+    return postWithAuth("/gold/price/fetch", payload);
+}
+
+/**
+ * جلب سعر الذهب الحالي
+ */
+public ApiResponse getGoldPrice() {
+    return getWithAuth("/gold/price");
+}
+
+/**
+ * تحديث أسعار الذهب يدوياً
+ */
+public ApiResponse updateGoldPrice(JSONObject prices) {
+    return postWithAuth("/gold/price", prices);
+}
+
+/**
+ * جلب أسعار الصرف
+ */
+public ApiResponse getExchangeRates() {
+    return getWithAuth("/currency/rates");
+}
+
+/**
+ * حساب سعر قطعة ذهب
+ */
+public ApiResponse calculateGoldPrice(int karat, double weight, String currency) {
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("karat", karat);
+        payload.put("weight", weight);
+        payload.put("currency", currency);
+    } catch (Exception ignored) {}
+    return postWithAuth("/gold/calculate", payload);
+}
+
+/**
+ * جلب الأسعار المباشرة (الذهبية والعملات)
+ */
+public ApiResponse getLivePrices() {
+    return getWithAuth("/gold-currency/live-prices");
+}
+}
