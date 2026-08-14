@@ -121,7 +121,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         mContext.currentFragment = this;
 
         if (getContext() != null) {
-            vibrator = (Vibrator) getContext().getSystemService(Context.Vibrator_SERVICE);
+            vibrator = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
         }
 
         settingsManager = MiraSettingsManager.getInstance(mContext);
