@@ -227,7 +227,7 @@ public class MiraGoldCurrencyFragment extends Fragment {
                         pbGoldLoading.setVisibility(View.GONE);
                         btnFetchGoldPrice.setEnabled(true);
                         tvGoldPriceStatus.setText("❌ فشل جلب الأسعار");
-                        Toast.makeText(mContext, "❌ " + response.message, Toast.LENGTH_SHORT).show();
+                        Toast.makeText(mContext, "❌ فشل جلب الأسعار", Toast.LENGTH_SHORT).show();
                     });
                 }
             } catch (Exception e) {
