@@ -112,7 +112,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             setupListeners();
             loadGoldRates();
 
-            // إعطاء الاقتراحات المبدئية للنوع المختار افتراضياً (الخواتم)
             populateSuggestions("rings");
 
             if (getActivity() instanceof UHFMainActivity) {
@@ -140,7 +139,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
-    // ==================== أسعار الذهب وحسابه ====================
+    // ==================== ✅ أسعار الذهب وحسابه (مصحح) ====================
 
     private void loadGoldRates() {
         if (apiClient == null) return;
@@ -176,6 +175,11 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }).start();
     }
 
+    /**
+     * ✅ التصحيح الحاسم في حساب السعر:
+     * الصيغة الصحيحة: السعر النهائي = التكلفة + (التكلفة × هامش الربح)
+     * أي: finalPrice = totalCost * (1 + profitMargin / 100)
+     */
     private void calculateEstimatedGoldValue() {
         try {
             if (binding == null || binding.etGrossWeight == null) return;
@@ -189,18 +193,59 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             }
 
             double weight = Double.parseDouble(weightStr);
-            double gramPrice = getGoldPriceByKarat();
-            double baseGoldCost = weight * gramPrice;
-            double totalMakingCost = weight * makingChargePerGram;
-            double subtotal = baseGoldCost + totalMakingCost;
-            double finalPrice = subtotal * (profitMarginPercent / 100.0);
+            if (weight <= 0) {
+                binding.tvEstimatedGoldValue.setText(isArabic ? "0.00 ريال" : "0.00 YER");
+                return;
+            }
 
+            // 1️⃣ قيمة الذهب الخام
+            double gramPrice = getGoldPriceByKarat();
+            double goldValue = weight * gramPrice;
+
+            // 2️⃣ أجور الصياغة
+            double makingCost = weight * makingChargePerGram;
+
+            // 3️⃣ قيمة الأحجار (إن وجدت)
+            double stoneValue = 0;
+            if (binding.switchHasStones != null && binding.switchHasStones.isChecked()) {
+                try {
+                    String stoneValueStr = binding.etStoneValue.getText() != null ?
+                            binding.etStoneValue.getText().toString().trim() : "";
+                    if (!stoneValueStr.isEmpty()) {
+                        stoneValue = Double.parseDouble(stoneValueStr);
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            // 4️⃣ التكلفة الإجمالية
+            double totalCost = goldValue + makingCost + stoneValue;
+
+            // 5️⃣ ✅ هامش الربح الصحيح
+            double profitAmount = totalCost * (profitMarginPercent / 100.0);
+            double finalPrice = totalCost + profitAmount;
+
+            // 6️⃣ عرض السعر النهائي
             binding.tvEstimatedGoldValue.setText(String.format(Locale.US,
                     "%,.0f %s", finalPrice, isArabic ? "ريال" : "YER"));
 
         } catch (Exception e) {
             Log.e(TAG, "calculateEstimatedGoldValue error: " + e.getMessage());
         }
+    }
+
+    /**
+     * ✅ دالة مساعدة لحساب جميع تفاصيل التسعير
+     * @return [0]=قيمة الذهب, [1]=أجور الصياغة, [2]=قيمة الأحجار, [3]=التكلفة, [4]=الربح, [5]=السعر النهائي
+     */
+    private double[] calculatePricingDetails(double weight, double stoneValue) {
+        double gramPrice = getGoldPriceByKarat();
+        double goldValue = weight * gramPrice;
+        double makingCost = weight * makingChargePerGram;
+        double totalCost = goldValue + makingCost + stoneValue;
+        double profitAmount = totalCost * (profitMarginPercent / 100.0);
+        double finalPrice = totalCost + profitAmount;
+        
+        return new double[]{goldValue, makingCost, stoneValue, totalCost, profitAmount, finalPrice};
     }
 
     private double getGoldPriceByKarat() {
@@ -356,13 +401,24 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             }
 
             binding.switchHasStones.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                try { binding.layoutStonesDetails.setVisibility(isChecked ? View.VISIBLE : View.GONE); } catch (Exception ignored) {}
+                try { 
+                    binding.layoutStonesDetails.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+                    calculateEstimatedGoldValue(); // ✅ إعادة الحساب عند تغيير الأحجار
+                } catch (Exception ignored) {}
             });
 
             binding.etGrossWeight.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
                 @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                     calculateEstimatedGoldValue();
+                }
+                @Override public void afterTextChanged(Editable s) {}
+            });
+
+            binding.etStoneValue.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    calculateEstimatedGoldValue(); // ✅ إعادة الحساب عند تغيير قيمة الأحجار
                 }
                 @Override public void afterTextChanged(Editable s) {}
             });
@@ -493,7 +549,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     // ==================== نافذة النجاح الهجين والخيارات الثلاثة ====================
 
-    private void showEncodingSuccessDialog(String title, String epc, String weight) {
+    private void showEncodingSuccessDialog(String title, String epc, String weight, double finalPrice) {
         if (!isAdded() || getContext() == null) return;
 
         BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(requireContext());
@@ -503,6 +559,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         TextView tvTitle = view.findViewById(R.id.tvSummaryTitle);
         TextView tvEpc = view.findViewById(R.id.tvSummaryEpc);
         TextView tvWeight = view.findViewById(R.id.tvSummaryWeight);
+        TextView tvPrice = view.findViewById(R.id.tvSummaryPrice);
 
         MaterialButton btnViewDigitalIdentity = view.findViewById(R.id.btnViewDigitalIdentity);
         MaterialButton btnNewEncode = view.findViewById(R.id.btnNewEncode);
@@ -511,16 +568,15 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         if (tvTitle != null) tvTitle.setText(title);
         if (tvEpc != null) tvEpc.setText(epc);
         if (tvWeight != null) tvWeight.setText(weight + (isArabic ? " جرام" : " g"));
+        if (tvPrice != null) tvPrice.setText(String.format(Locale.US, "%,.0f %s", finalPrice, isArabic ? "ريال" : "YER"));
 
-        // 1. خيار عرض الهوية الرقمية للقطعة
         if (btnViewDigitalIdentity != null) {
             btnViewDigitalIdentity.setOnClickListener(v -> {
                 bottomSheetDialog.dismiss();
-                showDigitalIdentityDialog(title, epc, weight);
+                showDigitalIdentityDialog(title, epc, weight, finalPrice);
             });
         }
 
-        // 2. خيار تكويد قطعة جديدة (إعادة ضبط الحقول)
         if (btnNewEncode != null) {
             btnNewEncode.setOnClickListener(v -> {
                 bottomSheetDialog.dismiss();
@@ -528,7 +584,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             });
         }
 
-        // 3. خيار إغلاق / إلغاء
         if (btnClose != null) {
             btnClose.setOnClickListener(v -> bottomSheetDialog.dismiss());
         }
@@ -536,9 +591,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         bottomSheetDialog.show();
     }
 
-    // ==================== واجهة الهوية الرقمية الشاملة ====================
-
-    private void showDigitalIdentityDialog(String title, String epc, String weight) {
+    private void showDigitalIdentityDialog(String title, String epc, String weight, double finalPrice) {
         if (!isAdded() || getContext() == null) return;
 
         BottomSheetDialog identityDialog = new BottomSheetDialog(requireContext());
@@ -549,12 +602,14 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         TextView tvEpcCode = view.findViewById(R.id.tvEpcCode);
         TextView tvIdWeight = view.findViewById(R.id.tvIdWeight);
         TextView tvIdMetalKarat = view.findViewById(R.id.tvIdMetalKarat);
+        TextView tvIdPrice = view.findViewById(R.id.tvIdPrice);
         MaterialButton btnClose = view.findViewById(R.id.btnCloseIdentity);
 
         if (tvIdTitle != null) tvIdTitle.setText(title);
         if (tvEpcCode != null) tvEpcCode.setText("EPC: " + epc);
         if (tvIdWeight != null) tvIdWeight.setText(weight + (isArabic ? " جرام" : " g"));
         if (tvIdMetalKarat != null) tvIdMetalKarat.setText(getSelectedKaratCode());
+        if (tvIdPrice != null) tvIdPrice.setText(String.format(Locale.US, "%,.0f %s", finalPrice, isArabic ? "ريال" : "YER"));
 
         if (btnClose != null) {
             btnClose.setOnClickListener(v -> identityDialog.dismiss());
@@ -563,7 +618,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         identityDialog.show();
     }
 
-    // ==================== حفظ التكويد واكتمال العملية ====================
+    // ==================== ✅ حفظ التكويد مع التسعير الصحيح ====================
 
     private void finalizeItemIdentity() {
         try {
@@ -599,6 +654,14 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 try { stoneValue = Double.parseDouble(binding.etStoneValue.getText().toString().trim()); } catch (Exception ignored) {}
             }
 
+            // ✅ حساب التسعير الصحيح
+            double[] pricing = calculatePricingDetails(grossWeight, stoneValue);
+            double finalGoldValue = pricing[0];
+            double finalMakingCost = pricing[1];
+            double finalTotalCost = pricing[3];
+            double finalProfitAmount = pricing[4];
+            double finalRetailPrice = pricing[5];
+
             final AlertDialog loadingDialog = showLoadingDialog(
                     isArabic ? "🔄 جاري التكويد والربط السحابي..." : "🔄 Encoding & Cloud Linking..."
             );
@@ -613,16 +676,21 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
             final String finalEpc = epc;
             final String finalTitle = title;
-            final double finalGrossWeight = grossWeight;
-            final double finalStoneWeight = stoneWeight;
-            final int finalStoneCount = stoneCount;
-            final double finalStoneValue = stoneValue;
-            final String finalStoneType = stoneType;
+            final double fGrossWeight = grossWeight;
+            final double fStoneWeight = stoneWeight;
+            final int fStoneCount = stoneCount;
+            final double fStoneValue = stoneValue;
+            final String fStoneType = stoneType;
             final String selectedKarat = getSelectedKaratCode();
             final String selectedCategory = getSelectedCategory();
             final String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
             final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
             final List<String> finalPhotoPaths = new ArrayList<>(photoPaths);
+            final double fGoldValue = finalGoldValue;
+            final double fMakingCost = finalMakingCost;
+            final double fTotalCost = finalTotalCost;
+            final double fProfitAmount = finalProfitAmount;
+            final double fRetailPrice = finalRetailPrice;
 
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
@@ -642,14 +710,23 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     payload.put("epc", finalEpc);
                     payload.put("title", finalTitle);
                     payload.put("purity_code", selectedKarat);
-                    payload.put("gross_weight", finalGrossWeight);
-                    payload.put("net_weight", finalGrossWeight - finalStoneWeight);
-                    payload.put("stone_weight", finalStoneWeight);
-                    payload.put("stone_count", finalStoneCount);
-                    payload.put("stone_value", finalStoneValue);
-                    payload.put("stone_type", finalStoneType);
+                    payload.put("gross_weight", fGrossWeight);
+                    payload.put("net_weight", fGrossWeight - fStoneWeight);
+                    payload.put("stone_weight", fStoneWeight);
+                    payload.put("stone_count", fStoneCount);
+                    payload.put("stone_value", fStoneValue);
+                    payload.put("stone_type", fStoneType);
+                    
+                    // ✅ القيم المالية الصحيحة
+                    payload.put("gold_price_per_gram", getGoldPriceByKarat());
+                    payload.put("gold_value", fGoldValue);
                     payload.put("making_per_gram", makingChargePerGram);
+                    payload.put("making_charge", fMakingCost);
+                    payload.put("total_cost", fTotalCost);
                     payload.put("profit_margin", profitMarginPercent);
+                    payload.put("profit_amount", fProfitAmount);
+                    payload.put("retail_price", fRetailPrice);
+                    
                     payload.put("category", selectedCategory);
                     payload.put("location", location);
                     payload.put("branch_id", branchId);
@@ -692,19 +769,17 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                                 binding.etEpc.setEnabled(true);
                                 binding.etTitle.setEnabled(true);
                                 binding.etGrossWeight.setEnabled(true);
-                                binding.btnSaveIdentity.setText(isArabic ?
-                                        "اعتماد الموزون وتصدير MIRA ID" : "Approve & Export MIRA ID");
                             }
 
                             if (success) {
                                 removePendingEncode(finalEpc);
                                 playSuccessSound();
 
-                                // 🎯 استدعاء موديل النجاح والخيارات الثلاثة
                                 showEncodingSuccessDialog(
                                         finalTitle,
                                         finalEpc,
-                                        String.format(Locale.US, "%.2f", finalGrossWeight)
+                                        String.format(Locale.US, "%.2f", fGrossWeight),
+                                        fRetailPrice
                                 );
 
                                 if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
@@ -725,8 +800,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     Log.e(TAG, "Background error: " + e.getMessage());
                     safeRun(() -> {
                         dismissDialog(loadingDialog);
-                        showErrorDialog(isArabic ? "❌ فشل التكويد" : "❌ Encoding Failed",
-                                e.getMessage());
+                        showErrorDialog(isArabic ? "❌ فشل التكويد" : "❌ Encoding Failed", e.getMessage());
                     });
                 }
             });
@@ -751,8 +825,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 if (!imageFile.exists()) { failed++; continue; }
                 try {
                     boolean isPrimary = (imagePaths.indexOf(path) == 0);
-                    MiraApiClient.ApiResponse response = apiClient.uploadItemImage(
-                            itemId, imageFile, isPrimary, "Image");
+                    MiraApiClient.ApiResponse response = apiClient.uploadItemImage(itemId, imageFile, isPrimary, "Image");
                     if (response != null && response.isSuccess) uploaded++;
                     else failed++;
                 } catch (Exception e) { failed++; }
@@ -830,7 +903,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                         MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
                         if (response != null && response.isSuccess) {
                             synced++;
-                            String epc = payload.optString("epc", "");
                             if (response.data != null) {
                                 int syncedItemId = response.data.optInt("item_id", 0);
                                 JSONArray imagePaths = payload.optJSONArray("image_paths");
@@ -838,7 +910,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                                     uploadPendingImages(syncedItemId, imagePaths);
                                 }
                             }
-                            if (!epc.isEmpty()) removePendingEncode(epc);
                         } else {
                             remainingArr.put(payload);
                         }
