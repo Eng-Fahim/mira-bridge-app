@@ -1,5 +1,5 @@
 package com.example.uhf.fragment;
-import com.example.uhf.api.ApiResponse; // (أو مسار حزمة ApiResponse الصحيح في مشروعك)
+import com.example.uhf.api.MiraApiClient.ApiResponse;
 
 import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
