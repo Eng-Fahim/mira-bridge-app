@@ -531,6 +531,9 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 }
                 @Override public void afterTextChanged(Editable s) {}
             });
+            if (binding.btnViewPending != null) {
+    binding.btnViewPending.setOnClickListener(v -> showPendingSyncDialog());
+}
 
             binding.chipGroupKarat.setOnCheckedStateChangeListener((group, checkedIds) ->
                     calculateEstimatedGoldValue());
@@ -1365,4 +1368,4 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         super.onDestroyView();
         binding = null;
     }
-            }
+                    }
