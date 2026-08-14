@@ -568,7 +568,8 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         if (tvTitle != null) tvTitle.setText(title);
         if (tvEpc != null) tvEpc.setText(epc);
         if (tvWeight != null) tvWeight.setText(weight + (isArabic ? " جرام" : " g"));
-        if (tvPrice != null) tvPrice.setText(String.format(Locale.US, "%,.0f %s", finalPrice, isArabic ? "ريال" : "YER"));
+        /*if (tvPrice != null) tvPrice.setText(String.format(Locale.US, "%,.0f %s", finalPrice, isArabic ? "ريال" : "YER"));*/
+        
 
         if (btnViewDigitalIdentity != null) {
             btnViewDigitalIdentity.setOnClickListener(v -> {
@@ -609,8 +610,8 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         if (tvEpcCode != null) tvEpcCode.setText("EPC: " + epc);
         if (tvIdWeight != null) tvIdWeight.setText(weight + (isArabic ? " جرام" : " g"));
         if (tvIdMetalKarat != null) tvIdMetalKarat.setText(getSelectedKaratCode());
-        if (tvIdPrice != null) tvIdPrice.setText(String.format(Locale.US, "%,.0f %s", finalPrice, isArabic ? "ريال" : "YER"));
-
+        /*if (tvIdPrice != null) tvIdPrice.setText(String.format(Locale.US, "%,.0f %s", finalPrice, isArabic ? "ريال" : "YER"));
+*/
         if (btnClose != null) {
             btnClose.setOnClickListener(v -> identityDialog.dismiss());
         }
@@ -1020,4 +1021,4 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         super.onDestroyView();
         binding = null;
     }
-                }
+    }
