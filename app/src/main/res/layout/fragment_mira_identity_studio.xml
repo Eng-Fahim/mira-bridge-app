@@ -54,7 +54,19 @@
                         android:paddingVertical="4dp"
                         android:textSize="10sp" />
                 </LinearLayout>
-
+<!-- زر عرض الطلبات المعلقة -->
+<com.google.android.material.button.MaterialButton
+    android:id="@+id/btnViewPending"
+    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:layout_marginTop="8dp"
+    android:text="📦 عرض الطلبات المحفوظة محلياً"
+    android:textColor="#D97706"
+    app:strokeColor="#D97706"
+    app:cornerRadius="8dp"
+    app:icon="@android:drawable/ic_menu_upload"
+    app:iconTint="#D97706" />
                 <!-- حقل EPC -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilEpc"
