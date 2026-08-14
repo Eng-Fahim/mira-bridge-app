@@ -18,6 +18,22 @@
 <string name="nav_settings">Settings</string>
 <string name="nav_close">Close</string>
 
+
+<!--Gates -->
+
+<string name="mira_gate_title">MIRA Secure Gate™</string>
+<string name="mira_gate_subtitle">Security Gate &amp; Theft Prevention System</string>
+<string name="gate_status_armed">🛡️ Gate Armed - Security Scanning Active</string>
+<string name="gate_status_disarmed">🔒 Gate Disarmed</string>
+<string name="gate_status_verifying">🔍 Verifying Identity...</string>
+<string name="gate_status_alarm">🚨 Theft Alert / Unauthorized Exit!</string>
+<string name="gate_status_passed">✅ Authorized Exit</string>
+<string name="btn_arm_gate">🛡️ Arm Gate</string>
+<string name="btn_disarm_gate">🔒 Disarm Gate</string>
+<string name="stat_authorized">Authorized</string>
+<string name="stat_unauthorized">Unauthorized</string>
+<string name="stat_total_scans">Total</string>
+<string name="status_waiting">Waiting for activation...</string>
     <!-- DASHBOARD-->
     <string name="greeting_default">Welcome...</string>
 <string name="location_default">Main Showroom — Regional Branch</string>
