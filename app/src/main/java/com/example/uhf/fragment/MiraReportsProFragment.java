@@ -187,78 +187,78 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void fetchAndRenderReport(String reportType, WebView webView, View layoutLoading, TextView tvLoadingStatus, String fromDate, String toDate) {
-        if (getContext() == null) return;
+    if (getContext() == null) return;
 
-        // إظهار واجهة التحميل الأصلية وإخفاء الـ WebView مؤقتاً لتفادي الفلاش الأبيض
+    mainHandler.post(() -> {
+        if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
+        if (tvLoadingStatus != null) {
+            tvLoadingStatus.setText("جاري معالجة بيانات الذهب والمخزون...");
+        }
+        webView.setAlpha(0f);
+    });
+
+    new Thread(() -> {
+        JSONObject reportData = null;
+        String errorMessage = null;
+        String cacheKey = "cache_" + reportType + "_" + fromDate + "_" + toDate;
+
+        try {
+            int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+            MiraApiClient.ApiResponse response = apiClient != null ? apiClient.getReportData(reportType, fromDate, toDate, activeBranchId) : null;
+
+            if (response != null && response.isSuccess && response.data != null) {
+                reportData = response.data;
+                if (offlineCache != null) {
+                    offlineCache.edit().putString(cacheKey, reportData.toString()).apply();
+                }
+            } else {
+                errorMessage = "خطأ في الاتصال أو عدم توفر بيانات لهذه الفترة";
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "API Fetch failed for report " + reportType, e);
+            errorMessage = e.getLocalizedMessage();
+        }
+
+        // استرجاع الكاش عند الانقطاع عن الشبكة
+        if (reportData == null && offlineCache != null) {
+            String cachedJson = offlineCache.getString(cacheKey, null);
+            if (cachedJson != null) {
+                try {
+                    reportData = new JSONObject(cachedJson);
+                } catch (Exception ignored) {}
+            }
+        }
+
+        final JSONObject finalData = reportData;
+        final String finalError = errorMessage;
+
         mainHandler.post(() -> {
-            if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
-            if (tvLoadingStatus != null) {
-                tvLoadingStatus.setText("جاري معالجة بيانات الذهب والمخزون...");
-            }
-            webView.setAlpha(0f);
-        });
+            if (getContext() == null) return;
 
-        new Thread(() -> {
-            JSONObject reportData = null;
-            String errorMessage = null;
-            String cacheKey = "cache_" + reportType + "_" + fromDate + "_" + toDate;
+            if (finalData != null) {
+                String htmlContent = generateExecutiveHTML(reportType, finalData, fromDate, toDate);
 
-            try {
-                int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-                MiraApiClient.ApiResponse response = apiClient != null ? apiClient.getReportData(reportType, fromDate, toDate, activeBranchId) : null;
-
-                if (response != null && response.isSuccess && response.data != null) {
-                    reportData = response.data;
-                    if (offlineCache != null) {
-                        offlineCache.edit().putString(cacheKey, reportData.toString()).apply();
+                webView.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public void onPageFinished(WebView view, String url) {
+                        super.onPageFinished(view, url);
+                        if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+                        webView.animate().alpha(1f).setDuration(250).start();
                     }
-                } else if (response != null && response.message != null) {
-                    errorMessage = response.message;
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "API Fetch failed for report " + reportType, e);
-                errorMessage = e.getLocalizedMessage();
+                });
+
+                webView.loadDataWithBaseURL("file:///android_asset/", htmlContent, "text/html", "utf-8", null);
+            } else {
+                String errorHtml = buildEmptyOrErrorHTML(finalError != null ? finalError : "تحقق من الاتصال بالشبكة أو اختر فترة زمنية أخرى");
+
+                if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+                webView.loadDataWithBaseURL(null, errorHtml, "text/html", "utf-8", null);
+                webView.animate().alpha(1f).setDuration(200).start();
             }
+        });
+    }).start();
+}
 
-            // استرجاع الكاش عند الانقطاع عن الشبكة
-            if (reportData == null && offlineCache != null) {
-                String cachedJson = offlineCache.getString(cacheKey, null);
-                if (cachedJson != null) {
-                    try {
-                        reportData = new JSONObject(cachedJson);
-                    } catch (Exception ignored) {}
-                }
-            }
-
-            final JSONObject finalData = reportData;
-            final String finalError = errorMessage;
-
-            mainHandler.post(() -> {
-                if (getContext() == null) return;
-
-                if (finalData != null) {
-                    String htmlContent = generateExecutiveHTML(reportType, finalData, fromDate, toDate);
-
-                    webView.setWebViewClient(new WebViewClient() {
-                        @Override
-                        public void onPageFinished(WebView view, String url) {
-                            super.onPageFinished(view, url);
-                            if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-                            webView.animate().alpha(1f).setDuration(250).start();
-                        }
-                    });
-
-                    webView.loadDataWithBaseURL("file:///android_asset/", htmlContent, "text/html", "utf-8", null);
-                } else {
-                    String errorHtml = buildEmptyOrErrorHTML(finalError != null ? finalError : "تحقق من الاتصال بالشبكة أو اختر فترة زمنية أخرى");
-
-                    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-                    webView.loadDataWithBaseURL(null, errorHtml, "text/html", "utf-8", null);
-                    webView.animate().alpha(1f).setDuration(200).start();
-                }
-            });
-        }).start();
-    }
 
     // ==================== HTML GENERATOR (GOLD & RFID ENGINE) ====================
 
