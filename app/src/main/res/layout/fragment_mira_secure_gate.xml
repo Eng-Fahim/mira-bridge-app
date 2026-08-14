@@ -11,15 +11,15 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="20dp"
+        android:padding="16dp"
         android:gravity="center_horizontal">
 
         <!-- الأيقونة العلوية مع حلقة الحالة -->
         <FrameLayout
-            android:layout_width="120dp"
-            android:layout_height="120dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="16dp">
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="12dp">
 
             <View
                 android:id="@+id/statusIndicator"
@@ -33,7 +33,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:text="🚪"
-                android:textSize="54sp" />
+                android:textSize="48sp" />
         </FrameLayout>
 
         <!-- عناوين البوابة -->
@@ -41,7 +41,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/mira_gate_title"
-            android:textAppearance="?attr/textAppearanceHeadlineMedium"
+            android:textAppearance="?attr/textAppearanceHeadlineSmall"
             android:textColor="?attr/colorOnBackground"
             android:textStyle="bold" />
 
@@ -51,7 +51,7 @@
             android:text="@string/mira_gate_subtitle"
             android:textAppearance="?attr/textAppearanceBodySmall"
             android:textColor="?attr/colorOnSurfaceVariant"
-            android:layout_marginBottom="24dp" />
+            android:layout_marginBottom="16dp" />
 
         <!-- نص الحالة الرئيسي -->
         <TextView
@@ -62,14 +62,14 @@
             android:textAppearance="?attr/textAppearanceTitleLarge"
             android:textStyle="bold"
             android:gravity="center"
-            android:padding="12dp"
-            android:layout_marginBottom="16dp" />
+            android:padding="8dp"
+            android:layout_marginBottom="12dp" />
 
         <!-- بطاقة تفاصيل آخر حدث -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
+            android:layout_marginBottom="16dp"
             app:cardCornerRadius="12dp"
             app:cardElevation="2dp"
             app:strokeWidth="1dp"
@@ -79,7 +79,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp"
+                android:padding="12dp"
                 android:gravity="center">
 
                 <TextView
@@ -90,7 +90,7 @@
                     android:textAppearance="?attr/textAppearanceBodyMedium"
                     android:textColor="?attr/colorOnSurface"
                     android:gravity="center"
-                    tools:text="🔍 جاري التحقق من التاق: ...E200410" />
+                    tools:text="🔍 جاري التحقق..." />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -99,22 +99,21 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="32dp"
+            android:layout_marginBottom="16dp"
             android:weightSum="3">
 
-            <!-- مصرح -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginEnd="6dp"
+                android:layout_marginEnd="4dp"
                 app:cardCornerRadius="10dp"
                 app:cardElevation="1dp">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="12dp"
+                    android:padding="8dp"
                     android:gravity="center">
                     <TextView
                         android:id="@+id/tvPassCount"
@@ -122,7 +121,7 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="#2E7D32"
-                        android:textSize="28sp"
+                        android:textSize="24sp"
                         android:textStyle="bold" />
                     <TextView
                         android:layout_width="wrap_content"
@@ -132,20 +131,19 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- غير مصرح (إنذارات) -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="3dp"
-                android:layout_marginEnd="3dp"
+                android:layout_marginStart="2dp"
+                android:layout_marginEnd="2dp"
                 app:cardCornerRadius="10dp"
                 app:cardElevation="1dp">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="12dp"
+                    android:padding="8dp"
                     android:gravity="center">
                     <TextView
                         android:id="@+id/tvDenyCount"
@@ -153,7 +151,7 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="#C62828"
-                        android:textSize="28sp"
+                        android:textSize="24sp"
                         android:textStyle="bold" />
                     <TextView
                         android:layout_width="wrap_content"
@@ -163,19 +161,18 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- الإجمالي -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="6dp"
+                android:layout_marginStart="4dp"
                 app:cardCornerRadius="10dp"
                 app:cardElevation="1dp">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="12dp"
+                    android:padding="8dp"
                     android:gravity="center">
                     <TextView
                         android:id="@+id/tvTotalCount"
@@ -183,7 +180,7 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="?attr/colorOnSurface"
-                        android:textSize="28sp"
+                        android:textSize="24sp"
                         android:textStyle="bold" />
                     <TextView
                         android:layout_width="wrap_content"
@@ -195,27 +192,113 @@
         </LinearLayout>
 
         <!-- أزرار التحكم بالبوابة -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnArmGate"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="@string/btn_arm_gate"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            app:cornerRadius="10dp"
-            android:layout_marginBottom="12dp" />
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="12dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnDisarmGate"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnArmGate"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="@string/btn_arm_gate"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                app:cornerRadius="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDisarmGate"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="@string/btn_disarm_gate"
+                android:textColor="#C62828"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                app:strokeColor="#C62828"
+                app:cornerRadius="8dp" />
+        </LinearLayout>
+
+        <!-- 🧪 قسم المحاكاة للاختبار بدون قارئ هاردوير -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="@string/btn_disarm_gate"
-            android:textColor="#C62828"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            app:strokeColor="#C62828"
-            app:cornerRadius="10dp" />
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="#111827"
+            app:strokeColor="#374151"
+            app:cardCornerRadius="8dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="10dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🧪 محاكي البوابة (اختبار بدون القارئ)"
+                    android:textColor="#9CA3AF"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="6dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnSimulateAllowed"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:text="✅ مسح قطعة مسموحة"
+                        android:textColor="#10B981"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btnSimulateDenied"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:text="🚨 مسح قطعة مسروقة"
+                        android:textColor="#EF4444"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 📺 لوحة تحكم السجلات المباشرة البديلة لـ Logcat -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            app:cardBackgroundColor="#000000"
+            app:cardCornerRadius="6dp">
+
+            <ScrollView
+                android:id="@+id/scrollDebugLog"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="8dp">
+
+                <TextView
+                    android:id="@+id/tvDebugConsole"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="[System Console Ready...]"
+                    android:textColor="#00FF66"
+                    android:textSize="11sp"
+                    android:fontFamily="monospace" />
+            </ScrollView>
+        </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>
 </ScrollView>
