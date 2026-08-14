@@ -163,7 +163,15 @@ public class MiraReportsProFragment extends Fragment {
         btnApply.setOnClickListener(v -> fetchAndRenderReport(item.type, webView, layoutLoading, tvLoadingStatus, dates[0], dates[1]));
         btnPrint.setOnClickListener(v -> printReportWebView(webView, item.title));
         btnExport.setOnClickListener(v -> exportReportToCSV(item.type, dates[0], dates[1]));
-        btnClose.setOnClickListener(v -> dialog.dismiss());
+        
+        // تنظيف الـ WebView عند الإغلاق لتجنب تسرب الذاكرة
+        btnClose.setOnClickListener(v -> {
+            try {
+                webView.stopLoading();
+                webView.destroy();
+            } catch (Exception ignored) {}
+            dialog.dismiss();
+        });
 
         dialog.show();
 
