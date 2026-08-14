@@ -183,64 +183,72 @@ public class MiraGoldCurrencyFragment extends Fragment {
     // 💰 جلب أسعار الذهب من API
     // ============================================
     private void fetchGoldPricesFromApi() {
-        String provider = spGoldApiProvider.getSelectedItem().toString();
-        String apiKey = getText(etGoldApiKey);
-        
-        if (apiKey.isEmpty()) {
-            Toast.makeText(mContext, "⚠️ أدخل مفتاح API أولاً", Toast.LENGTH_SHORT).show();
-            return;
-        }
+    String provider = spGoldApiProvider.getSelectedItem().toString();
+    String apiKey = getText(etGoldApiKey);
+    
+    if (apiKey.isEmpty()) {
+        Toast.makeText(mContext, "⚠️ أدخل مفتاح API أولاً", Toast.LENGTH_SHORT).show();
+        return;
+    }
 
-        pbGoldLoading.setVisibility(View.VISIBLE);
-        btnFetchGoldPrice.setEnabled(false);
-        tvGoldPriceStatus.setText("⏳ جاري جلب الأسعار...");
-        
-        executor.execute(() -> {
-            try {
-                com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
-                com.example.uhf.api.MiraApiClient.ApiResponse response = client.fetchGoldPrice(provider, apiKey);
+    pbGoldLoading.setVisibility(View.VISIBLE);
+    btnFetchGoldPrice.setEnabled(false);
+    tvGoldPriceStatus.setText("⏳ جاري جلب الأسعار...");
+    
+    executor.execute(() -> {
+        try {
+            com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
+            com.example.uhf.api.MiraApiClient.ApiResponse response = client.fetchGoldPrice(provider, apiKey);
+            
+            if (response.isSuccess && response.data != null) {
+                JSONObject data = response.data.optJSONObject("data");
+                if (data == null) data = response.data;
                 
-                if (response.isSuccess && response.data != null) {
-                    JSONObject data = response.data.optJSONObject("data");
-                    if (data == null) data = response.data;
+                JSONObject prices = data.optJSONObject("prices");
+                if (prices == null) prices = data;
+                
+                // ✅ إنشاء متغيرات final
+                final JSONObject finalPrices = prices;
+                final double price24k = finalPrices.optDouble("24k", 0);
+                final double price22k = finalPrices.optDouble("22k", 0);
+                final double price21k = finalPrices.optDouble("21k", 0);
+                final double price18k = finalPrices.optDouble("18k", 0);
+                final double price14k = finalPrices.optDouble("14k", 0);
+                
+                mainHandler.post(() -> {
+                    if (price24k > 0) etGoldPrice24k.setText(decimalFormat.format(price24k));
+                    if (price22k > 0) etGoldPrice22k.setText(decimalFormat.format(price22k));
+                    if (price21k > 0) etGoldPrice21k.setText(decimalFormat.format(price21k));
+                    if (price18k > 0) etGoldPrice18k.setText(decimalFormat.format(price18k));
+                    if (price14k > 0) etGoldPrice14k.setText(decimalFormat.format(price14k));
                     
-                    JSONObject prices = data.optJSONObject("prices");
-                    if (prices == null) prices = data;
+                    pbGoldLoading.setVisibility(View.GONE);
+                    btnFetchGoldPrice.setEnabled(true);
+                    tvGoldPriceStatus.setText("✅ تم تحديث الأسعار");
+                    tvLastUpdate.setText("آخر تحديث: " + dateFormat.format(new Date()));
+                    updateLivePrices();
                     
-                    mainHandler.post(() -> {
-                        if (prices.has("24k")) etGoldPrice24k.setText(decimalFormat.format(prices.optDouble("24k")));
-                        if (prices.has("22k")) etGoldPrice22k.setText(decimalFormat.format(prices.optDouble("22k")));
-                        if (prices.has("21k")) etGoldPrice21k.setText(decimalFormat.format(prices.optDouble("21k")));
-                        if (prices.has("18k")) etGoldPrice18k.setText(decimalFormat.format(prices.optDouble("18k")));
-                        if (prices.has("14k")) etGoldPrice14k.setText(decimalFormat.format(prices.optDouble("14k")));
-                        
-                        pbGoldLoading.setVisibility(View.GONE);
-                        btnFetchGoldPrice.setEnabled(true);
-                        tvGoldPriceStatus.setText("✅ تم تحديث الأسعار");
-                        tvLastUpdate.setText("آخر تحديث: " + dateFormat.format(new Date()));
-                        updateLivePrices();
-                        
-                        Toast.makeText(mContext, "✅ تم جلب أسعار الذهب بنجاح", Toast.LENGTH_SHORT).show();
-                    });
-                } else {
-                    mainHandler.post(() -> {
-                        pbGoldLoading.setVisibility(View.GONE);
-                        btnFetchGoldPrice.setEnabled(true);
-                        tvGoldPriceStatus.setText("❌ فشل جلب الأسعار");
-                        Toast.makeText(mContext, "❌ فشل جلب الأسعار", Toast.LENGTH_SHORT).show();
-                    });
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error fetching gold prices: " + e.getMessage());
+                    Toast.makeText(mContext, "✅ تم جلب أسعار الذهب بنجاح", Toast.LENGTH_SHORT).show();
+                });
+            } else {
                 mainHandler.post(() -> {
                     pbGoldLoading.setVisibility(View.GONE);
                     btnFetchGoldPrice.setEnabled(true);
-                    tvGoldPriceStatus.setText("❌ خطأ في الاتصال");
-                    Toast.makeText(mContext, "❌ " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    tvGoldPriceStatus.setText("❌ فشل جلب الأسعار");
+                    Toast.makeText(mContext, "❌ فشل جلب الأسعار من السيرفر", Toast.LENGTH_SHORT).show();
                 });
             }
-        });
-    }
+        } catch (Exception e) {
+            Log.e(TAG, "Error fetching gold prices: " + e.getMessage());
+            mainHandler.post(() -> {
+                pbGoldLoading.setVisibility(View.GONE);
+                btnFetchGoldPrice.setEnabled(true);
+                tvGoldPriceStatus.setText("❌ خطأ في الاتصال");
+                Toast.makeText(mContext, "❌ " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            });
+        }
+    });
+}
 
     // ============================================
     // 💾 حفظ إعدادات الذهب
@@ -528,4 +536,4 @@ public class MiraGoldCurrencyFragment extends Fragment {
         super.onDestroy();
         executor.shutdown();
     }
-}
+                }
