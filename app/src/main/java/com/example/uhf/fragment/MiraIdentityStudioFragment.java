@@ -40,6 +40,7 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.databinding.FragmentMiraIdentityStudioBinding;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
+import com.example.uhf.manager.MiraPriceManager;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
@@ -69,6 +70,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
+    private MiraPriceManager priceManager;
     private SharedPreferences offlineCache;
 
     private final Map<String, String[]> typeSuggestions = new HashMap<>();
@@ -79,15 +81,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private ActivityResultLauncher<String[]> pickImageLauncher;
     private ActivityResultLauncher<String> requestPermissionLauncher;
     private Uri photoUri;
-
-    // أسعار الذهب والإعدادات
-    private double goldPrice24K = 75.0;
-    private double goldPrice21K = 65.62;
-    private double goldPrice18K = 56.25;
-    private double goldPrice14K = 43.75;
-    private double makingChargePerGram = 10.0;
-    private double profitMarginPercent = 90.0;
-    private boolean goldRatesLoaded = false;
 
     private void applyLanguage() {
         if (binding == null) return;
@@ -112,6 +105,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 apiClient = MiraApiClient.getInstance(getContext());
                 branchesManager = MiraBranchesManager.getInstance(getContext());
                 orgProfile = MiraOrgProfileManager.getInstance(getContext());
+                priceManager = MiraPriceManager.getInstance(getContext());
                 offlineCache = getContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
             }
             isArabic = Locale.getDefault().getLanguage().equals("ar");
@@ -120,7 +114,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             setupPhotoLaunchers();
             applyLanguage();
             setupListeners();
-            loadGoldRates();
 
             populateSuggestions("rings");
 
@@ -151,38 +144,17 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     // ==================== أسعار الذهب وحسابه ====================
 
-    private void loadGoldRates() {
-        if (apiClient == null) return;
-
-        new Thread(() -> {
-            try {
-                MiraApiClient.ApiResponse response = apiClient.getGoldRatesAndSettings();
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject rates = response.data.optJSONObject("live_rates");
-                    if (rates != null) {
-                        goldPrice24K = rates.optDouble("24K", 75.0);
-                        goldPrice21K = rates.optDouble("21K", 65.62);
-                        goldPrice18K = rates.optDouble("18K", 56.25);
-                        goldPrice14K = rates.optDouble("14K", 43.75);
-                    }
-
-                    JSONObject makings = response.data.optJSONObject("default_making_charges");
-                    if (makings != null) {
-                        makingChargePerGram = makings.optDouble("21K", 10.0);
-                    }
-
-                    JSONObject margins = response.data.optJSONObject("default_profit_margins");
-                    if (margins != null) {
-                        profitMarginPercent = margins.optDouble("21K", 90.0);
-                    }
-
-                    goldRatesLoaded = true;
-                    safeRun(this::calculateEstimatedGoldValue);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading gold rates: " + e.getMessage());
-            }
-        }).start();
+    private int getSelectedKaratNumber() {
+        try {
+            int checkedId = binding.chipGroupKarat.getCheckedChipId();
+            if (checkedId == binding.chip24K.getId()) return 24;
+            if (checkedId == binding.chip21K.getId()) return 21;
+            if (checkedId == binding.chip18K.getId()) return 18;
+            if (checkedId == binding.chip14K.getId()) return 14;
+        } catch (Exception e) {
+            Log.e(TAG, "getSelectedKaratNumber error: " + e.getMessage());
+        }
+        return 21;
     }
 
     private void calculateEstimatedGoldValue() {
@@ -193,19 +165,19 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     binding.etGrossWeight.getText().toString().trim() : "";
 
             if (weightStr.isEmpty()) {
-                binding.tvEstimatedGoldValue.setText(isArabic ? "0.00 ريال" : "0.00 YER");
+                binding.tvEstimatedGoldValue.setText("0.00 " + priceManager.getCurrencySymbol(priceManager.getDefaultCurrency()));
                 return;
             }
 
             double weight = Double.parseDouble(weightStr);
             if (weight <= 0) {
-                binding.tvEstimatedGoldValue.setText(isArabic ? "0.00 ريال" : "0.00 YER");
+                binding.tvEstimatedGoldValue.setText("0.00 " + priceManager.getCurrencySymbol(priceManager.getDefaultCurrency()));
                 return;
             }
 
-            double gramPrice = getGoldPriceByKarat();
+            int karat = getSelectedKaratNumber();
+            double gramPrice = priceManager.getFinalPricePerGram(karat);
             double goldValue = weight * gramPrice;
-            double makingCost = weight * makingChargePerGram;
 
             double stoneValue = 0;
             if (binding.switchHasStones != null && binding.switchHasStones.isChecked()) {
@@ -218,12 +190,9 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 } catch (Exception ignored) {}
             }
 
-            double totalCost = goldValue + makingCost + stoneValue;
-            double profitAmount = totalCost * (profitMarginPercent / 100.0);
-            double finalPrice = totalCost + profitAmount;
-
-            binding.tvEstimatedGoldValue.setText(String.format(Locale.US,
-                    "%,.0f %s", finalPrice, isArabic ? "ريال" : "YER"));
+            double totalPrice = goldValue + stoneValue;
+            String formattedPrice = priceManager.formatPriceDefault(totalPrice);
+            binding.tvEstimatedGoldValue.setText(formattedPrice);
 
         } catch (Exception e) {
             Log.e(TAG, "calculateEstimatedGoldValue error: " + e.getMessage());
@@ -231,27 +200,25 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     private double[] calculatePricingDetails(double weight, double stoneValue) {
-        double gramPrice = getGoldPriceByKarat();
-        double goldValue = weight * gramPrice;
-        double makingCost = weight * makingChargePerGram;
-        double totalCost = goldValue + makingCost + stoneValue;
-        double profitAmount = totalCost * (profitMarginPercent / 100.0);
-        double finalPrice = totalCost + profitAmount;
+        int karat = getSelectedKaratNumber();
+        
+        double basePricePerGram = priceManager.getGoldPricePerGram(karat);
+        double marginPercent = priceManager.getMargin(karat);
+        double makingPerGram = priceManager.getMakingCharge(karat);
+        double finalPricePerGram = priceManager.getFinalPricePerGram(karat);
+        
+        double goldValue = weight * basePricePerGram;
+        double makingCost = weight * makingPerGram;
+        double totalCost = weight * finalPricePerGram;
+        double profitAmount = totalCost - goldValue - makingCost;
+        double finalPrice = totalCost + stoneValue;
         
         return new double[]{goldValue, makingCost, stoneValue, totalCost, profitAmount, finalPrice};
     }
 
     private double getGoldPriceByKarat() {
-        try {
-            int checkedId = binding.chipGroupKarat.getCheckedChipId();
-            if (checkedId == binding.chip24K.getId()) return goldPrice24K;
-            else if (checkedId == binding.chip21K.getId()) return goldPrice21K;
-            else if (checkedId == binding.chip18K.getId()) return goldPrice18K;
-            else if (checkedId == binding.chip14K.getId()) return goldPrice14K;
-        } catch (Exception e) {
-            Log.e(TAG, "getGoldPriceByKarat error: " + e.getMessage());
-        }
-        return goldPrice21K;
+        int karat = getSelectedKaratNumber();
+        return priceManager.getFinalPricePerGram(karat);
     }
 
     // ==================== الكاميرا والاستوديو ====================
@@ -693,7 +660,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
             String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
 
-            // التحقق من الحقول الإلزامية
             if (epc.isEmpty()) { 
                 showValidationError(isArabic ? "يرجى مسح RFID أولاً" : "Please scan RFID first");
                 return; 
@@ -724,7 +690,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 return;
             }
 
-            // التحقق من بيانات الأحجار
             String stoneType = "";
             double stoneWeight = 0;
             int stoneCount = 0;
@@ -811,6 +776,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             final double fTotalCost = finalTotalCost;
             final double fProfitAmount = finalProfitAmount;
             final double fRetailPrice = finalRetailPrice;
+            final int selectedKaratNum = getSelectedKaratNumber();
 
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
@@ -836,12 +802,12 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                     payload.put("stone_count", fStoneCount);
                     payload.put("stone_value", fStoneValue);
                     payload.put("stone_type", fStoneType);
-                    payload.put("gold_price_per_gram", getGoldPriceByKarat());
+                    payload.put("gold_price_per_gram", priceManager.getGoldPricePerGram(selectedKaratNum));
                     payload.put("gold_value", fGoldValue);
-                    payload.put("making_per_gram", makingChargePerGram);
+                    payload.put("making_per_gram", priceManager.getMakingCharge(selectedKaratNum));
                     payload.put("making_charge", fMakingCost);
                     payload.put("total_cost", fTotalCost);
-                    payload.put("profit_margin", profitMarginPercent);
+                    payload.put("profit_margin", priceManager.getMargin(selectedKaratNum));
                     payload.put("profit_amount", fProfitAmount);
                     payload.put("retail_price", fRetailPrice);
                     payload.put("category", selectedCategory);
@@ -1120,7 +1086,10 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             binding.etStoneCount.setText("");
             binding.etStoneValue.setText("");
             binding.tvStatusBadge.setText("WAITING");
-            binding.tvEstimatedGoldValue.setText(isArabic ? "0.00 ريال" : "0.00 YER");
+            
+            String currencySymbol = priceManager.getCurrencySymbol(priceManager.getDefaultCurrency());
+            binding.tvEstimatedGoldValue.setText("0.00 " + currencySymbol);
+            
             binding.switchHasStones.setChecked(false);
             binding.chipRing.setChecked(true);
             binding.chipYellowGold.setChecked(true);
@@ -1151,4 +1120,4 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         super.onDestroyView();
         binding = null;
     }
-                    }
+}
