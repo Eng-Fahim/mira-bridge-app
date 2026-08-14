@@ -207,83 +207,64 @@ public class MiraGoldCurrencyFragment extends Fragment {
     // 💰 جلب أسعار الذهب من API
     // ============================================
     private void fetchGoldPricesFromApi() {
-        String provider = spGoldApiProvider.getSelectedItem().toString();
-        String apiKey = getText(etGoldApiKey);
-        
-        if (apiKey.isEmpty()) {
-            Toast.makeText(mContext, "⚠️ أدخل مفتاح API أولاً", Toast.LENGTH_SHORT).show();
-            return;
-        }
+    String provider = spGoldApiProvider.getSelectedItem().toString();
+    String apiKey = getText(etGoldApiKey);
+    
+    if (apiKey.isEmpty()) {
+        Toast.makeText(mContext, "⚠️ أدخل مفتاح API أولاً", Toast.LENGTH_SHORT).show();
+        return;
+    }
 
-        pbGoldLoading.setVisibility(View.VISIBLE);
-        btnFetchGoldPrice.setEnabled(false);
-        tvGoldPriceStatus.setText("⏳ جاري جلب الأسعار...");
-        
-        executor.execute(() -> {
-            try {
-                String apiUrl = "";
-                String authHeader = "";
+    pbGoldLoading.setVisibility(View.VISIBLE);
+    btnFetchGoldPrice.setEnabled(false);
+    tvGoldPriceStatus.setText("⏳ جاري جلب الأسعار...");
+    
+    executor.execute(() -> {
+        try {
+            com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
+            com.example.uhf.api.MiraApiClient.ApiResponse response = client.fetchGoldPrice(provider, apiKey);
+            
+            if (response.isSuccess && response.data != null) {
+                JSONObject data = response.data.optJSONObject("data");
+                if (data == null) data = response.data;
                 
-                switch (provider) {
-                    case "metalprice":
-                        apiUrl = "https://api.metalpriceapi.com/v1/latest?api_key=" + apiKey + "&base=USD&currencies=XAU";
-                        break;
-                    case "goldapi":
-                        apiUrl = "https://www.goldapi.io/api/XAU/USD";
-                        authHeader = apiKey;
-                        break;
-                    case "metalsdev":
-                        apiUrl = "https://api.metals.dev/v1/latest?api_key=" + apiKey + "&currency=USD&unit=toz";
-                        break;
-                }
+                JSONObject prices = data.optJSONObject("prices");
+                if (prices == null) prices = data;
                 
-                URL url = new URL(apiUrl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setRequestProperty("Content-Type", "application/json");
-                if (!authHeader.isEmpty()) {
-                    conn.setRequestProperty("x-access-token", authHeader);
-                }
-                conn.setConnectTimeout(10000);
-                conn.setReadTimeout(10000);
-                
-                int responseCode = conn.getResponseCode();
-                if (responseCode == 200) {
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                    StringBuilder response = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) response.append(line);
+                mainHandler.post(() -> {
+                    if (prices.has("24k")) etGoldPrice24k.setText(decimalFormat.format(prices.optDouble("24k")));
+                    if (prices.has("22k")) etGoldPrice22k.setText(decimalFormat.format(prices.optDouble("22k")));
+                    if (prices.has("21k")) etGoldPrice21k.setText(decimalFormat.format(prices.optDouble("21k")));
+                    if (prices.has("18k")) etGoldPrice18k.setText(decimalFormat.format(prices.optDouble("18k")));
+                    if (prices.has("14k")) etGoldPrice14k.setText(decimalFormat.format(prices.optDouble("14k")));
                     
-                    JSONObject json = new JSONObject(response.toString());
-                    parseAndUpdateGoldPrices(json, provider);
+                    pbGoldLoading.setVisibility(View.GONE);
+                    btnFetchGoldPrice.setEnabled(true);
+                    tvGoldPriceStatus.setText("✅ تم تحديث الأسعار");
+                    tvLastUpdate.setText("آخر تحديث: " + dateFormat.format(new Date()));
+                    updateLivePrices();
                     
-                    mainHandler.post(() -> {
-                        pbGoldLoading.setVisibility(View.GONE);
-                        btnFetchGoldPrice.setEnabled(true);
-                        tvGoldPriceStatus.setText("✅ تم تحديث الأسعار");
-                        tvLastUpdate.setText("آخر تحديث: " + dateFormat.format(new Date()));
-                        updateLivePrices();
-                        Toast.makeText(mContext, "✅ تم جلب أسعار الذهب بنجاح", Toast.LENGTH_SHORT).show();
-                    });
-                } else {
-                    mainHandler.post(() -> {
-                        pbGoldLoading.setVisibility(View.GONE);
-                        btnFetchGoldPrice.setEnabled(true);
-                        tvGoldPriceStatus.setText("❌ فشل جلب الأسعار (Code: " + responseCode + ")");
-                        Toast.makeText(mContext, "❌ فشل الاتصال بمزود الأسعار", Toast.LENGTH_SHORT).show();
-                    });
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error fetching gold prices: " + e.getMessage());
+                    Toast.makeText(mContext, "✅ تم جلب أسعار الذهب بنجاح", Toast.LENGTH_SHORT).show();
+                });
+            } else {
                 mainHandler.post(() -> {
                     pbGoldLoading.setVisibility(View.GONE);
                     btnFetchGoldPrice.setEnabled(true);
-                    tvGoldPriceStatus.setText("❌ خطأ في الاتصال");
-                    Toast.makeText(mContext, "❌ " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    tvGoldPriceStatus.setText("❌ فشل جلب الأسعار");
+                    Toast.makeText(mContext, "❌ " + response.message, Toast.LENGTH_SHORT).show();
                 });
             }
-        });
-    }
+        } catch (Exception e) {
+            Log.e(TAG, "Error fetching gold prices: " + e.getMessage());
+            mainHandler.post(() -> {
+                pbGoldLoading.setVisibility(View.GONE);
+                btnFetchGoldPrice.setEnabled(true);
+                tvGoldPriceStatus.setText("❌ خطأ في الاتصال");
+                Toast.makeText(mContext, "❌ " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            });
+        }
+    });
+}
 
     private void parseAndUpdateGoldPrices(JSONObject json, String provider) {
         try {
@@ -463,34 +444,30 @@ public class MiraGoldCurrencyFragment extends Fragment {
     // 📡 إرسال البيانات للسيرفر
     // ============================================
     private boolean sendToServer(String action, JSONObject payload) {
-        try {
-            String apiUrl = settingsManager.getString("mira_api_url", "https://ams.ibreg.org/wp-json/mira/v1/settings");
-            String apiKey = settingsManager.getString("mira_api_key", "");
-            
-            URL url = new URL(apiUrl);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-            conn.setDoOutput(true);
-            
-            JSONObject requestData = new JSONObject();
-            requestData.put("action", action);
-            requestData.put("data", payload);
-            
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(requestData.toString().getBytes("utf-8"));
-            }
-            
-            int responseCode = conn.getResponseCode();
-            return responseCode == 200;
-        } catch (Exception e) {
-            Log.e(TAG, "Error sending to server: " + e.getMessage());
-            return false;
+    try {
+        com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
+        
+        switch (action) {
+            case "mira_save_gold_settings":
+                com.example.uhf.api.MiraApiClient.ApiResponse goldResponse = client.saveGoldSettings(payload);
+                return goldResponse.isSuccess;
+                
+            case "mira_save_currency_settings":
+                com.example.uhf.api.MiraApiClient.ApiResponse currencyResponse = client.saveCurrencySettings(payload);
+                return currencyResponse.isSuccess;
+                
+            case "mira_save_all_settings":
+                com.example.uhf.api.MiraApiClient.ApiResponse allResponse = client.saveGoldCurrencySettings(payload, null);
+                return allResponse.isSuccess;
+                
+            default:
+                return false;
         }
+    } catch (Exception e) {
+        Log.e(TAG, "Error sending to server: " + e.getMessage());
+        return false;
     }
+}
 
     // ============================================
     // 🔄 تحديث الأسعار المباشرة
@@ -569,41 +546,34 @@ public class MiraGoldCurrencyFragment extends Fragment {
     }
 
     private void loadServerSettings() {
-        executor.execute(() -> {
-            try {
-                String apiUrl = settingsManager.getString("mira_api_url", "https://ams.ibreg.org/wp-json/mira/v1/settings");
-                String apiKey = settingsManager.getString("mira_api_key", "");
+    executor.execute(() -> {
+        try {
+            com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
+            com.example.uhf.api.MiraApiClient.ApiResponse response = client.getGoldCurrencySettings();
+            
+            if (response.isSuccess && response.data != null) {
+                JSONObject data = response.data.optJSONObject("data");
+                if (data == null) data = response.data;
                 
-                URL url = new URL(apiUrl + "?action=get_gold_currency_settings");
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
+                JSONObject goldData = data.optJSONObject("gold");
+                JSONObject currencyData = data.optJSONObject("currency");
                 
-                if (conn.getResponseCode() == 200) {
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                    StringBuilder response = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) response.append(line);
-                    
-                    JSONObject json = new JSONObject(response.toString());
-                    if (json.optBoolean("success")) {
-                        JSONObject data = json.optJSONObject("data");
-                        if (data != null) {
-                            mainHandler.post(() -> {
-                                applyGoldSettings(data.optJSONObject("gold"));
-                                applyCurrencySettings(data.optJSONObject("currency"));
-                                updateLivePrices();
-                            });
-                        }
+                mainHandler.post(() -> {
+                    if (goldData != null) {
+                        applyGoldSettings(goldData);
                     }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading server settings: " + e.getMessage());
+                    if (currencyData != null) {
+                        applyCurrencySettings(currencyData);
+                    }
+                    updateLivePrices();
+                });
             }
-        });
-    }
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading server settings: " + e.getMessage());
+        }
+    });
+}
+
 
     private void applyGoldSettings(JSONObject json) {
         try {
@@ -673,4 +643,4 @@ public class MiraGoldCurrencyFragment extends Fragment {
         super.onDestroy();
         executor.shutdown();
     }
-}
+                }
