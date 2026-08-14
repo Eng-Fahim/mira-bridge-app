@@ -9,13 +9,10 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ProgressBar;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -28,14 +25,8 @@ import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.manager.MiraSettingsManager;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -166,14 +157,12 @@ public class MiraGoldCurrencyFragment extends Fragment {
     }
 
     private void setupSpinners() {
-        // Gold API Providers
         String[] providers = {"metalprice", "goldapi", "metalsdev"};
         ArrayAdapter<String> providerAdapter = new ArrayAdapter<>(mContext, 
             android.R.layout.simple_spinner_item, providers);
         providerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spGoldApiProvider.setAdapter(providerAdapter);
 
-        // Currencies
         String[] currencies = {"USD", "YER", "EGP", "SAR", "AED"};
         ArrayAdapter<String> currencyAdapter = new ArrayAdapter<>(mContext, 
             android.R.layout.simple_spinner_item, currencies);
@@ -188,131 +177,69 @@ public class MiraGoldCurrencyFragment extends Fragment {
         btnSaveGoldSettings.setOnClickListener(v -> saveGoldSettings());
         btnSaveCurrencySettings.setOnClickListener(v -> saveCurrencySettings());
         btnRefreshRates.setOnClickListener(v -> updateLivePrices());
-        
-        // تحديث مباشر عند تغيير القيم
-        View.OnFocusChangeListener focusListener = (v, hasFocus) -> {
-            if (!hasFocus) updateLivePrices();
-        };
-        
-        etGoldPrice24k.setOnFocusChangeListener(focusListener);
-        etMargin24k.setOnFocusChangeListener(focusListener);
-        etMaking24k.setOnFocusChangeListener(focusListener);
-        etExchangeYER.setOnFocusChangeListener(focusListener);
-        etExchangeEGP.setOnFocusChangeListener(focusListener);
-        etExchangeSAR.setOnFocusChangeListener(focusListener);
-        etExchangeAED.setOnFocusChangeListener(focusListener);
     }
 
     // ============================================
     // 💰 جلب أسعار الذهب من API
     // ============================================
     private void fetchGoldPricesFromApi() {
-    String provider = spGoldApiProvider.getSelectedItem().toString();
-    String apiKey = getText(etGoldApiKey);
-    
-    if (apiKey.isEmpty()) {
-        Toast.makeText(mContext, "⚠️ أدخل مفتاح API أولاً", Toast.LENGTH_SHORT).show();
-        return;
-    }
+        String provider = spGoldApiProvider.getSelectedItem().toString();
+        String apiKey = getText(etGoldApiKey);
+        
+        if (apiKey.isEmpty()) {
+            Toast.makeText(mContext, "⚠️ أدخل مفتاح API أولاً", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-    pbGoldLoading.setVisibility(View.VISIBLE);
-    btnFetchGoldPrice.setEnabled(false);
-    tvGoldPriceStatus.setText("⏳ جاري جلب الأسعار...");
-    
-    executor.execute(() -> {
-        try {
-            com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
-            com.example.uhf.api.MiraApiClient.ApiResponse response = client.fetchGoldPrice(provider, apiKey);
-            
-            if (response.isSuccess && response.data != null) {
-                JSONObject data = response.data.optJSONObject("data");
-                if (data == null) data = response.data;
+        pbGoldLoading.setVisibility(View.VISIBLE);
+        btnFetchGoldPrice.setEnabled(false);
+        tvGoldPriceStatus.setText("⏳ جاري جلب الأسعار...");
+        
+        executor.execute(() -> {
+            try {
+                com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
+                com.example.uhf.api.MiraApiClient.ApiResponse response = client.fetchGoldPrice(provider, apiKey);
                 
-                JSONObject prices = data.optJSONObject("prices");
-                if (prices == null) prices = data;
-                
-                mainHandler.post(() -> {
-                    if (prices.has("24k")) etGoldPrice24k.setText(decimalFormat.format(prices.optDouble("24k")));
-                    if (prices.has("22k")) etGoldPrice22k.setText(decimalFormat.format(prices.optDouble("22k")));
-                    if (prices.has("21k")) etGoldPrice21k.setText(decimalFormat.format(prices.optDouble("21k")));
-                    if (prices.has("18k")) etGoldPrice18k.setText(decimalFormat.format(prices.optDouble("18k")));
-                    if (prices.has("14k")) etGoldPrice14k.setText(decimalFormat.format(prices.optDouble("14k")));
+                if (response.isSuccess && response.data != null) {
+                    JSONObject data = response.data.optJSONObject("data");
+                    if (data == null) data = response.data;
                     
+                    JSONObject prices = data.optJSONObject("prices");
+                    if (prices == null) prices = data;
+                    
+                    mainHandler.post(() -> {
+                        if (prices.has("24k")) etGoldPrice24k.setText(decimalFormat.format(prices.optDouble("24k")));
+                        if (prices.has("22k")) etGoldPrice22k.setText(decimalFormat.format(prices.optDouble("22k")));
+                        if (prices.has("21k")) etGoldPrice21k.setText(decimalFormat.format(prices.optDouble("21k")));
+                        if (prices.has("18k")) etGoldPrice18k.setText(decimalFormat.format(prices.optDouble("18k")));
+                        if (prices.has("14k")) etGoldPrice14k.setText(decimalFormat.format(prices.optDouble("14k")));
+                        
+                        pbGoldLoading.setVisibility(View.GONE);
+                        btnFetchGoldPrice.setEnabled(true);
+                        tvGoldPriceStatus.setText("✅ تم تحديث الأسعار");
+                        tvLastUpdate.setText("آخر تحديث: " + dateFormat.format(new Date()));
+                        updateLivePrices();
+                        
+                        Toast.makeText(mContext, "✅ تم جلب أسعار الذهب بنجاح", Toast.LENGTH_SHORT).show();
+                    });
+                } else {
+                    mainHandler.post(() -> {
+                        pbGoldLoading.setVisibility(View.GONE);
+                        btnFetchGoldPrice.setEnabled(true);
+                        tvGoldPriceStatus.setText("❌ فشل جلب الأسعار");
+                        Toast.makeText(mContext, "❌ " + response.message, Toast.LENGTH_SHORT).show();
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error fetching gold prices: " + e.getMessage());
+                mainHandler.post(() -> {
                     pbGoldLoading.setVisibility(View.GONE);
                     btnFetchGoldPrice.setEnabled(true);
-                    tvGoldPriceStatus.setText("✅ تم تحديث الأسعار");
-                    tvLastUpdate.setText("آخر تحديث: " + dateFormat.format(new Date()));
-                    updateLivePrices();
-                    
-                    Toast.makeText(mContext, "✅ تم جلب أسعار الذهب بنجاح", Toast.LENGTH_SHORT).show();
-                });
-            } else {
-                mainHandler.post(() -> {
-                    pbGoldLoading.setVisibility(View.GONE);
-                    btnFetchGoldPrice.setEnabled(true);
-                    tvGoldPriceStatus.setText("❌ فشل جلب الأسعار");
-                    Toast.makeText(mContext, "❌ " + response.message, Toast.LENGTH_SHORT).show();
+                    tvGoldPriceStatus.setText("❌ خطأ في الاتصال");
+                    Toast.makeText(mContext, "❌ " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error fetching gold prices: " + e.getMessage());
-            mainHandler.post(() -> {
-                pbGoldLoading.setVisibility(View.GONE);
-                btnFetchGoldPrice.setEnabled(true);
-                tvGoldPriceStatus.setText("❌ خطأ في الاتصال");
-                Toast.makeText(mContext, "❌ " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            });
-        }
-    });
-}
-
-    private void parseAndUpdateGoldPrices(JSONObject json, String provider) {
-        try {
-            double goldPricePerOunce = 0;
-            
-            switch (provider) {
-                case "metalprice":
-                    JSONObject rates = json.optJSONObject("rates");
-                    if (rates != null) {
-                        goldPricePerOunce = rates.optDouble("XAU", 0);
-                    }
-                    break;
-                case "goldapi":
-                    goldPricePerOunce = json.optDouble("price", 0);
-                    break;
-                case "metalsdev":
-                    JSONArray metals = json.optJSONArray("metals");
-                    if (metals != null && metals.length() > 0) {
-                        JSONObject gold = metals.optJSONObject(0);
-                        if (gold != null) {
-                            goldPricePerOunce = gold.optDouble("price", 0);
-                        }
-                    }
-                    break;
-            }
-            
-            if (goldPricePerOunce <= 0) return;
-            
-            // تحويل من أونصة إلى جرام (1 أونصة = 31.1035 جرام)
-            double goldPricePerGram = goldPricePerOunce / 31.1035;
-            
-            // حساب أسعار العيارات
-            final double price24k = goldPricePerGram;
-            final double price22k = goldPricePerGram * 22 / 24;
-            final double price21k = goldPricePerGram * 21 / 24;
-            final double price18k = goldPricePerGram * 18 / 24;
-            final double price14k = goldPricePerGram * 14 / 24;
-            
-            mainHandler.post(() -> {
-                etGoldPrice24k.setText(decimalFormat.format(price24k));
-                etGoldPrice22k.setText(decimalFormat.format(price22k));
-                etGoldPrice21k.setText(decimalFormat.format(price21k));
-                etGoldPrice18k.setText(decimalFormat.format(price18k));
-                etGoldPrice14k.setText(decimalFormat.format(price14k));
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Error parsing gold prices: " + e.getMessage());
-        }
+        });
     }
 
     // ============================================
@@ -326,14 +253,12 @@ public class MiraGoldCurrencyFragment extends Fragment {
             try {
                 JSONObject payload = new JSONObject();
                 
-                // أسعار الذهب
                 payload.put("gold_price_24k", getDouble(etGoldPrice24k));
                 payload.put("gold_price_22k", getDouble(etGoldPrice22k));
                 payload.put("gold_price_21k", getDouble(etGoldPrice21k));
                 payload.put("gold_price_18k", getDouble(etGoldPrice18k));
                 payload.put("gold_price_14k", getDouble(etGoldPrice14k));
                 
-                // الهوامش
                 payload.put("margin_24k", getDouble(etMargin24k));
                 payload.put("margin_22k", getDouble(etMargin22k));
                 payload.put("margin_21k", getDouble(etMargin21k));
@@ -341,7 +266,6 @@ public class MiraGoldCurrencyFragment extends Fragment {
                 payload.put("margin_14k", getDouble(etMargin14k));
                 payload.put("margin_12k", getDouble(etMargin12k));
                 
-                // المصنعية
                 payload.put("making_24k", getDouble(etMaking24k));
                 payload.put("making_22k", getDouble(etMaking22k));
                 payload.put("making_21k", getDouble(etMaking21k));
@@ -349,26 +273,24 @@ public class MiraGoldCurrencyFragment extends Fragment {
                 payload.put("making_14k", getDouble(etMaking14k));
                 payload.put("making_12k", getDouble(etMaking12k));
                 
-                // إعدادات API
                 payload.put("gold_api_provider", spGoldApiProvider.getSelectedItem().toString());
                 payload.put("gold_api_key", getText(etGoldApiKey));
                 payload.put("gold_default_currency", spGoldCurrency.getSelectedItem().toString());
                 
-                // حفظ محلياً
                 SharedPreferences.Editor editor = prefs.edit();
                 editor.putString("gold_settings", payload.toString());
                 editor.putLong("gold_last_update", System.currentTimeMillis());
                 editor.apply();
                 
-                // إرسال للسيرفر
-                boolean serverSaved = sendToServer("mira_save_gold_settings", payload);
+                com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
+                com.example.uhf.api.MiraApiClient.ApiResponse response = client.saveGoldSettings(payload);
                 
-                final boolean finalServerSaved = serverSaved;
+                final boolean serverSaved = response.isSuccess;
                 mainHandler.post(() -> {
                     pbGoldLoading.setVisibility(View.GONE);
                     btnSaveGoldSettings.setEnabled(true);
-                    if (finalServerSaved) {
-                        Toast.makeText(mContext, "✅ تم حفظ إعدادات الذهب محلياً وعلى السيرفر", Toast.LENGTH_SHORT).show();
+                    if (serverSaved) {
+                        Toast.makeText(mContext, "✅ تم حفظ إعدادات الذهب", Toast.LENGTH_SHORT).show();
                     } else {
                         Toast.makeText(mContext, "⚠️ تم الحفظ محلياً فقط", Toast.LENGTH_SHORT).show();
                     }
@@ -398,32 +320,29 @@ public class MiraGoldCurrencyFragment extends Fragment {
                 payload.put("global_default_currency", spDefaultCurrency.getSelectedItem().toString());
                 payload.put("chart_currency", spChartCurrency.getSelectedItem().toString());
                 
-                // أسعار الصرف الرسمية
                 payload.put("exchange_official_YER", getDouble(etExchangeYER));
                 payload.put("exchange_official_EGP", getDouble(etExchangeEGP));
                 payload.put("exchange_official_SAR", getDouble(etExchangeSAR));
                 payload.put("exchange_official_AED", getDouble(etExchangeAED));
                 
-                // أسعار الصرف السوقية
                 payload.put("exchange_market_YER", getDouble(etExchangeMarketYER));
                 payload.put("exchange_market_EGP", getDouble(etExchangeMarketEGP));
                 payload.put("exchange_market_SAR", getDouble(etExchangeMarketSAR));
                 payload.put("exchange_market_AED", getDouble(etExchangeMarketAED));
                 
-                // حفظ محلياً
                 SharedPreferences.Editor editor = prefs.edit();
                 editor.putString("currency_settings", payload.toString());
                 editor.apply();
                 
-                // إرسال للسيرفر
-                boolean serverSaved = sendToServer("mira_save_currency_settings", payload);
+                com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
+                com.example.uhf.api.MiraApiClient.ApiResponse response = client.saveCurrencySettings(payload);
                 
-                final boolean finalServerSaved = serverSaved;
+                final boolean serverSaved = response.isSuccess;
                 mainHandler.post(() -> {
                     pbCurrencyLoading.setVisibility(View.GONE);
                     btnSaveCurrencySettings.setEnabled(true);
-                    if (finalServerSaved) {
-                        Toast.makeText(mContext, "✅ تم حفظ إعدادات العملات محلياً وعلى السيرفر", Toast.LENGTH_SHORT).show();
+                    if (serverSaved) {
+                        Toast.makeText(mContext, "✅ تم حفظ إعدادات العملات", Toast.LENGTH_SHORT).show();
                     } else {
                         Toast.makeText(mContext, "⚠️ تم الحفظ محلياً فقط", Toast.LENGTH_SHORT).show();
                     }
@@ -439,35 +358,6 @@ public class MiraGoldCurrencyFragment extends Fragment {
             }
         });
     }
-
-    // ============================================
-    // 📡 إرسال البيانات للسيرفر
-    // ============================================
-    private boolean sendToServer(String action, JSONObject payload) {
-    try {
-        com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
-        
-        switch (action) {
-            case "mira_save_gold_settings":
-                com.example.uhf.api.MiraApiClient.ApiResponse goldResponse = client.saveGoldSettings(payload);
-                return goldResponse.isSuccess;
-                
-            case "mira_save_currency_settings":
-                com.example.uhf.api.MiraApiClient.ApiResponse currencyResponse = client.saveCurrencySettings(payload);
-                return currencyResponse.isSuccess;
-                
-            case "mira_save_all_settings":
-                com.example.uhf.api.MiraApiClient.ApiResponse allResponse = client.saveGoldCurrencySettings(payload, null);
-                return allResponse.isSuccess;
-                
-            default:
-                return false;
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "Error sending to server: " + e.getMessage());
-        return false;
-    }
-}
 
     // ============================================
     // 🔄 تحديث الأسعار المباشرة
@@ -546,34 +436,29 @@ public class MiraGoldCurrencyFragment extends Fragment {
     }
 
     private void loadServerSettings() {
-    executor.execute(() -> {
-        try {
-            com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
-            com.example.uhf.api.MiraApiClient.ApiResponse response = client.getGoldCurrencySettings();
-            
-            if (response.isSuccess && response.data != null) {
-                JSONObject data = response.data.optJSONObject("data");
-                if (data == null) data = response.data;
+        executor.execute(() -> {
+            try {
+                com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
+                com.example.uhf.api.MiraApiClient.ApiResponse response = client.getGoldCurrencySettings();
                 
-                JSONObject goldData = data.optJSONObject("gold");
-                JSONObject currencyData = data.optJSONObject("currency");
-                
-                mainHandler.post(() -> {
-                    if (goldData != null) {
-                        applyGoldSettings(goldData);
-                    }
-                    if (currencyData != null) {
-                        applyCurrencySettings(currencyData);
-                    }
-                    updateLivePrices();
-                });
+                if (response.isSuccess && response.data != null) {
+                    JSONObject data = response.data.optJSONObject("data");
+                    if (data == null) data = response.data;
+                    
+                    JSONObject goldData = data.optJSONObject("gold");
+                    JSONObject currencyData = data.optJSONObject("currency");
+                    
+                    mainHandler.post(() -> {
+                        if (goldData != null) applyGoldSettings(goldData);
+                        if (currencyData != null) applyCurrencySettings(currencyData);
+                        updateLivePrices();
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error loading server settings: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading server settings: " + e.getMessage());
-        }
-    });
-}
-
+        });
+    }
 
     private void applyGoldSettings(JSONObject json) {
         try {
@@ -643,4 +528,4 @@ public class MiraGoldCurrencyFragment extends Fragment {
         super.onDestroy();
         executor.shutdown();
     }
-                }
+}
