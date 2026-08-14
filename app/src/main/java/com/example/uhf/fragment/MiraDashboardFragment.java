@@ -52,6 +52,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
     private boolean isArabic;
     private SharedPreferences offlineCache;
+    private SharedPreferences branchPrefs;
     private final StringBuilder debugLog = new StringBuilder();
     private int currentBranchId = -1;
 
@@ -73,6 +74,8 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             orgProfile = MiraOrgProfileManager.getInstance(requireContext());
             isArabic = Locale.getDefault().getLanguage().equals("ar");
 
+            branchPrefs = requireContext().getSharedPreferences("mira_branches_prefs", Context.MODE_PRIVATE);
+
             initViews(view);
             setupListeners();
             updateHeader();
@@ -80,7 +83,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             currentBranchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : -1;
             initBranchCache(currentBranchId);
 
-            // إظهار التحميل الشامل في البداية
             showShimmer(true);
             loadOfflineData();
             fetchData();
@@ -381,26 +383,26 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     @Override
     public void onResume() {
         super.onResume();
-        if (branchesManager != null) {
-            branchesManager.registerListener(this);
-            int latestBranchId = branchesManager.getActiveBranchId();
-            if (latestBranchId != currentBranchId) {
-                onBranchChanged();
-            }
+        if (branchPrefs != null) {
+            branchPrefs.registerOnSharedPreferenceChangeListener(this);
+        }
+        int latestBranchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : -1;
+        if (latestBranchId != currentBranchId) {
+            onBranchChanged();
         }
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        if (branchesManager != null) {
-            branchesManager.unregisterListener(this);
+        if (branchPrefs != null) {
+            branchPrefs.unregisterOnSharedPreferenceChangeListener(this);
         }
     }
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
-        if ("active_branch_id".equals(key) || "active_branch".equals(key)) {
+        if ("active_branch_id".equals(key) || "active_branch".equals(key) || "active_branch_json".equals(key)) {
             mainHandler.post(this::onBranchChanged);
         }
     }
