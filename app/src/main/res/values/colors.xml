@@ -45,6 +45,12 @@
     <color name="deep_gray">#ff3f3f3f</color>
     <color name="text_gray">#ff999999</color>
 
+
+    <color name="status_draft">#757575</color>
+<color name="status_pending">#F57C00</color>
+<color name="status_in_transit">#0288D1</color>
+<color name="status_completed">#388E3C</color>
+
     <color name="red_qian">#cf9191</color>
 
     <color name="sliding_menu_back">#ff2c2c2e</color>
