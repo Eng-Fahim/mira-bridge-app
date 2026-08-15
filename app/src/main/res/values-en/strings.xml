@@ -34,6 +34,16 @@
 <string name="stat_unauthorized">Unauthorized</string>
 <string name="stat_total_scans">Total</string>
 <string name="status_waiting">Waiting for activation...</string>
+    <!-- ==================== Secure Gate Screen ==================== -->
+<string name="manual_scan_title">📝 Manual Entry / Scan</string>
+<string name="hint_manual_epc">Enter item EPC manually...</string>
+<string name="btn_submit">✅ Check</string>
+<string name="btn_scan_camera">📷 Camera</string>
+<string name="simulation_title">🧪 Simulation Mode</string>
+<string name="btn_simulate_pass">✅ Simulate Pass</string>
+<string name="btn_simulate_deny">🚨 Simulate Deny</string>
+<string name="debug_console_title">📋 Event Log</string>
+<string name="btn_stop_alarm">🔕 Stop Alarm</string>
     <!-- DASHBOARD-->
     <string name="greeting_default">Welcome...</string>
 <string name="location_default">Main Showroom — Regional Branch</string>
