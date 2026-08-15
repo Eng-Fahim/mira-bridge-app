@@ -2,7 +2,6 @@ package com.example.uhf.fragment;
 
 import android.content.Context;
 import android.graphics.Color;
-import android.media.SoundPool;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -28,6 +27,7 @@ import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.manager.MiraGatesSettings;
 import com.example.uhf.manager.MiraGatesSettingsManager;
+import com.example.uhf.tools.SoundGenerator;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
@@ -57,13 +57,10 @@ public class MiraSecureGateFragment extends Fragment {
 
     private UHFMainActivity mContext;
     private MiraGatesSettingsManager settingsManager;
-    private MiraGatesSettings MiraGatesSettings; // ✅ جديد
+    private MiraGatesSettings MiraGatesSettings;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService gateExecutor = Executors.newFixedThreadPool(4);
     private ScheduledExecutorService dbSyncScheduler;
-
-    // ✅ SoundPool مخصص للأصوات القابلة للتخصيص
-    private SoundPool customSoundPool;
 
     // عناصر الواجهة
     private TextView tvGateIcon, tvGateStatus, tvLastEvent, tvDebugConsole;
@@ -72,7 +69,8 @@ public class MiraSecureGateFragment extends Fragment {
     private EditText etManualEpc;
     private View statusIndicator;
     private FrameLayout overlayAlarm;
-    private Button btnArmGate, btnDisarmGate, btnSubmitManual, btnScanBarcode, btnSimulateAllowed, btnSimulateDenied, btnStopAlarm;
+    private Button btnArmGate, btnDisarmGate, btnSubmitManual, btnScanBarcode;
+    private Button btnSimulateAllowed, btnSimulateDenied, btnStopAlarm;
     private ScrollView scrollDebugLog;
 
     // حالة البوابة والعدادات
@@ -88,7 +86,7 @@ public class MiraSecureGateFragment extends Fragment {
     private Runnable flashRunnable;
     private Runnable soundLoopRunnable;
 
-    // Cache الذاكرة السريعة
+    // Cache الذاكرة السريعة لمنع التأخير
     private final Set<String> localAllowedEpcCache = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<String, Long> scanDebounceMap = new ConcurrentHashMap<>();
     private static final long SCAN_COOL_DOWN_MS = 2500;
@@ -120,7 +118,7 @@ public class MiraSecureGateFragment extends Fragment {
         if (getActivity() instanceof UHFMainActivity) {
             mContext = (UHFMainActivity) getActivity();
             settingsManager = MiraGatesSettingsManager.getInstance(mContext);
-            MiraGatesSettings = MiraGatesSettings.getInstance(mContext); // ✅ جديد
+            MiraGatesSettings = MiraGatesSettings.getInstance(mContext);
             vibrator = (Vibrator) mContext.getSystemService(Context.VIBRATOR_SERVICE);
         }
 
@@ -385,7 +383,7 @@ public class MiraSecureGateFragment extends Fragment {
             logConsole("✅ قرار البوابة: PASS - " + itemTitle);
 
             // ✅ استخدام صوت النجاح المخصص من الإعدادات
-            playCustomSound(MiraGatesSettings.getSoundPass());
+            SoundGenerator.playSound(MiraGatesSettings.getSoundPass());
 
             mainHandler.removeCallbacks(resetUIRunnable);
             mainHandler.postDelayed(resetUIRunnable, 3000);
@@ -406,11 +404,13 @@ public class MiraSecureGateFragment extends Fragment {
         }
     }
 
-    // 🚨 تفعيل وميض الشاشة والصوت والاهتزاز حسب الإعدادات
+    /**
+     * 🚨 تفعيل وميض الشاشة والصوت والاهتزاز حسب الإعدادات المخصصة
+     */
     private void triggerAlarmEffects(String itemTitle, String serial) {
         isAlarmActive = true;
 
-        // ✅ استخدام وميض الشاشة فقط إذا مفعل
+        // ✅ استخدام وميض الشاشة فقط إذا مفعل في الإعدادات
         if (MiraGatesSettings.isFlashEnabled() && overlayAlarm != null) {
             tvOverlayTitle.setText("🚨 " + itemTitle);
             tvOverlayDetails.setText("رقم القطعة / Serial: " + serial);
@@ -428,14 +428,14 @@ public class MiraSecureGateFragment extends Fragment {
             flashHandler.post(flashRunnable);
         }
 
-        // ✅ استخدام صوت الإنذار المخصص ومدة الإنذار المخصصة
+        // ✅ استخدام الصوت المخصص + الاهتزاز + مدة الإنذار من الإعدادات
         soundLoopRunnable = new Runnable() {
             @Override
             public void run() {
                 if (!isAlarmActive) return;
                 
-                // تشغيل الصوت المخصص
-                playCustomSound(MiraGatesSettings.getSoundAlarm());
+                // تشغيل الصوت المخصص - آمن تماماً مع SingleThreadExecutor
+                SoundGenerator.playSound(MiraGatesSettings.getSoundAlarm());
                 
                 // الاهتزاز حسب الإعدادات
                 if (MiraGatesSettings.isVibrationEnabled() && vibrator != null && vibrator.hasVibrator()) {
@@ -452,31 +452,8 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     /**
-     * ✅ تشغيل صوت مخصص من الإعدادات
+     * 🔕 إيقاف مؤثرات الإنذار
      */
-    private void playCustomSound(String soundName) {
-        try {
-            if (soundName == null || soundName.equals("silent") || mContext == null) return;
-            
-            int soundResourceId = MiraGatesSettings.SoundOptions.getSoundResourceId(mContext, soundName);
-            if (soundResourceId <= 0) return;
-            
-            if (customSoundPool == null) {
-                customSoundPool = new SoundPool.Builder().setMaxStreams(5).build();
-            }
-            
-            int soundId = customSoundPool.load(mContext, soundResourceId, 1);
-            customSoundPool.setOnLoadCompleteListener((pool, sampleId, status) -> {
-                if (status == 0) {
-                    pool.play(sampleId, 1.0f, 1.0f, 1, 0, 1.0f);
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "playCustomSound error: " + e.getMessage());
-        }
-    }
-
-    // 🔕 إيقاف مؤثرات الإنذار
     private void stopAlarmEffects() {
         isAlarmActive = false;
         flashHandler.removeCallbacks(flashRunnable);
@@ -607,10 +584,5 @@ public class MiraSecureGateFragment extends Fragment {
         }
         stopRealtimeDbSync();
         gateExecutor.shutdown();
-        
-        if (customSoundPool != null) {
-            customSoundPool.release();
-            customSoundPool = null;
-        }
     }
-            }
+}
