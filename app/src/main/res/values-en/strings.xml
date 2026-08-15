@@ -1574,4 +1574,38 @@
     <string name="about_description">MIRA Bridge™ is the official application for the MIRA ID Jewelry Management and Smart Security Gate System.\n\nSupports:\n• UHF RFID Scanning\n• QR/GS1 DataMatrix Camera\n• Radar Positioning\n• MIRA Secure Gate™\n• Integration with MIRA ID Cloud</string>
     <string name="about_developer">MIRA Technology © 2026</string>
     <string name="about_website">https://ams.ibreg.org</string>
+    
+    
+    <!-- Gate Settings -->
+    <string name="gate_settings_title">🏢 Security Gates Management</string>
+    <string name="add_gate">➕ Add New Gate</string>
+    <string name="sound_settings">🔊 Sound Settings</string>
+    <string name="sound_pass">✅ Pass Sound:</string>
+    <string name="sound_deny">❌ Deny Sound:</string>
+    <string name="sound_alarm">🚨 Alarm Sound:</string>
+    <string name="test_sound">🔊 Test Sound</string>
+    <string name="save_sounds">💾 Save Sounds</string>
+    <string name="additional_settings">⚙️ Additional Settings</string>
+    <string name="vibration_enabled">📳 Vibration on Alarm:</string>
+    <string name="flash_enabled">💡 Screen Flash:</string>
+    <string name="alarm_duration_label">⏱ Alarm Duration (seconds):</string>
+    <string name="rfid_power_label">📡 RFID Power (dBm):</string>
+    <string name="save_all">💾 Save All Settings</string>
+    
+    <!-- Sound Names -->
+    <string name="sound_beep_success">🔔 Short Success</string>
+    <string name="sound_beep_soft">🔔 Soft Beep</string>
+    <string name="sound_beep_double">🔔 Double Beep</string>
+    <string name="sound_chime_elegant">🎵 Elegant Chime</string>
+    <string name="sound_silent">🔇 Silent</string>
+    <string name="sound_beep_warning">⚠️ Warning</string>
+    <string name="sound_beep_error">❌ Error</string>
+    <string name="sound_alarm_soft">🚨 Soft Alarm</string>
+    <string name="sound_buzz_double">📳 Double Buzz</string>
+    <string name="sound_alarm_sold_item">🚨 Sold Item Alarm</string>
+    <string name="sound_alarm_breach_security">🚨 Security Breach</string>
+    <string name="sound_alarm_siren_strong">🚨 Strong Siren</string>
+    <string name="sound_alarm_police">🚨 Police Siren</string>
+    <string name="sound_alarm_buzzer_loud">🚨 Loud Buzzer</string>
+    <string name="sound_alarm_klaxon">🚨 Klaxon</string>
 </resources>
