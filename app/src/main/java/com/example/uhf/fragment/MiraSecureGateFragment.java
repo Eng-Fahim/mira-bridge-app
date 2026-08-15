@@ -26,7 +26,7 @@ import androidx.fragment.app.Fragment;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.manager.MiraGatesSettings;
-import com.example.uhf.manager.MiraGatesSettingsManager;
+import com.example.uhf.manager.MiraSettingsManager;
 import com.example.uhf.tools.SoundGenerator;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
@@ -56,8 +56,8 @@ public class MiraSecureGateFragment extends Fragment {
     private static final String TAG = "MiraSecureGate";
 
     private UHFMainActivity mContext;
-    private MiraGatesSettingsManager settingsManager;
-    private MiraGatesSettings MiraGatesSettings;
+    private MiraSettingsManager settingsManager;
+    private MiraGatesSettings miraGatesSettings;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService gateExecutor = Executors.newFixedThreadPool(4);
     private ScheduledExecutorService dbSyncScheduler;
@@ -117,8 +117,8 @@ public class MiraSecureGateFragment extends Fragment {
 
         if (getActivity() instanceof UHFMainActivity) {
             mContext = (UHFMainActivity) getActivity();
-            settingsManager = MiraGatesSettingsManager.getInstance(mContext);
-            MiraGatesSettings = MiraGatesSettings.getInstance(mContext);
+            settingsManager = MiraSettingsManager.getInstance(mContext);
+            miraGatesSettings = MiraGatesSettings.getInstance(mContext);
             vibrator = (Vibrator) mContext.getSystemService(Context.VIBRATOR_SERVICE);
         }
 
@@ -127,8 +127,8 @@ public class MiraSecureGateFragment extends Fragment {
         updateUI();
 
         logConsole("🚀 تم تشغيل MIRA Secure Gate™");
-        logConsole("🔊 صوت الإنذار: " + MiraGatesSettings.getSoundAlarm());
-        logConsole("📡 قوة RFID: " + MiraGatesSettings.getRfidPower() + " dBm");
+        logConsole("🔊 صوت الإنذار: " + miraGatesSettings.getSoundAlarm());
+        logConsole("📡 قوة RFID: " + miraGatesSettings.getRfidPower() + " dBm");
     }
 
     private void initViews(View view) {
@@ -234,7 +234,7 @@ public class MiraSecureGateFragment extends Fragment {
         if (mContext != null && mContext.mReader != null) {
             try {
                 // ✅ استخدام قوة RFID من الإعدادات
-                int rfidPower = MiraGatesSettings.getRfidPower();
+                int rfidPower = miraGatesSettings.getRfidPower();
                 mContext.mReader.setPower(rfidPower);
                 logConsole("📡 قوة RFID: " + rfidPower + " dBm");
                 
@@ -383,7 +383,7 @@ public class MiraSecureGateFragment extends Fragment {
             logConsole("✅ قرار البوابة: PASS - " + itemTitle);
 
             // ✅ استخدام صوت النجاح المخصص من الإعدادات
-            SoundGenerator.playSound(MiraGatesSettings.getSoundPass());
+            SoundGenerator.playSound(miraGatesSettings.getSoundPass());
 
             mainHandler.removeCallbacks(resetUIRunnable);
             mainHandler.postDelayed(resetUIRunnable, 3000);
@@ -411,7 +411,7 @@ public class MiraSecureGateFragment extends Fragment {
         isAlarmActive = true;
 
         // ✅ استخدام وميض الشاشة فقط إذا مفعل في الإعدادات
-        if (MiraGatesSettings.isFlashEnabled() && overlayAlarm != null) {
+        if (miraGatesSettings.isFlashEnabled() && overlayAlarm != null) {
             tvOverlayTitle.setText("🚨 " + itemTitle);
             tvOverlayDetails.setText("رقم القطعة / Serial: " + serial);
             overlayAlarm.setVisibility(View.VISIBLE);
@@ -435,16 +435,16 @@ public class MiraSecureGateFragment extends Fragment {
                 if (!isAlarmActive) return;
                 
                 // تشغيل الصوت المخصص - آمن تماماً مع SingleThreadExecutor
-                SoundGenerator.playSound(MiraGatesSettings.getSoundAlarm());
+                SoundGenerator.playSound(miraGatesSettings.getSoundAlarm());
                 
                 // الاهتزاز حسب الإعدادات
-                if (MiraGatesSettings.isVibrationEnabled() && vibrator != null && vibrator.hasVibrator()) {
+                if (miraGatesSettings.isVibrationEnabled() && vibrator != null && vibrator.hasVibrator()) {
                     long[] pattern = {0, 400, 200, 400};
                     vibrator.vibrate(pattern, -1);
                 }
                 
                 // استخدام فترة الإنذار المخصصة
-                int alarmInterval = MiraGatesSettings.getAlarmInterval();
+                int alarmInterval = miraGatesSettings.getAlarmInterval();
                 flashHandler.postDelayed(this, alarmInterval);
             }
         };
