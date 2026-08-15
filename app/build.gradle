@@ -46,9 +46,8 @@ android {
     }
 
     buildFeatures {
-        viewBinding true
+        viewBinding false
         buildConfig true
-        dataBinding true  // ✅ تأكد من وجود هذا
     }
 
     compileOptions {
@@ -59,19 +58,6 @@ android {
     lintOptions {
         checkReleaseBuilds false
         abortOnError false
-    }
-
-    // ✅ إضافة استثناءات Data Binding لملفات drawable
-    sourceSets {
-        main {
-            res {
-                exclude 'drawable/splash_background_gradient.xml'
-                exclude 'drawable/circle_glow.xml'
-                exclude 'drawable/gold_divider.xml'
-                exclude 'drawable/particles_top.xml'
-                exclude 'drawable/particles_bottom.xml'
-            }
-        }
     }
 }
 
