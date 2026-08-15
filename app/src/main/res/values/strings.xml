@@ -133,6 +133,17 @@
     <string name="stat_unauthorized">غير مصرح</string>
     <string name="stat_total_scans">الإجمالي</string>
     <string name="status_waiting">في انتظار التفعيل...</string>
+    
+    <!-- ==================== نصوص شاشة البوابة الأمنية - ناقصة ==================== -->
+<string name="manual_scan_title">📝 إدخال يدوي / مسح</string>
+<string name="hint_manual_epc">أدخل رقم القطعة (EPC) يدوياً...</string>
+<string name="btn_submit">✅ فحص</string>
+<string name="btn_scan_camera">📷 كاميرا</string>
+<string name="simulation_title">🧪 وضع المحاكاة</string>
+<string name="btn_simulate_pass">✅ محاكاة مسموح</string>
+<string name="btn_simulate_deny">🚨 محاكاة مرفوض</string>
+<string name="debug_console_title">📋 سجل الأحداث</string>
+<string name="btn_stop_alarm">🔕 إيقاف الإنذار</string>
 
 
 
@@ -1817,5 +1828,8 @@
     <string name="sound_alarm_police">🚨 صفارة شرطة</string>
     <string name="sound_alarm_buzzer_loud">🚨 طنين عالي</string>
     <string name="sound_alarm_klaxon">🚨 كلوكسون</string>
+    
+    
+    
 
 </resources>
