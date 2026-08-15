@@ -40,7 +40,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -77,7 +76,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     // Fast Data Structures (Offline-First Architecture)
     private final Set<String> scannedEpcSet = Collections.synchronizedSet(new HashSet<>());
     private final Map<String, InventoryItem> localCatalog = new ConcurrentHashMap<>();
-    private final List<InventoryItem> scannedItems = new ArrayList<>();
+    private final List<InventoryItem> scannedItems = Collections.synchronizedList(new ArrayList<>());
     private InventoryAdapter adapter;
 
     // Managers & Clients
@@ -89,7 +88,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     // Handlers & Batched UI Updates
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Runnable timerRunnable;
-    private Runnable uiUpdateRunnable;
     private boolean pendingUiUpdate = false;
 
     // Hardware Audio/Haptic Settings
@@ -129,7 +127,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         loadInventorySettings();
         updateBranchHeader();
         loadLastSnapshotOffline();
-        preloadBranchCatalog(); // جلب الكتالوج محلياً للتحقق السريع O(1)
+        preloadBranchCatalog();
     }
 
     @Override
@@ -257,14 +255,18 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     // ==================== HIGH-SPEED TAG PROCESSING ====================
 
     /**
-     * القارئ ينادي هذه الدالة بسرعة تصل إلى 200 قراءة/ثانية
+     * القارئ ينادي هذه الدالة بسرعة تصل إلى 200 قراءة/ثانية (دعم للـ int و String للـ RSSI)
      */
+    public void processScannedTag(String epcOrGtin, int rssi) {
+        processScannedTag(epcOrGtin, String.valueOf(rssi));
+    }
+
     public void processScannedTag(String epcOrGtin, String rssi) {
         if (!isScanning || epcOrGtin == null || epcOrGtin.trim().isEmpty()) return;
 
-        final String cleanCode = parseEpcToGtin(epcOrGtin.trim().toUpperCase());
+        final String cleanCode = epcOrGtin.trim().toUpperCase();
 
-        // 1. منع التكرار الفوري O(1) دون إغلاق الواجهة
+        // 1. منع التكرار الفوري O(1)
         if (!scannedEpcSet.add(cleanCode)) return;
 
         // 2. المطابقة الفورية من الذاكرة (Local In-Memory Lookup)
@@ -279,29 +281,22 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
         InventoryItem newItem = new InventoryItem(cleanCode, title, karat, weight, status, location);
 
-        synchronized (scannedItems) {
-            scannedItems.add(0, newItem);
-        }
+        scannedItems.add(0, newItem);
 
         scannedCount++;
         if ("✓".equals(status)) foundCount++;
 
         playInventorySound("scan");
 
-        // 3. تحديث الواجهة المجمع (Batched UI Updating) لتفادي التعليق
+        // 3. تحديث الواجهة المجمع (Batched UI Updating)
         scheduleUiUpdate(cleanCode, rssi);
-    }
-
-    private String parseEpcToGtin(String epcHex) {
-        // إذا كان الترميز SGTIN-96 يمكن فك الشفرة هنا، أو إرجاع الكود كما هو إذا كان Plain Text
-        return epcHex;
     }
 
     private void scheduleUiUpdate(String lastSerial, String rssi) {
         if (pendingUiUpdate) return;
         pendingUiUpdate = true;
 
-        mainHandler.postDelayed(uiUpdateRunnable = () -> {
+        mainHandler.postDelayed(() -> {
             pendingUiUpdate = false;
             if (!isScanning && !isAdded()) return;
 
@@ -309,11 +304,15 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             if (rvInventoryItems != null && !scannedItems.isEmpty()) rvInventoryItems.scrollToPosition(0);
 
             if (tvScannedCount != null) tvScannedCount.setText(String.valueOf(scannedCount));
-            if (tvVariance != null) tvVariance.setText(String.valueOf(Math.max(0, expectedCount - foundCount)));
+            
+            // ✅ تصحيح العجز: إظهار القطع المتبقية مسحها أثناء الجرد
+            int remaining = Math.max(0, expectedCount - foundCount);
+            if (tvVariance != null) tvVariance.setText(String.valueOf(remaining));
+            
             if (tvLastScan != null && lastSerial != null) {
                 tvLastScan.setText(lastSerial.substring(0, Math.min(14, lastSerial.length())));
             }
-            if (tvRssi != null && rssi != null) tvRssi.setText(rssi);
+            if (tvRssi != null && rssi != null) tvRssi.setText(rssi + " dBm");
 
             if (progressScanned != null && expectedCount > 0) {
                 progressScanned.setProgress(Math.min(100, (int) ((scannedCount * 100.0) / expectedCount)));
@@ -325,7 +324,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             }
 
             updateComparisonCard();
-        }, 200); // تحديث كل 200 ملي ثانية لضمان انسيابية الواجهة
+        }, 200);
     }
 
     // ==================== BATCH SYNC AT SESSION END ====================
@@ -345,10 +344,14 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }
 
         stopTimer();
+        
+        // ✅ حساب العجز النهائي الفعلي بعد إيقاف الجرد
         varianceCount = Math.max(0, expectedCount - foundCount);
+        if (tvVariance != null) tvVariance.setText(String.valueOf(varianceCount));
+        
         updateComparisonCard();
 
-        // إرسال كشوفات الجرد دفعة واحدة (Batch Processing) لتفادي اختناق الشبكة
+        // إرسال كشوفات الجرد دفعة واحدة (Batch Processing)
         syncFullInventorySession();
     }
 
@@ -384,7 +387,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                 }
                 payload.put("items", itemsJson);
 
-                // حفظ نسخة احتياطية محلياً
                 if (offlineCache != null) {
                     offlineCache.edit()
                         .putString("last_snapshot", payload.toString())
@@ -393,7 +395,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                         .apply();
                 }
 
-                // إرسال الطلب المجمع للسيرفر
                 apiClient.closeInventorySession(payload);
 
             } catch (Exception e) {
@@ -409,12 +410,13 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         isScanning = true;
         startTime = System.currentTimeMillis();
 
+        // ✅ إعادة ضبط العدادات بالكامل لمنع التداخل بين الجلسات
         scannedEpcSet.clear();
-        synchronized (scannedItems) {
-            scannedItems.clear();
-        }
+        scannedItems.clear();
         scannedCount = 0;
         foundCount = 0;
+        varianceCount = 0;
+
         if (adapter != null) adapter.notifyDataSetChanged();
 
         if (btnStartInventory != null) btnStartInventory.setEnabled(false);
@@ -471,7 +473,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private double calculateTotalValue() {
-        // جلب أسعار عيارات الذهب الحقيقية إن وجدت، وإلا حسابها بالقيمة التقديرية
         return Math.round(calculateTotalWeight() * 65.0 * 100.0) / 100.0;
     }
 
