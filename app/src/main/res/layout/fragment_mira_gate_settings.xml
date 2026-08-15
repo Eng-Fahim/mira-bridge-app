@@ -3,8 +3,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorBackground"
+    android:background="?android:attr/colorBackground"
     android:fillViewport="true">
+
+    
+    
+    
+
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -248,13 +253,13 @@
             app:boxCornerRadiusBottomEnd="8dp">
 
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etAlarmDuration"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="number"
-                android:hint="10"
-                android:textColor="?attr/colorOnSurface"
-                android:hintTextColor="?attr/colorOnSurfaceVariant"/>
+    android:id="@+id/etAlarmDuration"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:inputType="number"
+    android:hint="10"
+    android:textColor="?attr/colorOnSurface"/>
+    
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- قوة RFID -->
