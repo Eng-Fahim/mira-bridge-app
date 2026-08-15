@@ -46,15 +46,23 @@ public class MiraPriceManager {
         loadFromServer();
     }
 
-    /**
-     * الحصول على النسخة الوحيدة
-     */
-    public static synchronized MiraPriceManager getInstance(Context context) {
-        if (instance == null) {
-            instance = new MiraPriceManager(context);
-        }
-        return instance;
+   /**
+ * الحصول على النسخة الوحيدة
+ */
+public static synchronized MiraPriceManager getInstance(Context context) {
+    if (instance == null) {
+        instance = new MiraPriceManager(context);
     }
+    return instance;
+}
+
+// ✅ أضف هذه الدالة هنا
+/**
+ * تحديث فوري من السيرفر
+ */
+public void refreshNow() {
+    loadFromServer();
+}
 
     // ============================================
     // 💰 دوال أسعار الذهب
