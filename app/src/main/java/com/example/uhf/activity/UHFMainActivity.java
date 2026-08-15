@@ -311,60 +311,67 @@ private void hideKeyboard(View view) {
     // ==================== TOP TABS MANAGEMENT ====================
 
     private void setupTopTabs() {
-        if (sessionManager == null) return;
+    if (sessionManager == null) return;
 
-        SessionManager.Role role = sessionManager.getUserRole();
-        String roleStr = sessionManager.getRoleString();
-        boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
-        boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
-        boolean isAdmin = (role == SessionManager.Role.ADMIN) || "ADMIN".equals(roleStr);
-        boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
-        boolean isAnyAdmin = isSystemAdmin || isOrgAdmin || isAdmin;
-        boolean isManager = isAnyAdmin || isBranchManager;
-        boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
+    SessionManager.Role role = sessionManager.getUserRole();
+    String roleStr = sessionManager.getRoleString();
+    boolean isSystemAdmin = (role == SessionManager.Role.SYSTEM_ADMIN);
+    boolean isOrgAdmin = (role == SessionManager.Role.ORG_ADMIN);
+    boolean isAdmin = (role == SessionManager.Role.ADMIN) || "ADMIN".equals(roleStr);
+    boolean isBranchManager = (role == SessionManager.Role.BRANCH_MANAGER);
+    boolean isAnyAdmin = isSystemAdmin || isOrgAdmin || isAdmin;
+    boolean isManager = isAnyAdmin || isBranchManager;
+    boolean isInventoryMgr = (role == SessionManager.Role.INVENTORY_MGR);
 
-        setTopTabVisibility(R.id.tabTopSettings, isManager || isInventoryMgr);
-        setTopTabVisibility(R.id.tabTopIdentity, isManager || isInventoryMgr);
-        setTopTabVisibility(R.id.tabTopTransfers, isManager || isInventoryMgr);
-        setTopTabVisibility(R.id.tabTopBranches, isManager);
-        setTopTabVisibility(R.id.tabTopUsers, isAnyAdmin || isBranchManager);
-        setTopTabVisibility(R.id.tabTopRfid, isManager || isInventoryMgr);
-        setTopTabVisibility(R.id.tabTopReader, isManager || isInventoryMgr);
+    setTopTabVisibility(R.id.tabTopSettings, isManager || isInventoryMgr);
+    setTopTabVisibility(R.id.tabTopIdentity, isManager || isInventoryMgr);
+    setTopTabVisibility(R.id.tabTopTransfers, isManager || isInventoryMgr);
+    setTopTabVisibility(R.id.tabTopBranches, isManager);
+    setTopTabVisibility(R.id.tabTopUsers, isAnyAdmin || isBranchManager);
+    setTopTabVisibility(R.id.tabTopRfid, isManager || isInventoryMgr);
+    setTopTabVisibility(R.id.tabTopReader, isManager || isInventoryMgr);
+    // ✅ جديد - تبويب الذهب
+    setTopTabVisibility(R.id.tabTopGold, isManager || isInventoryMgr);
 
-        updateTopTabsContainerVisibility();
+    updateTopTabsContainerVisibility();
 
-        setupTopTab(R.id.tabTopSettings, "Settings");
-        setupTopTab(R.id.tabTopIdentity, "IdentityStudio");
-        setupTopTab(R.id.tabTopTransfers, "Transfers");
-        setupTopTab(R.id.tabTopBranches, "BranchesManagement");
-        setupTopTab(R.id.tabTopUsers, "UsersManagement");
-        setupTopTab(R.id.tabTopRfid, "ReadWrite");
-        setupTopTab(R.id.tabTopReader, "ReaderSetup");
-    }
+    setupTopTab(R.id.tabTopSettings, "Settings");
+    setupTopTab(R.id.tabTopIdentity, "IdentityStudio");
+    setupTopTab(R.id.tabTopTransfers, "Transfers");
+    setupTopTab(R.id.tabTopBranches, "BranchesManagement");
+    setupTopTab(R.id.tabTopUsers, "UsersManagement");
+    setupTopTab(R.id.tabTopRfid, "ReadWrite");
+    setupTopTab(R.id.tabTopReader, "ReaderSetup");
+    // ✅ جديد - تبويب الذهب
+    setupTopTab(R.id.tabTopGold, "Gold");
+}
 
     private void updateTopTabsContainerVisibility() {
-        View container = findViewById(R.id.topTabsContainer);
-        if (container == null) return;
+    View container = findViewById(R.id.topTabsContainer);
+    if (container == null) return;
 
-        boolean anyVisible = false;
-        int[] tabIds = {R.id.tabTopSettings, R.id.tabTopIdentity, R.id.tabTopTransfers,
-                R.id.tabTopBranches, R.id.tabTopUsers, R.id.tabTopRfid};
+    boolean anyVisible = false;
+    int[] tabIds = {
+        R.id.tabTopSettings, R.id.tabTopIdentity, R.id.tabTopTransfers,
+        R.id.tabTopBranches, R.id.tabTopUsers, R.id.tabTopRfid,
+        R.id.tabTopReader, R.id.tabTopGold  // ✅ جديد
+    };
 
-        for (int id : tabIds) {
-            View tab = findViewById(id);
-            if (tab != null && tab.getVisibility() == View.VISIBLE) {
-                anyVisible = true;
-                break;
-            }
-        }
-
-        ViewParent parentView = container.getParent();
-        if (parentView instanceof View) {
-            ((View) parentView).setVisibility(anyVisible ? View.VISIBLE : View.GONE);
-        } else {
-            container.setVisibility(anyVisible ? View.VISIBLE : View.GONE);
+    for (int id : tabIds) {
+        View tab = findViewById(id);
+        if (tab != null && tab.getVisibility() == View.VISIBLE) {
+            anyVisible = true;
+            break;
         }
     }
+
+    ViewParent parentView = container.getParent();
+    if (parentView instanceof View) {
+        ((View) parentView).setVisibility(anyVisible ? View.VISIBLE : View.GONE);
+    } else {
+        container.setVisibility(anyVisible ? View.VISIBLE : View.GONE);
+    }
+}
 
     private void setTopTabVisibility(int tabId, boolean visible) {
         View tab = findViewById(tabId);
@@ -535,29 +542,30 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
     }
 
     private void updateDynamicUIStrings() {
-        try {
-            BottomNavigationView quickNav = findViewById(R.id.bottomQuickNav);
-            if (quickNav != null && quickNav.getMenu() != null) {
-                Menu menu = quickNav.getMenu();
-                setMenuItemTitle(menu, R.id.nav_quick_dashboard, isArabic ? "الرئيسية" : "Home");
-                setMenuItemTitle(menu, R.id.nav_quick_menu, isArabic ? "إجراءات" : "Actions");
-                setMenuItemTitle(menu, R.id.nav_quick_inventory, isArabic ? "الجرد" : "Inventory");
-                setMenuItemTitle(menu, R.id.nav_quick_pos, isArabic ? "البيع" : "POS");
-            }
-
-            setTopTabLabel(R.id.tabTopSettings, isArabic ? "⚙️ الإعدادات" : "⚙️ Settings");
-            
-            setTopTabLabel(R.id.tabTopIdentity, isArabic ? "🆔 التكويد" : "🆔 Identity");
-            setTopTabLabel(R.id.tabTopTransfers, isArabic ? "📦 التحويلات" : "📦 Transfers");
-            setTopTabLabel(R.id.tabTopBranches, isArabic ? "🏢 الفروع" : "🏢 Branches");
-            setTopTabLabel(R.id.tabTopUsers, isArabic ? "👥 المستخدمين" : "👥 Users");
-            setTopTabLabel(R.id.tabTopRfid, isArabic ? "🔧 RFID" : "🔧 RFID");
-            setTopTabLabel(R.id.tabTopReader, isArabic ? "🔌 القارئ" : "🔌 Reader");
-
-        } catch (Exception e) {
-            Log.e(TAG, "Dynamic UI Translation Error: " + e.getMessage());
+    try {
+        BottomNavigationView quickNav = findViewById(R.id.bottomQuickNav);
+        if (quickNav != null && quickNav.getMenu() != null) {
+            Menu menu = quickNav.getMenu();
+            setMenuItemTitle(menu, R.id.nav_quick_dashboard, isArabic ? "الرئيسية" : "Home");
+            setMenuItemTitle(menu, R.id.nav_quick_menu, isArabic ? "إجراءات" : "Actions");
+            setMenuItemTitle(menu, R.id.nav_quick_inventory, isArabic ? "الجرد" : "Inventory");
+            setMenuItemTitle(menu, R.id.nav_quick_pos, isArabic ? "البيع" : "POS");
         }
+
+        setTopTabLabel(R.id.tabTopSettings, isArabic ? "⚙️ الإعدادات" : "⚙️ Settings");
+        setTopTabLabel(R.id.tabTopIdentity, isArabic ? "🆔 التكويد" : "🆔 Identity");
+        setTopTabLabel(R.id.tabTopTransfers, isArabic ? "📦 التحويلات" : "📦 Transfers");
+        setTopTabLabel(R.id.tabTopBranches, isArabic ? "🏢 الفروع" : "🏢 Branches");
+        setTopTabLabel(R.id.tabTopUsers, isArabic ? "👥 المستخدمين" : "👥 Users");
+        setTopTabLabel(R.id.tabTopRfid, isArabic ? "🔧 RFID" : "🔧 RFID");
+        setTopTabLabel(R.id.tabTopReader, isArabic ? "🔌 القارئ" : "🔌 Reader");
+        // ✅ جديد
+        setTopTabLabel(R.id.tabTopGold, isArabic ? "💰 الذهب" : "💰 Gold");
+
+    } catch (Exception e) {
+        Log.e(TAG, "Dynamic UI Translation Error: " + e.getMessage());
     }
+}
 
     private void setMenuItemTitle(Menu menu, int itemId, String title) {
         MenuItem item = menu.findItem(itemId);
@@ -1101,4 +1109,4 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
             Log.e(TAG, errorMessage + ": " + e.getMessage());
         }
     }
-                }
+        }
