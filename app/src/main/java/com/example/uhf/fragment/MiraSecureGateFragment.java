@@ -2,6 +2,7 @@ package com.example.uhf.fragment;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.media.SoundPool;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -25,7 +26,8 @@ import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
-import com.example.uhf.manager.MiraSettingsManager;
+import com.example.uhf.manager.MiraGatesSettings;
+import com.example.uhf.manager.MiraGatesSettingsManager;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
@@ -54,10 +56,14 @@ public class MiraSecureGateFragment extends Fragment {
     private static final String TAG = "MiraSecureGate";
 
     private UHFMainActivity mContext;
-    private MiraSettingsManager settingsManager;
+    private MiraGatesSettingsManager settingsManager;
+    private MiraGatesSettings MiraGatesSettings; // ✅ جديد
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService gateExecutor = Executors.newFixedThreadPool(4);
     private ScheduledExecutorService dbSyncScheduler;
+
+    // ✅ SoundPool مخصص للأصوات القابلة للتخصيص
+    private SoundPool customSoundPool;
 
     // عناصر الواجهة
     private TextView tvGateIcon, tvGateStatus, tvLastEvent, tvDebugConsole;
@@ -82,7 +88,7 @@ public class MiraSecureGateFragment extends Fragment {
     private Runnable flashRunnable;
     private Runnable soundLoopRunnable;
 
-    // Cache الذاكرة السريعة لمنع التأخير (<5ms)
+    // Cache الذاكرة السريعة
     private final Set<String> localAllowedEpcCache = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<String, Long> scanDebounceMap = new ConcurrentHashMap<>();
     private static final long SCAN_COOL_DOWN_MS = 2500;
@@ -113,7 +119,8 @@ public class MiraSecureGateFragment extends Fragment {
 
         if (getActivity() instanceof UHFMainActivity) {
             mContext = (UHFMainActivity) getActivity();
-            settingsManager = MiraSettingsManager.getInstance(mContext);
+            settingsManager = MiraGatesSettingsManager.getInstance(mContext);
+            MiraGatesSettings = MiraGatesSettings.getInstance(mContext); // ✅ جديد
             vibrator = (Vibrator) mContext.getSystemService(Context.VIBRATOR_SERVICE);
         }
 
@@ -121,7 +128,9 @@ public class MiraSecureGateFragment extends Fragment {
         setupClickListeners();
         updateUI();
 
-        logConsole("🚀 تم تشغيل MIRA Secure Gate™ (وضع التنبيه المرئي والمسموع الشديد)");
+        logConsole("🚀 تم تشغيل MIRA Secure Gate™");
+        logConsole("🔊 صوت الإنذار: " + MiraGatesSettings.getSoundAlarm());
+        logConsole("📡 قوة RFID: " + MiraGatesSettings.getRfidPower() + " dBm");
     }
 
     private void initViews(View view) {
@@ -187,7 +196,6 @@ public class MiraSecureGateFragment extends Fragment {
             processInputEpc(mockDeniedEpc, "SIMULATION_DENIED");
         });
 
-        // زر إيقاف التنبيه
         btnStopAlarm.setOnClickListener(v -> stopAlarmEffects());
     }
 
@@ -227,7 +235,11 @@ public class MiraSecureGateFragment extends Fragment {
     private void startContinuousRfidScan() {
         if (mContext != null && mContext.mReader != null) {
             try {
-                mContext.mReader.setPower(15);
+                // ✅ استخدام قوة RFID من الإعدادات
+                int rfidPower = MiraGatesSettings.getRfidPower();
+                mContext.mReader.setPower(rfidPower);
+                logConsole("📡 قوة RFID: " + rfidPower + " dBm");
+                
                 mContext.mReader.setInventoryCallback(new IUHFInventoryCallback() {
                     @Override
                     public void callback(UHFTAGInfo uhftagInfo) {
@@ -372,9 +384,8 @@ public class MiraSecureGateFragment extends Fragment {
 
             logConsole("✅ قرار البوابة: PASS - " + itemTitle);
 
-            if (mContext != null) {
-                mContext.playSound(1);
-            }
+            // ✅ استخدام صوت النجاح المخصص من الإعدادات
+            playCustomSound(MiraGatesSettings.getSoundPass());
 
             mainHandler.removeCallbacks(resetUIRunnable);
             mainHandler.postDelayed(resetUIRunnable, 3000);
@@ -391,49 +402,78 @@ public class MiraSecureGateFragment extends Fragment {
 
             logConsole("🚨 قرار البوابة: DENY ALARM - " + itemTitle);
 
-            // 🚨 تفعيل مؤشرات الوميض والإنذار الصوتي الشديد
             triggerAlarmEffects(itemTitle, serial);
         }
     }
 
-    // 🚨 تفعيل وميض الشاشة والصوت والاهتزاز الشديد
+    // 🚨 تفعيل وميض الشاشة والصوت والاهتزاز حسب الإعدادات
     private void triggerAlarmEffects(String itemTitle, String serial) {
         isAlarmActive = true;
 
-        if (overlayAlarm != null) {
+        // ✅ استخدام وميض الشاشة فقط إذا مفعل
+        if (MiraGatesSettings.isFlashEnabled() && overlayAlarm != null) {
             tvOverlayTitle.setText("🚨 " + itemTitle);
             tvOverlayDetails.setText("رقم القطعة / Serial: " + serial);
             overlayAlarm.setVisibility(View.VISIBLE);
+
+            flashRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    if (!isAlarmActive || overlayAlarm == null) return;
+                    flashState = !flashState;
+                    overlayAlarm.setBackgroundColor(flashState ? Color.parseColor("#D32F2F") : Color.parseColor("#000000"));
+                    flashHandler.postDelayed(this, 250);
+                }
+            };
+            flashHandler.post(flashRunnable);
         }
 
-        // 1. بدء أنيميشن الوميض الشديد بين الأحمر والأسود والأصفر
-        flashRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (!isAlarmActive || overlayAlarm == null) return;
-                flashState = !flashState;
-                overlayAlarm.setBackgroundColor(flashState ? Color.parseColor("#D32F2F") : Color.parseColor("#000000"));
-                flashHandler.postDelayed(this, 250);
-            }
-        };
-        flashHandler.post(flashRunnable);
-
-        // 2. تكرار تشغيل صوت الإنذار المرعب كل ثانيتين
+        // ✅ استخدام صوت الإنذار المخصص ومدة الإنذار المخصصة
         soundLoopRunnable = new Runnable() {
             @Override
             public void run() {
                 if (!isAlarmActive) return;
-                if (mContext != null) {
-                    mContext.playSound(2); // alarm_breach_security.mp3
-                }
-                if (vibrator != null && vibrator.hasVibrator()) {
+                
+                // تشغيل الصوت المخصص
+                playCustomSound(MiraGatesSettings.getSoundAlarm());
+                
+                // الاهتزاز حسب الإعدادات
+                if (MiraGatesSettings.isVibrationEnabled() && vibrator != null && vibrator.hasVibrator()) {
                     long[] pattern = {0, 400, 200, 400};
                     vibrator.vibrate(pattern, -1);
                 }
-                flashHandler.postDelayed(this, 2200);
+                
+                // استخدام فترة الإنذار المخصصة
+                int alarmInterval = MiraGatesSettings.getAlarmInterval();
+                flashHandler.postDelayed(this, alarmInterval);
             }
         };
         flashHandler.post(soundLoopRunnable);
+    }
+
+    /**
+     * ✅ تشغيل صوت مخصص من الإعدادات
+     */
+    private void playCustomSound(String soundName) {
+        try {
+            if (soundName == null || soundName.equals("silent") || mContext == null) return;
+            
+            int soundResourceId = MiraGatesSettings.SoundOptions.getSoundResourceId(mContext, soundName);
+            if (soundResourceId <= 0) return;
+            
+            if (customSoundPool == null) {
+                customSoundPool = new SoundPool.Builder().setMaxStreams(5).build();
+            }
+            
+            int soundId = customSoundPool.load(mContext, soundResourceId, 1);
+            customSoundPool.setOnLoadCompleteListener((pool, sampleId, status) -> {
+                if (status == 0) {
+                    pool.play(sampleId, 1.0f, 1.0f, 1, 0, 1.0f);
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "playCustomSound error: " + e.getMessage());
+        }
     }
 
     // 🔕 إيقاف مؤثرات الإنذار
@@ -444,6 +484,10 @@ public class MiraSecureGateFragment extends Fragment {
 
         if (overlayAlarm != null) {
             overlayAlarm.setVisibility(View.GONE);
+        }
+
+        if (vibrator != null) {
+            vibrator.cancel();
         }
 
         resetGateUI();
@@ -563,5 +607,10 @@ public class MiraSecureGateFragment extends Fragment {
         }
         stopRealtimeDbSync();
         gateExecutor.shutdown();
+        
+        if (customSoundPool != null) {
+            customSoundPool.release();
+            customSoundPool = null;
+        }
     }
-}
+            }
