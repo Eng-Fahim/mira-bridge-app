@@ -470,51 +470,71 @@ public class MiraPosFragment extends MiraBaseFragment {
     }
 
     private void parseItemResponse(String code, JSONObject data) {
-        try {
-            JSONObject item = data.optJSONObject("item");
-            JSONObject barcode = item != null ? item.optJSONObject("barcode") : null;
-            String vaultStatus = item != null ? item.optString("status", "").toLowerCase() : "";
-
-            boolean isAvailable = !vaultStatus.equals("sold") && !vaultStatus.equals("reserved");
-            String title = item != null ? item.optString("title", isArabic ? "قطعة" : "Item")
-                    : (isArabic ? "قطعة" : "Item");
-            String karat = item != null ? item.optString("karat", "21K") : "21K";
-            double weight = item != null ? item.optDouble("weight", item.optDouble("gross_weight", 0)) : 0;
-            double price = item != null ? item.optDouble("dynamic_retail_price",
-                    item.optDouble("retail_price", item.optDouble("price", 0))) : 0;
-
-            if (price <= 0 && weight > 0) {
-                // ✅ استخدام MiraPriceManager للحساب
-                int karatNum = getKaratNumber(karat);
-                price = priceManager.calculateGoldPrice(karatNum, weight);
-            }
-
-            CartItem cartItem = new CartItem(code, title, karat, weight,
-                    liveScaleWeight, price, isAvailable, vaultStatus.toUpperCase());
-            cartItem.serialNo = item != null ? item.optString("serial", code) : code;
-            cartItem.gtin = (barcode != null) ? barcode.optString("gtin13", "")
-                    : (item != null ? item.optString("gtin", "") : "");
-            cartItem.location = item != null ? item.optString("location", "") : "";
-            cartItem.itemId = item != null ? item.optInt("id", 0) : 0;
-
+    try {
+        // ✅ جديد - التحقق من تنبيهات العبث أولاً
+        JSONArray tamperAlerts = data.optJSONArray("tamper_alerts");
+        if (tamperAlerts != null && tamperAlerts.length() > 0) {
             safeRun(() -> {
-                if (!isAvailable) {
-                    showToast(isArabic ? "❌ غير متاحة: " + vaultStatus
-                            : "❌ Unavailable: " + vaultStatus);
-                    updateCartSummary();
-                    return;
-                }
-                scannedEpcs.add(code);
-                cartList.add(0, cartItem);
-                if (cartAdapter != null) cartAdapter.notifyItemInserted(0);
-                if (rvCartItems != null) rvCartItems.scrollToPosition(0);
-                updateCartSummary();
+                com.example.uhf.tools.TamperAlertHelper.showTamperAlert(mContext, tamperAlerts, code);
+                playAlertSound(2);
             });
-        } catch (Exception e) {
-            Log.e(TAG, "Parse: " + e.getMessage());
-            handleItemNotFound(code);
+            
+            // ✅ منع الإضافة إذا كان العبث خطيراً
+            if (com.example.uhf.tools.TamperAlertHelper.hasSecurityAlert(tamperAlerts)) {
+                safeRun(() -> {
+                    showToast(isArabic ? "🚨 تم منع العملية - عبث مكتشف!" : "🚨 Operation blocked - Tamper detected!");
+                    if (tvCartStatus != null) {
+                        tvCartStatus.setText(isArabic ? "🚨 عبث مكتشف - ممنوع" : "🚨 Tamper detected - Blocked");
+                    }
+                });
+                return;
+            }
         }
+        
+        // ============ باقي الكود الحالي كما هو ============
+        JSONObject item = data.optJSONObject("item");
+        JSONObject barcode = item != null ? item.optJSONObject("barcode") : null;
+        String vaultStatus = item != null ? item.optString("status", "").toLowerCase() : "";
+
+        boolean isAvailable = !vaultStatus.equals("sold") && !vaultStatus.equals("reserved");
+        String title = item != null ? item.optString("title", isArabic ? "قطعة" : "Item")
+                : (isArabic ? "قطعة" : "Item");
+        String karat = item != null ? item.optString("karat", "21K") : "21K";
+        double weight = item != null ? item.optDouble("weight", item.optDouble("gross_weight", 0)) : 0;
+        double price = item != null ? item.optDouble("dynamic_retail_price",
+                item.optDouble("retail_price", item.optDouble("price", 0))) : 0;
+
+        if (price <= 0 && weight > 0) {
+            int karatNum = getKaratNumber(karat);
+            price = priceManager.calculateGoldPrice(karatNum, weight);
+        }
+
+        CartItem cartItem = new CartItem(code, title, karat, weight,
+                liveScaleWeight, price, isAvailable, vaultStatus.toUpperCase());
+        cartItem.serialNo = item != null ? item.optString("serial", code) : code;
+        cartItem.gtin = (barcode != null) ? barcode.optString("gtin13", "")
+                : (item != null ? item.optString("gtin", "") : "");
+        cartItem.location = item != null ? item.optString("location", "") : "";
+        cartItem.itemId = item != null ? item.optInt("id", 0) : 0;
+
+        safeRun(() -> {
+            if (!isAvailable) {
+                showToast(isArabic ? "❌ غير متاحة: " + vaultStatus
+                        : "❌ Unavailable: " + vaultStatus);
+                updateCartSummary();
+                return;
+            }
+            scannedEpcs.add(code);
+            cartList.add(0, cartItem);
+            if (cartAdapter != null) cartAdapter.notifyItemInserted(0);
+            if (rvCartItems != null) rvCartItems.scrollToPosition(0);
+            updateCartSummary();
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "Parse: " + e.getMessage());
+        handleItemNotFound(code);
     }
+}
 
     private void handleItemNotFound(String code) {
         safeRun(() -> {
@@ -1037,4 +1057,4 @@ public class MiraPosFragment extends MiraBaseFragment {
             }
         }
     }
-}
+                                    }
