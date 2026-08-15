@@ -1784,4 +1784,38 @@
 <string name="about_description">MIRA Bridge™ هو التطبيق الرسمي لمنظومة MIRA ID لإدارة المجوهرات والبوابات الأمنية الذكية.\n\nيدعم:\n• مسح RFID UHF\n• كاميرا QR/GS1 DataMatrix\n• رادار تحديد المواقع\n• MIRA Secure Gate™\n• التكامل مع MIRA ID Cloud</string>
 <string name="about_developer">MIRA Technology © 2026</string>
 <string name="about_website">https://ams.ibreg.org</string>
+
+    <!-- إعدادات البوابات -->
+    <string name="gate_settings_title">🏢 إدارة البوابات الأمنية</string>
+    <string name="add_gate">➕ إضافة بوابة جديدة</string>
+    <string name="sound_settings">🔊 إعدادات الأصوات</string>
+    <string name="sound_pass">✅ صوت النجاح (PASS):</string>
+    <string name="sound_deny">❌ صوت الرفض (DENY):</string>
+    <string name="sound_alarm">🚨 صوت الإنذار (ALARM):</string>
+    <string name="test_sound">🔊 تجربة الصوت</string>
+    <string name="save_sounds">💾 حفظ الأصوات</string>
+    <string name="additional_settings">⚙️ إعدادات إضافية</string>
+    <string name="vibration_enabled">📳 الاهتزاز عند الإنذار:</string>
+    <string name="flash_enabled">💡 وميض الشاشة:</string>
+    <string name="alarm_duration_label">⏱ مدة الإنذار (ثواني):</string>
+    <string name="rfid_power_label">📡 قوة RFID (dBm):</string>
+    <string name="save_all">💾 حفظ جميع الإعدادات</string>
+    
+    <!-- أسماء الأصوات -->
+    <string name="sound_beep_success">🔔 نجاح قصير</string>
+    <string name="sound_beep_soft">🔔 ناعم</string>
+    <string name="sound_beep_double">🔔 مزدوج</string>
+    <string name="sound_chime_elegant">🎵 نغمة أنيقة</string>
+    <string name="sound_silent">🔇 بدون صوت</string>
+    <string name="sound_beep_warning">⚠️ تحذير</string>
+    <string name="sound_beep_error">❌ خطأ</string>
+    <string name="sound_alarm_soft">🚨 إنذار خفيف</string>
+    <string name="sound_buzz_double">📳 طنين مزدوج</string>
+    <string name="sound_alarm_sold_item">🚨 إنذار مباع</string>
+    <string name="sound_alarm_breach_security">🚨 اختراق أمني</string>
+    <string name="sound_alarm_siren_strong">🚨 صفارة قوية</string>
+    <string name="sound_alarm_police">🚨 صفارة شرطة</string>
+    <string name="sound_alarm_buzzer_loud">🚨 طنين عالي</string>
+    <string name="sound_alarm_klaxon">🚨 كلوكسون</string>
+
 </resources>
