@@ -52,6 +52,8 @@ import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.RFIDManager;
 import com.example.uhf.MiraRfid.model.RFIDDevice;
 
+// أضف في الأعلى
+import com.example.uhf.tools.TamperAlertHelper;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -1995,4 +1997,4 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
             }
         }
     }
-}
+                             }
