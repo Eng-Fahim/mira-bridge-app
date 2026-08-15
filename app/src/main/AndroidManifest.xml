@@ -4,14 +4,12 @@
     android:versionCode="1" 
     android:versionName="1.0">
 
-    <!-- أذونات التخزين -->
+    <!-- الأذونات كما هي بدون تغيير -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
         android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" 
         tools:ignore="ScopedStorage" />
-    
-    <!-- أذونات البلوتوث -->
     <uses-permission android:name="android.permission.BLUETOOTH" 
         android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" 
@@ -21,27 +19,16 @@
         tools:targetApi="s" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" 
         tools:targetApi="s" />
-    
-    <!-- أذونات الموقع (مطلوبة للبلوتوث في الأندرويد القديم) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    
-    <!-- أذونات الشبكة -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
-    
-    <!-- أذونات الكاميرا -->
     <uses-permission android:name="android.permission.CAMERA" />
-    
-    <!-- إذن الكتابة للصور (لأجهزة أندرويد 13+) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    
-    <!-- إذن الاهتزاز -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- ميزات الجهاز المطلوبة -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
@@ -59,24 +46,34 @@
         android:largeHeap="true"
         tools:targetApi="31">
 
+        <!-- ✅ SplashActivity هي المشغل الوحيد -->
         <activity
-            android:name=".MainActivity"
+            android:name=".activity.SplashActivity"
+            android:theme="@style/SplashTheme"
             android:exported="true"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
-
-        <activity
-            android:name="com.example.uhf.activity.LoginActivity"
-            android:screenOrientation="portrait"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.Uhfuartdemo"
-            android:windowSoftInputMode="adjustResize">
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
+        <!-- ❌ MainActivity بدون launcher -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <!-- ❌ LoginActivity بدون launcher -->
+        <activity
+            android:name="com.example.uhf.activity.LoginActivity"
+            android:screenOrientation="portrait"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Uhfuartdemo"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- ❌ UHFMainActivity بدون launcher -->
         <activity
             android:name="com.example.uhf.activity.UHFMainActivity"
             android:screenOrientation="portrait"
@@ -85,6 +82,7 @@
             android:theme="@style/Theme.Uhfuartdemo"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
+        <!-- باقي الأنشطة كما هي -->
         <receiver
             android:name="com.example.uhf.BootBroadcastReceiver"
             android:exported="true"
@@ -99,13 +97,13 @@
         <activity
             android:name="com.example.uhf.filebrowser.FileManagerActivity"
             android:screenOrientation="portrait"
-            android:exported="true"
+            android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
             android:name="com.example.uhf.activity.TestActivity"
             android:screenOrientation="portrait"
-            android:exported="true"
+            android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity
@@ -116,7 +114,6 @@
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
-        <!-- FileProvider للكاميرا -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
