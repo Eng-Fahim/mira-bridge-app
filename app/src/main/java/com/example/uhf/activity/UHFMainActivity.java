@@ -327,6 +327,8 @@ private void hideKeyboard(View view) {
     setTopTabVisibility(R.id.tabTopSettings, isManager || isInventoryMgr);
     setTopTabVisibility(R.id.tabTopIdentity, isManager || isInventoryMgr);
     setTopTabVisibility(R.id.tabTopTransfers, isManager || isInventoryMgr);
+    setTopTabVisibility(R.id.tabTopGateSettings, isManager || isInventoryMgr);
+    setupTopTab(R.id.tabTopGateSettings, "GateSettings");
     setTopTabVisibility(R.id.tabTopBranches, isManager);
     setTopTabVisibility(R.id.tabTopUsers, isAnyAdmin || isBranchManager);
     setTopTabVisibility(R.id.tabTopRfid, isManager || isInventoryMgr);
@@ -355,9 +357,9 @@ private void hideKeyboard(View view) {
     int[] tabIds = {
         R.id.tabTopSettings, R.id.tabTopIdentity, R.id.tabTopTransfers,
         R.id.tabTopBranches, R.id.tabTopUsers, R.id.tabTopRfid,
-        R.id.tabTopReader, R.id.tabTopGold  // ✅ جديد
+        R.id.tabTopReader, R.id.tabTopGold,
+        R.id.tabTopReader, R.id.tabTopGold, R.id.tabTopGateSettings  // ✅ جديد
     };
-
     for (int id : tabIds) {
         View tab = findViewById(id);
         if (tab != null && tab.getVisibility() == View.VISIBLE) {
@@ -554,6 +556,7 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
         }
 
         setTopTabLabel(R.id.tabTopSettings, isArabic ? "⚙️ الإعدادات" : "⚙️ Settings");
+        setTopTabLabel(R.id.tabTopGateSettings, isArabic ? "🔧 البوابات" : "🔧 Gates");
         setTopTabLabel(R.id.tabTopIdentity, isArabic ? "🆔 التكويد" : "🆔 Identity");
         setTopTabLabel(R.id.tabTopTransfers, isArabic ? "📦 التحويلات" : "📦 Transfers");
         setTopTabLabel(R.id.tabTopBranches, isArabic ? "🏢 الفروع" : "🏢 Branches");
@@ -1111,4 +1114,4 @@ private void bindMenuDirect(View root, int viewId, BottomSheetDialog dialog, Str
             Log.e(TAG, errorMessage + ": " + e.getMessage());
         }
     }
-        }
+}
