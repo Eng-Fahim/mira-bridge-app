@@ -21,7 +21,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
-import com.example.uhf.manager.MiraSettings;
+import com.example.uhf.manager.MiraGatesSettings;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 
@@ -29,7 +29,7 @@ import java.util.List;
 
 public class MiraGateSettingsFragment extends Fragment {
 
-    private MiraSettings settings;
+    private MiraGatesSettings settings;
     private SoundPool soundPool;
     private int currentSoundId = -1;
 
@@ -54,7 +54,7 @@ public class MiraGateSettingsFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         Context ctx = requireContext();
-        settings = MiraSettings.getInstance(ctx);
+        settings = MiraGatesSettings.getInstance(ctx);
 
         soundPool = new SoundPool.Builder().setMaxStreams(3).build();
 
@@ -86,19 +86,19 @@ public class MiraGateSettingsFragment extends Fragment {
     private void setupSpinners() {
         // صوت النجاح
         ArrayAdapter<String> passAdapter = new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_spinner_item, getSoundNames(MiraSettings.SoundOptions.PASS_SOUNDS));
+                android.R.layout.simple_spinner_item, getSoundNames(MiraGatesSettings.SoundOptions.PASS_SOUNDS));
         passAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spSoundPass.setAdapter(passAdapter);
 
         // صوت الرفض
         ArrayAdapter<String> denyAdapter = new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_spinner_item, getSoundNames(MiraSettings.SoundOptions.DENY_SOUNDS));
+                android.R.layout.simple_spinner_item, getSoundNames(MiraGatesSettings.SoundOptions.DENY_SOUNDS));
         denyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spSoundDeny.setAdapter(denyAdapter);
 
         // صوت الإنذار
         ArrayAdapter<String> alarmAdapter = new ArrayAdapter<>(requireContext(),
-                android.R.layout.simple_spinner_item, getSoundNames(MiraSettings.SoundOptions.ALARM_SOUNDS));
+                android.R.layout.simple_spinner_item, getSoundNames(MiraGatesSettings.SoundOptions.ALARM_SOUNDS));
         alarmAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spSoundAlarm.setAdapter(alarmAdapter);
     }
@@ -138,9 +138,9 @@ public class MiraGateSettingsFragment extends Fragment {
         String soundDeny = settings.getSoundDeny();
         String soundAlarm = settings.getSoundAlarm();
 
-        spSoundPass.setSelection(findIndex(MiraSettings.SoundOptions.PASS_SOUNDS, soundPass));
-        spSoundDeny.setSelection(findIndex(MiraSettings.SoundOptions.DENY_SOUNDS, soundDeny));
-        spSoundAlarm.setSelection(findIndex(MiraSettings.SoundOptions.ALARM_SOUNDS, soundAlarm));
+        spSoundPass.setSelection(findIndex(MiraGatesSettings.SoundOptions.PASS_SOUNDS, soundPass));
+        spSoundDeny.setSelection(findIndex(MiraGatesSettings.SoundOptions.DENY_SOUNDS, soundDeny));
+        spSoundAlarm.setSelection(findIndex(MiraGatesSettings.SoundOptions.ALARM_SOUNDS, soundAlarm));
 
         // تحميل الإعدادات الأخرى
         switchVibration.setChecked(settings.isVibrationEnabled());
@@ -161,14 +161,14 @@ public class MiraGateSettingsFragment extends Fragment {
         btnAddGate.setOnClickListener(v -> showAddGateDialog());
         
         btnTestSound.setOnClickListener(v -> {
-            String selectedSound = MiraSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()];
+            String selectedSound = MiraGatesSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()];
             playSound(selectedSound);
         });
 
         btnSaveSounds.setOnClickListener(v -> {
-            String soundPass = MiraSettings.SoundOptions.PASS_SOUNDS[spSoundPass.getSelectedItemPosition()];
-            String soundDeny = MiraSettings.SoundOptions.DENY_SOUNDS[spSoundDeny.getSelectedItemPosition()];
-            String soundAlarm = MiraSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()];
+            String soundPass = MiraGatesSettings.SoundOptions.PASS_SOUNDS[spSoundPass.getSelectedItemPosition()];
+            String soundDeny = MiraGatesSettings.SoundOptions.DENY_SOUNDS[spSoundDeny.getSelectedItemPosition()];
+            String soundAlarm = MiraGatesSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()];
 
             settings.setSoundPass(soundPass);
             settings.setSoundDeny(soundDeny);
@@ -201,7 +201,7 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private void playSound(String soundName) {
-        int soundId = MiraSettings.SoundOptions.getSoundResourceId(requireContext(), soundName);
+        int soundId = MiraGatesSettings.SoundOptions.getSoundResourceId(requireContext(), soundName);
         if (soundId > 0) {
             currentSoundId = soundPool.load(requireContext(), soundId, 1);
             soundPool.setOnLoadCompleteListener((pool, sampleId, status) -> {
@@ -236,7 +236,7 @@ public class MiraGateSettingsFragment extends Fragment {
             String location = etLocation.getText().toString().trim();
 
             if (!gateName.isEmpty()) {
-                MiraSettings.GateDevice gate = new MiraSettings.GateDevice();
+                MiraGatesSettings.GateDevice gate = new MiraGatesSettings.GateDevice();
                 gate.gateId = "gate_" + System.currentTimeMillis();
                 gate.gateName = gateName;
                 gate.location = location;
