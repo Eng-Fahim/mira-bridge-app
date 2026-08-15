@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F5F5"
+    android:background="?attr/colorBackground"
     android:fillViewport="true">
 
     <LinearLayout
@@ -16,27 +16,36 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="🏢 إدارة البوابات الأمنية"
+            android:text="@string/gate_settings_title"
             android:textSize="20sp"
             android:textStyle="bold"
-            android:textColor="#1A237E"
+            android:textColor="?attr/colorPrimary"
             android:layout_marginBottom="16dp"/>
 
         <!-- قائمة البوابات -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvGates"
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:layout_marginBottom="8dp"/>
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="1dp"
+            android:layout_marginBottom="8dp">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvGates"
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:padding="8dp"/>
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- زر إضافة بوابة -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnAddGate"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:text="➕ إضافة بوابة جديدة"
-            android:textColor="#FFFFFF"
-            app:backgroundTint="#1A237E"
+            android:text="@string/add_gate"
+            android:textColor="?attr/colorOnPrimary"
+            app:backgroundTint="?attr/colorPrimary"
             app:cornerRadius="8dp"
             android:layout_marginBottom="16dp"/>
 
@@ -44,65 +53,71 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#E0E0E0"
+            android:background="?attr/colorOutline"
             android:layout_marginVertical="16dp"/>
 
         <!-- 🔊 قسم الأصوات -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="🔊 إعدادات الأصوات"
+            android:text="@string/sound_settings"
             android:textSize="20sp"
             android:textStyle="bold"
-            android:textColor="#1A237E"
+            android:textColor="?attr/colorPrimary"
             android:layout_marginBottom="16dp"/>
 
         <!-- صوت النجاح -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="✅ صوت النجاح (PASS):"
+            android:text="@string/sound_pass"
             android:textSize="14sp"
             android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="4dp"/>
 
         <Spinner
             android:id="@+id/spSoundPass"
             android:layout_width="match_parent"
             android:layout_height="48dp"
+            android:background="?attr/colorSurface"
             android:layout_marginBottom="12dp"/>
 
         <!-- صوت الرفض -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="❌ صوت الرفض (DENY):"
+            android:text="@string/sound_deny"
             android:textSize="14sp"
             android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="4dp"/>
 
         <Spinner
             android:id="@+id/spSoundDeny"
             android:layout_width="match_parent"
             android:layout_height="48dp"
+            android:background="?attr/colorSurface"
             android:layout_marginBottom="12dp"/>
 
         <!-- صوت الإنذار -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="🚨 صوت الإنذار (ALARM):"
+            android:text="@string/sound_alarm"
             android:textSize="14sp"
             android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="4dp"/>
 
         <Spinner
             android:id="@+id/spSoundAlarm"
             android:layout_width="match_parent"
             android:layout_height="48dp"
+            android:background="?attr/colorSurface"
             android:layout_marginBottom="12dp"/>
 
-        <!-- زر تجربة الصوت -->
+        <!-- أزرار الصوت -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -111,10 +126,13 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnTestSound"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="44dp"
-                android:text="🔊 تجربة الصوت"
+                android:text="@string/test_sound"
+                android:textColor="?attr/colorPrimary"
+                app:strokeColor="?attr/colorPrimary"
                 app:cornerRadius="8dp"
                 android:layout_marginEnd="8dp"/>
 
@@ -123,9 +141,9 @@
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="44dp"
-                android:text="💾 حفظ الأصوات"
-                android:textColor="#FFFFFF"
-                app:backgroundTint="#1A237E"
+                android:text="@string/save_sounds"
+                android:textColor="?attr/colorOnPrimary"
+                app:backgroundTint="?attr/colorPrimary"
                 app:cornerRadius="8dp"/>
         </LinearLayout>
 
@@ -133,85 +151,120 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#E0E0E0"
+            android:background="?attr/colorOutline"
             android:layout_marginVertical="16dp"/>
 
         <!-- ⚙️ قسم إعدادات إضافية -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="⚙️ إعدادات إضافية"
+            android:text="@string/additional_settings"
             android:textSize="20sp"
             android:textStyle="bold"
-            android:textColor="#1A237E"
+            android:textColor="?attr/colorPrimary"
             android:layout_marginBottom="16dp"/>
 
         <!-- الاهتزاز -->
-        <LinearLayout
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="10dp"
+            app:cardElevation="1dp"
             android:layout_marginBottom="8dp">
 
-            <TextView
-                android:layout_width="0dp"
-                android:layout_weight="1"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="📳 الاهتزاز عند الإنذار:"
-                android:textSize="14sp"/>
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="12dp">
 
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switchVibration"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"/>
-        </LinearLayout>
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/vibration_enabled"
+                    android:textSize="14sp"
+                    android:textColor="?attr/colorOnSurface"/>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switchVibration"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- وميض الشاشة -->
-        <LinearLayout
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="10dp"
+            app:cardElevation="1dp"
             android:layout_marginBottom="8dp">
 
-            <TextView
-                android:layout_width="0dp"
-                android:layout_weight="1"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="💡 وميض الشاشة:"
-                android:textSize="14sp"/>
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="12dp">
 
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switchFlash"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"/>
-        </LinearLayout>
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/flash_enabled"
+                    android:textSize="14sp"
+                    android:textColor="?attr/colorOnSurface"/>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switchFlash"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- مدة الإنذار -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="⏱ مدة الإنذار (ثواني):"
+            android:text="@string/alarm_duration_label"
             android:textSize="14sp"
             android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="4dp"/>
 
-        <EditText
-            android:id="@+id/etAlarmDuration"
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:inputType="number"
-            android:hint="10"
-            android:layout_marginBottom="12dp"/>
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:boxBackgroundColor="?attr/colorSurface"
+            app:boxStrokeColor="?attr/colorPrimary"
+            app:boxCornerRadiusTopStart="8dp"
+            app:boxCornerRadiusTopEnd="8dp"
+            app:boxCornerRadiusBottomStart="8dp"
+            app:boxCornerRadiusBottomEnd="8dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etAlarmDuration"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:hint="10"
+                android:textColor="?attr/colorOnSurface"
+                android:hintTextColor="?attr/colorOnSurfaceVariant"/>
+        </com.google.android.material.textfield.TextInputLayout>
 
         <!-- قوة RFID -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="📡 قوة RFID (dBm):"
+            android:text="@string/rfid_power_label"
             android:textSize="14sp"
             android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="4dp"/>
 
         <SeekBar
@@ -221,6 +274,8 @@
             android:max="30"
             android:min="5"
             android:progress="28"
+            android:progressTint="?attr/colorPrimary"
+            android:thumbTint="?attr/colorPrimary"
             android:layout_marginBottom="4dp"/>
 
         <TextView
@@ -231,7 +286,7 @@
             android:gravity="center"
             android:textSize="14sp"
             android:textStyle="bold"
-            android:textColor="#1A237E"
+            android:textColor="?attr/colorPrimary"
             android:layout_marginBottom="16dp"/>
 
         <!-- زر حفظ الكل -->
@@ -239,11 +294,11 @@
             android:id="@+id/btnSaveAll"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:text="💾 حفظ جميع الإعدادات"
+            android:text="@string/save_all"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            app:backgroundTint="#1A237E"
+            android:textColor="?attr/colorOnPrimary"
+            app:backgroundTint="?attr/colorPrimary"
             app:cornerRadius="10dp"
             android:layout_marginTop="16dp"/>
 
