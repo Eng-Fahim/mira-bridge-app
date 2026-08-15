@@ -92,14 +92,14 @@ public class ChainwayReader implements MiraIRFIDReader {
                 isScanning = true;
                 if (listener != null) listener.onScanStarted();
                 
-                // ✅ بدء قراءة النتائج - readTagFromBuffer ترجع UHFTAGInfo واحد
+                // ✅ خيط قراءة فائق السرعة متوافق مع معمارية Offline-First
                 scanThread = new Thread(() -> {
                     while (isScanning) {
                         try {
-                            UHFTAGInfo tag = reader.readTagFromBuffer();
-                            if (tag != null) {
+                            UHFTAGInfo tag;
+                            // تفريغ الـ Buffer بالكامل في كل دورة لمنع تراكم القراءات
+                            while (isScanning && (tag = reader.readTagFromBuffer()) != null) {
                                 String epc = tag.getEPC();
-                                // ✅ getRssi ترجع String
                                 String rssiStr = tag.getRssi();
                                 int rssi = -50;
                                 if (rssiStr != null) {
@@ -111,7 +111,8 @@ public class ChainwayReader implements MiraIRFIDReader {
                                     listener.onTagRead(epc, rssi);
                                 }
                             }
-                            Thread.sleep(100);
+                            // فترة انتظار قصيرة جداً (10ms) لإراحة المعالج دون إبطاء الجرد
+                            Thread.sleep(10);
                         } catch (Exception e) {
                             if (isScanning && listener != null) {
                                 listener.onError(e.getMessage());
@@ -151,7 +152,6 @@ public class ChainwayReader implements MiraIRFIDReader {
     public void setPower(int powerDbm) {
         try {
             if (reader != null) {
-                // ✅ استخدام الدالة الصحيحة من SDK
                 reader.setPower(powerDbm);
             }
         } catch (Exception e) {
