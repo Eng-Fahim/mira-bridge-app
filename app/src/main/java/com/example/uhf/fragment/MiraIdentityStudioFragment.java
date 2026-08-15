@@ -125,7 +125,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
-    @@Override
+    @Override
 public void onResume() {
     super.onResume();
     
