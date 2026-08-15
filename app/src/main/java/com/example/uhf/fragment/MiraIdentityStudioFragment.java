@@ -125,14 +125,27 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        syncPendingEncodes();
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
-        }
+    @@Override
+public void onResume() {
+    super.onResume();
+    
+    // ✅ تحديث الأسعار من السيرفر عند فتح الواجهة
+    if (priceManager != null) {
+        priceManager.refreshNow();
+        
+        // ✅ إعادة حساب السعر بعد ثانيتين
+        new Handler().postDelayed(() -> {
+            if (isAdded() && binding != null) {
+                calculateEstimatedGoldValue();
+            }
+        }, 2000);
     }
+    
+    syncPendingEncodes();
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
+    }
+}
 
     @Override
     public void onPause() {
