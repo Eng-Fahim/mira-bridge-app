@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:width="360dp"
     android:height="200dp"
     android:viewportWidth="360"
-    android:viewportHeight="200">
+    android:viewportHeight="200"
+    tools:viewBindingIgnore="true">
 
-    <!-- نجوم وجزيئات -->
     <path
         android:fillColor="#FFFFFF"
         android:pathData="M50,30 L52,38 L60,40 L52,42 L50,50 L48,42 L40,40 L48,38 Z" />
@@ -21,8 +22,6 @@
     <path
         android:fillColor="#FFD700"
         android:pathData="M320,80 L321,85 L326,86 L321,87 L320,92 L319,87 L314,86 L319,85 Z" />
-    
-    <!-- نقاط صغيرة -->
     <path android:fillColor="#80FFFFFF" android:pathData="M80,100 m-2,0 a2,2 0 1,1 4,0 a2,2 0 1,1 -4,0" />
     <path android:fillColor="#80FFFFFF" android:pathData="M160,40 m-1.5,0 a1.5,1.5 0 1,1 3,0 a1.5,1.5 0 1,1 -3,0" />
     <path android:fillColor="#80FFFFFF" android:pathData="M250,90 m-2,0 a2,2 0 1,1 4,0 a2,2 0 1,1 -4,0" />
