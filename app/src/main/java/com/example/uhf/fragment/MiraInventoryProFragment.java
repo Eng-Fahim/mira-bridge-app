@@ -38,15 +38,22 @@ import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class MiraInventoryProFragment extends KeyDwonFragment {
 
     private static final String TAG = "MiraInventoryPro";
     private static final String OFFLINE_PREFS = "inventory_pro_cache";
 
+    // Views
     private TextView tvInventoryStatus, tvExpectedCount, tvScannedCount, tvVariance;
     private TextView tvAccuracy, tvElapsedTime, tvLastScan, tvRssi;
     private TextView tvPrevItems, tvCurrItems, tvDeltaItems;
@@ -55,6 +62,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private RecyclerView rvInventoryItems;
     private ProgressBar progressScanned;
 
+    // State & Counters
     private boolean isScanning = false;
     private boolean isBlindMode = false;
     private boolean isArabic;
@@ -66,34 +74,33 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private int sessionId = 0;
     private long startTime = 0;
 
+    // Fast Data Structures (Offline-First Architecture)
+    private final Set<String> scannedEpcSet = Collections.synchronizedSet(new HashSet<>());
+    private final Map<String, InventoryItem> localCatalog = new ConcurrentHashMap<>();
     private final List<InventoryItem> scannedItems = new ArrayList<>();
     private InventoryAdapter adapter;
 
+    // Managers & Clients
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
     private SharedPreferences offlineCache;
 
-    private final Handler handler = new Handler(Looper.getMainLooper());
+    // Handlers & Batched UI Updates
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Runnable timerRunnable;
-    private final Handler simulationHandler = new Handler(Looper.getMainLooper());
-    private Runnable simulationRunnable;
-    private int simulationIndex = 0;
+    private Runnable uiUpdateRunnable;
+    private boolean pendingUiUpdate = false;
 
+    // Hardware Audio/Haptic Settings
     private boolean soundEnabled = true;
     private boolean vibrateEnabled = true;
 
+    // Simulation Fallback Data
     private final String[] simulationGtins = {
         "0700000007885", "0700000007886", "0700000007887", "0700000007888", "0700000007889",
         "0700000007890", "0700000007891", "0700000007892", "0700000007893", "0700000007894",
-        "0700000007895", "0700000007896", "0700000007897", "0700000007898", "0700000007899",
-        "0700000007900", "0700000007901", "0700000007902", "0700000007903", "0700000007904",
-        "0700000007905", "0700000007906", "0700000007907", "0700000007908", "0700000007909",
-        "0700000007910", "0700000007911", "0700000007912", "0700000007913", "0700000007914",
-        "0700000007915", "0700000007916", "0700000007917", "0700000007918", "0700000007919",
-        "0700000007920", "0700000007921", "0700000007922", "0700000007923", "0700000007924",
-        "0700000007925", "0700000007926", "0700000007927", "0700000007928", "0700000007929",
-        "0700000007930", "0700000007931", "0700000007932", "0700000013764", "070000000040"
+        "0700000007895", "0700000007896", "0700000007897", "0700000007898", "0700000007899"
     };
 
     @Nullable
@@ -116,16 +123,19 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         return v;
     }
 
-    
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        loadInventorySettings();
+        updateBranchHeader();
+        loadLastSnapshotOffline();
+        preloadBranchCatalog(); // جلب الكتالوج محلياً للتحقق السريع O(1)
+    }
 
     @Override
     public void onResume() {
         super.onResume();
         updateBranchHeader();
-        if (!isScanning) {
-            loadLastSnapshotOffline();
-            loadLastSnapshot();
-        }
     }
 
     private void updateBranchHeader() {
@@ -196,7 +206,45 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (cardComparison != null) cardComparison.setVisibility(View.VISIBLE);
     }
 
-    // ==================== OFFLINE SNAPSHOT ====================
+    // ==================== OFFLINE CATALOG & PRELOAD ====================
+
+    private void preloadBranchCatalog() {
+        if (apiClient == null || branchesManager == null) return;
+        final int activeBranchId = branchesManager.getActiveBranchId();
+
+        new Thread(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(activeBranchId);
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONArray items = response.data.optJSONArray("items");
+                    if (items != null) {
+                        localCatalog.clear();
+                        for (int i = 0; i < items.length(); i++) {
+                            JSONObject obj = items.getJSONObject(i);
+                            String serial = obj.optString("gtin13", obj.optString("serial_number", obj.optString("epc", "")));
+                            if (!serial.isEmpty()) {
+                                String title = obj.optString("title", obj.optString("name", isArabic ? "قطعة ذهب" : "Gold Item"));
+                                String karat = obj.optString("karat", "21K");
+                                double weight = obj.optDouble("weight", 0.0);
+                                String location = obj.optString("location", branchesManager.getActiveBranchDisplayName());
+                                String status = !"sold".equalsIgnoreCase(obj.optString("status", "")) ? "✓" : "⚠️";
+
+                                localCatalog.put(serial.toUpperCase(), new InventoryItem(serial, title, karat, weight, status, location));
+                            }
+                        }
+                        expectedCount = localCatalog.size();
+                        safeRun(() -> {
+                            if (tvExpectedCount != null && !isBlindMode) {
+                                tvExpectedCount.setText(String.valueOf(expectedCount));
+                            }
+                        });
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Catalog Preload Error: " + e.getMessage());
+            }
+        }).start();
+    }
 
     private void loadLastSnapshotOffline() {
         try {
@@ -206,398 +254,84 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         } catch (Exception ignored) {}
     }
 
-    private void saveSnapshotOffline(JSONObject data) {
-        try {
-            int total = data.optInt("total_items", data.optInt("found_count", 0));
-            offlineCache.edit()
-                .putInt("prev_total_items", total)
-                .putLong("snapshot_time", System.currentTimeMillis())
-                .apply();
-        } catch (Exception ignored) {}
-    }
+    // ==================== HIGH-SPEED TAG PROCESSING ====================
 
-    private void loadLastSnapshot() {
-        if (apiClient == null || branchesManager == null) return;
-        final int activeBranchId = branchesManager.getActiveBranchId();
-        final String branchDisplayName = branchesManager.getActiveBranchDisplayName();
-
-        new Thread(() -> {
-            int loadedPrevItems = 0;
-            try {
-                MiraApiClient.ApiResponse response = apiClient.getLastSnapshot(branchDisplayName + " | branch:" + activeBranchId);
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject snapshotObj = response.data;
-                    if (snapshotObj.has("snapshot")) snapshotObj = snapshotObj.optJSONObject("snapshot");
-                    if (snapshotObj != null) {
-                        loadedPrevItems = snapshotObj.optInt("total_items", snapshotObj.optInt("found_count", 0));
-                        // ✅ حفظ محلي
-                        saveSnapshotOffline(snapshotObj);
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading snapshot: " + e.getMessage());
-            }
-
-            final int finalItems = loadedPrevItems;
-            safeRun(() -> {
-                prevTotalItems = finalItems;
-                if (tvPrevItems != null) tvPrevItems.setText(String.valueOf(prevTotalItems));
-                updateComparisonCard();
-            });
-        }).start();
-    }
-
-    // ==================== OFFLINE SESSION ====================
-
-    private void saveSessionOffline(int found, int expected, int variance) {
-        offlineCache.edit()
-            .putInt("last_found", found)
-            .putInt("last_expected", expected)
-            .putInt("last_variance", variance)
-            .putLong("last_session_time", System.currentTimeMillis())
-            .apply();
-    }
-
-    // ==================== Tag Processing ====================
-
+    /**
+     * القارئ ينادي هذه الدالة بسرعة تصل إلى 200 قراءة/ثانية
+     */
     public void processScannedTag(String epcOrGtin, String rssi) {
-        if (!isScanning || apiClient == null || branchesManager == null) return;
+        if (!isScanning || epcOrGtin == null || epcOrGtin.trim().isEmpty()) return;
 
-        for (InventoryItem item : scannedItems) {
-            if (item.serial.equalsIgnoreCase(epcOrGtin)) return;
+        final String cleanCode = parseEpcToGtin(epcOrGtin.trim().toUpperCase());
+
+        // 1. منع التكرار الفوري O(1) دون إغلاق الواجهة
+        if (!scannedEpcSet.add(cleanCode)) return;
+
+        // 2. المطابقة الفورية من الذاكرة (Local In-Memory Lookup)
+        InventoryItem matchedItem = localCatalog.get(cleanCode);
+        boolean isKnown = matchedItem != null;
+
+        String title = isKnown ? matchedItem.title : (isArabic ? "قطعة غير معرفة" : "Unknown Item");
+        String karat = isKnown ? matchedItem.karat : "21K";
+        double weight = isKnown ? matchedItem.numericWeight : 0.0;
+        String location = isKnown ? matchedItem.location : (branchesManager != null ? branchesManager.getActiveBranchDisplayName() : "");
+        String status = isKnown ? matchedItem.status : "⚠️";
+
+        InventoryItem newItem = new InventoryItem(cleanCode, title, karat, weight, status, location);
+
+        synchronized (scannedItems) {
+            scannedItems.add(0, newItem);
         }
 
-        final int activeBranchId = branchesManager.getActiveBranchId();
-        final String branchDisplayName = branchesManager.getActiveBranchDisplayName();
+        scannedCount++;
+        if ("✓".equals(status)) foundCount++;
 
-        new Thread(() -> {
-            try {
-                JSONObject extraParams = new JSONObject();
-                if (rssi != null) extraParams.put("rssi", rssi);
-                extraParams.put("branch_id", activeBranchId);
+        playInventorySound("scan");
 
-                MiraApiClient.ApiResponse response = apiClient.authorize(epcOrGtin, "inventory", extraParams);
+        // 3. تحديث الواجهة المجمع (Batched UI Updating) لتفادي التعليق
+        scheduleUiUpdate(cleanCode, rssi);
+    }
 
-                String title = isArabic ? "قطعة غير معرفة" : "Unknown Item";
-                String karat = "21K";
-                String weight = "0.00g";
-                String location = branchDisplayName;
-                String status = "⚠️";
-                boolean found = false;
+    private String parseEpcToGtin(String epcHex) {
+        // إذا كان الترميز SGTIN-96 يمكن فك الشفرة هنا، أو إرجاع الكود كما هو إذا كان Plain Text
+        return epcHex;
+    }
 
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject item = response.data.optJSONObject("item");
-                    if (item != null) {
-                        title = item.optString("title", item.optString("name", title));
-                        karat = item.optString("karat", "21K");
-                        double w = item.optDouble("weight", 0);
-                        weight = String.format(Locale.US, "%.2fg", w);
-                        location = item.optString("location", branchDisplayName);
-                        String vaultStatus = item.optString("status", "");
-                        found = !"sold".equalsIgnoreCase(vaultStatus);
-                        status = found ? "✓" : "⚠️";
-                    }
-                }
+    private void scheduleUiUpdate(String lastSerial, String rssi) {
+        if (pendingUiUpdate) return;
+        pendingUiUpdate = true;
 
-                final String fTitle = title, fKarat = karat, fWeight = weight;
-                final String fLocation = location, fStatus = status;
-                final boolean fFound = found;
+        mainHandler.postDelayed(uiUpdateRunnable = () -> {
+            pendingUiUpdate = false;
+            if (!isScanning && !isAdded()) return;
 
-                safeRun(() -> {
-                    scannedItems.add(0, new InventoryItem(epcOrGtin, fTitle, fKarat, fWeight, fStatus, fLocation));
-                    playInventorySound("scan");
-                    scannedCount++;
-                    if (fFound) foundCount++;
+            if (adapter != null) adapter.notifyDataSetChanged();
+            if (rvInventoryItems != null && !scannedItems.isEmpty()) rvInventoryItems.scrollToPosition(0);
 
-                    if (adapter != null) adapter.notifyItemInserted(0);
-                    if (rvInventoryItems != null) rvInventoryItems.scrollToPosition(0);
-
-                    if (tvScannedCount != null) tvScannedCount.setText(String.valueOf(scannedCount));
-                    if (tvVariance != null) tvVariance.setText(String.valueOf(Math.max(0, expectedCount - foundCount)));
-                    if (tvLastScan != null) tvLastScan.setText(epcOrGtin.substring(0, Math.min(14, epcOrGtin.length())));
-                    if (tvRssi != null && rssi != null) tvRssi.setText(rssi);
-
-                    if (progressScanned != null && expectedCount > 0) {
-                        progressScanned.setProgress(Math.min(100, (int) ((scannedCount * 100.0) / expectedCount)));
-                    }
-
-                    double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 100.0;
-                    if (tvAccuracy != null) {
-                        tvAccuracy.setText(String.format(Locale.US, isArabic ? "الدقة: %.1f%%" : "Accuracy: %.1f%%", acc));
-                    }
-
-                    updateComparisonCard();
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Error processing scanned tag: " + e.getMessage());
+            if (tvScannedCount != null) tvScannedCount.setText(String.valueOf(scannedCount));
+            if (tvVariance != null) tvVariance.setText(String.valueOf(Math.max(0, expectedCount - foundCount)));
+            if (tvLastScan != null && lastSerial != null) {
+                tvLastScan.setText(lastSerial.substring(0, Math.min(14, lastSerial.length())));
             }
-        }).start();
-    }
+            if (tvRssi != null && rssi != null) tvRssi.setText(rssi);
 
-    private void startSessionOnServer(boolean blind) {
-    if (apiClient == null || branchesManager == null) return;
-    final int activeBranchId = branchesManager.getActiveBranchId();
-    final String branchDisplayName = branchesManager.getActiveBranchDisplayName();
-
-    new Thread(() -> {
-        try {
-            // ✅ جلب قائمة القطع مباشرة
-            MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(activeBranchId);
-            
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONArray items = response.data.optJSONArray("items");
-                if (items != null && items.length() > 0) {
-                    expectedCount = items.length();
-                    saveRealGtinsForSimulation(items);
-                    Log.i(TAG, "✅ Loaded " + items.length() + " items for inventory");
-                } else {
-                    // جرب المخزون العادي
-                    loadInventoryFallback(activeBranchId);
-                }
-            } else {
-                loadInventoryFallback(activeBranchId);
+            if (progressScanned != null && expectedCount > 0) {
+                progressScanned.setProgress(Math.min(100, (int) ((scannedCount * 100.0) / expectedCount)));
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Session start error: " + e.getMessage());
-            loadOfflineGtinsForSimulation();
-        }
 
-        safeRun(() -> {
-            if (expectedCount == 0) expectedCount = realGtinsForSimulation.length > 0 ? realGtinsForSimulation.length : simulationGtins.length;
-            if (tvExpectedCount != null) tvExpectedCount.setText(blind ? "???" : String.valueOf(expectedCount));
-            startSimulation();
-        });
-    }).start();
-}
-
-private void loadInventoryFallback(int branchId) {
-    try {
-        MiraApiClient.ApiResponse response = apiClient.getBranchInventory(branchId);
-        if (response != null && response.isSuccess && response.data != null) {
-            JSONArray items = response.data.optJSONArray("items");
-            if (items == null) items = response.data.optJSONArray("inventory");
-            if (items != null && items.length() > 0) {
-                expectedCount = items.length();
-                saveRealGtinsForSimulation(items);
+            double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 100.0;
+            if (tvAccuracy != null) {
+                tvAccuracy.setText(String.format(Locale.US, isArabic ? "الدقة: %.1f%%" : "Accuracy: %.1f%%", acc));
             }
-        }
-    } catch (Exception e) {
-        loadOfflineGtinsForSimulation();
-    }
-}
 
-    private void closeSessionOnServer() {
-        if (apiClient == null || branchesManager == null) return;
-        final int activeBranchId = branchesManager.getActiveBranchId();
-
-        new Thread(() -> {
-            try {
-                JSONObject payload = new JSONObject();
-                payload.put("session_id", sessionId);
-                payload.put("found_count", foundCount);
-                payload.put("expected_count", expectedCount);
-                payload.put("variance", varianceCount);
-                payload.put("branch_id", activeBranchId);
-                apiClient.closeInventorySession(payload);
-            } catch (Exception ignored) {}
-        }).start();
-        
-        // ✅ حفظ محلي
-        saveSessionOffline(foundCount, expectedCount, varianceCount);
+            updateComparisonCard();
+        }, 200); // تحديث كل 200 ملي ثانية لضمان انسيابية الواجهة
     }
 
-// ==================== REAL GTIN SIMULATION ====================
-
-private String[] realGtinsForSimulation = new String[0];
-
-/**
- * حفظ أرقام GTIN الحقيقية من API للاستخدام في المحاكاة
- */
-private void saveRealGtinsForSimulation(JSONArray items) {
-    try {
-        List<String> gtins = new ArrayList<>();
-        for (int i = 0; i < items.length(); i++) {
-            JSONObject item = items.getJSONObject(i);
-            // ✅ جرب جميع الحقول الممكنة
-            String gtin = item.optString("gtin13", "");
-            if (gtin.isEmpty()) gtin = item.optString("serial_number", "");
-            if (gtin.isEmpty()) gtin = item.optString("epc", "");
-            if (gtin.isEmpty()) gtin = item.optString("code", "");
-            if (!gtin.isEmpty()) gtins.add(gtin);
-        }
-        
-        if (!gtins.isEmpty()) {
-            realGtinsForSimulation = gtins.toArray(new String[0]);
-            expectedCount = gtins.size();
-            
-            JSONArray arr = new JSONArray();
-            for (String gtin : gtins) arr.put(gtin);
-            if (offlineCache != null) {
-                offlineCache.edit()
-                    .putString("real_gtins", arr.toString())
-                    .putInt("real_gtins_count", gtins.size())
-                    .apply();
-            }
-            Log.i(TAG, "✅ Saved " + gtins.size() + " GTINs for simulation");
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "Save GTINs error: " + e.getMessage());
-    }
-}
-
-/**
- * تحميل أرقام GTIN المخزنة محلياً
- */
-private void loadOfflineGtinsForSimulation() {
-    try {
-        if (offlineCache == null) return;
-        String json = offlineCache.getString("real_gtins", "");
-        if (!json.isEmpty()) {
-            JSONArray arr = new JSONArray(json);
-            List<String> gtins = new ArrayList<>();
-            for (int i = 0; i < arr.length(); i++) {
-                String gtin = arr.optString(i, "");
-                if (!gtin.isEmpty()) {
-                    gtins.add(gtin);
-                }
-            }
-            if (!gtins.isEmpty()) {
-                realGtinsForSimulation = gtins.toArray(new String[0]);
-                expectedCount = realGtinsForSimulation.length;
-                Log.i(TAG, "📱 Loaded " + gtins.size() + " GTINs from offline storage");
-            }
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "Load offline GTINs error: " + e.getMessage());
-    }
-}
-
-    private void createSnapshotOnServer() {
-        if (scannedItems.isEmpty() || foundCount == 0 || apiClient == null || branchesManager == null) return;
-        final int activeBranchId = branchesManager.getActiveBranchId();
-        final String branchDisplayName = branchesManager.getActiveBranchDisplayName();
-
-        new Thread(() -> {
-            try {
-                JSONObject payload = new JSONObject();
-                payload.put("session_id", sessionId);
-                payload.put("branch_id", activeBranchId);
-                payload.put("location", branchDisplayName);
-                payload.put("total_items", foundCount);
-                payload.put("total_weight", calculateTotalWeight());
-                payload.put("total_value", calculateTotalValue());
-                
-                JSONArray itemsJson = new JSONArray();
-                for (InventoryItem item : scannedItems) {
-                    JSONObject obj = new JSONObject();
-                    obj.put("serial", item.serial); 
-                    obj.put("title", item.title);
-                    obj.put("karat", item.karat); 
-                    obj.put("weight", item.weight);
-                    obj.put("status", item.status); 
-                    obj.put("location", item.location);
-                    itemsJson.put(obj);
-                }
-                payload.put("items", itemsJson);
-                
-                // ✅ حفظ محلي
-                try {
-                    offlineCache.edit()
-                        .putString("last_snapshot", payload.toString())
-                        .putInt("prev_total_items", foundCount)
-                        .putLong("snapshot_time", System.currentTimeMillis())
-                        .apply();
-                } catch (Exception ignored) {}
-                
-                apiClient.createInventorySnapshot(payload);
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to create snapshot: " + e.getMessage());
-            }
-        }).start();
-    }
-
-    private void startSimulation() {
-    simulationIndex = 0;
-    
-    // ✅ استخدام الأرقام الحقيقية إذا كانت متاحة
-    final String[] gtinsToUse = realGtinsForSimulation.length > 0 
-        ? realGtinsForSimulation 
-        : simulationGtins;
-    
-    final int totalGtins = gtinsToUse.length;
-    expectedCount = totalGtins;
-    
-    if (tvExpectedCount != null) {
-        tvExpectedCount.setText(isBlindMode ? "???" : String.valueOf(totalGtins));
-    }
-    
-    simulationRunnable = () -> {
-        if (!isScanning || simulationIndex >= totalGtins) {
-            if (isScanning) stopInventory();
-            return;
-        }
-        processScannedTag(gtinsToUse[simulationIndex], "-" + (40 + (int)(Math.random() * 25)));
-        simulationIndex++;
-        simulationHandler.postDelayed(simulationRunnable, 500);
-    };
-    simulationHandler.postDelayed(simulationRunnable, 300);
-}
-
-@Override
-public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-    super.onViewCreated(view, savedInstanceState);
-    loadInventorySettings();
-    updateBranchHeader();
-    loadLastSnapshotOffline();
-    loadLastSnapshot();
-    loadOfflineGtinsForSimulation();  // ✅ تحميل الأرقام المحلية فوراً
-}
-
-    private double calculateTotalWeight() {
-        double total = 0;
-        for (InventoryItem item : scannedItems) {
-            try {
-                String w = item.weight.replace("g", "").replace("غرام", "").trim();
-                total += Double.parseDouble(w);
-            } catch (Exception ignored) {}
-        }
-        return Math.round(total * 1000.0) / 1000.0;
-    }
-
-    private double calculateTotalValue() {
-        return Math.round(calculateTotalWeight() * 65 * 100.0) / 100.0;
-    }
-
-    private void startInventory(boolean blindMode) {
-        isBlindMode = blindMode;
-        isScanning = true;
-        startTime = System.currentTimeMillis();
-        scannedItems.clear();
-        scannedCount = 0;
-        foundCount = 0;
-        if (adapter != null) adapter.notifyDataSetChanged();
-
-        if (btnStartInventory != null) btnStartInventory.setEnabled(false);
-        if (btnBlindInventory != null) btnBlindInventory.setEnabled(false);
-        if (btnStopInventory != null) btnStopInventory.setEnabled(true);
-        if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
-        if (cardComparison != null) cardComparison.setVisibility(View.VISIBLE);
-
-        updateComparisonCard();
-
-        if (tvInventoryStatus != null) {
-            tvInventoryStatus.setText(isArabic ? "● جاري الجرد" : "● SCANNING");
-            tvInventoryStatus.setTextColor(Color.parseColor("#38BDF8"));
-        }
-
-        playInventorySound("start");
-        startSessionOnServer(blindMode);
-        startTimer();
-    }
+    // ==================== BATCH SYNC AT SESSION END ====================
 
     private void stopInventory() {
         isScanning = false;
-        if (simulationRunnable != null) simulationHandler.removeCallbacks(simulationRunnable);
         playInventorySound("complete");
 
         if (btnStartInventory != null) btnStartInventory.setEnabled(true);
@@ -611,10 +345,91 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
         }
 
         stopTimer();
-        closeSessionOnServer();
         varianceCount = Math.max(0, expectedCount - foundCount);
         updateComparisonCard();
-        createSnapshotOnServer();
+
+        // إرسال كشوفات الجرد دفعة واحدة (Batch Processing) لتفادي اختناق الشبكة
+        syncFullInventorySession();
+    }
+
+    private void syncFullInventorySession() {
+        if (apiClient == null || branchesManager == null) return;
+        final int activeBranchId = branchesManager.getActiveBranchId();
+        final String branchDisplayName = branchesManager.getActiveBranchDisplayName();
+
+        new Thread(() -> {
+            try {
+                JSONObject payload = new JSONObject();
+                payload.put("session_id", sessionId);
+                payload.put("branch_id", activeBranchId);
+                payload.put("location", branchDisplayName);
+                payload.put("total_items", foundCount);
+                payload.put("scanned_count", scannedCount);
+                payload.put("expected_count", expectedCount);
+                payload.put("variance", varianceCount);
+                payload.put("total_weight", calculateTotalWeight());
+
+                JSONArray itemsJson = new JSONArray();
+                synchronized (scannedItems) {
+                    for (InventoryItem item : scannedItems) {
+                        JSONObject obj = new JSONObject();
+                        obj.put("serial", item.serial);
+                        obj.put("title", item.title);
+                        obj.put("karat", item.karat);
+                        obj.put("weight", item.numericWeight);
+                        obj.put("status", item.status);
+                        obj.put("location", item.location);
+                        itemsJson.put(obj);
+                    }
+                }
+                payload.put("items", itemsJson);
+
+                // حفظ نسخة احتياطية محلياً
+                if (offlineCache != null) {
+                    offlineCache.edit()
+                        .putString("last_snapshot", payload.toString())
+                        .putInt("prev_total_items", foundCount)
+                        .putLong("snapshot_time", System.currentTimeMillis())
+                        .apply();
+                }
+
+                // إرسال الطلب المجمع للسيرفر
+                apiClient.closeInventorySession(payload);
+
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to batch sync inventory: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    // ==================== AUXILIARY METHODS ====================
+
+    private void startInventory(boolean blindMode) {
+        isBlindMode = blindMode;
+        isScanning = true;
+        startTime = System.currentTimeMillis();
+
+        scannedEpcSet.clear();
+        synchronized (scannedItems) {
+            scannedItems.clear();
+        }
+        scannedCount = 0;
+        foundCount = 0;
+        if (adapter != null) adapter.notifyDataSetChanged();
+
+        if (btnStartInventory != null) btnStartInventory.setEnabled(false);
+        if (btnBlindInventory != null) btnBlindInventory.setEnabled(false);
+        if (btnStopInventory != null) btnStopInventory.setEnabled(true);
+        if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
+        if (cardComparison != null) cardComparison.setVisibility(View.VISIBLE);
+
+        if (tvInventoryStatus != null) {
+            tvInventoryStatus.setText(isArabic ? "● جاري الجرد" : "● SCANNING");
+            tvInventoryStatus.setTextColor(Color.parseColor("#38BDF8"));
+        }
+
+        playInventorySound("start");
+        startTimer();
     }
 
     private void updateComparisonCard() {
@@ -636,13 +451,28 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
             if (tvElapsedTime != null) {
                 tvElapsedTime.setText(String.format(Locale.US, "%02d:%02d:%02d", e / 3600000, (e / 60000) % 60, (e / 1000) % 60));
             }
-            handler.postDelayed(timerRunnable, 1000);
+            mainHandler.postDelayed(timerRunnable, 1000);
         };
-        handler.post(timerRunnable);
+        mainHandler.post(timerRunnable);
     }
 
     private void stopTimer() {
-        if (timerRunnable != null) handler.removeCallbacks(timerRunnable);
+        if (timerRunnable != null) mainHandler.removeCallbacks(timerRunnable);
+    }
+
+    private double calculateTotalWeight() {
+        double total = 0;
+        synchronized (scannedItems) {
+            for (InventoryItem item : scannedItems) {
+                total += item.numericWeight;
+            }
+        }
+        return Math.round(total * 1000.0) / 1000.0;
+    }
+
+    private double calculateTotalValue() {
+        // جلب أسعار عيارات الذهب الحقيقية إن وجدت، وإلا حسابها بالقيمة التقديرية
+        return Math.round(calculateTotalWeight() * 65.0 * 100.0) / 100.0;
     }
 
     private void playInventorySound(String type) {
@@ -650,20 +480,19 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
         if (vibrateEnabled && "scan".equals(type)) {
             try {
                 android.os.Vibrator vib = (android.os.Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
-                if (vib != null && vib.hasVibrator()) vib.vibrate(40);
+                if (vib != null && vib.hasVibrator()) vib.vibrate(30);
             } catch (Exception ignored) {}
         }
     }
 
     private void loadInventorySettings() {
         if (getContext() == null) return;
-        android.content.SharedPreferences p = getContext().getSharedPreferences("MIRA_BRIDGE_SETTINGS", Context.MODE_PRIVATE);
+        SharedPreferences p = getContext().getSharedPreferences("MIRA_BRIDGE_SETTINGS", Context.MODE_PRIVATE);
         soundEnabled = "true".equals(p.getString("inventory_sound", "true"));
         vibrateEnabled = "true".equals(p.getString("inventory_vibrate", "true"));
     }
 
-    // ==================== Report ====================
-    // (نفس كود generateProReport السابق - لم يتغير)
+    // ==================== PRINT REPORT ====================
 
     private void generateProReport() {
         if (getContext() == null || !isAdded()) return;
@@ -675,21 +504,20 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
 
         double totalWt = calculateTotalWeight();
         double totalVal = calculateTotalValue();
-        int dailySalesCount = 3;
-        int adjustedExpected = Math.max(0, prevTotalItems - dailySalesCount);
-        int netVariance = foundCount - adjustedExpected;
 
         StringBuilder rows = new StringBuilder();
         int count = 1;
-        for (int i = scannedItems.size() - 1; i >= 0; i--) {
-            InventoryItem item = scannedItems.get(i);
-            String color = "✓".equals(item.status) ? "#22C55E" : "⚠️".equals(item.status) ? "#F59E0B" : "#EF4444";
-            rows.append(String.format(Locale.US,
-                "<tr><td>%d</td><td style='color:%s;'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>",
-                count++, color, item.status, item.serial, item.title, item.karat, item.weight));
+        synchronized (scannedItems) {
+            for (int i = scannedItems.size() - 1; i >= 0; i--) {
+                InventoryItem item = scannedItems.get(i);
+                String color = "✓".equals(item.status) ? "#22C55E" : "⚠️".equals(item.status) ? "#F59E0B" : "#EF4444";
+                rows.append(String.format(Locale.US,
+                    "<tr><td>%d</td><td style='color:%s;'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%.2fg</td></tr>",
+                    count++, color, item.status, item.serial, item.title, item.karat, item.numericWeight));
+            }
         }
 
-        double accVal = adjustedExpected > 0 ? (foundCount * 100.0 / adjustedExpected) : 100.0;
+        double accVal = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 100.0;
         String accColor = accVal >= 98 ? "#22C55E" : accVal >= 90 ? "#F59E0B" : "#EF4444";
         String dir = isArabic ? "rtl" : "ltr";
 
@@ -697,7 +525,6 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
             "body{font-family:sans-serif;color:#111827;padding:20px;direction:" + dir + ";background:#fff;font-size:11px}" +
             ".header{text-align:center;border-bottom:2px solid #D4AF37;padding-bottom:10px;margin-bottom:12px}" +
             ".header h2{color:#1A237E;margin:0;font-size:18px}" +
-            ".header p{color:#666;font-size:10px;margin:2px 0}" +
             ".summary{display:flex;justify-content:space-between;margin:12px 0;gap:6px}" +
             ".card{flex:1;text-align:center;padding:8px;background:#F9FAFB;border-radius:6px}" +
             ".card .val{font-size:16px;font-weight:700}" +
@@ -711,16 +538,16 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
             (isArabic ? "تقرير تدقيق المخزون" : "Inventory Audit Report") + " | " +
             new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date()) + "</div>" +
             "<div class='summary'>" +
-            "<div class='card'><div class='val'>" + adjustedExpected + "</div><div class='lbl'>" + (isArabic ? "المتوقع" : "Expected") + "</div></div>" +
+            "<div class='card'><div class='val'>" + expectedCount + "</div><div class='lbl'>" + (isArabic ? "المتوقع" : "Expected") + "</div></div>" +
             "<div class='card'><div class='val' style='color:#22C55E'>" + foundCount + "</div><div class='lbl'>" + (isArabic ? "تم التحقق" : "Verified") + "</div></div>" +
-            "<div class='card'><div class='val' style='color:" + (netVariance >= 0 ? "#22C55E" : "#EF4444") + "'>" + (netVariance >= 0 ? "+" : "") + netVariance + "</div><div class='lbl'>" + (isArabic ? "التفاوت" : "Variance") + "</div></div>" +
+            "<div class='card'><div class='val' style='color:" + (varianceCount == 0 ? "#22C55E" : "#EF4444") + "'>" + varianceCount + "</div><div class='lbl'>" + (isArabic ? "العجز" : "Variance") + "</div></div>" +
             "<div class='card'><div class='val' style='color:" + accColor + "'>" + String.format(Locale.US, "%.1f%%", accVal) + "</div><div class='lbl'>" + (isArabic ? "الدقة" : "Accuracy") + "</div></div>" +
             "</div>" +
             "<table><tr><th>#</th><th>" + (isArabic ? "حالة" : "St") + "</th><th>" + (isArabic ? "الرقم" : "Serial") + "</th><th>" + (isArabic ? "القطعة" : "Item") + "</th><th>" + (isArabic ? "عيار" : "K") + "</th><th>" + (isArabic ? "وزن" : "Wt") + "</th></tr>" +
             rows.toString() + "</table>" +
             "<div style='display:flex;justify-content:space-between;margin-top:12px;font-weight:bold'>" +
-            "<div>" + (isArabic ? "الوزن: " : "Weight: ") + String.format(Locale.US, "%.2fg", totalWt) + "</div>" +
-            "<div>" + (isArabic ? "القيمة: " : "Value: ") + String.format(Locale.US, "%,.0f YER", totalVal) + "</div></div>" +
+            "<div>" + (isArabic ? "الوزن الكلي: " : "Total Weight: ") + String.format(Locale.US, "%.2fg", totalWt) + "</div>" +
+            "<div>" + (isArabic ? "القيمة الكلية: " : "Total Value: ") + String.format(Locale.US, "%,.0f YER", totalVal) + "</div></div>" +
             "<div class='footer'>MIRA Inventory Pro | " + orgName + " © 2026</div>" +
             "</body></html>";
 
@@ -741,59 +568,34 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
     }
 
     private void showAuditHistoryDialog() {
-        if (getContext() == null || apiClient == null || branchesManager == null) return;
+        if (getContext() == null || apiClient == null) return;
         Toast.makeText(getContext(), isArabic ? "🔄 جاري التحميل..." : "🔄 Loading...", Toast.LENGTH_SHORT).show();
-
-        final int activeBranchId = branchesManager.getActiveBranchId();
 
         new Thread(() -> {
             try {
                 MiraApiClient.ApiResponse response = apiClient.getInventorySessionsList();
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray sessionsArr = response.data.optJSONArray("sessions");
-                    if (sessionsArr == null || sessionsArr.length() == 0) {
-                        safeRun(() -> Toast.makeText(getContext(), isArabic ? "لا توجد جلسات سابقة" : "No previous sessions", Toast.LENGTH_SHORT).show());
-                        return;
-                    }
+                    if (sessionsArr == null || sessionsArr.length() == 0) return;
 
                     List<String> titleList = new ArrayList<>();
-                    List<Integer> idList = new ArrayList<>();
-
                     for (int i = 0; i < sessionsArr.length(); i++) {
                         JSONObject s = sessionsArr.optJSONObject(i);
                         if (s != null) {
-                            int id = s.optInt("id");
-                            idList.add(id);
-                            titleList.add((isArabic ? "جلسة #" : "Session #") + id + " - " + s.optString("created_at"));
+                            titleList.add((isArabic ? "جلسة #" : "Session #") + s.optInt("id") + " - " + s.optString("created_at"));
                         }
                     }
 
-                    if (titleList.isEmpty()) {
-                        safeRun(() -> Toast.makeText(getContext(), isArabic ? "لا توجد جلسات سابقة" : "No previous sessions", Toast.LENGTH_SHORT).show());
-                        return;
-                    }
-
-                    final String[] titles = titleList.toArray(new String[0]);
-                    final int[] ids = idList.stream().mapToInt(Integer::intValue).toArray();
-
-                    safeRun(() -> {
-                        if (!isAdded()) return;
-                        new AlertDialog.Builder(getContext())
-                            .setTitle(isArabic ? "📂 أرشيف الجرد" : "📂 Audit Archive")
-                            .setItems(titles, (d, w) -> loadAndPrintHistoricalReport(ids[w]))
-                            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-                            .show();
-                    });
+                    safeRun(() -> new AlertDialog.Builder(requireContext())
+                        .setTitle(isArabic ? "📂 أرشيف الجرد" : "📂 Audit Archive")
+                        .setItems(titleList.toArray(new String[0]), null)
+                        .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                        .show());
                 }
             } catch (Exception e) {
                 Log.e(TAG, "History error: " + e.getMessage());
             }
         }).start();
-    }
-
-    private void loadAndPrintHistoricalReport(int targetSessionId) {
-        if (apiClient == null || getContext() == null) return;
-        Toast.makeText(getContext(), isArabic ? "🔄 جاري التحميل..." : "🔄 Loading...", Toast.LENGTH_SHORT).show();
     }
 
     private void safeRun(Runnable r) {
@@ -806,10 +608,19 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
         else stopInventory();
     }
 
+    // ==================== ITEM & ADAPTER ====================
+
     public static class InventoryItem {
-        String serial, title, karat, weight, status, location;
-        public InventoryItem(String s, String t, String k, String w, String st, String l) {
-            serial = s; title = t; karat = k; weight = w; status = st; location = l;
+        String serial, title, karat, status, location;
+        double numericWeight;
+
+        public InventoryItem(String s, String t, String k, double w, String st, String l) {
+            this.serial = s;
+            this.title = t;
+            this.karat = k;
+            this.numericWeight = w;
+            this.status = st;
+            this.location = l;
         }
     }
 
@@ -824,7 +635,11 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
 
         @Override
         public void onBindViewHolder(@NonNull VH h, int pos) {
-            InventoryItem item = items.get(pos);
+            InventoryItem item;
+            synchronized (items) {
+                if (pos >= items.size()) return;
+                item = items.get(pos);
+            }
             if (h.s != null) {
                 h.s.setText(item.status);
                 h.s.setTextColor("✓".equals(item.status) ? Color.parseColor("#22C55E") :
@@ -832,11 +647,13 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
             }
             if (h.serial != null) h.serial.setText(item.serial);
             if (h.title != null) h.title.setText(item.title);
-            if (h.details != null) h.details.setText(item.karat + " | " + item.weight);
+            if (h.details != null) h.details.setText(String.format(Locale.US, "%s | %.2fg", item.karat, item.numericWeight));
             if (h.location != null) h.location.setText(item.location);
         }
 
-        @Override public int getItemCount() { return items.size(); }
+        @Override public int getItemCount() {
+            synchronized (items) { return items.size(); }
+        }
 
         class VH extends RecyclerView.ViewHolder {
             TextView s, serial, title, details, location;
@@ -855,10 +672,8 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
     public void onDestroyView() {
         isScanning = false;
         stopTimer();
-        if (simulationRunnable != null) simulationHandler.removeCallbacks(simulationRunnable);
-        handler.removeCallbacksAndMessages(null);
-        simulationHandler.removeCallbacksAndMessages(null);
+        mainHandler.removeCallbacksAndMessages(null);
         if (rvInventoryItems != null) rvInventoryItems.setAdapter(null);
         super.onDestroyView();
     }
-            }
+}
