@@ -475,7 +475,7 @@ public class MiraPosFragment extends MiraBaseFragment {
         JSONArray tamperAlerts = data.optJSONArray("tamper_alerts");
         if (tamperAlerts != null && tamperAlerts.length() > 0) {
             safeRun(() -> {
-                com.example.uhf.tools.TamperAlertHelper.showTamperAlert(mContext, tamperAlerts, code);
+                com.example.uhf.tools.TamperAlertHelper.showTamperAlert(getContext(), tamperAlerts, code);
                 playAlertSound(2);
             });
             
@@ -1057,4 +1057,4 @@ public class MiraPosFragment extends MiraBaseFragment {
             }
         }
     }
-                                    }
+                }
