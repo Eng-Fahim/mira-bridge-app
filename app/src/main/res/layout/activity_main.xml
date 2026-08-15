@@ -62,6 +62,19 @@
     android:textColor="@color/tab_top_text_color"
     android:textSize="12sp" />
     <TextView
+    android:id="@+id/tabTopGateSettings"
+    android:layout_width="wrap_content"
+    android:layout_height="32dp"
+    android:layout_marginEnd="6dp"
+    android:background="@drawable/bg_tab_top_selector"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center"
+    android:paddingHorizontal="14dp"
+    android:text="🔧 البوابات"
+    android:textColor="@color/tab_top_text_color"
+    android:textSize="12sp" />
+    <TextView
     android:id="@+id/tabTopGold"
     android:layout_width="wrap_content"
     android:layout_height="32dp"
