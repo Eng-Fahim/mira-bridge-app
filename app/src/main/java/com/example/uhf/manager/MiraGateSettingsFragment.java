@@ -1,449 +1,262 @@
-package com.example.uhf.manager;
+package com.example.uhf.fragment;
 
 import android.content.Context;
-import android.content.SharedPreferences;
-import android.util.Log;
+import android.media.SoundPool;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
+import android.widget.EditText;
+import android.widget.SeekBar;
+import android.widget.Spinner;
+import android.widget.TextView;
+import android.widget.Toast;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
-import java.util.ArrayList;
+import com.example.uhf.R;
+import com.example.uhf.manager.MiraSettings;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.switchmaterial.SwitchMaterial;
+
 import java.util.List;
 
-/**
- * MIRA Settings Manager
- * إدارة إعدادات التطبيق الشاملة
- * - إعدادات البوابات الأمنية
- * - إعدادات الأصوات والتنبيهات
- * - إعدادات أجهزة Chainway C72
- */
-public class MiraSettings {
+public class MiraGateSettingsFragment extends Fragment {
 
-    private static final String TAG = "MiraSettings";
-    private static final String PREFS_NAME = "MIRA_APP_SETTINGS";
-    
-    private static MiraSettings instance;
-    private final SharedPreferences prefs;
-    private final Context appContext;
+    private MiraSettings settings;
+    private SoundPool soundPool;
+    private int currentSoundId = -1;
 
-    // مفاتيح الإعدادات
-    private static final String KEY_GATES_LIST = "gates_list";
-    private static final String KEY_SOUND_PASS = "sound_pass";
-    private static final String KEY_SOUND_DENY = "sound_deny";
-    private static final String KEY_SOUND_ALARM = "sound_alarm";
-    private static final String KEY_VIBRATION_ENABLED = "vibration_enabled";
-    private static final String KEY_FLASH_ENABLED = "flash_enabled";
-    private static final String KEY_ALARM_DURATION = "alarm_duration";
-    private static final String KEY_ALARM_INTERVAL = "alarm_interval";
-    private static final String KEY_RFID_POWER = "rfid_power";
-    private static final String KEY_SCAN_COOLDOWN = "scan_cooldown";
+    // UI
+    private RecyclerView rvGates;
+    private Spinner spSoundPass, spSoundDeny, spSoundAlarm;
+    private SwitchMaterial switchVibration, switchFlash;
+    private EditText etAlarmDuration;
+    private SeekBar seekRfidPower;
+    private TextView tvRfidPowerValue;
+    private MaterialButton btnAddGate, btnTestSound, btnSaveSounds, btnSaveAll;
 
-    private MiraSettings(Context context) {
-        appContext = context.getApplicationContext();
-        prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.fragment_mira_gate_settings, container, false);
     }
 
-    public static synchronized MiraSettings getInstance(Context context) {
-        if (instance == null) {
-            instance = new MiraSettings(context);
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        Context ctx = requireContext();
+        settings = MiraSettings.getInstance(ctx);
+
+        soundPool = new SoundPool.Builder().setMaxStreams(3).build();
+
+        initViews(view);
+        setupSpinners();
+        loadSettings();
+        setupListeners();
+    }
+
+    private void initViews(View view) {
+        rvGates = view.findViewById(R.id.rvGates);
+        spSoundPass = view.findViewById(R.id.spSoundPass);
+        spSoundDeny = view.findViewById(R.id.spSoundDeny);
+        spSoundAlarm = view.findViewById(R.id.spSoundAlarm);
+        switchVibration = view.findViewById(R.id.switchVibration);
+        switchFlash = view.findViewById(R.id.switchFlash);
+        etAlarmDuration = view.findViewById(R.id.etAlarmDuration);
+        seekRfidPower = view.findViewById(R.id.seekRfidPower);
+        tvRfidPowerValue = view.findViewById(R.id.tvRfidPowerValue);
+        btnAddGate = view.findViewById(R.id.btnAddGate);
+        btnTestSound = view.findViewById(R.id.btnTestSound);
+        btnSaveSounds = view.findViewById(R.id.btnSaveSounds);
+        btnSaveAll = view.findViewById(R.id.btnSaveAll);
+
+        // إعداد قائمة البوابات
+        rvGates.setLayoutManager(new LinearLayoutManager(getContext()));
+    }
+
+    private void setupSpinners() {
+        // صوت النجاح
+        ArrayAdapter<String> passAdapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, getSoundNames(MiraSettings.SoundOptions.PASS_SOUNDS));
+        passAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spSoundPass.setAdapter(passAdapter);
+
+        // صوت الرفض
+        ArrayAdapter<String> denyAdapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, getSoundNames(MiraSettings.SoundOptions.DENY_SOUNDS));
+        denyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spSoundDeny.setAdapter(denyAdapter);
+
+        // صوت الإنذار
+        ArrayAdapter<String> alarmAdapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, getSoundNames(MiraSettings.SoundOptions.ALARM_SOUNDS));
+        alarmAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spSoundAlarm.setAdapter(alarmAdapter);
+    }
+
+    private String[] getSoundNames(String[] soundKeys) {
+        String[] names = new String[soundKeys.length];
+        for (int i = 0; i < soundKeys.length; i++) {
+            names[i] = getSoundDisplayName(soundKeys[i]);
         }
-        return instance;
+        return names;
     }
 
-    // ============================================
-    // 🏢 إدارة البوابات الأمنية
-    // ============================================
+    private String getSoundDisplayName(String soundKey) {
+        switch (soundKey) {
+            case "beep_success": return "🔔 نجاح قصير";
+            case "beep_soft": return "🔔 ناعم";
+            case "beep_double": return "🔔 مزدوج";
+            case "chime_elegant": return "🎵 نغمة أنيقة";
+            case "silent": return "🔇 بدون صوت";
+            case "beep_warning": return "⚠️ تحذير";
+            case "beep_error": return "❌ خطأ";
+            case "alarm_soft": return "🚨 إنذار خفيف";
+            case "buzz_double": return "📳 طنين مزدوج";
+            case "alarm_sold_item": return "🚨 إنذار مباع";
+            case "alarm_breach_security": return "🚨 اختراق أمني";
+            case "alarm_siren_strong": return "🚨 صفارة قوية";
+            case "alarm_police": return "🚨 صفارة شرطة";
+            case "alarm_buzzer_loud": return "🚨 طنين عالي";
+            case "alarm_klaxon": return "🚨 كلوكسون";
+            default: return soundKey;
+        }
+    }
 
-    /**
-     * نموذج بوابة أمنية
-     */
-    public static class GateDevice {
-        public String gateId;
-        public String gateName;
-        public String location;
-        public String deviceType = "chainway_c72";
-        public String ipAddress;
-        public int port = 8080;
-        public String macAddress;
-        public String firmwareVersion;
-        public String status = "offline";
-        public boolean isPrimary;
-        public int rfidPower = 28;
-        public int scanInterval = 500;
-        public boolean autoArm;
-        public String soundPass;
-        public String soundDeny;
-        public String soundAlarm;
+    private void loadSettings() {
+        // تحميل الأصوات
+        String soundPass = settings.getSoundPass();
+        String soundDeny = settings.getSoundDeny();
+        String soundAlarm = settings.getSoundAlarm();
 
-        public JSONObject toJson() {
-            JSONObject json = new JSONObject();
-            try {
-                json.put("gate_id", gateId);
-                json.put("gate_name", gateName);
-                json.put("location", location);
-                json.put("device_type", deviceType);
-                json.put("ip_address", ipAddress);
-                json.put("port", port);
-                json.put("mac_address", macAddress);
-                json.put("firmware_version", firmwareVersion);
-                json.put("status", status);
-                json.put("is_primary", isPrimary);
-                json.put("rfid_power", rfidPower);
-                json.put("scan_interval", scanInterval);
-                json.put("auto_arm", autoArm);
-                json.put("sound_pass", soundPass);
-                json.put("sound_deny", soundDeny);
-                json.put("sound_alarm", soundAlarm);
-            } catch (Exception e) {
-                Log.e(TAG, "GateDevice toJson error: " + e.getMessage());
+        spSoundPass.setSelection(findIndex(MiraSettings.SoundOptions.PASS_SOUNDS, soundPass));
+        spSoundDeny.setSelection(findIndex(MiraSettings.SoundOptions.DENY_SOUNDS, soundDeny));
+        spSoundAlarm.setSelection(findIndex(MiraSettings.SoundOptions.ALARM_SOUNDS, soundAlarm));
+
+        // تحميل الإعدادات الأخرى
+        switchVibration.setChecked(settings.isVibrationEnabled());
+        switchFlash.setChecked(settings.isFlashEnabled());
+        etAlarmDuration.setText(String.valueOf(settings.getAlarmDuration()));
+        seekRfidPower.setProgress(settings.getRfidPower());
+        tvRfidPowerValue.setText(settings.getRfidPower() + " dBm");
+    }
+
+    private int findIndex(String[] array, String value) {
+        for (int i = 0; i < array.length; i++) {
+            if (array[i].equals(value)) return i;
+        }
+        return 0;
+    }
+
+    private void setupListeners() {
+        btnAddGate.setOnClickListener(v -> showAddGateDialog());
+        
+        btnTestSound.setOnClickListener(v -> {
+            String selectedSound = MiraSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()];
+            playSound(selectedSound);
+        });
+
+        btnSaveSounds.setOnClickListener(v -> {
+            String soundPass = MiraSettings.SoundOptions.PASS_SOUNDS[spSoundPass.getSelectedItemPosition()];
+            String soundDeny = MiraSettings.SoundOptions.DENY_SOUNDS[spSoundDeny.getSelectedItemPosition()];
+            String soundAlarm = MiraSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()];
+
+            settings.setSoundPass(soundPass);
+            settings.setSoundDeny(soundDeny);
+            settings.setSoundAlarm(soundAlarm);
+
+            Toast.makeText(getContext(), "✅ تم حفظ الأصوات", Toast.LENGTH_SHORT).show();
+        });
+
+        seekRfidPower.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                tvRfidPowerValue.setText(progress + " dBm");
             }
-            return json;
-        }
 
-        public static GateDevice fromJson(JSONObject json) {
-            GateDevice gate = new GateDevice();
-            gate.gateId = json.optString("gate_id", "");
-            gate.gateName = json.optString("gate_name", "");
-            gate.location = json.optString("location", "");
-            gate.deviceType = json.optString("device_type", "chainway_c72");
-            gate.ipAddress = json.optString("ip_address", "");
-            gate.port = json.optInt("port", 8080);
-            gate.macAddress = json.optString("mac_address", "");
-            gate.firmwareVersion = json.optString("firmware_version", "");
-            gate.status = json.optString("status", "offline");
-            gate.isPrimary = json.optBoolean("is_primary", false);
-            gate.rfidPower = json.optInt("rfid_power", 28);
-            gate.scanInterval = json.optInt("scan_interval", 500);
-            gate.autoArm = json.optBoolean("auto_arm", false);
-            gate.soundPass = json.optString("sound_pass", "beep_success");
-            gate.soundDeny = json.optString("sound_deny", "beep_warning");
-            gate.soundAlarm = json.optString("sound_alarm", "alarm_sold_item");
-            return gate;
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        btnSaveAll.setOnClickListener(v -> {
+            settings.setVibrationEnabled(switchVibration.isChecked());
+            settings.setFlashEnabled(switchFlash.isChecked());
+            settings.setAlarmDuration(Integer.parseInt(etAlarmDuration.getText().toString()));
+            settings.setRfidPower(seekRfidPower.getProgress());
+
+            Toast.makeText(getContext(), "✅ تم حفظ جميع الإعدادات", Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    private void playSound(String soundName) {
+        int soundId = MiraSettings.SoundOptions.getSoundResourceId(requireContext(), soundName);
+        if (soundId > 0) {
+            currentSoundId = soundPool.load(requireContext(), soundId, 1);
+            soundPool.setOnLoadCompleteListener((pool, sampleId, status) -> {
+                if (status == 0) {
+                    pool.play(sampleId, 1.0f, 1.0f, 1, 0, 1.0f);
+                }
+            });
+        } else {
+            Toast.makeText(getContext(), "🔇 بدون صوت", Toast.LENGTH_SHORT).show();
         }
     }
 
-    /**
-     * حفظ قائمة البوابات
-     */
-    public void saveGates(List<GateDevice> gates) {
-        JSONArray array = new JSONArray();
-        for (GateDevice gate : gates) {
-            array.put(gate.toJson());
-        }
-        prefs.edit().putString(KEY_GATES_LIST, array.toString()).apply();
-    }
+    private void showAddGateDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("➕ إضافة بوابة جديدة");
 
-    /**
-     * جلب قائمة البوابات
-     */
-    public List<GateDevice> getGates() {
-        List<GateDevice> gates = new ArrayList<>();
-        String json = prefs.getString(KEY_GATES_LIST, "[]");
-        try {
-            JSONArray array = new JSONArray(json);
-            for (int i = 0; i < array.length(); i++) {
-                gates.add(GateDevice.fromJson(array.optJSONObject(i)));
+        LinearLayout layout = new LinearLayout(requireContext());
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(40, 20, 40, 10);
+
+        final EditText etGateName = new EditText(requireContext());
+        etGateName.setHint("اسم البوابة (مثال: البوابة الرئيسية)");
+        layout.addView(etGateName);
+
+        final EditText etLocation = new EditText(requireContext());
+        etLocation.setHint("الموقع (مثال: المدخل الرئيسي)");
+        layout.addView(etLocation);
+
+        builder.setView(layout);
+        builder.setPositiveButton("إضافة", (dialog, which) -> {
+            String gateName = etGateName.getText().toString().trim();
+            String location = etLocation.getText().toString().trim();
+
+            if (!gateName.isEmpty()) {
+                MiraSettings.GateDevice gate = new MiraSettings.GateDevice();
+                gate.gateId = "gate_" + System.currentTimeMillis();
+                gate.gateName = gateName;
+                gate.location = location;
+                gate.deviceType = "chainway_c72";
+                gate.status = "offline";
+
+                settings.addGate(gate);
+                Toast.makeText(getContext(), "✅ تمت إضافة البوابة", Toast.LENGTH_SHORT).show();
             }
-        } catch (Exception e) {
-            Log.e(TAG, "getGates error: " + e.getMessage());
-        }
-        return gates;
+        });
+        builder.setNegativeButton("إلغاء", null);
+        builder.show();
     }
 
-    /**
-     * إضافة بوابة جديدة
-     */
-    public void addGate(GateDevice gate) {
-        List<GateDevice> gates = getGates();
-        gates.add(gate);
-        saveGates(gates);
-    }
-
-    /**
-     * تحديث بوابة
-     */
-    public void updateGate(String gateId, GateDevice updatedGate) {
-        List<GateDevice> gates = getGates();
-        for (int i = 0; i < gates.size(); i++) {
-            if (gates.get(i).gateId.equals(gateId)) {
-                gates.set(i, updatedGate);
-                break;
-            }
-        }
-        saveGates(gates);
-    }
-
-    /**
-     * حذف بوابة
-     */
-    public void removeGate(String gateId) {
-        List<GateDevice> gates = getGates();
-        for (int i = 0; i < gates.size(); i++) {
-            if (gates.get(i).gateId.equals(gateId)) {
-                gates.remove(i);
-                break;
-            }
-        }
-        saveGates(gates);
-    }
-
-    /**
-     * الحصول على البوابة الأساسية
-     */
-    public GateDevice getPrimaryGate() {
-        List<GateDevice> gates = getGates();
-        for (GateDevice gate : gates) {
-            if (gate.isPrimary) return gate;
-        }
-        return gates.isEmpty() ? null : gates.get(0);
-    }
-
-    /**
-     * تعيين البوابة الأساسية
-     */
-    public void setPrimaryGate(String gateId) {
-        List<GateDevice> gates = getGates();
-        for (GateDevice gate : gates) {
-            gate.isPrimary = gate.gateId.equals(gateId);
-        }
-        saveGates(gates);
-    }
-
-    // ============================================
-    // 🔊 إعدادات الأصوات
-    // ============================================
-
-    /**
-     * خيارات الأصوات المتاحة
-     */
-    public static class SoundOptions {
-        public static final String[] PASS_SOUNDS = {
-            "beep_success",      // صوت نجاح قصير
-            "beep_soft",         // صوت ناعم
-            "beep_double",       // صوت مزدوج
-            "chime_elegant",     // نغمة أنيقة
-            "silent"             // بدون صوت
-        };
-
-        public static final String[] DENY_SOUNDS = {
-            "beep_warning",      // صوت تحذير
-            "beep_error",        // صوت خطأ
-            "alarm_soft",        // إنذار خفيف
-            "buzz_double",       // طنين مزدوج
-            "silent"             // بدون صوت
-        };
-
-        public static final String[] ALARM_SOUNDS = {
-            "alarm_sold_item",       // إنذار البضاعة المباعة (افتراضي)
-            "alarm_breach_security", // إنذار اختراق أمني
-            "alarm_siren_strong",    // صفارة قوية
-            "alarm_police",          // صفارة شرطة
-            "alarm_buzzer_loud",     // طنين عالي
-            "alarm_klaxon",          // كلوكسون
-            "silent"                 // بدون صوت
-        };
-
-        /**
-         * الحصول على Resource ID للصوت
-         */
-        public static int getSoundResourceId(Context context, String soundName) {
-            if (soundName == null || soundName.equals("silent")) return -1;
-            
-            switch (soundName) {
-                case "beep_success": return context.getResources().getIdentifier("beep_success", "raw", context.getPackageName());
-                case "beep_soft": return context.getResources().getIdentifier("beep_soft", "raw", context.getPackageName());
-                case "beep_double": return context.getResources().getIdentifier("beep_double", "raw", context.getPackageName());
-                case "chime_elegant": return context.getResources().getIdentifier("chime_elegant", "raw", context.getPackageName());
-                case "beep_warning": return context.getResources().getIdentifier("beep_warning", "raw", context.getPackageName());
-                case "beep_error": return context.getResources().getIdentifier("beep_error", "raw", context.getPackageName());
-                case "alarm_soft": return context.getResources().getIdentifier("alarm_soft", "raw", context.getPackageName());
-                case "buzz_double": return context.getResources().getIdentifier("buzz_double", "raw", context.getPackageName());
-                case "alarm_sold_item": return context.getResources().getIdentifier("alarm_sold_item", "raw", context.getPackageName());
-                case "alarm_breach_security": return context.getResources().getIdentifier("alarm_breach_security", "raw", context.getPackageName());
-                case "alarm_siren_strong": return context.getResources().getIdentifier("alarm_siren_strong", "raw", context.getPackageName());
-                case "alarm_police": return context.getResources().getIdentifier("alarm_police", "raw", context.getPackageName());
-                case "alarm_buzzer_loud": return context.getResources().getIdentifier("alarm_buzzer_loud", "raw", context.getPackageName());
-                case "alarm_klaxon": return context.getResources().getIdentifier("alarm_klaxon", "raw", context.getPackageName());
-                case "barcodebeep": return context.getResources().getIdentifier("barcodebeep", "raw", context.getPackageName());
-                default: return -1;
-            }
-        }
-    }
-
-    /**
-     * حفظ صوت النجاح
-     */
-    public void setSoundPass(String soundName) {
-        prefs.edit().putString(KEY_SOUND_PASS, soundName).apply();
-    }
-
-    /**
-     * جلب صوت النجاح
-     */
-    public String getSoundPass() {
-        return prefs.getString(KEY_SOUND_PASS, "beep_success");
-    }
-
-    /**
-     * حفظ صوت الرفض
-     */
-    public void setSoundDeny(String soundName) {
-        prefs.edit().putString(KEY_SOUND_DENY, soundName).apply();
-    }
-
-    /**
-     * جلب صوت الرفض
-     */
-    public String getSoundDeny() {
-        return prefs.getString(KEY_SOUND_DENY, "beep_warning");
-    }
-
-    /**
-     * حفظ صوت الإنذار
-     */
-    public void setSoundAlarm(String soundName) {
-        prefs.edit().putString(KEY_SOUND_ALARM, soundName).apply();
-    }
-
-    /**
-     * جلب صوت الإنذار
-     */
-    public String getSoundAlarm() {
-        return prefs.getString(KEY_SOUND_ALARM, "alarm_breach_security");
-    }
-
-    // ============================================
-    // ⚙️ إعدادات إضافية
-    // ============================================
-
-    /**
-     * تفعيل/تعطيل الاهتزاز
-     */
-    public void setVibrationEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_VIBRATION_ENABLED, enabled).apply();
-    }
-
-    public boolean isVibrationEnabled() {
-        return prefs.getBoolean(KEY_VIBRATION_ENABLED, true);
-    }
-
-    /**
-     * تفعيل/تعطيل وميض الشاشة
-     */
-    public void setFlashEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_FLASH_ENABLED, enabled).apply();
-    }
-
-    public boolean isFlashEnabled() {
-        return prefs.getBoolean(KEY_FLASH_ENABLED, true);
-    }
-
-    /**
-     * مدة الإنذار بالثواني
-     */
-    public void setAlarmDuration(int seconds) {
-        prefs.edit().putInt(KEY_ALARM_DURATION, seconds).apply();
-    }
-
-    public int getAlarmDuration() {
-        return prefs.getInt(KEY_ALARM_DURATION, 10);
-    }
-
-    /**
-     * فترة تكرار الإنذار بالمللي ثانية
-     */
-    public void setAlarmInterval(int milliseconds) {
-        prefs.edit().putInt(KEY_ALARM_INTERVAL, milliseconds).apply();
-    }
-
-    public int getAlarmInterval() {
-        return prefs.getInt(KEY_ALARM_INTERVAL, 2200);
-    }
-
-    /**
-     * قوة RFID
-     */
-    public void setRfidPower(int power) {
-        prefs.edit().putInt(KEY_RFID_POWER, power).apply();
-    }
-
-    public int getRfidPower() {
-        return prefs.getInt(KEY_RFID_POWER, 28);
-    }
-
-    /**
-     * فترة تهدئة التاق المكرر
-     */
-    public void setScanCooldown(long milliseconds) {
-        prefs.edit().putLong(KEY_SCAN_COOLDOWN, milliseconds).apply();
-    }
-
-    public long getScanCooldown() {
-        return prefs.getLong(KEY_SCAN_COOLDOWN, 2500);
-    }
-
-    // ============================================
-    // 🏢 إعدادات Chainway C72
-    // ============================================
-
-    /**
-     * إعدادات جهاز Chainway C72
-     */
-    public static class ChainwaySettings {
-        public int rfidPower = 28;
-        public int scanInterval = 500;
-        public boolean continuousMode = true;
-        public int sessionTimeout = 30000;
-        public boolean autoConnect = true;
-        public String bluetoothMac = "";
-        public String wifiIp = "";
-        public int wifiPort = 8080;
-
-        public JSONObject toJson() {
-            JSONObject json = new JSONObject();
-            try {
-                json.put("rfid_power", rfidPower);
-                json.put("scan_interval", scanInterval);
-                json.put("continuous_mode", continuousMode);
-                json.put("session_timeout", sessionTimeout);
-                json.put("auto_connect", autoConnect);
-                json.put("bluetooth_mac", bluetoothMac);
-                json.put("wifi_ip", wifiIp);
-                json.put("wifi_port", wifiPort);
-            } catch (Exception e) {}
-            return json;
-        }
-
-        public static ChainwaySettings fromJson(JSONObject json) {
-            ChainwaySettings settings = new ChainwaySettings();
-            settings.rfidPower = json.optInt("rfid_power", 28);
-            settings.scanInterval = json.optInt("scan_interval", 500);
-            settings.continuousMode = json.optBoolean("continuous_mode", true);
-            settings.sessionTimeout = json.optInt("session_timeout", 30000);
-            settings.autoConnect = json.optBoolean("auto_connect", true);
-            settings.bluetoothMac = json.optString("bluetooth_mac", "");
-            settings.wifiIp = json.optString("wifi_ip", "");
-            settings.wifiPort = json.optInt("wifi_port", 8080);
-            return settings;
-        }
-    }
-
-    /**
-     * حفظ إعدادات Chainway C72
-     */
-    public void saveChainwaySettings(ChainwaySettings settings) {
-        prefs.edit().putString("chainway_settings", settings.toJson().toString()).apply();
-    }
-
-    /**
-     * جلب إعدادات Chainway C72
-     */
-    public ChainwaySettings getChainwaySettings() {
-        String json = prefs.getString("chainway_settings", "{}");
-        try {
-            return ChainwaySettings.fromJson(new JSONObject(json));
-        } catch (Exception e) {
-            return new ChainwaySettings();
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (soundPool != null) {
+            soundPool.release();
+            soundPool = null;
         }
     }
 }
