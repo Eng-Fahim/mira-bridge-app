@@ -1,21 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/splash_background_gradient">
 
-    <!-- طبقة الجزيئات العلوية -->
-    <ImageView
-        android:id="@+id/ivParticlesTop"
-        android:layout_width="match_parent"
-        android:layout_height="200dp"
-        android:layout_alignParentTop="true"
-        android:src="@drawable/particles_top"
-        android:alpha="0.3"
-        android:scaleType="fitXY" />
-
-    <!-- الشعار الرئيسي -->
+    <!-- الشعار الرئيسي والعنوان -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -24,20 +13,11 @@
         android:gravity="center"
         android:padding="24dp">
 
-        <!-- حاوية الشعار مع الظل -->
+        <!-- حاوية الشعار -->
         <FrameLayout
             android:layout_width="120dp"
             android:layout_height="120dp"
             android:layout_marginBottom="24dp">
-
-            <!-- دائرة متوهجة خلف الشعار -->
-            <View
-                android:id="@+id/glowCircle"
-                android:layout_width="100dp"
-                android:layout_height="100dp"
-                android:layout_gravity="center"
-                android:background="@drawable/circle_glow"
-                android:alpha="0.8" />
 
             <!-- الشعار -->
             <ImageView
@@ -79,13 +59,6 @@
             android:letterSpacing="0.1"
             android:fontFamily="sans-serif-light"
             android:gravity="center" />
-
-        <!-- خط فاصل ذهبي -->
-        <View
-            android:layout_width="60dp"
-            android:layout_height="2dp"
-            android:layout_marginTop="16dp"
-            android:background="@drawable/gold_divider" />
     </LinearLayout>
 
     <!-- مؤشر التحميل -->
@@ -105,16 +78,6 @@
             android:indeterminateTint="#FFD700"
             android:indeterminateTintMode="src_atop" />
 
-        <TextView
-            android:id="@+id/tvLoadingText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="جاري التحميل..."
-            android:textSize="12sp"
-            android:textColor="#80FFFFFF"
-            android:fontFamily="sans-serif-light" />
-
         <!-- نسخة التطبيق -->
         <TextView
             android:id="@+id/tvVersion"
@@ -126,14 +89,5 @@
             android:textColor="#40FFFFFF"
             android:fontFamily="sans-serif-light" />
     </LinearLayout>
-
-    <!-- طبقة الجزيئات السفلية -->
-    <ImageView
-        android:layout_width="match_parent"
-        android:layout_height="200dp"
-        android:layout_alignParentBottom="true"
-        android:src="@drawable/particles_bottom"
-        android:alpha="0.2"
-        android:scaleType="fitXY" />
 
 </RelativeLayout>
