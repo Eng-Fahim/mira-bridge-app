@@ -35,12 +35,12 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-import androidx.core.app.ActivityCompat;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.AppCompatSpinner;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -51,9 +51,8 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.RFIDManager;
 import com.example.uhf.MiraRfid.model.RFIDDevice;
-
-// أضف في الأعلى
 import com.example.uhf.tools.TamperAlertHelper;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -75,6 +74,7 @@ import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -87,11 +87,14 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     private static final long DEFAULT_INACTIVITY_TIMEOUT_MS = 180000;
     private static final long UI_UPDATE_INTERVAL_MS = 300;
     private static final int BATCH_SIZE_THRESHOLD = 50;
+    private static final long DEBOUNCE_INTERVAL_MS = 200; // منع تكرار المسح في أجزاء الثانية
+    private static final double DEFAULT_RSSI_THRESHOLD = -75.0; // حد تصفية الإشارات البعيدة
 
     // إعدادات البلوتوث والـ Offline Cache
     private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private static final String OFFLINE_PREFS = "uhf_inventory_cache";
     private static final String PREF_LAST_CONNECTED_DEVICE = "last_bt_device";
+    private static final String PREF_SESSION_BACKUP = "session_backup_epcs";
 
     // خرائط وقوائم البيانات
     private final Map<String, ExpectedItem> expectedItemsMap = new HashMap<>();
@@ -101,6 +104,7 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     private final Set<String> scannedEpcSet = new HashSet<>();
     private final Queue<TagModel> pendingTagsQueue = new LinkedList<>();
     private final List<TagModel> missingItemsCache = new ArrayList<>();
+    private final Map<String, Long> lastSeenTagMap = new ConcurrentHashMap<>(); // منع التداخل الزمني
     private boolean isMissingCacheDirty = true;
 
     // عناصر الواجهة (UI Controls)
@@ -124,12 +128,12 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     private RFIDManager rfidManager;
     private TagAdapter tagAdapter;
 
-    // الخيوط الموازية والمؤقتات (Handlers & Executors)
+    // الخيوط الموازية والمؤقتات
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private ExecutorService networkExecutor;
     private ExecutorService hardwareExecutor;
 
-    // الوسائط المساعدة (المؤثرات الصوتية والاهتزاز)
+    // الوسائط المساعدة
     private SoundPool soundPool;
     private int soundSuccessId, soundWarningId, soundAlertId;
     private Vibrator vibrator;
@@ -173,7 +177,6 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     private InputStream wifiInputStream;
     private OutputStream wifiOutputStream;
 
-    // مستلم الأحداث اللاسلكية
     private final BroadcastReceiver bluetoothReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -183,7 +186,6 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
         }
     };
 
-    // مؤقت الجلسة والتوقف الآلي
     private final Runnable timerRunnable = new Runnable() {
         @Override
         public void run() {
@@ -206,7 +208,6 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
 
     private final Runnable inactivityRunnable = this::stopScanningDueToInactivity;
 
-    // محاكي القراءة الذكي المشتق من قاعدة البيانات
     private final Runnable simulationRunnable = new Runnable() {
         @Override
         public void run() {
@@ -217,7 +218,6 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
         }
     };
 
-    // تحديث الواجهة التراكمي
     private final Runnable uiBatchUpdateRunnable = new Runnable() {
         @Override
         public void run() {
@@ -276,24 +276,16 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
                 }
 
                 @Override
-                public void onScanStarted() {
-                    Log.i(TAG, "RFID Scan Started");
-                }
+                public void onScanStarted() { Log.i(TAG, "RFID Scan Started"); }
 
                 @Override
-                public void onScanStopped() {
-                    Log.i(TAG, "RFID Scan Stopped");
-                }
+                public void onScanStopped() { Log.i(TAG, "RFID Scan Stopped"); }
 
                 @Override
-                public void onConnectionChanged(boolean connected) {
-                    Log.i(TAG, "RFID Connection: " + connected);
-                }
+                public void onConnectionChanged(boolean connected) { Log.i(TAG, "RFID Connection: " + connected); }
 
                 @Override
-                public void onError(String error) {
-                    Log.e(TAG, "RFID Error: " + error);
-                }
+                public void onError(String error) { Log.e(TAG, "RFID Error: " + error); }
             });
 
             sessionId = "AUDIT-" + System.currentTimeMillis();
@@ -306,12 +298,142 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
             setupZoneSpinner();
             loadDynamicInventorySettings();
             loadExpectedInventory();
+            restoreLocalSessionBackup();
             startReaderMonitoring();
             setInventoryState(InventoryState.IDLE);
 
         } catch (Exception e) {
             Log.e(TAG, "onViewCreated error: " + e.getMessage());
         }
+    }
+
+    private String normalizeEpc(String rawEpc) {
+        if (rawEpc == null) return "";
+        return rawEpc.replaceAll("[^A-Fa-f0-9]", "").toUpperCase().trim();
+    }
+
+    public void onTagScanned(String rawEpc, double rssi) {
+        if (currentState != InventoryState.SCANNING || rawEpc == null) return;
+
+        // 1. تصفية الإشارات البعيدة جدًا
+        if (rssi < DEFAULT_RSSI_THRESHOLD) return;
+
+        // 2. توحيد صيغة EPC
+        String epc = normalizeEpc(rawEpc);
+        if (epc.isEmpty()) return;
+
+        // 3. منع التكرار في الأجزاء الزهرية من الثانية (Debouncing)
+        long currentTime = System.currentTimeMillis();
+        Long lastSeen = lastSeenTagMap.get(epc);
+        if (lastSeen != null && (currentTime - lastSeen < DEBOUNCE_INTERVAL_MS)) {
+            return;
+        }
+        lastSeenTagMap.put(epc, currentTime);
+
+        resetInactivityTimer();
+        totalScannedCount++;
+
+        checkTamperForTag(epc);
+
+        synchronized (pendingTagsQueue) {
+            TagModel model = new TagModel();
+            model.epc = epc;
+            model.rssi = rssi;
+            pendingTagsQueue.add(model);
+        }
+
+        mainHandler.post(() -> {
+            tvTotalScanned.setText(String.valueOf(totalScannedCount));
+
+            if (!scannedEpcSet.contains(epc)) {
+                scannedEpcSet.add(epc);
+                tvUniqueTags.setText(String.valueOf(scannedEpcSet.size()));
+                saveSessionBackupLocally();
+            }
+        });
+
+        scheduleUiUpdate();
+
+        if (pendingTagsQueue.size() >= BATCH_SIZE_THRESHOLD) {
+            mainHandler.post(this::processPendingBatch);
+        }
+    }
+
+    private void saveSessionBackupLocally() {
+        networkExecutor.execute(() -> {
+            try {
+                Set<String> copySet = new HashSet<>(scannedEpcSet);
+                JSONArray array = new JSONArray(copySet);
+                offlineCache.edit().putString(PREF_SESSION_BACKUP, array.toString()).apply();
+            } catch (Exception e) {
+                Log.e(TAG, "Error saving backup: " + e.getMessage());
+            }
+        });
+    }
+
+    private void restoreLocalSessionBackup() {
+        try {
+            String backupJson = offlineCache.getString(PREF_SESSION_BACKUP, null);
+            if (backupJson != null) {
+                JSONArray array = new JSONArray(backupJson);
+                for (int i = 0; i < array.length(); i++) {
+                    String epc = array.getString(i);
+                    scannedEpcSet.add(epc);
+                    TagModel model = new TagModel();
+                    model.epc = epc;
+                    model.rssi = -50;
+                    processSingleTag(model);
+                }
+                updateReconciliationStats();
+                tvUniqueTags.setText(String.valueOf(scannedEpcSet.size()));
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error restoring backup: " + e.getMessage());
+        }
+    }
+
+    private void checkTamperForTag(String epc) {
+        networkExecutor.execute(() -> {
+            try {
+                MiraApiClient api = MiraApiClient.getInstance(requireContext());
+                JSONObject extraParams = new JSONObject();
+                extraParams.put("context", "inventory");
+                extraParams.put("scale_weight", 0);
+
+                MiraApiClient.ApiResponse response = api.authorize(epc, "inventory", extraParams);
+
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONArray tamperAlerts = response.data.optJSONArray("tamper_alerts");
+
+                    if (tamperAlerts != null && tamperAlerts.length() > 0) {
+                        mainHandler.post(() -> {
+                            TamperAlertHelper.showTamperAlert(requireContext(), tamperAlerts, epc);
+                            playAlertSound();
+
+                            if (alertBannerView != null && tvAlertMessage != null) {
+                                alertBannerView.setVisibility(View.VISIBLE);
+                                alertBannerView.setBackgroundColor(Color.parseColor("#DC2626"));
+
+                                StringBuilder alertText = new StringBuilder();
+                                alertText.append("🚨 عبث مكتشف!\n");
+                                for (int i = 0; i < tamperAlerts.length(); i++) {
+                                    JSONObject alert = tamperAlerts.optJSONObject(i);
+                                    if (alert != null) {
+                                        alertText.append("• ").append(alert.optString("message", "")).append("\n");
+                                    }
+                                }
+                                tvAlertMessage.setText(alertText.toString());
+
+                                mainHandler.removeCallbacks(hideAlertRunnable);
+                                mainHandler.postDelayed(hideAlertRunnable, 8000);
+                            }
+                        });
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Tamper check error: " + e.getMessage());
+            }
+        });
     }
 
     private void detectAndSetConnectionType() {
@@ -450,9 +572,6 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
         });
     }
 
-    /**
-     * ✅ إدارة حالات واجهة المستخدم مع التفعيل الدائم لأزرار التصدير والطباعة
-     */
     private void setInventoryState(InventoryState newState) {
         this.currentState = newState;
 
@@ -508,7 +627,6 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
                     btnFinalizeAudit.setVisibility(View.VISIBLE);
                     btnFinalizeAudit.setEnabled(true);
 
-                    // تفعيل أدوات التقرير دائماً عند الاكتشاف
                     if (btnPrintReport != null) btnPrintReport.setEnabled(true);
                     if (btnExportCSV != null) btnExportCSV.setEnabled(true);
                     if (btnShareReport != null) btnShareReport.setEnabled(true);
@@ -524,9 +642,8 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
                     btnStopInventory.setEnabled(false);
                     btnClearInventory.setEnabled(true);
                     btnFinalizeAudit.setVisibility(View.VISIBLE);
-                    btnFinalizeAudit.setEnabled(false); // اعتُمد مسبقاً
+                    btnFinalizeAudit.setEnabled(false);
 
-                    // تفعيل أدوات التقرير دائماً بعد الاعتماد
                     if (btnPrintReport != null) btnPrintReport.setEnabled(true);
                     if (btnExportCSV != null) btnExportCSV.setEnabled(true);
                     if (btnShareReport != null) btnShareReport.setEnabled(true);
@@ -538,13 +655,9 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
         });
     }
 
-    /**
-     * ✅ تصحيح بدء المسح وتصفير الجلسة التلقائي لتجنب تضاعف الأعداد
-     */
     private void startScanning() {
         if (currentState == InventoryState.SCANNING) return;
 
-        // إعادة التصفير وبدء جلسة نظيفة إذا كانت الجلسة السابقة مكتملة أو معتمدة
         if (currentState == InventoryState.COMPLETED || currentState == InventoryState.FINALIZED) {
             clearScanData();
             sessionId = "AUDIT-" + System.currentTimeMillis();
@@ -673,10 +786,13 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
         filteredTagList.clear();
         pendingTagsQueue.clear();
         missingItemsCache.clear();
+        lastSeenTagMap.clear();
         isMissingCacheDirty = true;
         totalScannedCount = 0;
         startTimeMs = 0;
         lastSecondCount = 0;
+
+        offlineCache.edit().remove(PREF_SESSION_BACKUP).apply();
 
         tvTotalScanned.setText("0");
         tvUniqueTags.setText("0");
@@ -697,86 +813,6 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
 
         Toast.makeText(getContext(), "🗑 تم مسح بيانات الجلسة", Toast.LENGTH_SHORT).show();
     }
-
-    public void onTagScanned(String epc, double rssi) {
-    if (currentState != InventoryState.SCANNING || epc == null || epc.isEmpty()) return;
-
-    resetInactivityTimer();
-    totalScannedCount++;
-
-    // ✅ جديد - فحص العبث عند المسح
-    checkTamperForTag(epc);
-
-    synchronized (pendingTagsQueue) {
-        TagModel model = new TagModel();
-        model.epc = epc.trim();
-        model.rssi = rssi;
-        pendingTagsQueue.add(model);
-    }
-
-    mainHandler.post(() -> {
-        tvTotalScanned.setText(String.valueOf(totalScannedCount));
-
-        if (!scannedEpcSet.contains(epc.trim())) {
-            scannedEpcSet.add(epc.trim());
-            tvUniqueTags.setText(String.valueOf(scannedEpcSet.size()));
-        }
-    });
-
-    scheduleUiUpdate();
-
-    if (pendingTagsQueue.size() >= BATCH_SIZE_THRESHOLD) {
-        mainHandler.post(this::processPendingBatch);
-    }
-}
-/**
- * 🚨 فحص العبث للقطعة الممسوحة
- */
-private void checkTamperForTag(String epc) {
-    networkExecutor.execute(() -> {
-        try {
-            MiraApiClient api = MiraApiClient.getInstance(requireContext());
-            
-            JSONObject extraParams = new JSONObject();
-            extraParams.put("context", "inventory");
-            extraParams.put("scale_weight", 0); // يمكن ربطه بالميزان لاحقاً
-            
-            MiraApiClient.ApiResponse response = api.authorize(epc, "inventory", extraParams);
-            
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONArray tamperAlerts = response.data.optJSONArray("tamper_alerts");
-                
-                if (tamperAlerts != null && tamperAlerts.length() > 0) {
-                    mainHandler.post(() -> {
-                        TamperAlertHelper.showTamperAlert(requireContext(), tamperAlerts, epc);
-                        playAlertSound();
-                        
-                        // إظهار تنبيه في البانر
-                        if (alertBannerView != null && tvAlertMessage != null) {
-                            alertBannerView.setVisibility(View.VISIBLE);
-                            alertBannerView.setBackgroundColor(Color.parseColor("#DC2626"));
-                            
-                            StringBuilder alertText = new StringBuilder();
-                            alertText.append("🚨 عبث مكتشف!\n");
-                            for (int i = 0; i < tamperAlerts.length(); i++) {
-                                JSONObject alert = tamperAlerts.optJSONObject(i);
-                                if (alert != null) {
-                                    alertText.append("• ").append(alert.optString("message", "")).append("\n");
-                                }
-                            }
-                            tvAlertMessage.setText(alertText.toString());
-                            
-                            mainHandler.removeCallbacks(hideAlertRunnable);
-                            mainHandler.postDelayed(hideAlertRunnable, 8000);
-                        }
-                    });
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Tamper check error: " + e.getMessage());
-        }
-    });
-}
 
     private void scheduleUiUpdate() {
         long now = System.currentTimeMillis();
@@ -1139,6 +1175,7 @@ private void checkTamperForTag(String epc) {
                 mainHandler.post(() -> {
                     if (res != null && res.isSuccess) {
                         setInventoryState(InventoryState.FINALIZED);
+                        offlineCache.edit().remove(PREF_SESSION_BACKUP).apply();
 
                         if (reportData != null) {
                             showAuditResultDialog(reportData);
@@ -1380,9 +1417,6 @@ private void checkTamperForTag(String epc) {
         }
     }
 
-    /**
-     * ✅ تصحيح خوارزمية المحاكاة لتستند على قاعدة البيانات الفعلية
-     */
     private void generateSimulatedTag() {
         if (currentState != InventoryState.SCANNING) return;
 
@@ -1395,7 +1429,6 @@ private void checkTamperForTag(String epc) {
         List<String> expectedEpcs = new ArrayList<>(expectedItemsMap.keySet());
         String epc;
 
-        // 90% قراءة قطعة متوقعة من السيرفر، و 10% قطعة زائدة/غريبة
         if (new Random().nextDouble() < 0.90) {
             epc = expectedEpcs.get(new Random().nextInt(expectedEpcs.size()));
         } else {
@@ -1406,13 +1439,9 @@ private void checkTamperForTag(String epc) {
         onTagScanned(epc, rssi);
     }
 
-    private void startSimulation() {
-        mainHandler.post(simulationRunnable);
-    }
+    private void startSimulation() { mainHandler.post(simulationRunnable); }
 
-    private void stopSimulation() {
-        mainHandler.removeCallbacks(simulationRunnable);
-    }
+    private void stopSimulation() { mainHandler.removeCallbacks(simulationRunnable); }
 
     private void loadDynamicInventorySettings() {
         networkExecutor.execute(() -> {
@@ -1462,8 +1491,10 @@ private void checkTamperForTag(String epc) {
                     if (items != null) {
                         for (int i = 0; i < items.length(); i++) {
                             JSONObject obj = items.getJSONObject(i);
-                            String epc = obj.optString("serial_number",
+                            String rawEpc = obj.optString("serial_number",
                                     obj.optString("gtin13", obj.optString("epc", "")));
+
+                            String epc = normalizeEpc(rawEpc);
 
                             if (!epc.isEmpty()) {
                                 ExpectedItem item = new ExpectedItem(
@@ -1515,7 +1546,7 @@ private void checkTamperForTag(String epc) {
 
     private void loadDemoData() {
         for (int i = 1; i <= 15; i++) {
-            String epc = "076000000000" + String.format(Locale.US, "%02d", i);
+            String epc = normalizeEpc("076000000000" + String.format(Locale.US, "%02d", i));
             boolean isSold = (i == 5 || i == 12);
             ExpectedItem item = new ExpectedItem(
                     epc,
@@ -1563,18 +1594,16 @@ private void checkTamperForTag(String epc) {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-    if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT) 
-            != PackageManager.PERMISSION_GRANTED) {
-        
-        // ✅ التعديل الاحترافي لطلب الصلاحية عبر Activity context
-        ActivityCompat.requestPermissions(
-                requireActivity(),
-                new String[]{Manifest.permission.BLUETOOTH_CONNECT},
-                1001
-        );
-        return;
-    }
-}
+            if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.BLUETOOTH_CONNECT)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(
+                        requireActivity(),
+                        new String[]{Manifest.permission.BLUETOOTH_CONNECT},
+                        1001
+                );
+                return;
+            }
+        }
 
         Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
         List<String> deviceNames = new ArrayList<>();
@@ -1834,7 +1863,7 @@ private void checkTamperForTag(String epc) {
                             try { rssi = Double.parseDouble(kv[1]); } catch (Exception ignored) {}
                         }
                     }
-                } else if (part.length() >= 24 && part.matches("[A-Fa-f0-9]+")) {
+                } else if (part.length() >= 20 && part.matches("[A-Fa-f0-9]+")) {
                     epc = part;
                 }
 
@@ -1966,7 +1995,6 @@ private void checkTamperForTag(String epc) {
         }
     }
 
-    // هياكل البيانات الداخلية (Inner Data Models)
     private static class ExpectedItem {
         String epc, title, karat;
         double weight;
@@ -1987,7 +2015,6 @@ private void checkTamperForTag(String epc) {
         int readCount = 0;
     }
 
-    // محول العرض لقائمة القطع (RecyclerView Adapter)
     private class TagAdapter extends RecyclerView.Adapter<TagAdapter.ViewHolder> {
         private final List<TagModel> list;
 
@@ -2048,4 +2075,4 @@ private void checkTamperForTag(String epc) {
             }
         }
     }
-                             }
+}
