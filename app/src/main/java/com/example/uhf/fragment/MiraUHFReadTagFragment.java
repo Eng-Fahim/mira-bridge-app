@@ -699,33 +699,84 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     }
 
     public void onTagScanned(String epc, double rssi) {
-        if (currentState != InventoryState.SCANNING || epc == null || epc.isEmpty()) return;
+    if (currentState != InventoryState.SCANNING || epc == null || epc.isEmpty()) return;
 
-        resetInactivityTimer();
-        totalScannedCount++;
+    resetInactivityTimer();
+    totalScannedCount++;
 
-        synchronized (pendingTagsQueue) {
-            TagModel model = new TagModel();
-            model.epc = epc.trim();
-            model.rssi = rssi;
-            pendingTagsQueue.add(model);
-        }
+    // ✅ جديد - فحص العبث عند المسح
+    checkTamperForTag(epc);
 
-        mainHandler.post(() -> {
-            tvTotalScanned.setText(String.valueOf(totalScannedCount));
-
-            if (!scannedEpcSet.contains(epc.trim())) {
-                scannedEpcSet.add(epc.trim());
-                tvUniqueTags.setText(String.valueOf(scannedEpcSet.size()));
-            }
-        });
-
-        scheduleUiUpdate();
-
-        if (pendingTagsQueue.size() >= BATCH_SIZE_THRESHOLD) {
-            mainHandler.post(this::processPendingBatch);
-        }
+    synchronized (pendingTagsQueue) {
+        TagModel model = new TagModel();
+        model.epc = epc.trim();
+        model.rssi = rssi;
+        pendingTagsQueue.add(model);
     }
+
+    mainHandler.post(() -> {
+        tvTotalScanned.setText(String.valueOf(totalScannedCount));
+
+        if (!scannedEpcSet.contains(epc.trim())) {
+            scannedEpcSet.add(epc.trim());
+            tvUniqueTags.setText(String.valueOf(scannedEpcSet.size()));
+        }
+    });
+
+    scheduleUiUpdate();
+
+    if (pendingTagsQueue.size() >= BATCH_SIZE_THRESHOLD) {
+        mainHandler.post(this::processPendingBatch);
+    }
+}
+/**
+ * 🚨 فحص العبث للقطعة الممسوحة
+ */
+private void checkTamperForTag(String epc) {
+    networkExecutor.execute(() -> {
+        try {
+            MiraApiClient api = MiraApiClient.getInstance(requireContext());
+            
+            JSONObject extraParams = new JSONObject();
+            extraParams.put("context", "inventory");
+            extraParams.put("scale_weight", 0); // يمكن ربطه بالميزان لاحقاً
+            
+            MiraApiClient.ApiResponse response = api.authorize(epc, "inventory", extraParams);
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONArray tamperAlerts = response.data.optJSONArray("tamper_alerts");
+                
+                if (tamperAlerts != null && tamperAlerts.length() > 0) {
+                    mainHandler.post(() -> {
+                        TamperAlertHelper.showTamperAlert(requireContext(), tamperAlerts, epc);
+                        playAlertSound();
+                        
+                        // إظهار تنبيه في البانر
+                        if (alertBannerView != null && tvAlertMessage != null) {
+                            alertBannerView.setVisibility(View.VISIBLE);
+                            alertBannerView.setBackgroundColor(Color.parseColor("#DC2626"));
+                            
+                            StringBuilder alertText = new StringBuilder();
+                            alertText.append("🚨 عبث مكتشف!\n");
+                            for (int i = 0; i < tamperAlerts.length(); i++) {
+                                JSONObject alert = tamperAlerts.optJSONObject(i);
+                                if (alert != null) {
+                                    alertText.append("• ").append(alert.optString("message", "")).append("\n");
+                                }
+                            }
+                            tvAlertMessage.setText(alertText.toString());
+                            
+                            mainHandler.removeCallbacks(hideAlertRunnable);
+                            mainHandler.postDelayed(hideAlertRunnable, 8000);
+                        }
+                    });
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Tamper check error: " + e.getMessage());
+        }
+    });
+}
 
     private void scheduleUiUpdate() {
         long now = System.currentTimeMillis();
