@@ -5,13 +5,14 @@ import android.content.SharedPreferences;
 import android.util.Log;
 
 import com.example.uhf.manager.MiraBranchesManager;
+import com.example.uhf.manager.MiraServerConfig; // ✅ جديد
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
-import java.io.File;              // ✅ أضف هذا
-import java.io.FileInputStream;    // ✅ أضف هذا
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -24,14 +25,11 @@ public class MiraApiClient {
     private static final String PREFS_NAME = "mira_settings";
     private static final String SESSION_PREFS = "MiraEnterpriseSession";
 
-    private static final String DEFAULT_API_URL = "https://sa.mirabarcode.com/wp-json/mira-gate/v1";
-    private static final String DEFAULT_API_KEY = "mira_gate_test071234567890abcdefghijklmnop";
-    private static final String DEFAULT_GATE_ID = "handheld_c72";
-
     private final Context context;
     private final String apiUrl;
     private final String apiKey;
     private final String gateId;
+    private final MiraServerConfig serverConfig; // ✅ جديد
 
     private static MiraApiClient instance;
 
@@ -44,11 +42,24 @@ public class MiraApiClient {
 
     private MiraApiClient(Context context) {
         this.context = context;
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        this.apiUrl = prefs.getString("mira_api_url", DEFAULT_API_URL);
-        this.apiKey = prefs.getString("mira_api_key", DEFAULT_API_KEY);
-        this.gateId = prefs.getString("mira_gate_id", DEFAULT_GATE_ID);
+        this.serverConfig = MiraServerConfig.getInstance(context); // ✅ جديد
+        
+        // ✅ قراءة من MiraServerConfig
+        this.apiUrl = serverConfig.getBaseUrl() + "mira-gate/v1";
+        this.apiKey = serverConfig.getApiKey();
+        this.gateId = serverConfig.getGateId();
     }
+
+    // ===================== 🔧 إعادة تحميل الإعدادات =====================
+
+    /**
+     * إعادة تحميل الإعدادات بعد تغيير الدومين
+     */
+    public static synchronized void reloadInstance(Context context) {
+        instance = new MiraApiClient(context.getApplicationContext());
+    }
+
+   
 
     // ===================== 🔑 AUTHENTICATION =====================
 
@@ -1022,4 +1033,4 @@ public ApiResponse calculateGoldPrice(int karat, double weight, String currency)
 public ApiResponse getLivePrices() {
     return getWithAuth("/gold-currency/live-prices");
 }
-}
+        }
