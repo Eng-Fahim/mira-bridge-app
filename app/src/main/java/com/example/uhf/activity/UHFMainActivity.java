@@ -15,6 +15,8 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
@@ -24,6 +26,7 @@ import android.widget.TabHost;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.app.ActivityCompat;
@@ -31,14 +34,19 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
 import com.example.uhf.R;
+import com.example.uhf.fragment.AuthenticateNxpUcodeDnaFragment;
+import com.example.uhf.fragment.MiraAccountingFragment;
+import com.example.uhf.fragment.MiraDashboardFragment;
 import com.example.uhf.fragment.MiraGateSettingsFragment;
 import com.example.uhf.fragment.MiraIdentityStudioFragment;
 import com.example.uhf.fragment.MiraPosFragment;
+import com.example.uhf.fragment.MiraRadarFragment;
 import com.example.uhf.fragment.MiraReaderSetupFragment;
 import com.example.uhf.fragment.MiraReceiptFragment;
 import com.example.uhf.fragment.MiraReportsProFragment;
 import com.example.uhf.fragment.MiraTransferFragment;
 import com.example.uhf.fragment.MiraUHFReadTagFragment;
+import com.example.uhf.fragment.UHFLocationFragment;
 import com.example.uhf.fragment.UHFSetFragment;
 import com.example.uhf.fragment.UsersManagementFragment;
 import com.example.uhf.manager.MiraBranchesManager;
@@ -60,10 +68,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private static final String TAG = "UHFMainActivity";
     private static final int PERMISSION_REQUEST_CODE = 1001;
 
-    // Legacy public fields required by child fragments
+    // Public TabHost required for legacy fragment references
     public TabHost mTabHost = null;
 
-    // UI Elements
+    // UI & State Elements
     private FrameLayout loadingOverlay;
     private FragmentManager fragmentManager;
     public Fragment currentFragment;
@@ -82,7 +90,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private boolean isArabic = true;
     private int lastActiveBranchId = -1;
 
-    // Audio System
+    // Audio Engine
     private PlaySoundThread playSoundThread = null;
     private SoundPool soundPool;
     private AudioManager audioManager;
@@ -145,7 +153,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             setupQuickNav();
 
-            loadFragment(new MiraPosFragment(), "POS");
+            // Default startup tab -> Dashboard
+            loadFragment(new MiraDashboardFragment(), "Dashboard");
 
             showLoading();
             mainHandler.postDelayed(this::hideLoading, 300);
@@ -165,6 +174,85 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         } catch (Exception e) {
             Log.w(TAG, "Locale check failed: " + e.getMessage());
         }
+    }
+
+    // ==================== TOOLBAR MENU (PROFILE, GOLD, LANG, LOGOUT) ====================
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
+
+        if (id == R.id.action_dashboard) {
+            checkInventoryLockAndExecute(() -> loadFragment(new MiraDashboardFragment(), "Dashboard"));
+            return true;
+        } else if (id == R.id.action_gold_rates) {
+            showGoldRatesDialog();
+            return true;
+        } else if (id == R.id.action_toggle_language) {
+            toggleLanguage();
+            return true;
+        } else if (id == R.id.action_profile) {
+            showProfileInfoDialog();
+            return true;
+        } else if (id == R.id.action_logout) {
+            confirmLogout();
+            return true;
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void toggleLanguage() {
+        String newLang = isArabic ? "en" : "ar";
+        MiraLanguageHelper.setLanguage(this, newLang);
+        Intent intent = new Intent(this, UHFMainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
+    }
+
+    private void showGoldRatesDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle(isArabic ? "💰 إعدادات أسعار الذهب والبورصة" : "💰 Gold Rates & Exchange")
+                .setMessage(isArabic ? "يمكنك ضبط عيار 24، 21، 18 وأسعار الأونصة المباشرة من لوحة التحكم."
+                        : "Configure live rates for 24K, 21K, 18K and bullion indexes.")
+                .setPositiveButton(isArabic ? "فتح المحاسبة" : "Open Accounting", (dialog, which) -> {
+                    loadFragment(new MiraAccountingFragment(), "Accounting");
+                })
+                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+                .show();
+    }
+
+    private void showProfileInfoDialog() {
+        String name = sessionManager.getDisplayName();
+        String user = sessionManager.getUsername();
+        String role = sessionManager.getUserRole();
+
+        new AlertDialog.Builder(this)
+                .setTitle(isArabic ? "👤 الملف الشخصي" : "👤 User Profile")
+                .setMessage((isArabic ? "الاسم: " : "Name: ") + name + "\n" +
+                        (isArabic ? "اسم المستخدم: " : "Username: ") + user + "\n" +
+                        (isArabic ? "الصلاحية: " : "Role: ") + role)
+                .setPositiveButton(isArabic ? "موافق" : "OK", null)
+                .show();
+    }
+
+    private void confirmLogout() {
+        new AlertDialog.Builder(this)
+                .setTitle(isArabic ? "تسجيل الخروج" : "Logout")
+                .setMessage(isArabic ? "هل أنت تأكد من تسجيل الخروج من المنظومة؟" : "Are you sure you want to log out?")
+                .setPositiveButton(isArabic ? "تأكيد" : "Logout", (dialog, which) -> {
+                    sessionManager.logout();
+                    navigateToLogin();
+                })
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                .show();
     }
 
     // ==================== NAV SYSTEM & FRAGMENT MANAGEMENT ====================
@@ -219,13 +307,20 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             View view = getLayoutInflater().inflate(R.layout.dialog_quick_menu, null);
             bottomSheet.setContentView(view);
 
+            // Core Operations & Modules
+            bindMenuAction(view, R.id.btnAdminDashboard, bottomSheet, new MiraDashboardFragment(), "Dashboard");
+            bindMenuAction(view, R.id.btnAdminAccounting, bottomSheet, new MiraAccountingFragment(), "Accounting");
+            bindMenuAction(view, R.id.btnAdminRadar, bottomSheet, new MiraRadarFragment(), "Radar");
             bindMenuAction(view, R.id.btnAdminIdentity, bottomSheet, new MiraIdentityStudioFragment(), "Identity");
             bindMenuAction(view, R.id.btnAdminUsers, bottomSheet, new UsersManagementFragment(), "Users");
             bindMenuAction(view, R.id.btnAdminReports, bottomSheet, new MiraReportsProFragment(), "Reports");
             bindMenuAction(view, R.id.btnAdminSettings, bottomSheet, new UHFSetFragment(), "Settings");
 
+            // Hardware Controls
             bindMenuAction(view, R.id.btnHardwareRfid, bottomSheet, new MiraReaderSetupFragment(), "ReaderSetup");
             bindMenuAction(view, R.id.btnHardwareGate, bottomSheet, new MiraGateSettingsFragment(), "GateSettings");
+            bindMenuAction(view, R.id.btnHardwareLocation, bottomSheet, new UHFLocationFragment(), "Location");
+            bindMenuAction(view, R.id.btnHardwareNxp, bottomSheet, new AuthenticateNxpUcodeDnaFragment(), "NxpUcode");
 
             bottomSheet.show();
         } catch (Exception e) {
@@ -236,6 +331,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private void bindMenuAction(View root, int viewId, BottomSheetDialog dialog, Fragment fragment, String tag) {
         View btn = root.findViewById(viewId);
         if (btn != null) {
+            btn.setVisibility(View.VISIBLE);
             btn.setOnClickListener(v -> {
                 dialog.dismiss();
                 checkInventoryLockAndExecute(() -> loadFragment(fragment, tag));
@@ -244,15 +340,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void showHardwareOptionsDialog() {
-        String[] options = isArabic ? new String[]{"إعدادات قارئ RFID", "تهيئة البوابات الأمنية", "اختبار التوصيل"}
-                : new String[]{"RFID Reader Setup", "Gate Security Setup", "Connection Test"};
+        String[] options = isArabic ? new String[]{"إعدادات قارئ RFID", "تهيئة البوابات الأمنية", "الرادار والبحث الإشاري", "اختبار التوصيل"}
+                : new String[]{"RFID Reader Setup", "Gate Security Setup", "Signal Radar Search", "Connection Test"};
 
         new AlertDialog.Builder(this)
-                .setTitle(isArabic ? "📡 أجهزة المنظومة" : "📡 Hardware Control")
+                .setTitle(isArabic ? "📡 أجهزة ومستشعرات المنظومة" : "📡 Hardware & Sensors")
                 .setItems(options, (dialog, which) -> {
                     if (which == 0) loadFragment(new MiraReaderSetupFragment(), "ReaderSetup");
                     else if (which == 1) loadFragment(new MiraGateSettingsFragment(), "GateSettings");
-                    else Toast.makeText(this, isArabic ? "الأجهزة متصلة وتعمل بشكل ممتازة" : "Hardware is online", Toast.LENGTH_SHORT).show();
+                    else if (which == 2) loadFragment(new MiraRadarFragment(), "Radar");
+                    else Toast.makeText(this, isArabic ? "الأجهزة متصلة وتعمل بشكل ممتاز" : "Hardware is online", Toast.LENGTH_SHORT).show();
                 })
                 .show();
     }
