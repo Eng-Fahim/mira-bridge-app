@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- اللون عند التحديد: ذهبي فخم -->
+    <item android:color="#B8860B" android:state_checked="true" />
+    <!-- اللون الإفتراضي: رمادي مائل للاعتدال -->
+    <item android:color="#7A869A" />
+</selector>
