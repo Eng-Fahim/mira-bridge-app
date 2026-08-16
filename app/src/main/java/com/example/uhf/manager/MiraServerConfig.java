@@ -5,7 +5,7 @@ import android.content.SharedPreferences;
 
 /**
  * MIRA Server Configuration Manager
- * إدارة عنوان السيرفر والنطاق بشكل ديناميكي
+ * إدارة عنوان السيرفر والنطاق بشكل ديناميكي وآمن
  */
 public class MiraServerConfig {
 
@@ -13,6 +13,7 @@ public class MiraServerConfig {
     private static final String KEY_BASE_URL = "base_url";
     private static final String KEY_API_KEY = "api_key";
     private static final String KEY_GATE_ID = "gate_id";
+    private static final String KEY_AUTH_TOKEN = "auth_token";
     
     private static MiraServerConfig instance;
     private final SharedPreferences prefs;
@@ -29,17 +30,13 @@ public class MiraServerConfig {
     }
 
     /**
-     * الحصول على الرابط الأساسي
+     * ✅ الرابط الافتراضي - ضع رابط سيرفرك هنا
      */
     public String getBaseUrl() {
         return prefs.getString(KEY_BASE_URL, "https://ams.ibreg.org/wp-json/");
     }
 
-    /**
-     * حفظ الرابط الأساسي
-     */
     public void setBaseUrl(String baseUrl) {
-        // التأكد من أن الرابط ينتهي بـ /
         if (!baseUrl.endsWith("/")) {
             baseUrl += "/";
         }
@@ -47,48 +44,63 @@ public class MiraServerConfig {
     }
 
     /**
-     * الحصول على الرابط الكامل لـ API
-     */
-    public String getApiUrl(String endpoint) {
-        String baseUrl = getBaseUrl();
-        // إزالة / الزائدة من البداية
-        if (endpoint.startsWith("/")) {
-            endpoint = endpoint.substring(1);
-        }
-        return baseUrl + endpoint;
-    }
-
-    /**
-     * الحصول على مفتاح API
+     * ✅ مفتاح API - فارغ افتراضياً (يأت من السيرفر عند تسجيل الدخول)
      */
     public String getApiKey() {
-        return prefs.getString(KEY_API_KEY, "mira_gate_test071234567890abcdefghijklmnop");
+        return prefs.getString(KEY_API_KEY, "");
     }
 
-    /**
-     * حفظ مفتاح API
-     */
     public void setApiKey(String apiKey) {
         prefs.edit().putString(KEY_API_KEY, apiKey).apply();
     }
 
     /**
-     * الحصول على معرف البوابة
+     * ✅ معرف البوابة - فارغ افتراضياً
      */
     public String getGateId() {
-        return prefs.getString(KEY_GATE_ID, "secure_gate_01");
+        return prefs.getString(KEY_GATE_ID, "");
     }
 
-    /**
-     * حفظ معرف البوابة
-     */
     public void setGateId(String gateId) {
         prefs.edit().putString(KEY_GATE_ID, gateId).apply();
     }
 
     /**
-     * اختبار الاتصال بالسيرفر
+     * ✅ حفظ بيانات الجلسة بعد تسجيل الدخول
      */
+    public void saveSession(String apiKey, String gateId, String authToken) {
+        prefs.edit()
+            .putString(KEY_API_KEY, apiKey)
+            .putString(KEY_GATE_ID, gateId)
+            .putString(KEY_AUTH_TOKEN, authToken)
+            .apply();
+    }
+
+    /**
+     * ✅ الحصول على التوكن المحفوظ
+     */
+    public String getAuthToken() {
+        return prefs.getString(KEY_AUTH_TOKEN, "");
+    }
+
+    /**
+     * ✅ مسح الجلسة عند تسجيل الخروج
+     */
+    public void clearSession() {
+        prefs.edit()
+            .remove(KEY_API_KEY)
+            .remove(KEY_GATE_ID)
+            .remove(KEY_AUTH_TOKEN)
+            .apply();
+    }
+
+    /**
+     * ✅ التحقق من وجود جلسة نشطة
+     */
+    public boolean hasSession() {
+        return !getApiKey().isEmpty() && !getAuthToken().isEmpty();
+    }
+
     public boolean testConnection(String baseUrl) {
         try {
             java.net.URL url = new java.net.URL(baseUrl);
