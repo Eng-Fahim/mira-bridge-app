@@ -710,11 +710,125 @@
             android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="8dp"/>
         <!-- بعد أسعار الصرف الرسمية أضف: -->
-<EditText android:id="@+id/etExchangeMarketYER" ... />
-<EditText android:id="@+id/etExchangeMarketEGP" ... />
-<EditText android:id="@+id/etExchangeMarketSAR" ... />
-<EditText android:id="@+id/etExchangeMarketAED" ... />
-<ProgressBar android:id="@+id/pbCurrencyLoading" ... />
+<<!-- أسعار الصرف السوقية -->
+<TextView
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="@string/market_rates_title"
+    android:textSize="16sp"
+    android:textStyle="bold"
+    android:textColor="?attr/colorOnBackground"
+    android:layout_marginBottom="8dp"/>
+
+<!-- Market YER -->
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:layout_marginBottom="4dp"
+    android:gravity="center_vertical">
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="YER (سوق)"
+        android:textColor="?attr/colorOnBackground"/>
+    <EditText
+        android:id="@+id/etExchangeMarketYER"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:inputType="numberDecimal"
+        android:hint="530.00"
+        android:textColor="?attr/colorOnSurface"
+        android:background="?attr/colorSurfaceVariant"
+        android:padding="12dp"/>
+</LinearLayout>
+
+<!-- Market EGP -->
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:layout_marginBottom="4dp"
+    android:gravity="center_vertical">
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="EGP (سوق)"
+        android:textColor="?attr/colorOnBackground"/>
+    <EditText
+        android:id="@+id/etExchangeMarketEGP"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:inputType="numberDecimal"
+        android:hint="47.50"
+        android:textColor="?attr/colorOnSurface"
+        android:background="?attr/colorSurfaceVariant"
+        android:padding="12dp"/>
+</LinearLayout>
+
+<!-- Market SAR -->
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:layout_marginBottom="4dp"
+    android:gravity="center_vertical">
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="SAR (سوق)"
+        android:textColor="?attr/colorOnBackground"/>
+    <EditText
+        android:id="@+id/etExchangeMarketSAR"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:inputType="numberDecimal"
+        android:hint="3.75"
+        android:textColor="?attr/colorOnSurface"
+        android:background="?attr/colorSurfaceVariant"
+        android:padding="12dp"/>
+</LinearLayout>
+
+<!-- Market AED -->
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:layout_marginBottom="16dp"
+    android:gravity="center_vertical">
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="AED (سوق)"
+        android:textColor="?attr/colorOnBackground"/>
+    <EditText
+        android:id="@+id/etExchangeMarketAED"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:inputType="numberDecimal"
+        android:hint="3.67"
+        android:textColor="?attr/colorOnSurface"
+        android:background="?attr/colorSurfaceVariant"
+        android:padding="12dp"/>
+</LinearLayout>
+
+<!-- ProgressBar للعملات -->
+<ProgressBar
+    android:id="@+id/pbCurrencyLoading"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:visibility="gone"
+    android:indeterminateTint="?attr/colorPrimary"
+    style="?android:attr/progressBarStyleHorizontal"
+    android:layout_marginBottom="8dp"/>
         <!-- YER -->
         <LinearLayout
             android:layout_width="match_parent"
