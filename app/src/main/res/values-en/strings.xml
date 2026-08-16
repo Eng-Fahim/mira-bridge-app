@@ -21,8 +21,6 @@
 
     <string name="menu_action_center">Quick Actions</string>
     <string name="nav_home">Home</string>
-    <string name="nav_reports">Reports</string>
-    <string name="nav_inventory">Inventory</string>
     <string name="nav_profile">Profile</string>
     
     <string name="action_rfid_scan">Scan Code</string>
