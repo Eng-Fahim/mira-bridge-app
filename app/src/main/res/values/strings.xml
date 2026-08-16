@@ -145,8 +145,6 @@
 <string name="debug_console_title">📋 سجل الأحداث</string>
 <string name="btn_stop_alarm">🔕 إيقاف الإنذار</string>
     
-<string name="debug_console_title">📋 سجل الأحداث</string>
-    
     <string name="gate_input_title">🔍 إدخال واختبار القطع (يدوي / باركود / RFID)</string>
     <string name="gate_input_hint">أدخل رقم الـ EPC / السيريال</string>
     <string name="gate_btn_check">فحص</string>
