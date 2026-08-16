@@ -55,7 +55,7 @@
 <string name="gate_alarm_title">🚨 SECURITY BREACH 🚨</string>
 <string name="gate_alarm_message">Security Breach - Unauthorized Item!</string>
 <string name="gate_alarm_epc">EPC: -</string>
-<string name="gate_alarm_stop">🔕 Stop Alarm & Visual Effects</string>
+<string name="gate_alarm_stop">🔕 Stop Alarm&amp; Visual Effects</string>
     <!-- DASHBOARD-->
     <string name="greeting_default">Welcome...</string>
 <string name="location_default">Main Showroom — Regional Branch</string>
