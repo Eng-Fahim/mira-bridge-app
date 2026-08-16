@@ -144,7 +144,7 @@
 <string name="btn_simulate_deny">🚨 محاكاة مرفوض</string>
 <string name="debug_console_title">📋 سجل الأحداث</string>
 <string name="btn_stop_alarm">🔕 إيقاف الإنذار</string>
-<string name="simulation_title">🧪 وضع المحاكاة</string>
+    
 <string name="debug_console_title">📋 سجل الأحداث</string>
     
     <string name="gate_input_title">🔍 إدخال واختبار القطع (يدوي / باركود / RFID)</string>
