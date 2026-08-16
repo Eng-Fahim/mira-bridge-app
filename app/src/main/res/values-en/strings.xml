@@ -45,7 +45,7 @@
 <string name="debug_console_title">📋 Event Log</string>
 <string name="btn_stop_alarm">🔕 Stop Alarm</string>
     
-    <string name="gate_input_title">🔍 Item Entry & Testing (Manual / Barcode / RFID)</string>
+    <string name="gate_input_title">🔍 Item Entry &amp; Testing (Manual / Barcode / RFID)</string>
 <string name="gate_input_hint">Enter EPC / Serial Number</string>
 <string name="gate_btn_check">Check</string>
 <string name="gate_btn_camera">📷 Camera</string>
