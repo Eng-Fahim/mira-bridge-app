@@ -3,16 +3,17 @@ package com.example.uhf.fragment;
 import android.content.Context;
 import android.media.SoundPool;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -22,13 +23,21 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
+import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraGatesSettings;
+import com.example.uhf.tools.SoundGenerator;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.util.ArrayList;
 import java.util.List;
 
 public class MiraGateSettingsFragment extends Fragment {
+
+    private static final String TAG = "MiraGateSettingsFragment";
 
     private MiraGatesSettings settings;
     private SoundPool soundPool;
@@ -42,6 +51,10 @@ public class MiraGateSettingsFragment extends Fragment {
     private SeekBar seekRfidPower;
     private TextView tvRfidPowerValue;
     private MaterialButton btnAddGate, btnTestSound, btnSaveSounds, btnSaveAll;
+
+    // ✅ محول قائمة البوابات
+    private GateAdapter gateAdapter;
+    private final List<MiraGatesSettings.GateDevice> gatesList = new ArrayList<>();
 
     @Nullable
     @Override
@@ -63,6 +76,8 @@ public class MiraGateSettingsFragment extends Fragment {
         setupSpinners();
         loadSettings();
         setupListeners();
+        loadGatesFromLocal();
+        loadGatesFromServer(); // ✅ جلب من السيرفر
     }
 
     private void initViews(View view) {
@@ -82,6 +97,8 @@ public class MiraGateSettingsFragment extends Fragment {
 
         // إعداد قائمة البوابات
         rvGates.setLayoutManager(new LinearLayoutManager(getContext()));
+        gateAdapter = new GateAdapter(gatesList, this::removeGate);
+        rvGates.setAdapter(gateAdapter);
     }
 
     private void setupSpinners() {
@@ -160,10 +177,11 @@ public class MiraGateSettingsFragment extends Fragment {
 
     private void setupListeners() {
         btnAddGate.setOnClickListener(v -> showAddGateDialog());
-        
+
         btnTestSound.setOnClickListener(v -> {
             String selectedSound = MiraGatesSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()];
-            playSound(selectedSound);
+            SoundGenerator.playSound(selectedSound);
+            Toast.makeText(getContext(), "🔊 تشغيل: " + getSoundDisplayName(selectedSound), Toast.LENGTH_SHORT).show();
         });
 
         btnSaveSounds.setOnClickListener(v -> {
@@ -194,27 +212,85 @@ public class MiraGateSettingsFragment extends Fragment {
         btnSaveAll.setOnClickListener(v -> {
             settings.setVibrationEnabled(switchVibration.isChecked());
             settings.setFlashEnabled(switchFlash.isChecked());
-            settings.setAlarmDuration(Integer.parseInt(etAlarmDuration.getText().toString()));
+            
+            try {
+                settings.setAlarmDuration(Integer.parseInt(etAlarmDuration.getText().toString()));
+            } catch (NumberFormatException e) {
+                settings.setAlarmDuration(10);
+            }
+            
             settings.setRfidPower(seekRfidPower.getProgress());
 
             Toast.makeText(getContext(), "✅ تم حفظ جميع الإعدادات", Toast.LENGTH_SHORT).show();
         });
     }
 
-    private void playSound(String soundName) {
-        int soundId = MiraGatesSettings.SoundOptions.getSoundResourceId(requireContext(), soundName);
-        if (soundId > 0) {
-            currentSoundId = soundPool.load(requireContext(), soundId, 1);
-            soundPool.setOnLoadCompleteListener((pool, sampleId, status) -> {
-                if (status == 0) {
-                    pool.play(sampleId, 1.0f, 1.0f, 1, 0, 1.0f);
-                }
-            });
-        } else {
-            Toast.makeText(getContext(), "🔇 بدون صوت", Toast.LENGTH_SHORT).show();
-        }
+    // ============================================
+    // 🏢 إدارة البوابات
+    // ============================================
+
+    /**
+     * تحميل البوابات من التخزين المحلي
+     */
+    private void loadGatesFromLocal() {
+        gatesList.clear();
+        gatesList.addAll(settings.getGates());
+        gateAdapter.notifyDataSetChanged();
     }
 
+    /**
+     * تحميل البوابات من السيرفر
+     */
+    private void loadGatesFromServer() {
+        new Thread(() -> {
+            try {
+                MiraApiClient client = MiraApiClient.getInstance(getContext());
+                MiraApiClient.ApiResponse response = client.getGates();
+
+                if (response.isSuccess && response.data != null) {
+                    JSONArray gatesArray = response.data.optJSONArray("gates");
+                    if (gatesArray == null) {
+                        gatesArray = response.data.optJSONArray("data");
+                    }
+
+                    if (gatesArray != null && gatesArray.length() > 0) {
+                        List<MiraGatesSettings.GateDevice> serverGates = new ArrayList<>();
+                        
+                        for (int i = 0; i < gatesArray.length(); i++) {
+                            JSONObject gateJson = gatesArray.optJSONObject(i);
+                            if (gateJson != null) {
+                                MiraGatesSettings.GateDevice gate = new MiraGatesSettings.GateDevice();
+                                gate.gateId = gateJson.optString("gate_id", "");
+                                gate.gateName = gateJson.optString("name", gateJson.optString("gate_name", ""));
+                                gate.location = gateJson.optString("location", "");
+                                gate.deviceType = gateJson.optString("device_type", "chainway_c72");
+                                gate.status = gateJson.optString("status", "offline");
+                                gate.ipAddress = gateJson.optString("ip_address", "");
+                                gate.port = gateJson.optInt("port", 8080);
+                                serverGates.add(gate);
+                            }
+                        }
+
+                        if (!serverGates.isEmpty()) {
+                            // حفظ محلياً
+                            settings.saveGates(serverGates);
+
+                            getActivity().runOnUiThread(() -> {
+                                loadGatesFromLocal();
+                                Toast.makeText(getContext(), "✅ تم تحميل " + serverGates.size() + " بوابة من السيرفر", Toast.LENGTH_SHORT).show();
+                            });
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "loadGatesFromServer error: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    /**
+     * عرض نافذة إضافة بوابة
+     */
     private void showAddGateDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle("➕ إضافة بوابة جديدة");
@@ -225,16 +301,25 @@ public class MiraGateSettingsFragment extends Fragment {
 
         final EditText etGateName = new EditText(requireContext());
         etGateName.setHint("اسم البوابة (مثال: البوابة الرئيسية)");
+        etGateName.setSingleLine(true);
         layout.addView(etGateName);
 
         final EditText etLocation = new EditText(requireContext());
         etLocation.setHint("الموقع (مثال: المدخل الرئيسي)");
+        etLocation.setSingleLine(true);
         layout.addView(etLocation);
+
+        final EditText etIpAddress = new EditText(requireContext());
+        etIpAddress.setHint("عنوان IP (اختياري)");
+        etIpAddress.setSingleLine(true);
+        etIpAddress.setInputType(android.text.InputType.TYPE_CLASS_PHONE);
+        layout.addView(etIpAddress);
 
         builder.setView(layout);
         builder.setPositiveButton("إضافة", (dialog, which) -> {
             String gateName = etGateName.getText().toString().trim();
             String location = etLocation.getText().toString().trim();
+            String ipAddress = etIpAddress.getText().toString().trim();
 
             if (!gateName.isEmpty()) {
                 MiraGatesSettings.GateDevice gate = new MiraGatesSettings.GateDevice();
@@ -243,13 +328,77 @@ public class MiraGateSettingsFragment extends Fragment {
                 gate.location = location;
                 gate.deviceType = "chainway_c72";
                 gate.status = "offline";
+                gate.ipAddress = ipAddress;
+                gate.port = 8080;
 
+                // حفظ محلي
                 settings.addGate(gate);
+                loadGatesFromLocal();
+
+                // مزامنة مع السيرفر
+                syncGateToServer(gate);
+
                 Toast.makeText(getContext(), "✅ تمت إضافة البوابة", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(getContext(), "⚠️ اسم البوابة مطلوب", Toast.LENGTH_SHORT).show();
             }
         });
         builder.setNegativeButton("إلغاء", null);
         builder.show();
+    }
+
+    /**
+     * مزامنة بوابة مع السيرفر
+     */
+    private void syncGateToServer(MiraGatesSettings.GateDevice gate) {
+        new Thread(() -> {
+            try {
+                MiraApiClient client = MiraApiClient.getInstance(getContext());
+                JSONObject payload = new JSONObject();
+                payload.put("gate_id", gate.gateId);
+                payload.put("name", gate.gateName);
+                payload.put("location", gate.location);
+                payload.put("device_type", gate.deviceType);
+                if (gate.ipAddress != null && !gate.ipAddress.isEmpty()) {
+                    payload.put("ip_address", gate.ipAddress);
+                }
+                payload.put("port", gate.port);
+
+                MiraApiClient.ApiResponse response = client.createGate(payload);
+
+                getActivity().runOnUiThread(() -> {
+                    if (response.isSuccess) {
+                        Toast.makeText(getContext(), "✅ تمت المزامنة مع السيرفر", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(getContext(), "⚠️ حفظ محلي فقط (سيرفر غير متاح)", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "syncGateToServer error: " + e.getMessage());
+                getActivity().runOnUiThread(() -> {
+                    Toast.makeText(getContext(), "💾 حفظ محلي فقط", Toast.LENGTH_SHORT).show();
+                });
+            }
+        }).start();
+    }
+
+    /**
+     * حذف بوابة
+     */
+    private void removeGate(int position) {
+        if (position >= 0 && position < gatesList.size()) {
+            MiraGatesSettings.GateDevice gate = gatesList.get(position);
+            settings.removeGate(gate.gateId);
+            loadGatesFromLocal();
+            Toast.makeText(getContext(), "🗑 تم حذف: " + gate.gateName, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /**
+     * تجربة صوت
+     */
+    private void playSound(String soundName) {
+        SoundGenerator.playSound(soundName);
     }
 
     @Override
@@ -260,4 +409,72 @@ public class MiraGateSettingsFragment extends Fragment {
             soundPool = null;
         }
     }
-}
+
+    // ============================================
+    // 📋 محول قائمة البوابات
+    // ============================================
+
+    private class GateAdapter extends RecyclerView.Adapter<GateAdapter.GateViewHolder> {
+
+        interface OnGateRemoveListener {
+            void onRemove(int position);
+        }
+
+        private final List<MiraGatesSettings.GateDevice> gates;
+        private final OnGateRemoveListener removeListener;
+
+        GateAdapter(List<MiraGatesSettings.GateDevice> gates, OnGateRemoveListener listener) {
+            this.gates = gates;
+            this.removeListener = listener;
+        }
+
+        @NonNull
+        @Override
+        public GateViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_gate_device, parent, false);
+            return new GateViewHolder(view);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull GateViewHolder holder, int position) {
+            MiraGatesSettings.GateDevice gate = gates.get(position);
+
+            holder.tvGateName.setText(gate.gateName);
+            holder.tvGateLocation.setText("📍 " + (gate.location != null && !gate.location.isEmpty() ? gate.location : "غير محدد"));
+            
+            if ("online".equals(gate.status)) {
+                holder.tvGateStatus.setText("🟢 متصل");
+                holder.tvGateStatus.setTextColor(0xFF2E7D32);
+            } else {
+                holder.tvGateStatus.setText("⚪ غير متصل");
+                holder.tvGateStatus.setTextColor(0xFF9E9E9E);
+            }
+
+            holder.btnRemove.setOnClickListener(v -> {
+                int pos = holder.getAdapterPosition();
+                if (pos != RecyclerView.NO_POSITION) {
+                    removeListener.onRemove(pos);
+                }
+            });
+        }
+
+        @Override
+        public int getItemCount() {
+            return gates.size();
+        }
+
+        class GateViewHolder extends RecyclerView.ViewHolder {
+            TextView tvGateName, tvGateLocation, tvGateStatus;
+            View btnRemove;
+
+            GateViewHolder(@NonNull View itemView) {
+                super(itemView);
+                tvGateName = itemView.findViewById(R.id.tvGateName);
+                tvGateLocation = itemView.findViewById(R.id.tvGateLocation);
+                tvGateStatus = itemView.findViewById(R.id.tvGateStatus);
+                btnRemove = itemView.findViewById(R.id.btnRemoveGate);
+            }
+        }
+    }
+                                          }
