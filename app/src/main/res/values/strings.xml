@@ -111,6 +111,41 @@
     <string name="title_activity_bluetooth_print">طابعة البلوتوث</string>
     <string name="title_decode_time">زمن فك الترميز</string>
 
+    <!-- إعدادات وأسعار الذهب -->
+<string name="gold_currency">الذهب والعملات</string>
+<string name="fetch_prices">جلب الأسعار</string>
+<string name="gold_prices_title">أسعار الذهب المباشرة</string>
+<string name="profit_margins_title">هوامش الربح</string>
+<string name="making_charges_title">أجور الصياغة والمصنعية</string>
+
+<!-- العيارات -->
+<string name="karat_24_label">عيار 24</string>
+<string name="karat_22_label">عيار 22</string>
+<string name="karat_21_label">عيار 21</string>
+<string name="karat_18_label">عيار 18</string>
+<string name="karat_14_label">عيار 14</string>
+<string name="karat_12_label">عيار 12</string>
+
+<!-- نصوص العامة والجرد -->
+<string name="total">الإجمالي</string>
+<string name="tv_all">الكل</string>
+<string name="tv_fast_inventory">الجرد السريع</string>
+<string name="tv_phase">المرحلة</string>
+
+<!-- نصوص UHF -->
+<string name="uhf_btn_memoryBank">بنك الذاكرة</string>
+<string name="uhf_gyro_loaction">موقع الجيروسكوب</string>
+<string name="uhf_located_angle">زاوية التحديد</string>
+<string name="uhf_locating_tag_value">قيمة البطاقة المحددة</string>
+<string name="uhf_msg_filter_addr_must_decimal">عنوان التصفية يجب أن يكون عشرياً</string>
+<string name="uhf_msg_filter_len_must_decimal">طول التصفية يجب أن يكون عشرياً</string>
+<string name="uhf_msg_get_para_fail">فشل جلب المعلمات</string>
+<string name="uhf_msg_get_para_succ">تم جلب المعلمات بنجاح</string>
+<string name="uhf_msg_length_error">خطأ في الطول</string>
+<string name="uhf_msg_no_Bluetooth">لا يوجد جهاز بلوتوث</string>
+<string name="uhf_msg_no_Sensor">لم يتم العثور على مستشعر</string>
+
+    
     <!-- BTPrinterDemo -->
     <string name="send">إرسال</string>
     <string name="Print">طباعة</string>
