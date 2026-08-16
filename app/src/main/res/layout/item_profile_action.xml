@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="10dp"
+    android:clickable="true"
+    android:focusable="true"
+    app:cardBackgroundColor="@android:color/white"
+    app:cardCornerRadius="14dp"
+    app:cardElevation="1dp"
+    app:strokeWidth="0dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
+
+        <!-- سهم التوسع أو الانتقال اليساري -->
+        <ImageView
+            android:id="@+id/imgArrow"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@android:drawable/arrow_down_float"
+            app:tint="#8E8E93" />
+
+        <!-- عنوان الخيار -->
+        <TextView
+            android:id="@+id/tvActionTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:layout_weight="1"
+            android:gravity="end"
+            android:text="عنوان الخيار"
+            android:textColor="#2C2C2E"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <!-- أيقونة الخيار الرئيسية على اليمين -->
+        <ImageView
+            android:id="@+id/imgActionIcon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@android:drawable/ic_menu_manage"
+            app:tint="#1C1C1E" />
+
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>
