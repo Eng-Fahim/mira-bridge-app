@@ -395,9 +395,7 @@ public class MiraGateSettingsFragment extends Fragment {
 
     private class GateAdapter extends RecyclerView.Adapter<GateAdapter.GateViewHolder> {
 
-        interface OnGateRemoveListener {
-            void onRemove(int position);
-        }
+        
 
         private final List<MiraGatesSettings.GateDevice> gates;
         private final OnGateRemoveListener removeListener;
@@ -456,4 +454,7 @@ public class MiraGateSettingsFragment extends Fragment {
             }
         }
     }
+    interface OnGateRemoveListener {
+            void onRemove(int position);
+        }
 }
