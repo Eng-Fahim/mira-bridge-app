@@ -7,6 +7,7 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 
@@ -17,22 +18,30 @@ public class MiraAdminHubFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_mira_admin_hub, container, false);
 
-        // 1. الأجهزة والشبكة
-        bindCard(view, R.id.cardAdminSettings, new UHFSetFragment(), "Settings");
-        bindCard(view, R.id.cardAdminReader, new MiraReaderSetupFragment(), "ReaderSetup");
-        bindCard(view, R.id.cardAdminGateSettings, new MiraGateSettingsFragment(), "GateSettings");
-        bindCard(view, R.id.cardAdminGoldRates, new MiraGoldCurrencyFragment(), "GoldRates");
+        // 1. إدارة الفروع والشركات (استخدام MiraBranchesManagementFragment بالجمع)
+        bindCard(view, R.id.cardAdminBranches, new MiraBranchesManagementFragment(), "BranchesManagement");
 
-        // 2. الهيكل والإدارة
-        bindCard(view, R.id.cardAdminBranches, new MiraBranchManagementFragment(), "Branches");
-        bindCard(view, R.id.cardAdminUsers, new UsersManagementFragment(), "Users");
-        bindCard(view, R.id.cardAdminProfile, new MiraProfileFragment(), "Profile");
+        // 2. إعدادات القارئ والتجهيزات
+        bindCard(view, R.id.cardAdminReaderSetup, new MiraReaderSetupFragment(), "ReaderSetup");
+
+        // 3. إعدادات البوابات الأمنية
+        bindCard(view, R.id.cardAdminGateSetup, new MiraGateSettingsFragment(), "GateSettings");
+
+        // 4. إدارة المستخدمين والصلاحيات (استخدام UsersManagementFragment بدلاً من Profile المفقود)
+        bindCard(view, R.id.cardAdminProfile, new UsersManagementFragment(), "UsersManagement");
+
+        // 5. التشفير والمصادقة المتقدمة (NXP UCode DNA)
+        bindCard(view, R.id.cardAdminSecurity, new AuthenticateNxpUcodeDnaFragment(), "NxpSecurity");
+
+        // 6. إعدادات الهوائيات والترددات (UHF Set)
+        bindCard(view, R.id.cardAdminUhfSet, new UHFSetFragment(), "UHFSet");
 
         return view;
     }
 
-    private void bindCard(View root, int resId, Fragment fragment, String tag) {
-        View card = root.findViewById(resId);
+    private void bindCard(View root, int cardId, Fragment fragment, String tag) {
+        if (root == null) return;
+        View card = root.findViewById(cardId);
         if (card != null) {
             card.setOnClickListener(v -> {
                 if (getActivity() instanceof UHFMainActivity) {
