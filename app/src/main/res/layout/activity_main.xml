@@ -85,13 +85,14 @@
         android:layout_marginBottom="28dp"
         android:contentDescription="@string/nav_actions"
         app:backgroundTint="?attr/colorPrimary"
-        app:borderWidth="3dp"
-        app:borderColor="?attr/colorSurface"
+        app:strokeColor="?attr/colorSurface"
+        app:strokeWidth="3dp"
         app:elevation="14dp"
         app:fabSize="normal"
         app:maxImageSize="28dp"
         app:srcCompat="@drawable/ic_gold_gem"
         app:tint="?attr/colorOnPrimary" />
+
 
     <!-- 5. غطاء التحميل -->
     <FrameLayout
