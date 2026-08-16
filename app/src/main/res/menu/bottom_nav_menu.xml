@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:id="@+id/nav_quick_dashboard"
-        android:icon="@drawable/ic_dashboard"
-        android:title="الرئيسية" />
-
-    
 
     <item
-        android:id="@+id/nav_quick_menu"
-        android:icon="@drawable/ic_flash"
-        android:title="إجراءات" />
+        android:id="@+id/nav_pos"
+        android:icon="@drawable/ic_pos_cart" 
+        android:title="نقطة البيع" />
 
     <item
-        android:id="@+id/nav_quick_inventory"
-        android:icon="@drawable/ic_scan"
-        android:title="الجرد" />
+        android:id="@+id/nav_inventory"
+        android:icon="@drawable/ic_rfid_scan" 
+        android:title="الجرد والبحث" />
 
     <item
-        android:id="@+id/nav_quick_pos"
-        android:icon="@drawable/ic_cart"
-        android:title="البيع" />
+        android:id="@+id/nav_transfers"
+        android:icon="@drawable/ic_transfer_arrows" 
+        android:title="التحويلات" />
+
+    <item
+        android:id="@+id/nav_more"
+        android:icon="@drawable/ic_grid_more" 
+        android:title="الإجراءات" />
+
 </menu>
