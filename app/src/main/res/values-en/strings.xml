@@ -4,19 +4,13 @@
     <string name="menu_profile">My Profile</string>
     <string name="menu_logout">Sign Out</string>
 <!-- Bottom Navigation -->
+<!-- Bottom Navigation -->
 <string name="nav_dashboard">Home</string>
-<string name="nav_jewelry">Jewelry</string>
+<string name="nav_actions">Actions</string>
 <string name="nav_inventory">Inventory</string>
 <string name="nav_pos">Sales</string>
 <string name="nav_more">More</string>
 
-    <string name="nav_identity">Encoding</string>
-<string name="nav_reports">Reports</string>
-<string name="nav_transfers">Transfers</string>
-<string name="nav_gate">Gates</string>
-<string name="nav_accounting">Accounting</string>
-<string name="nav_settings">Settings</string>
-<string name="nav_close">Close</string>
 
 
     <string name="menu_action_center">Quick Actions</string>
