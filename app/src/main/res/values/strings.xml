@@ -19,10 +19,6 @@
 
 
     <string name="menu_action_center">مركز الإجراءات</string>
-    <string name="nav_home">الرئيسية</string>
-    <string name="nav_reports">التقارير</string>
-    <string name="nav_inventory">الجرد</string>
-    <string name="nav_profile">الملف</string>
     
     <string name="action_rfid_scan">مسح الكود</string>
     <string name="action_quick_pos">نقطة البيع</string>
