@@ -24,7 +24,7 @@ public class MiraApiClient {
     private static final String PREFS_NAME = "mira_settings";
     private static final String SESSION_PREFS = "MiraEnterpriseSession";
 
-    private static final String DEFAULT_API_URL = "https://ams.ibreg.org/wp-json/mira-gate/v1";
+    private static final String DEFAULT_API_URL = "https://sa.mirabarcode.com/wp-json/mira-gate/v1";
     private static final String DEFAULT_API_KEY = "mira_gate_test071234567890abcdefghijklmnop";
     private static final String DEFAULT_GATE_ID = "handheld_c72";
 
