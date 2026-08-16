@@ -3,22 +3,22 @@
 
     <item
         android:id="@+id/nav_pos"
-        android:icon="@drawable/ic_pos_cart" 
+        android:icon="@android:drawable/ic_menu_agenda" 
         android:title="نقطة البيع" />
 
     <item
         android:id="@+id/nav_inventory"
-        android:icon="@drawable/ic_rfid_scan" 
+        android:icon="@android:drawable/ic_menu_search" 
         android:title="الجرد والبحث" />
 
     <item
         android:id="@+id/nav_transfers"
-        android:icon="@drawable/ic_transfer_arrows" 
+        android:icon="@android:drawable/ic_menu_directions" 
         android:title="التحويلات" />
 
     <item
         android:id="@+id/nav_more"
-        android:icon="@drawable/ic_grid_more" 
+        android:icon="@android:drawable/ic_menu_manage" 
         android:title="الإجراءات" />
 
 </menu>
