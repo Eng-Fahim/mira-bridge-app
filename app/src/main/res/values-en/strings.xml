@@ -19,6 +19,18 @@
 <string name="nav_close">Close</string>
 
 
+    <string name="menu_action_center">Quick Actions</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_reports">Reports</string>
+    <string name="nav_inventory">Inventory</string>
+    <string name="nav_profile">Profile</string>
+    
+    <string name="action_rfid_scan">Scan Code</string>
+    <string name="action_quick_pos">Quick POS</string>
+    <string name="action_transfers">Transfers</string>
+    <string name="action_more_tools">More Actions</string>
+
+
 <!--Gates -->
 
 <string name="mira_gate_title">MIRA Secure Gate™</string>
