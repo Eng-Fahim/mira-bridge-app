@@ -1,4 +1,5 @@
-ات</string>
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
     <string name="action_set">الإعدادات</string>
     <string name="msg_network_none">الشبكة غير متوفرة</string>
     <string name="msg_network_ok">الشبكة متصلة</string>
