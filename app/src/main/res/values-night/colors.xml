@@ -40,6 +40,19 @@
     <color name="full_transparent">#00000000</color>
     <color name="half_transparent">#AAFFFFFF</color>
 
+
+  <color name="brand_primary">#C2A24D</color>
+    <color name="brand_primary_dark">#9E8033</color>
+    
+    <color name="nav_bar_background">#1A1D24</color>
+    <color name="nav_item_selected">#C2A24D</color>
+    <color name="nav_item_unselected">#6C727F</color>
+    
+    <color name="action_sheet_bg">#12141A</color>
+    <color name="action_sheet_card_bg">#1C2029</color>
+    <color name="action_sheet_text_primary">#FFFFFF</color>
+    <color name="action_sheet_text_secondary">#8C92A4</color>
+    <color name="action_sheet_divider">#272C38</color>
     <color name="listitem_black">#FFFFFFFF</color>
     <color name="listitem_gray">#6B6B6B</color>
 
