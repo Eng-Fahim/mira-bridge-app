@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- شكل الماسة/الجوهرية الهندسي -->
+    <path
+        android:fillColor="?attr/colorOnPrimary"
+        android:pathData="M12,2 L5,8 L12,22 L19,8 L12,2 Z M12,4.5 L16.2,8 L12,18 L7.8,8 L12,4.5 Z" />
+</vector>
