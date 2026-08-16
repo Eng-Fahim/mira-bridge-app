@@ -36,6 +36,7 @@ import androidx.fragment.app.FragmentManager;
 import com.example.uhf.R;
 import com.example.uhf.fragment.AuthenticateNxpUcodeDnaFragment;
 import com.example.uhf.fragment.MiraAccountingFragment;
+import com.example.uhf.fragment.MiraGoldCurrencyFragment;
 import com.example.uhf.fragment.MiraDashboardFragment;
 import com.example.uhf.fragment.MiraGateSettingsFragment;
 import com.example.uhf.fragment.MiraIdentityStudioFragment;
@@ -180,29 +181,31 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         return true;
     }
 
-    @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        int id = item.getItemId();
+@Override
+public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+    int id = item.getItemId();
 
-        if (id == R.id.action_dashboard) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraDashboardFragment(), "Dashboard"));
-            return true;
-        } else if (id == R.id.action_gold_rates) {
-            showGoldRatesDialog();
-            return true;
-        } else if (id == R.id.action_toggle_language) {
-            toggleLanguage();
-            return true;
-        } else if (id == R.id.action_profile) {
-            showProfileInfoDialog();
-            return true;
-        } else if (id == R.id.action_logout) {
-            confirmLogout();
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
+    if (id == R.id.action_dashboard) {
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraDashboardFragment(), "Dashboard"));
+        return true;
+    } else if (id == R.id.action_gold_rates) {
+        // الربط المباشر مع شاشة أسعار الذهب والعملات
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraGoldCurrencyFragment(), "GoldRates"));
+        return true;
+    } else if (id == R.id.action_toggle_language) {
+        toggleLanguage();
+        return true;
+    } else if (id == R.id.action_profile) {
+        showProfileInfoDialog();
+        return true;
+    } else if (id == R.id.action_logout) {
+        confirmLogout();
+        return true;
     }
+
+    return super.onOptionsItemSelected(item);
+}
+
 
     private void toggleLanguage() {
         String newLang = isArabic ? "en" : "ar";
@@ -212,18 +215,17 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         startActivity(intent);
         finish();
     }
-
-    private void showGoldRatesDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle(isArabic ? "💰 إعدادات أسعار الذهب والبورصة" : "💰 Gold Rates & Exchange")
-                .setMessage(isArabic ? "يمكنك ضبط عيار 24، 21، 18 وأسعار الأونصة المباشرة من لوحة المحاسبة."
-                        : "Configure live rates for 24K, 21K, 18K and bullion indexes.")
-                .setPositiveButton(isArabic ? "فتح المحاسبة" : "Open Accounting", (dialog, which) -> {
-                    loadFragment(new MiraAccountingFragment(), "Accounting");
-                })
-                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                .show();
-    }
+private void showGoldRatesDialog() {
+    new AlertDialog.Builder(this)
+            .setTitle(isArabic ? "💰 أسعار الذهب والبورصة" : "💰 Gold Rates & Exchange")
+            .setMessage(isArabic ? "عرض وتحديث أسعار الذهب المباشرة والعملات."
+                    : "View and update live gold and currency exchange rates.")
+            .setPositiveButton(isArabic ? "فتح أسعار الذهب" : "Open Gold Rates", (dialog, which) -> {
+                loadFragment(new MiraGoldCurrencyFragment(), "GoldRates"); // ✅ التوجيه الصحيح
+            })
+            .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+            .show();
+}
 
     private void showProfileInfoDialog() {
         String name = sessionManager.getDisplayName();
