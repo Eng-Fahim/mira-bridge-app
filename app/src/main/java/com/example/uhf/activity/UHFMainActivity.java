@@ -35,6 +35,7 @@ import androidx.fragment.app.FragmentManager;
 
 import com.example.uhf.R;
 import com.example.uhf.fragment.MiraServerConfigFragment;
+import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.fragment.AuthenticateNxpUcodeDnaFragment;
 import com.example.uhf.fragment.MiraSalesHistoryFragment;
 import com.example.uhf.fragment.MiraAccountingFragment;
@@ -305,43 +306,86 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
         dialog.setContentView(view);
 
+        // ✅ استخدام إعدادات الوصول السريع
+        MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(this);
+
         // 1. استوديو التكويد
-        bindMenuAction(view, R.id.btnIdentityStudio, dialog, new MiraIdentityStudioFragment(), "IdentityStudio");
+        if (quickAccess.isActionEnabled("identity")) {
+            bindMenuAction(view, R.id.btnIdentityStudio, dialog, new MiraIdentityStudioFragment(), "IdentityStudio");
+        } else {
+            view.findViewById(R.id.btnIdentityStudio).setVisibility(View.GONE);
+        }
 
         // 2. الرادار
-        bindMenuAction(view, R.id.btnRadarLocation, dialog, new MiraUHFRadarLocationFragment(), "Radar");
+        if (quickAccess.isActionEnabled("radar")) {
+            bindMenuAction(view, R.id.btnRadarLocation, dialog, new MiraUHFRadarLocationFragment(), "Radar");
+        } else {
+            view.findViewById(R.id.btnRadarLocation).setVisibility(View.GONE);
+        }
 
         // 3. البوابة الأمنية
-        bindMenuAction(view, R.id.btnSecureGate, dialog, new MiraSecureGateFragment(), "SecureGate");
+        if (quickAccess.isActionEnabled("gate")) {
+            bindMenuAction(view, R.id.btnSecureGate, dialog, new MiraSecureGateFragment(), "SecureGate");
+        } else {
+            view.findViewById(R.id.btnSecureGate).setVisibility(View.GONE);
+        }
 
         // 4. التقارير
-        bindMenuAction(view, R.id.btnReports, dialog, new MiraReportsProFragment(), "Reports");
+        if (quickAccess.isActionEnabled("reports")) {
+            bindMenuAction(view, R.id.btnReports, dialog, new MiraReportsProFragment(), "Reports");
+        } else {
+            view.findViewById(R.id.btnReports).setVisibility(View.GONE);
+        }
 
         // 5. المحاسبة
-        bindMenuAction(view, R.id.btnAccounting, dialog, new MiraAccountingFragment(), "Accounting");
+        if (quickAccess.isActionEnabled("accounting")) {
+            bindMenuAction(view, R.id.btnAccounting, dialog, new MiraAccountingFragment(), "Accounting");
+        } else {
+            view.findViewById(R.id.btnAccounting).setVisibility(View.GONE);
+        }
 
         // 6. التحويلات
-        bindMenuAction(view, R.id.btnTransfer, dialog, new MiraTransferFragment(), "Transfers");
+        if (quickAccess.isActionEnabled("transfers")) {
+            bindMenuAction(view, R.id.btnTransfer, dialog, new MiraTransferFragment(), "Transfers");
+        } else {
+            view.findViewById(R.id.btnTransfer).setVisibility(View.GONE);
+        }
 
-        // 7. ✅ سجل المبيعات
-        bindMenuAction(view, R.id.btnSalesHistory, dialog, new MiraSalesHistoryFragment(), "SalesHistory");
+        // 7. سجل المبيعات
+        if (quickAccess.isActionEnabled("sales_history")) {
+            bindMenuAction(view, R.id.btnSalesHistory, dialog, new MiraSalesHistoryFragment(), "SalesHistory");
+        } else {
+            view.findViewById(R.id.btnSalesHistory).setVisibility(View.GONE);
+        }
 
         // 8. الخيارات الإدارية
-        View btnAdminHub = view.findViewById(R.id.btnAdminHub);
-        if (btnAdminHub != null) {
-            btnAdminHub.setOnClickListener(v -> {
-                dialog.dismiss();
-                checkInventoryLockAndExecute(() -> loadFragment(new MiraAdminHubFragment(), "AdminHub"));
-            });
+        if (quickAccess.isActionEnabled("admin_hub")) {
+            View btnAdminHub = view.findViewById(R.id.btnAdminHub);
+            if (btnAdminHub != null) {
+                btnAdminHub.setVisibility(View.VISIBLE);
+                btnAdminHub.setOnClickListener(v -> {
+                    dialog.dismiss();
+                    checkInventoryLockAndExecute(() -> loadFragment(new MiraAdminHubFragment(), "AdminHub"));
+                });
+            }
+        } else {
+            View btnAdminHub = view.findViewById(R.id.btnAdminHub);
+            if (btnAdminHub != null) btnAdminHub.setVisibility(View.GONE);
         }
 
         // 9. إعدادات السيرفر
-        View btnServerConfig = view.findViewById(R.id.btnServerConfig);
-        if (btnServerConfig != null) {
-            btnServerConfig.setOnClickListener(v -> {
-                dialog.dismiss();
-                loadFragment(new MiraServerConfigFragment(), "ServerConfig");
-            });
+        if (quickAccess.isActionEnabled("server_config")) {
+            View btnServerConfig = view.findViewById(R.id.btnServerConfig);
+            if (btnServerConfig != null) {
+                btnServerConfig.setVisibility(View.VISIBLE);
+                btnServerConfig.setOnClickListener(v -> {
+                    dialog.dismiss();
+                    loadFragment(new MiraServerConfigFragment(), "ServerConfig");
+                });
+            }
+        } else {
+            View btnServerConfig = view.findViewById(R.id.btnServerConfig);
+            if (btnServerConfig != null) btnServerConfig.setVisibility(View.GONE);
         }
 
         // زر الإغلاق
