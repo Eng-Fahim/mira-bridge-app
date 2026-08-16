@@ -19,7 +19,7 @@
             android:padding="16dp"
             android:gravity="center_horizontal">
 
-            <!-- مؤشر حالة البوابة مع الأيقونة -->
+            <!-- مؤشر حالة البوابة -->
             <FrameLayout
                 android:layout_width="90dp"
                 android:layout_height="90dp"
@@ -58,7 +58,7 @@
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:layout_marginBottom="12dp" />
 
-            <!-- نص حالة البوابة الرئيسي -->
+            <!-- حالة البوابة -->
             <TextView
                 android:id="@+id/tvGateStatus"
                 android:layout_width="match_parent"
@@ -70,7 +70,7 @@
                 android:padding="6dp"
                 android:layout_marginBottom="8dp" />
 
-            <!-- بطاقة تفاصيل آخر حدث -->
+            <!-- بطاقة آخر حدث -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -94,12 +94,11 @@
                         android:text="@string/status_waiting"
                         android:textAppearance="?attr/textAppearanceBodyMedium"
                         android:textColor="?attr/colorOnSurface"
-                        android:gravity="center"
-                        tools:text="🔍 في انتظار الفحص..." />
+                        android:gravity="center" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- لوحة الإحصائيات -->
+            <!-- الإحصائيات -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -107,6 +106,7 @@
                 android:layout_marginBottom="12dp"
                 android:weightSum="3">
 
+                <!-- مسموح -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -125,7 +125,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0"
-                            android:textColor="#2E7D32"
+                            android:textColor="@color/gate_pass_green"
                             android:textSize="22sp"
                             android:textStyle="bold" />
                         <TextView
@@ -136,6 +136,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+                <!-- مرفوض -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -155,7 +156,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0"
-                            android:textColor="#C62828"
+                            android:textColor="@color/gate_deny_red"
                             android:textSize="22sp"
                             android:textStyle="bold" />
                         <TextView
@@ -166,6 +167,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+                <!-- الإجمالي -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -196,7 +198,7 @@
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
 
-            <!-- أزرار تفعيل وإيقاف البوابة -->
+            <!-- أزرار التشغيل -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -222,10 +224,10 @@
                     android:layout_weight="1"
                     android:layout_marginStart="4dp"
                     android:text="@string/btn_disarm_gate"
-                    android:textColor="#C62828"
+                    android:textColor="@color/gate_deny_red"
                     android:textSize="14sp"
                     android:textStyle="bold"
-                    app:strokeColor="#C62828"
+                    app:strokeColor="@color/gate_deny_red"
                     app:cornerRadius="8dp" />
             </LinearLayout>
 
@@ -247,7 +249,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="🔍 إدخال واختبار القطع (يدوي / باركود / RFID)"
+                        android:text="@string/gate_input_title"
                         android:textAppearance="?attr/textAppearanceLabelMedium"
                         android:textStyle="bold"
                         android:layout_marginBottom="8dp"/>
@@ -262,7 +264,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:hint="أدخل رقم الـ EPC / السيريال"
+                            android:hint="@string/gate_input_hint"
                             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
 
                             <com.google.android.material.textfield.TextInputEditText
@@ -279,7 +281,7 @@
                             android:layout_height="wrap_content"
                             android:layout_gravity="center_vertical"
                             android:layout_marginStart="8dp"
-                            android:text="فحص" />
+                            android:text="@string/gate_btn_check" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -294,7 +296,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:layout_marginEnd="4dp"
-                            android:text="📷 كاميرا"
+                            android:text="@string/gate_btn_camera"
                             app:icon="@android:drawable/ic_menu_camera" />
 
                         <com.google.android.material.button.MaterialButton
@@ -303,8 +305,8 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="✅ مسموح"
-                            android:textColor="#10B981" />
+                            android:text="@string/gate_btn_sim_allowed"
+                            android:textColor="@color/gate_sim_green" />
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnSimulateDenied"
@@ -312,32 +314,33 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="🚨 مسروق"
-                            android:textColor="#EF4444" />
+                            android:text="@string/gate_btn_sim_denied"
+                            android:textColor="@color/gate_sim_red" />
                     </LinearLayout>
 
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- لوحة المتابعة Console -->
+            <!-- Console -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="130dp"
-                app:cardBackgroundColor="#000000"
+                app:cardBackgroundColor="@color/gate_console_bg"
                 app:cardCornerRadius="6dp">
 
                 <ScrollView
                     android:id="@+id/scrollDebugLog"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:padding="8dp">
+                    android:padding="8dp"
+                    android:nestedScrollingEnabled="true">
 
                     <TextView
                         android:id="@+id/tvDebugConsole"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="[System Console Initialized...]\n"
-                        android:textColor="#00FF66"
+                        android:text="@string/gate_console_initial"
+                        android:textColor="@color/gate_console_text"
                         android:textSize="11sp"
                         android:fontFamily="monospace" />
                 </ScrollView>
@@ -346,12 +349,12 @@
         </LinearLayout>
     </ScrollView>
 
-    <!-- 🚨 غطاء الطوارئ الكامل للوميض المرعب وإيقاف الصوت -->
+    <!-- غطاء الطوارئ -->
     <FrameLayout
         android:id="@+id/overlayAlarm"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#D32F2F"
+        android:background="@color/gate_alarm_bg"
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true">
@@ -367,7 +370,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="🚨 SECURITY BREACH 🚨"
+                android:text="@string/gate_alarm_title"
                 android:textColor="#FFFFFF"
                 android:textSize="32sp"
                 android:textStyle="bold"
@@ -378,8 +381,8 @@
                 android:id="@+id/tvOverlayTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="خرق أمني - قطعة غير مصرح بها!"
-                android:textColor="#FFFF00"
+                android:text="@string/gate_alarm_message"
+                android:textColor="@color/gate_alarm_title_yellow"
                 android:textSize="24sp"
                 android:textStyle="bold"
                 android:gravity="center"
@@ -389,7 +392,7 @@
                 android:id="@+id/tvOverlayDetails"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="EPC: E20041000000000000001111"
+                android:text="@string/gate_alarm_epc"
                 android:textColor="#FFFFFF"
                 android:textSize="16sp"
                 android:gravity="center"
@@ -399,7 +402,7 @@
                 android:id="@+id/btnStopAlarm"
                 android:layout_width="match_parent"
                 android:layout_height="64dp"
-                android:text="🔕 إيقاف الإنذار الصوتي والمربك"
+                android:text="@string/gate_alarm_stop"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:textColor="#000000"
