@@ -1,5 +1,53 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- ✅ أضف فقط هذه إذا لم تكن موجودة -->
+<string name="menu_profile">ملفي</string>
+<string name="menu_logout">تسجيل الخروج</string>
+<!-- Bottom Navigation -->
+<string name="nav_dashboard">الرئيسية</string>
+<string name="nav_jewelry">المجوهرات</string>
+<string name="nav_inventory">الجرد</string>
+<string name="nav_pos">البيع</string>
+<string name="nav_more">المزيد</string>
+<string name="nav_identity">التكويد</string>
+<string name="nav_reports">التقارير</string>
+<string name="nav_transfers">التحويلات</string>
+    
+    <string name="nav_home">Home</string>
+    <string name="nav_profile">Profile</string>
+<string name="nav_gate">البوابات</string>
+<string name="nav_accounting">المحاسبة</string>
+<string name="nav_settings">الإعدادات</string>
+<string name="nav_close">إغلاق</string>
+
+
+    <string name="menu_action_center">مركز الإجراءات</string>
+    
+    <string name="action_rfid_scan">مسح الكود</string>
+    <string name="action_quick_pos">نقطة البيع</string>
+    <string name="action_transfers">التحويلات</string>
+    <string name="action_more_tools">الإجراءات</string>
+
+
+    
+    <string name="app_name">MIRA Jewelry Enterprise™</string>
+    <string name="action_settings">الإعدادات</string>
+    <string name="action_about">حول التطبيق</string>
+    <string name="action_display">إعدادات العرض</string>
+    <string name="title_ip_or_domain">إدخال النطاق/عنوان IP</string>
+    <string name="title_ping_count">عدد محاولات PING</string>
+    <string name="title_ping_succ">نجاح PING</string>
+    <string name="title_ping_fail">فشل PING</string>
+    <string name="title_ping_seconds"> ثانية</string>
+    <string name="title_ping_background">في الخلفية</string>
+    <string name="title_ping_wait">مهلة الانتظار (ثانية)</string>
+    <string name="title_ping_restart">إعادة التشغيل</string>
+    <string name="title_ping_pingresult">نتيجة Ping</string>
+    <string name="title_ping_uploadresult">نتيجة الرفع</string>
+    <string name="title_ping_downloadresult">نتيجة التنزيل</string>
+    <string name="title_start">بدء</string>
+    <string name="title_stop">إيقاف</string>
+    <string name="title_activity_settings">الإعدادات</string>
     <string name="action_set">الإعدادات</string>
     <string name="msg_network_none">الشبكة غير متوفرة</string>
     <string name="msg_network_ok">الشبكة متصلة</string>
@@ -50,12 +98,12 @@
     <string name="yid_title_scan_compare">مقارنة</string>
     <string name="yid_title_scan_continuous">تلقائي، فاصل زمني</string>
     <string name="yid_msg_scan_fail">فشل المسح</string>
+
     <string name="yid_msg_scan_cancel">تم إلغاء المسح</string>
     <string name="yid_msg_scan_timeout">انتهت مهلة المسح</string>
-    
-    <string name="sales_title">سجل المبيعات</string>
-    <string name="sales_search_hint">ابحث برقم العملية أو اسم العميل...</string>
-    <string name="sales_empty">لا توجد عمليات بيع حتى الآن</string>
+<string name="sales_title">سجل المبيعات</string>
+<string name="sales_search_hint">ابحث برقم العملية أو اسم العميل...</string>
+<string name="sales_empty">لا توجد عمليات بيع حتى الآن</string>
     <string name="yid_msg_scan_error">خطأ في الباركود</string>
     <string name="title_scan_count">الإجمالي</string>
     <string name="title_succ_count">الناجحة</string>
@@ -65,43 +113,9 @@
     <string name="title_succ_rate">نسبة النجاح</string>
     <string name="title_fail_rate">نسبة الفشل</string>
     <string name="title_activity_bluetooth_print">طابعة البلوتوث</string>
+
     <string name="title_decode_time">زمن فك الترميز</string>
 
-    <!-- إعدادات وأسعار الذهب -->
-<string name="gold_currency">الذهب والعملات</string>
-<string name="fetch_prices">جلب الأسعار</string>
-<string name="gold_prices_title">أسعار الذهب المباشرة</string>
-<string name="profit_margins_title">هوامش الربح</string>
-<string name="making_charges_title">أجور الصياغة والمصنعية</string>
-
-<!-- العيارات -->
-<string name="karat_24_label">عيار 24</string>
-<string name="karat_22_label">عيار 22</string>
-<string name="karat_21_label">عيار 21</string>
-<string name="karat_18_label">عيار 18</string>
-<string name="karat_14_label">عيار 14</string>
-<string name="karat_12_label">عيار 12</string>
-
-<!-- نصوص العامة والجرد -->
-<string name="total">الإجمالي</string>
-<string name="tv_all">الكل</string>
-<string name="tv_fast_inventory">الجرد السريع</string>
-<string name="tv_phase">المرحلة</string>
-
-<!-- نصوص UHF -->
-<string name="uhf_btn_memoryBank">بنك الذاكرة</string>
-<string name="uhf_gyro_loaction">موقع الجيروسكوب</string>
-<string name="uhf_located_angle">زاوية التحديد</string>
-<string name="uhf_locating_tag_value">قيمة البطاقة المحددة</string>
-<string name="uhf_msg_filter_addr_must_decimal">عنوان التصفية يجب أن يكون عشرياً</string>
-<string name="uhf_msg_filter_len_must_decimal">طول التصفية يجب أن يكون عشرياً</string>
-<string name="uhf_msg_get_para_fail">فشل جلب المعلمات</string>
-<string name="uhf_msg_get_para_succ">تم جلب المعلمات بنجاح</string>
-<string name="uhf_msg_length_error">خطأ في الطول</string>
-<string name="uhf_msg_no_Bluetooth">لا يوجد جهاز بلوتوث</string>
-<string name="uhf_msg_no_Sensor">لم يتم العثور على مستشعر</string>
-
-    
     <!-- BTPrinterDemo -->
     <string name="send">إرسال</string>
     <string name="Print">طباعة</string>
@@ -115,74 +129,10 @@
     <string name="fontGrayscaleName">التدرج الرمادي</string>
     <string name="fontGrayScaleRange">(1~8)</string>
     <string name="PrintContent"> أهلاً بك! \n</string>
-
-
-    <!-- Navigation & Layout Extras -->
-<string name="nav_actions">المرئيات والإجراءات</string>
-
-<!-- MIRA Gate Settings -->
-<string name="gate_settings_title">إعدادات بوابة الحماية</string>
-<string name="add_gate">إضافة بوابة</string>
-<string name="sound_settings">إعدادات الأصوات</string>
-<string name="sound_pass">صوت المرور المصرح</string>
-<string name="sound_deny">صوت رفض المرور</string>
-<string name="sound_alarm">صوت الإنذار</string>
-<string name="test_sound">تجربة الصوت</string>
-<string name="save_sounds">حفظ الأصوات</string>
-<string name="additional_settings">إعدادات إضافية</string>
-<string name="vibration_enabled">تفعيل الاهتزاز</string>
-<string name="flash_enabled">تفعيل الفلاش</string>
-<string name="alarm_duration_label">مدة مدة الإنذار</string>
-<string name="rfid_power_label">قوة إشارة الـ RFID</string>
-<string name="save_all">حفظ الكل</string>
-
-<!-- Gold & Currency Settings -->
-<string name="gold_settings_title">إعدادات أسعار الذهب والعملات</string>
-<string name="ready_to_update">جاهز للتحديث</string>
-<string name="api_provider">مزود خدمة API</string>
-<string name="api_key_hint">أدخل مفتاح API</string>
-
-
-        <!-- ==================== نصوص أسعار الذهب والعملات (Gold & Currency) ==================== -->
-    <string name="final_prices_title">الأسعار النهائية</string>
-    <string name="currency_settings_title">إعدادات العملة</string>
-    <string name="default_currency">العملة الافتراضية</string>
-    <string name="chart_currency">عملة الرسم البياني</string>
-    <string name="official_rates_title">الأسعار الرسمية</string>
-    <string name="market_rates_title">أسعار السوق</string>
-    <string name="save_currency_settings">حفظ إعدادات العملة</string>
-    <string name="refresh_rates">تحديث الأسعار</string>
-
-    <!-- ==================== نصوص شاشة البيع (POS) ==================== -->
-    <string name="pos_title">نقطة البيع</string>
-    <string name="pos_scale_searching">جاري البحث عن الميزان...</string>
-    <string name="pos_scan_gs1">مسح GS1</string>
-    <string name="pos_scan_rfid">مسح RFID</string>
-    <string name="pos_ready_scan">جاهز للمسح الضوئي</string>
-    <string name="pos_manual_hint">إدخال يدوي...</string>
-    <string name="pos_add">إضافة</string>
-    <string name="pos_item_count">عدد القطع</string>
-    <string name="pos_total_amount">الإجمالي</string>
-    <string name="pos_default_amount">0.00</string>
-    <string name="pos_clear">مسح</string>
-
-<!-- Missing UHF Resources -->
-<string name="uhf_msg_offset_error">خطأ في الإزاحة</string>
-<string name="uhf_msg_set_fail">فشل الإعداد</string>
-<string name="uhf_msg_set_frehop_fail">فشل ضبط القفز الترددي</string>
-<string name="uhf_msg_set_frehop_succ">تم ضبط القفز الترددي بنجاح</string>
-<string name="uhf_msg_set_succ">تم الإعداد بنجاح</string>
-<string name="uhf_msg_upgrade_fail">فشلت الترقية</string>
-<string name="uhf_msg_upgrade_succ">تمت الترقية بنجاح</string>
-<string name="uhf_not_support_rssi">مؤشر RSSI غير مدعوم</string>
-<string name="uhf_radar_loaction">موقع الرادار</string>
-<string name="uhf_tag_count">عدد البطاقات</string>
-<string name="unique">فريد</string>
-<string name="user_area_number">رقم منطقة المستخدم</string>
-<string name="word">كلمة</string>
-<string name="workTime">وقت العمل</string>
-
-    <!--- البوابات الأمنية -->
+    
+    
+    <!---البوابات الامنية -->
+    
     <string name="mira_gate_title">MIRA Secure Gate™</string>
     <string name="mira_gate_subtitle">نظام البوابة الأمنية والوقاية من السرقة</string>
     <string name="gate_status_armed">🛡️ البوابة مفعلة - المسح الأمني نشط</string>
@@ -197,15 +147,16 @@
     <string name="stat_total_scans">الإجمالي</string>
     <string name="status_waiting">في انتظار التفعيل...</string>
     
-    <string name="manual_scan_title">📝 إدخال يدوي / مسح</string>
-    <string name="hint_manual_epc">أدخل رقم القطعة (EPC) يدوياً...</string>
-    <string name="btn_submit">✅ فحص</string>
-    <string name="btn_scan_camera">📷 كاميرا</string>
-    <string name="simulation_title">🧪 وضع المحاكاة</string>
-    <string name="btn_simulate_pass">✅ محاكاة مسموح</string>
-    <string name="btn_simulate_deny">🚨 محاكاة مرفوض</string>
-    <string name="debug_console_title">📋 سجل الأحداث</string>
-    <string name="btn_stop_alarm">🔕 إيقاف الإنذار</string>
+    <!-- ==================== نصوص شاشة البوابة الأمنية - ناقصة ==================== -->
+<string name="manual_scan_title">📝 إدخال يدوي / مسح</string>
+<string name="hint_manual_epc">أدخل رقم القطعة (EPC) يدوياً...</string>
+<string name="btn_submit">✅ فحص</string>
+<string name="btn_scan_camera">📷 كاميرا</string>
+<string name="simulation_title">🧪 وضع المحاكاة</string>
+<string name="btn_simulate_pass">✅ محاكاة مسموح</string>
+<string name="btn_simulate_deny">🚨 محاكاة مرفوض</string>
+<string name="debug_console_title">📋 سجل الأحداث</string>
+<string name="btn_stop_alarm">🔕 إيقاف الإنذار</string>
     
     <string name="gate_input_title">🔍 إدخال واختبار القطع (يدوي / باركود / RFID)</string>
     <string name="gate_input_hint">أدخل رقم الـ EPC / السيريال</string>
@@ -218,6 +169,10 @@
     <string name="gate_alarm_message">خرق أمني - قطعة غير مصرح بها!</string>
     <string name="gate_alarm_epc">EPC: -</string>
     <string name="gate_alarm_stop">🔕 إيقاف الإنذار الصوتي والمربك</string>
+
+
+
+
 
     <!-- DASHBOARD -->
     <string name="precious_inventory">المخزون الثمين والكتلة</string>
@@ -238,57 +193,57 @@
     <string name="offline">● OFFLINE</string>
     <string name="pieces">قطعة</string>
     <string name="greeting_default">مرحباً بك...</string>
-    <string name="location_default">المعرض الرئيسي — الفرع الإقليمي</string>
+<string name="location_default">المعرض الرئيسي — الفرع الإقليمي</string>
+
 
     <!-- Identity Studio Strings -->
-    <string name="step_title">الخطوة 1 من 4: الربط والتصنيف</string>
-    <string name="hint_epc">رمز الشريحة (EPC / GTIN)...</string>
-    <string name="hint_title">عنوان ووصف القطعة</string>
-    <string name="btn_save_identity">اعتماد الموزون وتصدير MIRA ID</string>
-    <string name="btn_add_photos">📷 التقاط / إرفاق صور القطعة</string>
-    <string name="no_photos">لم يتم إرفاق صور بعد</string>
-    <string name="estimated_value_currency">ريال</string>
-    <string name="classify_item">تصنيف القطعة</string>
-    <string name="ring">💍 خاتم</string>
-    <string name="set">💎 طقم</string>
-    <string name="bracelet">📿 سوار</string>
-    <string name="necklace">📐 عقد</string>
-    <string name="metal_specs">مواصفات المعدن والوزن</string>
-    <string name="metal_type">معدن القطعة:</string>
-    <string name="yellow_gold">🟡 ذهب أصفر</string>
-    <string name="white_gold">⚪ ذهب أبيض</string>
-    <string name="rose_gold">🔴 ذهب وردي</string>
-    <string name="karat">العيار:</string>
-    <string name="gross_weight_label">الوزن القائم (جرام)</string>
-    <string name="estimated_gold_value">القيمة التقديرية للذهب الخام:</string>
-    <string name="stones_title">الأحجار والتطعيم</string>
-    <string name="has_stones">هل القطعة مرصعة بأحجار / زركون؟</string>
-    <string name="stone_type_hint">نوع الأحجار (مثال: ألماس، زركون، ياقوت...)</string>
-    <string name="stone_weight_hint">وزن الأحجار (قيراط)</string>
-    <string name="stone_count_hint">عدد الأحجار</string>
-    <string name="stone_value_hint">القيمة الإضافية للأحجار ($)</string>
-    <string name="photos_title">صور القطعة والاعتماد النهائي</string>
-    <string name="bound">BOUND</string>
-    <string name="waiting">WAITING</string>
-    <string name="encoding">جاري التكويد...</string>
-    <string name="camera_permission">صلاحية الكاميرا مطلوبة لالتقاط الصور</string>
-    <string name="photo_captured">✅ تم التقاط الصورة بنجاح</string>
-    <string name="no_camera">❌ لا يوجد تطبيق كاميرا متاح</string>
-    <string name="rfid_required">يرجى مسح أو كتابة رمز RFID أولاً</string>
-    <string name="title_required">يرجى كتابة عنوان القطعة</string>
-    <string name="weight_required">يرجى تحديد وزن القطعة</string>
-    <string name="invalid_weight">وزن غير صالح</string>
-    <string name="encode_success">✅ تم تكويد القطعة وربطها بنجاح!</string>
-    <string name="encode_failed">❌ فشل التكويد:</string>
-    <string name="encode_error">❌ خطأ:</string>
-    <string name="photos_attached">تم إرفاق (%d) صور</string>
-    <string name="main_showroom">المعرض الرئيسي</string>
-    <string name="category_jewelry">مجوهرات</string>
-    <string name="category_rings">خواتم</string>
-    <string name="category_sets">أطقم</string>
-    <string name="category_bracelets">أساور</string>
-    <string name="category_necklaces">عقود</string>
-
+<string name="step_title">الخطوة 1 من 4: الربط والتصنيف</string>
+<string name="hint_epc">رمز الشريحة (EPC / GTIN)...</string>
+<string name="hint_title">عنوان ووصف القطعة</string>
+<string name="btn_save_identity">اعتماد الموزون وتصدير MIRA ID</string>
+<string name="btn_add_photos">📷 التقاط / إرفاق صور القطعة</string>
+<string name="no_photos">لم يتم إرفاق صور بعد</string>
+<string name="estimated_value_currency">ريال</string>
+<string name="classify_item">تصنيف القطعة</string>
+<string name="ring">💍 خاتم</string>
+<string name="set">💎 طقم</string>
+<string name="bracelet">📿 سوار</string>
+<string name="necklace">📐 عقد</string>
+<string name="metal_specs">مواصفات المعدن والوزن</string>
+<string name="metal_type">معدن القطعة:</string>
+<string name="yellow_gold">🟡 ذهب أصفر</string>
+<string name="white_gold">⚪ ذهب أبيض</string>
+<string name="rose_gold">🔴 ذهب وردي</string>
+<string name="karat">العيار:</string>
+<string name="gross_weight_label">الوزن القائم (جرام)</string>
+<string name="estimated_gold_value">القيمة التقديرية للذهب الخام:</string>
+<string name="stones_title">الأحجار والتطعيم</string>
+<string name="has_stones">هل القطعة مرصعة بأحجار / زركون؟</string>
+<string name="stone_type_hint">نوع الأحجار (مثال: ألماس، زركون، ياقوت...)</string>
+<string name="stone_weight_hint">وزن الأحجار (قيراط)</string>
+<string name="stone_count_hint">عدد الأحجار</string>
+<string name="stone_value_hint">القيمة الإضافية للأحجار ($)</string>
+<string name="photos_title">صور القطعة والاعتماد النهائي</string>
+<string name="bound">BOUND</string>
+<string name="waiting">WAITING</string>
+<string name="encoding">جاري التكويد...</string>
+<string name="camera_permission">صلاحية الكاميرا مطلوبة لالتقاط الصور</string>
+<string name="photo_captured">✅ تم التقاط الصورة بنجاح</string>
+<string name="no_camera">❌ لا يوجد تطبيق كاميرا متاح</string>
+<string name="rfid_required">يرجى مسح أو كتابة رمز RFID أولاً</string>
+<string name="title_required">يرجى كتابة عنوان القطعة</string>
+<string name="weight_required">يرجى تحديد وزن القطعة</string>
+<string name="invalid_weight">وزن غير صالح</string>
+<string name="encode_success">✅ تم تكويد القطعة وربطها بنجاح!</string>
+<string name="encode_failed">❌ فشل التكويد:</string>
+<string name="encode_error">❌ خطأ:</string>
+<string name="photos_attached">تم إرفاق (%d) صور</string>
+<string name="main_showroom">المعرض الرئيسي</string>
+<string name="category_jewelry">مجوهرات</string>
+<string name="category_rings">خواتم</string>
+<string name="category_sets">أطقم</string>
+<string name="category_bracelets">أساور</string>
+<string name="category_necklaces">عقود</string>
     <!-- DeviceListActivity -->
     <string name="scanning">جاري البحث...</string>
     <string name="select_device">حدد جهازاً</string>
@@ -300,6 +255,7 @@
     <string name="title_activity_uhfmain">UHF</string>
     
     <!-- التكويد -->
+   
     <string name="identity_step_title">الخطوة 1 من 4: الربط والتصنيف</string>
     <string name="identity_epc_hint">رمز الشريحة (EPC / GTIN)</string>
     <string name="identity_scan_rfid">📡 مسح RFID تلقائي</string>
@@ -331,6 +287,8 @@
     <string name="identity_waiting">WAITING</string>
     <string name="identity_default_value">0.00 ريال</string>
 
+    
+
     <!-- inventorytag -->
     <string name="tvInventoryName">جرد الشريحة</string>
     <string name="tvCountOfTags">الإجمالي  </string>
@@ -345,7 +303,6 @@
     <string name="tvTagCount">العدد</string>
     <string name="btClear">مسح</string>
     <string name="tvTag">الشريحة</string>
-    
     <string-array name="arrayAntiQ">
         <item>0</item>
         <item>1</item>
@@ -364,13 +321,13 @@
         <item>14</item>
         <item>15</item>
     </string-array>
-    
     <string-array name="arrayLF">
         <item>بطاقة الهوية (ID)</item>
         <item>شريحة الحيوانات</item>
         <item>شريحة HiTag</item>
         <item>شريحة HDX</item>
         <item>EM4450</item>
+
         <item>HID PROXIMITY</item>
     </string-array>
 
@@ -386,12 +343,10 @@
         <item>Odd</item>
         <item>Even</item>
     </string-array>
-    
     <string-array name="arrayKeyId" translatable="false">
         <item>0</item>
         <item>1</item>
     </string-array>
-    
     <!-- read -->
     <string name="btUii">قراءة EPC</string>
     <string name="ckWithUii">استخدام EPC</string>
@@ -419,7 +374,9 @@
 
     <string name="uhf_title_read">قراءة</string>
     <string name="uhf_title_write">كتابة</string>
+
     <string name="uhf_title_filter">تصفية</string>
+
 
     <string name="uhf_title_temp">قناع مؤقت</string>
     <string name="uhf_title_perm">قناع دائم</string>
@@ -432,18 +389,15 @@
         <item>TID</item>
         <item>المستخدم (USER)</item>
     </string-array>
-    
     <string-array name="arrayReadLock">
         <item>قراءة</item>
         <item>قفل دائم</item>
     </string-array>
-    
     <string-array name="arrayBank2">
         <item>EPC</item>
         <item>TID</item>
         <item>المستخدم (USER)</item>
     </string-array>
-    
     <string-array name="arrayOption_Read">
         <item>مفرد</item>
         <item>تلقائي</item>
@@ -459,9 +413,11 @@
     <string name="uhf_btn_getpower">جلب الطاقة</string>
     <string name="uhf_title_dbm">dBm</string>
 
+
     <string name="uhf_title_link">رابط التردد (RFLink)：</string>
     <string name="uhf_btn_set_link">ضبط الرابط</string>
     <string name="uhf_btn_get_link">جلب الرابط</string>
+
 
     <string-array name="arrayPower2" translatable="false">
         <item>5</item>
@@ -485,6 +441,7 @@
         <item>23</item>
         <item>24</item>
     </string-array>
+
 
     <!-- chooseuii -->
     <string name="tvChooseInfo">يرجى تحديد وجهة UII</string>
@@ -578,7 +535,9 @@
     </string-array>
 
     <!-- frequency -->
+
     <string name="tv_r2000_fun"></string>
+
     <string name="tvProtocol">البروتوكول：</string>
     <string name="tvQTPublic">العثور على المنطقة المخفية (شريحة QT)：</string>
     <string name="tvTAndE">وضع EPC و TID：</string>
@@ -591,9 +550,12 @@
     <string name="tvFreHop">القفز الترددي：</string>
 
     <string name="btSetFre">ضبط التردد</string>
+
     <string name="btSetFreHop">ضبط القفز الترددي</string>
+
     <string name="btSetPrar">ضبط معلمات QT</string>
     <string name="btGetPrar">جلب معلمات QT</string>
+
 
     <string name="btSetProtocol">ضبط البروتوكول</string>
     <string name="tvFreRange">نطاق التردد：</string>
@@ -615,6 +577,7 @@
     <string name="tvMHz">ميغاهرتز</string>
     <string name="tvKHz">كيلوهيرتز</string>
 
+
     <string name="ETSI_Standard">المعيار الأوروبي ETSI (865~868MHz)</string>
     <string name="United_States_Standard">المعيار الأمريكي (902~928MHz)</string>
     <string name="Fixed_Frequency_915MHz">تردد ثابت (915MHz)</string>
@@ -625,7 +588,6 @@
     <string name="China_Standard_920_925MHz">المعيار الصيني (920~925MHz)</string>
     <string name="South_Africa_915_919MHz">جنوب أفريقيا (915~919MHz)</string>
     <string name="New_Zealand">نيوزيلندا</string>
-    
     <string-array name="arrayMode" translatable="false">
         <item>@string/ETSI_Standard</item>
         <item>@string/United_States_Standard</item>
@@ -659,6 +621,7 @@
         <item>923.875</item>
         <item>924.125</item>
         <item>924.375</item>
+
     </string-array>
 
     <string-array name="arrayFreHop_us" translatable="false">
@@ -712,6 +675,7 @@
         <item>926.25</item>
         <item>926.75</item>
         <item>927.25</item>
+
     </string-array>
 
     <string-array name="arrayProtocol" translatable="false">
@@ -784,7 +748,6 @@
         <item>24</item>
         <item>25</item>
     </integer-array>
-
     <string-array name="arrayLinkTest" translatable="false">
         <item>0-PR ASK/Miller8/160KHz</item>
         <item>1-PR ASK/Miller4/250KHz</item>
@@ -806,7 +769,6 @@
         <item>24-Autoset/Miller2/320KHz</item>
         <item>25-Autoget/Miller2/640KHz</item>
     </string-array>
-
     <string-array name="arrayThreshold" translatable="false">
         <item>level1(22)</item>
         <item>level2(36)</item>
@@ -815,6 +777,7 @@
         <item>level5(70)</item>
     </string-array>
 
+
     <string-array name="arrayPacketSize" translatable="false">
         <item>32bytes</item>
         <item>64bytes</item>
@@ -822,11 +785,11 @@
         <item>256bytes</item>
     </string-array>
 
+
     <string-array name="arrayBase">
         <item>0</item>
         <item>1</item>
     </string-array>
-
     <string-array name="arrayChannelSpc0">
         <item>1</item>
         <item>2</item>
@@ -849,7 +812,6 @@
         <item>19</item>
         <item>20</item>
     </string-array>
-
     <string-array name="arrayChannelSpc1">
         <item>1</item>
         <item>2</item>
@@ -860,20 +822,17 @@
         <item>7</item>
         <item>8</item>
     </string-array>
-
     <string-array name="arrayHop">
         <item>قفز عشوائي للتردد</item>
         <item>قفز تسلسلي من الأعلى إلى الأسفل</item>
         <item>قفز تسلسلي من الأسفل إلى الأعلى</item>
     </string-array>
-
     <string-array name="arrayVoltage">
         <item>5V</item>
         <item>3V</item>
         <item>1.8V</item>
         <item>iso</item>
     </string-array>
-
     <string-array name="arrayBaud">
         <item>9600</item>
         <item>19200</item>
@@ -903,6 +862,7 @@
         <item>57600</item>
         <item>115200</item>
     </string-array>
+
 
     <string-array name="arrayFringeprintBaud" translatable="false">
         <item>57600</item>
@@ -966,6 +926,7 @@
     <string name="m1_title_single">عام</string>
     <string name="m1_title_multiple">تلقائي</string>
 
+
     <string name="m1_title_key_type">نوع المفتاح:</string>
     <string name="m1_title_key_value">المفتاح:</string>
     <string name="m1_title_sector">القطاع:</string>
@@ -991,9 +952,12 @@
     <string name="rfid_title_continuous_write_succ_count">النجاح (كتابة):</string>
     <string name="rfid_title_continuous_write_fail_count">الفشل (كتابة):</string>
     <string name="action_rfid_ver">إصدار RFID</string>
+
     <string name="action_psam_ver">إصدار PSAM</string>
 
+
     <string name="action_psam_upgrader">تحديث PSAM</string>
+
 
     <string name="action_uhf_ver">إصدار UHF</string>
     <string name="action_fingerprint_ver">إصدار البصمة</string>
@@ -1046,6 +1010,7 @@
     <string name="network_msg_title_mobile">شبكة الجوال</string>
     <string name="network_msg_sim_not_exist">لا توجد شريحة SIM</string>
     <string name="network_msg_emergency_only">المكالمات الطارئة فقط</string>
+
     <string name="network_msg_in_service">في الخدمة</string>
     <string name="network_msg_out_of_service">خارج الخدمة</string>
     <string name="network_msg_power_off">إيقاف التشغيل</string>
@@ -1074,12 +1039,17 @@
     <string name="ping_msg_finish">إنهاء</string>
     <string name="bluetooth_title_file">ملف</string>
     <string name="title_activity_battery_monitor">البطارية</string>
+
     <string name="title_activity_reboot">اختبار إعادة التشغيل</string>
+
+
     <string name="battery_title_tips">تلميح: يتم تخزين النتائج في بطاقة SD ضمن المجلد handset/BatteryMonitor.</string>
     <string name="battery_msg_background_monitoring">مراقب البطارية</string>
     <string name="battery_msg_runing">جاري المراقبة</string>
+
     <string name="battery_title_rb_def">افتراضي</string>
     <string name="battery_title_rb_cust">مخصص</string>
+
 
     <string name="battery_tips_STATUS_NOT_CHARGING">لا يشحن</string>
     <string name="battery_tips_STATUS_CHARGING">جاري الشحن</string>
@@ -1096,6 +1066,7 @@
     <string name="battery_tips_voltage">الجهد الكهربائي:</string>
     <string name="battery_tips_temperature">درجة الحرارة:</string>
     <string name="battery_tips_extra_level">مستوى إضافي:</string>
+
     <string name="battery_tips_extra_dl">تيار إضافي:</string>
 
     <string name="title_activity_fingerprint">بصمة الإصبع</string>
@@ -1125,8 +1096,10 @@
     <string name="fingerprint_title_get_img_fail">فشل في جلب صور البصمة</string>
     <string name="fingerprint_msg_init_fail">فشلت تهيئة الجهاز</string>
 
+
     <string name="rfid_msg_upgrade_fail">فشل تحديث RFID</string>
     <string name="rfid_msg_upgrade_succ">نجح تحديث RFID</string>
+
 
     <string name="psam_msg_upgrade_fail">فشل تحديث PSAM</string>
     <string name="psam_msg_upgrade_succ">نجح تحديث PSAM</string>
@@ -1154,27 +1127,33 @@
 
     <string name="fingerprint_title_threshold">العتبة (Threshold)</string>
     <string name="fingerprint_title_packet_size">حجم الحزمة</string>
+
     <string name="fingerprint_title_PSW">كلمة المرور</string>
 
     <string name="fingerprint_btn_set_PSW">ضبط كلمة المرور</string>
     <string name="fingerprint_btn_Vfy_PSW">التحقق من كلمة المرور</string>
 
+
     <string name="fingerprint_btn_set_Threshold">ضبط العتبة</string>
     <string name="fingerprint_btn_get_Threshold">جلب العتبة</string>
 
+
     <string name="fingerprint_btn_set_Baudrate">ضبط معدل البود (Baudrate)</string>
     <string name="fingerprint_btn_get_Baudrate">جلب معدل البود (Baudrate)</string>
+
 
     <string name="fingerprint_btn_reinit">إعادة التهيئة</string>
 
     <string name="fingerprint_btn_set_PacketSize">ضبط حجم الحزمة</string>
     <string name="fingerprint_btn_get_PacketSize">جلب حجم الحزمة</string>
 
+
     <string name="fingerprint_msg_set_threshold_succ">تم ضبط العتبة بنجاح</string>
     <string name="fingerprint_msg_set_threshold_fail">فشل ضبط العتبة</string>
 
     <string name="fingerprint_msg_set_Baudrate_succ">تم ضبط معدل البود بنجاح</string>
     <string name="fingerprint_msg_set_Baudrate_fail">فشل ضبط معدل البود</string>
+
 
     <string name="fingerprint_msg_set_PacketSize_succ">تم ضبط حجم الحزمة بنجاح</string>
     <string name="fingerprint_msg_set_PacketSize_fail">فشل ضبط حجم الحزمة</string>
@@ -1222,10 +1201,12 @@
     <string name="volum_title_voice_notification">الإشعارات</string>
     <string name="volum_title_voice_alarm">المنبه</string>
     <string name="app_msg_init">جاري التهيئة...</string>
-    <string name="app_msg_Upgrade">جاري التحديث...\nلا تخرج لتجنب تلف الجهاز</string>
 
+    <string name="app_msg_Upgrade">جاري التحديث...\nلا تخرج لتجنب تلف الجهاز</string>
+    
     <string name="total_sales">إجمالي المبيعات</string>
     <string name="invoices_count">عدد الفواتير</string>
+    
 
     <string name="title_activity_light_and_psensor">المستشعر</string>
     <string name="lp_btn_open">فتح</string>
@@ -1238,8 +1219,10 @@
     <string name="lp_title_light">الإضاءة</string>
     <string name="lp_title_sensor">المستشعر</string>
     <string name="lp_title_brightness">السطوع</string>
+
     <string name="lp_title_compass">البوصلة</string>
     <string name="lp_title_gyroscope">الجيوروسكوب</string>
+
     <string name="lp_title_psensor">قيمة مستشعر التقارب (P-Sensor)：</string>
     <string name="lp_title_lightsensor">قيمة مستشعر الإضاءة：</string>
     <string name="led_action_open">تشغيل ضوء LED</string>
@@ -1274,7 +1257,7 @@
     <string name="b14443_title_auto">تلقائي</string>
     <string name="b14443_title_stop">إيقاف</string>
     <string name="b14443_msg_rats">خطأ في RATS و PPS</string>
-    <string name="b14443_msg_num">معالج (CPU ID)</string>
+    <string name="b14443_msg_num">معرف المعالج (CPU ID)</string>
     <string name="b14443_msg_rev">بيانات RATS</string>
     <string name="b14443_msg_send_err">فشل الإرسال</string>
     <string name="b14443_msg_uid_err">فشل جلب المعرف (UID)</string>
@@ -1305,10 +1288,13 @@
     <string name="psam_title_send">إرسال</string>
     <string name="psam_title_set">ضبط</string>
     <string name="psam_title_clear">مسح</string>
+
     <string name="psam_title_save">حفظ السجلات</string>
+
     <string name="psam_title_tips">مخزنة في بطاقة SD ضمن المجلد handset/PSAM.</string>
     <string name="psam_title_card_1">البطاقة 1</string>
     <string name="psam_title_card_2">البطاقة 2</string>
+
     <string name="psam_msg_fail">فشل</string>
     <string name="title_activity_analog_call">مكالمة تناظرية</string>
     <string name="title_analog_call_touch_on">اضغط للتسجيل</string>
@@ -1440,9 +1426,11 @@
     <string name="wifi_changing_network">جاري طلب الاتصال بالشبكة\u2026</string>
     <string name="wifi_ssid_label">اسم الشبكة</string>
     <string name="wifi_type_label">النوع</string>
+
     <!-- zxing end -->
 
     <string name="title_activity_auto_run_network">الشبكة_تلقائي</string>
+
     <string name="desfire_title_scan">مسح</string>
     <string name="desfire_title_back">رجوع</string>
     <string name="desfire_title_pwd">كلمة المرور</string>
@@ -1455,18 +1443,23 @@
     <string name="desfire_title_format">تهيئة (Format)</string>
     <string name="title_del">حذف</string>
     <string name="desfire_title_add_file">ملف جديد</string>
+
     <string name="desfire_title_sel_app_fail">فشل تحديد التطبيق</string>
     <string name="desfire_msg_pwd_not_hex">يرجى إدخال رقم بنظام الست عشري (HEX)</string>
     <string name="desfire_msg_pwd_vail_fail">فشل التحقق</string>
     <string name="desfire_msg_get_apps_fail">فشل في جلب التطبيق</string>
     <string name="desfire_msg_get_files_fail">فشل في جلب الملف</string>
     <string name="desfire_msg_get_info_fail">فشل في جلب المعلومات</string>
+
+
     <string name="desfire_title_pwd_pro_chg">سمات كلمة المرور قابلة للتعديل</string>
     <string name="desfire_title_add_del_pwd">إضافة أو حذف رموز مصادقة التطبيق</string>
     <string name="desfire_title_oper_pwd">رموز مصادقة تطبيق التشغيل</string>
     <string name="desfire_title_pwd_chg">كلمة المرور قابلة للتعديل</string>
+
     <string name="desfire_msg_operator_fail">فشلت العملية</string>
     <string name="desfire_msg_operator_succ">نجحت العملية</string>
+
     <string name="desfire_title_app_id">معرف التطبيق (App ID)</string>
     <string name="desfire_title_file_num">عدد الملفات</string>
     <string name="desfire_title_comm_setting">إعداد الاتصال</string>
@@ -1494,24 +1487,27 @@
         <item>0D</item>
         <item>0E</item>
         <item>0F</item>
+
     </string-array>
-    
     <string name="desfire_title_file_size">الحجم</string>
     <string name="desfire_title_link_encry">التشفير</string>
-    
     <string-array name="desfire_array_encry">
         <item>شفاف (Transparent)</item>
         <item>3DES</item>
     </string-array>
 
+
     <string name="desfire_title_read_permission">قراءة</string>
     <string name="desfire_title_write_permission">كتابة</string>
     <string name="desfire_title_readwrite_permission">قراءة/كتابة</string>
     <string name="desfire_title_update_permission">تحديث</string>
+
     <string name="desfire_msg_file_no_less_1">الملف ممتلئ</string>
+
     <string name="desfire_ms_filesize_not_null">لا يمكن أن يكون رقم الملف فارغاً</string>
     <string name="desfire_title_sta_file">ملف البيانات</string>
     <string name="desfire_title_value_file">ملف القيمة</string>
+
     <string name="desfire_title_value_min">الحد الأدنى</string>
     <string name="desfire_title_value_max">الحد الأقصى</string>
     <string name="desfire_title_value_curr">الحالي</string>
@@ -1519,17 +1515,23 @@
     <string name="desfire_title_value_balance">الرصيد</string>
     <string name="desfire_title_value_credit">إيداع (Credit)</string>
     <string name="desfire_title_value_debit">خصم (Debit)</string>
+
     <string name="desfire_title_file">البيانات</string>
     <string name="desfire_title_card_properties">خصائص البطاقة</string>
     <string name="desfire_title_get_card_version">إصدار البطاقة</string>
+
     <string name="desfire_ms_unknown_file">أنواع ملفات غير معروفة</string>
+
     <string name="desfire_title_app_change_pwd">تعديل كلمة مرور التطبيق</string>
     <string name="desfire_title_app_properties">خصائص التطبيق</string>
     <string name="desfire_title_dialog_tips">تلميحات</string>
     <string name="desfire_title_dialog_tips_msg">هل تؤكد العملية؟</string>
+
+
     <string name="desfire_title_appid_input">رقم ست عشري من 3 بايت</string>
     <string name="desfire_title_app_add_del_pwd">إضافة أو حذف رموز مصادقة الملفات</string>
     <string name="desfire_title_app_oper_pwd">رموز مصادقة ملف التشغيل</string>
+
     <string name="desfire_title_app_change_pwd_permission">الأذونات المطلوبة لتغيير رمز التطبيق</string>
     <string name="desfire_title_app_max_key">أكبر عدد من المفاتيح</string>
     <string name="desfire_title_card_click_tip">اضغط للدخول</string>
@@ -1548,52 +1550,76 @@
     <string name="nfc_msg_write_exception">تعذر الكتابة على هذه الشريحة بسبب خطأ استثنائي.</string>
     <string name="title_activity_printer">الطابعة</string>
     <string name="printer_msg_low_pager">الطابعة نفدت من الورق</string>
+
+
     <string name="keyboard_title_single">مصغر (MINI)</string>
     <string name="keyboard_title_multiple">كامل (FULL)</string>
     <string name="title_activity_er_dsoft">2D(S)</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment" translatable="false">Hello blank fragment</string>
     <string name="er_dsoft_tab_scan">مسح</string>
     <string name="er_dsoft_tab_pic">الصورة</string>
     <string name="er_dsoft_tab_set">التهيئات</string>
+
     <string name="er_dsoft_get_img_data_fail">فشل جلب بيانات الصورة</string>
     <string name="er_dsoft_get_img_succ">تم حفظ الصور في المعرض</string>
     <string name="er_dsoft_get_ParamNum" translatable="false">ParamNum</string>
     <string name="er_dsoft_get_ParamVal" translatable="false">ParamVal</string>
+
     <string name="er_dsoft_get_Get">جلب</string>
     <string name="er_dsoft_get_Set">ضبط</string>
     <string name="setting_succ">تم الضبط بنجاح</string>
     <string name="setting_fail">فشل الضبط</string>
+
     <string name="er_dsoft_Set_succ">تم الضبط بنجاح</string>
     <string name="er_dsoft_Set_fail">فشل الضبط</string>
     <string name="title_activity_app_setings">الإعدادات</string>
     <string name="msg_barcode_set">إعداد مسح الباركود</string>
+
     <string name="msg_rfid_set" translatable="false">RFID</string>
+
+
     <string name="msg_psam_set" translatable="false">PSAM</string>
+
+
     <string name="msg_barcode_ck">تمكين إيقاف المسح عند إفلات الزر</string>
+
     <string name="title_activity_infrared">الأشعة تحت الحمراء</string>
+
     <string name="title_activity_uart">UART</string>
+
     <string name="msg_receive">البيانات المستلمة</string>
+
     <string name="msg_reboot_count">عدد مرات إعادة التشغيل：</string>
     <string name="msg_reboot_complete">المكتمل：</string>
     <string name="msg_reboot_set">الإعداد：</string>
     <string name="title_UART">UART：</string>
+
     <string name="title_hex">HEX</string>
+
     <string name="msg_init_fail">فشل الفتح</string>
     <string name="msg_init_succ">تم الفتح بنجاح</string>
+
     <string name="msg_free_fail">فشل الإغلاق</string>
     <string name="msg_free_succ">تم الإغلاق بنجاح</string>
+
     <string name="msg_file_format_err">الملف لا يحتوي على التنسيق الصحيح</string>
     <string name="title_Check">الفحص：</string>
+
     <string name="title_id_power">جلب الطاقة</string>
+
     <string name="title_elapsed_time">الوقت المنقضي</string>
+
     <string name="title_97_infrared">97</string>
     <string name="title_07_infrared">07</string>
     <string name="title_power_id">رقم العداد</string>
 
-    <!-- إضافة وقوائم -->
+
+    <!-- 新添 -->
     <string name="myMenu">القائمة</string>
     <string name="normal_set">الإعدادات الشائعة</string>
-    <string name="R2000_set">إعدادات R2000</string>
+    <string name="R2000_set"></string>
     <string name="uhf_btn_setLinkParams">ضبط معلمات الرابط</string>
     <string name="uhf_btn_getLinkParams">جلب معلمات الرابط</string>
     <string name="tagFocus">تشغيل tagFocus</string>
@@ -1617,10 +1643,241 @@
     <string name="msg_disable_fail">فشل التعطيل</string>
     <string name="msg_data_hex">تنسيق البيانات غير صحيح</string>
     <string name="msg_tag_hex">تنسيق رقم الشريحة غير صحيح</string>
-    <string name="uhf_msg_r2000_tip">تلميحات R2000</string>
+    <string name="uhf_msg_r2000_tip"></string>
     <string name="uhf_msg_set_filter_fail">فشل ضبط الفلتر</string>
     <string name="uhf_msg_set_filter_fail2">فشل ضبط الفلتر (خطأ في الطول)</string>
     <string name="uhf_msg_set_filter_succ">تم ضبط الفلتر بنجاح</string>
     <string name="uhf_msg_set_protocol_fail">فشل ضبط البروتوكول</string>
     <string name="uhf_msg_set_protocol_succ">تم ضبط البروتوكول بنجاح</string>
+
+    <string name="uhf_msg_set_frehop_succ">تم ضبط القفز الترددي بنجاح</string>
+    <string name="uhf_msg_set_frehop_fail">فشل ضبط القفز الترددي</string>
+
+    <string name="uhf_msg_set_succ">نجاح</string>
+    <string name="uhf_msg_set_fail">فشل</string>
+
+    <string name="uhf_msg_get_para_succ">نجاح</string>
+    <string name="uhf_msg_get_para_fail">فشل</string>
+
+    <string name="China">الصين</string>
+    <string name="Europe">أوروبا</string>
+    <string name="America">أمريكا</string>
+    <string name="Others">أخرى</string>
+    <string name="freHopType">نوع القفز الترددي：</string>
+
+    <string name="uhf_msg_filter_addr_must_decimal">يجب أن يكون عنوان الفلتر أرقاماً عشرية.</string>
+    <string name="uhf_msg_filter_len_must_decimal">يجب أن يكون طول الفلتر أرقاماً عشرية.</string>
+    <string name="time_d_s">الوقت：%f ثانية</string>
+
+    <string name="GB_tag_lock">قفل بطاقة GB/GJB</string>
+    <string name="storageArea">منطقة التخزين:</string>
+    <string name="user_area_number">رقم المنطقة:</string>
+    <string name="configure">تكوين:</string>
+    <string name="action">الإجراء:</string>
+
+    <string name="start_location">بدء تحديد الموقع</string>
+    <string name="stop_location">إيقاف تحديد الموقع</string>
+    <string name="location">تحديد الموقع</string>
+
+    <string name="action_rfid_upgrader">تحديث</string>
+    <string name="uhf_msg_upgrade_fail">فشل</string>
+    <string name="uhf_msg_upgrade_succ">نجاح</string>
+    <string name="export">تصدير البيانات</string>
+
+    <string name="uhf_radar_loaction">الرادار</string>
+    <string name="uhf_msg_no_Sensor">الجهاز لا يدعم مستشعرات الاتجاه</string>
+    <string name="uhf_msg_no_Bluetooth">البلوتوث غير متصل</string>
+    <string name="uhf_located_angle">السمت (Azimuth):</string>
+    <string name="uhf_tag_count">عدد الشرائح:</string>
+    <string name="uhf_locating_tag_value">قوة إشارة الشريحة المحدد موقعها (rssi)：</string>
+    <string name="uhf_not_support_rssi">يرجى تشغيل مفتاح rssi في إعدادات التهيئات (CONFIG)!</string>
+    <string name="searchRange">نطاق البحث</string>
+
+    <string name="btn_light_single">إضاءة شريحة واحدة</string>
+    <string name="btn_light_continuous">إضاءة مستمرة</string>
+    <string name="btn_light_stop">إيقاف الإضاءة</string>
+    <string name="msg_copy_clipboard">تم نسخ EPC إلى الحافظة</string>
+
+    <string name="workTime">وقت العمل:</string>
+    <string name="second">ثانية</string>
+
+    <string name="uhf_gyro_loaction">تحديد الموقع بالجيوروسكوب</string>
+
+
+    <string name="factory_reset">إعادة ضبط المصنع</string>
+    <string name="reset_succ">نجحت إعادة الضبط</string>
+    <string name="reset_fail">فشلت إعادة الضبط</string>
+    <string name="tv_phase">الطور (Phase)</string>
+    <string name="tv_all">الكل：</string>
+
+    <string name="uhf_btn_memoryBank">بنك الذاكرة:</string>
+    <string name="word">(كلمة/word)</string>
+    <string-array name="arrayMemoryBank" translatable="false">
+        <item>EPC</item>
+        <item>EPC＋TID</item>
+        <item>EPC＋TID＋USER</item>
+        <item>EPC＋RESERVED</item>
+        <item>LED TAG</item>
+        <item>M775AUTHENTICATION</item>
+    </string-array>
+    <integer-array name="arrayMemoryBankValue" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>10</item>
+        <item>14</item>
+        <item>3</item>
+    </integer-array>
+    <string name="uhf_msg_offset_error">خطأ في الإزاحة (Offset)</string>
+    <string name="uhf_msg_length_error">خطأ في الطول</string>
+    <string name="get_succ">تم الجلب بنجاح</string>
+    <string name="get_fail">فشل الجلب</string>
+
+    <string name="success">نجاح</string>
+    <string name="fail">فشل</string>
+    <string name="title_tag_lit">الشريحة مضاءة</string>
+    <string name="title_tag_flash">الشريحة تومض</string>
+    <string name="btnInventory">الجرد</string>
+    <string name="btnTagLed">مؤشر LED للشريحة</string>
+    <string name="msg_max_select_tag_8">يمكن تحديد ما يصل إلى 8 شرائح فقط للتصفية</string>
+    <string name="title_stop_read_card">يرجى إيقاف قراءة الشرائح!</string>
+
+    <string name="tv_fast_inventory">الجرد السريع</string>
+
+<string name="simulation_mode_available">وضع المحاكاة / الكاميرا متاح</string>
+<string name="total">الإجمالي</string>
+<string name="unique">فريد</string>
+<string name="speed">السرعة</string>
+<string name="time">الوقت</string>
+<string name="ready_to_scan">جاهز للمسح</string>
+<string name="start_inventory">بدء الجرد</string>
+<string name="camera_manual">كاميرا/يدوي</string>
+<string name="simulate_scan">محاكاة المسح</string>
+<string name="instructions">تعليمات</string>
+<string name="print_inventory">طباعة الجرد</string>
+<string name="print_missing">طباعة النواقص</string>
+<string name="screenshot">لقطة شاشة</string>
+<!-- POS -->
+<string name="pos_title">🛒 نظام البيع - MIRA POS</string>
+<string name="pos_scale_searching">⚖️ الميزان: جاري البحث...</string>
+<string name="pos_scan_gs1">📷 مسح GS1</string>
+<string name="pos_scan_rfid">📡 مسح RFID</string>
+<string name="pos_ready_scan">جاهز لمسح القطع والخواتم...</string>
+<string name="pos_manual_hint">أدخل كود EPC أو الباركود يدوياً...</string>
+<string name="pos_add">إضافة</string>
+<string name="pos_item_count">عدد القطع</string>
+<string name="pos_total_amount">المبلغ الإجمالي</string>
+<string name="pos_default_amount">0 YER</string>
+<string name="pos_clear">تفريغ</string>
+<string name="pos_checkout">إتمام البيع وتحديث المخزون</string>
+    
+    <!-- ============Inventory الجرد ======////-->
+      <string name="inventory_alert_sold">🚨 تحذير: قطعة مباعة وموجودة بالرف!</string>
+<string name="inventory_branch_default">الفرع الرئيسي - صنعاء</string>
+<string name="inventory_reader_connected">متصل (C72)</string>
+<string name="inventory_zone_label">منطقة الجرد:</string>
+<string name="inventory_total_scanned">إجمالي المسح</string>
+<string name="inventory_unique_tags">قطع فريدة</string>
+<string name="inventory_scan_rate">سرعة المسح</string>
+<string name="inventory_elapsed">الزمن</string>
+<string name="inventory_expected">متوقع</string>
+<string name="inventory_found">مطابق</string>
+<string name="inventory_missing">عجز</string>
+<string name="inventory_unexpected">زائد</string>
+<string name="inventory_ready">جاهز لبدء الجرد</string>
+<string name="inventory_last_tag">آخر قطعة ممسوحة:</string>
+<string name="inventory_start">▶ بدء الجرد</string>
+<string name="inventory_pause">⏸ تعليق</string>
+<string name="inventory_stop">⏹ إيقاف</string>
+<string name="inventory_clear">🗑 مسح</string>
+<string name="inventory_finalize">✅ حفظ واعتماد الجرد السحابي</string>
+<string name="inventory_export_csv">📊 تصدير CSV</string>
+<string name="inventory_print">🖨️ طباعة</string>
+<string name="inventory_share">📤 مشاركة</string>
+<string name="inventory_filter_all">الكل</string>
+<string name="inventory_filter_found">المطابق</string>
+<string name="inventory_filter_missing">العجز</string>
+<string name="inventory_filter_unexpected">التحذيرات / الزائد</string>
+<string name="inventory_connection_type">نوع الاتصال:</string>
+<string name="inventory_disconnect">قطع</string>
+      
+      <string name="app_title_inventory">📡 جرد MIRA RFID</string>
+    <string name="branch_label">📍 الفرع</string>
+    <string name="metric_total_scans">إجمالي القراءات</string>
+    <string name="metric_unique_tags">القطع الفريدة</string>
+    <string name="metric_scan_rate">السرعة/ث</string>
+    <string name="metric_time">الوقت</string>
+    <string name="current_tag_header">القطعة الحالية</string>
+    <string name="awaiting_scan">في انتظار المسح...</string>
+    <string name="btn_start_inventory">▶ بدء الجرد</string>
+    <string name="btn_stop_inventory">⏹ إيقاف</string>
+    <string name="btn_clear_inventory">🗑️ مسح</string>
+    <string name="btn_export_inventory">📤 تصدير</string>
+<!-- ============================================ -->
+<!-- 🟢 MIRA Bridge - About & Branding -->
+<!-- ============================================ -->
+<string name="about_title">حول MIRA Bridge</string>
+<string name="about_version">الإصدار 1.3.0</string>
+<string name="about_description">MIRA Bridge™ هو التطبيق الرسمي لمنظومة MIRA ID لإدارة المجوهرات والبوابات الأمنية الذكية.\n\nيدعم:\n• مسح RFID UHF\n• كاميرا QR/GS1 DataMatrix\n• رادار تحديد المواقع\n• MIRA Secure Gate™\n• التكامل مع MIRA ID Cloud</string>
+<string name="about_developer">MIRA Technology © 2026</string>
+<string name="about_website">https://ams.ibreg.org</string>
+
+    <!-- إعدادات البوابات -->
+    <string name="gate_settings_title">🏢 إدارة البوابات الأمنية</string>
+    <string name="add_gate">➕ إضافة بوابة جديدة</string>
+    <string name="sound_settings">🔊 إعدادات الأصوات</string>
+    <string name="sound_pass">✅ صوت النجاح (PASS):</string>
+    <string name="sound_deny">❌ صوت الرفض (DENY):</string>
+    <string name="sound_alarm">🚨 صوت الإنذار (ALARM):</string>
+    <string name="test_sound">🔊 تجربة الصوت</string>
+    <string name="save_sounds">💾 حفظ الأصوات</string>
+    <string name="additional_settings">⚙️ إعدادات إضافية</string>
+    <string name="vibration_enabled">📳 الاهتزاز عند الإنذار:</string>
+    <string name="flash_enabled">💡 وميض الشاشة:</string>
+    <string name="alarm_duration_label">⏱ مدة الإنذار (ثواني):</string>
+    <string name="rfid_power_label">📡 قوة RFID (dBm):</string>
+    <string name="save_all">💾 حفظ جميع الإعدادات</string>
+    
+    <!-- أسماء الأصوات -->
+    <string name="sound_beep_success">🔔 نجاح قصير</string>
+    <string name="sound_beep_soft">🔔 ناعم</string>
+    <string name="sound_beep_double">🔔 مزدوج</string>
+    <string name="sound_chime_elegant">🎵 نغمة أنيقة</string>
+    <string name="sound_silent">🔇 بدون صوت</string>
+    <string name="sound_beep_warning">⚠️ تحذير</string>
+    <string name="sound_beep_error">❌ خطأ</string>
+    <string name="sound_alarm_soft">🚨 إنذار خفيف</string>
+    <string name="sound_buzz_double">📳 طنين مزدوج</string>
+    <string name="sound_alarm_sold_item">🚨 إنذار مباع</string>
+    <string name="sound_alarm_breach_security">🚨 اختراق أمني</string>
+    <string name="sound_alarm_siren_strong">🚨 صفارة قوية</string>
+    <string name="sound_alarm_police">🚨 صفارة شرطة</string>
+    <string name="sound_alarm_buzzer_loud">🚨 طنين عالي</string>
+    <string name="sound_alarm_klaxon">🚨 كلوكسون</string>
+        
+    <!-- ==================== شاشة الذهب والعملات ==================== -->
+<string name="gold_settings_title">💰 أسعار الذهب العالمية</string>
+<string name="ready_to_update">جاهز للتحديث</string>
+<string name="api_provider">مزود API:</string>
+<string name="api_key_hint">مفتاح API</string>
+<string name="gold_currency">عملة الذهب:</string>
+<string name="fetch_prices">🔄 جلب الأسعار</string>
+<string name="gold_prices_title">أسعار الذهب (دولار/جرام)</string>
+<string name="karat_24_label">24 قيراط</string>
+<string name="karat_22_label">22 قيراط</string>
+<string name="karat_21_label">21 قيراط</string>
+<string name="karat_18_label">18 قيراط</string>
+<string name="karat_14_label">14 قيراط</string>
+<string name="karat_12_label">12 قيراط</string>
+<string name="profit_margins_title">هوامش الربح (%)</string>
+<string name="making_charges_title">المصنعية (دولار/جرام)</string>
+<string name="final_prices_title">الأسعار النهائية (مع الهوامش والمصنعية)</string>
+<string name="currency_settings_title">💱 أسعار الصرف والعملات</string>
+<string name="default_currency">العملة الافتراضية:</string>
+<string name="chart_currency">عملة الرسوم:</string>
+<string name="official_rates_title">أسعار الصرف الرسمية</string>
+<string name="market_rates_title">أسعار الصرف السوقية</string>
+<string name="save_currency_settings">💾 حفظ إعدادات العملات</string>
+<string name="refresh_rates">🔄 تحديث الأسعار المباشرة</string>
+
 </resources>
