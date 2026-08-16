@@ -3,86 +3,81 @@
     <!-- Menu -->
     <string name="menu_profile">My Profile</string>
     <string name="menu_logout">Sign Out</string>
-<!-- Bottom Navigation -->
-<!-- Bottom Navigation -->
-<string name="nav_dashboard">Home</string>
-<string name="nav_actions">Actions</string>
-<string name="nav_inventory">Inventory</string>
-<string name="nav_pos">Sales</string>
-<string name="nav_more">More</string>
 
-
-
-    <string name="menu_action_center">Quick Actions</string>
+    <!-- Bottom Navigation -->
+    <string name="nav_dashboard">Home</string>
+    <string name="nav_actions">Actions</string>
+    <string name="nav_inventory">Inventory</string>
+    <string name="nav_pos">Sales</string>
+    <string name="nav_more">More</string>
     <string name="nav_home">Home</string>
     <string name="nav_profile">Profile</string>
-    
+
+    <string name="menu_action_center">Quick Actions</string>
     <string name="action_rfid_scan">Scan Code</string>
     <string name="action_quick_pos">Quick POS</string>
     <string name="action_transfers">Transfers</string>
     <string name="action_more_tools">More Actions</string>
 
+    <!-- Gates -->
+    <string name="mira_gate_title">MIRA Secure Gate™</string>
+    <string name="mira_gate_subtitle">Security Gate &amp; Theft Prevention System</string>
+    <string name="gate_status_armed">🛡️ Gate Armed - Security Scanning Active</string>
+    <string name="gate_status_disarmed">🔒 Gate Disarmed</string>
+    <string name="gate_status_verifying">🔍 Verifying Identity...</string>
+    <string name="gate_status_alarm">🚨 Theft Alert / Unauthorized Exit!</string>
+    <string name="gate_status_passed">✅ Authorized Exit</string>
+    <string name="btn_arm_gate">🛡️ Arm Gate</string>
+    <string name="btn_disarm_gate">🔒 Disarm Gate</string>
+    <string name="stat_authorized">Authorized</string>
+    <string name="stat_unauthorized">Unauthorized</string>
+    <string name="stat_total_scans">Total</string>
+    <string name="status_waiting">Waiting for activation...</string>
 
-<!--Gates -->
-
-<string name="mira_gate_title">MIRA Secure Gate™</string>
-<string name="mira_gate_subtitle">Security Gate &amp; Theft Prevention System</string>
-<string name="gate_status_armed">🛡️ Gate Armed - Security Scanning Active</string>
-<string name="gate_status_disarmed">🔒 Gate Disarmed</string>
-<string name="gate_status_verifying">🔍 Verifying Identity...</string>
-<string name="gate_status_alarm">🚨 Theft Alert / Unauthorized Exit!</string>
-<string name="gate_status_passed">✅ Authorized Exit</string>
-<string name="btn_arm_gate">🛡️ Arm Gate</string>
-<string name="btn_disarm_gate">🔒 Disarm Gate</string>
-<string name="stat_authorized">Authorized</string>
-<string name="stat_unauthorized">Unauthorized</string>
-<string name="stat_total_scans">Total</string>
-<string name="status_waiting">Waiting for activation...</string>
-    <!-- ==================== Secure Gate Screen ==================== -->
-<string name="manual_scan_title">📝 Manual Entry / Scan</string>
-<string name="hint_manual_epc">Enter item EPC manually...</string>
-<string name="btn_submit">✅ Check</string>
-<string name="btn_scan_camera">📷 Camera</string>
-<string name="simulation_title">🧪 Simulation Mode</string>
-<string name="btn_simulate_pass">✅ Simulate Pass</string>
-<string name="btn_simulate_deny">🚨 Simulate Deny</string>
-<string name="debug_console_title">📋 Event Log</string>
-<string name="btn_stop_alarm">🔕 Stop Alarm</string>
-    
+    <!-- Secure Gate Screen -->
+    <string name="manual_scan_title">📝 Manual Entry / Scan</string>
+    <string name="hint_manual_epc">Enter item EPC manually...</string>
+    <string name="btn_submit">✅ Check</string>
+    <string name="btn_scan_camera">📷 Camera</string>
+    <string name="simulation_title">🧪 Simulation Mode</string>
+    <string name="btn_simulate_pass">✅ Simulate Pass</string>
+    <string name="btn_simulate_deny">🚨 Simulate Deny</string>
+    <string name="debug_console_title">📋 Event Log</string>
+    <string name="btn_stop_alarm">🔕 Stop Alarm</string>
     <string name="gate_input_title">🔍 Item Entry &amp; Testing (Manual / Barcode / RFID)</string>
-<string name="gate_input_hint">Enter EPC / Serial Number</string>
-<string name="gate_btn_check">Check</string>
-<string name="gate_btn_camera">📷 Camera</string>
-<string name="gate_btn_sim_allowed">✅ Allowed</string>
-<string name="gate_btn_sim_denied">🚨 Stolen</string>
-<string name="gate_console_initial">[System Console Initialized...]\n</string>
-<string name="gate_alarm_title">🚨 SECURITY BREACH 🚨</string>
-<string name="gate_alarm_message">Security Breach - Unauthorized Item!</string>
-<string name="gate_alarm_epc">EPC: -</string>
-<string name="gate_alarm_stop">🔕 Stop Alarm&amp; Visual Effects</string>
-    <!-- DASHBOARD-->
-    <string name="greeting_default">Welcome...</string>
-<string name="location_default">Main Showroom — Regional Branch</string>
-    <string name="precious_inventory">Precious Inventory &amp; Mass</string>
-<string name="sold_today">Sold Today</string>
-<string name="total_weight">Total Weight</string>
-<string name="total_items">Total Items</string>
-<string name="sales_today">Today\'s Sales</string>
-<string name="sales_month">Monthly Sales</string>
-<string name="sales_year">Yearly Sales</string>
-<string name="field_operations">Field Operations &amp; Monitoring</string>
-<string name="gate_security">Gate Security Control</string>
-<string name="rfid_audit">RFID Quick Audit</string>
-<string name="karat_18">18K</string>
-<string name="karat_21">21K</string>
-<string name="karat_24">24K</string>
-<string name="updating">● Updating...</string>
-<string name="online">● ONLINE</string>
-<string name="offline">● OFFLINE</string>
-<string name="pieces">pcs</string>
+    <string name="gate_input_hint">Enter EPC / Serial Number</string>
+    <string name="gate_btn_check">Check</string>
+    <string name="gate_btn_camera">📷 Camera</string>
+    <string name="gate_btn_sim_allowed">✅ Allowed</string>
+    <string name="gate_btn_sim_denied">🚨 Stolen</string>
+    <string name="gate_console_initial">[System Console Initialized...]\n</string>
+    <string name="gate_alarm_title">🚨 SECURITY BREACH 🚨</string>
+    <string name="gate_alarm_message">Security Breach - Unauthorized Item!</string>
+    <string name="gate_alarm_epc">EPC: -</string>
+    <string name="gate_alarm_stop">🔕 Stop Alarm&amp; Visual Effects</string>
 
-    <!--Encoding -->
-    
+    <!-- Dashboard -->
+    <string name="greeting_default">Welcome...</string>
+    <string name="location_default">Main Showroom — Regional Branch</string>
+    <string name="precious_inventory">Precious Inventory &amp; Mass</string>
+    <string name="sold_today">Sold Today</string>
+    <string name="total_weight">Total Weight</string>
+    <string name="total_items">Total Items</string>
+    <string name="sales_today">Today\'s Sales</string>
+    <string name="sales_month">Monthly Sales</string>
+    <string name="sales_year">Yearly Sales</string>
+    <string name="field_operations">Field Operations &amp; Monitoring</string>
+    <string name="gate_security">Gate Security Control</string>
+    <string name="rfid_audit">RFID Quick Audit</string>
+    <string name="karat_18">18K</string>
+    <string name="karat_21">21K</string>
+    <string name="karat_24">24K</string>
+    <string name="updating">● Updating...</string>
+    <string name="online">● ONLINE</string>
+    <string name="offline">● OFFLINE</string>
+    <string name="pieces">pcs</string>
+
+    <!-- Encoding -->
     <string name="identity_step_title">Step 1 of 4: Bind &amp; Classify</string>
     <string name="identity_epc_hint">EPC / GTIN Code</string>
     <string name="identity_scan_rfid">📡 Auto RFID Scan</string>
@@ -119,7 +114,7 @@
     <string name="action_settings">Settings</string>
     <string name="action_about">About</string>
     <string name="action_display">Display Settings</string>
-    
+
     <!-- Network / Ping -->
     <string name="title_ip_or_domain">Enter Domain/IP Address</string>
     <string name="title_ping_count">PING Attempts</string>
@@ -137,89 +132,70 @@
     <string name="title_activity_settings">Settings</string>
     <string name="action_set">Settings</string>
 
-
     <!-- Gold & Currency Extra Titles -->
-<string name="gold_currency">Gold &amp; Currency</string>
-<string name="fetch_prices">Fetch Prices</string>
-<string name="gold_prices_title">Live Gold Prices</string>
-<string name="profit_margins_title">Profit Margins</string>
-<string name="making_charges_title">Making Charges (Craftsmanship)</string>
+    <string name="gold_currency">Gold &amp; Currency</string>
+    <string name="fetch_prices">Fetch Prices</string>
+    <string name="gold_prices_title">Live Gold Prices</string>
+    <string name="profit_margins_title">Profit Margins</string>
+    <string name="making_charges_title">Making Charges (Craftsmanship)</string>
 
-<!-- Gold Karats Labels -->
-<string name="karat_24_label">Karat 24</string>
-<string name="karat_22_label">Karat 22</string>
-<string name="karat_21_label">Karat 21</string>
-<string name="karat_18_label">Karat 18</string>
-<string name="karat_14_label">Karat 14</string>
-<string name="karat_12_label">Karat 12</string>
-
-<!-- Missing General & Inventory Strings -->
-<string name="total">Total</string>
-<string name="tv_all">All</string>
-<string name="tv_fast_inventory">Fast Inventory</string>
-<string name="tv_phase">Phase</string>
-
-<!-- UHF SDK Warnings Prevention -->
-<string name="uhf_btn_memoryBank">Memory Bank</string>
-<string name="uhf_gyro_loaction">Gyro Location</string>
-<string name="uhf_located_angle">Located Angle</string>
-<string name="uhf_locating_tag_value">Locating Tag Value</string>
-<string name="uhf_msg_filter_addr_must_decimal">Filter address must be decimal</string>
-<string name="uhf_msg_filter_len_must_decimal">Filter length must be decimal</string>
-<string name="uhf_msg_get_para_fail">Get parameters failed</string>
-<string name="uhf_msg_get_para_succ">Get parameters succeeded</string>
-<string name="uhf_msg_length_error">Length error</string>
-<string name="uhf_msg_no_Bluetooth">No Bluetooth device</string>
-<string name="uhf_msg_no_Sensor">No Sensor detected</string>
+    <!-- Gold Karats Labels -->
+    <string name="karat_24_label">Karat 24</string>
+    <string name="karat_22_label">Karat 22</string>
+    <string name="karat_21_label">Karat 21</string>
+    <string name="karat_18_label">Karat 18</string>
+    <string name="karat_14_label">Karat 14</string>
+    <string name="karat_12_label">Karat 12</string>
 
     <!-- Identity Studio Strings -->
-<string name="step_title">Step 1 of 4: Bind &amp; Classify</string>
-<string name="hint_epc">EPC / GTIN Code...</string>
-<string name="hint_title">Item Title &amp; Description</string>
-<string name="btn_save_identity">Approve &amp; Export MIRA ID</string>
-<string name="btn_add_photos">📷 Capture / Attach Photos</string>
-<string name="no_photos">No photos attached yet</string>
-<string name="estimated_value_currency">YER</string>
-<string name="classify_item">Classify Item</string>
-<string name="ring">💍 Ring</string>
-<string name="set">💎 Set</string>
-<string name="bracelet">📿 Bracelet</string>
-<string name="necklace">📐 Necklace</string>
-<string name="metal_specs">Metal Specifications &amp; Weight</string>
-<string name="metal_type">Metal Type:</string>
-<string name="yellow_gold">🟡 Yellow Gold</string>
-<string name="white_gold">⚪ White Gold</string>
-<string name="rose_gold">🔴 Rose Gold</string>
-<string name="karat">Karat:</string>
-<string name="gross_weight_label">Gross Weight (grams)</string>
-<string name="estimated_gold_value">Estimated Raw Gold Value:</string>
-<string name="stones_title">Stones &amp; Inlays</string>
-<string name="has_stones">Is the item set with stones / zircon?</string>
-<string name="stone_type_hint">Stone Type (e.g. Diamond, Zircon, Ruby...)</string>
-<string name="stone_weight_hint">Stone Weight (carat)</string>
-<string name="stone_count_hint">Stone Count</string>
-<string name="stone_value_hint">Additional Stone Value ($)</string>
-<string name="photos_title">Item Photos &amp; Final Approval</string>
-<string name="bound">BOUND</string>
-<string name="waiting">WAITING</string>
-<string name="encoding">Encoding...</string>
-<string name="camera_permission">Camera permission is required to take photos</string>
-<string name="photo_captured">✅ Photo captured successfully</string>
-<string name="no_camera">❌ No camera app available</string>
-<string name="rfid_required">Please scan or enter RFID first</string>
-<string name="title_required">Please enter item title</string>
-<string name="weight_required">Please specify item weight</string>
-<string name="invalid_weight">Invalid weight</string>
-<string name="encode_success">✅ Item encoded &amp; linked successfully!</string>
-<string name="encode_failed">❌ Encoding failed:</string>
-<string name="encode_error">❌ Error:</string>
-<string name="photos_attached">Attached (%d) photos</string>
-<string name="main_showroom">Main Showroom</string>
-<string name="category_jewelry">Jewelry</string>
-<string name="category_rings">Rings</string>
-<string name="category_sets">Sets</string>
-<string name="category_bracelets">Bracelets</string>
-<string name="category_necklaces">Necklaces</string>
+    <string name="step_title">Step 1 of 4: Bind &amp; Classify</string>
+    <string name="hint_epc">EPC / GTIN Code...</string>
+    <string name="hint_title">Item Title &amp; Description</string>
+    <string name="btn_save_identity">Approve &amp; Export MIRA ID</string>
+    <string name="btn_add_photos">📷 Capture / Attach Photos</string>
+    <string name="no_photos">No photos attached yet</string>
+    <string name="estimated_value_currency">YER</string>
+    <string name="classify_item">Classify Item</string>
+    <string name="ring">💍 Ring</string>
+    <string name="set">💎 Set</string>
+    <string name="bracelet">📿 Bracelet</string>
+    <string name="necklace">📐 Necklace</string>
+    <string name="metal_specs">Metal Specifications &amp; Weight</string>
+    <string name="metal_type">Metal Type:</string>
+    <string name="yellow_gold">🟡 Yellow Gold</string>
+    <string name="white_gold">⚪ White Gold</string>
+    <string name="rose_gold">🔴 Rose Gold</string>
+    <string name="karat">Karat:</string>
+    <string name="gross_weight_label">Gross Weight (grams)</string>
+    <string name="estimated_gold_value">Estimated Raw Gold Value:</string>
+    <string name="stones_title">Stones &amp; Inlays</string>
+    <string name="has_stones">Is the item set with stones / zircon?</string>
+    <string name="stone_type_hint">Stone Type (e.g. Diamond, Zircon, Ruby...)</string>
+    <string name="stone_weight_hint">Stone Weight (carat)</string>
+    <string name="stone_count_hint">Stone Count</string>
+    <string name="stone_value_hint">Additional Stone Value ($)</string>
+    <string name="photos_title">Item Photos &amp; Final Approval</string>
+    <string name="bound">BOUND</string>
+    <string name="waiting">WAITING</string>
+    <string name="encoding">Encoding...</string>
+    <string name="camera_permission">Camera permission is required to take photos</string>
+    <string name="photo_captured">✅ Photo captured successfully</string>
+    <string name="no_camera">❌ No camera app available</string>
+    <string name="rfid_required">Please scan or enter RFID first</string>
+    <string name="title_required">Please enter item title</string>
+    <string name="weight_required">Please specify item weight</string>
+    <string name="invalid_weight">Invalid weight</string>
+    <string name="encode_success">✅ Item encoded &amp; linked successfully!</string>
+    <string name="encode_failed">❌ Encoding failed:</string>
+    <string name="encode_error">❌ Error:</string>
+    <string name="photos_attached">Attached (%d) photos</string>
+    <string name="main_showroom">Main Showroom</string>
+    <string name="category_jewelry">Jewelry</string>
+    <string name="category_rings">Rings</string>
+    <string name="category_sets">Sets</string>
+    <string name="category_bracelets">Bracelets</string>
+    <string name="category_necklaces">Necklaces</string>
+
     <!-- Network Messages -->
     <string name="msg_network_none">Network unavailable</string>
     <string name="msg_network_ok">Network connected</string>
@@ -230,15 +206,13 @@
     <string name="msg_mac_error">Error</string>
     <string name="msg_mac_change">Changed</string>
     <string name="msg_mac_unmatched">Unmatched</string>
-    
-    
 
     <!-- App Center -->
     <string name="app_title">App Center</string>
     <string name="app_msg_exit_confirm">Press again to exit</string>
     <string name="upload_title">Upload Tool %s</string>
     <string name="download_title">Download Tool %s</string>
-    
+
     <!-- General Actions -->
     <string name="action_back">Back</string>
     <string name="ok">OK</string>
@@ -252,7 +226,7 @@
     <string name="strFilePath">File Path</string>
     <string name="strBrowser">Browse</string>
     <string name="strPermissionDeny">Permission Denied</string>
-    
+
     <!-- Download / Upload Activities -->
     <string name="title_activity_download">Download Tool</string>
     <string name="title_activity_upload">Upload Tool</string>
@@ -266,8 +240,9 @@
     <string name="title_ping_packet_size">Packet Size</string>
     <string name="ping_title">Ping Tool %s</string>
     <string name="sales_title">Sales History</string>
-<string name="sales_search_hint">Search by transaction ID or customer...</string>
-<string name="sales_empty">No sales yet</string>
+    <string name="sales_search_hint">Search by transaction ID or customer...</string>
+    <string name="sales_empty">No sales yet</string>
+
     <!-- Barcode 1D / 2D -->
     <string name="yid_title">1D Barcode Tool</string>
     <string name="erd_title">2D Barcode Tool</string>
@@ -293,7 +268,7 @@
     <string name="title_succ_rate">Success Rate</string>
     <string name="title_fail_rate">Failure Rate</string>
     <string name="title_decode_time">Decode Time</string>
-    
+
     <!-- Bluetooth Printer -->
     <string name="title_activity_bluetooth_print">Bluetooth Printer</string>
     <string name="send">Send</string>
@@ -307,7 +282,7 @@
     <string name="fontGrayscaleName">Grayscale</string>
     <string name="fontGrayScaleRange">(1~8)</string>
     <string name="PrintContent"> Hello! \n</string>
-    
+
     <!-- Device List -->
     <string name="scanning">Searching…</string>
     <string name="select_device">Select a device</string>
@@ -316,7 +291,7 @@
     <string name="title_paired_devices">Paired Devices</string>
     <string name="title_other_devices">Other Devices</string>
     <string name="button_scan">Scan/Search</string>
-    
+
     <!-- UHF Main -->
     <string name="title_activity_uhfmain">UHF</string>
     <string name="tvInventoryName">Tag Inventory</string>
@@ -332,7 +307,7 @@
     <string name="tvTagCount">Count</string>
     <string name="btClear">Clear</string>
     <string name="tvTag">Tag</string>
-    
+
     <!-- UHF Arrays -->
     <string-array name="arrayAntiQ">
         <item>0</item><item>1</item><item>2</item><item>3</item><item>4</item><item>5</item><item>6</item><item>7</item>
@@ -361,7 +336,7 @@
         <item>0</item>
         <item>1</item>
     </string-array>
-    
+
     <!-- UHF Read -->
     <string name="btUii">Read EPC</string>
     <string name="ckWithUii">Use EPC</string>
@@ -380,7 +355,7 @@
     <string name="tvLen2_Read">Len：</string>
     <string name="tvData_Read">Data：</string>
     <string name="btRead">Read</string>
-    
+
     <!-- UHF Titles -->
     <string name="uhf_title_kill" translatable="false">Kill:</string>
     <string name="uhf_title_access" translatable="false">Access:</string>
@@ -394,7 +369,7 @@
     <string name="uhf_title_perm">Permanent Mask</string>
     <string name="uhf_title_open">Open</string>
     <string name="uhf_title_lock">Lock</string>
-    
+
     <!-- UHF Bank Arrays -->
     <string-array name="arrayBank">
         <item>RESERVED</item>
@@ -417,7 +392,7 @@
         <item>Anti-collision (Level 1)</item>
         <item>Anti-collision (Level 2)</item>
     </string-array>
-    
+
     <!-- UHF Power -->
     <string name="uhf_title_power">Output Power：</string>
     <string name="uhf_btn_setpower">Set Power</string>
@@ -428,13 +403,13 @@
     <string name="uhf_title_link">RFLink：</string>
     <string name="uhf_btn_set_link">Set Link</string>
     <string name="uhf_btn_get_link">Get Link</string>
-    
+
     <string-array name="arrayPower2" translatable="false">
         <item>5</item><item>6</item><item>7</item><item>8</item><item>9</item><item>10</item><item>11</item><item>12</item>
         <item>13</item><item>14</item><item>15</item><item>16</item><item>17</item><item>18</item><item>19</item><item>20</item>
         <item>21</item><item>22</item><item>23</item><item>24</item>
     </string-array>
-    
+
     <!-- Choose UII -->
     <string name="tvChooseInfo">Please select UII target</string>
     <string name="rbRead">Read Data</string>
@@ -445,7 +420,7 @@
     <string name="btCancel">Cancel</string>
     <string name="tvGetUiiForOperation">Tag List</string>
     <string name="btReadUii">Read UII</string>
-    
+
     <!-- Data List -->
     <string name="btStop">Stop</string>
     <string name="btBack1">Back</string>
@@ -456,7 +431,7 @@
     <string name="tvCount_Data">Count：</string>
     <string name="tvData_Data">Data：</string>
     <string name="tvStatus_Data">Status：</string>
-    
+
     <!-- UHF Write -->
     <string name="tvTagUii_Write">EPC：</string>
     <string name="tvOption_Write">Write Mode：</string>
@@ -466,7 +441,7 @@
         <item>Singleword</item>
         <item>Multiword</item>
     </string-array>
-    
+
     <!-- UHF Lock -->
     <string name="tvTagUii_Lock">EPC：</string>
     <string name="tvKill_Lock">Kill Password：</string>
@@ -484,12 +459,12 @@
         <item>Permanent Lock</item>
         <item>Permanent Unlock</item>
     </string-array>
-    
+
     <!-- Kill Tag -->
     <string name="tvTagUii_Kill">EPC：</string>
     <string name="tvKillPwd">Kill Password：</string>
     <string name="btKill">Kill</string>
-    
+
     <!-- Select / Filter -->
     <string name="tvBank_Select">Bank：</string>
     <string name="tvPtr_Select">Ptr：</string>
@@ -504,7 +479,7 @@
         <item>0</item><item>1</item><item>2</item><item>3</item><item>4</item><item>5</item><item>6</item><item>7</item>
         <item>8</item><item>9</item><item>10</item><item>11</item><item>12</item><item>13</item><item>14</item><item>15</item>
     </string-array>
-    
+
     <!-- Frequency -->
     <string name="tv_r2000_fun"></string>
     <string name="tvProtocol">Protocol：</string>
@@ -538,7 +513,7 @@
     <string name="btCalRange">Calculate</string>
     <string name="tvMHz">MHz</string>
     <string name="tvKHz">KHz</string>
-    
+
     <!-- Frequency Standards -->
     <string name="ETSI_Standard">ETSI Standard (865~868MHz)</string>
     <string name="United_States_Standard">US Standard (902~928MHz)</string>
@@ -550,7 +525,7 @@
     <string name="China_Standard_920_925MHz">China Standard (920~925MHz)</string>
     <string name="South_Africa_915_919MHz">South Africa (915~919MHz)</string>
     <string name="New_Zealand">New Zealand</string>
-    
+
     <string-array name="arrayMode" translatable="false">
         <item>@string/ETSI_Standard</item>
         <item>@string/United_States_Standard</item>
@@ -562,7 +537,7 @@
         <item>@string/Morocco</item>
         <item>@string/New_Zealand</item>
     </string-array>
-    
+
     <string-array name="arrayFreHop" translatable="false">
         <item>865.700</item><item>866.300</item><item>866.900</item><item>867.500</item>
         <item>920.625</item><item>920.875</item><item>921.125</item><item>921.375</item>
@@ -570,7 +545,7 @@
         <item>922.625</item><item>922.875</item><item>923.125</item><item>923.375</item>
         <item>923.625</item><item>923.875</item><item>924.125</item><item>924.375</item>
     </string-array>
-    
+
     <string-array name="arrayFreHop_us" translatable="false">
         <item>902.75</item><item>903.25</item><item>903.75</item><item>904.25</item><item>904.75</item>
         <item>905.25</item><item>905.75</item><item>906.25</item><item>906.75</item><item>907.25</item>
@@ -583,14 +558,14 @@
         <item>922.75</item><item>923.25</item><item>923.75</item><item>924.25</item><item>924.75</item>
         <item>925.25</item><item>925.75</item><item>926.25</item><item>926.75</item><item>927.25</item>
     </string-array>
-    
+
     <string-array name="arrayProtocol" translatable="false">
         <item>ISO 18000-6C</item>
         <item>GB/T 29768</item>
         <item>GJB 7377.1</item>
         <item>ISO 18000-6B</item>
     </string-array>
-    
+
     <string-array name="arrayLink" translatable="false">
         <item>0-PR ASK/Miller8/160KHz</item>
         <item>1-PR ASK/Miller4/250KHz</item>
@@ -611,19 +586,19 @@
         <item>24-Autoset/Miller2/320KHz</item>
         <item>25-Autoget/Miller2/640KHz</item>
     </string-array>
-    
+
     <integer-array name="arrayLinkValue" translatable="false">
         <item>0</item><item>1</item><item>2</item><item>3</item><item>4</item><item>5</item>
         <item>10</item><item>11</item><item>12</item><item>13</item><item>14</item><item>15</item>
         <item>20</item><item>21</item><item>22</item><item>23</item><item>24</item><item>25</item>
     </integer-array>
-    
+
     <integer-array name="arrayLinkValueTest" translatable="false">
         <item>0</item><item>1</item><item>2</item><item>3</item><item>4</item><item>5</item><item>6</item>
         <item>10</item><item>11</item><item>12</item><item>13</item><item>14</item><item>15</item>
         <item>20</item><item>21</item><item>22</item><item>23</item><item>24</item><item>25</item>
     </integer-array>
-    
+
     <string-array name="arrayLinkTest" translatable="false">
         <item>0-PR ASK/Miller8/160KHz</item>
         <item>1-PR ASK/Miller4/250KHz</item>
@@ -645,7 +620,7 @@
         <item>24-Autoset/Miller2/320KHz</item>
         <item>25-Autoget/Miller2/640KHz</item>
     </string-array>
-    
+
     <string-array name="arrayThreshold" translatable="false">
         <item>level1(22)</item>
         <item>level2(36)</item>
@@ -653,14 +628,14 @@
         <item>level4(60)</item>
         <item>level5(70)</item>
     </string-array>
-    
+
     <string-array name="arrayPacketSize" translatable="false">
         <item>32bytes</item>
         <item>64bytes</item>
         <item>128bytes</item>
         <item>256bytes</item>
     </string-array>
-    
+
     <string-array name="arrayBase">
         <item>0</item>
         <item>1</item>
@@ -703,10 +678,10 @@
         <item>00</item><item>01</item><item>02</item><item>03</item><item>04</item><item>05</item><item>06</item>
         <item>07</item><item>08</item><item>09</item><item>0A</item><item>0B</item><item>0C</item><item>0D</item>
     </string-array>
-    
+
     <!-- UHF Settings -->
     <string name="title_activity_uhfset">UHF Settings</string>
-    
+
     <!-- Network Status -->
     <string name="title_activity_network_status">Network</string>
     <string name="ap_list_header_channel">Channel</string>
@@ -723,13 +698,13 @@
     <string name="ap_title_security">Security：</string>
     <string name="ap_title_pwd">Password：</string>
     <string name="ap_title_ip">IP Address：</string>
-    
+
     <!-- Telephony -->
     <string name="tel_title_OperatorName">Operator：</string>
     <string name="tel_title_Status">Status：</string>
     <string name="tel_title_NetworkType">Network Type：</string>
     <string name="tel_title_Signal">Signal Strength：</string>
-    
+
     <!-- GPS -->
     <string name="title_activity_gps">GPS</string>
     <string name="gps_title_Longitude">Longitude：</string>
@@ -738,10 +713,10 @@
     <string name="gps_title_Altitude">Altitude：</string>
     <string name="gps_title_GpsStatus">Status：</string>
     <string name="gps_title_Time">Time：</string>
-    
+
     <!-- App Settings -->
     <string name="title_activity_app_set">Settings</string>
-    
+
     <!-- RFID 14443A / 15693 -->
     <string name="title_activity_a1443">14443A</string>
     <string name="title_activity_iso15693">15693</string>
@@ -763,7 +738,7 @@
     <string name="ul_title_lock_AFI">Lock</string>
     <string name="ul_title_write_DSFID">Write</string>
     <string name="ul_title_lock_DSFID">Lock</string>
-    
+
     <!-- RFID Continuous -->
     <string name="rfid_title_continuous">Auto Read/Write</string>
     <string name="rfid_title_continuous_read">Read</string>
@@ -774,14 +749,14 @@
     <string name="rfid_title_continuous_read_fail_count">Failure (Read):</string>
     <string name="rfid_title_continuous_write_succ_count">Success (Write):</string>
     <string name="rfid_title_continuous_write_fail_count">Failure (Write):</string>
-    
+
     <!-- Versions -->
     <string name="action_rfid_ver">RFID Version</string>
     <string name="action_psam_ver">PSAM Version</string>
     <string name="action_psam_upgrader">PSAM Upgrade</string>
     <string name="action_uhf_ver">UHF Version</string>
     <string name="action_fingerprint_ver">Fingerprint Version</string>
-    
+
     <!-- About Device -->
     <string name="title_about_ram">RAM:</string>
     <string name="title_about_storage">Storage:</string>
@@ -795,16 +770,16 @@
     <string name="title_about_mac">MAC Address:</string>
     <string name="title_about_sn">Serial Number (SN):</string>
     <string name="title_about_imei">IMEI:</string>
-    
+
     <!-- Global Set -->
     <string name="title_activity_global_set">Please select a function …</string>
-    
+
     <!-- Key Test -->
     <string name="title_activity_key_test">Keyboard</string>
     <string name="title_activity_key_power">P\no\nw\ne\nr</string>
     <string name="title_activity_key_home">Home</string>
     <string name="title_activity_key_back">Back</string>
-    
+
     <!-- Ping Messages -->
     <string name="ping_msg_pinging">Pinging… </string>
     <string name="ping_msg_fail">Domain/IP error</string>
@@ -816,7 +791,7 @@
     <string name="up_msg_stop_time">End Time：</string>
     <string name="up_msg_total_time">Elapsed Time：</string>
     <string name="up_msg_avg_speed">Speed (avg)：</string>
-    
+
     <!-- Download Messages -->
     <string name="download_msg_down_file">Download File</string>
     <string name="download_msg_down_confirm">Confirm download?</string>
@@ -836,10 +811,10 @@
     <string name="download_msg_uploading">Uploading …</string>
     <string name="download_msg_cancel_upload">Upload cancelled</string>
     <string name="download_msg_cancel_down">Download cancelled</string>
-    
+
     <!-- Bluetooth Messages -->
     <string name="bluetooth_msg_not_supp">Bluetooth devices not supported</string>
-    
+
     <!-- Network Messages -->
     <string name="network_msg_title_mobile">Mobile Network</string>
     <string name="network_msg_sim_not_exist">No SIM card</string>
@@ -853,14 +828,14 @@
     <string name="network_msg_wifi_conn">Connect</string>
     <string name="network_msg_wifi_speed">Speed：</string>
     <string name="network_msg_wifi_level">Level：</string>
-    
+
     <!-- GPS Messages -->
     <string name="gps_msg_open_gps">Please enable GPS…</string>
     <string name="gps_msg_Locate_succ">GPS location succeeded</string>
     <string name="gps_msg_Locateing">Locating…</string>
     <string name="gps_msg_Locate_stop">Location stopped</string>
     <string name="gps_msg_title_satellite_signal">Satellite Signal</string>
-    
+
     <!-- UHF Tabs -->
     <string name="uhf_msg_tab_scan">Scan</string>
     <string name="uhf_msg_tab_read_write">Read-Write</string>
@@ -869,19 +844,19 @@
     <string name="uhf_msg_tab_set">Config</string>
     <string name="uhf_msg_tab_kill">Kill</string>
     <string name="uhf_msg_tab_lock">Lock</string>
-    
+
     <!-- RFID Messages -->
     <string name="rfid_msg_scan_fail">Scan failed</string>
     <string name="rfid_msg_scan_continuous">Auto Scan</string>
-    
+
     <!-- Ping Background -->
     <string name="ping_msg_background_ping">Ping</string>
     <string name="ping_msg_runing">Pinging… Tap to view when complete</string>
     <string name="ping_msg_finish">Finish</string>
-    
+
     <!-- Bluetooth File -->
     <string name="bluetooth_title_file">File</string>
-    
+
     <!-- Battery Monitor -->
     <string name="title_activity_battery_monitor">Battery</string>
     <string name="title_activity_reboot">Reboot Test</string>
@@ -906,7 +881,7 @@
     <string name="battery_tips_temperature">Temperature:</string>
     <string name="battery_tips_extra_level">Extra Level:</string>
     <string name="battery_tips_extra_dl">Extra Current:</string>
-    
+
     <!-- Fingerprint -->
     <string name="title_activity_fingerprint">Fingerprint</string>
     <string name="fingerprint_tab_identification">Identification</string>
@@ -980,37 +955,37 @@
     <string name="fingerprint_msg_set_PSW_fail">Password set failed</string>
     <string name="fingerprint_msg_verify_PSW_succ">Password verified successfully</string>
     <string name="fingerprint_msg_verify_PSW_fail">Password verification failed</string>
-    
+
     <!-- Operator -->
     <string name="network_msg_operator_is_null">No operator information</string>
-    
+
     <!-- LF / Needle RFID -->
     <string name="title_activity_lf">RFID_LF</string>
     <string name="title_activity_needle">Needle RFID Tag</string>
-    
+
     <!-- File Select -->
     <string name="file_title_sel_file">Select a file</string>
     <string name="file_title_sel_file_confirm">Are you sure you want to select this file?</string>
     <string name="file_btn_confirm">Confirm</string>
     <string name="file_btn_cancel">Cancel</string>
     <string name="file_msg_cancel">Cancel</string>
-    
+
     <!-- Ping Not Null -->
     <string name="ping_msg_not_null">Input cannot be empty</string>
-    
+
     <!-- GPS Tip -->
     <string name="gps_title_tip">Message</string>
     <string name="gps_msg_gps_not_open">GPS is not enabled. Enable it?</string>
     <string name="gps_btn_yes">Yes</string>
     <string name="gps_btn_no">No</string>
-    
+
     <!-- Bluetooth Tip -->
     <string name="bluetooth_title_tip">Message</string>
     <string name="bluetooth_msg_not_adapter">No paired Bluetooth devices. Go to pairing?</string>
     <string name="bluetooth_btn_yes">Yes</string>
     <string name="bluetooth_btn_no">No</string>
     <string name="bluetooth_msg_connection_failed">Connection failed. Please check if the device is in use.</string>
-    
+
     <!-- LF -->
     <string name="lf_title_card_type">Card Type:</string>
     <string name="lf_msg_scan_fail">Scan failed</string>
@@ -1023,7 +998,7 @@
     <string name="lf_msg_write_succ">Data written successfully</string>
     <string name="lf_msg_write_fail">Data write failed</string>
     <string name="lf_msg_data_page_id_err_em4305">Data can only be written to pages: 0, 3, 5~13</string>
-    
+
     <!-- Volume -->
     <string name="title_activity_volum">Volume</string>
     <string name="volum_title_voice_call">Voice Call</string>
@@ -1032,11 +1007,11 @@
     <string name="volum_title_voice_music">Music</string>
     <string name="volum_title_voice_notification">Notification</string>
     <string name="volum_title_voice_alarm">Alarm</string>
-    
+
     <!-- Init / Upgrade -->
     <string name="app_msg_init">Initializing…</string>
     <string name="app_msg_Upgrade">Upgrading…\nDo not exit to avoid device damage</string>
-    
+
     <!-- Light & Proximity Sensor -->
     <string name="title_activity_light_and_psensor">Sensor</string>
     <string name="lp_btn_open">Open</string>
@@ -1053,19 +1028,19 @@
     <string name="lp_title_gyroscope">Gyroscope</string>
     <string name="lp_title_psensor">Proximity Sensor Value：</string>
     <string name="lp_title_lightsensor">Light Sensor Value：</string>
-    
+
     <!-- LED -->
     <string name="led_action_open">Turn on LED</string>
     <string name="led_action_close">Turn off LED</string>
     <string name="led_msg_open_fail">Failed to turn on LED</string>
     <string name="led_msg_close_fail">Failed to turn off LED</string>
-    
+
     <!-- Global Set Message -->
     <string name="gs_msg_not_one">Please select one functional module</string>
-    
+
     <!-- Ping Pop -->
     <string name="title_activity_ping_pop" translatable="false">PingPopActivity</string>
-    
+
     <!-- Beidou / BDNav -->
     <string name="title_activity_bdnav">Beidou</string>
     <string name="bd_msg_Locate_succ">Success</string>
@@ -1084,7 +1059,7 @@
     <string name="bd_title_cold">Cold Start</string>
     <string name="bd_title_warm">Warm Start</string>
     <string name="bd_title_hot">Hot Start</string>
-    
+
     <!-- 14443A CPU -->
     <string name="title_activity_iso14443_a4_cpu">14443A CPU</string>
     <string name="b14443_title_cmd">Command</string>
@@ -1101,16 +1076,16 @@
     <string name="b14443_msg_uid_err">Failed to get UID</string>
     <string name="b14443_msg_uid">UID:</string>
     <string name="b14443_msg_init_err">Failed to get card number</string>
-    
+
     <!-- 14443B -->
     <string name="title_activity_iso14443b">14443B</string>
     <string name="b14443_msg_reset_err">Initialization failed</string>
     <string name="b14443_msg_data">Returned Initialization Data</string>
     <string name="b14443_msg_cmd_data">Returned Command Data</string>
-    
+
     <!-- To Service Page -->
     <string name="title_activity_to_service_page" translatable="false">ToServicePageActivity</string>
-    
+
     <!-- Update -->
     <string name="update_msg_unmount">Could not download the installation file. Please check SD card.</string>
     <string name="update_msg_checking">Please wait…</string>
@@ -1123,7 +1098,7 @@
     <string name="update_title_update_now">Now</string>
     <string name="update_title_update_last">Later</string>
     <string name="update_msg_updateing">Downloading</string>
-    
+
     <!-- PSAM -->
     <string name="title_activity_psam">PSAM</string>
     <string name="psam_title_voltage">Voltage</string>
@@ -1139,18 +1114,18 @@
     <string name="psam_title_card_1">Card 1</string>
     <string name="psam_title_card_2">Card 2</string>
     <string name="psam_msg_fail">Failed</string>
-    
+
     <!-- Analog Call -->
     <string name="title_activity_analog_call">Analog Call</string>
     <string name="title_analog_call_touch_on">Press to Record</string>
     <string name="title_analog_call_touch_off">Release to Play</string>
-    
+
     <!-- Camera -->
     <string name="title_activity_camera">Camera</string>
     <string name="camera_alert">Device has only one camera!</string>
     <string name="switch_cam">Switch Camera</string>
     <string name="camera_none">No camera equipment!</string>
-    
+
     <!-- ZXing Barcode Scanner -->
     <string name="zxing_app_name">Camera Barcode</string>
     <string name="app_picker_name">Applications</string>
@@ -1273,10 +1248,10 @@
     <string name="wifi_changing_network">Requesting network connection\u2026</string>
     <string name="wifi_ssid_label">Network Name</string>
     <string name="wifi_type_label">Type</string>
-    
+
     <!-- Auto Run Network -->
     <string name="title_activity_auto_run_network">Network_Auto</string>
-    
+
     <!-- DesFire -->
     <string name="desfire_title_scan">Scan</string>
     <string name="desfire_title_back">Back</string>
@@ -1311,19 +1286,19 @@
     <string name="desfire_msg_file_num_must_len_1">File count must be 1 byte</string>
     <string name="desfire_msg_comm_setting_must_len_1">Communication setting must be 1 byte</string>
     <string name="desfire_title_file_id">File Number</string>
-    
+
     <string-array name="desfire_array_hex" translatable="false">
         <item>00</item><item>01</item><item>02</item><item>03</item><item>04</item><item>05</item><item>06</item><item>07</item>
         <item>08</item><item>09</item><item>0A</item><item>0B</item><item>0C</item><item>0D</item><item>0E</item><item>0F</item>
     </string-array>
-    
+
     <string name="desfire_title_file_size">Size</string>
     <string name="desfire_title_link_encry">Encryption</string>
     <string-array name="desfire_array_encry">
         <item>Transparent</item>
         <item>3DES</item>
     </string-array>
-    
+
     <string name="desfire_title_read_permission">Read</string>
     <string name="desfire_title_write_permission">Write</string>
     <string name="desfire_title_readwrite_permission">Read/Write</string>
@@ -1353,10 +1328,10 @@
     <string name="desfire_title_app_change_pwd_permission">Permissions required to change application code</string>
     <string name="desfire_title_app_max_key">Maximum number of keys</string>
     <string name="desfire_title_card_click_tip">Tap to enter</string>
-    
+
     <!-- Key Test Broadcast -->
     <string name="kettest_msg_broadcast_tip">Key broadcast</string>
-    
+
     <!-- NFC -->
     <string name="title_activity_nfc" translatable="false">NFC</string>
     <string name="nfc_msg_no_device">NFC not available</string>
@@ -1369,15 +1344,15 @@
     <string name="nfc_msg_write_succ">Tag written successfully</string>
     <string name="nfc_msg_not_support_ndef">Cannot write to this tag. The tag does not support NDEF.</string>
     <string name="nfc_msg_write_exception">Could not write to this tag due to an exceptional error.</string>
-    
+
     <!-- Printer -->
     <string name="title_activity_printer">Printer</string>
     <string name="printer_msg_low_pager">Printer is out of paper</string>
-    
+
     <!-- Keyboard -->
     <string name="keyboard_title_single">MINI</string>
     <string name="keyboard_title_multiple">FULL</string>
-    
+
     <!-- 2D Soft -->
     <string name="title_activity_er_dsoft">2D(S)</string>
     <string name="hello_blank_fragment" translatable="false">Hello blank fragment</string>
@@ -1394,26 +1369,26 @@
     <string name="setting_fail">Set failed</string>
     <string name="er_dsoft_Set_succ">Set successfully</string>
     <string name="er_dsoft_Set_fail">Set failed</string>
-    
+
     <!-- App Settings -->
     <string name="title_activity_app_setings">Settings</string>
     <string name="msg_barcode_set">Barcode Scan Setting</string>
     <string name="msg_rfid_set" translatable="false">RFID</string>
     <string name="msg_psam_set" translatable="false">PSAM</string>
     <string name="msg_barcode_ck">Enable stop scanning on button release</string>
-    
+
     <!-- Infrared -->
     <string name="title_activity_infrared">Infrared</string>
-    
+
     <!-- UART -->
     <string name="title_activity_uart">UART</string>
     <string name="msg_receive">Received Data</string>
-    
+
     <!-- Reboot -->
     <string name="msg_reboot_count">Reboot Count：</string>
     <string name="msg_reboot_complete">Completed：</string>
     <string name="msg_reboot_set">Setting：</string>
-    
+
     <!-- UART -->
     <string name="title_UART">UART：</string>
     <string name="title_hex">HEX</string>
@@ -1422,7 +1397,7 @@
     <string name="msg_free_fail">Close failed</string>
     <string name="msg_free_succ">Closed successfully</string>
     <string name="msg_file_format_err">File does not have the correct format</string>
-    
+
     <!-- Infrared Check -->
     <string name="title_Check">Check：</string>
     <string name="title_id_power">Get Power</string>
@@ -1430,7 +1405,7 @@
     <string name="title_97_infrared">97</string>
     <string name="title_07_infrared">07</string>
     <string name="title_power_id">Meter Number</string>
-    
+
     <!-- New Additions -->
     <string name="myMenu">Menu</string>
     <string name="normal_set">Common Settings</string>
@@ -1470,36 +1445,36 @@
     <string name="uhf_msg_set_fail">Failed</string>
     <string name="uhf_msg_get_para_succ">Success</string>
     <string name="uhf_msg_get_para_fail">Failed</string>
-    
+
     <!-- Region Names -->
     <string name="China">China</string>
     <string name="Europe">Europe</string>
     <string name="America">America</string>
     <string name="Others">Others</string>
     <string name="freHopType">Hopping Type：</string>
-    
+
     <string name="uhf_msg_filter_addr_must_decimal">Filter address must be decimal digits.</string>
     <string name="uhf_msg_filter_len_must_decimal">Filter length must be decimal digits.</string>
     <string name="time_d_s">Time：%f sec</string>
-    
+
     <!-- GB/GJB Tag Lock -->
     <string name="GB_tag_lock">Lock GB/GJB Card</string>
     <string name="storageArea">Storage Area:</string>
     <string name="user_area_number">Area Number:</string>
     <string name="configure">Configure:</string>
     <string name="action">Action:</string>
-    
+
     <!-- Location -->
     <string name="start_location">Start Location</string>
     <string name="stop_location">Stop Location</string>
     <string name="location">Location</string>
-    
+
     <!-- RFID Upgrade -->
     <string name="action_rfid_upgrader">Upgrade</string>
     <string name="uhf_msg_upgrade_fail">Failed</string>
     <string name="uhf_msg_upgrade_succ">Success</string>
     <string name="export">Export Data</string>
-    
+
     <!-- Radar -->
     <string name="uhf_radar_loaction">Radar</string>
     <string name="uhf_msg_no_Sensor">Device does not support orientation sensors</string>
@@ -1509,28 +1484,28 @@
     <string name="uhf_locating_tag_value">Located Tag Signal Strength (rssi)：</string>
     <string name="uhf_not_support_rssi">Please enable rssi switch in CONFIG settings!</string>
     <string name="searchRange">Search Range</string>
-    
+
     <!-- Tag LED -->
     <string name="btn_light_single">Single Tag Light</string>
     <string name="btn_light_continuous">Continuous Light</string>
     <string name="btn_light_stop">Stop Light</string>
     <string name="msg_copy_clipboard">EPC copied to clipboard</string>
-    
+
     <string name="workTime">Work Time:</string>
     <string name="second">sec</string>
-    
+
     <!-- Gyro Location -->
     <string name="uhf_gyro_loaction">Gyroscope Location</string>
-    
+
     <!-- Factory Reset -->
     <string name="factory_reset">Factory Reset</string>
     <string name="reset_succ">Reset succeeded</string>
     <string name="reset_fail">Reset failed</string>
-    
+
     <!-- Phase -->
     <string name="tv_phase">Phase</string>
     <string name="tv_all">All：</string>
-    
+
     <!-- Memory Bank -->
     <string name="uhf_btn_memoryBank">Memory Bank:</string>
     <string name="word">(word)</string>
@@ -1545,7 +1520,7 @@
     <integer-array name="arrayMemoryBankValue" translatable="false">
         <item>0</item><item>1</item><item>2</item><item>10</item><item>14</item><item>3</item>
     </integer-array>
-    
+
     <string name="uhf_msg_offset_error">Offset error</string>
     <string name="uhf_msg_length_error">Length error</string>
     <string name="get_succ">Retrieved successfully</string>
@@ -1559,9 +1534,9 @@
     <string name="msg_max_select_tag_8">Maximum 8 tags can be selected for filtering</string>
     <string name="title_stop_read_card">Please stop reading tags!</string>
     <string name="tv_fast_inventory">Fast Inventory</string>
-     <string name="total_sales">Total Sales</string>
+    <string name="total_sales">Total Sales</string>
     <string name="invoices_count">Invoices Count</string>
-    
+
     <string name="app_title_inventory">📡 MIRA RFID Inventory</string>
     <string name="branch_label">📍 Branch</string>
     <string name="metric_total_scans">Scans</string>
@@ -1574,69 +1549,71 @@
     <string name="btn_stop_inventory">⏹ Stop</string>
     <string name="btn_clear_inventory">🗑️ Clear</string>
     <string name="btn_export_inventory">📤 Export</string>
-<!-- POS -->
-<string name="pos_title">🛒 MIRA POS System</string>
-<string name="pos_scale_searching">⚖️ Scale: Searching...</string>
-<string name="pos_scan_gs1">📷 Scan GS1</string>
-<string name="pos_scan_rfid">📡 Scan RFID</string>
-<string name="pos_ready_scan">Ready to scan items...</string>
-<string name="pos_manual_hint">Enter EPC or barcode manually...</string>
-<string name="pos_add">Add</string>
-<string name="pos_item_count">Item Count</string>
-<string name="pos_total_amount">Total Amount</string>
-<string name="pos_default_amount">0 YER</string>
-<string name="pos_clear">Clear</string>
-<string name="pos_checkout">Checkout &amp; Update Stock</string>
-<!-- Inventory Fragment -->
+
+    <!-- POS -->
+    <string name="pos_title">🛒 MIRA POS System</string>
+    <string name="pos_scale_searching">⚖️ Scale: Searching...</string>
+    <string name="pos_scan_gs1">📷 Scan GS1</string>
+    <string name="pos_scan_rfid">📡 Scan RFID</string>
+    <string name="pos_ready_scan">Ready to scan items...</string>
+    <string name="pos_manual_hint">Enter EPC or barcode manually...</string>
+    <string name="pos_add">Add</string>
+    <string name="pos_item_count">Item Count</string>
+    <string name="pos_total_amount">Total Amount</string>
+    <string name="pos_default_amount">0 YER</string>
+    <string name="pos_clear">Clear</string>
+    <string name="pos_checkout">Checkout &amp; Update Stock</string>
+
+    <!-- Inventory Fragment -->
     <string name="inventory_alert_sold">🚨 Alert: Sold item found on shelf!</string>
-<string name="inventory_branch_default">Main Branch - Sanaa</string>
-<string name="inventory_reader_connected">Connected (C72)</string>
-<string name="inventory_zone_label">Inventory Zone:</string>
-<string name="inventory_total_scanned">Total Scanned</string>
-<string name="inventory_unique_tags">Unique Tags</string>
-<string name="inventory_scan_rate">Scan Rate</string>
-<string name="inventory_elapsed">Elapsed</string>
-<string name="inventory_expected">Expected</string>
-<string name="inventory_found">Found</string>
-<string name="inventory_missing">Missing</string>
-<string name="inventory_unexpected">Extra</string>
-<string name="inventory_ready">Ready to start</string>
-<string name="inventory_last_tag">Last Scanned Item:</string>
-<string name="inventory_start">▶ Start</string>
-<string name="inventory_pause">⏸ Pause</string>
-<string name="inventory_stop">⏹ Stop</string>
-<string name="inventory_clear">🗑 Clear</string>
-<string name="inventory_finalize">✅ Save &amp; Approve Cloud Audit</string>
-<string name="inventory_export_csv">📊 Export CSV</string>
-<string name="inventory_print">🖨️ Print</string>
-<string name="inventory_share">📤 Share</string>
-<string name="inventory_filter_all">All</string>
-<string name="inventory_filter_found">Found</string>
-<string name="inventory_filter_missing">Missing</string>
-<string name="inventory_filter_unexpected">Warnings / Extra</string>
-<string name="inventory_connection_type">Connection:</string>
-<string name="inventory_disconnect">Disconnect</string>
-<string name="simulation_mode_available">Simulation / Camera Available</string>
-<string name="total">Total</string>
-<string name="unique">Unique</string>
-<string name="speed">Speed</string>
-<string name="time">Time</string>
-<string name="ready_to_scan">Ready to Scan</string>
-<string name="start_inventory">Start Inventory</string>
-<string name="camera_manual">Camera/Manual</string>
-<string name="simulate_scan">Simulate Scan</string>
-<string name="instructions">Instructions</string>
-<string name="print_inventory">Print Inventory</string>
-<string name="print_missing">Print Missing</string>
-<string name="screenshot">Screenshot</string>
+    <string name="inventory_branch_default">Main Branch - Sanaa</string>
+    <string name="inventory_reader_connected">Connected (C72)</string>
+    <string name="inventory_zone_label">Inventory Zone:</string>
+    <string name="inventory_total_scanned">Total Scanned</string>
+    <string name="inventory_unique_tags">Unique Tags</string>
+    <string name="inventory_scan_rate">Scan Rate</string>
+    <string name="inventory_elapsed">Elapsed</string>
+    <string name="inventory_expected">Expected</string>
+    <string name="inventory_found">Found</string>
+    <string name="inventory_missing">Missing</string>
+    <string name="inventory_unexpected">Extra</string>
+    <string name="inventory_ready">Ready to start</string>
+    <string name="inventory_last_tag">Last Scanned Item:</string>
+    <string name="inventory_start">▶ Start</string>
+    <string name="inventory_pause">⏸ Pause</string>
+    <string name="inventory_stop">⏹ Stop</string>
+    <string name="inventory_clear">🗑 Clear</string>
+    <string name="inventory_finalize">✅ Save &amp; Approve Cloud Audit</string>
+    <string name="inventory_export_csv">📊 Export CSV</string>
+    <string name="inventory_print">🖨️ Print</string>
+    <string name="inventory_share">📤 Share</string>
+    <string name="inventory_filter_all">All</string>
+    <string name="inventory_filter_found">Found</string>
+    <string name="inventory_filter_missing">Missing</string>
+    <string name="inventory_filter_unexpected">Warnings / Extra</string>
+    <string name="inventory_connection_type">Connection:</string>
+    <string name="inventory_disconnect">Disconnect</string>
+    <string name="simulation_mode_available">Simulation / Camera Available</string>
+    <string name="total">Total</string>
+    <string name="unique">Unique</string>
+    <string name="speed">Speed</string>
+    <string name="time">Time</string>
+    <string name="ready_to_scan">Ready to Scan</string>
+    <string name="start_inventory">Start Inventory</string>
+    <string name="camera_manual">Camera/Manual</string>
+    <string name="simulate_scan">Simulate Scan</string>
+    <string name="instructions">Instructions</string>
+    <string name="print_inventory">Print Inventory</string>
+    <string name="print_missing">Print Missing</string>
+    <string name="screenshot">Screenshot</string>
+
     <!-- MIRA Bridge - About & Branding -->
     <string name="about_title">About MIRA Bridge</string>
     <string name="about_version">Version 1.3.0</string>
     <string name="about_description">MIRA Bridge™ is the official application for the MIRA ID Jewelry Management and Smart Security Gate System.\n\nSupports:\n• UHF RFID Scanning\n• QR/GS1 DataMatrix Camera\n• Radar Positioning\n• MIRA Secure Gate™\n• Integration with MIRA ID Cloud</string>
     <string name="about_developer">MIRA Technology © 2026</string>
     <string name="about_website">https://ams.ibreg.org</string>
-    
-    
+
     <!-- Gate Settings -->
     <string name="gate_settings_title">🏢 Security Gates Management</string>
     <string name="add_gate">➕ Add New Gate</string>
@@ -1652,7 +1629,7 @@
     <string name="alarm_duration_label">⏱ Alarm Duration (seconds):</string>
     <string name="rfid_power_label">📡 RFID Power (dBm):</string>
     <string name="save_all">💾 Save All Settings</string>
-    
+
     <!-- Sound Names -->
     <string name="sound_beep_success">🔔 Short Success</string>
     <string name="sound_beep_soft">🔔 Soft Beep</string>
