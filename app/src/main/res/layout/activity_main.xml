@@ -16,8 +16,9 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:background="?attr/colorPrimary"
-            app:title="نظام إدارة الذهب"
-            app:titleTextColor="?attr/colorOnPrimary">
+            app:title="@string/app_name"
+            app:titleTextColor="?attr/colorOnPrimary"
+            app:popupTheme="@style/CustomOverflowMenu">
 
             <!-- شارة حالة الأجهزة -->
             <LinearLayout
@@ -64,17 +65,17 @@
             android:background="@drawable/bg_modern_navbar"
             android:elevation="12dp"
             app:elevation="12dp"
-            app:itemIconTint="@color/nav_item_color_selector"
-            app:itemTextColor="@color/nav_item_color_selector"
-            app:itemIconSize="22dp"
-            app:labelVisibilityMode="labeled"
             app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
+            app:itemIconSize="22dp"
+            app:itemIconTint="@color/nav_item_color_selector"
             app:itemRippleColor="#209E8033"
+            app:itemTextColor="@color/nav_item_color_selector"
+            app:labelVisibilityMode="labeled"
             app:menu="@menu/bottom_nav_menu" />
 
     </LinearLayout>
 
-    <!-- 4. الزر الدائري التفاعلي السريع في المنتصف -->
+    <!-- 4. الزر الدائري التفاعلي السريع في المنتصف (بثيم الذهب) -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabActionCenter"
         android:layout_width="wrap_content"
@@ -82,11 +83,15 @@
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="28dp"
-        android:contentDescription="الإجراءات السريعة"
+        android:contentDescription="@string/nav_actions"
+        app:backgroundTint="?attr/colorPrimary"
+        app:borderWidth="3dp"
+        app:borderColor="?attr/colorSurface"
+        app:elevation="14dp"
         app:fabSize="normal"
         app:maxImageSize="28dp"
-        app:srcCompat="@android:drawable/ic_input_add"
-        app:tint="@android:color/white" />
+        app:srcCompat="@drawable/ic_gold_gem"
+        app:tint="?attr/colorOnPrimary" />
 
     <!-- 5. غطاء التحميل -->
     <FrameLayout
