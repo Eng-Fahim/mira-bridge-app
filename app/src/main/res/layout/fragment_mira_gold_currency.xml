@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F5F5">
+    android:background="?android:attr/colorBackground"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -14,10 +16,10 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="💰 أسعار الذهب العالمية"
+            android:text="@string/gold_settings_title"
             android:textSize="20sp"
             android:textStyle="bold"
-            android:textColor="#1A237E"
+            android:textColor="?attr/colorPrimary"
             android:layout_marginBottom="16dp"/>
 
         <LinearLayout
@@ -31,8 +33,9 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="جاهز للتحديث"
-                android:textSize="14sp"/>
+                android:text="@string/ready_to_update"
+                android:textSize="14sp"
+                android:textColor="?attr/colorOnSurface"/>
 
             <TextView
                 android:id="@+id/tvLastUpdate"
@@ -40,7 +43,7 @@
                 android:layout_height="wrap_content"
                 android:text=""
                 android:textSize="12sp"
-                android:textColor="#666"/>
+                android:textColor="?attr/colorOnSurfaceVariant"/>
         </LinearLayout>
 
         <ProgressBar
@@ -48,6 +51,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:visibility="gone"
+            android:indeterminateTint="?attr/colorPrimary"
             style="?android:attr/progressBarStyleHorizontal"/>
 
         <!-- مزود API -->
@@ -55,14 +59,16 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
+            android:layout_marginBottom="8dp"
+            android:gravity="center_vertical">
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="مزود API:"
-                android:textSize="16sp"/>
+                android:text="@string/api_provider"
+                android:textSize="16sp"
+                android:textColor="?attr/colorOnBackground"/>
 
             <Spinner
                 android:id="@+id/spGoldApiProvider"
@@ -72,27 +78,41 @@
         </LinearLayout>
 
         <!-- مفتاح API -->
-        <EditText
-            android:id="@+id/etGoldApiKey"
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="مفتاح API"
-            android:inputType="textPassword"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginBottom="8dp"
+            app:boxBackgroundColor="?attr/colorSurface"
+            app:boxStrokeColor="?attr/colorPrimary"
+            app:boxCornerRadiusTopStart="8dp"
+            app:boxCornerRadiusTopEnd="8dp"
+            app:boxCornerRadiusBottomStart="8dp"
+            app:boxCornerRadiusBottomEnd="8dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etGoldApiKey"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/api_key_hint"
+                android:inputType="textPassword"
+                android:textColor="?attr/colorOnSurface"/>
+        </com.google.android.material.textfield.TextInputLayout>
 
         <!-- عملة الذهب -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
+            android:layout_marginBottom="8dp"
+            android:gravity="center_vertical">
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="عملة الذهب:"
-                android:textSize="16sp"/>
+                android:text="@string/gold_currency"
+                android:textSize="16sp"
+                android:textColor="?attr/colorOnBackground"/>
 
             <Spinner
                 android:id="@+id/spGoldCurrency"
@@ -108,413 +128,492 @@
             android:orientation="horizontal"
             android:layout_marginBottom="16dp">
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnFetchGoldPrice"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="🔄 جلب الأسعار"
+                android:text="@string/fetch_prices"
+                android:textColor="?attr/colorOnPrimary"
+                app:backgroundTint="?attr/colorPrimary"
+                app:cornerRadius="8dp"
                 android:layout_marginEnd="8dp"/>
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSaveGoldSettings"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="💾 حفظ"/>
+                android:text="@string/save"
+                android:textColor="?attr/colorPrimary"
+                app:strokeColor="?attr/colorPrimary"
+                app:cornerRadius="8dp"/>
         </LinearLayout>
 
         <!-- أسعار الذهب -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="أسعار الذهب (دولار/جرام)"
+            android:text="@string/gold_prices_title"
             android:textSize="16sp"
             android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="8dp"/>
 
+        <!-- 24K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="24 قيراط"/>
-
+                android:text="@string/karat_24_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etGoldPrice24k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="0.00"/>
+                android:hint="0.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- 22K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="22 قيراط"/>
-
+                android:text="@string/karat_22_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etGoldPrice22k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="0.00"/>
+                android:hint="0.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- 21K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="21 قيراط"/>
-
+                android:text="@string/karat_21_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etGoldPrice21k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="0.00"/>
+                android:hint="0.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- 18K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="18 قيراط"/>
-
+                android:text="@string/karat_18_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etGoldPrice18k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="0.00"/>
+                android:hint="0.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- 14K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="16dp">
-
+            android:layout_marginBottom="16dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="14 قيراط"/>
-
+                android:text="@string/karat_14_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etGoldPrice14k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="0.00"/>
+                android:hint="0.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
         <!-- هوامش الربح -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="هوامش الربح (%)"
+            android:text="@string/profit_margins_title"
             android:textSize="16sp"
             android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="8dp"/>
 
+        <!-- Margin 24K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="24 قيراط"/>
-
+                android:text="@string/karat_24_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etMargin24k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="95.00"/>
+                android:hint="95.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- Margin 22K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="22 قيراط"/>
-
+                android:text="@string/karat_22_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etMargin22k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="88.00"/>
+                android:hint="88.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- Margin 21K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="21 قيراط"/>
-
+                android:text="@string/karat_21_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etMargin21k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="90.00"/>
+                android:hint="90.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- Margin 18K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="18 قيراط"/>
-
+                android:text="@string/karat_18_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etMargin18k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="100.80"/>
+                android:hint="100.80"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- Margin 14K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="14 قيراط"/>
-
+                android:text="@string/karat_14_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etMargin14k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="105.80"/>
+                android:hint="105.80"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- Margin 12K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="16dp">
-
+            android:layout_marginBottom="16dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="12 قيراط"/>
-
+                android:text="@string/karat_12_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etMargin12k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="110.00"/>
+                android:hint="110.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
         <!-- المصنعية -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="المصنعية (دولار/جرام)"
+            android:text="@string/making_charges_title"
             android:textSize="16sp"
             android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="8dp"/>
 
+        <!-- Making 24K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="24 قيراط"/>
-
+                android:text="@string/karat_24_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etMaking24k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="5.00"/>
+                android:hint="5.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- Making 22K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="22 قيراط"/>
-
+                android:text="@string/karat_22_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etMaking22k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="8.00"/>
+                android:hint="8.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- Making 21K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="21 قيراط"/>
-
+                android:text="@string/karat_21_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etMaking21k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="10.00"/>
+                android:hint="10.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- Making 18K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="18 قيراط"/>
-
+                android:text="@string/karat_18_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etMaking18k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="12.00"/>
+                android:hint="12.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- Making 14K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="14 قيراط"/>
-
+                android:text="@string/karat_14_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etMaking14k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="15.00"/>
+                android:hint="15.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- Making 12K -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="16dp">
-
+            android:layout_marginBottom="16dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="12 قيراط"/>
-
+                android:text="@string/karat_12_label"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etMaking12k"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="18.00"/>
+                android:hint="18.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
         <!-- الأسعار المباشرة -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="الأسعار النهائية (مع الهوامش والمصنعية)"
+            android:text="@string/final_prices_title"
             android:textSize="16sp"
             android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="8dp"/>
 
         <TextView
@@ -522,6 +621,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="24k: $0.00/g"
+            android:textColor="?attr/colorOnSurface"
             android:layout_marginBottom="4dp"/>
 
         <TextView
@@ -529,6 +629,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="22k: $0.00/g"
+            android:textColor="?attr/colorOnSurface"
             android:layout_marginBottom="4dp"/>
 
         <TextView
@@ -536,6 +637,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="21k: $0.00/g"
+            android:textColor="?attr/colorOnSurface"
             android:layout_marginBottom="4dp"/>
 
         <TextView
@@ -543,16 +645,17 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="18k: $0.00/g"
+            android:textColor="?attr/colorOnSurface"
             android:layout_marginBottom="16dp"/>
 
         <!-- 💱 قسم العملات -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="💱 أسعار الصرف والعملات"
+            android:text="@string/currency_settings_title"
             android:textSize="20sp"
             android:textStyle="bold"
-            android:textColor="#1A237E"
+            android:textColor="?attr/colorPrimary"
             android:layout_marginBottom="16dp"/>
 
         <!-- العملة الافتراضية -->
@@ -560,15 +663,15 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
-
+            android:layout_marginBottom="8dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="العملة الافتراضية:"
-                android:textSize="16sp"/>
-
+                android:text="@string/default_currency"
+                android:textSize="16sp"
+                android:textColor="?attr/colorOnBackground"/>
             <Spinner
                 android:id="@+id/spDefaultCurrency"
                 android:layout_width="0dp"
@@ -576,20 +679,20 @@
                 android:layout_weight="1"/>
         </LinearLayout>
 
-        <!-- عملة الرسوم البيانية -->
+        <!-- عملة الرسوم -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
-
+            android:layout_marginBottom="8dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="عملة الرسوم:"
-                android:textSize="16sp"/>
-
+                android:text="@string/chart_currency"
+                android:textSize="16sp"
+                android:textColor="?attr/colorOnBackground"/>
             <Spinner
                 android:id="@+id/spChartCurrency"
                 android:layout_width="0dp"
@@ -601,196 +704,111 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="أسعار الصرف الرسمية"
+            android:text="@string/official_rates_title"
             android:textSize="16sp"
             android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="8dp"/>
 
+        <!-- YER -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="YER"/>
-
+                android:text="YER"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etExchangeYER"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="250.00"/>
+                android:hint="250.00"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- EGP -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="EGP"/>
-
+                android:text="EGP"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etExchangeEGP"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="30.90"/>
+                android:hint="30.90"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- SAR -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
+            android:layout_marginBottom="4dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="SAR"/>
-
+                android:text="SAR"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etExchangeSAR"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="3.75"/>
+                android:hint="3.75"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
 
+        <!-- AED -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="16dp">
-
+            android:layout_marginBottom="16dp"
+            android:gravity="center_vertical">
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="AED"/>
-
+                android:text="AED"
+                android:textColor="?attr/colorOnBackground"/>
             <EditText
                 android:id="@+id/etExchangeAED"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="3.67"/>
+                android:hint="3.67"
+                android:textColor="?attr/colorOnSurface"
+                android:background="?attr/colorSurfaceVariant"
+                android:padding="12dp"/>
         </LinearLayout>
-
-        <!-- أسعار الصرف السوقية -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="أسعار الصرف السوقية"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp"/>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="YER (سوق)"/>
-
-            <EditText
-                android:id="@+id/etExchangeMarketYER"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:inputType="numberDecimal"
-                android:hint="530.00"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="EGP (سوق)"/>
-
-            <EditText
-                android:id="@+id/etExchangeMarketEGP"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:inputType="numberDecimal"
-                android:hint="47.50"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="4dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="SAR (سوق)"/>
-
-            <EditText
-                android:id="@+id/etExchangeMarketSAR"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:inputType="numberDecimal"
-                android:hint="3.75"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="16dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="AED (سوق)"/>
-
-            <EditText
-                android:id="@+id/etExchangeMarketAED"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:inputType="numberDecimal"
-                android:hint="3.67"/>
-        </LinearLayout>
-
-        <!-- ProgressBar للعملات -->
-        <ProgressBar
-            android:id="@+id/pbCurrencyLoading"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:visibility="gone"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_marginBottom="8dp"/>
 
         <!-- الأسعار المباشرة -->
         <TextView
@@ -798,6 +816,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="1 USD = 250.00 YER"
+            android:textColor="?attr/colorOnSurface"
             android:layout_marginBottom="4dp"/>
 
         <TextView
@@ -805,6 +824,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="1 USD = 30.90 EGP"
+            android:textColor="?attr/colorOnSurface"
             android:layout_marginBottom="4dp"/>
 
         <TextView
@@ -812,6 +832,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="1 USD = 3.75 SAR"
+            android:textColor="?attr/colorOnSurface"
             android:layout_marginBottom="4dp"/>
 
         <TextView
@@ -819,21 +840,29 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="1 USD = 3.67 AED"
+            android:textColor="?attr/colorOnSurface"
             android:layout_marginBottom="16dp"/>
 
         <!-- أزرار الحفظ -->
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSaveCurrencySettings"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="💾 حفظ إعدادات العملات"
+            android:text="@string/save_currency_settings"
+            android:textColor="?attr/colorOnPrimary"
+            app:backgroundTint="?attr/colorPrimary"
+            app:cornerRadius="8dp"
             android:layout_marginBottom="8dp"/>
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnRefreshRates"
+            style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="🔄 تحديث الأسعار المباشرة"/>
+            android:text="@string/refresh_rates"
+            android:textColor="?attr/colorPrimary"
+            app:strokeColor="?attr/colorPrimary"
+            app:cornerRadius="8dp"/>
 
     </LinearLayout>
 </ScrollView>
