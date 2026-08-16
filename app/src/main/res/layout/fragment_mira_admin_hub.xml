@@ -50,8 +50,9 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- تم تعديل الـ ID من cardAdminReader إلى cardAdminReaderSetup -->
             <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardAdminReader"
+                android:id="@+id/cardAdminReaderSetup"
                 android:layout_width="0dp"
                 android:layout_height="85dp"
                 android:layout_columnWeight="1"
@@ -63,8 +64,9 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- تم تعديل الـ ID من cardAdminGateSettings إلى cardAdminGateSetup -->
             <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardAdminGateSettings"
+                android:id="@+id/cardAdminGateSetup"
                 android:layout_width="0dp"
                 android:layout_height="85dp"
                 android:layout_columnWeight="1"
@@ -73,6 +75,34 @@
                 app:cardElevation="2dp">
                 <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
                     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🚪 إعدادات البوابات" android:textStyle="bold"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- تم إضافة الكارت المفقود cardAdminSecurity -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardAdminSecurity"
+                android:layout_width="0dp"
+                android:layout_height="85dp"
+                android:layout_columnWeight="1"
+                android:layout_margin="4dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🔒 الأمان والحماية" android:textStyle="bold"/>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- تم إضافة الكارت المفقود cardAdminUhfSet -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardAdminUhfSet"
+                android:layout_width="0dp"
+                android:layout_height="85dp"
+                android:layout_columnWeight="1"
+                android:layout_margin="4dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="📡 إعدادات UHF" android:textStyle="bold"/>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
