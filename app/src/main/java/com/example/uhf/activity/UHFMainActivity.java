@@ -34,6 +34,7 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
 import com.example.uhf.R;
+import com.example.uhf.fragment.MiraServerConfigFragment;
 import com.example.uhf.fragment.AuthenticateNxpUcodeDnaFragment;
 import com.example.uhf.fragment.MiraAccountingFragment;
 import com.example.uhf.fragment.MiraAdminHubFragment;
@@ -319,7 +320,15 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             // 7. الخيارات الإدارية (تفتح الشاشة الإدارية الشاملة MiraAdminHubFragment)
             View btnAdminHub = view.findViewById(R.id.btnAdminHub);
-if (btnAdminHub != null) {
+            // 8. إعدادات السيرفر
+View btnServerConfig = view.findViewById(R.id.btnServerConfig);
+if (btnServerConfig != null) {
+    btnServerConfig.setOnClickListener(v -> {
+        dialog.dismiss();
+        loadFragment(new MiraServerConfigFragment(), "ServerConfig");
+    });
+}
+            if (btnAdminHub != null) {
     btnAdminHub.setOnClickListener(v -> {
         dialog.dismiss();
         checkInventoryLockAndExecute(() -> loadFragment(new MiraAdminHubFragment(), "AdminHub"));
@@ -671,4 +680,4 @@ if (btnAdminHub != null) {
             }
         }
     }
-        }
+}
