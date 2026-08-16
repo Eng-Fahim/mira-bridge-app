@@ -399,11 +399,13 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
     }
 
     // ===================== 🚪 GATES =====================
+public ApiResponse createGate(JSONObject gateData) {
+    return postWithAuth("/gates", gateData);
+}
 
-    public ApiResponse getGates() {
-        return get("/gates");
-    }
-
+public ApiResponse getGates() {
+    return getWithAuth("/gates");
+}
     public ApiResponse getGatesStats() {
         return get("/gates/stats");
     }
