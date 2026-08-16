@@ -1842,6 +1842,29 @@
     <string name="sound_alarm_buzzer_loud">🚨 طنين عالي</string>
     <string name="sound_alarm_klaxon">🚨 كلوكسون</string>
         
-    
+    <!-- ==================== شاشة الذهب والعملات ==================== -->
+<string name="gold_settings_title">💰 أسعار الذهب العالمية</string>
+<string name="ready_to_update">جاهز للتحديث</string>
+<string name="api_provider">مزود API:</string>
+<string name="api_key_hint">مفتاح API</string>
+<string name="gold_currency">عملة الذهب:</string>
+<string name="fetch_prices">🔄 جلب الأسعار</string>
+<string name="gold_prices_title">أسعار الذهب (دولار/جرام)</string>
+<string name="karat_24_label">24 قيراط</string>
+<string name="karat_22_label">22 قيراط</string>
+<string name="karat_21_label">21 قيراط</string>
+<string name="karat_18_label">18 قيراط</string>
+<string name="karat_14_label">14 قيراط</string>
+<string name="karat_12_label">12 قيراط</string>
+<string name="profit_margins_title">هوامش الربح (%)</string>
+<string name="making_charges_title">المصنعية (دولار/جرام)</string>
+<string name="final_prices_title">الأسعار النهائية (مع الهوامش والمصنعية)</string>
+<string name="currency_settings_title">💱 أسعار الصرف والعملات</string>
+<string name="default_currency">العملة الافتراضية:</string>
+<string name="chart_currency">عملة الرسوم:</string>
+<string name="official_rates_title">أسعار الصرف الرسمية</string>
+<string name="market_rates_title">أسعار الصرف السوقية</string>
+<string name="save_currency_settings">💾 حفظ إعدادات العملات</string>
+<string name="refresh_rates">🔄 تحديث الأسعار المباشرة</string>
 
 </resources>
