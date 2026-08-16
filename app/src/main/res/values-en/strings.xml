@@ -137,6 +137,41 @@
     <string name="title_activity_settings">Settings</string>
     <string name="action_set">Settings</string>
 
+
+    <!-- Gold & Currency Extra Titles -->
+<string name="gold_currency">Gold &amp; Currency</string>
+<string name="fetch_prices">Fetch Prices</string>
+<string name="gold_prices_title">Live Gold Prices</string>
+<string name="profit_margins_title">Profit Margins</string>
+<string name="making_charges_title">Making Charges (Craftsmanship)</string>
+
+<!-- Gold Karats Labels -->
+<string name="karat_24_label">Karat 24</string>
+<string name="karat_22_label">Karat 22</string>
+<string name="karat_21_label">Karat 21</string>
+<string name="karat_18_label">Karat 18</string>
+<string name="karat_14_label">Karat 14</string>
+<string name="karat_12_label">Karat 12</string>
+
+<!-- Missing General & Inventory Strings -->
+<string name="total">Total</string>
+<string name="tv_all">All</string>
+<string name="tv_fast_inventory">Fast Inventory</string>
+<string name="tv_phase">Phase</string>
+
+<!-- UHF SDK Warnings Prevention -->
+<string name="uhf_btn_memoryBank">Memory Bank</string>
+<string name="uhf_gyro_loaction">Gyro Location</string>
+<string name="uhf_located_angle">Located Angle</string>
+<string name="uhf_locating_tag_value">Locating Tag Value</string>
+<string name="uhf_msg_filter_addr_must_decimal">Filter address must be decimal</string>
+<string name="uhf_msg_filter_len_must_decimal">Filter length must be decimal</string>
+<string name="uhf_msg_get_para_fail">Get parameters failed</string>
+<string name="uhf_msg_get_para_succ">Get parameters succeeded</string>
+<string name="uhf_msg_length_error">Length error</string>
+<string name="uhf_msg_no_Bluetooth">No Bluetooth device</string>
+<string name="uhf_msg_no_Sensor">No Sensor detected</string>
+
     <!-- Identity Studio Strings -->
 <string name="step_title">Step 1 of 4: Bind &amp; Classify</string>
 <string name="hint_epc">EPC / GTIN Code...</string>
