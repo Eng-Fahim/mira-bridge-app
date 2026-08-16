@@ -40,12 +40,12 @@ import com.example.uhf.fragment.MiraDashboardFragment;
 import com.example.uhf.fragment.MiraGateSettingsFragment;
 import com.example.uhf.fragment.MiraIdentityStudioFragment;
 import com.example.uhf.fragment.MiraPosFragment;
-import com.example.uhf.fragment.MiraRadarFragment;
 import com.example.uhf.fragment.MiraReaderSetupFragment;
 import com.example.uhf.fragment.MiraReceiptFragment;
 import com.example.uhf.fragment.MiraReportsProFragment;
 import com.example.uhf.fragment.MiraTransferFragment;
 import com.example.uhf.fragment.MiraUHFReadTagFragment;
+import com.example.uhf.fragment.MiraUHFRadarLocationFragment;
 import com.example.uhf.fragment.UHFLocationFragment;
 import com.example.uhf.fragment.UHFSetFragment;
 import com.example.uhf.fragment.UsersManagementFragment;
@@ -206,7 +206,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private void toggleLanguage() {
         String newLang = isArabic ? "en" : "ar";
-        MiraLanguageHelper.setLanguage(this, newLang);
+        MiraLanguageHelper.applyLanguage(this, newLang);
         Intent intent = new Intent(this, UHFMainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
@@ -228,7 +228,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private void showProfileInfoDialog() {
         String name = sessionManager.getDisplayName();
         String user = sessionManager.getUsername();
-        String role = sessionManager.getUserRole();
+        String role = sessionManager.getUserRole() != null ? sessionManager.getUserRole().name() : "";
 
         new AlertDialog.Builder(this)
                 .setTitle(isArabic ? "👤 الملف الشخصي" : "👤 User Profile")
@@ -312,7 +312,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             bindMenuAction(view, R.id.btnHardwareGate, bottomSheet, new MiraGateSettingsFragment(), "GateSettings");
 
             // ربط الشاشات الإضافية بأمان في حال وجودها بنفس الأسماء في المخطط
-            bindMenuActionByName(view, "btnAdminRadar", bottomSheet, new MiraRadarFragment(), "Radar");
+            bindMenuActionByName(view, "btnAdminRadar", bottomSheet, new MiraUHFRadarLocationFragment(), "Radar");
             bindMenuActionByName(view, "btnHardwareLocation", bottomSheet, new UHFLocationFragment(), "Location");
             bindMenuActionByName(view, "btnHardwareNxp", bottomSheet, new AuthenticateNxpUcodeDnaFragment(), "NxpUcode");
 
