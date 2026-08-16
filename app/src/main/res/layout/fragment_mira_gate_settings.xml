@@ -26,7 +26,9 @@
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvGates"
             android:layout_width="match_parent"
-            android:layout_height="200dp"
+            android:layout_height="wrap_content"
+            android:minHeight="120dp"
+            android:nestedScrollingEnabled="false"
             android:layout_marginBottom="8dp"/>
 
         <!-- زر إضافة بوابة -->
@@ -45,7 +47,7 @@
             android:layout_width="match_parent"
             android:layout_height="1dp"
             android:background="?attr/colorOutline"
-            android:layout_marginVertical="16dp"/>
+            android:layout_marginBottom="16dp"/>
 
         <!-- 🔊 قسم الأصوات -->
         <TextView
@@ -140,7 +142,7 @@
             android:layout_width="match_parent"
             android:layout_height="1dp"
             android:background="?attr/colorOutline"
-            android:layout_marginVertical="16dp"/>
+            android:layout_marginBottom="16dp"/>
 
         <!-- ⚙️ قسم إعدادات إضافية -->
         <TextView
@@ -206,14 +208,21 @@
             android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="4dp"/>
 
-        <EditText
-            android:id="@+id/etAlarmDuration"
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:inputType="number"
-            android:hint="10"
-            android:textColor="?attr/colorOnSurface"
-            android:layout_marginBottom="12dp"/>
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etAlarmDuration"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:hint="10"
+                android:autofillHints=""
+                android:textColor="?attr/colorOnSurface"/>
+        </com.google.android.material.textfield.TextInputLayout>
 
         <!-- قوة RFID -->
         <TextView
@@ -230,7 +239,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:max="30"
-            android:min="5"
             android:progress="28"
             android:progressTint="?attr/colorPrimary"
             android:thumbTint="?attr/colorPrimary"
