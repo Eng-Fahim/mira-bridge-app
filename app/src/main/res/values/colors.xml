@@ -155,4 +155,16 @@
 <color name="colorOutline">#FFE2E8F0</color>
 <color name="colorOutlineVariant">#FF94A3B8</color>
 <color name="colorWhite">#FFFFFFFF</color>
+
+
+
+<color name="gate_pass_green">#2E7D32</color>
+<color name="gate_deny_red">#C62828</color>
+<color name="gate_sim_green">#10B981</color>
+<color name="gate_sim_red">#EF4444</color>
+<color name="gate_console_bg">#000000</color>
+<color name="gate_console_text">#00FF66</color>
+<color name="gate_alarm_bg">#D32F2F</color>
+<color name="gate_alarm_title_yellow">#FFFF00</color>
+
 </resources>
