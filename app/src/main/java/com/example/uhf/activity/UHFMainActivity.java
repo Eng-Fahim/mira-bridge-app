@@ -319,12 +319,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             // 7. الخيارات الإدارية (تفتح الشاشة الإدارية الشاملة MiraAdminHubFragment)
             View btnAdminHub = view.findViewById(R.id.btnAdminHub);
-            if (btnAdminHub != null) {
-                btnAdminHub.setOnClickListener(v -> {
-                    dialog.dismiss();
-                    checkInventoryLockAndExecute(() -> loadFragment(new MiraAdminHubFragment(), "AdminHub"));
-                });
-            }
+if (btnAdminHub != null) {
+    btnAdminHub.setOnClickListener(v -> {
+        dialog.dismiss();
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraAdminHubFragment(), "AdminHub"));
+    });
+}
+
 
             // زر الإغلاق السفلي
             View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
@@ -670,4 +671,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
     }
-}
+        }
