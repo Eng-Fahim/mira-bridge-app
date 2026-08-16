@@ -41,7 +41,6 @@ public class MiraGateSettingsFragment extends Fragment {
 
     private MiraGatesSettings settings;
     private SoundPool soundPool;
-    private int currentSoundId = -1;
 
     // UI
     private RecyclerView rvGates;
@@ -77,7 +76,7 @@ public class MiraGateSettingsFragment extends Fragment {
         loadSettings();
         setupListeners();
         loadGatesFromLocal();
-        loadGatesFromServer(); // ✅ جلب من السيرفر
+        loadGatesFromServer();
     }
 
     private void initViews(View view) {
@@ -95,26 +94,22 @@ public class MiraGateSettingsFragment extends Fragment {
         btnSaveSounds = view.findViewById(R.id.btnSaveSounds);
         btnSaveAll = view.findViewById(R.id.btnSaveAll);
 
-        // إعداد قائمة البوابات
         rvGates.setLayoutManager(new LinearLayoutManager(getContext()));
         gateAdapter = new GateAdapter(gatesList, this::removeGate);
         rvGates.setAdapter(gateAdapter);
     }
 
     private void setupSpinners() {
-        // صوت النجاح
         ArrayAdapter<String> passAdapter = new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_item, getSoundNames(MiraGatesSettings.SoundOptions.PASS_SOUNDS));
         passAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spSoundPass.setAdapter(passAdapter);
 
-        // صوت الرفض
         ArrayAdapter<String> denyAdapter = new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_item, getSoundNames(MiraGatesSettings.SoundOptions.DENY_SOUNDS));
         denyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spSoundDeny.setAdapter(denyAdapter);
 
-        // صوت الإنذار
         ArrayAdapter<String> alarmAdapter = new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_item, getSoundNames(MiraGatesSettings.SoundOptions.ALARM_SOUNDS));
         alarmAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -151,7 +146,6 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private void loadSettings() {
-        // تحميل الأصوات
         String soundPass = settings.getSoundPass();
         String soundDeny = settings.getSoundDeny();
         String soundAlarm = settings.getSoundAlarm();
@@ -160,7 +154,6 @@ public class MiraGateSettingsFragment extends Fragment {
         spSoundDeny.setSelection(findIndex(MiraGatesSettings.SoundOptions.DENY_SOUNDS, soundDeny));
         spSoundAlarm.setSelection(findIndex(MiraGatesSettings.SoundOptions.ALARM_SOUNDS, soundAlarm));
 
-        // تحميل الإعدادات الأخرى
         switchVibration.setChecked(settings.isVibrationEnabled());
         switchFlash.setChecked(settings.isFlashEnabled());
         etAlarmDuration.setText(String.valueOf(settings.getAlarmDuration()));
@@ -181,7 +174,9 @@ public class MiraGateSettingsFragment extends Fragment {
         btnTestSound.setOnClickListener(v -> {
             String selectedSound = MiraGatesSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()];
             SoundGenerator.playSound(selectedSound);
-            Toast.makeText(getContext(), "🔊 تشغيل: " + getSoundDisplayName(selectedSound), Toast.LENGTH_SHORT).show();
+            if (isAdded()) {
+                Toast.makeText(getContext(), "🔊 تشغيل: " + getSoundDisplayName(selectedSound), Toast.LENGTH_SHORT).show();
+            }
         });
 
         btnSaveSounds.setOnClickListener(v -> {
@@ -193,7 +188,9 @@ public class MiraGateSettingsFragment extends Fragment {
             settings.setSoundDeny(soundDeny);
             settings.setSoundAlarm(soundAlarm);
 
-            Toast.makeText(getContext(), "✅ تم حفظ الأصوات", Toast.LENGTH_SHORT).show();
+            if (isAdded()) {
+                Toast.makeText(getContext(), "✅ تم حفظ الأصوات", Toast.LENGTH_SHORT).show();
+            }
         });
 
         seekRfidPower.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -213,34 +210,31 @@ public class MiraGateSettingsFragment extends Fragment {
             settings.setVibrationEnabled(switchVibration.isChecked());
             settings.setFlashEnabled(switchFlash.isChecked());
             
-            try {
-                settings.setAlarmDuration(Integer.parseInt(etAlarmDuration.getText().toString()));
-            } catch (NumberFormatException e) {
+            String durationInput = etAlarmDuration.getText().toString().trim();
+            if (!durationInput.isEmpty()) {
+                try {
+                    settings.setAlarmDuration(Integer.parseInt(durationInput));
+                } catch (NumberFormatException e) {
+                    settings.setAlarmDuration(10);
+                }
+            } else {
                 settings.setAlarmDuration(10);
             }
             
             settings.setRfidPower(seekRfidPower.getProgress());
 
-            Toast.makeText(getContext(), "✅ تم حفظ جميع الإعدادات", Toast.LENGTH_SHORT).show();
+            if (isAdded()) {
+                Toast.makeText(getContext(), "✅ تم حفظ جميع الإعدادات", Toast.LENGTH_SHORT).show();
+            }
         });
     }
 
-    // ============================================
-    // 🏢 إدارة البوابات
-    // ============================================
-
-    /**
-     * تحميل البوابات من التخزين المحلي
-     */
     private void loadGatesFromLocal() {
         gatesList.clear();
         gatesList.addAll(settings.getGates());
         gateAdapter.notifyDataSetChanged();
     }
 
-    /**
-     * تحميل البوابات من السيرفر
-     */
     private void loadGatesFromServer() {
         new Thread(() -> {
             try {
@@ -272,13 +266,14 @@ public class MiraGateSettingsFragment extends Fragment {
                         }
 
                         if (!serverGates.isEmpty()) {
-                            // حفظ محلياً
                             settings.saveGates(serverGates);
 
-                            getActivity().runOnUiThread(() -> {
-                                loadGatesFromLocal();
-                                Toast.makeText(getContext(), "✅ تم تحميل " + serverGates.size() + " بوابة من السيرفر", Toast.LENGTH_SHORT).show();
-                            });
+                            if (isAdded()) {
+                                requireActivity().runOnUiThread(() -> {
+                                    loadGatesFromLocal();
+                                    Toast.makeText(getContext(), "✅ تم تحميل " + serverGates.size() + " بوابة من السيرفر", Toast.LENGTH_SHORT).show();
+                                });
+                            }
                         }
                     }
                 }
@@ -288,9 +283,6 @@ public class MiraGateSettingsFragment extends Fragment {
         }).start();
     }
 
-    /**
-     * عرض نافذة إضافة بوابة
-     */
     private void showAddGateDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle("➕ إضافة بوابة جديدة");
@@ -331,11 +323,9 @@ public class MiraGateSettingsFragment extends Fragment {
                 gate.ipAddress = ipAddress;
                 gate.port = 8080;
 
-                // حفظ محلي
                 settings.addGate(gate);
                 loadGatesFromLocal();
 
-                // مزامنة مع السيرفر
                 syncGateToServer(gate);
 
                 Toast.makeText(getContext(), "✅ تمت إضافة البوابة", Toast.LENGTH_SHORT).show();
@@ -347,9 +337,6 @@ public class MiraGateSettingsFragment extends Fragment {
         builder.show();
     }
 
-    /**
-     * مزامنة بوابة مع السيرفر
-     */
     private void syncGateToServer(MiraGatesSettings.GateDevice gate) {
         new Thread(() -> {
             try {
@@ -366,39 +353,35 @@ public class MiraGateSettingsFragment extends Fragment {
 
                 MiraApiClient.ApiResponse response = client.createGate(payload);
 
-                getActivity().runOnUiThread(() -> {
-                    if (response.isSuccess) {
-                        Toast.makeText(getContext(), "✅ تمت المزامنة مع السيرفر", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(getContext(), "⚠️ حفظ محلي فقط (سيرفر غير متاح)", Toast.LENGTH_SHORT).show();
-                    }
-                });
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
+                        if (response.isSuccess) {
+                            Toast.makeText(getContext(), "✅ تمت المزامنة مع السيرفر", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(getContext(), "⚠️ حفظ محلي فقط (سيرفر غير متاح)", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
             } catch (Exception e) {
                 Log.e(TAG, "syncGateToServer error: " + e.getMessage());
-                getActivity().runOnUiThread(() -> {
-                    Toast.makeText(getContext(), "💾 حفظ محلي فقط", Toast.LENGTH_SHORT).show();
-                });
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "💾 حفظ محلي فقط", Toast.LENGTH_SHORT).show();
+                    });
+                }
             }
         }).start();
     }
 
-    /**
-     * حذف بوابة
-     */
     private void removeGate(int position) {
         if (position >= 0 && position < gatesList.size()) {
             MiraGatesSettings.GateDevice gate = gatesList.get(position);
             settings.removeGate(gate.gateId);
             loadGatesFromLocal();
-            Toast.makeText(getContext(), "🗑 تم حذف: " + gate.gateName, Toast.LENGTH_SHORT).show();
+            if (isAdded()) {
+                Toast.makeText(getContext(), "🗑 تم حذف: " + gate.gateName, Toast.LENGTH_SHORT).show();
+            }
         }
-    }
-
-    /**
-     * تجربة صوت
-     */
-    private void playSound(String soundName) {
-        SoundGenerator.playSound(soundName);
     }
 
     @Override
@@ -409,10 +392,6 @@ public class MiraGateSettingsFragment extends Fragment {
             soundPool = null;
         }
     }
-
-    // ============================================
-    // 📋 محول قائمة البوابات
-    // ============================================
 
     private class GateAdapter extends RecyclerView.Adapter<GateAdapter.GateViewHolder> {
 
@@ -477,4 +456,4 @@ public class MiraGateSettingsFragment extends Fragment {
             }
         }
     }
-                                          }
+}
