@@ -1,49 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- ✅ أسماء القوائم والتنقل -->
-    <string name="menu_profile">ملفي</string>
-    <string name="menu_logout">تسجيل الخروج</string>
-
-    <!-- Bottom Navigation -->
-    <string name="nav_dashboard">الرئيسية</string>
-    <string name="nav_jewelry">المجوهرات</string>
-    <string name="nav_inventory">الجرد</string>
-    <string name="nav_pos">البيع</string>
-    <string name="nav_more">المزيد</string>
-    <string name="nav_identity">التكويد</string>
-    <string name="nav_reports">التقارير</string>
-    <string name="nav_transfers">التحويلات</string>
-    <string name="nav_home">Home</string>
-    <string name="nav_profile">Profile</string>
-    <string name="nav_gate">البوابات</string>
-    <string name="nav_accounting">المحاسبة</string>
-    <string name="nav_settings">الإعدادات</string>
-    <string name="nav_close">إغلاق</string>
-
-    <string name="menu_action_center">مركز الإجراءات</string>
-    <string name="action_rfid_scan">مسح الكود</string>
-    <string name="action_quick_pos">نقطة البيع</string>
-    <string name="action_transfers">التحويلات</string>
-    <string name="action_more_tools">الإجراءات</string>
-
-    <string name="app_name">MIRA Jewelry Enterprise™</string>
-    <string name="action_settings">الإعدادات</string>
-    <string name="action_about">حول التطبيق</string>
-    <string name="action_display">إعدادات العرض</string>
-    <string name="title_ip_or_domain">إدخال النطاق/عنوان IP</string>
-    <string name="title_ping_count">عدد محاولات PING</string>
-    <string name="title_ping_succ">نجاح PING</string>
-    <string name="title_ping_fail">فشل PING</string>
-    <string name="title_ping_seconds"> ثانية</string>
-    <string name="title_ping_background">في الخلفية</string>
-    <string name="title_ping_wait">مهلة الانتظار (ثانية)</string>
-    <string name="title_ping_restart">إعادة التشغيل</string>
-    <string name="title_ping_pingresult">نتيجة Ping</string>
-    <string name="title_ping_uploadresult">نتيجة الرفع</string>
-    <string name="title_ping_downloadresult">نتيجة التنزيل</string>
-    <string name="title_start">بدء</string>
-    <string name="title_stop">إيقاف</string>
-    <string name="title_activity_settings">الإعدادات</string>
+ات</string>
     <string name="action_set">الإعدادات</string>
     <string name="msg_network_none">الشبكة غير متوفرة</string>
     <string name="msg_network_ok">الشبكة متصلة</string>
@@ -185,6 +140,30 @@
 <string name="ready_to_update">جاهز للتحديث</string>
 <string name="api_provider">مزود خدمة API</string>
 <string name="api_key_hint">أدخل مفتاح API</string>
+
+
+        <!-- ==================== نصوص أسعار الذهب والعملات (Gold & Currency) ==================== -->
+    <string name="final_prices_title">الأسعار النهائية</string>
+    <string name="currency_settings_title">إعدادات العملة</string>
+    <string name="default_currency">العملة الافتراضية</string>
+    <string name="chart_currency">عملة الرسم البياني</string>
+    <string name="official_rates_title">الأسعار الرسمية</string>
+    <string name="market_rates_title">أسعار السوق</string>
+    <string name="save_currency_settings">حفظ إعدادات العملة</string>
+    <string name="refresh_rates">تحديث الأسعار</string>
+
+    <!-- ==================== نصوص شاشة البيع (POS) ==================== -->
+    <string name="pos_title">نقطة البيع</string>
+    <string name="pos_scale_searching">جاري البحث عن الميزان...</string>
+    <string name="pos_scan_gs1">مسح GS1</string>
+    <string name="pos_scan_rfid">مسح RFID</string>
+    <string name="pos_ready_scan">جاهز للمسح الضوئي</string>
+    <string name="pos_manual_hint">إدخال يدوي...</string>
+    <string name="pos_add">إضافة</string>
+    <string name="pos_item_count">عدد القطع</string>
+    <string name="pos_total_amount">الإجمالي</string>
+    <string name="pos_default_amount">0.00</string>
+    <string name="pos_clear">مسح</string>
 
 <!-- Missing UHF Resources -->
 <string name="uhf_msg_offset_error">خطأ في الإزاحة</string>
