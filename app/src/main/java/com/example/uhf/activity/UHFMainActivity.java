@@ -4,7 +4,6 @@ import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.content.res.Configuration;
 import android.media.AudioManager;
 import android.media.SoundPool;
 import android.net.Uri;
@@ -16,58 +15,41 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
-import android.view.KeyEvent;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.TabHost;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatDelegate;
-import androidx.core.os.LocaleListCompat;
+import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
 import com.example.uhf.R;
-import com.example.uhf.fragment.JewelryDashboardFragment;
-import com.example.uhf.fragment.MiraAccountingFragment;
-import com.example.uhf.fragment.MiraBranchPickerFragment;
-import com.example.uhf.fragment.MiraBranchesManagementFragment;
-import com.example.uhf.fragment.MiraDashboardFragment;
 import com.example.uhf.fragment.MiraGateSettingsFragment;
-import com.example.uhf.fragment.MiraGoldCurrencyFragment;
 import com.example.uhf.fragment.MiraIdentityStudioFragment;
-import com.example.uhf.fragment.MiraInventoryProFragment;
 import com.example.uhf.fragment.MiraPosFragment;
 import com.example.uhf.fragment.MiraReaderSetupFragment;
 import com.example.uhf.fragment.MiraReceiptFragment;
 import com.example.uhf.fragment.MiraReportsProFragment;
-import com.example.uhf.fragment.MiraSalesHistoryFragment;
-import com.example.uhf.fragment.MiraSecureGateFragment;
 import com.example.uhf.fragment.MiraTransferFragment;
-import com.example.uhf.fragment.MiraUHFRadarLocationFragment;
 import com.example.uhf.fragment.MiraUHFReadTagFragment;
-import com.example.uhf.fragment.UHFReadWriteFragment;
 import com.example.uhf.fragment.UHFSetFragment;
 import com.example.uhf.fragment.UsersManagementFragment;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
-import com.example.uhf.tools.ExportExcelAsyncTask;
 import com.example.uhf.tools.MiraLanguageHelper;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.ToastUtil;
-import com.example.uhf.tools.UIHelper;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
-import com.rscja.deviceapi.interfaces.ConnectionStatus;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -77,6 +59,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private static final String TAG = "UHFMainActivity";
     private static final int PERMISSION_REQUEST_CODE = 1001;
+
+    // Legacy public fields required by child fragments
+    public TabHost mTabHost = null;
 
     // UI Elements
     private FrameLayout loadingOverlay;
@@ -147,7 +132,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 updateToolbarTitle();
             }
 
-            // ربط زر حالة الأجهزة العلوي بالوصول السريع
             View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
             if (btnHardwareStatus != null) {
                 btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
@@ -161,7 +145,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             setupQuickNav();
 
-            // تحميل شاشة البيع افتراضياً عند فتح التطبيق
             loadFragment(new MiraPosFragment(), "POS");
 
             showLoading();
@@ -236,13 +219,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             View view = getLayoutInflater().inflate(R.layout.dialog_quick_menu, null);
             bottomSheet.setContentView(view);
 
-            // 1. العمليات والإدارة
             bindMenuAction(view, R.id.btnAdminIdentity, bottomSheet, new MiraIdentityStudioFragment(), "Identity");
             bindMenuAction(view, R.id.btnAdminUsers, bottomSheet, new UsersManagementFragment(), "Users");
             bindMenuAction(view, R.id.btnAdminReports, bottomSheet, new MiraReportsProFragment(), "Reports");
             bindMenuAction(view, R.id.btnAdminSettings, bottomSheet, new UHFSetFragment(), "Settings");
 
-            // 2. إعدادات ومعدات الأجهزة
             bindMenuAction(view, R.id.btnHardwareRfid, bottomSheet, new MiraReaderSetupFragment(), "ReaderSetup");
             bindMenuAction(view, R.id.btnHardwareGate, bottomSheet, new MiraGateSettingsFragment(), "GateSettings");
 
@@ -276,6 +257,58 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 .show();
     }
 
+    // ==================== LEGACY COMPATIBILITY METHODS ====================
+
+    public void startUHFScan() {
+        try {
+            loopFlag = true;
+            if (mReader != null) {
+                mReader.startInventoryTag();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "startUHFScan Error: " + e.getMessage());
+        }
+    }
+
+    public void stopUHFScan() {
+        try {
+            loopFlag = false;
+            if (mReader != null) {
+                mReader.stopInventory();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "stopUHFScan Error: " + e.getMessage());
+        }
+    }
+
+    public void openReceiptFragment(String rawJson) {
+        try {
+            MiraReceiptFragment fragment = MiraReceiptFragment.newInstance(rawJson);
+            loadFragment(fragment, "Receipt");
+        } catch (Exception e) {
+            Log.e(TAG, "openReceiptFragment Error: " + e.getMessage());
+        }
+    }
+
+    public void showToast(String text) {
+        if (text == null) return;
+        mainHandler.post(() -> Toast.makeText(getApplicationContext(), text, Toast.LENGTH_SHORT).show());
+    }
+
+    public void showToast(int resId) {
+        mainHandler.post(() -> Toast.makeText(getApplicationContext(), getString(resId), Toast.LENGTH_SHORT).show());
+    }
+
+    public void playSoundDelayed(int val) {
+        mainHandler.postDelayed(() -> {
+            try {
+                playSound(val);
+            } catch (Exception e) {
+                Log.e(TAG, "Error playing delayed sound: " + e.getMessage());
+            }
+        }, 10);
+    }
+
     // ==================== INVENTORY LOCK PROTECTION ====================
 
     public boolean isInventoryActive() {
@@ -305,7 +338,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private void stopActiveInventory() {
         try {
-            loopFlag = false;
+            stopUHFScan();
             if (currentFragment instanceof MiraUHFReadTagFragment) {
                 ((MiraUHFReadTagFragment) currentFragment).stopScanning();
             }
@@ -447,7 +480,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
                 }
                 if (!permissions.isEmpty()) {
-                    requestPermissions(permissions.toArray(new String[0]), PERMISSION_REQUEST_CODE);
+                    ActivityCompat.requestPermissions(this, permissions.toArray(new String[0]), PERMISSION_REQUEST_CODE);
                 }
             }
         } catch (Exception e) {
@@ -514,31 +547,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
     }
-    // ==================== LEGACY HELPER METHODS ====================
-
-    /**
-     * عرض رسائل Toast المترجمة من النصوص أو الـ Resources
-     */
-    public void showToast(String text) {
-        if (text == null) return;
-        mainHandler.post(() -> Toast.makeText(getApplicationContext(), text, Toast.LENGTH_SHORT).show());
-    }
-
-    public void showToast(int resId) {
-        mainHandler.post(() -> Toast.makeText(getApplicationContext(), getString(resId), Toast.LENGTH_SHORT).show());
-    }
-
-    /**
-     * تشغيل الصوت مع تأخير زمني مخصص للفرع القديم
-     */
-    public void playSoundDelayed(int val) {
-        mainHandler.postDelayed(() -> {
-            try {
-                playSound(val);
-            } catch (Exception e) {
-                Log.e(TAG, "Error playing delayed sound: " + e.getMessage());
-            }
-        }, 10);
-    }
-
 }
