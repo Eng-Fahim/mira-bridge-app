@@ -57,16 +57,21 @@
 
         <!-- 3. الشريط السفلي المحترف (4 وظائف تشغيلية فقط) -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
-            android:id="@+id/bottomQuickNav"
-            android:layout_width="match_parent"
-            android:layout_height="64dp"
-            android:background="?attr/colorSurface"
-            android:elevation="8dp"
-            app:itemIconSize="22dp"
-            app:itemIconTint="@color/bottom_nav_colors"
-            app:itemTextColor="@color/bottom_nav_colors"
-            app:labelVisibilityMode="labeled"
-            app:menu="@menu/bottom_quick_menu" />
+    android:id="@+id/bottomQuickNav"
+    android:layout_width="match_parent"
+    android:layout_height="68dp"
+    android:layout_gravity="bottom"
+    android:background="@drawable/bg_modern_navbar"
+    android:elevation="12dp"
+    app:elevation="12dp"
+    app:itemIconTint="@color/nav_item_color_selector"
+    app:itemTextColor="@color/nav_item_color_selector"
+    app:itemIconSize="22dp"
+    app:labelVisibilityMode="labeled"
+    app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
+    app:itemRippleColor="#209E8033"
+    app:menu="@menu/bottom_nav_menu" />
+
 
     </LinearLayout>
 
