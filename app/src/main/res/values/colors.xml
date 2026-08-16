@@ -1,6 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <color name="brand_primary">#9E8033</color>
+    <color name="brand_primary_dark">#7A6123</color>
+    
+    <!-- خلفية القائمة السفلية وخلفية الحاويات -->
+    <color name="nav_bar_background">#FFFFFF</color>
+    <color name="nav_item_selected">#9E8033</color>
+    <color name="nav_item_unselected">#8E8E93</color>
+    
+    <!-- النافذة المنبثقة للإجراءات السريعة (Dark Sheet) -->
+    <color name="action_sheet_bg">#1E222B</color>
+    <color name="action_sheet_card_bg">#2C313E</color>
+    <color name="action_sheet_text_primary">#FFFFFF</color>
+    <color name="action_sheet_text_secondary">#A0A5B5</color>
+    <color name="action_sheet_divider">#383E4D</color>
+
+
     <color name="lfile_colorPrimary">#92B4F4</color>
     <color name="white">#FFFFFF</color>
     <color name="white1">#eeeeee</color>
