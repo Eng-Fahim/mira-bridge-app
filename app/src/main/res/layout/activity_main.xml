@@ -5,213 +5,72 @@
     android:layout_height="match_parent"
     android:background="?attr/android:colorBackground">
 
-    <!-- المحتوى الرئيسي للتطبيق -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
 
+        <!-- 1. الشريط العلوي الذكي مع مؤشر حالة الأجهزة -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:background="?attr/colorPrimary"
-            app:titleTextColor="?attr/colorOnPrimary"
-            app:subtitleTextColor="?attr/colorOnPrimary" />
+            app:title="نظام إدارة الذهب"
+            app:titleTextColor="?attr/colorOnPrimary">
 
-        <!-- الشريط العلوي للتنقل العرضي (التبويبات) -->
-        <HorizontalScrollView
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:background="?attr/colorSurface"
-            android:elevation="2dp"
-            android:scrollbars="none">
-
+            <!-- شارة حالة الأجهزة (Hardware Status Badge) -->
             <LinearLayout
-                android:id="@+id/topTabsContainer"
+                android:id="@+id/btnHardwareStatus"
                 android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingHorizontal="8dp">
+                android:layout_height="32dp"
+                android:layout_gravity="end"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/bg_hardware_badge"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:paddingHorizontal="10dp">
+
+                <View
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:background="@drawable/bg_status_dot_green" />
 
                 <TextView
-                    android:id="@+id/tabTopSettings"
                     android:layout_width="wrap_content"
-                    android:layout_height="32dp"
-                    android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_tab_top_selector"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:paddingHorizontal="14dp"
-                    android:text="⚙️ الإعدادات"
-                    android:textColor="@color/tab_top_text_color"
-                    android:textSize="12sp" />
-                <TextView
-    android:id="@+id/tabTopReader"
-    android:layout_width="wrap_content"
-    android:layout_height="32dp"
-    android:layout_marginEnd="6dp"
-    android:background="@drawable/bg_tab_top_selector"
-    android:clickable="true"
-    android:focusable="true"
-    android:gravity="center"
-    android:paddingHorizontal="14dp"
-    android:text="🔌 القارئ"
-    android:textColor="@color/tab_top_text_color"
-    android:textSize="12sp" />
-    <TextView
-    android:id="@+id/tabTopGateSettings"
-    android:layout_width="wrap_content"
-    android:layout_height="32dp"
-    android:layout_marginEnd="6dp"
-    android:background="@drawable/bg_tab_top_selector"
-    android:clickable="true"
-    android:focusable="true"
-    android:gravity="center"
-    android:paddingHorizontal="14dp"
-    android:text="🔧 البوابات"
-    android:textColor="@color/tab_top_text_color"
-    android:textSize="12sp" />
-    <TextView
-    android:id="@+id/tabTopGold"
-    android:layout_width="wrap_content"
-    android:layout_height="32dp"
-    android:layout_marginEnd="6dp"
-    android:background="@drawable/bg_tab_top_selector"
-    android:clickable="true"
-    android:focusable="true"
-    android:gravity="center"
-    android:paddingHorizontal="14dp"
-    android:text="💰 الذهب"
-    android:textColor="@color/tab_top_text_color"
-    android:textSize="12sp" />
-
-                <TextView
-                    android:id="@+id/tabTopIdentity"
-                    android:layout_width="wrap_content"
-                    android:layout_height="32dp"
-                    android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_tab_top_selector"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:paddingHorizontal="14dp"
-                    android:text="🆔 التكويد"
-                    android:textColor="@color/tab_top_text_color"
-                    android:textSize="12sp" />
-
-                <TextView
-                    android:id="@+id/tabTopTransfers"
-                    android:layout_width="wrap_content"
-                    android:layout_height="32dp"
-                    android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_tab_top_selector"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:paddingHorizontal="14dp"
-                    android:text="📦 تحويلات"
-                    android:textColor="@color/tab_top_text_color"
-                    android:textSize="12sp" />
-
-                <TextView
-                    android:id="@+id/tabTopBranches"
-                    android:layout_width="wrap_content"
-                    android:layout_height="32dp"
-                    android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_tab_top_selector"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:paddingHorizontal="14dp"
-                    android:text="🏢 فروع"
-                    android:textColor="@color/tab_top_text_color"
-                    android:textSize="12sp" />
-
-                <TextView
-                    android:id="@+id/tabTopUsers"
-                    android:layout_width="wrap_content"
-                    android:layout_height="32dp"
-                    android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_tab_top_selector"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:paddingHorizontal="14dp"
-                    android:text="👥 مستخدمين"
-                    android:textColor="@color/tab_top_text_color"
-                    android:textSize="12sp" />
-
-                <TextView
-                    android:id="@+id/tabTopRfid"
-                    android:layout_width="wrap_content"
-                    android:layout_height="32dp"
-                    android:background="@drawable/bg_tab_top_selector"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:paddingHorizontal="14dp"
-                    android:text="🔧 RFID"
-                    android:textColor="@color/tab_top_text_color"
-                    android:textSize="12sp" />
-
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:text="الأجهزة متصلة"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
             </LinearLayout>
-        </HorizontalScrollView>
+        </com.google.android.material.appbar.MaterialToolbar>
 
-        <androidx.fragment.app.FragmentTabHost
-            android:id="@android:id/tabhost"
+        <!-- 2. الحاوية الرئيسية للمحتوى (Fragments) -->
+        <FrameLayout
+            android:id="@+id/fragment_container"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1">
+            android:layout_weight="1" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="vertical">
-
-                <TabWidget
-                    android:id="@android:id/tabs"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:visibility="gone" />
-
-                <FrameLayout
-                    android:id="@android:id/tabcontent"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp" />
-
-                <FrameLayout
-                    android:id="@+id/realtabcontent"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent" />
-            </LinearLayout>
-        </androidx.fragment.app.FragmentTabHost>
-
-        <!-- القائمة السفلية المتوافقة مع الثيم -->
+        <!-- 3. الشريط السفلي المحترف (4 وظائف تشغيلية فقط) -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
-    android:id="@+id/bottomQuickNav"
-    android:layout_width="match_parent"
-    android:layout_height="68dp"
-    android:layout_gravity="bottom"
-    android:layout_marginStart="12dp"
-    android:layout_marginEnd="12dp"
-    android:layout_marginBottom="12dp"
-    android:background="@drawable/bg_bottom_nav_dynamic"
-    android:elevation="8dp"
-    app:itemActiveIndicatorStyle="@style/CustomNavIndicator"
-    app:itemIconSize="22dp"
-    app:itemIconTint="@color/bottom_nav_colors"
-    app:itemRippleColor="?attr/colorControlHighlight"
-    app:itemTextColor="@color/bottom_nav_colors"
-    app:labelVisibilityMode="labeled"
-    app:menu="@menu/bottom_quick_menu" /> <!-- تم تعديل اسم الملف هنا -->
-
+            android:id="@+id/bottomQuickNav"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:background="?attr/colorSurface"
+            android:elevation="8dp"
+            app:itemIconSize="22dp"
+            app:itemIconTint="@color/bottom_nav_colors"
+            app:itemTextColor="@color/bottom_nav_colors"
+            app:labelVisibilityMode="labeled"
+            app:menu="@menu/bottom_quick_menu" />
 
     </LinearLayout>
 
-    <!-- غطاء التحميل الفاخر متوافق ديناميكياً مع الثيم -->
+    <!-- 4. غطاء التحميل عند إجراء معالجة سريعة -->
     <FrameLayout
         android:id="@+id/loading_overlay"
         android:layout_width="match_parent"
@@ -221,44 +80,36 @@
         android:focusable="true"
         android:visibility="gone">
 
-        <LinearLayout
-            android:layout_width="160dp"
-            android:layout_height="160dp"
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="140dp"
+            android:layout_height="140dp"
             android:layout_gravity="center"
-            android:background="@drawable/bg_loading_card_dynamic"
-            android:elevation="12dp"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="16dp">
+            app:cardCornerRadius="16dp"
+            app:cardElevation="10dp">
 
-            <RelativeLayout
-                android:layout_width="56dp"
-                android:layout_height="56dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="16dp">
 
                 <ProgressBar
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:indeterminateTint="?attr/colorPrimary" />
 
                 <TextView
+                    android:id="@+id/tvLoadingTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_centerInParent="true"
-                    android:text="💎"
-                    android:textSize="20sp" />
-            </RelativeLayout>
-
-            <TextView
-                android:id="@+id/tvLoadingTitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:fontFamily="sans-serif-medium"
-                android:text="جاري التحميل..."
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="13sp" />
-
-        </LinearLayout>
+                    android:layout_marginTop="12dp"
+                    android:text="جاري التحميل..."
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
     </FrameLayout>
 
 </RelativeLayout>
