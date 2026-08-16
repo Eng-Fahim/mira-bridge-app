@@ -19,6 +19,10 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
+
+import com.example.uhf.fragment.MiraSecureGateFragment;
+import com.example.uhf.fragment.MiraUHFReadTagFragment;
+
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.SessionManager;
@@ -141,9 +145,18 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     private void setupListeners() {
-        if (btnGate != null) btnGate.setOnClickListener(v -> switchTab("SecureGate"));
-        if (btnInventory != null) btnInventory.setOnClickListener(v -> switchTab("Inventory Pro"));
-    }
+    if (btnGate != null) btnGate.setOnClickListener(v -> {
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).loadFragment(new MiraSecureGateFragment(), "SecureGate");
+        }
+    });
+    
+    if (btnInventory != null) btnInventory.setOnClickListener(v -> {
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).loadFragment(new MiraUHFReadTagFragment(), "Scan");
+        }
+    });
+}
 
     private void showShimmer(boolean show) {
         if (shimmerLayout != null) {
@@ -358,16 +371,7 @@ private String formatCurrency(double amount) {
         if (tv != null) tv.setText(text);
     }
 
-    private void switchTab(String tag) {
-        try {
-            if (getActivity() instanceof UHFMainActivity) {
-                UHFMainActivity a = (UHFMainActivity) getActivity();
-                if (a.mTabHost != null) a.mTabHost.setCurrentTabByTag(tag);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "switchTab error", e);
-        }
-    }
+    
 
     public void onBranchChanged() {
         if (!isAdded()) return;
