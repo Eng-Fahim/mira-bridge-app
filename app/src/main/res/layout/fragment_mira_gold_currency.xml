@@ -709,8 +709,8 @@
             android:textStyle="bold"
             android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="8dp"/>
-        <!-- بعد أسعار الصرف الرسمية أضف: -->
-<<!-- أسعار الصرف السوقية -->
+ 
+<!-- أسعار الصرف السوقية -->
 <TextView
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
