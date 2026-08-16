@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:attr/colorBackground"
     android:padding="24dp">
 
+    <!-- زر تغيير اللغة -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnToggleLanguage"
         style="@style/Widget.Material3.Button.TextButton"
@@ -21,6 +23,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- إصدار التطبيق -->
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/tvAppVersion"
         android:layout_width="wrap_content"
@@ -32,6 +35,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="@+id/btnToggleLanguage" />
 
+    <!-- هيدر الشعار والهوية -->
     <LinearLayout
         android:id="@+id/logoContainer"
         android:layout_width="match_parent"
@@ -85,11 +89,12 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:text="منظومة التتبع والمصادقة المعتمدة للمجوهرات"
+            android:textAlignment="center"
             android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="11sp"
-            android:textAlignment="center" />
+            android:textSize="11sp" />
     </LinearLayout>
 
+    <!-- كارت تسجيل الدخول -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/loginCard"
         android:layout_width="match_parent"
@@ -149,11 +154,11 @@
                     android:id="@+id/etUsername"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:imeOptions="actionNext"
                     android:inputType="text"
                     android:textAlignment="viewStart"
                     android:textColor="?attr/colorOnSurface"
-                    android:textSize="16sp"
-                    android:imeOptions="actionNext" />
+                    android:textSize="16sp" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
@@ -175,19 +180,19 @@
                     android:id="@+id/etPassword"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:imeOptions="actionDone"
                     android:inputType="textPassword"
                     android:textAlignment="viewStart"
                     android:textColor="?attr/colorOnSurface"
-                    android:textSize="16sp"
-                    android:imeOptions="actionDone" />
+                    android:textSize="16sp" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layoutDirection="locale"
                 android:orientation="horizontal"
-                android:weightSum="3"
-                android:layoutDirection="locale">
+                android:weightSum="3">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnLogin"
@@ -221,12 +226,14 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
+    <!-- عناصر الخادم والتحميل خلف الكواليس -->
     <LinearLayout
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="parent">
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
         <com.google.android.material.textview.MaterialTextView
             android:id="@+id/tvServerSettings"
@@ -235,17 +242,17 @@
 
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/serverConfigCard"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content">
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilServerUrl"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etServerUrl"
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -259,6 +266,7 @@
             android:id="@+id/loadingContainer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content">
+
             <ProgressBar
                 android:id="@+id/pbLoading"
                 android:layout_width="wrap_content"
@@ -266,6 +274,7 @@
         </FrameLayout>
     </LinearLayout>
 
+    <!-- التذييل السفلي -->
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/tvFooter"
         android:layout_width="wrap_content"
