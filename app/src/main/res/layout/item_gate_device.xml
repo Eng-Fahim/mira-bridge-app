@@ -6,7 +6,9 @@
     android:layout_marginBottom="8dp"
     app:cardBackgroundColor="?attr/colorSurface"
     app:cardCornerRadius="10dp"
-    app:cardElevation="2dp">
+    app:cardElevation="2dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="?attr/colorOutlineVariant">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -47,18 +49,18 @@
             android:text="⚪ غير متصل"
             android:textSize="12sp"
             android:textStyle="bold"
-            android:textColor="#9E9E9E"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:layout_marginEnd="8dp"/>
 
-        <TextView
+        <ImageButton
             android:id="@+id/btnRemoveGate"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:text="🗑"
-            android:textSize="18sp"
-            android:gravity="center"
-            android:clickable="true"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@android:drawable/ic_menu_delete"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="?attr/colorError"
+            android:contentDescription="حذف البوابة"
             android:focusable="true"
-            android:background="?attr/selectableItemBackgroundBorderless"/>
+            android:clickable="true"/>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
