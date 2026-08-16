@@ -46,15 +46,33 @@ public class MiraServerConfigFragment extends Fragment {
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-
-        serverConfig = MiraServerConfig.getInstance(requireContext());
-
-        initViews(view);
-        loadCurrentConfig();
-        setupListeners();
+public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    super.onViewCreated(view, savedInstanceState);
+    
+    serverConfig = MiraServerConfig.getInstance(requireContext());
+    
+    initViews(view);
+    loadCurrentConfig();
+    setupListeners();
+    
+    // ✅ إخفاء الحقول الحساسة عن المستخدمين العاديين
+    if (!isSystemAdmin()) {
+        etApiKey.setVisibility(View.GONE);
+        etGateId.setVisibility(View.GONE);
     }
+}
+
+private boolean isSystemAdmin() {
+    try {
+        SessionManager sessionManager = new SessionManager(requireContext());
+        SessionManager.Role role = sessionManager.getUserRole();
+        return role == SessionManager.Role.SYSTEM_ADMIN || 
+               role == SessionManager.Role.ORG_ADMIN ||
+               role == SessionManager.Role.ADMIN;
+    } catch (Exception e) {
+        return false;
+    }
+}
 
     private void initViews(View view) {
         etBaseUrl = view.findViewById(R.id.etBaseUrl);
