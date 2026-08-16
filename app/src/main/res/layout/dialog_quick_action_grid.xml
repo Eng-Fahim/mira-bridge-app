@@ -16,17 +16,16 @@
         android:layout_marginBottom="16dp"
         android:background="@drawable/bg_sheet_handle" />
 
-    <!-- شبكة الإجراءات 2x2 -->
+    <!-- شبكة الإجراءات السريعة -->
     <GridLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:columnCount="2"
-        android:rowCount="2"
         android:useDefaultMargins="true">
 
-        <!-- الإجراء 1: مسح RFID / الكود -->
+        <!-- 1. استوديو التكويد والمطابقة -->
         <com.google.android.material.card.MaterialCardView
-            android:id="@+id/btnQuickRfid"
+            android:id="@+id/btnIdentityStudio"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_columnWeight="1"
@@ -53,16 +52,16 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="12dp"
-                    android:text="@string/action_rfid_scan"
+                    android:text="استوديو التكويد"
                     android:textColor="@color/action_sheet_text_primary"
                     android:textSize="14sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- الإجراء 2: نقطة البيع السريعة -->
+        <!-- 2. الرادار وتحديد الموقع -->
         <com.google.android.material.card.MaterialCardView
-            android:id="@+id/btnQuickPos"
+            android:id="@+id/btnRadarLocation"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_columnWeight="1"
@@ -89,16 +88,16 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="12dp"
-                    android:text="@string/action_quick_pos"
+                    android:text="رادار التتبع"
                     android:textColor="@color/action_sheet_text_primary"
                     android:textSize="14sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- الإجراء 3: التحويل بين الفروع -->
+        <!-- 3. مراقبة البوابات -->
         <com.google.android.material.card.MaterialCardView
-            android:id="@+id/btnQuickTransfer"
+            android:id="@+id/btnSecureGate"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_columnWeight="1"
@@ -125,16 +124,16 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="12dp"
-                    android:text="@string/action_transfers"
+                    android:text="مراقبة البوابات"
                     android:textColor="@color/action_sheet_text_primary"
                     android:textSize="14sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- الإجراء 4: قائمة الخيارات الإضافية -->
+        <!-- 4. التقارير التشغيلية -->
         <com.google.android.material.card.MaterialCardView
-            android:id="@+id/btnQuickMore"
+            android:id="@+id/btnReports"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_columnWeight="1"
@@ -161,7 +160,115 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="12dp"
-                    android:text="@string/action_more_tools"
+                    android:text="التقارير"
+                    android:textColor="@color/action_sheet_text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 5. محاسبة المجوهرات -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/btnAccounting"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:layout_margin="6dp"
+            app:cardBackgroundColor="@color/action_sheet_card_bg"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="14dp">
+
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/ic_grid_more"
+                    app:tint="@color/brand_primary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="المحاسبة"
+                    android:textColor="@color/action_sheet_text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 6. التحويلات -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/btnTransfer"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:layout_margin="6dp"
+            app:cardBackgroundColor="@color/action_sheet_card_bg"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="14dp">
+
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/ic_transfer_arrows"
+                    app:tint="@color/brand_primary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="التحويلات"
+                    android:textColor="@color/action_sheet_text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 7. الخيارات الإدارية (Admin Hub) -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/btnAdminHub"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:layout_margin="6dp"
+            app:cardBackgroundColor="@color/action_sheet_card_bg"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="14dp">
+
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/ic_grid_more"
+                    app:tint="@color/brand_primary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="الخيارات الإدارية"
                     android:textColor="@color/action_sheet_text_primary"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -170,7 +277,7 @@
 
     </GridLayout>
 
-    <!-- زر إغلاق صريح بالأسفل بنفس نمط التصميم -->
+    <!-- زر إغلاق صريح -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabCloseSheet"
         android:layout_width="wrap_content"
