@@ -125,6 +125,48 @@
     <string name="fontGrayScaleRange">(1~8)</string>
     <string name="PrintContent"> أهلاً بك! \n</string>
 
+
+    <!-- Navigation & Layout Extras -->
+<string name="nav_actions">المرئيات والإجراءات</string>
+
+<!-- MIRA Gate Settings -->
+<string name="gate_settings_title">إعدادات بوابة الحماية</string>
+<string name="add_gate">إضافة بوابة</string>
+<string name="sound_settings">إعدادات الأصوات</string>
+<string name="sound_pass">صوت المرور المصرح</string>
+<string name="sound_deny">صوت رفض المرور</string>
+<string name="sound_alarm">صوت الإنذار</string>
+<string name="test_sound">تجربة الصوت</string>
+<string name="save_sounds">حفظ الأصوات</string>
+<string name="additional_settings">إعدادات إضافية</string>
+<string name="vibration_enabled">تفعيل الاهتزاز</string>
+<string name="flash_enabled">تفعيل الفلاش</string>
+<string name="alarm_duration_label">مدة مدة الإنذار</string>
+<string name="rfid_power_label">قوة إشارة الـ RFID</string>
+<string name="save_all">حفظ الكل</string>
+
+<!-- Gold & Currency Settings -->
+<string name="gold_settings_title">إعدادات أسعار الذهب والعملات</string>
+<string name="ready_to_update">جاهز للتحديث</string>
+<string name="api_provider">مزود خدمة API</string>
+<string name="api_key_hint">أدخل مفتاح API</string>
+
+<!-- Missing UHF Resources -->
+<string name="uhf_msg_offset_error">خطأ في الإزاحة</string>
+<string name="uhf_msg_set_fail">فشل الإعداد</string>
+<string name="uhf_msg_set_frehop_fail">فشل ضبط القفز الترددي</string>
+<string name="uhf_msg_set_frehop_succ">تم ضبط القفز الترددي بنجاح</string>
+<string name="uhf_msg_set_succ">تم الإعداد بنجاح</string>
+<string name="uhf_msg_upgrade_fail">فشلت الترقية</string>
+<string name="uhf_msg_upgrade_succ">تمت الترقية بنجاح</string>
+<string name="uhf_not_support_rssi">مؤشر RSSI غير مدعوم</string>
+<string name="uhf_radar_loaction">موقع الرادار</string>
+<string name="uhf_tag_count">عدد البطاقات</string>
+<string name="unique">فريد</string>
+<string name="user_area_number">رقم منطقة المستخدم</string>
+<string name="word">كلمة</string>
+<string name="workTime">وقت العمل</string>
+
     <!--- البوابات الأمنية -->
     <string name="mira_gate_title">MIRA Secure Gate™</string>
     <string name="mira_gate_subtitle">نظام البوابة الأمنية والوقاية من السرقة</string>
