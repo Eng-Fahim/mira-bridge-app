@@ -19,6 +19,8 @@
 <string name="nav_accounting">المحاسبة</string>
 <string name="nav_settings">الإعدادات</string>
 <string name="nav_close">إغلاق</string>
+<string name="nav_actions">المرئيات والإجراءات</string>
+<string name="nav_sales">المبيعات</string>
 
 
     <string name="menu_action_center">مركز الإجراءات</string>
