@@ -514,4 +514,31 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
     }
+    // ==================== LEGACY HELPER METHODS ====================
+
+    /**
+     * عرض رسائل Toast المترجمة من النصوص أو الـ Resources
+     */
+    public void showToast(String text) {
+        if (text == null) return;
+        mainHandler.post(() -> Toast.makeText(getApplicationContext(), text, Toast.LENGTH_SHORT).show());
+    }
+
+    public void showToast(int resId) {
+        mainHandler.post(() -> Toast.makeText(getApplicationContext(), getString(resId), Toast.LENGTH_SHORT).show());
+    }
+
+    /**
+     * تشغيل الصوت مع تأخير زمني مخصص للفرع القديم
+     */
+    public void playSoundDelayed(int val) {
+        mainHandler.postDelayed(() -> {
+            try {
+                playSound(val);
+            } catch (Exception e) {
+                Log.e(TAG, "Error playing delayed sound: " + e.getMessage());
+            }
+        }, 10);
+    }
+
 }
