@@ -19,7 +19,7 @@
             app:title="نظام إدارة الذهب"
             app:titleTextColor="?attr/colorOnPrimary">
 
-            <!-- شارة حالة الأجهزة (Hardware Status Badge) -->
+            <!-- شارة حالة الأجهزة -->
             <LinearLayout
                 android:id="@+id/btnHardwareStatus"
                 android:layout_width="wrap_content"
@@ -55,27 +55,40 @@
             android:layout_height="0dp"
             android:layout_weight="1" />
 
-        <!-- 3. الشريط السفلي المحترف (4 وظائف تشغيلية فقط) -->
+        <!-- 3. الشريط السفلي المحترف -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
-    android:id="@+id/bottomQuickNav"
-    android:layout_width="match_parent"
-    android:layout_height="68dp"
-    android:layout_gravity="bottom"
-    android:background="@drawable/bg_modern_navbar"
-    android:elevation="12dp"
-    app:elevation="12dp"
-    app:itemIconTint="@color/nav_item_color_selector"
-    app:itemTextColor="@color/nav_item_color_selector"
-    app:itemIconSize="22dp"
-    app:labelVisibilityMode="labeled"
-    app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
-    app:itemRippleColor="#209E8033"
-    app:menu="@menu/bottom_nav_menu" />
-
+            android:id="@+id/bottomNavigationView"
+            android:layout_width="match_parent"
+            android:layout_height="68dp"
+            android:layout_gravity="bottom"
+            android:background="@drawable/bg_modern_navbar"
+            android:elevation="12dp"
+            app:elevation="12dp"
+            app:itemIconTint="@color/nav_item_color_selector"
+            app:itemTextColor="@color/nav_item_color_selector"
+            app:itemIconSize="22dp"
+            app:labelVisibilityMode="labeled"
+            app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
+            app:itemRippleColor="#209E8033"
+            app:menu="@menu/bottom_nav_menu" />
 
     </LinearLayout>
 
-    <!-- 4. غطاء التحميل عند إجراء معالجة سريعة -->
+    <!-- 4. الزر الدائري التفاعلي السريع في المنتصف -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabActionCenter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="28dp"
+        android:contentDescription="الإجراءات السريعة"
+        app:fabSize="normal"
+        app:maxImageSize="28dp"
+        app:srcCompat="@android:drawable/ic_input_add"
+        app:tint="@android:color/white" />
+
+    <!-- 5. غطاء التحميل -->
     <FrameLayout
         android:id="@+id/loading_overlay"
         android:layout_width="match_parent"
