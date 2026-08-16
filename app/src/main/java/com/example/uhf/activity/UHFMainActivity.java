@@ -256,32 +256,99 @@ private void showGoldRatesDialog() {
     // ==================== NAV SYSTEM & FRAGMENT MANAGEMENT ====================
 
     private void setupQuickNav() {
-        try {
-            BottomNavigationView quickNav = findViewById(R.id.bottomQuickNav);
-            if (quickNav == null) return;
+    try {
+        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+        FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
 
+        // ربط ضغطة الزر الدائري البارز في المنتصف
+        if (fabActionCenter != null) {
+            fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
+        }
+
+        // ربط عناصر القائمة السفلية
+        if (quickNav != null) {
             quickNav.setOnItemSelectedListener(item -> {
                 int id = item.getItemId();
 
-                if (id == R.id.nav_pos) {
-                    checkInventoryLockAndExecute(() -> loadFragment(new MiraPosFragment(), "POS"));
+                if (id == R.id.nav_home) {
+                    checkInventoryLockAndExecute(() -> loadFragment(new MiraDashboardFragment(), "Dashboard"));
                     return true;
                 } else if (id == R.id.nav_inventory) {
                     checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadTagFragment(), "Scan"));
                     return true;
-                } else if (id == R.id.nav_transfers) {
-                    checkInventoryLockAndExecute(() -> loadFragment(new MiraTransferFragment(), "Transfers"));
+                } else if (id == R.id.nav_reports) {
+                    checkInventoryLockAndExecute(() -> loadFragment(new MiraReportsProFragment(), "Reports"));
                     return true;
-                } else if (id == R.id.nav_more) {
-                    showAdminBottomSheet();
+                } else if (id == R.id.nav_profile) {
+                    showProfileInfoDialog();
                     return true;
+                } else if (id == R.id.nav_placeholder) {
+                    // المساحة المفرغة للزر الدائري (لا تفعل شيئاً)
+                    return false;
                 }
                 return false;
             });
-        } catch (Exception e) {
-            Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
         }
+    } catch (Exception e) {
+        Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
     }
+}
+
+
+private void showQuickActionMenu() {
+    try {
+        BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
+        View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
+        dialog.setContentView(view);
+
+        // 1. مسح الكود / RFID
+        View btnQuickRfid = view.findViewById(R.id.btnQuickRfid);
+        if (btnQuickRfid != null) {
+            btnQuickRfid.setOnClickListener(v -> {
+                dialog.dismiss();
+                checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadTagFragment(), "Scan"));
+            });
+        }
+
+        // 2. نقطة البيع
+        View btnQuickPos = view.findViewById(R.id.btnQuickPos);
+        if (btnQuickPos != null) {
+            btnQuickPos.setOnClickListener(v -> {
+                dialog.dismiss();
+                checkInventoryLockAndExecute(() -> loadFragment(new MiraPosFragment(), "POS"));
+            });
+        }
+
+        // 3. التحويلات
+        View btnQuickTransfer = view.findViewById(R.id.btnQuickTransfer);
+        if (btnQuickTransfer != null) {
+            btnQuickTransfer.setOnClickListener(v -> {
+                dialog.dismiss();
+                checkInventoryLockAndExecute(() -> loadFragment(new MiraTransferFragment(), "Transfers"));
+            });
+        }
+
+        // 4. خيارات إضافية (تفتحBottomSheet الإدارة الشامل)
+        View btnQuickMore = view.findViewById(R.id.btnQuickMore);
+        if (btnQuickMore != null) {
+            btnQuickMore.setOnClickListener(v -> {
+                dialog.dismiss();
+                showAdminBottomSheet();
+            });
+        }
+
+        // زر الإغلاق السفلي
+        View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
+        if (fabCloseSheet != null) {
+            fabCloseSheet.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        dialog.show();
+    } catch (Exception e) {
+        Log.e(TAG, "QuickActionMenu Error: " + e.getMessage(), e);
+    }
+}
+
 
     public void loadFragment(Fragment fragment, String tag) {
         try {
@@ -648,4 +715,4 @@ private void showGoldRatesDialog() {
             }
         }
     }
-}
+                }
