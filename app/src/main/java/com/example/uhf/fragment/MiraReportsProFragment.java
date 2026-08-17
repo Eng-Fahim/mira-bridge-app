@@ -2,7 +2,9 @@ package com.example.uhf.fragment;
 
 import android.app.DatePickerDialog;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -20,6 +22,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -33,6 +36,8 @@ import com.google.android.material.button.MaterialButton;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -115,12 +120,14 @@ public class MiraReportsProFragment extends Fragment {
 
         tvTitle.setText(item.icon + " " + item.title);
 
-        // إعدادات الـ WebView الآمنة
+        // إعدادات الـ WebView
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
         webSettings.setDomStorageEnabled(true);
         webSettings.setLoadWithOverviewMode(true);
         webSettings.setUseWideViewPort(true);
+        webSettings.setBuiltInZoomControls(true);
+        webSettings.setDisplayZoomControls(false);
         webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
 
         final String[] dates = {getDefaultFromDate(), getDefaultToDate()};
@@ -164,7 +171,6 @@ public class MiraReportsProFragment extends Fragment {
         btnPrint.setOnClickListener(v -> printReportWebView(webView, item.title));
         btnExport.setOnClickListener(v -> exportReportToCSV(item.type, dates[0], dates[1]));
         
-        // تنظيف الـ WebView عند الإغلاق لتجنب تسرب الذاكرة
         btnClose.setOnClickListener(v -> {
             try {
                 webView.stopLoading();
@@ -175,8 +181,8 @@ public class MiraReportsProFragment extends Fragment {
 
         dialog.show();
 
-        // جلب البيانات بعد اكتمال ظهور الحوار لضمان تحميل الـ WebView بشكل سليم
-        mainHandler.postDelayed(() -> fetchAndRenderReport(item.type, webView, layoutLoading, tvLoadingStatus, dates[0], dates[1]), 200);
+        // تأخير الاستدعاء حتى يكتمل تجهيز قياسات الشاشة والـ WebView
+        webView.post(() -> fetchAndRenderReport(item.type, webView, layoutLoading, tvLoadingStatus, dates[0], dates[1]));
     }
 
     private void fetchAndRenderReport(String reportType, WebView webView, View layoutLoading, TextView tvLoadingStatus, String fromDate, String toDate) {
@@ -197,7 +203,6 @@ public class MiraReportsProFragment extends Fragment {
                 MiraApiClient.ApiResponse response = apiClient.getReportData(reportType, fromDate, toDate, activeBranchId);
 
                 if (response != null && response.isSuccess && response.data != null) {
-                    // معالجة مرنة لاستخراج بيانات الـ JSON بغض النظر عن هيكلة الاستجابة
                     if (response.data.has("data")) {
                         Object innerData = response.data.opt("data");
                         if (innerData instanceof JSONObject) {
@@ -207,7 +212,6 @@ public class MiraReportsProFragment extends Fragment {
                             reportData.put("items_array", innerData);
                         }
                     }
-                    
                     if (reportData == null) {
                         reportData = response.data;
                     }
@@ -222,7 +226,6 @@ public class MiraReportsProFragment extends Fragment {
                 errorMessage = "خطأ في المعالجة: " + e.getMessage();
             }
 
-            // استخدام الكاش الاحتياطي في حال تعذر الاتصال
             if (reportData == null && offlineCache != null) {
                 String cached = offlineCache.getString(cacheKey, null);
                 if (cached != null) {
@@ -252,8 +255,16 @@ public class MiraReportsProFragment extends Fragment {
                             "</body></html>";
                 }
 
-                webView.setWebViewClient(new WebViewClient());
-                webView.loadDataWithBaseURL(null, htmlContent, "text/html", "utf-8", null);
+                webView.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public void onPageFinished(WebView view, String url) {
+                        super.onPageFinished(view, url);
+                        view.requestLayout(); // إجبار الـ WebView على إعادة حساب أبعاده
+                    }
+                });
+
+                // تحميل البيانات بتشفر UTF-8 آمن
+                webView.loadDataWithBaseURL("file:///android_asset/", htmlContent, "text/html", "UTF-8", null);
             });
         }).start();
     }
@@ -265,16 +276,17 @@ public class MiraReportsProFragment extends Fragment {
         String orgName = orgProfile != null ? orgProfile.getOrgName() : "MIRA JEWELRY SYSTEM";
 
         html.append("<!DOCTYPE html><html dir='rtl' lang='ar'><head><meta charset='UTF-8'>")
+            .append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
             .append("<style>")
             .append("body{font-family:sans-serif;margin:0;padding:12px;background:#F4F6F9;color:#1F2937;}")
             .append(".header{background:linear-gradient(135deg,#1E293B,#0F172A);color:#FFF;padding:16px;border-radius:12px;margin-bottom:12px;}")
             .append(".header h2{margin:0;font-size:18px;color:#F1F5F9;}")
             .append(".header p{margin:4px 0 0;font-size:11px;color:#94A3B8;}")
-            .append(".card{background:#FFF;padding:14px;border-radius:10px;margin-bottom:12px;border:1px solid #E2E8F0;}")
+            .append(".card{background:#FFF;padding:14px;border-radius:10px;margin-bottom:12px;border:1px solid #E2E8F0;box-shadow: 0 1px 3px rgba(0,0,0,0.05);}")
             .append(".card-title{font-size:14px;font-weight:bold;color:#0F172A;margin-bottom:10px;border-bottom:2px solid #F1F5F9;padding-bottom:6px;}")
-            .append(".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:10px;}")
+            .append(".grid{display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;margin-bottom:10px;}")
             .append(".metric{background:#F8FAFC;border:1px solid #E2E8F0;padding:10px;border-radius:8px;text-align:center;}")
-            .append(".metric .val{font-size:16px;font-weight:800;color:#0F172A;}")
+            .append(".metric .val{font-size:15px;font-weight:800;color:#0F172A;}")
             .append(".metric .lbl{font-size:10px;color:#64748B;}")
             .append(".gold{color:#D97706;font-weight:bold;}")
             .append("table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11px;}")
@@ -283,7 +295,7 @@ public class MiraReportsProFragment extends Fragment {
             .append("</style></head><body>");
 
         html.append("<div class='header'><h2>").append(orgName).append("</h2>")
-            .append("<p>").append(from).append(" إلى ").append(to).append("</p></div>");
+            .append("<p>الفترة من ").append(from).append(" إلى ").append(to).append("</p></div>");
 
         switch (type) {
             case "inventory": renderInventoryHTML(html, data); break;
@@ -301,140 +313,150 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void renderDashboardHTML(StringBuilder html, JSONObject data) {
-        JSONObject inv = data.optJSONObject("inventory");
-        JSONObject sales = data.optJSONObject("sales");
-        
+        JSONObject inv = data.has("inventory") ? data.optJSONObject("inventory") : data;
+        JSONObject sales = data.has("sales") ? data.optJSONObject("sales") : data;
+
         html.append("<div class='card'><div class='card-title'>📊 الملخص التنفيذي</div><div class='grid'>");
-        if (inv != null) {
-            html.append(metricBox("📦", String.valueOf(inv.optInt("total_items", 0)), "القطع"));
-            html.append(metricBox("⚖️", String.format(Locale.US, "%.1f", inv.optDouble("total_weight", 0)), "الوزن جم"));
-            html.append(metricBox("✨", String.format(Locale.US, "%.1f", inv.optDouble("net_24k_weight", 0)), "صافي 24K", "gold"));
-        }
-        if (sales != null) {
-            html.append(metricBox("💰", String.format(Locale.US, "%,.0f", sales.optDouble("total_revenue", 0)), "المبيعات"));
-            html.append(metricBox("📈", String.format(Locale.US, "%,.0f", sales.optDouble("net_profit", 0)), "الأرباح", "gold"));
-        }
+        html.append(metricBox("📦", String.valueOf(inv.optInt("total_items", inv.optInt("count", 0))), "إجمالي القطع"));
+        html.append(metricBox("⚖️", String.format(Locale.US, "%.1f جم", inv.optDouble("total_weight", 0)), "الوزن الإجمالي"));
+        html.append(metricBox("✨", String.format(Locale.US, "%.1f جم", inv.optDouble("net_24k_weight", 0)), "صافي 24K", "gold"));
+        html.append(metricBox("💰", String.format(Locale.US, "%,.0f", sales.optDouble("total_revenue", 0)), "الإيرادات"));
         html.append("</div></div>");
-        
-        if (inv != null) renderInventoryHTML(html, data);
+
+        renderInventoryHTML(html, data);
     }
 
     private void renderInventoryHTML(StringBuilder html, JSONObject data) {
-        JSONObject inv = data.optJSONObject("inventory");
-        if (inv == null) { html.append("<div class='card'>لا توجد بيانات مخزون</div>"); return; }
+        JSONObject inv = data.has("inventory") ? data.optJSONObject("inventory") : data;
 
-        html.append("<div class='card'><div class='card-title'>📦 توزيع العيارات</div>")
-            .append("<table><tr><th>العيار</th><th>الوزن</th><th>القطع</th><th>صافي 24K</th></tr>");
-        
+        html.append("<div class='card'><div class='card-title'>📦 تفكيك العيارات والمخزون</div>")
+            .append("<table><tr><th>العيار</th><th>الوزن القائم</th><th>القطع</th><th>صافي 24K</th></tr>");
+
         JSONArray karats = inv.optJSONArray("karat_breakdown");
-        if (karats != null) {
+        if (karats == null) karats = inv.optJSONArray("items_array");
+
+        if (karats != null && karats.length() > 0) {
             for (int i = 0; i < karats.length(); i++) {
                 JSONObject k = karats.optJSONObject(i);
                 if (k == null) continue;
-                html.append("<tr><td><b>").append(k.optString("karat")).append("</b></td>")
-                    .append("<td>").append(String.format(Locale.US, "%.2f", k.optDouble("gross_weight", 0))).append("</td>")
-                    .append("<td>").append(k.optInt("count", 0)).append("</td>")
+                html.append("<tr><td><b>").append(k.optString("karat", k.optString("name", "—"))).append("</b></td>")
+                    .append("<td>").append(String.format(Locale.US, "%.2f", k.optDouble("gross_weight", k.optDouble("weight", 0)))).append("</td>")
+                    .append("<td>").append(k.optInt("count", k.optInt("items_count", 0))).append("</td>")
                     .append("<td class='gold'>").append(String.format(Locale.US, "%.2f", k.optDouble("net_24k", 0))).append("</td></tr>");
             }
+        } else {
+            html.append("<tr><td colspan='4'>لا توجد تفاصيل عيارات مجمعة</td></tr>");
         }
         html.append("</table></div>");
     }
 
     private void renderSalesHTML(StringBuilder html, JSONObject data) {
-        JSONObject sales = data.optJSONObject("sales");
-        if (sales == null) { html.append("<div class='card'>لا توجد بيانات مبيعات</div>"); return; }
+        JSONObject sales = data.has("sales") ? data.optJSONObject("sales") : data;
 
-        html.append("<div class='card'><div class='card-title'>💰 المبيعات</div><div class='grid'>")
-            .append(metricBox("💵", String.format(Locale.US, "%,.0f", sales.optDouble("total_revenue", 0)), "الإيرادات"))
-            .append(metricBox("🔨", String.format(Locale.US, "%,.0f", sales.optDouble("total_making_charges", 0)), "أجور"))
-            .append(metricBox("📈", String.format(Locale.US, "%,.0f", sales.optDouble("net_profit", 0)), "الربح", "gold"))
-            .append(metricBox("🧾", String.valueOf(sales.optInt("invoices_count", 0)), "فواتير"))
+        html.append("<div class='card'><div class='card-title'>💰 تحليل المبيعات والأرباح</div><div class='grid'>")
+            .append(metricBox("💵", String.format(Locale.US, "%,.0f", sales.optDouble("total_revenue", 0)), "الإيرادات الكلية"))
+            .append(metricBox("🔨", String.format(Locale.US, "%,.0f", sales.optDouble("total_making_charges", 0)), "أجور الصياغة"))
+            .append(metricBox("📈", String.format(Locale.US, "%,.0f", sales.optDouble("net_profit", 0)), "صافي الربح", "gold"))
+            .append(metricBox("🧾", String.valueOf(sales.optInt("invoices_count", 0)), "عدد الفواتير"))
             .append("</div></div>");
     }
 
     private void renderMovementHTML(StringBuilder html, JSONObject data) {
         JSONArray movements = data.optJSONArray("movements");
-        html.append("<div class='card'><div class='card-title'>🔄 التحويلات</div>");
+        if (movements == null) movements = data.optJSONArray("items_array");
+
+        html.append("<div class='card'><div class='card-title'>🔄 سجل الحركة والتحويلات</div>");
         if (movements != null && movements.length() > 0) {
-            html.append("<table><tr><th>الرقم</th><th>من</th><th>إلى</th><th>الحالة</th></tr>");
+            html.append("<table><tr><th>الرمز</th><th>من</th><th>إلى</th><th>الحالة</th></tr>");
             for (int i = 0; i < movements.length(); i++) {
                 JSONObject m = movements.optJSONObject(i);
                 if (m != null) {
-                    html.append("<tr><td>").append(m.optString("transfer_code", "—")).append("</td>")
+                    html.append("<tr><td>").append(m.optString("transfer_code", m.optString("code", "—"))).append("</td>")
                         .append("<td>").append(m.optString("from_branch", "—")).append("</td>")
                         .append("<td>").append(m.optString("to_branch", "—")).append("</td>")
-                        .append("<td>").append(m.optString("status", "—")).append("</td></tr>");
+                        .append("<td>").append(m.optString("status", "مكتمل")).append("</td></tr>");
                 }
             }
             html.append("</table>");
         } else {
-            html.append("<p>لا توجد تحويلات</p>");
+            html.append("<p style='text-align:center;color:#64748B;'>لا توجد عمليات تحويل مسجلة خلال الفترة</p>");
         }
         html.append("</div>");
     }
 
     private void renderBranchesHTML(StringBuilder html, JSONObject data) {
         JSONArray branches = data.optJSONArray("branches_performance");
-        html.append("<div class='card'><div class='card-title'>🏢 الفروع</div>");
+        if (branches == null) branches = data.optJSONArray("items_array");
+
+        html.append("<div class='card'><div class='card-title'>🏢 أداء الفروع المقارن</div>");
         if (branches != null && branches.length() > 0) {
             html.append("<table><tr><th>الفرع</th><th>القطع</th><th>المبيعات</th></tr>");
             for (int i = 0; i < branches.length(); i++) {
                 JSONObject b = branches.optJSONObject(i);
                 if (b != null) {
-                    html.append("<tr><td>").append(b.optString("branch_name", "—")).append("</td>")
+                    html.append("<tr><td>").append(b.optString("branch_name", b.optString("name", "—"))).append("</td>")
                         .append("<td>").append(b.optInt("items_count", 0)).append("</td>")
                         .append("<td class='gold'>").append(String.format(Locale.US, "%,.0f", b.optDouble("sales_total", 0))).append("</td></tr>");
                 }
             }
             html.append("</table>");
+        } else {
+            html.append("<p style='text-align:center;color:#64748B;'>لا توجد بيانات مقارنة متاحة للفروع</p>");
         }
         html.append("</div>");
     }
 
     private void renderGatesHTML(StringBuilder html, JSONObject data) {
         JSONArray logs = data.optJSONArray("gate_logs");
-        html.append("<div class='card'><div class='card-title'>🚪 البوابات</div>");
+        if (logs == null) logs = data.optJSONArray("items_array");
+
+        html.append("<div class='card'><div class='card-title'>🚪 سجل البوابات والإنذارات</div>");
         if (logs != null && logs.length() > 0) {
-            html.append("<table><tr><th>الوقت</th><th>البوابة</th><th>EPC</th></tr>");
+            html.append("<table><tr><th>الوقت</th><th>البوابة</th><th>رمز EPC</th></tr>");
             for (int i = 0; i < Math.min(logs.length(), 50); i++) {
                 JSONObject l = logs.optJSONObject(i);
                 if (l != null) {
-                    html.append("<tr><td>").append(l.optString("timestamp", "—")).append("</td>")
-                        .append("<td>").append(l.optString("gate_name", "—")).append("</td>")
+                    html.append("<tr><td>").append(l.optString("timestamp", l.optString("created_at", "—"))).append("</td>")
+                        .append("<td>").append(l.optString("gate_name", "البوابة الرئيسية")).append("</td>")
                         .append("<td>").append(l.optString("epc", "—")).append("</td></tr>");
                 }
             }
             html.append("</table>");
+        } else {
+            html.append("<p style='text-align:center;color:#64748B;'>سجل البوابات نظيف، لا توجد تنبيهات</p>");
         }
         html.append("</div>");
     }
 
     private void renderAuditHTML(StringBuilder html, JSONObject data) {
-        JSONObject audit = data.optJSONObject("audit_summary");
-        if (audit == null) { html.append("<div class='card'>لا توجد نتائج جرد</div>"); return; }
-        
-        html.append("<div class='card'><div class='card-title'>📋 الجرد</div><div class='grid'>")
-            .append(metricBox("🎯", String.format(Locale.US, "%.1f%%", audit.optDouble("accuracy", 0)), "الدقة"))
-            .append(metricBox("✅", String.valueOf(audit.optInt("found_items", 0)), "موجود"))
-            .append(metricBox("❌", String.valueOf(audit.optInt("missing_items", 0)), "مفقود"))
+        JSONObject audit = data.has("audit_summary") ? data.optJSONObject("audit_summary") : data;
+
+        html.append("<div class='card'><div class='card-title'>📋 نتائج مطابقة الجرد</div><div class='grid'>")
+            .append(metricBox("🎯", String.format(Locale.US, "%.1f%%", audit.optDouble("accuracy", 100.0)), "نسبة الدقة"))
+            .append(metricBox("✅", String.valueOf(audit.optInt("found_items", audit.optInt("total_found", 0))), "الموجودات"))
+            .append(metricBox("❌", String.valueOf(audit.optInt("missing_items", audit.optInt("total_missing", 0))), "المفقودات"))
             .append("</div></div>");
     }
 
     private void renderReorderHTML(StringBuilder html, JSONObject data) {
         JSONArray items = data.optJSONArray("reorder_items");
-        html.append("<div class='card'><div class='card-title'>💎 نواقص</div>");
+        if (items == null) items = data.optJSONArray("items_array");
+
+        html.append("<div class='card'><div class='card-title'>💎 قائمة النواقص وإعادة الطلب</div>");
         if (items != null && items.length() > 0) {
-            html.append("<table><tr><th>الصنف</th><th>العيار</th><th>مباع</th><th>متبقي</th></tr>");
+            html.append("<table><tr><th>الصنف</th><th>العيار</th><th>المباع</th><th>المتبقي</th></tr>");
             for (int i = 0; i < items.length(); i++) {
                 JSONObject item = items.optJSONObject(i);
                 if (item != null) {
-                    html.append("<tr><td>").append(item.optString("category", "—")).append("</td>")
+                    html.append("<tr><td>").append(item.optString("category", item.optString("name", "—"))).append("</td>")
                         .append("<td>").append(item.optString("karat", "—")).append("</td>")
                         .append("<td>").append(item.optInt("sold_count", 0)).append("</td>")
                         .append("<td>").append(item.optInt("remaining_stock", 0)).append("</td></tr>");
                 }
             }
             html.append("</table>");
+        } else {
+            html.append("<p style='text-align:center;color:#64748B;'>المخزون متوازن، لا توجد نواقص حرجة</p>");
         }
         html.append("</div>");
     }
@@ -460,7 +482,44 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void exportReportToCSV(String type, String from, String to) {
-        Toast.makeText(getContext(), "جاري التصدير...", Toast.LENGTH_SHORT).show();
+        if (getContext() == null) return;
+        try {
+            String cacheKey = "cache_pro_" + type + "_" + from + "_" + to;
+            String cached = offlineCache != null ? offlineCache.getString(cacheKey, null) : null;
+
+            if (cached == null) {
+                Toast.makeText(getContext(), "لا توجد بيانات محفوظة لتصديرها حالياً", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            File exportDir = new File(requireContext().getCacheDir(), "exports");
+            if (!exportDir.exists()) exportDir.mkdirs();
+
+            File file = new File(exportDir, "MIRA_Report_" + type + "_" + System.currentTimeMillis() + ".csv");
+            FileOutputStream fos = new FileOutputStream(file);
+            
+            // إضافة BOM لدعم اللغة العربية في Excel
+            fos.write(0xEF); fos.write(0xBB); fos.write(0xBF);
+
+            StringBuilder csvContent = new StringBuilder();
+            csvContent.append("تقرير MIRA System,").append(type).append("\n");
+            csvContent.append("من,").append(from).append(",إلى,").append(to).append("\n\n");
+            csvContent.append("البيانات الخام (JSON)\n");
+            csvContent.append("\"").append(cached.replace("\"", "\"\"")).append("\"\n");
+
+            fos.write(csvContent.toString().getBytes("UTF-8"));
+            fos.close();
+
+            Uri contentUri = FileProvider.getUriForFile(requireContext(), requireContext().getPackageName() + ".fileprovider", file);
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("text/csv");
+            shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(shareIntent, "مشاركة التقرير عبر"));
+
+        } catch (Exception e) {
+            Toast.makeText(getContext(), "فشل التصدير: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     // ==================== HELPERS ====================
