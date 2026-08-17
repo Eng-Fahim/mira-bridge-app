@@ -560,46 +560,9 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements OnClick
     // ============================================
     // استبدل دالة lockTag() كاملة
 private void lockTag() {
-    String pwdStr = EtAccessPwd.getText().toString().trim();
-    if (TextUtils.isEmpty(pwdStr)) pwdStr = "00000000";
-    
-    // التحقق من كلمة المرور
-    if (pwdStr.length() != 8 || !mContext.vailHexInput(pwdStr)) {
-        mContext.showToast(R.string.uhf_msg_addr_must_len8);
-        return;
-    }
-    
-    // عرض تحذير قبل القفل
-    new android.app.AlertDialog.Builder(mContext)
-        .setTitle("⚠️ تحذير")
-        .setMessage("هل أنت متأكد من قفل الشريحة؟\nبعد القفل لن تتمكن من الكتابة عليها بدون كلمة المرور الصحيحة.")
-        .setPositiveButton("نعم، قفل", (dialog, which) -> {
-            boolean result = false;
-            try {
-                // استخدام الدالة المتاحة في مكتبة Chainway
-                // جرب أحد هذه الخيارات حسب المكتبة المتوفرة لديك
-                result = mContext.mReader.lockTag(pwdStr);
-                // أو
-                // result = mContext.mReader.lockTag();
-                // أو
-                // result = mContext.mReader.lockEPC(pwdStr);
-            } catch (Exception e) {
-                Log.e(TAG, "Lock error: " + e.getMessage());
-                result = false;
-            }
-            
-            if (result) {
-                tvProgrammerStatus.setText("🔐 تم قفل الشريحة بنجاح");
-                tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
-                mContext.playSound(1);
-            } else {
-                tvProgrammerStatus.setText("❌ فشل القفل - غير مدعوم في هذا الجهاز");
-                tvProgrammerStatus.setTextColor(Color.RED);
-                mContext.playSound(2);
-            }
-        })
-        .setNegativeButton("إلغاء", null)
-        .show();
+    tvProgrammerStatus.setText("⚠️ وظيفة القفل غير متاحة في هذا الإصدار");
+    tvProgrammerStatus.setTextColor(Color.parseColor("#FF9800"));
+    mContext.playSound(2);
 }
 
     // ============================================
