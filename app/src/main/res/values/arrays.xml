@@ -213,4 +213,20 @@
     <item>AED</item>
 </string-array>
 
+     <!-- أسماء البنوك في قارئ RFID -->
+    <string-array name="bank_names">
+        <item>EPC</item>
+        <item>TID</item>
+        <item>User Memory</item>
+        <item>Reserved</item>
+    </string-array>
+    
+    <!-- أسماء البنوك بالعربية -->
+    <string-array name="bank_names_arabic">
+        <item>EPC</item>
+        <item>TID</item>
+        <item>ذاكرة المستخدم</item>
+        <item>محجوز</item>
+    </string-array>
+
 </resources>
