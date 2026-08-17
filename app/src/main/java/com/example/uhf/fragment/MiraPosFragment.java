@@ -306,15 +306,21 @@ public class MiraPosFragment extends MiraBaseFragment {
     }
 
     private void submitManualEpc() {
-        UIHelper.hideKeyboard(getActivity());
-        String epc = etManualEpc != null ? etManualEpc.getText().toString().trim() : "";
-        if (!epc.isEmpty()) {
-            processRingEpc(epc, "manual");
-            if (etManualEpc != null) etManualEpc.setText("");
-        } else {
-            showToast(isArabic ? "أدخل EPC أو باركود" : "Enter EPC or barcode");
+    UIHelper.hideKeyboard(getActivity());
+    String epc = etManualEpc != null ? etManualEpc.getText().toString().trim() : "";
+    if (!epc.isEmpty()) {
+        // ✅ منع التكرار
+        if (scannedEpcs.contains(epc)) {
+            showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً في السلة!" : "⚠️ This item is already in cart!");
+            playAlertSound(2);
+            return;
         }
+        processRingEpc(epc, "manual");
+        if (etManualEpc != null) etManualEpc.setText("");
+    } else {
+        showToast(isArabic ? "أدخل EPC أو باركود" : "Enter EPC or barcode");
     }
+}
 
     // ==================== الميزان الذكي ====================
 
@@ -411,20 +417,30 @@ public class MiraPosFragment extends MiraBaseFragment {
     // ==================== مسح القطع ====================
 
     public void onRingScanned(String epc) {
-        if (scannedEpcs.contains(epc)) {
-            return;
-        }
-        processRingEpc(epc, "rfid");
-    }
-
-    public void onBarcodeScanned(String data) {
-        if (scannedEpcs.contains(data)) {
+    // ✅ منع التكرار
+    if (scannedEpcs.contains(epc)) {
+        safeRun(() -> {
+            showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً في السلة!" : "⚠️ This item is already in cart!");
             playAlertSound(2);
-            showToast(isArabic ? "مضافة مسبقاً" : "Already added");
-            return;
-        }
-        processRingEpc(data, "barcode");
+        });
+        return;
     }
+    processRingEpc(epc, "rfid");
+}
+
+public void onBarcodeScanned(String data) {
+    // ✅ منع التكرار
+    if (scannedEpcs.contains(data)) {
+        safeRun(() -> {
+            showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً في السلة!" : "⚠️ This item is already in cart!");
+            playAlertSound(2);
+        });
+        return;
+    }
+    processRingEpc(data, "barcode");
+}
+
+
 
     private void processRingEpc(final String code, final String source) {
         synchronized (pendingEpcs) {
@@ -626,117 +642,153 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
-        if (!isAdded()) return;
+   private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
+    if (!isAdded()) return;
 
-        final AlertDialog loadingDialog = showLoadingDialog();
+    final AlertDialog loadingDialog = showLoadingDialog();
 
-        safeRun(() -> {
-            if (btnCheckout != null) {
-                btnCheckout.setEnabled(false);
-                btnCheckout.setAlpha(0.5f);
+    safeRun(() -> {
+        if (btnCheckout != null) {
+            btnCheckout.setEnabled(false);
+            btnCheckout.setAlpha(0.5f);
+        }
+    });
+
+    new Thread(() -> {
+        try {
+            Context ctx = getContext();
+            if (ctx == null) return;
+            MiraApiClient client = MiraApiClient.getInstance(ctx);
+            
+            // ✅ الحصول على بيانات المستخدم والفرع
+            SessionManager sessionManager = new SessionManager(ctx);
+            int userId = sessionManager.getUserId();
+            String username = sessionManager.getUsername();
+            int branchId = getActiveBranchId();
+            String branchName = branchesManager != null ? branchesManager.getActiveBranchDisplayName() : "";
+            
+            JSONObject payload = new JSONObject();
+            payload.put("action", "COMPLETE_POS_SALE");
+            payload.put("gate_id", client.getGateId());
+            payload.put("branch_id", branchId);
+            payload.put("branch_name", branchName); // ✅
+            payload.put("user_id", userId); // ✅
+            payload.put("username", username); // ✅
+            payload.put("sale_number", ""); // ✅ السيرفر سيولده
+            payload.put("sale_date", new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date())); // ✅
+            payload.put("sale_time", new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date())); // ✅
+
+            // ✅ بيانات العميل الكاملة
+            JSONObject customer = new JSONObject();
+            customer.put("name", data.customerName);
+            customer.put("phone", data.customerPhone);
+            customer.put("email", data.customerEmail != null ? data.customerEmail : ""); // ✅
+            customer.put("address", data.customerAddress != null ? data.customerAddress : ""); // ✅
+            customer.put("payment_method", data.paymentMethod);
+            customer.put("notes", data.customerNotes != null ? data.customerNotes : ""); // ✅
+            payload.put("customer", customer);
+
+            // ✅ بيانات القطع مع التفاصيل الكاملة
+            JSONArray itemsArr = new JSONArray();
+            for (CartItem item : cartList) {
+                JSONObject obj = new JSONObject();
+                obj.put("epc", item.epc);
+                obj.put("serial_no", item.serialNo != null ? item.serialNo : item.epc);
+                obj.put("gtin", item.gtin != null ? item.gtin : ""); // ✅
+                obj.put("title", item.name);
+                obj.put("karat", item.karat);
+                obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
+                obj.put("sale_price", item.price);
+                obj.put("currency", "YER"); // ✅
+                obj.put("new_status", "SOLD");
+                obj.put("item_id", item.itemId > 0 ? item.itemId : 0);
+                obj.put("location", item.location != null ? item.location : ""); // ✅
+                obj.put("branch_id", branchId); // ✅
+                itemsArr.put(obj);
             }
-        });
+            payload.put("items", itemsArr);
 
-        new Thread(() -> {
-            try {
-                Context ctx = getContext();
-                if (ctx == null) return;
-                MiraApiClient client = MiraApiClient.getInstance(ctx);
-                JSONObject payload = new JSONObject();
-                payload.put("action", "COMPLETE_POS_SALE");
-                payload.put("gate_id", client.getGateId());
-                payload.put("branch_id", getActiveBranchId());
+            // ✅ بيانات الدفع الكاملة
+            JSONObject payment = new JSONObject();
+            payment.put("subtotal", getCartTotal());
+            payment.put("discount_percent", data.discount);
+            payment.put("discount_amount", data.discountAmount); // ✅
+            payment.put("tax_amount", 0); // ✅
+            payment.put("final_amount", data.finalAmount);
+            payment.put("currency", "YER"); // ✅
+            payment.put("account_code", getAccountCode(data.paymentMethod)); // ✅
+            payment.put("transaction_id", ""); // ✅
+            payment.put("reference_number", ""); // ✅
+            payload.put("payment", payment);
 
-                JSONObject customer = new JSONObject();
-                customer.put("name", data.customerName);
-                customer.put("phone", data.customerPhone);
-                customer.put("payment_method", data.paymentMethod);
-                payload.put("customer", customer);
+            MiraApiClient.ApiResponse response = client.checkout(payload);
 
-                JSONArray itemsArr = new JSONArray();
-                for (CartItem item : cartList) {
-                    JSONObject obj = new JSONObject();
-                    obj.put("epc", item.epc);
-                    obj.put("serial_no", item.serialNo != null ? item.serialNo : item.epc);
-                    obj.put("title", item.name);
-                    obj.put("karat", item.karat);
-                    obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
-                    obj.put("sale_price", item.price);
-                    obj.put("new_status", "SOLD");
-                    if (item.itemId > 0) obj.put("item_id", item.itemId);
-                    itemsArr.put(obj);
+            safeRun(() -> {
+                if (loadingDialog != null && loadingDialog.isShowing()) {
+                    loadingDialog.dismiss();
                 }
-                payload.put("items", itemsArr);
 
-                JSONObject payment = new JSONObject();
-                payment.put("subtotal", getCartTotal());
-                payment.put("discount_percent", data.discount);
-                payment.put("final_amount", data.finalAmount);
-
-                String targetAccountCode;
-                switch (data.paymentMethod.toUpperCase()) {
-                    case "CARD":
-                    case "NET":
-                        targetAccountCode = "110201";
-                        break;
-                    case "CREDIT":
-                        targetAccountCode = "110301";
-                        break;
-                    case "CASH":
-                    default:
-                        targetAccountCode = "110101";
-                        break;
-                }
-                payment.put("account_code", targetAccountCode);
-                payload.put("payment", payment);
-
-                MiraApiClient.ApiResponse response = client.checkout(payload);
-
-                safeRun(() -> {
-                    if (loadingDialog != null && loadingDialog.isShowing()) {
-                        loadingDialog.dismiss();
-                    }
-
-                    if (response != null && response.isSuccess) {
-                        playAlertSound(1);
-                        int soldCount = cartList.size();
-                        double finalAmount = data.finalAmount;
-                        String paymentMethod = data.paymentMethod;
-                        clearCart();
-                        showSuccessDialog(finalAmount, soldCount, paymentMethod);
-                        String json = response.data != null ? response.data.toString() : "{}";
-                        if (getActivity() instanceof UHFMainActivity)
-                            ((UHFMainActivity) getActivity()).openReceiptFragment(json);
-                    } else {
-                        if (tvCartStatus != null) {
-                            tvCartStatus.setText("❌ " + (response != null ? response.code : "Error"));
-                        }
-                        if (btnCheckout != null) {
-                            btnCheckout.setEnabled(true);
-                            btnCheckout.setAlpha(1f);
-                        }
-                        showToast(isArabic ? "❌ فشل البيع" : "❌ Failed");
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Checkout Error: " + e.getMessage());
-                safeRun(() -> {
-                    if (loadingDialog != null && loadingDialog.isShowing()) {
-                        loadingDialog.dismiss();
-                    }
-                    saveFullSaleLocally(data);
+                if (response != null && response.isSuccess) {
+                    playAlertSound(1);
+                    int soldCount = cartList.size();
+                    double finalAmount = data.finalAmount;
+                    String paymentMethod = data.paymentMethod;
                     clearCart();
+                    showSuccessDialog(finalAmount, soldCount, paymentMethod);
+                    String json = response.data != null ? response.data.toString() : "{}";
+                    if (getActivity() instanceof UHFMainActivity)
+                        ((UHFMainActivity) getActivity()).openReceiptFragment(json);
+                } else {
+                    if (tvCartStatus != null) {
+                        tvCartStatus.setText("❌ " + (response != null ? response.code : "Error"));
+                    }
                     if (btnCheckout != null) {
                         btnCheckout.setEnabled(true);
                         btnCheckout.setAlpha(1f);
                     }
-                    showToast(isArabic ? "💾 تم الحفظ محلياً للترحيل لاحقاً"
-                            : "💾 Saved locally for later posting");
-                });
-            }
-        }).start();
+                    showToast(isArabic ? "❌ فشل البيع" : "❌ Failed");
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Checkout Error: " + e.getMessage());
+            safeRun(() -> {
+                if (loadingDialog != null && loadingDialog.isShowing()) {
+                    loadingDialog.dismiss();
+                }
+                saveFullSaleLocally(data);
+                clearCart();
+                if (btnCheckout != null) {
+                    btnCheckout.setEnabled(true);
+                    btnCheckout.setAlpha(1f);
+                }
+                showToast(isArabic ? "💾 تم الحفظ محلياً للترحيل لاحقاً"
+                        : "💾 Saved locally for later posting");
+            });
+        }
+    }).start();
+}
+
+/**
+ * ✅ الحصول على كود الحساب حسب طريقة الدفع
+ */
+private String getAccountCode(String paymentMethod) {
+    if (paymentMethod == null) return "110101";
+    
+    switch (paymentMethod.toUpperCase()) {
+        case "CARD":
+        case "NET":
+        case "VISA":
+        case "MASTERCARD":
+            return "110201";
+        case "CREDIT":
+            return "110301";
+        case "BANK_TRANSFER":
+            return "110202";
+        case "CASH":
+        default:
+            return "110101";
     }
+}
 
     // ==================== دعم العمل دون اتصال ====================
 
@@ -1057,4 +1109,4 @@ public class MiraPosFragment extends MiraBaseFragment {
             }
         }
     }
-                }
+                        }
