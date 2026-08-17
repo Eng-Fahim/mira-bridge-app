@@ -199,4 +199,9 @@ public class GenericBluetoothReader implements MiraIRFIDReader {
             }
         }
     }
+    @Override
+public boolean killTag(String accessPassword) {
+    // غير مدعوم حالياً - يمكن تنفيذه لاحقاً
+    return false;
+}
 }
