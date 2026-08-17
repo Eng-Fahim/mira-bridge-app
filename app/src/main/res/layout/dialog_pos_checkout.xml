@@ -69,6 +69,22 @@
                             android:textSize="13sp"
                             android:textStyle="bold"
                             android:textColor="?attr/colorOnSurface"/>
+
+                        <TextView
+    android:id="@+id/tvSubtotal"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="0 YER"
+    android:textSize="13sp"
+    android:textColor="?attr/colorOnSurface"/>
+
+<TextView
+    android:id="@+id/tvDiscountAmount"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="0 YER"
+    android:textSize="13sp"
+    android:textColor="#E53935"/>
                     </LinearLayout>
 
                     <View
