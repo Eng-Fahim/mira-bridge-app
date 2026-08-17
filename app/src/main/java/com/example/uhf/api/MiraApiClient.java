@@ -5,7 +5,7 @@ import android.content.SharedPreferences;
 import android.util.Log;
 
 import com.example.uhf.manager.MiraBranchesManager;
-import com.example.uhf.manager.MiraServerConfig; // ✅ جديد
+import com.example.uhf.manager.MiraServerConfig;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -22,16 +22,17 @@ import java.net.URL;
 public class MiraApiClient {
 
     private static final String TAG = "MiraApiClient";
-    private static final String PREFS_NAME = "mira_settings";
     private static final String SESSION_PREFS = "MiraEnterpriseSession";
 
     private final Context context;
-    private final String apiUrl;
-    private final String apiKey;
-    private final String gateId;
-    private final MiraServerConfig serverConfig; // ✅ جديد
+    private final MiraServerConfig serverConfig;
+    
+    // ✅ قيم ديناميكية تتحدث بعد تسجيل الدخول
+    private String apiUrl;
+    private String apiKey;
+    private String gateId;
 
-    private static MiraApiClient instance;
+    private static volatile MiraApiClient instance;
 
     public static synchronized MiraApiClient getInstance(Context context) {
         if (instance == null) {
@@ -41,14 +42,21 @@ public class MiraApiClient {
     }
 
     private MiraApiClient(Context context) {
-    this.context = context;
-    this.serverConfig = MiraServerConfig.getInstance(context);
-    this.apiUrl = serverConfig.getBaseUrl() + "mira-gate/v1";
-    this.apiKey = serverConfig.getApiKey();
-    this.gateId = serverConfig.getGateId();
-}
+        this.context = context;
+        this.serverConfig = MiraServerConfig.getInstance(context);
+        refreshCredentials();
+    }
 
-    // ===================== 🔧 إعادة تحميل الإعدادات =====================
+    /**
+     * ✅ تحديث القيم من MiraServerConfig
+     */
+    private void refreshCredentials() {
+        this.apiUrl = serverConfig.getBaseUrl() + "mira-gate/v1";
+        this.apiKey = serverConfig.getApiKey();
+        this.gateId = serverConfig.getGateId();
+        
+        Log.d(TAG, "Credentials: URL=" + apiUrl + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "SET") + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId));
+    }
 
     /**
      * إعادة تحميل الإعدادات بعد تغيير الدومين
@@ -57,50 +65,65 @@ public class MiraApiClient {
         instance = new MiraApiClient(context.getApplicationContext());
     }
 
-   
+    /**
+     * ✅ الحصول على api_key الفعال
+     */
+    private String getEffectiveApiKey() {
+        if (apiKey == null || apiKey.isEmpty()) {
+            return "mira_gate_test071234567890abcdefghijklmnop";
+        }
+        return apiKey;
+    }
+
+    /**
+     * ✅ الحصول على gate_id الفعال
+     */
+    private String getEffectiveGateId() {
+        if (gateId == null || gateId.isEmpty()) {
+            return "handheld_c72";
+        }
+        return gateId;
+    }
 
     // ===================== 🔑 AUTHENTICATION =====================
 
-    /**
- * ✅ تسجيل الدخول - يجلب API Key و Gate ID من السيرفر
- */
-public ApiResponse login(String username, String password, String deviceId) {
-    JSONObject payload = new JSONObject();
-    try {
-        payload.put("username", username);
-        payload.put("password", password);
-        payload.put("device_id", deviceId != null ? deviceId : "");
-        payload.put("gate_id", "handheld_c72"); // ✅ مؤقت حتى يرسل السيرفر الصحيح
-        payload.put("app_version", "MIRA-ANDROID-v3.0");
-    } catch (Exception e) {
-        Log.e(TAG, "Error building login payload: " + e.getMessage());
-    }
-    
-    ApiResponse response = post("/auth/login", payload);
-    
-    // ✅ بعد نجاح تسجيل الدخول، احفظ البيانات من الرد
-    if (response.isSuccess && response.data != null) {
-        String apiKey = response.data.optString("api_key", "");
-        String gateId = response.data.optString("gate_id", "");
-        String authToken = response.data.optString("token", "");
-        
-        if (!apiKey.isEmpty() || !authToken.isEmpty()) {
-            serverConfig.saveSession(apiKey, gateId, authToken);
+    public ApiResponse login(String username, String password, String deviceId) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("username", username);
+            payload.put("password", password);
+            payload.put("device_id", deviceId != null ? deviceId : "");
+            payload.put("gate_id", getEffectiveGateId());
+            payload.put("app_version", "MIRA-ANDROID-v3.0");
+        } catch (Exception e) {
+            Log.e(TAG, "Error building login payload: " + e.getMessage());
         }
+        
+        ApiResponse response = post("/auth/login", payload);
+        
+        if (response.isSuccess && response.data != null) {
+            String newApiKey = response.data.optString("api_key", "");
+            String newGateId = response.data.optString("gate_id", "");
+            String authToken = response.data.optString("token", "");
+            
+            if (!newApiKey.isEmpty() || !authToken.isEmpty()) {
+                serverConfig.saveSession(newApiKey, newGateId, authToken);
+                refreshCredentials(); // ✅ تحديث فوري
+                
+                Log.d(TAG, "Login success - credentials updated");
+            }
+        }
+        
+        return response;
     }
-    
-    return response;
-}
-/**
- * جلب قطع الفرع حسب نوع المجوهرات
- */
-public ApiResponse getBranchItemsByCategory(int branchId, String category) {
-    String endpoint = "/branches/" + branchId + "/inventory/items";
-    if (category != null && !category.isEmpty()) {
-        endpoint += "?category=" + category;
+
+    public ApiResponse getBranchItemsByCategory(int branchId, String category) {
+        String endpoint = "/branches/" + branchId + "/inventory/items";
+        if (category != null && !category.isEmpty()) {
+            endpoint += "?category=" + category;
+        }
+        return getWithAuth(endpoint);
     }
-    return getWithAuth(endpoint);
-}
     
     public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
         JSONObject payload = new JSONObject();
@@ -114,7 +137,7 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
         JSONObject payload = new JSONObject();
         try {
             payload.put("token", token);
-            payload.put("gate_id", gateId);
+            payload.put("gate_id", getEffectiveGateId());
         } catch (Exception e) {
             Log.e(TAG, "Error building validate payload: " + e.getMessage());
         }
@@ -125,7 +148,7 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
         JSONObject payload = new JSONObject();
         try {
             payload.put("token", token);
-            payload.put("gate_id", gateId);
+            payload.put("gate_id", getEffectiveGateId());
         } catch (Exception e) {
             Log.e(TAG, "Error building logout payload: " + e.getMessage());
         }
@@ -140,14 +163,14 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
         JSONObject payload = new JSONObject();
         try {
             payload.put("token", oldToken);
-            payload.put("gate_id", gateId);
+            payload.put("gate_id", getEffectiveGateId());
         } catch (Exception e) {
             Log.e(TAG, "Error building refresh payload: " + e.getMessage());
         }
         return postWithAuth("/auth/refresh-token", payload);
     }
 
-    // ===================== 📦 TRANSFERS AUDIT & DETAILS =====================
+    // ===================== 📦 TRANSFERS =====================
 
     public ApiResponse receiveTransferWithAudit(JSONObject payload) {
         return postWithAuth("/transfers/receive-audit", payload);
@@ -163,10 +186,8 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
             payload.put("token", token);
             payload.put("device_id", deviceId);
             payload.put("public_key", publicKey);
-            payload.put("gate_id", gateId);
-        } catch (Exception e) {
-            Log.e(TAG, "Error building biometric payload: " + e.getMessage());
-        }
+            payload.put("gate_id", getEffectiveGateId());
+        } catch (Exception e) {}
         return post("/auth/register-biometric", payload);
     }
 
@@ -175,14 +196,12 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
         try {
             payload.put("token", token);
             payload.put("signed_challenge", signedChallenge);
-            payload.put("gate_id", gateId);
-        } catch (Exception e) {
-            Log.e(TAG, "Error building biometric verify payload: " + e.getMessage());
-        }
+            payload.put("gate_id", getEffectiveGateId());
+        } catch (Exception e) {}
         return post("/auth/verify-biometric", payload);
     }
 
-    // ===================== 🏢 ORGANIZATION PROFILE =====================
+    // ===================== 🏢 ORGANIZATION =====================
 
     public ApiResponse saveOrgProfile(JSONObject payload) {
         return postWithAuth("/org-profile/save", payload);
@@ -192,7 +211,7 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
         return get("/org-profile/get");
     }
 
-    // ===================== 👥 USERS MANAGEMENT =====================
+    // ===================== 👥 USERS =====================
 
     public ApiResponse getUsers() {
         return getWithAuth("/auth/users");
@@ -218,7 +237,7 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
         JSONObject payload = new JSONObject();
         try {
             payload.put("epc", epc);
-            payload.put("gate_id", gateId);
+            payload.put("gate_id", getEffectiveGateId());
             payload.put("context", contextType != null ? contextType : "scan");
             if (extraParams != null) {
                 java.util.Iterator<String> keys = extraParams.keys();
@@ -231,7 +250,7 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
         return post("/authorize", payload);
     }
 
-    // ===================== 📡 PING & TEST CONNECTION =====================
+    // ===================== 📡 PING =====================
 
     public boolean pingApi(String targetUrl, String targetApiKey) {
         HttpURLConnection conn = null;
@@ -245,14 +264,13 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("X-MIRA-API-Key", (targetApiKey != null && !targetApiKey.isEmpty()) ? targetApiKey : this.apiKey);
+            conn.setRequestProperty("X-MIRA-API-Key", (targetApiKey != null && !targetApiKey.isEmpty()) ? targetApiKey : getEffectiveApiKey());
             conn.setConnectTimeout(8000);
             conn.setReadTimeout(8000);
 
             int responseCode = conn.getResponseCode();
             return (responseCode >= 200 && responseCode < 400);
         } catch (Exception e) {
-            Log.e(TAG, "pingApi Error: " + e.getMessage());
             return false;
         } finally {
             if (conn != null) conn.disconnect();
@@ -260,7 +278,7 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
     }
 
     public boolean pingApi() {
-        return pingApi(this.apiUrl, this.apiKey);
+        return pingApi(this.apiUrl, getEffectiveApiKey());
     }
 
     // ===================== 📊 DASHBOARD =====================
@@ -274,16 +292,6 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
         if (branchId > 0) {
             endpoint += "?branch_id=" + branchId;
         }
-
-        Log.e("DASHBOARD_DEBUG", "═══════════════════════════════");
-        Log.e("DASHBOARD_DEBUG", "Request URL: " + apiUrl + endpoint);
-        Log.e("DASHBOARD_DEBUG", "Branch ID sent: " + branchId);
-        Log.e("DASHBOARD_DEBUG", "Token exists: " + !getAuthToken().isEmpty());
-        if (!getAuthToken().isEmpty()) {
-            Log.e("DASHBOARD_DEBUG", "Token: " + getAuthToken().substring(0, Math.min(20, getAuthToken().length())) + "...");
-        }
-        Log.e("DASHBOARD_DEBUG", "═══════════════════════════════");
-
         return getWithAuth(endpoint);
     }
 
@@ -303,10 +311,8 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
             payload.put("epc", epc != null ? epc : "");
             payload.put("serial_no", serialNo != null ? serialNo : "");
             payload.put("reason", reason != null ? reason : "مرتجع مبيعات");
-            payload.put("gate_id", gateId);
-        } catch (Exception e) {
-            Log.e(TAG, "Error building refund payload: " + e.getMessage());
-        }
+            payload.put("gate_id", getEffectiveGateId());
+        } catch (Exception e) {}
         return postWithAuth("/pos/refund", payload);
     }
 
@@ -314,7 +320,7 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
         return getWithAuth("/pos/sales");
     }
 
-    // ===================== 🏷️ ITEM DETAIL =====================
+    // ===================== 🏷️ ITEM =====================
 
     public ApiResponse getItemDetail(String code) {
         return get("/item/" + code);
@@ -329,8 +335,6 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
     public ApiResponse getInventoryHistory(String location, int limit) {
         return get("/inventory/history/" + location + "?limit=" + limit);
     }
-
-    // ===================== 💎 HIGH VALUE ITEMS =====================
 
     public ApiResponse getHighValueItems(String location, double threshold) {
         return get("/inventory/high-value?location=" + (location != null ? location : "Main Showroom") + "&threshold=" + threshold);
@@ -390,11 +394,11 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
         return get("/inventory/settings/" + (location != null ? location : "default"));
     }
 
-    // ===================== 🏷️ ENCODE ITEM =====================
+    // ===================== 🏷️ ENCODE =====================
 
     public ApiResponse encodeItem(JSONObject itemPayload) {
-    return postWithAuth("/encode-item", itemPayload);
-}
+        return postWithAuth("/encode-item", itemPayload);
+    }
 
     public ApiResponse encodeItem(String epc, String barcode, String title, String purityCode,
                                   double grossWeight, double netWeight, double makingPerGram,
@@ -411,27 +415,27 @@ public ApiResponse getBranchItemsByCategory(int branchId, String category) {
             payload.put("profit_margin", profitMargin);
             payload.put("category", category != null ? category : "مجوهرات");
             payload.put("location", location != null ? location : "المعرض الرئيسي");
-            payload.put("gate_id", gateId);
-        } catch (Exception e) {
-            Log.e(TAG, "Error building encode payload: " + e.getMessage());
-        }
+            payload.put("gate_id", getEffectiveGateId());
+        } catch (Exception e) {}
         return encodeItem(payload);
     }
 
-    // ===================== 📈 GOLD RATES =====================
+    // ===================== 📈 GOLD =====================
 
     public ApiResponse getGoldRatesAndSettings() {
         return get("/gold-rates");
     }
 
     // ===================== 🚪 GATES =====================
-public ApiResponse createGate(JSONObject gateData) {
-    return postWithAuth("/gates", gateData);
-}
 
-public ApiResponse getGates() {
-    return getWithAuth("/gates");
-}
+    public ApiResponse createGate(JSONObject gateData) {
+        return postWithAuth("/gates", gateData);
+    }
+
+    public ApiResponse getGates() {
+        return getWithAuth("/gates");
+    }
+
     public ApiResponse getGatesStats() {
         return get("/gates/stats");
     }
@@ -441,7 +445,7 @@ public ApiResponse getGates() {
     public ApiResponse heartbeat(String status, int battery) {
         JSONObject payload = new JSONObject();
         try {
-            payload.put("gate_id", gateId);
+            payload.put("gate_id", getEffectiveGateId());
             payload.put("status", status != null ? status : "online");
             if (battery > 0) payload.put("battery", battery);
         } catch (Exception ignored) {}
@@ -451,13 +455,13 @@ public ApiResponse getGates() {
     // ===================== ⚙️ SETTINGS =====================
 
     public ApiResponse getSettings() {
-        return get("/settings/" + gateId);
+        return get("/settings/" + getEffectiveGateId());
     }
 
     public ApiResponse saveSettings(JSONObject settings) {
         JSONObject payload = new JSONObject();
         try {
-            payload.put("gate_id", gateId);
+            payload.put("gate_id", getEffectiveGateId());
             payload.put("settings", settings);
         } catch (Exception ignored) {}
         return post("/settings", payload);
@@ -468,7 +472,7 @@ public ApiResponse getGates() {
     public ApiResponse spotlightTags(String[] tags) {
         JSONObject payload = new JSONObject();
         try {
-            payload.put("gate_id", gateId);
+            payload.put("gate_id", getEffectiveGateId());
             payload.put("tags", new JSONArray(java.util.Arrays.asList(tags)));
         } catch (Exception ignored) {}
         return post("/spotlight", payload);
@@ -479,87 +483,77 @@ public ApiResponse getGates() {
         try {
             payload.put("serial", serial);
             payload.put("new_epc", newEpc);
-            payload.put("gate_id", gateId);
+            payload.put("gate_id", getEffectiveGateId());
         } catch (Exception ignored) {}
         return post("/program", payload);
     }
-    /**
- * 🟢 رفع صورة قطعة إلى السيرفر
- */
-public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary, String altText) {
-    HttpURLConnection conn = null;
-    try {
-        String fullUrl = apiUrl + "/items/" + itemId + "/images";
-        URL url = new URL(fullUrl);
-        conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-        
-        String token = getAuthToken();
-        if (!token.isEmpty()) {
-            conn.setRequestProperty("Authorization", "Bearer " + token);
-        }
-        
-        conn.setConnectTimeout(30000);
-        conn.setReadTimeout(30000);
-        conn.setDoOutput(true);
-        
-        // بناء multipart data
-        String boundary = "----MiraBoundary" + System.currentTimeMillis();
-        conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
-        
-        try (OutputStream os = conn.getOutputStream()) {
-            // جزء الصورة
-            StringBuilder sb = new StringBuilder();
-            sb.append("--").append(boundary).append("\r\n");
-            sb.append("Content-Disposition: form-data; name=\"image\"; filename=\"")
-              .append(imageFile.getName()).append("\"\r\n");
-            sb.append("Content-Type: image/jpeg\r\n\r\n");
-            os.write(sb.toString().getBytes("utf-8"));
+
+    public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary, String altText) {
+        HttpURLConnection conn = null;
+        try {
+            String fullUrl = apiUrl + "/items/" + itemId + "/images";
+            URL url = new URL(fullUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
             
-            // كتابة بيانات الصورة
-            java.io.FileInputStream fis = new java.io.FileInputStream(imageFile);
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-            while ((bytesRead = fis.read(buffer)) != -1) {
-                os.write(buffer, 0, bytesRead);
+            String token = getAuthToken();
+            if (!token.isEmpty()) {
+                conn.setRequestProperty("Authorization", "Bearer " + token);
             }
-            fis.close();
             
-            // جزء is_primary
-            sb = new StringBuilder();
-            sb.append("\r\n--").append(boundary).append("\r\n");
-            sb.append("Content-Disposition: form-data; name=\"is_primary\"\r\n\r\n");
-            sb.append(isPrimary ? "1" : "0");
-            os.write(sb.toString().getBytes("utf-8"));
+            conn.setConnectTimeout(30000);
+            conn.setReadTimeout(30000);
+            conn.setDoOutput(true);
             
-            // جزء alt_text
-            sb = new StringBuilder();
-            sb.append("\r\n--").append(boundary).append("\r\n");
-            sb.append("Content-Disposition: form-data; name=\"alt_text\"\r\n\r\n");
-            sb.append(altText != null ? altText : "");
-            os.write(sb.toString().getBytes("utf-8"));
+            String boundary = "----MiraBoundary" + System.currentTimeMillis();
+            conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
             
-            // نهاية multipart
-            os.write(("\r\n--" + boundary + "--\r\n").getBytes("utf-8"));
-            os.flush();
+            try (OutputStream os = conn.getOutputStream()) {
+                StringBuilder sb = new StringBuilder();
+                sb.append("--").append(boundary).append("\r\n");
+                sb.append("Content-Disposition: form-data; name=\"image\"; filename=\"")
+                  .append(imageFile.getName()).append("\"\r\n");
+                sb.append("Content-Type: image/jpeg\r\n\r\n");
+                os.write(sb.toString().getBytes("utf-8"));
+                
+                FileInputStream fis = new FileInputStream(imageFile);
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = fis.read(buffer)) != -1) {
+                    os.write(buffer, 0, bytesRead);
+                }
+                fis.close();
+                
+                sb = new StringBuilder();
+                sb.append("\r\n--").append(boundary).append("\r\n");
+                sb.append("Content-Disposition: form-data; name=\"is_primary\"\r\n\r\n");
+                sb.append(isPrimary ? "1" : "0");
+                os.write(sb.toString().getBytes("utf-8"));
+                
+                sb = new StringBuilder();
+                sb.append("\r\n--").append(boundary).append("\r\n");
+                sb.append("Content-Disposition: form-data; name=\"alt_text\"\r\n\r\n");
+                sb.append(altText != null ? altText : "");
+                os.write(sb.toString().getBytes("utf-8"));
+                
+                os.write(("\r\n--" + boundary + "--\r\n").getBytes("utf-8"));
+                os.flush();
+            }
+            
+            return buildResponse(conn);
+        } catch (Exception e) {
+            return new ApiResponse(-1, null, e.getMessage());
+        } finally {
+            if (conn != null) conn.disconnect();
         }
-        
-        return buildResponse(conn);
-        
-    } catch (Exception e) {
-        Log.e(TAG, "Upload image error: " + e.getMessage());
-        return new ApiResponse(-1, null, e.getMessage());
-    } finally {
-        if (conn != null) conn.disconnect();
     }
-}
 
     public ApiResponse lockTag(String serial) {
         JSONObject payload = new JSONObject();
         try {
             payload.put("serial", serial);
-            payload.put("gate_id", gateId);
+            payload.put("gate_id", getEffectiveGateId());
         } catch (Exception ignored) {}
         return post("/lock", payload);
     }
@@ -568,12 +562,12 @@ public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary
         JSONObject payload = new JSONObject();
         try {
             payload.put("serial", serial);
-            payload.put("gate_id", gateId);
+            payload.put("gate_id", getEffectiveGateId());
         } catch (Exception ignored) {}
         return post("/deactivate", payload);
     }
 
-    // ===================== 🏢 BRANCHES MANAGEMENT =====================
+    // ===================== 🏢 BRANCHES =====================
 
     public ApiResponse getBranches() {
         return getWithAuth("/branches");
@@ -649,7 +643,7 @@ public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary
         return postWithAuth("/transfers/" + transferId, payload);
     }
 
-    // ===================== 💰 ACCOUNTING & FINANCIAL API =====================
+    // ===================== 💰 ACCOUNTING =====================
 
     public ApiResponse getJournalEntries(String branchId) {
         String url = "/accounting/journal-entries";
@@ -687,7 +681,15 @@ public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary
         return getWithAuth(url);
     }
 
-    // ===================== CORE HTTP METHODS =====================
+    public ApiResponse getReportData(String reportType, String fromDate, String toDate, int branchId) {
+        String endpoint = "/reports/data?type=" + (reportType != null ? reportType : "")
+                + "&from=" + (fromDate != null ? fromDate : "")
+                + "&to=" + (toDate != null ? toDate : "")
+                + "&branch_id=" + branchId;
+        return getWithAuth(endpoint);
+    }
+
+    // ===================== CORE HTTP =====================
 
     private String getAuthToken() {
         SharedPreferences prefs = context.getSharedPreferences(SESSION_PREFS, Context.MODE_PRIVATE);
@@ -698,27 +700,20 @@ public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary
         HttpURLConnection conn = null;
         try {
             String fullUrl = apiUrl + endpoint;
-            Log.d(TAG, "GET(Auth) " + fullUrl);
-
             URL url = new URL(fullUrl);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-
+            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
             String token = getAuthToken();
             if (!token.isEmpty()) {
                 conn.setRequestProperty("Authorization", "Bearer " + token);
                 conn.setRequestProperty("X-MIRA-Auth-Token", token);
             }
-
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(15000);
-
             return buildResponse(conn);
-
         } catch (Exception e) {
-            Log.e(TAG, "GET(Auth) Error: " + e.getMessage());
             return new ApiResponse(-1, null, e.getMessage());
         } finally {
             if (conn != null) conn.disconnect();
@@ -729,37 +724,28 @@ public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary
         HttpURLConnection conn = null;
         try {
             String fullUrl = apiUrl + endpoint;
-            Log.d(TAG, "POST(Auth) " + fullUrl);
-
             URL url = new URL(fullUrl);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-
+            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
             String token = getAuthToken();
             if (!token.isEmpty()) {
                 conn.setRequestProperty("Authorization", "Bearer " + token);
                 conn.setRequestProperty("X-MIRA-Auth-Token", token);
             }
-
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(15000);
             conn.setDoOutput(true);
-
             if (payload != null) {
                 String jsonString = payload.toString();
-                Log.d(TAG, "Payload: " + jsonString);
                 try (OutputStream os = conn.getOutputStream()) {
                     byte[] input = jsonString.getBytes("utf-8");
                     os.write(input, 0, input.length);
                 }
             }
-
             return buildResponse(conn);
-
         } catch (Exception e) {
-            Log.e(TAG, "POST(Auth) Error: " + e.getMessage());
             return new ApiResponse(-1, null, e.getMessage());
         } finally {
             if (conn != null) conn.disconnect();
@@ -770,69 +756,42 @@ public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary
         HttpURLConnection conn = null;
         try {
             String fullUrl = apiUrl + endpoint;
-            Log.d(TAG, "POST " + fullUrl);
-
             URL url = new URL(fullUrl);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
+            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(15000);
             conn.setDoOutput(true);
-
             if (payload != null) {
                 String jsonString = payload.toString();
-                Log.d(TAG, "Payload: " + jsonString);
                 try (OutputStream os = conn.getOutputStream()) {
                     byte[] input = jsonString.getBytes("utf-8");
                     os.write(input, 0, input.length);
                 }
             }
-
             return buildResponse(conn);
-
         } catch (Exception e) {
-            Log.e(TAG, "POST Error: " + e.getMessage());
-            return new ApiResponse(-1, null, e.getMessage()); 
+            return new ApiResponse(-1, null, e.getMessage());
         } finally {
             if (conn != null) conn.disconnect();
         }
     }
-    
-      // ===================== 📊 REPORTS API =====================
-
-    /**
-     * جلب بيانات التقارير المتقدمة حسب النوع، الفترة الزمنية، والفرع
-     */
-    public ApiResponse getReportData(String reportType, String fromDate, String toDate, int branchId) {
-        String endpoint = "/reports/data?type=" + (reportType != null ? reportType : "")
-                + "&from=" + (fromDate != null ? fromDate : "")
-                + "&to=" + (toDate != null ? toDate : "")
-                + "&branch_id=" + branchId;
-        return getWithAuth(endpoint);
-    }
-
-
 
     private ApiResponse get(String endpoint) {
         HttpURLConnection conn = null;
         try {
             String fullUrl = apiUrl + endpoint;
-            Log.d(TAG, "GET " + fullUrl);
-
             URL url = new URL(fullUrl);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
+            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(15000);
-
             return buildResponse(conn);
-
         } catch (Exception e) {
-            Log.e(TAG, "GET Error: " + e.getMessage());
             return new ApiResponse(-1, null, e.getMessage());
         } finally {
             if (conn != null) conn.disconnect();
@@ -843,7 +802,6 @@ public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary
         int responseCode = conn.getResponseCode();
         InputStream is = (responseCode >= 200 && responseCode < 300) ?
                 conn.getInputStream() : conn.getErrorStream();
-
         BufferedReader reader = new BufferedReader(new InputStreamReader(is, "utf-8"));
         StringBuilder response = new StringBuilder();
         String line;
@@ -851,25 +809,115 @@ public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary
             response.append(line.trim());
         }
         reader.close();
-
         String responseBody = response.toString();
-
-        Log.e("DASHBOARD_DEBUG", "Response Code: " + responseCode);
-        Log.e("DASHBOARD_DEBUG", "Response Body: " + responseBody);
-        Log.e("DASHBOARD_DEBUG", "═══════════════════════════════");
-
         JSONObject json = null;
         try {
             json = new JSONObject(responseBody);
-        } catch (Exception ignored) {
-            Log.e("DASHBOARD_DEBUG", "Failed to parse JSON: " + ignored.getMessage());
-        }
-
+        } catch (Exception ignored) {}
         return new ApiResponse(responseCode, json, null);
     }
 
-    public String getGateId() { return gateId; }
+    public String getGateId() { return getEffectiveGateId(); }
     public String getApiUrl() { return apiUrl; }
+
+    public void submitInventoryAuditReport(JSONObject payload) {
+        HttpURLConnection conn = null;
+        try {
+            String fullUrl = apiUrl + "/inventory/submit-audit";
+            URL url = new URL(fullUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
+            String token = getAuthToken();
+            if (!token.isEmpty()) {
+                conn.setRequestProperty("Authorization", "Bearer " + token);
+            }
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            conn.setDoOutput(true);
+            if (payload != null) {
+                String jsonString = payload.toString();
+                try (OutputStream os = conn.getOutputStream()) {
+                    byte[] input = jsonString.getBytes("utf-8");
+                    os.write(input, 0, input.length);
+                }
+            }
+            conn.getResponseCode();
+        } catch (Exception e) {
+            Log.e(TAG, "submitInventoryAuditReport error: " + e.getMessage());
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    // ===================== 💰 GOLD & CURRENCY =====================
+
+    public ApiResponse getGoldCurrencySettings() {
+        return getWithAuth("/gold-currency/settings");
+    }
+
+    public ApiResponse getGoldSettings() {
+        return getWithAuth("/gold/settings");
+    }
+
+    public ApiResponse saveGoldSettings(JSONObject goldSettings) {
+        return postWithAuth("/gold/settings", goldSettings);
+    }
+
+    public ApiResponse getCurrencySettings() {
+        return getWithAuth("/currency/settings");
+    }
+
+    public ApiResponse saveCurrencySettings(JSONObject currencySettings) {
+        return postWithAuth("/currency/settings", currencySettings);
+    }
+
+    public ApiResponse saveGoldCurrencySettings(JSONObject goldSettings, JSONObject currencySettings) {
+        JSONObject payload = new JSONObject();
+        try {
+            if (goldSettings != null) payload.put("gold", goldSettings);
+            if (currencySettings != null) payload.put("currency", currencySettings);
+        } catch (Exception ignored) {}
+        return postWithAuth("/gold-currency/settings", payload);
+    }
+
+    public ApiResponse fetchGoldPrice(String provider, String apiKey) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("provider", provider);
+            payload.put("api_key", apiKey);
+        } catch (Exception ignored) {}
+        return postWithAuth("/gold/price/fetch", payload);
+    }
+
+    public ApiResponse getGoldPrice() {
+        return getWithAuth("/gold/price");
+    }
+
+    public ApiResponse updateGoldPrice(JSONObject prices) {
+        return postWithAuth("/gold/price", prices);
+    }
+
+    public ApiResponse getExchangeRates() {
+        return getWithAuth("/currency/rates");
+    }
+
+    public ApiResponse calculateGoldPrice(int karat, double weight, String currency) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("karat", karat);
+            payload.put("weight", weight);
+            payload.put("currency", currency);
+        } catch (Exception ignored) {}
+        return postWithAuth("/gold/calculate", payload);
+    }
+
+    public ApiResponse getLivePrices() {
+        return getWithAuth("/gold-currency/live-prices");
+    }
+
+    // ===================== ApiResponse =====================
 
     public static class ApiResponse {
         public final int code;
@@ -904,148 +952,4 @@ public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary
             return null;
         }
     }
-        // دالة إرسال تقرير الجرد
-    public void submitInventoryAuditReport(JSONObject payload) {
-        HttpURLConnection conn = null;
-        try {
-            String fullUrl = apiUrl + "/inventory/submit-audit";
-            URL url = new URL(fullUrl);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-            
-            String token = getAuthToken();
-            if (!token.isEmpty()) {
-                conn.setRequestProperty("Authorization", "Bearer " + token);
-            }
-            
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
-            conn.setDoOutput(true);
-
-            if (payload != null) {
-                String jsonString = payload.toString();
-                try (OutputStream os = conn.getOutputStream()) {
-                    byte[] input = jsonString.getBytes("utf-8");
-                    os.write(input, 0, input.length);
-                }
-            }
-            
-            int responseCode = conn.getResponseCode();
-            Log.d(TAG, "submitInventoryAuditReport response: " + responseCode);
-            
-        } catch (Exception e) {
-            Log.e(TAG, "submitInventoryAuditReport error: " + e.getMessage());
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
     }
-    // ============================================
-// 💰 Gold & Currency API Endpoints
-// ============================================
-
-/**
- * جلب جميع إعدادات الذهب والعملات
- */
-public ApiResponse getGoldCurrencySettings() {
-    return getWithAuth("/gold-currency/settings");
-}
-
-/**
- * جلب إعدادات الذهب فقط
- */
-public ApiResponse getGoldSettings() {
-    return getWithAuth("/gold/settings");
-}
-
-/**
- * حفظ إعدادات الذهب
- */
-public ApiResponse saveGoldSettings(JSONObject goldSettings) {
-    return postWithAuth("/gold/settings", goldSettings);
-}
-
-/**
- * جلب إعدادات العملات فقط
- */
-public ApiResponse getCurrencySettings() {
-    return getWithAuth("/currency/settings");
-}
-
-/**
- * حفظ إعدادات العملات
- */
-public ApiResponse saveCurrencySettings(JSONObject currencySettings) {
-    return postWithAuth("/currency/settings", currencySettings);
-}
-
-/**
- * حفظ جميع إعدادات الذهب والعملات معاً
- */
-public ApiResponse saveGoldCurrencySettings(JSONObject goldSettings, JSONObject currencySettings) {
-    JSONObject payload = new JSONObject();
-    try {
-        if (goldSettings != null) {
-            payload.put("gold", goldSettings);
-        }
-        if (currencySettings != null) {
-            payload.put("currency", currencySettings);
-        }
-    } catch (Exception ignored) {}
-    return postWithAuth("/gold-currency/settings", payload);
-}
-
-/**
- * جلب سعر الذهب من API خارجي
- */
-public ApiResponse fetchGoldPrice(String provider, String apiKey) {
-    JSONObject payload = new JSONObject();
-    try {
-        payload.put("provider", provider);
-        payload.put("api_key", apiKey);
-    } catch (Exception ignored) {}
-    return postWithAuth("/gold/price/fetch", payload);
-}
-
-/**
- * جلب سعر الذهب الحالي
- */
-public ApiResponse getGoldPrice() {
-    return getWithAuth("/gold/price");
-}
-
-/**
- * تحديث أسعار الذهب يدوياً
- */
-public ApiResponse updateGoldPrice(JSONObject prices) {
-    return postWithAuth("/gold/price", prices);
-}
-
-/**
- * جلب أسعار الصرف
- */
-public ApiResponse getExchangeRates() {
-    return getWithAuth("/currency/rates");
-}
-
-/**
- * حساب سعر قطعة ذهب
- */
-public ApiResponse calculateGoldPrice(int karat, double weight, String currency) {
-    JSONObject payload = new JSONObject();
-    try {
-        payload.put("karat", karat);
-        payload.put("weight", weight);
-        payload.put("currency", currency);
-    } catch (Exception ignored) {}
-    return postWithAuth("/gold/calculate", payload);
-}
-
-/**
- * جلب الأسعار المباشرة (الذهبية والعملات)
- */
-public ApiResponse getLivePrices() {
-    return getWithAuth("/gold-currency/live-prices");
-}
-                }
