@@ -83,6 +83,7 @@ public interface MiraIRFIDReader {
             return displayName + " - " + description;
         }
     }
+    
     /**
      * دورة حياة القارئ
      */
@@ -117,6 +118,17 @@ public interface MiraIRFIDReader {
      * المستمع
      */
     void setOnTagReadListener(OnTagReadListener listener);
+
+    /**
+     * عمليات الكتابة المتقدمة
+     */
+    boolean writeEpc(String newEpc, String accessPassword);
+    boolean writeUserMemory(int address, String data, String accessPassword);
+    String readTid();
+    String readUserMemory(int address, int length);
+    boolean lockTag(String accessPassword);
+    boolean unlockTag(String accessPassword);
+    boolean killTag(String accessPassword);
 
     /**
      * واجهة المستمع لنتائج القراءة
