@@ -330,8 +330,11 @@ public class RFIDSimulator {
     }
 
     @Override
-public boolean killTag(String accessPassword) {
-    // غير مدعوم حالياً - يمكن تنفيذه لاحقاً
+    public boolean unlockTag(String accessPassword) {
     return false;
-}
+    }
+    @Override
+    public boolean killTag(String accessPassword) {
+    return false;
+    }
 }
