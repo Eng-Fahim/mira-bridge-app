@@ -486,7 +486,7 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
         btnExportCSV = view.findViewById(R.id.btnExportCSV);
         btnPrintReport = view.findViewById(R.id.btnPrintReport);
         btnShareReport = view.findViewById(R.id.btnShareReport);
-        cardConnectionInfoView = view.findViewById(R.id.cardConnectionInfo);
+        //cardConnectionInfoView = view.findViewById(R.id.cardConnectionInfo);
 
         pbScanProgress = view.findViewById(R.id.pbScanProgress);
 
@@ -2075,4 +2075,4 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
             }
         }
     }
-}
+                }
