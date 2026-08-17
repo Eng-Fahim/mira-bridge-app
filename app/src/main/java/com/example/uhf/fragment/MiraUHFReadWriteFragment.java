@@ -50,8 +50,8 @@ import java.util.Random;
  * - قفل الشريحة
  * - توليد EPC جديد
  */
-public class UHFReadWriteFragment extends KeyDwonFragment implements OnClickListener {
-    private static final String TAG = "UHFReadWriteFragment";
+public class MiraUHFReadWriteFragment extends KeyDwonFragment implements OnClickListener {
+    private static final String TAG = "MiraUHFReadWriteFragment";
     private UHFMainActivity mContext;
     private MiraSettingsManager settingsManager;
 
@@ -629,4 +629,4 @@ public class UHFReadWriteFragment extends KeyDwonFragment implements OnClickList
             }
         }
     }
-}
+                                       }
