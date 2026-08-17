@@ -41,14 +41,12 @@ public class MiraApiClient {
     }
 
     private MiraApiClient(Context context) {
-        this.context = context;
-        this.serverConfig = MiraServerConfig.getInstance(context); // ✅ جديد
-        
-        // ✅ قراءة من MiraServerConfig
-        this.apiUrl = serverConfig.getBaseUrl() + "mira-gate/v1";
-        this.apiKey = serverConfig.getApiKey();
-        this.gateId = serverConfig.getGateId();
-    }
+    this.context = context;
+    this.serverConfig = MiraServerConfig.getInstance(context);
+    this.apiUrl = serverConfig.getBaseUrl() + "mira-gate/v1";
+    this.apiKey = serverConfig.getApiKey();
+    this.gateId = serverConfig.getGateId();
+}
 
     // ===================== 🔧 إعادة تحميل الإعدادات =====================
 
@@ -63,19 +61,36 @@ public class MiraApiClient {
 
     // ===================== 🔑 AUTHENTICATION =====================
 
-    public ApiResponse login(String username, String password, String deviceId) {
-        JSONObject payload = new JSONObject();
-        try {
-            payload.put("username", username);
-            payload.put("password", password);
-            payload.put("device_id", deviceId != null ? deviceId : "");
-            payload.put("gate_id", gateId);
-            payload.put("app_version", "MIRA-ANDROID-v3.0");
-        } catch (Exception e) {
-            Log.e(TAG, "Error building login payload: " + e.getMessage());
-        }
-        return post("/auth/login", payload);
+    /**
+ * ✅ تسجيل الدخول - يجلب API Key و Gate ID من السيرفر
+ */
+public ApiResponse login(String username, String password, String deviceId) {
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("username", username);
+        payload.put("password", password);
+        payload.put("device_id", deviceId != null ? deviceId : "");
+        payload.put("gate_id", "handheld_c72"); // ✅ مؤقت حتى يرسل السيرفر الصحيح
+        payload.put("app_version", "MIRA-ANDROID-v3.0");
+    } catch (Exception e) {
+        Log.e(TAG, "Error building login payload: " + e.getMessage());
     }
+    
+    ApiResponse response = post("/auth/login", payload);
+    
+    // ✅ بعد نجاح تسجيل الدخول، احفظ البيانات من الرد
+    if (response.isSuccess && response.data != null) {
+        String apiKey = response.data.optString("api_key", "");
+        String gateId = response.data.optString("gate_id", "");
+        String authToken = response.data.optString("token", "");
+        
+        if (!apiKey.isEmpty() || !authToken.isEmpty()) {
+            serverConfig.saveSession(apiKey, gateId, authToken);
+        }
+    }
+    
+    return response;
+}
 /**
  * جلب قطع الفرع حسب نوع المجوهرات
  */
@@ -1033,4 +1048,4 @@ public ApiResponse calculateGoldPrice(int karat, double weight, String currency)
 public ApiResponse getLivePrices() {
     return getWithAuth("/gold-currency/live-prices");
 }
-        }
+                }
