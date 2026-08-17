@@ -28,7 +28,7 @@
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
-            <!-- بطاقة معلومات الشريحة -->
+            <!-- 🟢 بطاقة البحث في MIRA -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -49,61 +49,78 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="8dp"
-                        android:text="معلومات الشريحة الحالية"
+                        android:text="🔍 البحث في MIRA"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
-                    <!-- قراءة الشريحة الحالية -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnReadCurrentTag"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:layout_marginBottom="12dp"
-                        android:text="🔍 قراءة الشريحة القريبة"
-                        android:textSize="14sp"
-                        app:cornerRadius="8dp" />
-
-                    <!-- عرض معلومات الشريحة -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
+                        android:orientation="horizontal">
+
+                        <EditText
+                            android:id="@+id/etProgrammerSearch"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:hint="Serial أو GTIN-13 أو EPC"
+                            android:inputType="text"
+                            android:padding="8dp"
+                            android:textSize="14sp" />
+
+                        <Button
+                            android:id="@+id/btnProgrammerSearch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="48dp"
+                            android:layout_marginStart="8dp"
+                            android:text="بحث"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <!-- عرض نتيجة البحث -->
+                    <LinearLayout
+                        android:id="@+id/layoutProgrammerItem"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
                         android:background="#F8FAFC"
-                        android:padding="12dp">
+                        android:orientation="vertical"
+                        android:padding="12dp"
+                        android:visibility="gone">
 
                         <TextView
-                            android:id="@+id/tvCurrentEpc"
+                            android:id="@+id/tvProgrammerItemTitle"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="EPC الحالي: —"
+                            android:text=""
                             android:textColor="?attr/colorOnSurface"
-                            android:textSize="12sp"
-                            android:fontFamily="monospace" />
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
 
                         <TextView
-                            android:id="@+id/tvCurrentTid"
+                            android:id="@+id/tvProgrammerItemDetails"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="TID: —"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp"
-                            android:fontFamily="monospace" />
-
-                        <TextView
-                            android:id="@+id/tvCurrentRssi"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:text="RSSI: —"
+                            android:text=""
                             android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="12sp" />
                     </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvProgrammerStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center"
+                        android:text=""
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="12sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- بطاقة إعدادات الكتابة -->
+            <!-- 🟢 بطاقة إعدادات القراءة/الكتابة -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -124,240 +141,318 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="12dp"
-                        android:text="بيانات الكتابة الجديدة"
+                        android:text="⚙️ إعدادات القراءة/الكتابة"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
-                    <!-- نوع البيانات المراد كتابتها -->
+                    <!-- اختيار البنك -->
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="4dp"
-                        android:text="نوع العملية:"
+                        android:text="البنك (Bank):"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="12sp" />
 
-                    <com.google.android.material.button.MaterialButtonToggleGroup
-                        android:id="@+id/toggleWriteType"
+                    <Spinner
+                        android:id="@+id/SpinnerBank"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginBottom="8dp"
+                        android:entries="@array/bank_names" />
+
+                    <!-- العنوان -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="4dp"
+                        android:text="العنوان (Ptr):"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/EtPtr"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginBottom="8dp"
+                        android:hint="32"
+                        android:inputType="number"
+                        android:padding="8dp"
+                        android:text="32"
+                        android:textSize="14sp" />
+
+                    <!-- الطول -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="4dp"
+                        android:text="الطول (Len):"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/EtLen"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginBottom="8dp"
+                        android:hint="6"
+                        android:inputType="number"
+                        android:padding="8dp"
+                        android:text="6"
+                        android:textSize="14sp" />
+
+                    <!-- كلمة المرور -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="4dp"
+                        android:text="كلمة المرور (Access Password):"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/EtAccessPwd"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginBottom="12dp"
+                        android:hint="00000000"
+                        android:inputType="textPassword"
+                        android:maxLength="8"
+                        android:padding="8dp"
+                        android:text="00000000"
+                        android:textSize="14sp" />
+
+                    <!-- البيانات -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="4dp"
+                        android:text="البيانات (Data):"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/EtData"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="12dp"
-                        app:checkedButton="@id/btnWriteEpc"
-                        app:singleSelection="true">
+                        android:gravity="top"
+                        android:hint="بيانات Hex"
+                        android:inputType="text"
+                        android:minLines="2"
+                        android:padding="8dp"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnWriteEpc"
-                            style="?attr/materialButtonOutlinedStyle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="EPC"
-                            android:textSize="12sp" />
+            <!-- 🟢 بطاقة الفلترة -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="?attr/colorSurface"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="3dp"
+                app:strokeColor="?attr/colorOutline"
+                app:strokeWidth="1dp">
 
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnWriteUserMemory"
-                            style="?attr/materialButtonOutlinedStyle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="User Memory"
-                            android:textSize="12sp" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnWriteBoth"
-                            style="?attr/materialButtonOutlinedStyle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="الكل"
-                            android:textSize="12sp" />
-                    </com.google.android.material.button.MaterialButtonToggleGroup>
-
-                    <!-- حقل EPC الجديد -->
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="4dp"
-                        android:text="EPC الجديد (Hex):"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="12sp" />
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/tilNewEpc"
+                    <CheckBox
+                        android:id="@+id/cb_filter"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="8dp"
-                        android:hint="مثال: 300833B2DDD9014000000001"
-                        app:boxBackgroundMode="outline"
-                        app:boxCornerRadiusBottomEnd="8dp"
-                        app:boxCornerRadiusBottomStart="8dp"
-                        app:boxCornerRadiusTopEnd="8dp"
-                        app:boxCornerRadiusTopStart="8dp">
+                        android:text="تفعيل الفلترة (Filter)"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
 
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etNewEpc"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="monospace"
-                            android:inputType="text"
-                            android:maxLength="24"
-                            android:textSize="14sp" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <!-- زر توليد EPC تلقائي -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnGenerateEpc"
-                        style="?attr/materialButtonOutlinedStyle"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:layout_marginBottom="12dp"
-                        android:text="🎲 توليد EPC تلقائي"
-                        android:textSize="12sp"
-                        app:cornerRadius="8dp" />
-
-                    <!-- حقل بيانات User Memory -->
-                    <TextView
-                        android:id="@+id/lblUserMemory"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="4dp"
-                        android:text="User Memory (Hex):"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="12sp" />
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/tilUserMemory"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="8dp"
-                        android:hint="بيانات إضافية (اختياري)"
-                        app:boxBackgroundMode="outline"
-                        app:boxCornerRadiusBottomEnd="8dp"
-                        app:boxCornerRadiusBottomStart="8dp"
-                        app:boxCornerRadiusTopEnd="8dp"
-                        app:boxCornerRadiusTopStart="8dp">
-
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etUserMemory"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="monospace"
-                            android:inputType="text"
-                            android:textSize="14sp" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <!-- كلمة مرور الوصول -->
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="4dp"
-                        android:text="كلمة مرور الوصول (Access Password):"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="12sp" />
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/tilAccessPassword"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="8dp"
-                        android:hint="8 خانات Hex (افتراضي: 00000000)"
-                        app:boxBackgroundMode="outline"
-                        app:boxCornerRadiusBottomEnd="8dp"
-                        app:boxCornerRadiusBottomStart="8dp"
-                        app:boxCornerRadiusTopEnd="8dp"
-                        app:boxCornerRadiusTopStart="8dp"
-                        app:endIconMode="passwordToggle">
-
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etAccessPassword"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="monospace"
-                            android:inputType="textPassword"
-                            android:maxLength="8"
-                            android:text="00000000"
-                            android:textSize="14sp" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <!-- خيارات إضافية -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:layout_marginBottom="8dp"
                         android:orientation="horizontal">
 
-                        <CheckBox
-                            android:id="@+id/cbVerifyAfterWrite"
+                        <RadioButton
+                            android:id="@+id/rbEPC_filter"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:checked="true"
-                            android:text="التحقق بعد الكتابة"
-                            android:textColor="?attr/colorOnSurface"
+                            android:text="EPC"
                             android:textSize="12sp" />
 
-                        <CheckBox
-                            android:id="@+id/cbLockAfterWrite"
+                        <RadioButton
+                            android:id="@+id/rbTID_filter"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="قفل الشريحة"
-                            android:textColor="?attr/colorOnSurface"
+                            android:text="TID"
+                            android:textSize="12sp" />
+
+                        <RadioButton
+                            android:id="@+id/rbUser_filter"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="User"
                             android:textSize="12sp" />
                     </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="عنوان الفلتر:"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/etPtr_filter"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginBottom="8dp"
+                        android:hint="32"
+                        android:inputType="number"
+                        android:padding="8dp"
+                        android:text="32"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="بيانات الفلتر:"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/etData_filter"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginBottom="8dp"
+                        android:hint="بيانات Hex"
+                        android:inputType="text"
+                        android:padding="8dp"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="طول الفلتر:"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/etLen_filter"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:hint="96"
+                        android:inputType="number"
+                        android:padding="8dp"
+                        android:textSize="12sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- أزرار التنفيذ -->
+            <!-- 🟢 أزرار العمليات -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/BtRead"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#0284C7"
+                    android:text="🔍 قراءة"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/BtWrite"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#16A34A"
+                    android:text="✍️ كتابة"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/BtReadTid"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#7C3AED"
+                    android:text="📋 TID"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
                 android:orientation="horizontal">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnWriteTag"
+                <Button
+                    android:id="@+id/BtGenerateEpc"
                     android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_marginEnd="6dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="4dp"
                     android:layout_weight="1"
-                    android:backgroundTint="#16A34A"
-                    android:text="✍️ كتابة"
+                    android:backgroundTint="#F59E0B"
+                    android:text="🎲 توليد EPC"
                     android:textColor="#FFFFFF"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="8dp" />
+                    android:textStyle="bold" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnVerifyTag"
+                <Button
+                    android:id="@+id/BtLock"
                     android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_marginEnd="6dp"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
-                    android:backgroundTint="#0284C7"
-                    android:text="🔍 تحقق"
-                    android:textColor="#FFFFFF"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="8dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnLockTag"
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_weight="1"
-                    android:backgroundTint="#7C3AED"
+                    android:backgroundTint="#DC2626"
                     android:text="🔐 قفل"
                     android:textColor="#FFFFFF"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="8dp" />
+                    android:textStyle="bold" />
             </LinearLayout>
+
+            <!-- خيار التحقق -->
+            <CheckBox
+                android:id="@+id/cbVerifyAfterWrite"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="التحقق التلقائي بعد الكتابة"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="12sp" />
+
+            <!-- عرض TID -->
+            <TextView
+                android:id="@+id/tvCurrentTid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text=""
+                android:textColor="?attr/colorPrimary"
+                android:textSize="12sp"
+                android:fontFamily="monospace"
+                android:visibility="gone" />
 
             <!-- سجل العمليات -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
+                android:layout_marginTop="12dp"
                 app:cardBackgroundColor="?attr/colorSurfaceVariant"
                 app:cardCornerRadius="14dp"
                 app:cardElevation="2dp">
