@@ -20,6 +20,7 @@ import com.example.uhf.R;
 import com.example.uhf.manager.MiraServerConfig;
 import com.google.android.material.button.MaterialButton;
 
+import com.example.uhf.tools.SessionManager;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
