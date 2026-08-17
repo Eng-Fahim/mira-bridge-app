@@ -200,8 +200,37 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
 
     @Override
-    public boolean killTag(String accessPassword) {
-    // غير مدعوم حالياً - يمكن تنفيذه لاحقاً
+public boolean writeEpc(String newEpc, String accessPassword) {
+    return false;
+}
+
+@Override
+public boolean writeUserMemory(int address, String data, String accessPassword) {
+    return false;
+}
+
+@Override
+public String readTid() {
+    return null;
+}
+
+@Override
+public String readUserMemory(int address, int length) {
+    return null;
+}
+
+@Override
+public boolean lockTag(String accessPassword) {
+    return false;
+}
+
+@Override
+public boolean unlockTag(String accessPassword) {
+    return false;
+}
+
+@Override
+public boolean killTag(String accessPassword) {
     return false;
 }
 }
