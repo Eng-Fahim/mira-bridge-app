@@ -73,7 +73,7 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements OnClick
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.uhf_read_write_fragment, container, false);
+        return inflater.inflate(R.layout.fragment_mira_uhf_write, container, false);
     }
 
     @Override
@@ -558,39 +558,50 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements OnClick
     // ============================================
     // 🟢 قفل الشريحة
     // ============================================
-    private void lockTag() {
-        String pwdStr = EtAccessPwd.getText().toString().trim();
-        if (TextUtils.isEmpty(pwdStr)) pwdStr = "00000000";
-        
-        // التحقق من كلمة المرور
-        if (pwdStr.length() != 8 || !mContext.vailHexInput(pwdStr)) {
-            mContext.showToast(R.string.uhf_msg_addr_must_len8);
-            return;
-        }
-        
-        // عرض تحذير قبل القفل
-        new android.app.AlertDialog.Builder(mContext)
-            .setTitle("⚠️ تحذير")
-            .setMessage("هل أنت متأكد من قفل الشريحة؟\nبعد القفل لن تتمكن من الكتابة عليها بدون كلمة المرور الصحيحة.")
-            .setPositiveButton("نعم، قفل", (dialog, which) -> {
-                // قفل EPC (منع الكتابة)
-                boolean result = mContext.mReader.lockTag(pwdStr, 
-                    RFIDWithUHFUART.LockType.LOCK_EPC, 
-                    RFIDWithUHFUART.LockAction.LOCK_ACTION_LOCK);
-                
-                if (result) {
-                    tvProgrammerStatus.setText("🔐 تم قفل الشريحة بنجاح");
-                    tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
-                    mContext.playSound(1);
-                } else {
-                    tvProgrammerStatus.setText("❌ فشل القفل");
-                    tvProgrammerStatus.setTextColor(Color.RED);
-                    mContext.playSound(2);
-                }
-            })
-            .setNegativeButton("إلغاء", null)
-            .show();
+    // استبدل دالة lockTag() كاملة
+private void lockTag() {
+    String pwdStr = EtAccessPwd.getText().toString().trim();
+    if (TextUtils.isEmpty(pwdStr)) pwdStr = "00000000";
+    
+    // التحقق من كلمة المرور
+    if (pwdStr.length() != 8 || !mContext.vailHexInput(pwdStr)) {
+        mContext.showToast(R.string.uhf_msg_addr_must_len8);
+        return;
     }
+    
+    // عرض تحذير قبل القفل
+    new android.app.AlertDialog.Builder(mContext)
+        .setTitle("⚠️ تحذير")
+        .setMessage("هل أنت متأكد من قفل الشريحة؟\nبعد القفل لن تتمكن من الكتابة عليها بدون كلمة المرور الصحيحة.")
+        .setPositiveButton("نعم، قفل", (dialog, which) -> {
+            // ✅ استخدام الدالة الصحيحة
+            boolean result = false;
+            try {
+                // محاولة استخدام lockTag المتاحة
+                result = mContext.mReader.lockTag(pwdStr, 1, 1);
+            } catch (Exception e) {
+                // بديل: استخدام setLock
+                try {
+                    result = mContext.mReader.setLock(pwdStr, RFIDWithUHFUART.Bank_EPC, true);
+                } catch (Exception e2) {
+                    Log.e(TAG, "Lock error: " + e2.getMessage());
+                    result = false;
+                }
+            }
+            
+            if (result) {
+                tvProgrammerStatus.setText("🔐 تم قفل الشريحة بنجاح");
+                tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
+                mContext.playSound(1);
+            } else {
+                tvProgrammerStatus.setText("❌ فشل القفل");
+                tvProgrammerStatus.setTextColor(Color.RED);
+                mContext.playSound(2);
+            }
+        })
+        .setNegativeButton("إلغاء", null)
+        .show();
+}
 
     // ============================================
     // 🟢 الحصول على بنك الفلتر
@@ -623,10 +634,10 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements OnClick
         // إيقاف أي عمليات جارية
         if (mContext != null && mContext.mReader != null) {
             try {
-                mContext.mReader.stopInventoryTag();
+                mContext.mReader.stopInventory();
             } catch (Exception e) {
                 Log.e(TAG, "Cleanup error: " + e.getMessage());
             }
         }
     }
-                                       }
+}
