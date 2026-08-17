@@ -71,6 +71,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import com.example.uhf.fragment.MiraUHFReadWriteFragment;
+
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private static final String TAG = "UHFMainActivity";
@@ -300,7 +302,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 }
 
-    private void showQuickActionMenu() {
+  private void showQuickActionMenu() {
     try {
         BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
         View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
@@ -308,6 +310,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         // ✅ استخدام إعدادات الوصول السريع
         MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(this);
+
+        // ✅ إضافة زر برمجة RFID
+        View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
+        if (btnRfidWrite != null) {
+            btnRfidWrite.setVisibility(View.VISIBLE);
+            btnRfidWrite.setOnClickListener(v -> {
+                dialog.dismiss();
+                checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadWriteFragment(), "RFIDWrite"));
+            });
+        } // ✅ القوس هنا
 
         // 1. استوديو التكويد
         if (quickAccess.isActionEnabled("identity")) {
