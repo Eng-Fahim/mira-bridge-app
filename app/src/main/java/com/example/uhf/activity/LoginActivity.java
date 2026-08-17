@@ -30,6 +30,7 @@ import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
+import com.example.uhf.manager.MiraServerConfig;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -375,6 +376,10 @@ public class LoginActivity extends AppCompatActivity {
         String branchName = response.optString("branch_name", "");
         String branchCode = response.optString("branch_code", "");
         String serverUrl = getText(etServerUrl);
+        
+        if (!serverUrl.isEmpty()) {
+    MiraServerConfig.getInstance(this).setBaseUrl(serverUrl);
+}
 
         sessionManager.createLoginSession(username, roleStr, token, serverUrl);
         sessionManager.setDisplayName(displayName);
