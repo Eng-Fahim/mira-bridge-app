@@ -6,7 +6,7 @@ import android.content.SharedPreferences;
 /**
  * 🏢 MiraOrgProfileManager - مدير بيانات الجهة المركزي
  * 
- * يحفظ بيانات الجهة (الاسم، الشعار، جهات الاتصال) ويعممها على كامل التطبيق
+ * يحفظ بيانات الجهة (الاسم، الشعار، جهات الاتصال، الرقم الضريبي) ويعممها على كامل التطبيق
  * تستخدم في: شاشة تسجيل الدخول، الشاشة الرئيسية، الفواتير، الإيصالات
  */
 public class MiraOrgProfileManager {
@@ -51,17 +51,41 @@ public class MiraOrgProfileManager {
     public String getOrgWebsite() {
         return prefs.getString("org_website", "");
     }
+
     public String getOrgNameEn() {
-    return prefs.getString("org_name_en", "");
-}
+        return prefs.getString("org_name_en", "");
+    }
 
-public String getOrgSloganEn() {
-    return prefs.getString("org_slogan_en", "");
-}
+    public String getOrgSloganEn() {
+        return prefs.getString("org_slogan_en", "");
+    }
 
-public String getOrgLogo() {
-    return prefs.getString("org_logo", "");
-}
+    public String getOrgLogo() {
+        return prefs.getString("org_logo", "");
+    }
+
+    /**
+     * ✅ إرجاع الرقم الضريبي المعتمد للجهة
+     */
+    public String getTaxNumber() {
+        return prefs.getString("tax_number", "VAT-3100293841");
+    }
+
+    // ==================== Setters (للتحديث) ====================
+
+    public void setTaxNumber(String taxNumber) {
+        prefs.edit().putString("tax_number", taxNumber).apply();
+    }
+
+    public void saveOrgProfile(String name, String slogan, String phone, String address, String taxNumber) {
+        prefs.edit()
+                .putString("org_name", name)
+                .putString("org_slogan", slogan)
+                .putString("org_phone", phone)
+                .putString("org_address", address)
+                .putString("tax_number", taxNumber)
+                .apply();
+    }
 
     // ==================== دوال مساعدة ====================
 
