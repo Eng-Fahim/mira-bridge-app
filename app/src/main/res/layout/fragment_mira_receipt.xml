@@ -1,89 +1,96 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#0B0F17"
-    android:orientation="vertical">
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="#FFFFFF">
 
-    <!-- Header -->
-    <LinearLayout
+    <!-- Header: Title & Close Button -->
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#111827"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="12dp">
+        android:layout_marginBottom="12dp">
 
         <TextView
-            android:layout_width="0dp"
+            android:id="@+id/tvReceiptTitle"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="🧾 إيصال البيع"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
+            android:layout_centerVertical="true"
+            android:text="سند مالي ضريبي"
+            android:textColor="#1A237E"
+            android:textSize="16sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/btnMiraCloseReceipt"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="@drawable/bg_circle_dark"
-            android:gravity="center"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_alignParentRight="true"
+            android:padding="8dp"
             android:text="✕"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp" />
-    </LinearLayout>
+            android:textColor="#757575"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </RelativeLayout>
 
-    <!-- WebView Receipt -->
-    <WebView
-        android:id="@+id/webMiraReceipt"
+    <!-- WebView Container with fixed max height -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_height="420dp"
+        android:background="#FAFAFA">
 
-    <!-- Action Buttons -->
+        <WebView
+            android:id="@+id/webMiraReceipt"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+
+    <!-- Bottom Action Buttons Toolbar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="12dp"
-        android:background="#111827"
-        android:orientation="horizontal">
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal"
+        android:weightSum="3">
 
         <Button
             android:id="@+id/btnMiraPrintReceipt"
+            style="?android:attr/buttonBarButtonStyle"
             android:layout_width="0dp"
             android:layout_height="48dp"
+            android:layout_marginEnd="4dp"
+            android:layout_marginRight="4dp"
             android:layout_weight="1"
-            android:layout_marginEnd="6dp"
-            android:background="@drawable/bg_blue_btn"
+            android:background="#1A237E"
             android:text="🖨️ طباعة"
             android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:textSize="13sp" />
 
         <Button
             android:id="@+id/btnMiraShareReceipt"
+            style="?android:attr/buttonBarButtonStyle"
             android:layout_width="0dp"
             android:layout_height="48dp"
+            android:layout_marginEnd="4dp"
+            android:layout_marginRight="4dp"
             android:layout_weight="1"
-            android:layout_marginHorizontal="3dp"
-            android:background="@drawable/bg_scanner_btn"
+            android:background="#0288D1"
             android:text="📤 مشاركة"
             android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:textSize="13sp" />
 
         <Button
             android:id="@+id/btnMiraSaveReceipt"
+            style="?android:attr/buttonBarButtonStyle"
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
-            android:layout_marginStart="6dp"
-            android:background="@drawable/bg_rfid_btn"
+            android:background="#388E3C"
             android:text="💾 حفظ"
             android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:textSize="13sp" />
     </LinearLayout>
+
 </LinearLayout>
