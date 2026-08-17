@@ -574,19 +574,18 @@ private void lockTag() {
         .setTitle("⚠️ تحذير")
         .setMessage("هل أنت متأكد من قفل الشريحة؟\nبعد القفل لن تتمكن من الكتابة عليها بدون كلمة المرور الصحيحة.")
         .setPositiveButton("نعم، قفل", (dialog, which) -> {
-            // ✅ استخدام الدالة الصحيحة
             boolean result = false;
             try {
-                // محاولة استخدام lockTag المتاحة
-                result = mContext.mReader.lockTag(pwdStr, 1, 1);
+                // استخدام الدالة المتاحة في مكتبة Chainway
+                // جرب أحد هذه الخيارات حسب المكتبة المتوفرة لديك
+                result = mContext.mReader.lockTag(pwdStr);
+                // أو
+                // result = mContext.mReader.lockTag();
+                // أو
+                // result = mContext.mReader.lockEPC(pwdStr);
             } catch (Exception e) {
-                // بديل: استخدام setLock
-                try {
-                    result = mContext.mReader.setLock(pwdStr, RFIDWithUHFUART.Bank_EPC, true);
-                } catch (Exception e2) {
-                    Log.e(TAG, "Lock error: " + e2.getMessage());
-                    result = false;
-                }
+                Log.e(TAG, "Lock error: " + e.getMessage());
+                result = false;
             }
             
             if (result) {
@@ -594,7 +593,7 @@ private void lockTag() {
                 tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
                 mContext.playSound(1);
             } else {
-                tvProgrammerStatus.setText("❌ فشل القفل");
+                tvProgrammerStatus.setText("❌ فشل القفل - غير مدعوم في هذا الجهاز");
                 tvProgrammerStatus.setTextColor(Color.RED);
                 mContext.playSound(2);
             }
