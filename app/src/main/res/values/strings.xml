@@ -580,6 +580,20 @@
     <string name="tvKHz">كيلوهيرتز</string>
 
 
+<!-- POS Checkout Dialog -->
+<string name="checkout_title">💳 إتمام عملية البيع والدفع</string>
+<string name="item_count_label">عدد القطع:</string>
+<string name="total_amount_label">المبلغ الإجمالي:</string>
+<string name="customer_info_section">👤 بيانات العميل</string>
+<string name="customer_name_required">اسم العميل * (إلزامي)</string>
+<string name="customer_phone_optional">رقم الهاتف (اختياري)</string>
+<string name="customer_email_optional">البريد الإلكتروني (اختياري)</string>
+<string name="customer_address_optional">العنوان (اختياري)</string>
+<string name="customer_notes_optional">ملاحظات (اختياري)</string>
+<string name="payment_method_section">🏦 طريقة الدفع</string>
+<string name="discount_percent_label">نسبة الخصم %</string>
+<string name="confirm_sale">تأكيد البيع ✓</string>
+
     <string name="ETSI_Standard">المعيار الأوروبي ETSI (865~868MHz)</string>
     <string name="United_States_Standard">المعيار الأمريكي (902~928MHz)</string>
     <string name="Fixed_Frequency_915MHz">تردد ثابت (915MHz)</string>
