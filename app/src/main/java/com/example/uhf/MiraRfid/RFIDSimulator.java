@@ -328,4 +328,10 @@ public class RFIDSimulator {
         String userMemory;
         boolean isLocked;
     }
+
+    @Override
+public boolean killTag(String accessPassword) {
+    // غير مدعوم حالياً - يمكن تنفيذه لاحقاً
+    return false;
+}
 }
