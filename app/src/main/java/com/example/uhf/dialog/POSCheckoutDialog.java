@@ -32,11 +32,18 @@ public class POSCheckoutDialog extends DialogFragment {
         void onCheckout(POSCheckoutData data);
     }
 
+    /**
+     * ✅ نموذج بيانات البيع الكامل
+     */
     public static class POSCheckoutData {
         public String customerName = "";
         public String customerPhone = "";
+        public String customerEmail = "";      // ✅ جديد
+        public String customerAddress = "";    // ✅ جديد
+        public String customerNotes = "";      // ✅ جديد
         public String paymentMethod = "CASH";
-        public double discount = 0.0;
+        public double discount = 0.0;          // نسبة الخصم
+        public double discountAmount = 0.0;    // ✅ قيمة الخصم
         public double finalAmount = 0.0;
     }
 
@@ -49,8 +56,8 @@ public class POSCheckoutDialog extends DialogFragment {
     private boolean isArabic;
     private MiraOrgProfileManager orgProfile;
 
-    private TextView tvDialogTitle, tvItemCount, tvFinalTotal;
-    private EditText etCustomerName, etCustomerPhone, etDiscount;
+    private TextView tvDialogTitle, tvItemCount, tvSubtotal, tvDiscountAmount, tvFinalTotal;
+    private EditText etCustomerName, etCustomerPhone, etCustomerEmail, etCustomerAddress, etCustomerNotes, etDiscount;
     private Spinner spPaymentMethod;
     private Button btnConfirmCheckout, btnCancelCheckout;
 
@@ -111,9 +118,14 @@ public class POSCheckoutDialog extends DialogFragment {
     private void bindViews(View view) {
         tvDialogTitle = view.findViewById(R.id.tvDialogTitle);
         tvItemCount = view.findViewById(R.id.tvItemCount);
+        tvSubtotal = view.findViewById(R.id.tvSubtotal);
+        tvDiscountAmount = view.findViewById(R.id.tvDiscountAmount);
         tvFinalTotal = view.findViewById(R.id.tvFinalTotal);
         etCustomerName = view.findViewById(R.id.etCustomerName);
         etCustomerPhone = view.findViewById(R.id.etCustomerPhone);
+        etCustomerEmail = view.findViewById(R.id.etCustomerEmail);
+        etCustomerAddress = view.findViewById(R.id.etCustomerAddress);
+        etCustomerNotes = view.findViewById(R.id.etCustomerNotes);
         spPaymentMethod = view.findViewById(R.id.spPaymentMethod);
         etDiscount = view.findViewById(R.id.etDiscount);
         btnCancelCheckout = view.findViewById(R.id.btnCancelCheckout);
@@ -130,6 +142,15 @@ public class POSCheckoutDialog extends DialogFragment {
         if (etCustomerPhone != null) {
             etCustomerPhone.setHint(isArabic ? "رقم الهاتف" : "Phone Number");
         }
+        if (etCustomerEmail != null) {
+            etCustomerEmail.setHint(isArabic ? "البريد الإلكتروني (اختياري)" : "Email (optional)");
+        }
+        if (etCustomerAddress != null) {
+            etCustomerAddress.setHint(isArabic ? "العنوان (اختياري)" : "Address (optional)");
+        }
+        if (etCustomerNotes != null) {
+            etCustomerNotes.setHint(isArabic ? "ملاحظات (اختياري)" : "Notes (optional)");
+        }
         if (etDiscount != null) {
             etDiscount.setHint(isArabic ? "نسبة الخصم %" : "Discount %");
         }
@@ -144,8 +165,8 @@ public class POSCheckoutDialog extends DialogFragment {
     private void setupSpinner() {
         if (spPaymentMethod != null && getContext() != null) {
             String[] methods = isArabic
-                ? new String[]{"نقداً", "بطاقة", "تحويل", "آجل"}
-                : new String[]{"CASH", "CARD", "TRANSFER", "CREDIT"};
+                ? new String[]{"💵 نقداً", "💳 بطاقة", "🏦 تحويل بنكي", "⏳ آجل"}
+                : new String[]{"CASH", "CARD", "BANK_TRANSFER", "CREDIT"};
             ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(),
                     android.R.layout.simple_spinner_item, methods);
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -178,23 +199,17 @@ public class POSCheckoutDialog extends DialogFragment {
         if (btnConfirmCheckout != null) {
             btnConfirmCheckout.setOnClickListener(v -> {
                 POSCheckoutData data = new POSCheckoutData();
+                
                 if (etCustomerName != null) data.customerName = etCustomerName.getText().toString().trim();
                 if (etCustomerPhone != null) data.customerPhone = etCustomerPhone.getText().toString().trim();
+                if (etCustomerEmail != null) data.customerEmail = etCustomerEmail.getText().toString().trim();
+                if (etCustomerAddress != null) data.customerAddress = etCustomerAddress.getText().toString().trim();
+                if (etCustomerNotes != null) data.customerNotes = etCustomerNotes.getText().toString().trim();
 
+                // ✅ تحويل طريقة الدفع للقيمة الإنجليزية الموحدة
                 if (spPaymentMethod != null && spPaymentMethod.getSelectedItem() != null) {
                     String method = spPaymentMethod.getSelectedItem().toString();
-                    // تحويل الاسم العربي للإنجليزي
-                    if (isArabic) {
-                        switch (method) {
-                            case "نقداً": data.paymentMethod = "CASH"; break;
-                            case "بطاقة": data.paymentMethod = "CARD"; break;
-                            case "تحويل": data.paymentMethod = "TRANSFER"; break;
-                            case "آجل": data.paymentMethod = "CREDIT"; break;
-                            default: data.paymentMethod = method;
-                        }
-                    } else {
-                        data.paymentMethod = method;
-                    }
+                    data.paymentMethod = getEnglishPaymentMethod(method);
                 }
 
                 String discountStr = (etDiscount != null) ? etDiscount.getText().toString().trim() : "0";
@@ -204,13 +219,41 @@ public class POSCheckoutDialog extends DialogFragment {
                     data.discount = 0;
                 }
 
-                data.finalAmount = totalAmount * (1.0 - (data.discount / 100.0));
+                // ✅ حساب قيمة الخصم والمبلغ النهائي
+                data.discountAmount = totalAmount * (data.discount / 100.0);
+                data.finalAmount = totalAmount - data.discountAmount;
+
                 dismissAllowingStateLoss();
 
                 if (listener != null) {
                     listener.onCheckout(data);
                 }
             });
+        }
+    }
+
+    /**
+     * ✅ تحويل طريقة الدفع للقيمة الإنجليزية الموحدة
+     */
+    private String getEnglishPaymentMethod(String method) {
+        if (method == null) return "CASH";
+        
+        switch (method) {
+            case "💵 نقداً":
+            case "CASH":
+                return "CASH";
+            case "💳 بطاقة":
+            case "CARD":
+                return "CARD";
+            case "🏦 تحويل بنكي":
+            case "BANK_TRANSFER":
+            case "TRANSFER":
+                return "BANK_TRANSFER";
+            case "⏳ آجل":
+            case "CREDIT":
+                return "CREDIT";
+            default:
+                return method;
         }
     }
 
@@ -222,7 +265,16 @@ public class POSCheckoutDialog extends DialogFragment {
                 try { discountPercent = Double.parseDouble(val); } catch (Exception ignored) {}
             }
         }
-        double finalAmount = totalAmount * (1.0 - (discountPercent / 100.0));
+        
+        double discountAmount = totalAmount * (discountPercent / 100.0);
+        double finalAmount = totalAmount - discountAmount;
+        
+        if (tvSubtotal != null) {
+            tvSubtotal.setText(String.format(Locale.US, "%,.0f YER", totalAmount));
+        }
+        if (tvDiscountAmount != null) {
+            tvDiscountAmount.setText(String.format(Locale.US, "%,.0f YER", discountAmount));
+        }
         if (tvFinalTotal != null) {
             tvFinalTotal.setText(String.format(Locale.US, "%,.0f YER", finalAmount));
         }
