@@ -133,4 +133,45 @@ public class SimulatorReader implements MiraIRFIDReader {
     public void setOnTagReadListener(OnTagReadListener listener) {
         this.listener = listener;
     }
+    @Override
+public boolean writeEpc(String newEpc, String accessPassword) {
+    // TODO: تنفيذ الكتابة عبر البلوتوث
+    return false;
+}
+
+@Override
+public boolean writeUserMemory(int address, String data, String accessPassword) {
+    // TODO: تنفيذ كتابة User Memory
+    return false;
+}
+
+@Override
+public String readTid() {
+    // TODO: تنفيذ قراءة TID
+    return null;
+}
+
+@Override
+public String readUserMemory(int address, int length) {
+    // TODO: تنفيذ قراءة User Memory
+    return null;
+}
+
+@Override
+public boolean lockTag(String accessPassword) {
+    // TODO: تنفيذ قفل الشريحة
+    return false;
+}
+
+@Override
+public boolean unlockTag(String accessPassword) {
+    // TODO: تنفيذ فتح الشريحة
+    return false;
+}
+
+@Override
+public boolean killTag(String accessPassword) {
+    // TODO: تنفيذ kill tag
+    return false;
+}
 }
