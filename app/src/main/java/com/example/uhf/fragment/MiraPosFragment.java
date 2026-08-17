@@ -1,5 +1,5 @@
 package com.example.uhf.fragment;
-
+import com.example.uhf.tools.SessionManager;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
