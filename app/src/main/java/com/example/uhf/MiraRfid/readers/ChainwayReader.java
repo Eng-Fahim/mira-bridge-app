@@ -198,4 +198,10 @@ public class ChainwayReader implements MiraIRFIDReader {
     public void setOnTagReadListener(OnTagReadListener listener) {
         this.listener = listener;
     }
+
+    @Override
+    public boolean killTag(String accessPassword) {
+    // غير مدعوم حالياً - يمكن تنفيذه لاحقاً
+    return false;
+}
 }
