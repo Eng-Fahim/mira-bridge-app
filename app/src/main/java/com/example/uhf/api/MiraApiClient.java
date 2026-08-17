@@ -696,7 +696,7 @@ public class MiraApiClient {
         return prefs.getString("authToken", "");
     }
 
-    private ApiResponse getWithAuth(String endpoint) {
+    public ApiResponse getWithAuth(String endpoint) {
         HttpURLConnection conn = null;
         try {
             String fullUrl = apiUrl + endpoint;
@@ -720,7 +720,7 @@ public class MiraApiClient {
         }
     }
 
-    private ApiResponse postWithAuth(String endpoint, JSONObject payload) {
+    public ApiResponse postWithAuth(String endpoint, JSONObject payload) {
         HttpURLConnection conn = null;
         try {
             String fullUrl = apiUrl + endpoint;
