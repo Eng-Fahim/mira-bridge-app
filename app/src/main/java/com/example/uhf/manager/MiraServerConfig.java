@@ -33,7 +33,7 @@ public class MiraServerConfig {
      * ✅ الرابط الافتراضي - ضع رابط سيرفرك هنا
      */
     public String getBaseUrl() {
-        return prefs.getString(KEY_BASE_URL, "https://ams.ibreg.org/wp-json/");
+        return prefs.getString(KEY_BASE_URL, "https://sa.mirabarcode.com/wp-json/");
     }
 
     public void setBaseUrl(String baseUrl) {
