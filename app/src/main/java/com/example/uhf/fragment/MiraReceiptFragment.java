@@ -27,7 +27,6 @@ import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
 import androidx.fragment.app.DialogFragment;
 
-
 import com.example.uhf.R;
 import com.example.uhf.manager.MiraOrgProfileManager;
 
@@ -65,7 +64,6 @@ public class MiraReceiptFragment extends DialogFragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // تعيين النمط ليكون نافذة منبثقة ملء الشاشة تقريباً
         setStyle(DialogFragment.STYLE_NORMAL, android.R.style.Theme_Material_Light_Dialog_MinWidth);
         if (getArguments() != null) receiptJsonStr = getArguments().getString(ARG_RECEIPT_JSON, "{}");
         isArabic = Locale.getDefault().getLanguage().equals("ar");
@@ -118,26 +116,23 @@ public class MiraReceiptFragment extends DialogFragment {
 
     // ==================== 🖨️ طباعة ====================
     private void printReceipt() {
-    if (getContext() == null || webReceipt == null) return;
-    
-    // ✅ حفظ محلي أولاً
-    saveReceiptOffline();
-    
-    // محاولة الطباعة
-    try {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
-            PrintManager pm = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
-            PrintDocumentAdapter adapter = webReceipt.createPrintDocumentAdapter(orgName);
-            pm.print(orgName, adapter, new PrintAttributes.Builder().build());
-            Toast.makeText(getContext(), isArabic ? "🖨️ تم فتح الطباعة" : "🖨️ Print opened", Toast.LENGTH_SHORT).show();
+        if (getContext() == null || webReceipt == null) return;
+        
+        saveReceiptOffline();
+        
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+                PrintManager pm = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
+                PrintDocumentAdapter adapter = webReceipt.createPrintDocumentAdapter(orgName);
+                pm.print(orgName, adapter, new PrintAttributes.Builder().build());
+                Toast.makeText(getContext(), isArabic ? "🖨️ تم فتح الطباعة" : "🖨️ Print opened", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Toast.makeText(getContext(), 
+                isArabic ? "💾 تم حفظ السند محلياً" : "💾 Receipt saved locally", 
+                Toast.LENGTH_SHORT).show();
         }
-    } catch (Exception e) {
-        // فشل الطباعة - السند محفوظ محلياً
-        Toast.makeText(getContext(), 
-            isArabic ? "💾 تم حفظ السند محلياً" : "💾 Receipt saved locally", 
-            Toast.LENGTH_SHORT).show();
     }
-}
 
     // ==================== 📤 مشاركة PDF ====================
     private void shareReceiptAsPDF() {
@@ -216,128 +211,203 @@ public class MiraReceiptFragment extends DialogFragment {
         } catch (Exception e) { return null; }
     }
     
-    
-// ==================== OFFLINE RECEIPT ====================
+    // ==================== OFFLINE RECEIPT ====================
 
-/**
- * حفظ السند محلياً عند عدم وجود اتصال
- */
-private void saveReceiptOffline() {
-    try {
-        if (getContext() == null) return;
-        
-        JSONObject receiptData = new JSONObject();
+    private void saveReceiptOffline() {
         try {
-            receiptData = new JSONObject(receiptJsonStr);
-        } catch (Exception ignored) {}
-        
-        receiptData.put("saved_at", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()));
-        receiptData.put("org_name", orgName);
-        receiptData.put("printed", false);
-        
-        // تحميل السندات المحفوظة
-        SharedPreferences prefs = getContext().getSharedPreferences("offline_receipts", Context.MODE_PRIVATE);
-        String existingJson = prefs.getString("receipts", "[]");
-        JSONArray receiptsArray = new JSONArray(existingJson);
-        receiptsArray.put(receiptData);
-        
-        // الاحتفاظ بآخر 50 سند فقط
-        while (receiptsArray.length() > 50) {
-            receiptsArray.remove(0);
-        }
-        
-        prefs.edit().putString("receipts", receiptsArray.toString()).apply();
-        
-        Log.i(TAG, "💾 Receipt saved offline: " + receiptData.optString("sale_id", "unknown"));
-    } catch (Exception e) {
-        Log.e(TAG, "Save receipt offline error: " + e.getMessage());
-    }
-}
-
-/**
- * طباعة أو مشاركة السند المحفوظ
- */
-private void printOrShareOfflineReceipt() {
-    // توليد PDF من WebView مباشرة
-    webReceipt.postDelayed(() -> {
-        try {
-            File pdf = generatePDF();
-            if (pdf != null) {
-                saveReceiptOffline();
-                Toast.makeText(getContext(), 
-                    isArabic ? "✅ تم حفظ السند محلياً" : "✅ Receipt saved locally", 
-                    Toast.LENGTH_SHORT).show();
+            if (getContext() == null) return;
+            
+            JSONObject receiptData = new JSONObject();
+            try {
+                receiptData = new JSONObject(receiptJsonStr);
+            } catch (Exception ignored) {}
+            
+            receiptData.put("saved_at", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()));
+            receiptData.put("org_name", orgName);
+            receiptData.put("printed", false);
+            
+            SharedPreferences prefs = getContext().getSharedPreferences("offline_receipts", Context.MODE_PRIVATE);
+            String existingJson = prefs.getString("receipts", "[]");
+            JSONArray receiptsArray = new JSONArray(existingJson);
+            receiptsArray.put(receiptData);
+            
+            while (receiptsArray.length() > 50) {
+                receiptsArray.remove(0);
             }
+            
+            prefs.edit().putString("receipts", receiptsArray.toString()).apply();
+            
+            Log.i(TAG, "💾 Receipt saved offline: " + receiptData.optString("sale_id", "unknown"));
         } catch (Exception e) {
-            Log.e(TAG, "Offline receipt error: " + e.getMessage());
+            Log.e(TAG, "Save receipt offline error: " + e.getMessage());
         }
-    }, 500);
-}
-    // ==================== HTML ====================
+    }
+
+    // ==================== 🔢 محرك التفقيط المالي ====================
+
+    private String convertToWords(long number) {
+        if (number == 0) return "صفر";
+        if (number < 0) return "سالب " + convertToWords(Math.abs(number));
+
+        String[] units = {"", "واحد", "اثنان", "ثلاثة", "أربعة", "خمسة", "ستة", "سبعة", "ثمانية", "تسعة", "عشرة",
+                          "أحد عشر", "اثنا عشر", "ثلاثة عشر", "أربعة عشر", "خمسة عشر", "ستة عشر", "سبعة عشر", "ثمانية عشر", "تسعة عشر"};
+        String[] tens = {"", "", "عشرون", "ثلاثون", "أربعون", "خمسون", "ستون", "سبعون", "ثمانون", "تسعون"};
+        String[] hundreds = {"", "مائة", "مائتان", "ثلاثمائة", "أربعمائة", "خمسمائة", "ستمائة", "سبعمائة", "ثمانمائة", "تسعمائة"};
+
+        StringBuilder words = new StringBuilder();
+
+        if ((number / 1000000) > 0) {
+            words.append(convertToWords(number / 1000000)).append(" مليون ");
+            number %= 1000000;
+        }
+
+        if ((number / 1000) > 0) {
+            words.append(convertToWords(number / 1000)).append(" ألف ");
+            number %= 1000;
+        }
+
+        if ((number / 100) > 0) {
+            words.append(hundreds[(int) (number / 100)]).append(" ");
+            number %= 100;
+        }
+
+        if (number > 0) {
+            if (number < 20) {
+                words.append(units[(int) number]);
+            } else {
+                words.append(units[(int) (number % 10)]);
+                if ((number % 10) > 0) words.append(" و");
+                words.append(tens[(int) (number / 10)]);
+            }
+        }
+
+        return words.toString().trim();
+    }
+
+    // ==================== 📄 HTML RECEIPT GENERATOR ====================
+
     private void renderHtmlReceipt() {
         if (webReceipt == null) return;
+        
         String slogan = orgProfile != null ? orgProfile.getOrgSlogan() : "";
         String phone = orgProfile != null ? orgProfile.getOrgPhone() : "";
         String address = orgProfile != null ? orgProfile.getOrgAddress() : "";
+        String taxNumber = orgProfile != null ? orgProfile.getTaxNumber() : "VAT-3100293841";
         String dir = isArabic ? "rtl" : "ltr";
 
         StringBuilder h = new StringBuilder();
-        h.append("<!DOCTYPE html><html dir='").append(dir).append("'><head><meta charset='UTF-8'><style>")
-         .append("body{font-family:sans-serif;padding:12px;max-width:380px;margin:auto;background:#fff;color:#1a1a1a}")
-         .append(".org-name{font-size:20px;font-weight:bold;color:#1A237E;text-align:center}")
-         .append(".org-slogan{font-size:11px;color:#666;text-align:center}")
-         .append(".org-contact{font-size:10px;color:#888;text-align:center;margin-bottom:10px}")
-         .append(".divider{border-top:2px solid #C5A059;margin:10px 0}")
-         .append(".check{text-align:center;font-size:36px;color:#22C55E}")
-         .append(".success{text-align:center;font-weight:bold;color:#22C55E;margin-bottom:8px}")
-         .append(".row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px}")
-         .append(".label{color:#666}.value{font-weight:bold}")
-         .append("table{width:100%;border-collapse:collapse;margin:10px 0;font-size:11px}")
-         .append("th{background:#f5f5f5;padding:5px;border-bottom:1px solid #ddd}")
-         .append("td{padding:5px;border-bottom:1px solid #eee;text-align:center}")
-         .append(".total-box{background:#1A237E;color:#fff;padding:10px;border-radius:6px;text-align:center;margin-top:10px}")
-         .append(".total{font-size:22px;font-weight:bold}")
-         .append(".footer{text-align:center;margin-top:14px;font-size:9px;color:#888}")
-         .append("</style></head><body>")
+        h.append("<!DOCTYPE html><html dir='").append(dir).append("'><head><meta charset='UTF-8'>")
+         .append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
+         .append("<style>")
+         .append("@page { size: auto; margin: 0; }")
+         .append("body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 10px; max-width: 380px; margin: auto; background: #fff; color: #1a1a1a; font-size: 11px; }")
+         .append(".header { text-align: center; border-bottom: 2px double #1A237E; padding-bottom: 8px; margin-bottom: 8px; }")
+         .append(".org-name { font-size: 18px; font-weight: bold; color: #1A237E; }")
+         .append(".org-meta { font-size: 9px; color: #555; margin-top: 2px; }")
+         .append(".receipt-title { font-size: 13px; font-weight: bold; text-align: center; background: #f0f2f5; padding: 4px; margin: 6px 0; border-radius: 4px; border: 1px dashed #1A237E; }")
+         .append(".info-grid { width: 100%; font-size: 10px; margin-bottom: 8px; }")
+         .append(".info-grid td { padding: 2px 0; }")
+         .append(".label { color: #666; } .value { font-weight: bold; color: #000; }")
+         .append("table.items { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }")
+         .append("table.items th { background: #1A237E; color: #fff; padding: 4px; text-align: center; border: 1px solid #1A237E; }")
+         .append("table.items td { padding: 4px; border: 1px solid #ddd; text-align: center; }")
+         .append(".totals-table { width: 100%; font-size: 10px; margin-top: 6px; }")
+         .append(".totals-table td { padding: 3px 0; }")
+         .append(".grand-total { font-size: 15px; font-weight: bold; color: #1A237E; border-top: 1px solid #1A237E; border-bottom: 2px double #1A237E; padding: 4px 0; }")
+         .append(".tafweet { font-size: 9px; font-style: italic; color: #444; text-align: center; margin-top: 4px; background: #fafafa; padding: 4px; border-radius: 4px; }")
+         .append(".qr-container { text-align: center; margin-top: 10px; padding-top: 6px; border-top: 1px dashed #ccc; }")
+         .append(".qr-container img { width: 110px; height: 110px; }")
+         .append(".footer { text-align: center; margin-top: 10px; font-size: 8px; color: #777; }")
+         .append("</style></head><body>");
+
+        h.append("<div class='header'>")
          .append("<div class='org-name'>").append(orgName).append("</div>")
-         .append("<div class='org-slogan'>").append(slogan).append("</div>")
-         .append("<div class='org-contact'>");
-        if (!phone.isEmpty()) h.append("📞 ").append(phone).append(" ");
-        if (!address.isEmpty()) h.append("📍 ").append(address);
-        h.append("</div><div class='divider'></div>")
-         .append("<div class='check'>✓</div>")
-         .append("<div class='success'>").append(isArabic ? "تم البيع بنجاح" : "Sale Completed").append("</div>");
+         .append("<div class='org-meta'>").append(slogan).append("</div>")
+         .append("<div class='org-meta'>").append(address).append(" | ").append(phone).append("</div>")
+         .append("<div class='org-meta'><b>الرقم الضريبي: </b>").append(taxNumber).append("</div>")
+         .append("</div>");
 
         try {
             JSONObject t = new JSONObject(receiptJsonStr).optJSONObject("transaction");
             if (t == null) t = new JSONObject(receiptJsonStr);
-            h.append("<div class='row'><span class='label'>").append(isArabic ? "رقم العملية" : "Receipt #").append("</span><span class='value'>#").append(t.optString("sale_id", "—")).append("</span></div>");
-            h.append("<div class='row'><span class='label'>").append(isArabic ? "التاريخ" : "Date").append("</span><span class='value'>").append(t.optString("timestamp", new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date()))).append("</span></div>");
-            h.append("<div class='row'><span class='label'>").append(isArabic ? "العميل" : "Customer").append("</span><span class='value'>").append(t.optString("customer_name", "—")).append("</span></div>");
+
+            String saleId = t.optString("sale_id", "—");
+            String dateStr = t.optString("timestamp", new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date()));
+            String customer = t.optString("customer_name", "عميل نقدي");
+            String paymentMethod = t.optString("payment_method", "CASH");
+            String accountCode = t.optString("account_code", "110101");
+
+            h.append("<div class='receipt-title'>سند بيع ضريبي / TAX INVOICE</div>");
+
+            h.append("<table class='info-grid'>")
+             .append("<tr><td class='label'>رقم السند:</td><td class='value'>#").append(saleId).append("</td><td class='label'>التاريخ:</td><td class='value'>").append(dateStr).append("</td></tr>")
+             .append("<tr><td class='label'>العميل:</td><td class='value'>").append(customer).append("</td><td class='label'>طريقة الدفع:</td><td class='value'>").append(paymentMethod).append("</td></tr>")
+             .append("<tr><td class='label'>الحساب المالي:</td><td class='value' colspan='3'>").append(accountCode).append(" - المبيعات/النقدية</td></tr>")
+             .append("</table>");
 
             JSONArray items = t.optJSONArray("items");
             if (items != null && items.length() > 0) {
-                h.append("<table><tr><th>#</th><th>").append(isArabic ? "القطعة" : "Item").append("</th><th>").append(isArabic ? "العيار" : "Karat").append("</th><th>").append(isArabic ? "السعر" : "Price").append("</th></tr>");
+                h.append("<table class='items'><thead><tr>")
+                 .append("<th>#</th><th>الصنف</th><th>العيار</th><th>الوزن (جم)</th><th>المبلغ</th>")
+                 .append("</tr></thead><tbody>");
+                
+                double totalWeight = 0.0;
                 for (int i = 0; i < items.length(); i++) {
                     JSONObject it = items.optJSONObject(i);
                     if (it == null) continue;
-                    h.append("<tr><td>").append(i + 1).append("</td><td>").append(it.optString("title", "—")).append("</td><td>").append(it.optString("karat", "—")).append("</td><td>").append(String.format(Locale.US, "%,.0f", it.optDouble("price", 0))).append("</td></tr>");
+                    double weight = it.optDouble("weight", 0.0);
+                    totalWeight += weight;
+
+                    h.append("<tr>")
+                     .append("<td>").append(i + 1).append("</td>")
+                     .append("<td style='text-align:right;'>").append(it.optString("title", "—")).append("</td>")
+                     .append("<td>").append(it.optString("karat", "—")).append("</td>")
+                     .append("<td>").append(String.format(Locale.US, "%.2f", weight)).append("</td>")
+                     .append("<td>").append(String.format(Locale.US, "%,.0f", it.optDouble("price", 0))).append("</td>")
+                     .append("</tr>");
                 }
-                h.append("</table>");
+                h.append("</tbody></table>");
             }
 
-            double amt = t.optDouble("final_amount", t.optDouble("subtotal", 0));
-            h.append("<div class='total-box'><div style='font-size:10px;opacity:0.8'>").append(isArabic ? "المبلغ النهائي" : "Final Amount").append("</div><div class='total'>").append(String.format(Locale.US, "%,.0f YER", amt)).append("</div></div>");
+            double subtotal = t.optDouble("subtotal", 0);
+            double discount = t.optDouble("discount_amount", 0);
+            double finalAmt = t.optDouble("final_amount", subtotal - discount);
+
+            h.append("<table class='totals-table'>")
+             .append("<tr><td class='label'>الإجمالي قبل الخصم:</td><td class='value' style='text-align:left;'>").append(String.format(Locale.US, "%,.0f YER", subtotal)).append("</td></tr>");
+            
+            if (discount > 0) {
+                h.append("<tr><td class='label'>مبلغ الخصم:</td><td class='value' style='text-align:left; color:red;'>- ").append(String.format(Locale.US, "%,.0f YER", discount)).append("</td></tr>");
+            }
+
+            h.append("<tr class='grand-total'><td class='label' style='color:#1A237E;'>الصافي النهائي:</td><td class='value' style='text-align:left; color:#1A237E;'>").append(String.format(Locale.US, "%,.0f YER", finalAmt)).append("</td></tr>")
+             .append("</table>");
+
+            String tafweetText = convertToWords((long) finalAmt) + " ريال يمني لا غير";
+            h.append("<div class='tafweet'><b>المبلغ فقط: </b>").append(tafweetText).append("</div>");
+
+            String qrData = Uri.encode("Org:" + orgName + "|Receipt:" + saleId + "|Total:" + finalAmt + "|Tax:" + taxNumber);
+            String qrApiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + qrData;
+
+            h.append("<div class='qr-container'>")
+             .append("<img src='").append(qrApiUrl).append("' alt='QR Verify'/><br>")
+             .append("<span style='font-size:8px;color:#888;'>مسح الرمز للتحقق من صحة السند إلكترونياً</span>")
+             .append("</div>");
+
         } catch (Exception e) {
-            h.append("<p style='color:red;text-align:center'>").append(isArabic ? "خطأ في البيانات" : "Data error").append("</p>");
+            h.append("<p style='color:red;text-align:center'>خطأ في معالجة بيانات السند</p>");
         }
 
-        h.append("<div class='footer'>").append(orgName).append("<br>MIRA Jewelry System © 2026</div></body></html>");
+        h.append("<div class='footer'>")
+         .append("شكرًا لتعاملكم معنا | ").append(orgName).append("<br>")
+         .append("نظام MIRA Trust Platform © 2026")
+         .append("</div></body></html>");
+
         webReceipt.loadDataWithBaseURL(null, h.toString(), "text/html", "UTF-8", null);
     }
 
     private void closeFragment() {
         if (!isAdded()) return;
-        dismissAllowingStateLoss(); // إغلاق الـ Dialog بشكل آمن
+        dismissAllowingStateLoss();
     }
-    }
+}
