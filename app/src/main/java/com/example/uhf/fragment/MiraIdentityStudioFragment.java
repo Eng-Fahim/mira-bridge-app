@@ -82,12 +82,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private ActivityResultLauncher<String> requestPermissionLauncher;
     private Uri photoUri;
 
-    private void applyLanguage() {
-        if (binding == null) return;
-        applyLanguageDirection(binding.getRoot());
-        if (isArabic) setArabicTexts(); else setEnglishTexts();
-    }
-
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -114,7 +108,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             setupPhotoLaunchers();
             applyLanguage();
             setupListeners();
-
             populateSuggestions("rings");
 
             if (getActivity() instanceof UHFMainActivity) {
@@ -126,26 +119,21 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     @Override
-public void onResume() {
-    super.onResume();
-    
-    // ✅ تحديث الأسعار من السيرفر عند فتح الواجهة
-    if (priceManager != null) {
-        priceManager.refreshNow();
-        
-        // ✅ إعادة حساب السعر بعد ثانيتين
-        new Handler().postDelayed(() -> {
-            if (isAdded() && binding != null) {
-                calculateEstimatedGoldValue();
-            }
-        }, 2000);
+    public void onResume() {
+        super.onResume();
+        if (priceManager != null) {
+            priceManager.refreshNow();
+            new Handler().postDelayed(() -> {
+                if (isAdded() && binding != null) {
+                    calculateEstimatedGoldValue();
+                }
+            }, 2000);
+        }
+        syncPendingEncodes();
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
+        }
     }
-    
-    syncPendingEncodes();
-    if (getActivity() instanceof UHFMainActivity) {
-        ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
-    }
-}
 
     @Override
     public void onPause() {
@@ -155,7 +143,118 @@ public void onResume() {
         }
     }
 
-    // ==================== أسعار الذهب وحسابه ====================
+    private void applyLanguage() {
+        if (binding == null) return;
+        applyLanguageDirection(binding.getRoot());
+        if (isArabic) setArabicTexts(); else setEnglishTexts();
+    }
+
+    private void setArabicTexts() {
+        try {
+            binding.tvStepTitle.setText("الخطوة 1 من 4: الربط والتصنيف");
+            binding.tilEpc.setHint("رمز الشريحة (EPC / GTIN)...");
+            binding.btnScanRfid.setText("مسح رمز RFID");
+            binding.etTitle.setHint("عنوان ووصف القطعة");
+            binding.btnSaveIdentity.setText("اعتماد الموزون وتصدير MIRA ID");
+            binding.btnAddPhotos.setText("📷 التقاط / إرفاق صور القطعة");
+            binding.tvPhotosCount.setText(photoPaths.isEmpty() ? "لم يتم إرفاق صور بعد" : "تم إرفاق (" + photoPaths.size() + ") صور");
+            calculateEstimatedGoldValue();
+        } catch (Exception e) {
+            Log.e(TAG, "setArabicTexts error: " + e.getMessage());
+        }
+    }
+
+    private void setEnglishTexts() {
+        try {
+            binding.tvStepTitle.setText("Step 1 of 4: Bind & Classify");
+            binding.tilEpc.setHint("EPC / GTIN Code...");
+            binding.btnScanRfid.setText("Scan RFID Tag");
+            binding.etTitle.setHint("Item Title & Description");
+            binding.btnSaveIdentity.setText("Approve & Export MIRA ID");
+            binding.btnAddPhotos.setText("📷 Capture / Attach Photos");
+            binding.tvPhotosCount.setText(photoPaths.isEmpty() ? "No photos attached yet" : "Attached (" + photoPaths.size() + ") photos");
+            calculateEstimatedGoldValue();
+        } catch (Exception e) {
+            Log.e(TAG, "setEnglishTexts error: " + e.getMessage());
+        }
+    }
+
+    private void initSuggestionsData() {
+        typeSuggestions.clear();
+        if (isArabic) {
+            typeSuggestions.put("rings", new String[]{"خاتم سوليتير ألماسي", "خاتم محبس كلاسيك", "خاتم توينز راقي"});
+            typeSuggestions.put("sets", new String[]{"طقم شبكة عروس كامل", "طقم ملكي مرصع بالألماس"});
+            typeSuggestions.put("bracelets", new String[]{"بناجر / أساور خليجي", "سوار تنادي عصري"});
+            typeSuggestions.put("necklaces", new String[]{"عقد شوكر عصري", "سلسلة ذهبية ناعمة"});
+        } else {
+            typeSuggestions.put("rings", new String[]{"Diamond Solitaire Ring", "Classic Band Ring", "Twins Ring"});
+            typeSuggestions.put("sets", new String[]{"Complete Bridal Set", "Royal Diamond Set"});
+            typeSuggestions.put("bracelets", new String[]{"Khaleeji Bangle", "Modern Tennis Bracelet"});
+            typeSuggestions.put("necklaces", new String[]{"Modern Choker", "Fine Gold Chain"});
+        }
+    }
+
+    private void setupListeners() {
+        try {
+            binding.etEpc.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    try { binding.tvStatusBadge.setText(s.length() > 0 ? "BOUND" : "WAITING"); } catch (Exception ignored) {}
+                }
+                @Override public void afterTextChanged(Editable s) {}
+            });
+
+            if (binding.tilEpc != null) {
+                binding.tilEpc.setEndIconOnClickListener(v -> openBarcodeScannerForEPC());
+            }
+
+            if (binding.btnScanRfid != null) {
+                binding.btnScanRfid.setOnClickListener(v -> activateRFIDModeForEncoding());
+            }
+
+            binding.switchHasStones.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                try { 
+                    binding.layoutStonesDetails.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+                    calculateEstimatedGoldValue();
+                } catch (Exception ignored) {}
+            });
+
+            binding.etGrossWeight.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    calculateEstimatedGoldValue();
+                }
+                @Override public void afterTextChanged(Editable s) {}
+            });
+
+            binding.etStoneValue.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    calculateEstimatedGoldValue();
+                }
+                @Override public void afterTextChanged(Editable s) {}
+            });
+
+            binding.chipGroupKarat.setOnCheckedStateChangeListener((group, checkedIds) ->
+                    calculateEstimatedGoldValue());
+
+            binding.chipGroupTypes.setOnCheckedStateChangeListener((group, checkedIds) -> {
+                try {
+                    if (checkedIds.isEmpty()) return;
+                    int id = checkedIds.get(0);
+                    if (id == binding.chipRing.getId()) populateSuggestions("rings");
+                    else if (id == binding.chipSet.getId()) populateSuggestions("sets");
+                    else if (id == binding.chipBracelet.getId()) populateSuggestions("bracelets");
+                    else if (id == binding.chipNecklace.getId()) populateSuggestions("necklaces");
+                } catch (Exception ignored) {}
+            });
+
+            binding.btnAddPhotos.setOnClickListener(v -> showImageSourceDialog());
+            binding.btnSaveIdentity.setOnClickListener(v -> finalizeItemIdentity());
+        } catch (Exception e) {
+            Log.e(TAG, "setupListeners error: " + e.getMessage());
+        }
+    }
 
     private int getSelectedKaratNumber() {
         try {
@@ -168,6 +267,19 @@ public void onResume() {
             Log.e(TAG, "getSelectedKaratNumber error: " + e.getMessage());
         }
         return 21;
+    }
+
+    private String getSelectedKaratCode() {
+        try {
+            int checkedId = binding.chipGroupKarat.getCheckedChipId();
+            if (checkedId == binding.chip24K.getId()) return "24K";
+            if (checkedId == binding.chip21K.getId()) return "21K";
+            if (checkedId == binding.chip18K.getId()) return "18K";
+            if (checkedId == binding.chip14K.getId()) return "14K";
+        } catch (Exception e) {
+            Log.e(TAG, "getSelectedKaratCode error: " + e.getMessage());
+        }
+        return "21K";
     }
 
     private void calculateEstimatedGoldValue() {
@@ -233,8 +345,6 @@ public void onResume() {
         int karat = getSelectedKaratNumber();
         return priceManager.getFinalPricePerGram(karat);
     }
-
-    // ==================== الكاميرا والاستوديو ====================
 
     private void setupPhotoLaunchers() {
         requestPermissionLauncher = registerForActivityResult(
@@ -384,117 +494,6 @@ public void onResume() {
         }
     }
 
-    // ==================== إعداد اللغة والنصوص ====================
-
-    private void setArabicTexts() {
-        try {
-            binding.tvStepTitle.setText("الخطوة 1 من 4: الربط والتصنيف");
-            binding.tilEpc.setHint("رمز الشريحة (EPC / GTIN)...");
-            binding.btnScanRfid.setText("مسح رمز RFID");
-            binding.etTitle.setHint("عنوان ووصف القطعة");
-            binding.btnSaveIdentity.setText("اعتماد الموزون وتصدير MIRA ID");
-            binding.btnAddPhotos.setText("📷 التقاط / إرفاق صور القطعة");
-            binding.tvPhotosCount.setText(photoPaths.isEmpty() ? "لم يتم إرفاق صور بعد" : "تم إرفاق (" + photoPaths.size() + ") صور");
-            calculateEstimatedGoldValue();
-        } catch (Exception e) {
-            Log.e(TAG, "setArabicTexts error: " + e.getMessage());
-        }
-    }
-
-    private void setEnglishTexts() {
-        try {
-            binding.tvStepTitle.setText("Step 1 of 4: Bind & Classify");
-            binding.tilEpc.setHint("EPC / GTIN Code...");
-            binding.btnScanRfid.setText("Scan RFID Tag");
-            binding.etTitle.setHint("Item Title & Description");
-            binding.btnSaveIdentity.setText("Approve & Export MIRA ID");
-            binding.btnAddPhotos.setText("📷 Capture / Attach Photos");
-            binding.tvPhotosCount.setText(photoPaths.isEmpty() ? "No photos attached yet" : "Attached (" + photoPaths.size() + ") photos");
-            calculateEstimatedGoldValue();
-        } catch (Exception e) {
-            Log.e(TAG, "setEnglishTexts error: " + e.getMessage());
-        }
-    }
-
-    private void initSuggestionsData() {
-        typeSuggestions.clear();
-        if (isArabic) {
-            typeSuggestions.put("rings", new String[]{"خاتم سوليتير ألماسي", "خاتم محبس كلاسيك", "خاتم توينز راقي"});
-            typeSuggestions.put("sets", new String[]{"طقم شبكة عروس كامل", "طقم ملكي مرصع بالألماس"});
-            typeSuggestions.put("bracelets", new String[]{"بناجر / أساور خليجي", "سوار تنادي عصري"});
-            typeSuggestions.put("necklaces", new String[]{"عقد شوكر عصري", "سلسلة ذهبية ناعمة"});
-        } else {
-            typeSuggestions.put("rings", new String[]{"Diamond Solitaire Ring", "Classic Band Ring", "Twins Ring"});
-            typeSuggestions.put("sets", new String[]{"Complete Bridal Set", "Royal Diamond Set"});
-            typeSuggestions.put("bracelets", new String[]{"Khaleeji Bangle", "Modern Tennis Bracelet"});
-            typeSuggestions.put("necklaces", new String[]{"Modern Choker", "Fine Gold Chain"});
-        }
-    }
-
-    private void setupListeners() {
-        try {
-            binding.etEpc.addTextChangedListener(new TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    try { binding.tvStatusBadge.setText(s.length() > 0 ? "BOUND" : "WAITING"); } catch (Exception ignored) {}
-                }
-                @Override public void afterTextChanged(Editable s) {}
-            });
-
-            if (binding.tilEpc != null) {
-                binding.tilEpc.setEndIconOnClickListener(v -> openBarcodeScannerForEPC());
-            }
-
-            if (binding.btnScanRfid != null) {
-                binding.btnScanRfid.setOnClickListener(v -> activateRFIDModeForEncoding());
-            }
-
-            binding.switchHasStones.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                try { 
-                    binding.layoutStonesDetails.setVisibility(isChecked ? View.VISIBLE : View.GONE);
-                    calculateEstimatedGoldValue();
-                } catch (Exception ignored) {}
-            });
-
-            binding.etGrossWeight.addTextChangedListener(new TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    calculateEstimatedGoldValue();
-                }
-                @Override public void afterTextChanged(Editable s) {}
-            });
-
-            binding.etStoneValue.addTextChangedListener(new TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    calculateEstimatedGoldValue();
-                }
-                @Override public void afterTextChanged(Editable s) {}
-            });
-
-            binding.chipGroupKarat.setOnCheckedStateChangeListener((group, checkedIds) ->
-                    calculateEstimatedGoldValue());
-
-            binding.chipGroupTypes.setOnCheckedStateChangeListener((group, checkedIds) -> {
-                try {
-                    if (checkedIds.isEmpty()) return;
-                    int id = checkedIds.get(0);
-                    if (id == binding.chipRing.getId()) populateSuggestions("rings");
-                    else if (id == binding.chipSet.getId()) populateSuggestions("sets");
-                    else if (id == binding.chipBracelet.getId()) populateSuggestions("bracelets");
-                    else if (id == binding.chipNecklace.getId()) populateSuggestions("necklaces");
-                } catch (Exception ignored) {}
-            });
-
-            binding.btnAddPhotos.setOnClickListener(v -> showImageSourceDialog());
-            binding.btnSaveIdentity.setOnClickListener(v -> finalizeItemIdentity());
-        } catch (Exception e) {
-            Log.e(TAG, "setupListeners error: " + e.getMessage());
-        }
-    }
-
-    // ==================== المسح الضوئي و RFID ====================
-
     private void openBarcodeScannerForEPC() {
         try {
             if (!isAdded()) return;
@@ -575,7 +574,18 @@ public void onResume() {
     }
 
     private boolean isValidEPC(String epc) {
-        return epc != null && epc.matches("^[A-Fa-f0-9]{6,}$");
+        if (epc == null || epc.isEmpty()) return false;
+        
+        // EPC RFID قياسي = 24+ حرف hex
+        if (epc.matches("^[A-Fa-f0-9]{24,}$")) return true;
+        
+        // GTIN-13 = 13 رقم بالضبط
+        if (epc.matches("^\\d{13}$")) return true;
+        
+        // Serial Number = 6-50 حرف/رقم/شرطة
+        if (epc.matches("^[A-Za-z0-9\\-]{6,50}$")) return true;
+        
+        return false;
     }
 
     private void populateSuggestions(String typeKey) {
@@ -595,8 +605,6 @@ public void onResume() {
             Log.e(TAG, "populateSuggestions error: " + e.getMessage());
         }
     }
-
-    // ==================== نافذة النجاح ====================
 
     private void showEncodingSuccessDialog(String title, String epc, String weight, double finalPrice) {
         if (!isAdded() || getContext() == null) return;
@@ -663,8 +671,6 @@ public void onResume() {
         identityDialog.show();
     }
 
-    // ==================== حفظ التكويد مع التحقق ====================
-
     private void finalizeItemIdentity() {
         try {
             if (binding == null) return;
@@ -678,7 +684,19 @@ public void onResume() {
                 return; 
             }
             if (!isValidEPC(epc)) { 
-                showValidationError(isArabic ? "صيغة RFID غير صالحة" : "Invalid RFID format"); 
+                showValidationError(isArabic ? 
+                    "❌ رمز RFID غير صالح!\n\n" +
+                    "يجب أن يكون:\n" +
+                    "• EPC قياسي (24+ حرف hex)\n" +
+                    "• أو GTIN-13 (13 رقم)\n" +
+                    "• أو Serial Number (6+ أحرف)\n\n" +
+                    "الرمز الحالي: " + epc : 
+                    "❌ Invalid RFID code!\n\n" +
+                    "Must be:\n" +
+                    "• Standard EPC (24+ hex chars)\n" +
+                    "• Or GTIN-13 (13 digits)\n" +
+                    "• Or Serial Number (6+ chars)\n\n" +
+                    "Current code: " + epc); 
                 return; 
             }
             if (title.isEmpty()) { 
@@ -839,6 +857,7 @@ public void onResume() {
                     String serverBarcode = "";
                     String serverSerial = "";
                     int serverItemId = 0;
+                    String serverErrorMessage = "";
 
                     try {
                         MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
@@ -847,13 +866,19 @@ public void onResume() {
                             serverBarcode = response.data.optString("barcode", "");
                             serverSerial = response.data.optString("serial_number", "");
                             serverItemId = response.data.optInt("item_id", 0);
+                            serverErrorMessage = response.data.optString("message", "");
+                        }
+                        if (response != null && response.error != null && !response.error.isEmpty()) {
+                            serverErrorMessage = response.error;
                         }
                     } catch (Exception apiError) {
                         Log.e(TAG, "API encode failed: " + apiError.getMessage());
+                        serverErrorMessage = apiError.getMessage();
                     }
 
                     final boolean success = apiSuccess;
                     final int finalServerItemId = serverItemId;
+                    final String finalServerErrorMessage = serverErrorMessage;
 
                     safeRun(() -> {
                         try {
@@ -883,10 +908,17 @@ public void onResume() {
                                 }
 
                             } else {
-                                saveEncodeOffline(payload);
-                                showToast(isArabic ? "💾 تم حفظ التكويد محلياً للمزامنة لاحقاً"
-                                        : "💾 Encoding saved locally for later sync");
-                                resetFormForNextScan();
+                                if (!finalServerErrorMessage.isEmpty() && !finalServerErrorMessage.equals("Invalid data format")) {
+                                    showErrorDialog(
+                                        isArabic ? "❌ فشل التكويد" : "❌ Encoding Failed",
+                                        finalServerErrorMessage
+                                    );
+                                } else {
+                                    saveEncodeOffline(payload);
+                                    showToast(isArabic ? "💾 تم حفظ التكويد محلياً للمزامنة لاحقاً"
+                                            : "💾 Encoding saved locally for later sync");
+                                    resetFormForNextScan();
+                                }
                             }
                         } catch (Exception e) {
                             Log.e(TAG, "UI update error: " + e.getMessage());
@@ -919,8 +951,6 @@ public void onResume() {
             showToast(message);
         }
     }
-
-    // ==================== رفع الصور ====================
 
     private void uploadItemImages(int itemId, List<String> imagePaths) {
         if (imagePaths == null || imagePaths.isEmpty() || itemId <= 0) return;
@@ -961,8 +991,6 @@ public void onResume() {
         }
         uploadItemImages(itemId, paths);
     }
-
-    // ==================== المعالجة والمزامنة المحلية ====================
 
     private void saveEncodeOffline(JSONObject payload) {
         try {
@@ -1039,8 +1067,6 @@ public void onResume() {
         }).start();
     }
 
-    // ==================== المساعدات ====================
-
     private void safeRun(Runnable r) {
         try {
             if (isAdded() && getActivity() != null) {
@@ -1115,22 +1141,9 @@ public void onResume() {
         }
     }
 
-    private String getSelectedKaratCode() {
-        try {
-            int checkedId = binding.chipGroupKarat.getCheckedChipId();
-            if (checkedId == binding.chip24K.getId()) return "24K";
-            if (checkedId == binding.chip21K.getId()) return "21K";
-            if (checkedId == binding.chip18K.getId()) return "18K";
-            if (checkedId == binding.chip14K.getId()) return "14K";
-        } catch (Exception e) {
-            Log.e(TAG, "getSelectedKaratCode error: " + e.getMessage());
-        }
-        return "21K";
-    }
-
     @Override
     public void onDestroyView() {
         super.onDestroyView();
         binding = null;
     }
-}
+            }
