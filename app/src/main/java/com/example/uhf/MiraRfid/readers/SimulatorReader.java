@@ -25,9 +25,15 @@ public class SimulatorReader implements MiraIRFIDReader {
     private final Map<String, SimulatedTag> tagsMap = new HashMap<>();
     private String currentSelectedEpc = "";
     
+    // ✅ Constructor يقبل Context
     public SimulatorReader(Context context) {
         this.context = context;
         initializeDemoTags();
+    }
+    
+    // ✅ Constructor بدون معاملات (للتغلب على مشكلة الـ Factory)
+    public SimulatorReader() {
+        this(null);
     }
     
     private void initializeDemoTags() {
