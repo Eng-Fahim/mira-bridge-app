@@ -1073,19 +1073,22 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     private void updatePendingSyncBadge() {
-        try {
-            if (offlineCache == null || binding == null || binding.tvPendingSyncCount == null) return;
-            String json = offlineCache.getString("pending_encodes", "[]");
-            JSONArray arr = new JSONArray(json);
-            int count = arr.length();
+    try {
+        if (offlineCache == null || binding == null) return;
+        String json = offlineCache.getString("pending_encodes", "[]");
+        JSONArray arr = new JSONArray(json);
+        int count = arr.length();
+        
+        if (binding.tvPendingSyncCount != null) {
             if (count > 0) {
                 binding.tvPendingSyncCount.setVisibility(View.VISIBLE);
                 binding.tvPendingSyncCount.setText(isArabic ? "انتظار المزامنة: " + count : "Pending Sync: " + count);
             } else {
                 binding.tvPendingSyncCount.setVisibility(View.GONE);
             }
-        } catch (Exception ignored) {}
-    }
+        }
+    } catch (Exception ignored) {}
+}
 
     private void syncPendingEncodes() {
         if (apiClient == null || offlineCache == null) return;
@@ -1260,4 +1263,3 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 }
-
