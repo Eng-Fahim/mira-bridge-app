@@ -1,5 +1,5 @@
 package com.example.uhf.MiraRfid.readers;
-
+import android.content.Context;.
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 
 /**
