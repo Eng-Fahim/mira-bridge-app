@@ -54,6 +54,7 @@ import com.example.uhf.fragment.MiraUHFReadTagFragment;
 import com.example.uhf.fragment.MiraUHFRadarLocationFragment;
 import com.example.uhf.fragment.UHFLocationFragment;
 import com.example.uhf.fragment.UHFSetFragment;
+import com.example.uhf.fragment.MiraProfileFragment;
 import com.example.uhf.fragment.UsersManagementFragment;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
@@ -773,4 +774,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
     }
-                }
+    }
