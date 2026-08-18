@@ -24,9 +24,7 @@ import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.MiraRfid.MiraRfidService;
 import com.example.uhf.manager.MiraSettingsManager;
-import com.example.uhf.tools.StringUtils;
 import com.rscja.deviceapi.RFIDWithUHFUART;
-import com.rscja.utility.StringUtility;
 
 import org.json.JSONObject;
 
@@ -45,7 +43,6 @@ import java.util.Random;
 public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.OnClickListener {
     private static final String TAG = "MiraUHFReadWriteFragment";
     private UHFMainActivity mContext;
-    private MiraSettingsManager settingsManager;
     private MiraRfidService rfidService;
 
     Spinner SpinnerBank;
@@ -76,7 +73,6 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         super.onActivityCreated(savedInstanceState);
         mContext = (UHFMainActivity) getActivity();
         mContext.currentFragment = this;
-        settingsManager = MiraSettingsManager.getInstance(mContext);
         
         // ✅ استخدام الخدمة الموحدة
         rfidService = MiraRfidService.getInstance(mContext);
@@ -341,24 +337,28 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         boolean verifySuccess = rfidService.verifyWrite(newEpc, pwdStr);
         
         // تسجيل الربط
-        String miraId = currentMiraId.isEmpty() ? currentGtin : currentMiraId;
+        final String miraId = currentMiraId.isEmpty() ? currentGtin : currentMiraId;
+        final String finalNewEpc = newEpc;
+        final String finalTidData = tidData;
+        final boolean finalWriteSuccess = writeSuccess;
+        final boolean finalVerifySuccess = verifySuccess;
         
         new Thread(() -> {
-            boolean registered = rfidService.registerRfidBinding(miraId, newEpc, tidData);
+            boolean registered = rfidService.registerRfidBinding(miraId, finalNewEpc, finalTidData);
             
             getActivity().runOnUiThread(() -> {
-                if (writeSuccess && verifySuccess && registered) {
+                if (finalWriteSuccess && finalVerifySuccess && registered) {
                     tvProgrammerStatus.setText("✅ تمت البرمجة والتسجيل بنجاح\n" +
                         "MIRA ID: " + miraId + "\n" +
-                        "EPC: " + newEpc + "\n" +
-                        "TID: " + (tidData != null ? tidData : "غير متوفر") + "\n" +
+                        "EPC: " + finalNewEpc + "\n" +
+                        "TID: " + (finalTidData != null ? finalTidData : "غير متوفر") + "\n" +
                         (rfidService.isSimulationMode() ? "🔬 (وضع المحاكاة)" : ""));
                     tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
                     mContext.playSound(1);
                 } else {
                     tvProgrammerStatus.setText("⚠️ فشلت العملية\n" +
-                        "كتابة: " + (writeSuccess ? "✅" : "❌") + "\n" +
-                        "تحقق: " + (verifySuccess ? "✅" : "❌") + "\n" +
+                        "كتابة: " + (finalWriteSuccess ? "✅" : "❌") + "\n" +
+                        "تحقق: " + (finalVerifySuccess ? "✅" : "❌") + "\n" +
                         "تسجيل: " + (registered ? "✅" : "❌"));
                     tvProgrammerStatus.setTextColor(Color.parseColor("#FF9800"));
                     mContext.playSound(2);
@@ -408,33 +408,30 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
 
     // ============ كتابة مع تحقق ============
     private void writeAndVerify() {
-    String newEpc = EtData.getText().toString().trim();
-    String pwdStr = EtAccessPwd.getText().toString().trim();
-    if (TextUtils.isEmpty(pwdStr)) pwdStr = "00000000";
-    
-    // ✅ اجعل المتغيرات final
-    final String finalNewEpc = newEpc;
-    final String finalPwdStr = pwdStr;
-    
-    addLog("✍️ كتابة مع تحقق: " + finalNewEpc);
-    boolean writeSuccess = rfidService.writeEpc(finalNewEpc, finalPwdStr);
-    
-    new Handler(Looper.getMainLooper()).postDelayed(() -> {
-        boolean verifySuccess = rfidService.verifyWrite(finalNewEpc, finalPwdStr);
+        String newEpc = EtData.getText().toString().trim();
+        String pwdStr = EtAccessPwd.getText().toString().trim();
+        if (TextUtils.isEmpty(pwdStr)) pwdStr = "00000000";
         
-        if (writeSuccess && verifySuccess) {
-            tvProgrammerStatus.setText("✅ كتابة وتحقق ناجح");
-            tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
-            addLog("✅ كتابة وتحقق ناجح");
-            mContext.playSound(1);
-        } else {
-            tvProgrammerStatus.setText("⚠️ التحقق فشل");
-            tvProgrammerStatus.setTextColor(Color.parseColor("#FF9800"));
-            addLog("⚠️ كتابة: " + (writeSuccess ? "✅" : "❌") + " | تحقق: " + (verifySuccess ? "✅" : "❌"));
-            mContext.playSound(2);
-        }
-    }, 500);
-}
+        final String finalNewEpc = newEpc;
+        final String finalPwdStr = pwdStr;
+        
+        boolean writeSuccess = rfidService.writeEpc(finalNewEpc, finalPwdStr);
+        
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            boolean verifySuccess = rfidService.verifyWrite(finalNewEpc, finalPwdStr);
+            
+            if (writeSuccess && verifySuccess) {
+                tvProgrammerStatus.setText("✅ كتابة وتحقق ناجح" + (rfidService.isSimulationMode() ? " (محاكاة)" : ""));
+                tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
+                mContext.playSound(1);
+            } else {
+                tvProgrammerStatus.setText("⚠️ فشل التحقق\nكتابة: " + (writeSuccess ? "✅" : "❌") + 
+                    " | تحقق: " + (verifySuccess ? "✅" : "❌"));
+                tvProgrammerStatus.setTextColor(Color.parseColor("#FF9800"));
+                mContext.playSound(2);
+            }
+        }, 500);
+    }
 
     // ============ قراءة TID ============
     private void readTid() {
@@ -485,4 +482,4 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
     public void onDestroyView() {
         super.onDestroyView();
     }
-    }
+}
