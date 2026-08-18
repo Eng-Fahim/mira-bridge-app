@@ -428,12 +428,13 @@ public class MiraGoldCurrencyFragment extends Fragment {
             editor.putLong("gold_last_update", System.currentTimeMillis());
             editor.apply();
             
-            // ✅ إرسال للسيرفر بالصيغة الصحيحة
-            JSONObject requestPayload = new JSONObject();
-            requestPayload.put("gold", goldData);
+            // ✅ إرسال للسيرفر - بالصيغة الصحيحة
+            JSONObject goldPayload = new JSONObject();
+            goldPayload.put("gold", goldData);
+            JSONObject emptyCurrency = new JSONObject();
             
             com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
-            com.example.uhf.api.MiraApiClient.ApiResponse response = client.saveGoldCurrencySettings(requestPayload);
+            com.example.uhf.api.MiraApiClient.ApiResponse response = client.saveGoldCurrencySettings(goldPayload, emptyCurrency);
             
             final boolean serverSaved = response.isSuccess;
             mainHandler.post(() -> {
@@ -487,7 +488,6 @@ public class MiraGoldCurrencyFragment extends Fragment {
             currencyData.put("exchange_market_SAR", getDouble(etExchangeMarketSAR));
             currencyData.put("exchange_market_AED", getDouble(etExchangeMarketAED));
             
-            // ✅ حفظ مصادر الصرف
             currencyData.put("exchange_source_YER", useMarketRate ? "market" : "official");
             currencyData.put("exchange_source_EGP", useMarketRate ? "market" : "official");
             currencyData.put("exchange_source_SAR", useMarketRate ? "market" : "official");
@@ -499,12 +499,13 @@ public class MiraGoldCurrencyFragment extends Fragment {
             editor.putBoolean("use_market_rate", useMarketRate);
             editor.apply();
             
-            // ✅ إرسال للسيرفر بالصيغة الصحيحة
-            JSONObject requestPayload = new JSONObject();
-            requestPayload.put("currency", currencyData);
+            // ✅ إرسال للسيرفر - بالصيغة الصحيحة
+            JSONObject currencyPayload = new JSONObject();
+            currencyPayload.put("currency", currencyData);
+            JSONObject emptyGold = new JSONObject();
             
             com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
-            com.example.uhf.api.MiraApiClient.ApiResponse response = client.saveGoldCurrencySettings(requestPayload);
+            com.example.uhf.api.MiraApiClient.ApiResponse response = client.saveGoldCurrencySettings(emptyGold, currencyPayload);
             
             final boolean serverSaved = response.isSuccess;
             mainHandler.post(() -> {
