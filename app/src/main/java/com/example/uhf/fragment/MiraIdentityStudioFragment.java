@@ -672,271 +672,384 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     private void finalizeItemIdentity() {
-        try {
-            if (binding == null) return;
+    try {
+        if (binding == null) return;
 
-            String epc = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
-            String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
-            String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
+        String epc = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
+        String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
+        String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
 
-            if (epc.isEmpty()) { 
-                showValidationError(isArabic ? "يرجى مسح RFID أولاً" : "Please scan RFID first");
-                return; 
-            }
-            if (!isValidEPC(epc)) { 
-                showValidationError(isArabic ? 
-                    "❌ رمز RFID غير صالح!\n\n" +
-                    "يجب أن يكون:\n" +
-                    "• EPC قياسي (24+ حرف hex)\n" +
-                    "• أو GTIN-13 (13 رقم)\n" +
-                    "• أو Serial Number (6+ أحرف)\n\n" +
-                    "الرمز الحالي: " + epc : 
-                    "❌ Invalid RFID code!\n\n" +
-                    "Must be:\n" +
-                    "• Standard EPC (24+ hex chars)\n" +
-                    "• Or GTIN-13 (13 digits)\n" +
-                    "• Or Serial Number (6+ chars)\n\n" +
-                    "Current code: " + epc); 
-                return; 
-            }
-            if (title.isEmpty()) { 
-                showValidationError(isArabic ? "يرجى كتابة عنوان القطعة" : "Please enter item title"); 
-                return; 
-            }
-            if (weightStr.isEmpty()) { 
-                showValidationError(isArabic ? "يرجى تحديد وزن القطعة" : "Please specify item weight"); 
-                return; 
-            }
+        // ✅ التحقق من البيانات
+        if (epc.isEmpty()) { 
+            showValidationError(isArabic ? "يرجى مسح RFID أولاً" : "Please scan RFID first");
+            return; 
+        }
+        if (!isValidEPC(epc)) { 
+            showValidationError(isArabic ? 
+                "❌ رمز RFID غير صالح!\n\n" +
+                "يجب أن يكون:\n" +
+                "• EPC قياسي (24+ حرف hex)\n" +
+                "• أو GTIN-13 (13 رقم)\n" +
+                "• أو Serial Number (6+ أحرف)\n\n" +
+                "الرمز الحالي: " + epc : 
+                "❌ Invalid RFID code!\n\n" +
+                "Must be:\n" +
+                "• Standard EPC (24+ hex chars)\n" +
+                "• Or GTIN-13 (13 digits)\n" +
+                "• Or Serial Number (6+ chars)\n\n" +
+                "Current code: " + epc); 
+            return; 
+        }
+        if (title.isEmpty()) { 
+            showValidationError(isArabic ? "يرجى كتابة عنوان القطعة" : "Please enter item title"); 
+            return; 
+        }
+        if (weightStr.isEmpty()) { 
+            showValidationError(isArabic ? "يرجى تحديد وزن القطعة" : "Please specify item weight"); 
+            return; 
+        }
 
-            double grossWeight;
-            try { 
-                grossWeight = Double.parseDouble(weightStr); 
-            } catch (NumberFormatException e) { 
-                showValidationError(isArabic ? "وزن غير صالح" : "Invalid weight"); 
-                return; 
-            }
+        double grossWeight;
+        try { 
+            grossWeight = Double.parseDouble(weightStr); 
+        } catch (NumberFormatException e) { 
+            showValidationError(isArabic ? "وزن غير صالح" : "Invalid weight"); 
+            return; 
+        }
 
-            if (grossWeight <= 0) {
-                showValidationError(isArabic ? "يجب أن يكون الوزن أكبر من صفر" : "Weight must be greater than zero");
+        if (grossWeight <= 0) {
+            showValidationError(isArabic ? "يجب أن يكون الوزن أكبر من صفر" : "Weight must be greater than zero");
+            return;
+        }
+
+        // ✅ استخراج بيانات الأحجار
+        String stoneType = "";
+        double stoneWeight = 0;
+        int stoneCount = 0;
+        double stoneValue = 0;
+
+        if (binding.switchHasStones.isChecked()) {
+            stoneType = binding.etStoneType.getText() != null ? binding.etStoneType.getText().toString().trim() : "";
+            String stoneWeightStr = binding.etStoneWeight.getText() != null ? binding.etStoneWeight.getText().toString().trim() : "";
+            String stoneCountStr = binding.etStoneCount.getText() != null ? binding.etStoneCount.getText().toString().trim() : "";
+            String stoneValueStr = binding.etStoneValue.getText() != null ? binding.etStoneValue.getText().toString().trim() : "";
+
+            if (stoneType.isEmpty()) {
+                showValidationError(isArabic ? "يرجى إدخال نوع الأحجار" : "Please enter stone type");
                 return;
             }
 
-            String stoneType = "";
-            double stoneWeight = 0;
-            int stoneCount = 0;
-            double stoneValue = 0;
-
-            if (binding.switchHasStones.isChecked()) {
-                stoneType = binding.etStoneType.getText() != null ? binding.etStoneType.getText().toString().trim() : "";
-                String stoneWeightStr = binding.etStoneWeight.getText() != null ? binding.etStoneWeight.getText().toString().trim() : "";
-                String stoneCountStr = binding.etStoneCount.getText() != null ? binding.etStoneCount.getText().toString().trim() : "";
-                String stoneValueStr = binding.etStoneValue.getText() != null ? binding.etStoneValue.getText().toString().trim() : "";
-
-                if (stoneType.isEmpty()) {
-                    showValidationError(isArabic ? "يرجى إدخال نوع الأحجار" : "Please enter stone type");
-                    return;
-                }
-
-                try {
-                    stoneWeight = Double.parseDouble(stoneWeightStr);
-                    if (stoneWeight <= 0) {
-                        showValidationError(isArabic ? "وزن الأحجار غير صالح" : "Invalid stone weight");
-                        return;
-                    }
-                } catch (NumberFormatException e) {
+            try {
+                stoneWeight = Double.parseDouble(stoneWeightStr);
+                if (stoneWeight <= 0) {
                     showValidationError(isArabic ? "وزن الأحجار غير صالح" : "Invalid stone weight");
                     return;
                 }
+            } catch (NumberFormatException e) {
+                showValidationError(isArabic ? "وزن الأحجار غير صالح" : "Invalid stone weight");
+                return;
+            }
 
-                try {
-                    stoneCount = Integer.parseInt(stoneCountStr);
-                    if (stoneCount <= 0) {
-                        showValidationError(isArabic ? "عدد الأحجار غير صالح" : "Invalid stone count");
-                        return;
-                    }
-                } catch (NumberFormatException e) {
+            try {
+                stoneCount = Integer.parseInt(stoneCountStr);
+                if (stoneCount <= 0) {
                     showValidationError(isArabic ? "عدد الأحجار غير صالح" : "Invalid stone count");
                     return;
                 }
+            } catch (NumberFormatException e) {
+                showValidationError(isArabic ? "عدد الأحجار غير صالح" : "Invalid stone count");
+                return;
+            }
 
-                try {
-                    stoneValue = Double.parseDouble(stoneValueStr);
-                    if (stoneValue < 0) {
-                        showValidationError(isArabic ? "قيمة الأحجار غير صالحة" : "Invalid stone value");
-                        return;
-                    }
-                } catch (NumberFormatException e) {
+            try {
+                stoneValue = Double.parseDouble(stoneValueStr);
+                if (stoneValue < 0) {
                     showValidationError(isArabic ? "قيمة الأحجار غير صالحة" : "Invalid stone value");
                     return;
                 }
+            } catch (NumberFormatException e) {
+                showValidationError(isArabic ? "قيمة الأحجار غير صالحة" : "Invalid stone value");
+                return;
             }
+        }
 
-            double[] pricing = calculatePricingDetails(grossWeight, stoneValue);
-            double finalGoldValue = pricing[0];
-            double finalMakingCost = pricing[1];
-            double finalTotalCost = pricing[3];
-            double finalProfitAmount = pricing[4];
-            double finalRetailPrice = pricing[5];
+        // ✅ حساب التسعير
+        double[] pricing = calculatePricingDetails(grossWeight, stoneValue);
+        final double finalGoldValue = pricing[0];
+        final double finalMakingCost = pricing[1];
+        final double finalTotalCost = pricing[3];
+        final double finalProfitAmount = pricing[4];
+        final double finalRetailPrice = pricing[5];
 
-            final AlertDialog loadingDialog = showLoadingDialog(
-                    isArabic ? "🔄 جاري التكويد والربط السحابي..." : "🔄 Encoding & Cloud Linking..."
-            );
+        // ✅ 1. إظهار شريط التقدم الاحترافي
+        final AlertDialog loadingDialog = showProfessionalLoadingDialog(
+            isArabic ? "🔄 جاري التكويد..." : "🔄 Encoding in progress...",
+            isArabic ? "يرجى الانتظار - يتم الآن حفظ القطعة وربطها بالنظام" : "Please wait - saving item and linking to system"
+        );
 
+        // ✅ 2. تعطيل جميع العناصر التفاعلية
+        setFormEnabled(false);
+
+        // ✅ تجهيز البيانات النهائية
+        final String finalEpc = epc;
+        final String finalTitle = title;
+        final double fGrossWeight = grossWeight;
+        final double fStoneWeight = stoneWeight;
+        final int fStoneCount = stoneCount;
+        final double fStoneValue = stoneValue;
+        final String fStoneType = stoneType;
+        final String selectedKarat = getSelectedKaratCode();
+        final String selectedCategory = getSelectedCategory();
+        final String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
+        final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
+        final List<String> finalPhotoPaths = new ArrayList<>(photoPaths);
+        final double fGoldValue = finalGoldValue;
+        final double fMakingCost = finalMakingCost;
+        final double fTotalCost = finalTotalCost;
+        final double fProfitAmount = finalProfitAmount;
+        final double fRetailPrice = finalRetailPrice;
+        final int selectedKaratNum = getSelectedKaratNumber();
+        final int currentUserId = getCurrentUserId();
+
+        Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                binding.btnSaveIdentity.setEnabled(false);
-                binding.btnAddPhotos.setEnabled(false);
-                binding.etEpc.setEnabled(false);
-                binding.etTitle.setEnabled(false);
-                binding.etGrossWeight.setEnabled(false);
-            } catch (Exception ignored) {}
+                if (apiClient == null && getContext() != null) {
+                    apiClient = MiraApiClient.getInstance(getContext());
+                }
 
-            final String finalEpc = epc;
-            final String finalTitle = title;
-            final double fGrossWeight = grossWeight;
-            final double fStoneWeight = stoneWeight;
-            final int fStoneCount = stoneCount;
-            final double fStoneValue = stoneValue;
-            final String fStoneType = stoneType;
-            final String selectedKarat = getSelectedKaratCode();
-            final String selectedCategory = getSelectedCategory();
-            final String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
-            final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
-            final List<String> finalPhotoPaths = new ArrayList<>(photoPaths);
-            final double fGoldValue = finalGoldValue;
-            final double fMakingCost = finalMakingCost;
-            final double fTotalCost = finalTotalCost;
-            final double fProfitAmount = finalProfitAmount;
-            final double fRetailPrice = finalRetailPrice;
-            final int selectedKaratNum = getSelectedKaratNumber();
-
-            Executors.newSingleThreadExecutor().execute(() -> {
-                try {
-                    if (apiClient == null && getContext() != null) {
-                        apiClient = MiraApiClient.getInstance(getContext());
-                    }
-
-                    if (apiClient == null) {
-                        safeRun(() -> {
-                            dismissDialog(loadingDialog);
-                            showErrorDialog("خطأ", "API غير مهيأ");
-                        });
-                        return;
-                    }
-
-                    JSONObject payload = new JSONObject();
-                    payload.put("epc", finalEpc);
-                    payload.put("title", finalTitle);
-                    payload.put("purity_code", selectedKarat);
-                    payload.put("gross_weight", fGrossWeight);
-                    payload.put("net_weight", fGrossWeight - fStoneWeight);
-                    payload.put("stone_weight", fStoneWeight);
-                    payload.put("stone_count", fStoneCount);
-                    payload.put("stone_value", fStoneValue);
-                    payload.put("stone_type", fStoneType);
-                    payload.put("gold_price_per_gram", priceManager.getGoldPricePerGram(selectedKaratNum));
-                    payload.put("gold_value", fGoldValue);
-                    payload.put("making_per_gram", priceManager.getMakingCharge(selectedKaratNum));
-                    payload.put("making_charge", fMakingCost);
-                    payload.put("total_cost", fTotalCost);
-                    payload.put("profit_margin", priceManager.getMargin(selectedKaratNum));
-                    payload.put("profit_amount", fProfitAmount);
-                    payload.put("retail_price", fRetailPrice);
-                    payload.put("category", selectedCategory);
-                    payload.put("location", location);
-                    payload.put("branch_id", branchId);
-
-                    if (!finalPhotoPaths.isEmpty()) {
-                        JSONArray imagesArray = new JSONArray();
-                        for (String path : finalPhotoPaths) {
-                            imagesArray.put(path);
-                        }
-                        payload.put("image_paths", imagesArray);
-                    }
-
-                    boolean apiSuccess = false;
-                    String serverBarcode = "";
-                    String serverSerial = "";
-                    int serverItemId = 0;
-                    String serverErrorMessage = "";
-
-                    try {
-                        MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
-                        apiSuccess = (response != null && response.isSuccess);
-                        if (response != null && response.data != null) {
-                            serverBarcode = response.data.optString("barcode", "");
-                            serverSerial = response.data.optString("serial_number", "");
-                            serverItemId = response.data.optInt("item_id", 0);
-                            serverErrorMessage = response.data.optString("message", "");
-                        }
-                        if (response != null && response.error != null && !response.error.isEmpty()) {
-                            serverErrorMessage = response.error;
-                        }
-                    } catch (Exception apiError) {
-                        Log.e(TAG, "API encode failed: " + apiError.getMessage());
-                        serverErrorMessage = apiError.getMessage();
-                    }
-
-                    final boolean success = apiSuccess;
-                    final int finalServerItemId = serverItemId;
-                    final String finalServerErrorMessage = serverErrorMessage;
-
-                    safeRun(() -> {
-                        try {
-                            dismissDialog(loadingDialog);
-
-                            if (binding != null) {
-                                binding.btnSaveIdentity.setEnabled(true);
-                                binding.btnAddPhotos.setEnabled(true);
-                                binding.etEpc.setEnabled(true);
-                                binding.etTitle.setEnabled(true);
-                                binding.etGrossWeight.setEnabled(true);
-                            }
-
-                            if (success) {
-                                removePendingEncode(finalEpc);
-                                playSuccessSound();
-
-                                showEncodingSuccessDialog(
-                                        finalTitle,
-                                        finalEpc,
-                                        String.format(Locale.US, "%.2f", fGrossWeight),
-                                        fRetailPrice
-                                );
-
-                                if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
-                                    uploadItemImages(finalServerItemId, finalPhotoPaths);
-                                }
-
-                            } else {
-                                if (!finalServerErrorMessage.isEmpty() && !finalServerErrorMessage.equals("Invalid data format")) {
-                                    showErrorDialog(
-                                        isArabic ? "❌ فشل التكويد" : "❌ Encoding Failed",
-                                        finalServerErrorMessage
-                                    );
-                                } else {
-                                    saveEncodeOffline(payload);
-                                    showToast(isArabic ? "💾 تم حفظ التكويد محلياً للمزامنة لاحقاً"
-                                            : "💾 Encoding saved locally for later sync");
-                                    resetFormForNextScan();
-                                }
-                            }
-                        } catch (Exception e) {
-                            Log.e(TAG, "UI update error: " + e.getMessage());
-                        }
-                    });
-                } catch (Exception e) {
-                    Log.e(TAG, "Background error: " + e.getMessage());
+                if (apiClient == null) {
                     safeRun(() -> {
                         dismissDialog(loadingDialog);
-                        showErrorDialog(isArabic ? "❌ فشل التكويد" : "❌ Encoding Failed", e.getMessage());
+                        setFormEnabled(true);
+                        showErrorDialog(
+                            isArabic ? "❌ خطأ في النظام" : "❌ System Error",
+                            isArabic ? "API غير مهيأ - يرجى إعادة تشغيل التطبيق" : "API not initialized - please restart the app"
+                        );
                     });
+                    return;
                 }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "finalizeItemIdentity crash: " + e.getMessage());
-            showToast(isArabic ? "❌ خطأ: " + e.getMessage() : "❌ Error: " + e.getMessage());
-        }
+
+                JSONObject payload = new JSONObject();
+                payload.put("epc", finalEpc);
+                payload.put("title", finalTitle);
+                payload.put("purity_code", selectedKarat);
+                payload.put("gross_weight", fGrossWeight);
+                payload.put("net_weight", fGrossWeight - fStoneWeight);
+                payload.put("stone_weight", fStoneWeight);
+                payload.put("stone_count", fStoneCount);
+                payload.put("stone_value", fStoneValue);
+                payload.put("stone_type", fStoneType);
+                payload.put("gold_price_per_gram", priceManager.getGoldPricePerGram(selectedKaratNum));
+                payload.put("gold_value", fGoldValue);
+                payload.put("making_per_gram", priceManager.getMakingCharge(selectedKaratNum));
+                payload.put("making_charge", fMakingCost);
+                payload.put("total_cost", fTotalCost);
+                payload.put("profit_margin", priceManager.getMargin(selectedKaratNum));
+                payload.put("profit_amount", fProfitAmount);
+                payload.put("retail_price", fRetailPrice);
+                payload.put("category", selectedCategory);
+                payload.put("location", location);
+                payload.put("branch_id", branchId);
+                payload.put("user_id", currentUserId); // ✅ إضافة user_id
+
+                if (!finalPhotoPaths.isEmpty()) {
+                    JSONArray imagesArray = new JSONArray();
+                    for (String path : finalPhotoPaths) {
+                        imagesArray.put(path);
+                    }
+                    payload.put("image_paths", imagesArray);
+                }
+
+                boolean apiSuccess = false;
+                String serverBarcode = "";
+                String serverSerial = "";
+                int serverItemId = 0;
+                String serverErrorMessage = "";
+
+                try {
+                    MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
+                    apiSuccess = (response != null && response.isSuccess);
+                    if (response != null && response.data != null) {
+                        serverBarcode = response.data.optString("barcode", "");
+                        serverSerial = response.data.optString("serial_number", "");
+                        serverItemId = response.data.optInt("item_id", 0);
+                        serverErrorMessage = response.data.optString("message", "");
+                    }
+                    if (response != null && response.error != null && !response.error.isEmpty()) {
+                        serverErrorMessage = response.error;
+                    }
+                } catch (Exception apiError) {
+                    Log.e(TAG, "API encode failed: " + apiError.getMessage());
+                    serverErrorMessage = apiError.getMessage();
+                }
+
+                final boolean success = apiSuccess;
+                final int finalServerItemId = serverItemId;
+                final String finalServerErrorMessage = serverErrorMessage;
+
+                safeRun(() -> {
+                    try {
+                        // ✅ إخفاء شريط التقدم
+                        dismissDialog(loadingDialog);
+                        // ✅ إعادة تفعيل العناصر
+                        setFormEnabled(true);
+
+                        if (success) {
+                            // ✅ نجاح
+                            removePendingEncode(finalEpc);
+                            playSuccessSound();
+
+                            showEncodingSuccessDialog(
+                                    finalTitle,
+                                    finalEpc,
+                                    String.format(Locale.US, "%.2f", fGrossWeight),
+                                    fRetailPrice
+                            );
+
+                            if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
+                                uploadItemImages(finalServerItemId, finalPhotoPaths);
+                            }
+
+                        } else {
+                            // ✅ فشل - عرض رسالة واضحة مع زر إعادة المحاولة
+                            String errorMessage = finalServerErrorMessage;
+                            if (errorMessage == null || errorMessage.isEmpty()) {
+                                errorMessage = isArabic ? "فشل الاتصال بالسيرفر" : "Server connection failed";
+                            }
+
+                            showRetryDialog(
+                                isArabic ? "❌ فشل التكويد" : "❌ Encoding Failed",
+                                errorMessage,
+                                () -> finalizeItemIdentity() // ✅ إعادة المحاولة
+                            );
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "UI update error: " + e.getMessage());
+                        dismissDialog(loadingDialog);
+                        setFormEnabled(true);
+                        showRetryDialog(
+                            isArabic ? "❌ خطأ غير متوقع" : "❌ Unexpected Error",
+                            e.getMessage(),
+                            () -> finalizeItemIdentity()
+                        );
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Background error: " + e.getMessage());
+                safeRun(() -> {
+                    dismissDialog(loadingDialog);
+                    setFormEnabled(true);
+                    showRetryDialog(
+                        isArabic ? "❌ خطأ غير متوقع" : "❌ Unexpected Error",
+                        e.getMessage(),
+                        () -> finalizeItemIdentity()
+                    );
+                });
+            }
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "finalizeItemIdentity crash: " + e.getMessage());
+        showToast(isArabic ? "❌ خطأ: " + e.getMessage() : "❌ Error: " + e.getMessage());
     }
+}
+
+// ============================================
+// ✅ دوال مساعدة جديدة
+// ============================================
+
+/**
+ * إظهار شريط تقدم احترافي
+ */
+private AlertDialog showProfessionalLoadingDialog(String title, String message) {
+    AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+    builder.setTitle(title);
+    builder.setMessage(message);
+    builder.setCancelable(false);
+    
+    // ✅ إضافة ProgressBar دائري
+    final android.widget.ProgressBar progressBar = new android.widget.ProgressBar(requireContext());
+    progressBar.setIndeterminate(true);
+    progressBar.setPadding(40, 20, 40, 20);
+    builder.setView(progressBar);
+    
+    AlertDialog dialog = builder.create();
+    dialog.show();
+    return dialog;
+}
+
+/**
+ * تعطيل/تفعيل جميع عناصر النموذج
+ */
+private void setFormEnabled(boolean enabled) {
+    try {
+        binding.btnSaveIdentity.setEnabled(enabled);
+        binding.btnAddPhotos.setEnabled(enabled);
+        binding.etEpc.setEnabled(enabled);
+        binding.etTitle.setEnabled(enabled);
+        binding.etGrossWeight.setEnabled(enabled);
+        binding.switchHasStones.setEnabled(enabled);
+        binding.etStoneType.setEnabled(enabled);
+        binding.etStoneWeight.setEnabled(enabled);
+        binding.etStoneCount.setEnabled(enabled);
+        binding.etStoneValue.setEnabled(enabled);
+        binding.chipGroupKarat.setEnabled(enabled);
+        binding.chipGroupTypes.setEnabled(enabled);
+        binding.btnScanRfid.setEnabled(enabled);
+        
+        // ✅ تغيير شفافية الزر أثناء العملية
+        binding.btnSaveIdentity.setAlpha(enabled ? 1.0f : 0.5f);
+    } catch (Exception e) {
+        Log.e(TAG, "setFormEnabled error: " + e.getMessage());
+    }
+}
+
+/**
+ * إظهار رسالة خطأ مع زر إعادة المحاولة
+ */
+private void showRetryDialog(String title, String message, Runnable retryAction) {
+    try {
+        if (getContext() == null || !isAdded()) return;
+        
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(isArabic ? "🔄 إعادة المحاولة" : "🔄 Retry", (dialog, which) -> {
+                    dialog.dismiss();
+                    if (retryAction != null) retryAction.run();
+                })
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", (dialog, which) -> dialog.dismiss())
+                .setCancelable(false)
+                .show();
+    } catch (Exception e) {
+        showToast(message);
+    }
+}
+
+/**
+ * إخفاء الحوار
+ */
+private void dismissDialog(AlertDialog dialog) {
+    try {
+        if (dialog != null && dialog.isShowing()) {
+            dialog.dismiss();
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "dismissDialog error: " + e.getMessage());
+    }
+}
+
+/**
+ * الحصول على user_id الحالي
+ */
+private int getCurrentUserId() {
+    try {
+        if (getContext() == null) return 0;
+        SharedPreferences prefs = getContext().getSharedPreferences("session", Context.MODE_PRIVATE);
+        return prefs.getInt("user_id", 0);
+    } catch (Exception e) {
+        return 0;
+    }
+}
 
     private void showValidationError(String message) {
         try {
