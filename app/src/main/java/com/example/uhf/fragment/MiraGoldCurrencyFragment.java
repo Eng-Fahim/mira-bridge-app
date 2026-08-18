@@ -9,10 +9,13 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ProgressBar;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -28,6 +31,7 @@ import com.example.uhf.manager.MiraSettingsManager;
 import org.json.JSONObject;
 
 import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -37,6 +41,7 @@ import java.util.concurrent.Executors;
 /**
  * MIRA Gold & Currency Settings Fragment
  * واجهة متكاملة لإدارة أسعار الذهب والبورصة والعملات
+ * ✅ يدعم عملات متعددة: USD, YER, EGP, SAR, AED
  */
 public class MiraGoldCurrencyFragment extends Fragment {
 
@@ -52,6 +57,8 @@ public class MiraGoldCurrencyFragment extends Fragment {
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
     
     private boolean isArabic;
+    private String selectedCurrency = "USD";
+    private boolean useMarketRate = false;
 
     // ============ Gold Views ============
     private TextView tvGoldPriceStatus, tvLastUpdate;
@@ -69,6 +76,8 @@ public class MiraGoldCurrencyFragment extends Fragment {
     private EditText etExchangeMarketYER, etExchangeMarketEGP, etExchangeMarketSAR, etExchangeMarketAED;
     private Button btnSaveCurrencySettings, btnRefreshRates;
     private ProgressBar pbCurrencyLoading;
+    private RadioGroup rgExchangeRateType;
+    private RadioButton rbOfficialRate, rbMarketRate;
 
     // ============ Live Prices ============
     private TextView tvLiveGold24k, tvLiveGold22k, tvLiveGold21k, tvLiveGold18k;
@@ -90,6 +99,10 @@ public class MiraGoldCurrencyFragment extends Fragment {
         }
         
         isArabic = Locale.getDefault().getLanguage().equals("ar");
+        
+        // ✅ استعادة العملة المفضلة
+        selectedCurrency = prefs.getString("preferred_currency", "USD");
+        useMarketRate = prefs.getBoolean("use_market_rate", false);
 
         initViews(view);
         setupSpinners();
@@ -145,6 +158,10 @@ public class MiraGoldCurrencyFragment extends Fragment {
         btnSaveCurrencySettings = view.findViewById(R.id.btnSaveCurrencySettings);
         btnRefreshRates = view.findViewById(R.id.btnRefreshRates);
         pbCurrencyLoading = view.findViewById(R.id.pbCurrencyLoading);
+        
+        rgExchangeRateType = view.findViewById(R.id.rgExchangeRateType);
+        rbOfficialRate = view.findViewById(R.id.rbOfficialRate);
+        rbMarketRate = view.findViewById(R.id.rbMarketRate);
 
         tvLiveGold24k = view.findViewById(R.id.tvLiveGold24k);
         tvLiveGold22k = view.findViewById(R.id.tvLiveGold22k);
@@ -155,6 +172,11 @@ public class MiraGoldCurrencyFragment extends Fragment {
         tvLiveUSD_EGP = view.findViewById(R.id.tvLiveUSD_EGP);
         tvLiveUSD_SAR = view.findViewById(R.id.tvLiveUSD_SAR);
         tvLiveUSD_AED = view.findViewById(R.id.tvLiveUSD_AED);
+        
+        // ✅ استعادة حالة RadioGroup
+        if (rgExchangeRateType != null) {
+            rgExchangeRateType.check(useMarketRate ? R.id.rbMarketRate : R.id.rbOfficialRate);
+        }
     }
 
     private void setupSpinners() {
@@ -174,6 +196,12 @@ public class MiraGoldCurrencyFragment extends Fragment {
         spGoldCurrency.setAdapter(currencyAdapter);
         spDefaultCurrency.setAdapter(currencyAdapter);
         spChartCurrency.setAdapter(currencyAdapter);
+        
+        // ✅ تحديد العملة المفضلة
+        int currencyPosition = getCurrencyPosition(selectedCurrency);
+        spGoldCurrency.setSelection(currencyPosition);
+        spDefaultCurrency.setSelection(currencyPosition);
+        spChartCurrency.setSelection(currencyPosition);
     }
 
     private void setupListeners() {
@@ -181,8 +209,102 @@ public class MiraGoldCurrencyFragment extends Fragment {
         btnSaveGoldSettings.setOnClickListener(v -> saveGoldSettings());
         btnSaveCurrencySettings.setOnClickListener(v -> saveCurrencySettings());
         btnRefreshRates.setOnClickListener(v -> updateLivePrices());
+        
+        // ✅ مستمع تغيير العملة
+        spGoldCurrency.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedCurrency = parent.getItemAtPosition(position).toString();
+                prefs.edit().putString("preferred_currency", selectedCurrency).apply();
+                updateLivePrices();
+            }
+            
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        
+        // ✅ مستمع تغيير نوع سعر الصرف
+        if (rgExchangeRateType != null) {
+            rgExchangeRateType.setOnCheckedChangeListener((group, checkedId) -> {
+                useMarketRate = (checkedId == R.id.rbMarketRate);
+                prefs.edit().putBoolean("use_market_rate", useMarketRate).apply();
+                updateLivePrices();
+            });
+        }
     }
 
+    // ============================================
+    // ✅ دوال تحويل العملات
+    // ============================================
+    
+    private int getCurrencyPosition(String currency) {
+        switch (currency) {
+            case "YER": return 1;
+            case "EGP": return 2;
+            case "SAR": return 3;
+            case "AED": return 4;
+            default: return 0; // USD
+        }
+    }
+    
+    private String getCurrencySymbol(String currency) {
+        switch (currency) {
+            case "YER": return "﷼";
+            case "EGP": return "ج.م";
+            case "SAR": return "﷼";
+            case "AED": return "د.إ";
+            default: return "$";
+        }
+    }
+    
+    private String getCurrencyName(String currency) {
+        switch (currency) {
+            case "YER": return isArabic ? "ريال يمني" : "YER";
+            case "EGP": return isArabic ? "جنيه مصري" : "EGP";
+            case "SAR": return isArabic ? "ريال سعودي" : "SAR";
+            case "AED": return isArabic ? "درهم إماراتي" : "AED";
+            default: return isArabic ? "دولار أمريكي" : "USD";
+        }
+    }
+    
+    private double getExchangeRate(String currency) {
+        switch (currency) {
+            case "YER":
+                return useMarketRate ? getDouble(etExchangeMarketYER) : getDouble(etExchangeYER);
+            case "EGP":
+                return useMarketRate ? getDouble(etExchangeMarketEGP) : getDouble(etExchangeEGP);
+            case "SAR":
+                return useMarketRate ? getDouble(etExchangeMarketSAR) : getDouble(etExchangeSAR);
+            case "AED":
+                return useMarketRate ? getDouble(etExchangeMarketAED) : getDouble(etExchangeAED);
+            default:
+                return 1.0; // USD
+        }
+    }
+    
+    private double convertToCurrency(double usdAmount, String targetCurrency) {
+        if (targetCurrency.equals("USD")) {
+            return usdAmount;
+        }
+        double rate = getExchangeRate(targetCurrency);
+        return rate > 0 ? usdAmount * rate : usdAmount;
+    }
+    
+    private String formatCurrency(double amount, String currency) {
+        String symbol = getCurrencySymbol(currency);
+        
+        // ✅ تنسيق خاص للعملات ذات الأرقام الكبيرة
+        if (currency.equals("YER") || currency.equals("EGP")) {
+            DecimalFormat largeFormat = new DecimalFormat("#,##0");
+            return symbol + " " + largeFormat.format(amount);
+        }
+        
+        return symbol + " " + decimalFormat.format(amount);
+    }
+
+    // ============================================
+    // ✅ جلب أسعار الذهب من API
+    // ============================================
     private void fetchGoldPricesFromApi() {
         String providerDisplay = spGoldApiProvider.getSelectedItem().toString();
         String provider = getProviderValue(providerDisplay);
@@ -265,6 +387,9 @@ public class MiraGoldCurrencyFragment extends Fragment {
         return "metalprice";
     }
 
+    // ============================================
+    // ✅ حفظ إعدادات الذهب
+    // ============================================
     private void saveGoldSettings() {
         pbGoldLoading.setVisibility(View.VISIBLE);
         btnSaveGoldSettings.setEnabled(false);
@@ -295,7 +420,8 @@ public class MiraGoldCurrencyFragment extends Fragment {
                 
                 payload.put("gold_api_provider", getProviderValue(spGoldApiProvider.getSelectedItem().toString()));
                 payload.put("gold_api_key", getText(etGoldApiKey));
-                payload.put("gold_default_currency", spGoldCurrency.getSelectedItem().toString());
+                payload.put("gold_default_currency", selectedCurrency);
+                payload.put("use_market_rate", useMarketRate);
                 
                 SharedPreferences.Editor editor = prefs.edit();
                 editor.putString("gold_settings", payload.toString());
@@ -332,6 +458,9 @@ public class MiraGoldCurrencyFragment extends Fragment {
         });
     }
 
+    // ============================================
+    // ✅ حفظ إعدادات العملات
+    // ============================================
     private void saveCurrencySettings() {
         pbCurrencyLoading.setVisibility(View.VISIBLE);
         btnSaveCurrencySettings.setEnabled(false);
@@ -342,6 +471,7 @@ public class MiraGoldCurrencyFragment extends Fragment {
                 
                 payload.put("global_default_currency", spDefaultCurrency.getSelectedItem().toString());
                 payload.put("chart_currency", spChartCurrency.getSelectedItem().toString());
+                payload.put("use_market_rate", useMarketRate);
                 
                 payload.put("exchange_official_YER", getDouble(etExchangeYER));
                 payload.put("exchange_official_EGP", getDouble(etExchangeEGP));
@@ -388,52 +518,96 @@ public class MiraGoldCurrencyFragment extends Fragment {
         });
     }
 
+    // ============================================
+    // ✅ تحديث الأسعار الحية مع دعم العملات
+    // ============================================
     private void updateLivePrices() {
         updateLiveGoldPrices();
         updateLiveCurrencyRates();
     }
 
     private void updateLiveGoldPrices() {
-        double price24k = getDouble(etGoldPrice24k);
+        String currencySymbol = getCurrencySymbol(selectedCurrency);
+        String currencyName = getCurrencyName(selectedCurrency);
+        String karatLabel = isArabic ? "قيراط" : "K";
+        String perGram = isArabic ? "جرام" : "g";
+        
+        double price24kUsd = getDouble(etGoldPrice24k);
         double margin24k = getDouble(etMargin24k);
         double making24k = getDouble(etMaking24k);
         
-        String karatLabel = isArabic ? "قيراط" : "K";
-        
-        if (price24k > 0) {
-            double final24k = (price24k * margin24k / 100) + making24k;
+        if (price24kUsd > 0) {
+            // ✅ الحساب بالدولار
+            double final24kUsd = price24kUsd + (price24kUsd * margin24k / 100) + making24k;
+            
+            // ✅ التحويل للعملة المحددة
+            double final24kConverted = convertToCurrency(final24kUsd, selectedCurrency);
+            
             tvLiveGold24k.setText(String.format(Locale.getDefault(), 
-                "24%s: $%s/g", karatLabel, decimalFormat.format(final24k)));
+                "24%s: %s/%s\n($%s/%s)", 
+                karatLabel, 
+                formatCurrency(final24kConverted, selectedCurrency), perGram,
+                decimalFormat.format(final24kUsd), perGram));
             
-            double price22k = price24k * 22 / 24;
-            double final22k = (price22k * getDouble(etMargin22k) / 100) + getDouble(etMaking22k);
+            // 22K
+            double price22kUsd = price24kUsd * 22 / 24;
+            double final22kUsd = price22kUsd + (price22kUsd * getDouble(etMargin22k) / 100) + getDouble(etMaking22k);
+            double final22kConverted = convertToCurrency(final22kUsd, selectedCurrency);
             tvLiveGold22k.setText(String.format(Locale.getDefault(), 
-                "22%s: $%s/g", karatLabel, decimalFormat.format(final22k)));
+                "22%s: %s/%s\n($%s/%s)", 
+                karatLabel, 
+                formatCurrency(final22kConverted, selectedCurrency), perGram,
+                decimalFormat.format(final22kUsd), perGram));
             
-            double price21k = price24k * 21 / 24;
-            double final21k = (price21k * getDouble(etMargin21k) / 100) + getDouble(etMaking21k);
+            // 21K
+            double price21kUsd = price24kUsd * 21 / 24;
+            double final21kUsd = price21kUsd + (price21kUsd * getDouble(etMargin21k) / 100) + getDouble(etMaking21k);
+            double final21kConverted = convertToCurrency(final21kUsd, selectedCurrency);
             tvLiveGold21k.setText(String.format(Locale.getDefault(), 
-                "21%s: $%s/g", karatLabel, decimalFormat.format(final21k)));
+                "21%s: %s/%s\n($%s/%s)", 
+                karatLabel, 
+                formatCurrency(final21kConverted, selectedCurrency), perGram,
+                decimalFormat.format(final21kUsd), perGram));
             
-            double price18k = price24k * 18 / 24;
-            double final18k = (price18k * getDouble(etMargin18k) / 100) + getDouble(etMaking18k);
+            // 18K
+            double price18kUsd = price24kUsd * 18 / 24;
+            double final18kUsd = price18kUsd + (price18kUsd * getDouble(etMargin18k) / 100) + getDouble(etMaking18k);
+            double final18kConverted = convertToCurrency(final18kUsd, selectedCurrency);
             tvLiveGold18k.setText(String.format(Locale.getDefault(), 
-                "18%s: $%s/g", karatLabel, decimalFormat.format(final18k)));
+                "18%s: %s/%s\n($%s/%s)", 
+                karatLabel, 
+                formatCurrency(final18kConverted, selectedCurrency), perGram,
+                decimalFormat.format(final18kUsd), perGram));
         }
     }
 
     private void updateLiveCurrencyRates() {
-        double yer = getDouble(etExchangeYER);
-        double egp = getDouble(etExchangeEGP);
-        double sar = getDouble(etExchangeSAR);
-        double aed = getDouble(etExchangeAED);
+        String rateType = useMarketRate ? 
+            (isArabic ? "سعر السوق" : "Market rate") : 
+            (isArabic ? "السعر الرسمي" : "Official rate");
         
-        tvLiveUSD_YER.setText(String.format(Locale.getDefault(), "1 USD = %s YER", decimalFormat.format(yer)));
-        tvLiveUSD_EGP.setText(String.format(Locale.getDefault(), "1 USD = %s EGP", decimalFormat.format(egp)));
-        tvLiveUSD_SAR.setText(String.format(Locale.getDefault(), "1 USD = %s SAR", decimalFormat.format(sar)));
-        tvLiveUSD_AED.setText(String.format(Locale.getDefault(), "1 USD = %s AED", decimalFormat.format(aed)));
+        double yer = getExchangeRate("YER");
+        double egp = getExchangeRate("EGP");
+        double sar = getExchangeRate("SAR");
+        double aed = getExchangeRate("AED");
+        
+        tvLiveUSD_YER.setText(String.format(Locale.getDefault(), 
+            "1 USD = %s %s (%s)", 
+            decimalFormat.format(yer), isArabic ? "ريال يمني" : "YER", rateType));
+        tvLiveUSD_EGP.setText(String.format(Locale.getDefault(), 
+            "1 USD = %s %s (%s)", 
+            decimalFormat.format(egp), isArabic ? "جنيه مصري" : "EGP", rateType));
+        tvLiveUSD_SAR.setText(String.format(Locale.getDefault(), 
+            "1 USD = %s %s (%s)", 
+            decimalFormat.format(sar), isArabic ? "ريال سعودي" : "SAR", rateType));
+        tvLiveUSD_AED.setText(String.format(Locale.getDefault(), 
+            "1 USD = %s %s (%s)", 
+            decimalFormat.format(aed), isArabic ? "درهم إماراتي" : "AED", rateType));
     }
 
+    // ============================================
+    // ✅ تحميل الإعدادات
+    // ============================================
     private void loadLocalSettings() {
         String goldSettingsJson = prefs.getString("gold_settings", "");
         if (!goldSettingsJson.isEmpty()) {
@@ -508,6 +682,10 @@ public class MiraGoldCurrencyFragment extends Fragment {
             if (json.has("making_12k")) etMaking12k.setText(decimalFormat.format(json.optDouble("making_12k")));
             
             if (json.has("gold_api_key")) etGoldApiKey.setText(json.optString("gold_api_key"));
+            if (json.has("gold_default_currency")) {
+                String currency = json.optString("gold_default_currency", "USD");
+                spGoldCurrency.setSelection(getCurrencyPosition(currency));
+            }
         } catch (Exception e) {
             Log.e(TAG, "Error applying gold settings: " + e.getMessage());
         }
@@ -531,6 +709,9 @@ public class MiraGoldCurrencyFragment extends Fragment {
         }
     }
 
+    // ============================================
+    // ✅ دوال مساعدة
+    // ============================================
     private double getDouble(EditText et) {
         try {
             return et != null ? Double.parseDouble(et.getText().toString().trim()) : 0;
@@ -548,4 +729,4 @@ public class MiraGoldCurrencyFragment extends Fragment {
         super.onDestroy();
         executor.shutdown();
     }
-}
+                        }
