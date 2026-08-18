@@ -1150,7 +1150,7 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
 
                 JSONObject payload = new JSONObject();
                 payload.put("session_id", sessionId);
-                payload.put("user_id", sessionManager.getUserId()); // ✅ أضف هذا
+                payload.put("user_id", getCurrentUserId());
                 payload.put("zone", selectedZone);
                 payload.put("total_scanned", totalScannedCount);
                 payload.put("unique_count", scannedEpcSet.size());
@@ -1200,6 +1200,15 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
             }
         });
     }
+    
+    private int getCurrentUserId() {
+    try {
+        android.content.SharedPreferences prefs = mContext.getSharedPreferences("session", Context.MODE_PRIVATE);
+        return prefs.getInt("user_id", 0);
+    } catch (Exception e) {
+        return 0;
+    }
+}
 
     private void showAuditResultDialog(JSONObject data) {
         try {
@@ -2076,4 +2085,4 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
             }
         }
     }
-            }
+                                      }
