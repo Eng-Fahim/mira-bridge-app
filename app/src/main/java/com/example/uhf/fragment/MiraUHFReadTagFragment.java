@@ -1150,6 +1150,7 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
 
                 JSONObject payload = new JSONObject();
                 payload.put("session_id", sessionId);
+                payload.put("user_id", sessionManager.getUserId()); // ✅ أضف هذا
                 payload.put("zone", selectedZone);
                 payload.put("total_scanned", totalScannedCount);
                 payload.put("unique_count", scannedEpcSet.size());
@@ -2075,4 +2076,4 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
             }
         }
     }
-                }
+            }
