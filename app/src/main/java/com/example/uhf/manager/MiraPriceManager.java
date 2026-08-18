@@ -128,24 +128,78 @@ public void refreshNow() {
      * الحصول على العملة الافتراضية
      */
     public String getDefaultCurrency() {
-        return prefs.getString("global_default_currency", CURRENCY_YER);
+    try {
+        // ✅ قراءة من currency_settings JSON
+        String currencySettingsJson = prefs.getString("currency_settings", "");
+        if (!currencySettingsJson.isEmpty()) {
+            JSONObject currencySettings = new JSONObject(currencySettingsJson);
+            String currency = currencySettings.optString("global_default_currency", "");
+            if (!currency.isEmpty()) {
+                return currency;
+            }
+        }
+        
+        // ✅ قراءة مباشرة
+        String currency = prefs.getString("global_default_currency", "");
+        if (!currency.isEmpty()) {
+            return currency;
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Error getting default currency: " + e.getMessage());
     }
+    
+    return CURRENCY_YER; // ✅ الافتراضي ريال يمني
+}
 
     /**
      * الحصول على سعر الصرف لعملة معينة
      */
     public double getExchangeRate(String currency) {
-        if (currency.equals(CURRENCY_USD)) {
-            return 1.0;
-        }
+    if (currency.equals(CURRENCY_USD)) {
+        return 1.0;
+    }
 
-        // التحقق من مصدر السعر (رسمي أو سوقي)
+    try {
+        // ✅ قراءة الإعدادات من JSON
+        String currencySettingsJson = prefs.getString("currency_settings", "");
+        if (!currencySettingsJson.isEmpty()) {
+            JSONObject currencySettings = new JSONObject(currencySettingsJson);
+            
+            // ✅ قراءة نوع السعر (رسمي أو سوقي)
+            String source = currencySettings.optString("exchange_source_" + currency, "official");
+            
+            // ✅ تحديد المفتاح الصحيح
+            String key = "exchange_" + source + "_" + currency;
+            
+            // ✅ قراءة القيمة
+            double rate = currencySettings.optDouble(key, 0);
+            if (rate > 0) {
+                return rate;
+            }
+        }
+        
+        // ✅ محاولة القراءة المباشرة من prefs
         String source = prefs.getString("exchange_source_" + currency, "official");
         String key = "exchange_" + source + "_" + currency;
-        
         double rate = getDoubleFromPrefs(key, 0);
-        return rate > 0 ? rate : 1.0;
+        if (rate > 0) {
+            return rate;
+        }
+        
+        // ✅ قيم افتراضية
+        switch (currency) {
+            case CURRENCY_YER: return 530; // سعر السوق
+            case CURRENCY_EGP: return 47.5;
+            case CURRENCY_SAR: return 3.75;
+            case CURRENCY_AED: return 3.67;
+            default: return 1.0;
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Error getting exchange rate: " + e.getMessage());
     }
+    
+    return 1.0;
+}
 
     /**
      * تحويل مبلغ من دولار إلى عملة أخرى
@@ -388,14 +442,33 @@ public void refreshNow() {
     // ============================================
 
     private double getDoubleFromPrefs(String key, double defaultValue) {
-        try {
-            String value = prefs.getString(key, "");
-            if (!value.isEmpty()) {
-                return Double.parseDouble(value);
+    try {
+        // ✅ أولاً: جرب القراءة من gold_settings JSON
+        String goldSettingsJson = prefs.getString("gold_settings", "");
+        if (!goldSettingsJson.isEmpty()) {
+            JSONObject goldSettings = new JSONObject(goldSettingsJson);
+            if (goldSettings.has(key)) {
+                return goldSettings.optDouble(key, defaultValue);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error parsing " + key + ": " + e.getMessage());
         }
-        return defaultValue;
+        
+        // ✅ ثانياً: جرب القراءة من currency_settings JSON
+        String currencySettingsJson = prefs.getString("currency_settings", "");
+        if (!currencySettingsJson.isEmpty()) {
+            JSONObject currencySettings = new JSONObject(currencySettingsJson);
+            if (currencySettings.has(key)) {
+                return currencySettings.optDouble(key, defaultValue);
+            }
+        }
+        
+        // ✅ ثالثاً: جرب القراءة المباشرة
+        String value = prefs.getString(key, "");
+        if (!value.isEmpty()) {
+            return Double.parseDouble(value);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Error parsing " + key + ": " + e.getMessage());
     }
+    return defaultValue;
+}
 }
