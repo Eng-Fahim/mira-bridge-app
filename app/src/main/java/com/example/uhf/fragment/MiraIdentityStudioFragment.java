@@ -985,7 +985,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
-    private void dismissDialog(AlertDialog dialog) {
+    protected void dismissDialog(AlertDialog dialog) {
         try {
             if (dialog != null && dialog.isShowing()) {
                 dialog.dismiss();
