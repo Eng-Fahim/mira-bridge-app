@@ -537,6 +537,28 @@
             app:cornerRadius="10dp"
             app:icon="@android:drawable/ic_menu_save"
             app:iconTint="?attr/colorOnPrimary" />
+            
+            <!-- عدّاد المزامنة المعلقة -->
+<TextView
+    android:id="@+id/tvPendingSyncCount"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="4dp"
+    android:gravity="center"
+    android:text=""
+    android:textColor="#D97706"
+    android:textSize="11sp"
+    android:textStyle="bold"
+    android:visibility="gone" />
+
+<!-- معاينة الصور -->
+<androidx.recyclerview.widget.RecyclerView
+    android:id="@+id/rvPhotosPreview"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:orientation="horizontal"
+    android:visibility="gone" />
 
     </LinearLayout>
 </ScrollView>
