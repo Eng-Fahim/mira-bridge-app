@@ -360,14 +360,15 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private void preloadBranchCatalogSync() {
-        if (apiClient == null || branchesManager == null) return;
-        final int activeBranchId = branchesManager.getActiveBranchId();
-        MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(activeBranchId);
-        if (response != null && response.isSuccess && response.data != null) {
-            JSONArray items = response.data.optJSONArray("items");
-            if (items != null) {
-                localCatalog.clear();
-                for (int i = 0; i < items.length(); i++) {
+    if (apiClient == null || branchesManager == null) return;
+    final int activeBranchId = branchesManager.getActiveBranchId();
+    MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(activeBranchId);
+    if (response != null && response.isSuccess && response.data != null) {
+        JSONArray items = response.data.optJSONArray("items");
+        if (items != null) {
+            localCatalog.clear();
+            for (int i = 0; i < items.length(); i++) {
+                try { // ✅ أضف try-catch
                     JSONObject obj = items.getJSONObject(i);
                     String serial = obj.optString("gtin13", obj.optString("serial_number", obj.optString("epc", "")));
                     if (!serial.isEmpty()) {
@@ -380,11 +381,14 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                             branchesManager.getActiveBranchDisplayName()
                         ));
                     }
+                } catch (Exception e) { // ✅ catch
+                    Log.e(TAG, "Parse item error: " + e.getMessage());
                 }
-                expectedCount = localCatalog.size();
             }
+            expectedCount = localCatalog.size();
         }
     }
+}
 
     // ==================== STOP INVENTORY ====================
 
@@ -853,4 +857,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }
         super.onDestroyView();
     }
-}
+            }
