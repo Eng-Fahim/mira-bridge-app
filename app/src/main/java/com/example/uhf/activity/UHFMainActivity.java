@@ -207,8 +207,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             toggleLanguage();
             return true;
         } else if (id == R.id.action_profile) {
-            showProfileInfoDialog();
-            return true;
+    // ✅ فتح واجهة الملف الشخصي MiraProfileFragment
+    checkInventoryLockAndExecute(() -> loadFragment(new MiraProfileFragment(), "Profile"));
+    return true;
         } else if (id == R.id.action_logout) {
             confirmLogout();
             return true;
@@ -772,4 +773,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
     }
-}
+                }
