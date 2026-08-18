@@ -100,7 +100,7 @@ public void refreshNow() {
         double margin = getMargin(karat);
         double making = getMakingCharge(karat);
 
-        return (basePrice * margin / 100) + making;
+        return basePrice + (basePrice * margin / 100) + making;
     }
 
     /**
