@@ -881,6 +881,12 @@ public class MiraApiClient {
         } catch (Exception ignored) {}
         return postWithAuth("/gold-currency/settings", payload);
     }
+    
+    
+// ✅ الدالة الجديدة (معامل واحد)
+public ApiResponse saveGoldCurrencySettings(JSONObject fullPayload) {
+    return postWithAuth("/gold-currency/settings", fullPayload);
+}
 
     public ApiResponse fetchGoldPrice(String provider, String apiKey) {
         JSONObject payload = new JSONObject();
@@ -952,4 +958,4 @@ public class MiraApiClient {
             return null;
         }
     }
-    }
+                                                       }
