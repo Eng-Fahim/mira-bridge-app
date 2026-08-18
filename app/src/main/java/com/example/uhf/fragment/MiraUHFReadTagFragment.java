@@ -1203,7 +1203,7 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
     
     private int getCurrentUserId() {
     try {
-        android.content.SharedPreferences prefs = mContext.getSharedPreferences("session", Context.MODE_PRIVATE);
+        android.content.SharedPreferences prefs = requireContext().getSharedPreferences("session", android.content.Context.MODE_PRIVATE);
         return prefs.getInt("user_id", 0);
     } catch (Exception e) {
         return 0;
@@ -2085,4 +2085,4 @@ public class MiraUHFReadTagFragment extends MiraBaseFragment {
             }
         }
     }
-                                      }
+                }
