@@ -396,21 +396,19 @@ public class MiraGoldCurrencyFragment extends Fragment {
     
     executor.execute(() -> {
         try {
+            // ✅ 1. جمع بيانات الذهب
             JSONObject goldData = new JSONObject();
-            
             goldData.put("gold_price_24k", getDouble(etGoldPrice24k));
             goldData.put("gold_price_22k", getDouble(etGoldPrice22k));
             goldData.put("gold_price_21k", getDouble(etGoldPrice21k));
             goldData.put("gold_price_18k", getDouble(etGoldPrice18k));
             goldData.put("gold_price_14k", getDouble(etGoldPrice14k));
-            
             goldData.put("margin_24k", getDouble(etMargin24k));
             goldData.put("margin_22k", getDouble(etMargin22k));
             goldData.put("margin_21k", getDouble(etMargin21k));
             goldData.put("margin_18k", getDouble(etMargin18k));
             goldData.put("margin_14k", getDouble(etMargin14k));
             goldData.put("margin_12k", getDouble(etMargin12k));
-            
             goldData.put("making_24k", getDouble(etMaking24k));
             goldData.put("making_22k", getDouble(etMaking22k));
             goldData.put("making_21k", getDouble(etMaking21k));
@@ -418,119 +416,100 @@ public class MiraGoldCurrencyFragment extends Fragment {
             goldData.put("making_14k", getDouble(etMaking14k));
             goldData.put("making_12k", getDouble(etMaking12k));
             
-            goldData.put("gold_api_provider", getProviderValue(spGoldApiProvider.getSelectedItem().toString()));
-            goldData.put("gold_api_key", getText(etGoldApiKey));
-            goldData.put("gold_default_currency", selectedCurrency);
-            
-            // ✅ حفظ محلي
-            SharedPreferences.Editor editor = prefs.edit();
-            editor.putString("gold_settings", goldData.toString());
-            editor.putLong("gold_last_update", System.currentTimeMillis());
-            editor.apply();
-            
-            // ✅ إرسال للسيرفر - بالصيغة الصحيحة
-            JSONObject goldPayload = new JSONObject();
-            goldPayload.put("gold", goldData);
-            JSONObject emptyCurrency = new JSONObject();
-            
-            com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
-            com.example.uhf.api.MiraApiClient.ApiResponse response = client.saveGoldCurrencySettings(goldPayload, emptyCurrency);
-            
-            final boolean serverSaved = response.isSuccess;
-            mainHandler.post(() -> {
-                pbGoldLoading.setVisibility(View.GONE);
-                btnSaveGoldSettings.setEnabled(true);
-                
-                if (serverSaved) {
-                    Toast.makeText(mContext, 
-                        isArabic ? "✅ تم حفظ إعدادات الذهب" : "✅ Gold settings saved", 
-                        Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(mContext, 
-                        isArabic ? "⚠️ تم الحفظ محلياً فقط" : "⚠️ Saved locally only", 
-                        Toast.LENGTH_SHORT).show();
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Error saving gold settings: " + e.getMessage());
-            mainHandler.post(() -> {
-                pbGoldLoading.setVisibility(View.GONE);
-                btnSaveGoldSettings.setEnabled(true);
-                Toast.makeText(mContext, 
-                    isArabic ? "❌ فشل حفظ الإعدادات" : "❌ Save failed", 
-                    Toast.LENGTH_SHORT).show();
-            });
-        }
-    });
-}
-    // ============================================
-    // ✅ حفظ إعدادات العملات
-    // ============================================
-    private void saveCurrencySettings() {
-    pbCurrencyLoading.setVisibility(View.VISIBLE);
-    btnSaveCurrencySettings.setEnabled(false);
-    
-    executor.execute(() -> {
-        try {
+            // ✅ 2. جمع بيانات العملات (من الحقول الحالية)
             JSONObject currencyData = new JSONObject();
-            
             currencyData.put("global_default_currency", spDefaultCurrency.getSelectedItem().toString());
-            currencyData.put("chart_currency", spChartCurrency.getSelectedItem().toString());
-            currencyData.put("use_market_rate", useMarketRate);
-            
             currencyData.put("exchange_official_YER", getDouble(etExchangeYER));
             currencyData.put("exchange_official_EGP", getDouble(etExchangeEGP));
             currencyData.put("exchange_official_SAR", getDouble(etExchangeSAR));
             currencyData.put("exchange_official_AED", getDouble(etExchangeAED));
-            
             currencyData.put("exchange_market_YER", getDouble(etExchangeMarketYER));
             currencyData.put("exchange_market_EGP", getDouble(etExchangeMarketEGP));
             currencyData.put("exchange_market_SAR", getDouble(etExchangeMarketSAR));
             currencyData.put("exchange_market_AED", getDouble(etExchangeMarketAED));
             
-            currencyData.put("exchange_source_YER", useMarketRate ? "market" : "official");
-            currencyData.put("exchange_source_EGP", useMarketRate ? "market" : "official");
-            currencyData.put("exchange_source_SAR", useMarketRate ? "market" : "official");
-            currencyData.put("exchange_source_AED", useMarketRate ? "market" : "official");
+            // ✅ 3. دمج كل شيء في payload واحد
+            JSONObject fullPayload = new JSONObject();
+            fullPayload.put("gold", goldData);
+            fullPayload.put("currency", currencyData);
             
-            // ✅ حفظ محلي
-            SharedPreferences.Editor editor = prefs.edit();
-            editor.putString("currency_settings", currencyData.toString());
-            editor.putBoolean("use_market_rate", useMarketRate);
-            editor.apply();
+            // ✅ 4. حفظ محلي
+            prefs.edit().putString("gold_settings", goldData.toString()).apply();
+            prefs.edit().putString("currency_settings", currencyData.toString()).apply();
             
-            // ✅ إرسال للسيرفر - بالصيغة الصحيحة
-            JSONObject currencyPayload = new JSONObject();
-            currencyPayload.put("currency", currencyData);
-            JSONObject emptyGold = new JSONObject();
-            
+            // ✅ 5. إرسال للسيرفر - بمعامل واحد
             com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
-            com.example.uhf.api.MiraApiClient.ApiResponse response = client.saveGoldCurrencySettings(emptyGold, currencyPayload);
+            com.example.uhf.api.MiraApiClient.ApiResponse response = client.saveGoldCurrencySettings(fullPayload);
             
-            final boolean serverSaved = response.isSuccess;
+            final boolean serverSaved = response != null && response.isSuccess;
             mainHandler.post(() -> {
-                pbCurrencyLoading.setVisibility(View.GONE);
-                btnSaveCurrencySettings.setEnabled(true);
-                
-                if (serverSaved) {
-                    Toast.makeText(mContext, 
-                        isArabic ? "✅ تم حفظ إعدادات العملات" : "✅ Currency settings saved", 
-                        Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(mContext, 
-                        isArabic ? "⚠️ تم الحفظ محلياً فقط" : "⚠️ Saved locally only", 
-                        Toast.LENGTH_SHORT).show();
-                }
-                updateLivePrices();
+                pbGoldLoading.setVisibility(View.GONE);
+                btnSaveGoldSettings.setEnabled(true);
+                Toast.makeText(mContext, 
+                    serverSaved ? (isArabic ? "✅ تم حفظ الإعدادات" : "✅ Settings saved") 
+                                : (isArabic ? "⚠️ تم الحفظ محلياً" : "⚠️ Local only"), 
+                    Toast.LENGTH_SHORT).show();
             });
         } catch (Exception e) {
-            Log.e(TAG, "Error saving currency settings: " + e.getMessage());
+            Log.e(TAG, "Save error: " + e.getMessage());
+            mainHandler.post(() -> {
+                pbGoldLoading.setVisibility(View.GONE);
+                btnSaveGoldSettings.setEnabled(true);
+            });
+        }
+    });
+}
+
+private void saveCurrencySettings() {
+    // ✅ نفس الكود - أرسل كل شيء معاً
+    pbCurrencyLoading.setVisibility(View.VISIBLE);
+    btnSaveCurrencySettings.setEnabled(false);
+    
+    executor.execute(() -> {
+        try {
+            JSONObject goldData = new JSONObject();
+            goldData.put("gold_price_24k", getDouble(etGoldPrice24k));
+            goldData.put("gold_price_22k", getDouble(etGoldPrice22k));
+            goldData.put("gold_price_21k", getDouble(etGoldPrice21k));
+            goldData.put("gold_price_18k", getDouble(etGoldPrice18k));
+            goldData.put("gold_price_14k", getDouble(etGoldPrice14k));
+            
+            JSONObject currencyData = new JSONObject();
+            currencyData.put("global_default_currency", spDefaultCurrency.getSelectedItem().toString());
+            currencyData.put("exchange_official_YER", getDouble(etExchangeYER));
+            currencyData.put("exchange_official_EGP", getDouble(etExchangeEGP));
+            currencyData.put("exchange_official_SAR", getDouble(etExchangeSAR));
+            currencyData.put("exchange_official_AED", getDouble(etExchangeAED));
+            currencyData.put("exchange_market_YER", getDouble(etExchangeMarketYER));
+            currencyData.put("exchange_market_EGP", getDouble(etExchangeMarketEGP));
+            currencyData.put("exchange_market_SAR", getDouble(etExchangeMarketSAR));
+            currencyData.put("exchange_market_AED", getDouble(etExchangeMarketAED));
+            currencyData.put("use_market_rate", useMarketRate);
+            
+            JSONObject fullPayload = new JSONObject();
+            fullPayload.put("gold", goldData);
+            fullPayload.put("currency", currencyData);
+            
+            prefs.edit().putString("gold_settings", goldData.toString()).apply();
+            prefs.edit().putString("currency_settings", currencyData.toString()).apply();
+            
+            com.example.uhf.api.MiraApiClient client = com.example.uhf.api.MiraApiClient.getInstance(mContext);
+            com.example.uhf.api.MiraApiClient.ApiResponse response = client.saveGoldCurrencySettings(fullPayload);
+            
+            final boolean serverSaved = response != null && response.isSuccess;
             mainHandler.post(() -> {
                 pbCurrencyLoading.setVisibility(View.GONE);
                 btnSaveCurrencySettings.setEnabled(true);
                 Toast.makeText(mContext, 
-                    isArabic ? "❌ فشل حفظ الإعدادات" : "❌ Save failed", 
+                    serverSaved ? (isArabic ? "✅ تم الحفظ" : "✅ Saved") 
+                                : (isArabic ? "⚠️ محلياً" : "⚠️ Local"), 
                     Toast.LENGTH_SHORT).show();
+                updateLivePrices();
+            });
+        } catch (Exception e) {
+            mainHandler.post(() -> {
+                pbCurrencyLoading.setVisibility(View.GONE);
+                btnSaveCurrencySettings.setEnabled(true);
             });
         }
     });
