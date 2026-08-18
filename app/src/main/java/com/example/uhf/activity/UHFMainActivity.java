@@ -139,6 +139,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             setContentView(R.layout.activity_main);
             loadingOverlay = findViewById(R.id.loading_overlay);
             fragmentManager = getSupportFragmentManager();
+            
+            updateBottomNavLanguage();
 
             MaterialToolbar toolbar = findViewById(R.id.toolbar);
             if (toolbar != null) {
@@ -172,15 +174,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void initializeLanguageState() {
-        try {
-            isArabic = getResources().getConfiguration().locale.getLanguage().equals("ar");
-            getWindow().getDecorView().setLayoutDirection(
-                    isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR
-            );
-        } catch (Exception e) {
-            Log.w(TAG, "Locale check failed: " + e.getMessage());
-        }
+    try {
+        isArabic = getResources().getConfiguration().locale.getLanguage().equals("ar");
+        getWindow().getDecorView().setLayoutDirection(
+                isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR
+        );
+        
+    } catch (Exception e) {
+        Log.w(TAG, "Locale check failed: " + e.getMessage());
     }
+}
 
     // ==================== TOOLBAR MENU ====================
 
@@ -598,6 +601,29 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Toolbar Update Error: " + e.getMessage());
         }
     }
+    
+    private void updateBottomNavLanguage() {
+    try {
+        BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
+        if (nav != null && nav.getMenu() != null) {
+            Menu menu = nav.getMenu();
+            
+            MenuItem home = menu.findItem(R.id.nav_home);
+            if (home != null) home.setTitle(isArabic ? "الرئيسية" : "Home");
+            
+            MenuItem inventory = menu.findItem(R.id.nav_inventory);
+            if (inventory != null) inventory.setTitle(isArabic ? "الجرد" : "Inventory");
+            
+            MenuItem sales = menu.findItem(R.id.nav_sales);
+            if (sales != null) sales.setTitle(isArabic ? "البيع" : "Sales");
+            
+            MenuItem transfers = menu.findItem(R.id.nav_transfers);
+            if (transfers != null) transfers.setTitle(isArabic ? "التحويلات" : "Transfers");
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Update bottom nav language error: " + e.getMessage());
+    }
+}
 
     public void showLoading() {
         if (loadingOverlay != null && !isFinishing() && !isDestroyed()) {
