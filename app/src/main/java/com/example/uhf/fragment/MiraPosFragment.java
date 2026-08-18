@@ -1,4 +1,5 @@
 package com.example.uhf.fragment;
+
 import com.example.uhf.tools.SessionManager;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -20,7 +21,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -42,9 +42,11 @@ import org.json.JSONObject;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 public class MiraPosFragment extends MiraBaseFragment {
@@ -59,6 +61,9 @@ public class MiraPosFragment extends MiraBaseFragment {
     private RFIDManager rfidManager;
     private boolean isRFIDScanActive = false;
     private final Set<String> pendingEpcs = new HashSet<>();
+    
+    // ✅ Debouncing
+    private final Map<String, Long> lastScannedTimes = new HashMap<>();
 
     // UI Elements
     private TextView tvScaleStatus, tvItemCount, tvTotalAmount, tvCartStatus;
@@ -158,6 +163,11 @@ public class MiraPosFragment extends MiraBaseFragment {
         if (getActivity() instanceof UHFMainActivity)
             ((UHFMainActivity) getActivity()).setActivePOSFragment(this);
 
+        // ✅ الاتصال بالميزان عند فتح الواجهة
+        if (scaleConnector != null) {
+            scaleConnector.connect();
+        }
+
         if (tvCartStatus != null && cartList.isEmpty()) {
             tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan items...");
         }
@@ -169,8 +179,32 @@ public class MiraPosFragment extends MiraBaseFragment {
     public void onPause() {
         super.onPause();
         stopRFIDScan();
+        
+        // ✅ إغلاق اتصال الميزان عند التوقف
+        if (scaleConnector != null) {
+            scaleConnector.disconnect();
+        }
+        
         if (getActivity() instanceof UHFMainActivity)
             ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        stopRFIDScan();
+        // ✅ إلغاء المستمع لمنع تسريب الذاكرة
+        if (rfidManager != null) {
+            rfidManager.setListener(null);
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        stopRFIDScan();
+        if (scaleConnector != null) scaleConnector.disconnect();
+        if (rfidManager != null) rfidManager.release();
     }
 
     // ==================== دوال مساعدة ====================
@@ -193,11 +227,6 @@ public class MiraPosFragment extends MiraBaseFragment {
             case "14K": return 14;
             default: return 21;
         }
-    }
-
-    private double getGoldPriceByKarat(String karat) {
-        int karatNum = getKaratNumber(karat);
-        return priceManager.getFinalPricePerGram(karatNum);
     }
 
     private void safeRun(Runnable r) {
@@ -276,51 +305,40 @@ public class MiraPosFragment extends MiraBaseFragment {
             });
         }
 
-        if (btnAddManual != null) {
-            btnAddManual.setOnClickListener(v -> submitManualEpc());
-        }
-        if (btnClearCart != null) {
-            btnClearCart.setOnClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                clearCart();
-            });
-        }
-        if (btnCheckout != null) {
-            btnCheckout.setOnClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                processCheckoutAndStockUpdate();
-            });
-        }
-        if (btnOpenScanner != null) {
-            btnOpenScanner.setOnClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                openBarcodeScanner();
-            });
-        }
-        if (btnPosRFIDMode != null) {
-            btnPosRFIDMode.setOnClickListener(v -> {
-                UIHelper.hideKeyboard(getActivity());
-                toggleRFIDMode();
-            });
-        }
+        if (btnAddManual != null) btnAddManual.setOnClickListener(v -> submitManualEpc());
+        if (btnClearCart != null) btnClearCart.setOnClickListener(v -> {
+            UIHelper.hideKeyboard(getActivity());
+            clearCart();
+        });
+        if (btnCheckout != null) btnCheckout.setOnClickListener(v -> {
+            UIHelper.hideKeyboard(getActivity());
+            processCheckoutAndStockUpdate();
+        });
+        if (btnOpenScanner != null) btnOpenScanner.setOnClickListener(v -> {
+            UIHelper.hideKeyboard(getActivity());
+            openBarcodeScanner();
+        });
+        if (btnPosRFIDMode != null) btnPosRFIDMode.setOnClickListener(v -> {
+            UIHelper.hideKeyboard(getActivity());
+            toggleRFIDMode();
+        });
     }
 
     private void submitManualEpc() {
-    UIHelper.hideKeyboard(getActivity());
-    String epc = etManualEpc != null ? etManualEpc.getText().toString().trim() : "";
-    if (!epc.isEmpty()) {
-        // ✅ منع التكرار
-        if (scannedEpcs.contains(epc)) {
-            showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً في السلة!" : "⚠️ This item is already in cart!");
-            playAlertSound(2);
-            return;
+        UIHelper.hideKeyboard(getActivity());
+        String epc = etManualEpc != null ? etManualEpc.getText().toString().trim() : "";
+        if (!epc.isEmpty()) {
+            if (scannedEpcs.contains(epc)) {
+                showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً في السلة!" : "⚠️ This item is already in cart!");
+                playAlertSound(2);
+                return;
+            }
+            processRingEpc(epc, "manual");
+            if (etManualEpc != null) etManualEpc.setText("");
+        } else {
+            showToast(isArabic ? "أدخل EPC أو باركود" : "Enter EPC or barcode");
         }
-        processRingEpc(epc, "manual");
-        if (etManualEpc != null) etManualEpc.setText("");
-    } else {
-        showToast(isArabic ? "أدخل EPC أو باركود" : "Enter EPC or barcode");
     }
-}
 
     // ==================== الميزان الذكي ====================
 
@@ -339,18 +357,14 @@ public class MiraPosFragment extends MiraBaseFragment {
             @Override
             public void onScaleConnected(String n) {
                 safeRun(() -> {
-                    if (tvScaleStatus != null) {
-                        tvScaleStatus.setText("⚖️ " + n);
-                    }
+                    if (tvScaleStatus != null) tvScaleStatus.setText("⚖️ " + n);
                 });
             }
             @Override
             public void onScaleDisconnected() {
                 liveScaleWeight = 0.0;
                 safeRun(() -> {
-                    if (tvScaleStatus != null) {
-                        tvScaleStatus.setText(isArabic ? "⚖️ غير متصل" : "⚖️ Offline");
-                    }
+                    if (tvScaleStatus != null) tvScaleStatus.setText(isArabic ? "⚖️ غير متصل" : "⚖️ Offline");
                 });
             }
             @Override
@@ -384,23 +398,14 @@ public class MiraPosFragment extends MiraBaseFragment {
 
     private void toggleRFIDMode() {
         isRFIDModeActive = !isRFIDModeActive;
-
         if (isRFIDModeActive) {
             startRFIDScan();
-            if (btnPosRFIDMode != null) {
-                btnPosRFIDMode.setText(isArabic ? "📡 RFID نشط" : "📡 RFID Active");
-            }
-            if (tvCartStatus != null) {
-                tvCartStatus.setText(isArabic ? "📡 جاهز لمسح RFID..." : "📡 Ready for RFID scan...");
-            }
+            if (btnPosRFIDMode != null) btnPosRFIDMode.setText(isArabic ? "📡 RFID نشط" : "📡 RFID Active");
+            if (tvCartStatus != null) tvCartStatus.setText(isArabic ? "📡 جاهز لمسح RFID..." : "📡 Ready for RFID scan...");
         } else {
             stopRFIDScan();
-            if (btnPosRFIDMode != null) {
-                btnPosRFIDMode.setText(isArabic ? getString(R.string.pos_scan_rfid) : "📡 Scan RFID");
-            }
-            if (tvCartStatus != null) {
-                tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan items...");
-            }
+            if (btnPosRFIDMode != null) btnPosRFIDMode.setText(isArabic ? getString(R.string.pos_scan_rfid) : "📡 Scan RFID");
+            if (tvCartStatus != null) tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan items...");
         }
     }
 
@@ -414,59 +419,58 @@ public class MiraPosFragment extends MiraBaseFragment {
         rfidManager.stopScan();
     }
 
-    // ==================== مسح القطع ====================
+    // ==================== مسح القطع مع Debouncing ====================
 
     public void onRingScanned(String epc) {
-    // ✅ منع التكرار
-    if (scannedEpcs.contains(epc)) {
-        safeRun(() -> {
-            showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً في السلة!" : "⚠️ This item is already in cart!");
-            playAlertSound(2);
-        });
-        return;
+        long currentTime = System.currentTimeMillis();
+        Long lastTime = lastScannedTimes.get(epc);
+        if (lastTime != null && (currentTime - lastTime < 1500)) return;
+        lastScannedTimes.put(epc, currentTime);
+
+        if (scannedEpcs.contains(epc)) {
+            safeRun(() -> {
+                showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً في السلة!" : "⚠️ This item is already in cart!");
+                playAlertSound(2);
+            });
+            return;
+        }
+        processRingEpc(epc, "rfid");
     }
-    processRingEpc(epc, "rfid");
-}
 
-public void onBarcodeScanned(String data) {
-    // ✅ منع التكرار
-    if (scannedEpcs.contains(data)) {
-        safeRun(() -> {
-            showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً في السلة!" : "⚠️ This item is already in cart!");
-            playAlertSound(2);
-        });
-        return;
+    public void onBarcodeScanned(String data) {
+        long currentTime = System.currentTimeMillis();
+        Long lastTime = lastScannedTimes.get(data);
+        if (lastTime != null && (currentTime - lastTime < 1500)) return;
+        lastScannedTimes.put(data, currentTime);
+
+        if (scannedEpcs.contains(data)) {
+            safeRun(() -> {
+                showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً في السلة!" : "⚠️ This item is already in cart!");
+                playAlertSound(2);
+            });
+            return;
+        }
+        processRingEpc(data, "barcode");
     }
-    processRingEpc(data, "barcode");
-}
-
-
 
     private void processRingEpc(final String code, final String source) {
         synchronized (pendingEpcs) {
             if (pendingEpcs.contains(code)) return;
             pendingEpcs.add(code);
         }
-
         playAlertSound(1);
-
         safeRun(() -> {
-            if (tvCartStatus != null) {
-                tvCartStatus.setText(isArabic ? "🔍 جاري الاستعلام..." : "🔍 Querying...");
-            }
+            if (tvCartStatus != null) tvCartStatus.setText(isArabic ? "🔍 جاري الاستعلام..." : "🔍 Querying...");
         });
-
         new Thread(() -> {
             try {
                 Context context = getContext();
                 if (context == null) return;
                 MiraApiClient client = MiraApiClient.getInstance(context);
-
                 JSONObject extraParams = new JSONObject();
                 extraParams.put("source", source);
                 extraParams.put("branch_id", getActiveBranchId());
                 if (liveScaleWeight > 0) extraParams.put("scale_weight", liveScaleWeight);
-
                 MiraApiClient.ApiResponse response = client.authorize(code, "pos_sale", extraParams);
                 if (response != null && response.isSuccess && response.data != null
                         && response.data.optJSONObject("item") != null) {
@@ -486,71 +490,54 @@ public void onBarcodeScanned(String data) {
     }
 
     private void parseItemResponse(String code, JSONObject data) {
-    try {
-        // ✅ جديد - التحقق من تنبيهات العبث أولاً
-        JSONArray tamperAlerts = data.optJSONArray("tamper_alerts");
-        if (tamperAlerts != null && tamperAlerts.length() > 0) {
-            safeRun(() -> {
-                com.example.uhf.tools.TamperAlertHelper.showTamperAlert(getContext(), tamperAlerts, code);
-                playAlertSound(2);
-            });
-            
-            // ✅ منع الإضافة إذا كان العبث خطيراً
-            if (com.example.uhf.tools.TamperAlertHelper.hasSecurityAlert(tamperAlerts)) {
+        try {
+            JSONArray tamperAlerts = data.optJSONArray("tamper_alerts");
+            if (tamperAlerts != null && tamperAlerts.length() > 0) {
                 safeRun(() -> {
-                    showToast(isArabic ? "🚨 تم منع العملية - عبث مكتشف!" : "🚨 Operation blocked - Tamper detected!");
-                    if (tvCartStatus != null) {
-                        tvCartStatus.setText(isArabic ? "🚨 عبث مكتشف - ممنوع" : "🚨 Tamper detected - Blocked");
-                    }
+                    com.example.uhf.tools.TamperAlertHelper.showTamperAlert(getContext(), tamperAlerts, code);
+                    playAlertSound(2);
                 });
-                return;
+                if (com.example.uhf.tools.TamperAlertHelper.hasSecurityAlert(tamperAlerts)) {
+                    safeRun(() -> {
+                        showToast(isArabic ? "🚨 تم منع العملية - عبث مكتشف!" : "🚨 Operation blocked - Tamper detected!");
+                        if (tvCartStatus != null) tvCartStatus.setText(isArabic ? "🚨 عبث مكتشف - ممنوع" : "🚨 Tamper detected - Blocked");
+                    });
+                    return;
+                }
             }
-        }
-        
-        // ============ باقي الكود الحالي كما هو ============
-        JSONObject item = data.optJSONObject("item");
-        JSONObject barcode = item != null ? item.optJSONObject("barcode") : null;
-        String vaultStatus = item != null ? item.optString("status", "").toLowerCase() : "";
-
-        boolean isAvailable = !vaultStatus.equals("sold") && !vaultStatus.equals("reserved");
-        String title = item != null ? item.optString("title", isArabic ? "قطعة" : "Item")
-                : (isArabic ? "قطعة" : "Item");
-        String karat = item != null ? item.optString("karat", "21K") : "21K";
-        double weight = item != null ? item.optDouble("weight", item.optDouble("gross_weight", 0)) : 0;
-        double price = item != null ? item.optDouble("dynamic_retail_price",
-                item.optDouble("retail_price", item.optDouble("price", 0))) : 0;
-
-        if (price <= 0 && weight > 0) {
-            int karatNum = getKaratNumber(karat);
-            price = priceManager.calculateGoldPrice(karatNum, weight);
-        }
-
-        CartItem cartItem = new CartItem(code, title, karat, weight,
-                liveScaleWeight, price, isAvailable, vaultStatus.toUpperCase());
-        cartItem.serialNo = item != null ? item.optString("serial", code) : code;
-        cartItem.gtin = (barcode != null) ? barcode.optString("gtin13", "")
-                : (item != null ? item.optString("gtin", "") : "");
-        cartItem.location = item != null ? item.optString("location", "") : "";
-        cartItem.itemId = item != null ? item.optInt("id", 0) : 0;
-
-        safeRun(() -> {
-            if (!isAvailable) {
-                showToast(isArabic ? "❌ غير متاحة: " + vaultStatus
-                        : "❌ Unavailable: " + vaultStatus);
+            JSONObject item = data.optJSONObject("item");
+            JSONObject barcode = item != null ? item.optJSONObject("barcode") : null;
+            String vaultStatus = item != null ? item.optString("status", "").toLowerCase() : "";
+            boolean isAvailable = !vaultStatus.equals("sold") && !vaultStatus.equals("reserved");
+            String title = item != null ? item.optString("title", isArabic ? "قطعة" : "Item") : (isArabic ? "قطعة" : "Item");
+            String karat = item != null ? item.optString("karat", "21K") : "21K";
+            double weight = item != null ? item.optDouble("weight", item.optDouble("gross_weight", 0)) : 0;
+            double price = item != null ? item.optDouble("dynamic_retail_price", item.optDouble("retail_price", item.optDouble("price", 0))) : 0;
+            if (price <= 0 && weight > 0) {
+                price = priceManager.calculateGoldPrice(getKaratNumber(karat), weight);
+            }
+            CartItem cartItem = new CartItem(code, title, karat, weight, liveScaleWeight, price, isAvailable, vaultStatus.toUpperCase());
+            cartItem.serialNo = item != null ? item.optString("serial", code) : code;
+            cartItem.gtin = (barcode != null) ? barcode.optString("gtin13", "") : (item != null ? item.optString("gtin", "") : "");
+            cartItem.location = item != null ? item.optString("location", "") : "";
+            cartItem.itemId = item != null ? item.optInt("id", 0) : 0;
+            safeRun(() -> {
+                if (!isAvailable) {
+                    showToast(isArabic ? "❌ غير متاحة: " + vaultStatus : "❌ Unavailable: " + vaultStatus);
+                    updateCartSummary();
+                    return;
+                }
+                scannedEpcs.add(code);
+                cartList.add(0, cartItem);
+                if (cartAdapter != null) cartAdapter.notifyItemInserted(0);
+                if (rvCartItems != null) rvCartItems.scrollToPosition(0);
                 updateCartSummary();
-                return;
-            }
-            scannedEpcs.add(code);
-            cartList.add(0, cartItem);
-            if (cartAdapter != null) cartAdapter.notifyItemInserted(0);
-            if (rvCartItems != null) rvCartItems.scrollToPosition(0);
-            updateCartSummary();
-        });
-    } catch (Exception e) {
-        Log.e(TAG, "Parse: " + e.getMessage());
-        handleItemNotFound(code);
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Parse: " + e.getMessage());
+            handleItemNotFound(code);
+        }
     }
-}
 
     private void handleItemNotFound(String code) {
         safeRun(() -> {
@@ -572,26 +559,14 @@ public void onBarcodeScanned(String data) {
         final int fc = count;
         final double fs = sum;
         final boolean fb = bad;
-
         safeRun(() -> {
-            if (layoutCartEmptyState != null) {
-                layoutCartEmptyState.setVisibility(fc == 0 ? View.VISIBLE : View.GONE);
-            }
-
+            if (layoutCartEmptyState != null) layoutCartEmptyState.setVisibility(fc == 0 ? View.VISIBLE : View.GONE);
             if (tvItemCount != null) tvItemCount.setText(String.valueOf(fc));
-            if (tvTotalAmount != null) {
-                // ✅ استخدام العملة الافتراضية من MiraPriceManager
-                String formattedTotal = priceManager.formatPriceDefault(fs);
-                tvTotalAmount.setText(formattedTotal);
-            }
+            if (tvTotalAmount != null) tvTotalAmount.setText(priceManager.formatPriceDefault(fs));
             if (tvCartStatus != null) {
-                if (fc == 0) {
-                    tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
-                } else if (fb) {
-                    tvCartStatus.setText(isArabic ? "⚠️ قطعة غير متاحة!" : "⚠️ Unavailable item!");
-                } else {
-                    tvCartStatus.setText(isArabic ? "✓ جاهز للبيع" : "✓ Ready for sale");
-                }
+                if (fc == 0) tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
+                else if (fb) tvCartStatus.setText(isArabic ? "⚠️ قطعة غير متاحة!" : "⚠️ Unavailable item!");
+                else tvCartStatus.setText(isArabic ? "✓ جاهز للبيع" : "✓ Ready for sale");
             }
             if (btnCheckout != null) {
                 btnCheckout.setEnabled(fc > 0 && !fb);
@@ -610,10 +585,13 @@ public void onBarcodeScanned(String data) {
     }
 
     private void clearCart() {
-        cartList.clear();
-        scannedEpcs.clear();
-        if (cartAdapter != null) cartAdapter.notifyDataSetChanged();
-        updateCartSummary();
+        int size = cartList.size();
+        if (size > 0) {
+            cartList.clear();
+            scannedEpcs.clear();
+            if (cartAdapter != null) cartAdapter.notifyItemRangeRemoved(0, size);
+            updateCartSummary();
+        }
     }
 
     private double getCartTotal() {
@@ -631,7 +609,6 @@ public void onBarcodeScanned(String data) {
         }
         if (!isAdded() || getActivity() == null) return;
         UIHelper.hideKeyboard(getActivity());
-
         try {
             POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(getCartTotal(), cartList.size());
             dialog.setCheckoutListener(this::executeCheckout);
@@ -642,153 +619,119 @@ public void onBarcodeScanned(String data) {
         }
     }
 
-   private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
-    if (!isAdded()) return;
+    private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
+        if (!isAdded()) return;
 
-    final AlertDialog loadingDialog = showLoadingDialog();
+        final AlertDialog loadingDialog = showProfessionalLoadingDialog();
+        if (loadingDialog == null) return;
 
-    safeRun(() -> {
-        if (btnCheckout != null) {
-            btnCheckout.setEnabled(false);
-            btnCheckout.setAlpha(0.5f);
-        }
-    });
+        setButtonsEnabled(false);
 
-    new Thread(() -> {
-        try {
-            Context ctx = getContext();
-            if (ctx == null) return;
-            MiraApiClient client = MiraApiClient.getInstance(ctx);
-            
-            // ✅ الحصول على بيانات المستخدم والفرع
-            SessionManager sessionManager = new SessionManager(ctx);
-            int userId = sessionManager.getUserId();
-            String username = sessionManager.getUsername();
-            int branchId = getActiveBranchId();
-            String branchName = branchesManager != null ? branchesManager.getActiveBranchDisplayName() : "";
-            
-            JSONObject payload = new JSONObject();
-            payload.put("action", "COMPLETE_POS_SALE");
-            payload.put("gate_id", client.getGateId());
-            payload.put("branch_id", branchId);
-            payload.put("branch_name", branchName); // ✅
-            payload.put("user_id", userId); // ✅
-            payload.put("username", username); // ✅
-            payload.put("sale_number", ""); // ✅ السيرفر سيولده
-            payload.put("sale_date", new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date())); // ✅
-            payload.put("sale_time", new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date())); // ✅
+        new Thread(() -> {
+            try {
+                Context ctx = getContext();
+                if (ctx == null) return;
+                MiraApiClient client = MiraApiClient.getInstance(ctx);
 
-            // ✅ بيانات العميل الكاملة
-            JSONObject customer = new JSONObject();
-            customer.put("name", data.customerName);
-            customer.put("phone", data.customerPhone);
-            customer.put("email", data.customerEmail != null ? data.customerEmail : ""); // ✅
-            customer.put("address", data.customerAddress != null ? data.customerAddress : ""); // ✅
-            customer.put("payment_method", data.paymentMethod);
-            customer.put("notes", data.customerNotes != null ? data.customerNotes : ""); // ✅
-            payload.put("customer", customer);
+                SessionManager sessionManager = new SessionManager(ctx);
+                int userId = sessionManager.getUserId();
+                String username = sessionManager.getUsername();
+                int branchId = getActiveBranchId();
 
-            // ✅ بيانات القطع مع التفاصيل الكاملة
-            JSONArray itemsArr = new JSONArray();
-            for (CartItem item : cartList) {
-                JSONObject obj = new JSONObject();
-                obj.put("epc", item.epc);
-                obj.put("serial_no", item.serialNo != null ? item.serialNo : item.epc);
-                obj.put("gtin", item.gtin != null ? item.gtin : ""); // ✅
-                obj.put("title", item.name);
-                obj.put("karat", item.karat);
-                obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
-                obj.put("sale_price", item.price);
-                obj.put("currency", "YER"); // ✅
-                obj.put("new_status", "SOLD");
-                obj.put("item_id", item.itemId > 0 ? item.itemId : 0);
-                obj.put("location", item.location != null ? item.location : ""); // ✅
-                obj.put("branch_id", branchId); // ✅
-                itemsArr.put(obj);
-            }
-            payload.put("items", itemsArr);
+                JSONObject payload = new JSONObject();
+                payload.put("action", "COMPLETE_POS_SALE");
+                payload.put("gate_id", client.getGateId());
+                payload.put("branch_id", branchId);
+                payload.put("user_id", userId);
+                payload.put("username", username);
 
-            // ✅ بيانات الدفع الكاملة
-            JSONObject payment = new JSONObject();
-            payment.put("subtotal", getCartTotal());
-            payment.put("discount_percent", data.discount);
-            payment.put("discount_amount", data.discountAmount); // ✅
-            payment.put("tax_amount", 0); // ✅
-            payment.put("final_amount", data.finalAmount);
-            payment.put("currency", "YER"); // ✅
-            payment.put("account_code", getAccountCode(data.paymentMethod)); // ✅
-            payment.put("transaction_id", ""); // ✅
-            payment.put("reference_number", ""); // ✅
-            payload.put("payment", payment);
+                JSONObject customer = new JSONObject();
+                customer.put("name", data.customerName);
+                customer.put("phone", data.customerPhone);
+                customer.put("email", data.customerEmail != null ? data.customerEmail : "");
+                customer.put("payment_method", data.paymentMethod);
+                payload.put("customer", customer);
 
-            MiraApiClient.ApiResponse response = client.checkout(payload);
-
-            safeRun(() -> {
-                if (loadingDialog != null && loadingDialog.isShowing()) {
-                    loadingDialog.dismiss();
+                JSONArray itemsArr = new JSONArray();
+                for (CartItem item : cartList) {
+                    JSONObject obj = new JSONObject();
+                    obj.put("epc", item.epc);
+                    obj.put("serial_no", item.serialNo != null ? item.serialNo : item.epc);
+                    obj.put("title", item.name);
+                    obj.put("karat", item.karat);
+                    obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
+                    obj.put("sale_price", item.price);
+                    obj.put("item_id", item.itemId > 0 ? item.itemId : 0);
+                    itemsArr.put(obj);
                 }
+                payload.put("items", itemsArr);
 
-                if (response != null && response.isSuccess) {
-                    playAlertSound(1);
-                    int soldCount = cartList.size();
-                    double finalAmount = data.finalAmount;
-                    String paymentMethod = data.paymentMethod;
+                JSONObject payment = new JSONObject();
+                payment.put("subtotal", getCartTotal());
+                payment.put("discount_percent", data.discount);
+                payment.put("discount_amount", data.discountAmount);
+                payment.put("final_amount", data.finalAmount);
+                payment.put("account_code", getAccountCode(data.paymentMethod));
+                payment.put("currency", "YER");
+                payload.put("payment", payment);
+
+                MiraApiClient.ApiResponse response = client.checkout(payload);
+
+                safeRun(() -> {
+                    dismissDialog(loadingDialog);
+                    setButtonsEnabled(true);
+
+                    if (response != null && response.isSuccess) {
+                        playAlertSound(1);
+                        int soldCount = cartList.size();
+                        double finalAmount = data.finalAmount;
+                        String paymentMethod = data.paymentMethod;
+                        clearCart();
+                        showSuccessDialog(finalAmount, soldCount, paymentMethod);
+                        if (response.data != null) {
+                            String json = response.data.toString();
+                            if (getActivity() instanceof UHFMainActivity)
+                                ((UHFMainActivity) getActivity()).openReceiptFragment(json);
+                        }
+                    } else {
+                        String errorMsg = "";
+                        if (response != null && response.error != null) errorMsg = response.error;
+                        else if (response != null && response.data != null) errorMsg = response.data.optString("message", "");
+                        if (errorMsg.isEmpty()) errorMsg = isArabic ? "فشل الاتصال بالسيرفر" : "Server connection failed";
+                        showRetryDialog(
+                            isArabic ? "❌ فشل إتمام البيع" : "❌ Sale Failed",
+                            errorMsg,
+                            () -> executeCheckout(data)
+                        );
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Checkout Error: " + e.getMessage());
+                safeRun(() -> {
+                    dismissDialog(loadingDialog);
+                    setButtonsEnabled(true);
+                    saveFullSaleLocally(data);
                     clearCart();
-                    showSuccessDialog(finalAmount, soldCount, paymentMethod);
-                    String json = response.data != null ? response.data.toString() : "{}";
-                    if (getActivity() instanceof UHFMainActivity)
-                        ((UHFMainActivity) getActivity()).openReceiptFragment(json);
-                } else {
-                    if (tvCartStatus != null) {
-                        tvCartStatus.setText("❌ " + (response != null ? response.code : "Error"));
-                    }
-                    if (btnCheckout != null) {
-                        btnCheckout.setEnabled(true);
-                        btnCheckout.setAlpha(1f);
-                    }
-                    showToast(isArabic ? "❌ فشل البيع" : "❌ Failed");
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Checkout Error: " + e.getMessage());
-            safeRun(() -> {
-                if (loadingDialog != null && loadingDialog.isShowing()) {
-                    loadingDialog.dismiss();
-                }
-                saveFullSaleLocally(data);
-                clearCart();
-                if (btnCheckout != null) {
-                    btnCheckout.setEnabled(true);
-                    btnCheckout.setAlpha(1f);
-                }
-                showToast(isArabic ? "💾 تم الحفظ محلياً للترحيل لاحقاً"
-                        : "💾 Saved locally for later posting");
-            });
-        }
-    }).start();
-}
-
-/**
- * ✅ الحصول على كود الحساب حسب طريقة الدفع
- */
-private String getAccountCode(String paymentMethod) {
-    if (paymentMethod == null) return "110101";
-    
-    switch (paymentMethod.toUpperCase()) {
-        case "CARD":
-        case "NET":
-        case "VISA":
-        case "MASTERCARD":
-            return "110201";
-        case "CREDIT":
-            return "110301";
-        case "BANK_TRANSFER":
-            return "110202";
-        case "CASH":
-        default:
-            return "110101";
+                    showRetryDialog(
+                        isArabic ? "❌ خطأ في الاتصال" : "❌ Connection Error",
+                        isArabic ? "تم حفظ العملية محلياً.\nسيتم المزامنة تلقائياً عند توفر الاتصال." :
+                                "Sale saved locally.\nWill sync automatically when connection is available.",
+                        null
+                    );
+                });
+            }
+        }).start();
     }
-}
+
+    private String getAccountCode(String paymentMethod) {
+        if (paymentMethod == null) return "110101";
+        switch (paymentMethod.toUpperCase()) {
+            case "CARD": case "NET": case "VISA": case "MASTERCARD": return "110201";
+            case "CREDIT": return "110301";
+            case "BANK_TRANSFER": return "110202";
+            case "CASH": default: return "110101";
+        }
+    }
 
     // ==================== دعم العمل دون اتصال ====================
 
@@ -797,7 +740,6 @@ private String getAccountCode(String paymentMethod) {
         try {
             SharedPreferences p = getContext().getSharedPreferences(PENDING_SALES_PREFS, Context.MODE_PRIVATE);
             JSONArray arr = new JSONArray(p.getString("pending", "[]"));
-
             JSONObject sale = new JSONObject();
             sale.put("id", System.currentTimeMillis());
             sale.put("customer_name", data.customerName);
@@ -808,7 +750,6 @@ private String getAccountCode(String paymentMethod) {
             sale.put("item_count", cartList.size());
             sale.put("branch_id", getActiveBranchId());
             sale.put("created_at", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()));
-
             JSONArray itemsArr = new JSONArray();
             for (CartItem item : cartList) {
                 JSONObject obj = new JSONObject();
@@ -822,11 +763,8 @@ private String getAccountCode(String paymentMethod) {
                 itemsArr.put(obj);
             }
             sale.put("items", itemsArr);
-
             arr.put(sale);
             p.edit().putString("pending", arr.toString()).apply();
-
-            Log.i(TAG, "💾 Sale saved locally: " + sale.optString("id"));
         } catch (Exception e) {
             Log.e(TAG, "Save local sale error: " + e.getMessage());
         }
@@ -841,13 +779,11 @@ private String getAccountCode(String paymentMethod) {
             if (arr.length() > 0) {
                 safeRun(() -> {
                     if (tvCartStatus != null) {
-                        tvCartStatus.setText("⚠️ " + arr.length() + " "
-                                + (isArabic ? "عملية معلقة" : "pending sales"));
+                        tvCartStatus.setText("⚠️ " + arr.length() + " " + (isArabic ? "عملية معلقة" : "pending sales"));
                     }
                 });
             }
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
     }
 
     private void syncPendingSales() {
@@ -856,16 +792,11 @@ private String getAccountCode(String paymentMethod) {
             try {
                 SharedPreferences p = getContext().getSharedPreferences(PENDING_SALES_PREFS, Context.MODE_PRIVATE);
                 JSONArray arr = new JSONArray(p.getString("pending", "[]"));
-
                 if (arr.length() == 0) return;
-
-                Log.i(TAG, "🔄 Syncing " + arr.length() + " pending sales...");
-
                 MiraApiClient client = MiraApiClient.getInstance(getContext());
                 JSONArray remainingArr = new JSONArray();
                 int synced = 0;
                 int branchId = getActiveBranchId();
-
                 for (int i = 0; i < arr.length(); i++) {
                     try {
                         JSONObject sale = arr.getJSONObject(i);
@@ -873,53 +804,35 @@ private String getAccountCode(String paymentMethod) {
                         payload.put("action", "COMPLETE_POS_SALE");
                         payload.put("gate_id", client.getGateId());
                         payload.put("branch_id", sale.optInt("branch_id", branchId));
-
                         JSONObject customer = new JSONObject();
                         customer.put("name", sale.optString("customer_name", ""));
                         customer.put("phone", sale.optString("customer_phone", ""));
                         customer.put("payment_method", sale.optString("payment_method", "CASH"));
                         payload.put("customer", customer);
-
                         payload.put("items", sale.optJSONArray("items"));
-
                         JSONObject payment = new JSONObject();
                         payment.put("subtotal", sale.optDouble("final_amount", 0));
                         payment.put("discount_percent", sale.optDouble("discount", 0));
                         payment.put("final_amount", sale.optDouble("final_amount", 0));
                         payload.put("payment", payment);
-
                         MiraApiClient.ApiResponse response = client.checkout(payload);
-
-                        if (response != null && response.isSuccess) {
-                            synced++;
-                            Log.i(TAG, "✅ Synced sale: " + sale.optString("id"));
-                        } else {
-                            remainingArr.put(sale);
-                        }
+                        if (response != null && response.isSuccess) synced++;
+                        else remainingArr.put(sale);
                     } catch (Exception e) {
                         remainingArr.put(arr.getJSONObject(i));
                     }
                 }
-
                 p.edit().putString("pending", remainingArr.toString()).apply();
-
                 final int s = synced;
                 final int r = remainingArr.length();
                 safeRun(() -> {
-                    if (s > 0) {
-                        showToast(isArabic ? "✅ تمت مزامنة " + s + " عملية" : "✅ Synced " + s + " sales");
-                    }
+                    if (s > 0) showToast(isArabic ? "✅ تمت مزامنة " + s + " عملية" : "✅ Synced " + s + " sales");
                     if (r > 0) {
-                        if (tvCartStatus != null) {
-                            tvCartStatus.setText("⚠️ " + r + " " + (isArabic ? "معلقة" : "pending"));
-                        }
+                        if (tvCartStatus != null) tvCartStatus.setText("⚠️ " + r + " " + (isArabic ? "معلقة" : "pending"));
                     } else {
-                        if (tvCartStatus != null) {
-                            tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
-                        }
+                        if (tvCartStatus != null) tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
                     }
                 });
-
             } catch (Exception e) {
                 Log.e(TAG, "Sync pending error: " + e.getMessage());
             }
@@ -928,56 +841,105 @@ private String getAccountCode(String paymentMethod) {
 
     // ==================== DIALOGS ====================
 
-    private AlertDialog showLoadingDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+    private AlertDialog showProfessionalLoadingDialog() {
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return null;
 
-        LinearLayout layout = new LinearLayout(requireContext());
+        AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
+        LinearLayout layout = new LinearLayout(ctx);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(40, 30, 40, 30);
+        layout.setPadding(50, 40, 50, 40);
         layout.setGravity(android.view.Gravity.CENTER);
 
-        ProgressBar progressBar = new ProgressBar(requireContext());
+        ProgressBar progressBar = new ProgressBar(ctx);
         progressBar.setIndeterminate(true);
+        progressBar.setScaleX(1.5f);
+        progressBar.setScaleY(1.5f);
+        LinearLayout.LayoutParams pbParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        pbParams.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+        progressBar.setLayoutParams(pbParams);
         layout.addView(progressBar);
 
-        TextView tvLoading = new TextView(requireContext());
-        tvLoading.setText(isArabic ? "🔄 جاري إتمام البيع والترحيل المحاسبي..."
-                : "🔄 Processing sale & journal entry...");
-        tvLoading.setTextSize(14);
-        tvLoading.setPadding(0, 16, 0, 0);
+        TextView tvLoading = new TextView(ctx);
+        tvLoading.setText(isArabic ? "🔄 جاري إتمام البيع..." : "🔄 Processing sale...");
+        tvLoading.setTextSize(16);
+        tvLoading.setTypeface(null, android.graphics.Typeface.BOLD);
         tvLoading.setGravity(android.view.Gravity.CENTER);
+        tvLoading.setPadding(0, 20, 0, 8);
         layout.addView(tvLoading);
 
-        TextView tvSubtext = new TextView(requireContext());
-        tvSubtext.setText(isArabic ? "يرجى الانتظار، يتم تحديث المخزون وتسجيل القيود"
-                : "Please wait, updating inventory and ledger");
-        tvSubtext.setTextSize(11);
-        tvSubtext.setPadding(0, 4, 0, 0);
+        TextView tvSubtext = new TextView(ctx);
+        tvSubtext.setText(isArabic ? "يرجى الانتظار...\nيتم تحديث المخزون وتسجيل القيود المحاسبية" :
+                "Please wait...\nUpdating inventory and recording journal entries");
+        tvSubtext.setTextSize(12);
+        tvSubtext.setTextColor(Color.GRAY);
         tvSubtext.setGravity(android.view.Gravity.CENTER);
+        tvSubtext.setPadding(0, 8, 0, 0);
         layout.addView(tvSubtext);
 
         builder.setView(layout);
         builder.setCancelable(false);
-
         AlertDialog dialog = builder.create();
         dialog.show();
         return dialog;
     }
 
-    private void showSuccessDialog(double amount, int itemCount, String paymentMethod) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+    private void setButtonsEnabled(boolean enabled) {
+        safeRun(() -> {
+            if (btnCheckout != null) {
+                btnCheckout.setEnabled(enabled && !cartList.isEmpty());
+                btnCheckout.setAlpha(enabled && !cartList.isEmpty() ? 1.0f : 0.5f);
+            }
+            if (btnClearCart != null) btnClearCart.setEnabled(enabled);
+            if (btnAddManual != null) btnAddManual.setEnabled(enabled);
+            if (btnOpenScanner != null) btnOpenScanner.setEnabled(enabled);
+            if (btnPosRFIDMode != null) btnPosRFIDMode.setEnabled(enabled);
+            if (etManualEpc != null) etManualEpc.setEnabled(enabled);
+        });
+    }
 
-        LinearLayout layout = new LinearLayout(requireContext());
+    private void showRetryDialog(String title, String message, Runnable retryAction) {
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return;
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
+        builder.setTitle(title).setMessage(message).setCancelable(false);
+        if (retryAction != null) {
+            builder.setPositiveButton(isArabic ? "🔄 إعادة المحاولة" : "🔄 Retry", (dialog, which) -> {
+                dialog.dismiss();
+                retryAction.run();
+            });
+        }
+        builder.setNegativeButton(isArabic ? "إغلاق" : "Close", (dialog, which) -> dialog.dismiss());
+        builder.show();
+    }
+
+    private void dismissDialog(AlertDialog dialog) {
+        try {
+            if (dialog != null && dialog.isShowing()) dialog.dismiss();
+        } catch (Exception e) {
+            Log.e(TAG, "dismissDialog error: " + e.getMessage());
+        }
+    }
+
+    private void showSuccessDialog(double amount, int itemCount, String paymentMethod) {
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return;
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
+        LinearLayout layout = new LinearLayout(ctx);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(30, 25, 30, 10);
 
-        TextView tvIcon = new TextView(requireContext());
+        TextView tvIcon = new TextView(ctx);
         tvIcon.setText("✅");
         tvIcon.setTextSize(40);
         tvIcon.setGravity(android.view.Gravity.CENTER);
         layout.addView(tvIcon);
 
-        TextView tvTitle = new TextView(requireContext());
+        TextView tvTitle = new TextView(ctx);
         tvTitle.setText(isArabic ? "تم البيع بنجاح!" : "Sale Completed!");
         tvTitle.setTextSize(18);
         tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -986,26 +948,21 @@ private String getAccountCode(String paymentMethod) {
         layout.addView(tvTitle);
 
         com.google.android.material.card.MaterialCardView card =
-                new com.google.android.material.card.MaterialCardView(requireContext());
+                new com.google.android.material.card.MaterialCardView(ctx);
         card.setRadius(12);
         card.setCardElevation(2);
         card.setPadding(16, 16, 16, 16);
-
-        LinearLayout cardLayout = new LinearLayout(requireContext());
+        LinearLayout cardLayout = new LinearLayout(ctx);
         cardLayout.setOrientation(LinearLayout.VERTICAL);
-
         addDetailRow(cardLayout, isArabic ? "📦 عدد القطع" : "📦 Items", String.valueOf(itemCount));
-        addDetailRow(cardLayout, isArabic ? "💰 المبلغ الإجمالي" : "💰 Total Amount",
-                priceManager.formatPriceDefault(amount));
+        addDetailRow(cardLayout, isArabic ? "💰 المبلغ الإجمالي" : "💰 Total Amount", priceManager.formatPriceDefault(amount));
         addDetailRow(cardLayout, isArabic ? "💳 طريقة الدفع" : "💳 Payment", paymentMethod);
-
         card.addView(cardLayout);
         layout.addView(card);
 
         builder.setView(layout);
         builder.setPositiveButton(isArabic ? "🎉 متابعة" : "🎉 Continue", (d, w) -> d.dismiss());
         builder.setCancelable(false);
-
         builder.show();
     }
 
@@ -1013,31 +970,18 @@ private String getAccountCode(String paymentMethod) {
         LinearLayout row = new LinearLayout(requireContext());
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setPadding(0, 4, 0, 4);
-
         TextView tvLabel = new TextView(requireContext());
         tvLabel.setText(label);
         tvLabel.setTextSize(12);
         tvLabel.setTypeface(null, android.graphics.Typeface.BOLD);
         tvLabel.setMinWidth(150);
         row.addView(tvLabel);
-
         TextView tvValue = new TextView(requireContext());
         tvValue.setText(value);
         tvValue.setTextSize(12);
         tvValue.setPadding(8, 0, 0, 0);
         row.addView(tvValue);
-
         parent.addView(row);
-    }
-
-    // ==================== Cleanup ====================
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        stopRFIDScan();
-        if (scaleConnector != null) scaleConnector.disconnect();
-        if (rfidManager != null) rfidManager.release();
     }
 
     // ==================== Adapter ====================
@@ -1074,14 +1018,9 @@ private String getAccountCode(String paymentMethod) {
             if (h.tvKaratWeight != null)
                 h.tvKaratWeight.setText(String.format(Locale.US, "%s | %.2fg", item.karat,
                         item.scaleWeight > 0 ? item.scaleWeight : item.weight));
-            if (h.tvPrice != null)
-                h.tvPrice.setText(priceManager.formatPriceDefault(item.price));
+            if (h.tvPrice != null) h.tvPrice.setText(priceManager.formatPriceDefault(item.price));
             if (h.tvStatus != null) {
-                if (item.isAvailable) {
-                    h.tvStatus.setText(isArabic ? "✅ متاحة" : "✅ Available");
-                } else {
-                    h.tvStatus.setText(isArabic ? "❌ غير متاحة" : "❌ Unavailable");
-                }
+                h.tvStatus.setText(item.isAvailable ? (isArabic ? "✅ متاحة" : "✅ Available") : (isArabic ? "❌ غير متاحة" : "❌ Unavailable"));
             }
             if (h.btnRemove != null) h.btnRemove.setOnClickListener(v -> {
                 int p = h.getAdapterPosition();
@@ -1109,4 +1048,4 @@ private String getAccountCode(String paymentMethod) {
             }
         }
     }
-                        }
+                                  }
