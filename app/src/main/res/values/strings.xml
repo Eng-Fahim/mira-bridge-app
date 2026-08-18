@@ -1896,4 +1896,10 @@
 <string name="save_currency_settings">💾 حفظ إعدادات العملات</string>
 <string name="refresh_rates">🔄 تحديث الأسعار المباشرة</string>
 
+
+
+<!-- ✅ للنصين المفقودين -->
+<string name="official_rate">السعر الرسمي</string>
+<string name="market_rate">سعر السوق</string>
+
 </resources>
