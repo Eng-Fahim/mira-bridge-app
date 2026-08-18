@@ -408,27 +408,33 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
 
     // ============ كتابة مع تحقق ============
     private void writeAndVerify() {
-        String newEpc = EtData.getText().toString().trim();
-        String pwdStr = EtAccessPwd.getText().toString().trim();
-        if (TextUtils.isEmpty(pwdStr)) pwdStr = "00000000";
+    String newEpc = EtData.getText().toString().trim();
+    String pwdStr = EtAccessPwd.getText().toString().trim();
+    if (TextUtils.isEmpty(pwdStr)) pwdStr = "00000000";
+    
+    // ✅ اجعل المتغيرات final
+    final String finalNewEpc = newEpc;
+    final String finalPwdStr = pwdStr;
+    
+    addLog("✍️ كتابة مع تحقق: " + finalNewEpc);
+    boolean writeSuccess = rfidService.writeEpc(finalNewEpc, finalPwdStr);
+    
+    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+        boolean verifySuccess = rfidService.verifyWrite(finalNewEpc, finalPwdStr);
         
-        boolean writeSuccess = rfidService.writeEpc(newEpc, pwdStr);
-        
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            boolean verifySuccess = rfidService.verifyWrite(newEpc, pwdStr);
-            
-            if (writeSuccess && verifySuccess) {
-                tvProgrammerStatus.setText("✅ كتابة وتحقق ناجح" + (rfidService.isSimulationMode() ? " (محاكاة)" : ""));
-                tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
-                mContext.playSound(1);
-            } else {
-                tvProgrammerStatus.setText("⚠️ فشل التحقق\nكتابة: " + (writeSuccess ? "✅" : "❌") + 
-                    " | تحقق: " + (verifySuccess ? "✅" : "❌"));
-                tvProgrammerStatus.setTextColor(Color.parseColor("#FF9800"));
-                mContext.playSound(2);
-            }
-        }, 500);
-    }
+        if (writeSuccess && verifySuccess) {
+            tvProgrammerStatus.setText("✅ كتابة وتحقق ناجح");
+            tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
+            addLog("✅ كتابة وتحقق ناجح");
+            mContext.playSound(1);
+        } else {
+            tvProgrammerStatus.setText("⚠️ التحقق فشل");
+            tvProgrammerStatus.setTextColor(Color.parseColor("#FF9800"));
+            addLog("⚠️ كتابة: " + (writeSuccess ? "✅" : "❌") + " | تحقق: " + (verifySuccess ? "✅" : "❌"));
+            mContext.playSound(2);
+        }
+    }, 500);
+}
 
     // ============ قراءة TID ============
     private void readTid() {
@@ -479,4 +485,4 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
     public void onDestroyView() {
         super.onDestroyView();
     }
-}
+    }
