@@ -6,5 +6,11 @@ import com.example.uhf.MiraRfid.MiraIRFIDReader;
  * قارئ شبكة TCP عام
  */
 public class GenericNetworkReader extends SimulatorReader {
-    // يمكن التوسع لاحقاً لدعم TCP/IP
+    public GenericNetworkReader(Context context) {
+        super(context);
+    }
+    
+    public GenericNetworkReader() {
+        super(null);
+    }
 }
