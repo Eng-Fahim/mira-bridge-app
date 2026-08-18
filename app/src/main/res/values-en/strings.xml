@@ -18,6 +18,8 @@
     <string name="action_quick_pos">Quick POS</string>
     <string name="action_transfers">Transfers</string>
     <string name="action_more_tools">More Actions</string>
+    
+    <string name="nav_sales">Point of Sale</string>
 
     <!-- Gates -->
     <string name="mira_gate_title">MIRA Secure Gate™</string>
