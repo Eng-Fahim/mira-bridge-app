@@ -5,6 +5,12 @@
         <item name="cornerSize">50%</item>
     </style>
 
+    <!-- Circular Image Shape Style -->
+    <style name="CircularImageView">
+        <item name="cornerSize">50%</item>
+    </style>
+
+
     <!-- Style الحواف الدائرية الفاخرة للبطاقات والقوائم -->
     <style name="ShapeAppearance.TopRounded" parent="ShapeAppearance.Material3.Corner.None">
         <item name="cornerSizeTopLeft">24dp</item>
