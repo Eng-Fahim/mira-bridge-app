@@ -8,7 +8,7 @@ import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 
 /**
- * قارئ Chainway حقيقي - يستخدم DeviceAPI SDK
+ * قارئ Chainway حقيقي - يدعم القراءة والكتابة
  */
 public class ChainwayReader implements MiraIRFIDReader {
     
@@ -19,7 +19,6 @@ public class ChainwayReader implements MiraIRFIDReader {
     private OnTagReadListener listener;
     private boolean isScanning = false;
     private boolean isConnected = false;
-    private Thread scanThread;
     
     public ChainwayReader(Context context) {
         this.context = context;
@@ -50,7 +49,67 @@ public class ChainwayReader implements MiraIRFIDReader {
             }
             return isConnected;
         } catch (Exception e) {
-            Log.e(TAG, "Connect error: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    // ✅ دوال جديدة للقراءة والكتابة
+    
+    /**
+     * قراءة EPC من الشريحة
+     */
+    public String readEpcData(String accessPassword) {
+        if (reader == null) return null;
+        
+        try {
+            // قراءة EPC من البنك EPC، العنوان 32، الطول 6
+            String epcData = reader.readData(accessPassword, 
+                RFIDWithUHFUART.Bank_EPC, 32, 6);
+            
+            if (epcData != null && !epcData.isEmpty()) {
+                return epcData;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "readEpcData error: " + e.getMessage());
+        }
+        
+        return null;
+    }
+    
+    /**
+     * قراءة TID من الشريحة
+     */
+    public String readTidData(String accessPassword) {
+        if (reader == null) return null;
+        
+        try {
+            String tidData = reader.readData(accessPassword, 
+                RFIDWithUHFUART.Bank_TID, 0, 6);
+            
+            if (tidData != null && !tidData.isEmpty()) {
+                return tidData;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "readTidData error: " + e.getMessage());
+        }
+        
+        return null;
+    }
+    
+    /**
+     * كتابة EPC على الشريحة
+     */
+    public boolean writeEpcData(String newEpc, String accessPassword) {
+        if (reader == null) return false;
+        
+        try {
+            int writeLen = newEpc.length() / 4;
+            boolean success = reader.writeData(accessPassword, 
+                RFIDWithUHFUART.Bank_EPC, 32, writeLen, newEpc);
+            
+            return success;
+        } catch (Exception e) {
+            Log.e(TAG, "writeEpcData error: " + e.getMessage());
             return false;
         }
     }
@@ -92,12 +151,10 @@ public class ChainwayReader implements MiraIRFIDReader {
                 isScanning = true;
                 if (listener != null) listener.onScanStarted();
                 
-                // ✅ خيط قراءة فائق السرعة متوافق مع معمارية Offline-First
-                scanThread = new Thread(() -> {
+                new Thread(() -> {
                     while (isScanning) {
                         try {
                             UHFTAGInfo tag;
-                            // تفريغ الـ Buffer بالكامل في كل دورة لمنع تراكم القراءات
                             while (isScanning && (tag = reader.readTagFromBuffer()) != null) {
                                 String epc = tag.getEPC();
                                 String rssiStr = tag.getRssi();
@@ -111,7 +168,6 @@ public class ChainwayReader implements MiraIRFIDReader {
                                     listener.onTagRead(epc, rssi);
                                 }
                             }
-                            // فترة انتظار قصيرة جداً (10ms) لإراحة المعالج دون إبطاء الجرد
                             Thread.sleep(10);
                         } catch (Exception e) {
                             if (isScanning && listener != null) {
@@ -120,12 +176,10 @@ public class ChainwayReader implements MiraIRFIDReader {
                             break;
                         }
                     }
-                });
-                scanThread.start();
+                }).start();
             }
             return success;
         } catch (Exception e) {
-            Log.e(TAG, "Start scan error: " + e.getMessage());
             return false;
         }
     }
@@ -160,23 +214,14 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
     
     @Override
-    public void setRssiThreshold(int threshold) {
-        Log.i(TAG, "RSSI threshold: " + threshold);
-    }
+    public void setRssiThreshold(int threshold) {}
     
     @Override
-    public void setScanInterval(int intervalMs) {
-        Log.i(TAG, "Scan interval: " + intervalMs);
-    }
+    public void setScanInterval(int intervalMs) {}
     
     @Override
     public String getDeviceName() {
-        try {
-            if (reader != null) {
-                return "Chainway " + reader.getVersion();
-            }
-        } catch (Exception ignored) {}
-        return "Chainway UHF Reader";
+        return "Chainway C72";
     }
     
     @Override
@@ -198,39 +243,39 @@ public class ChainwayReader implements MiraIRFIDReader {
     public void setOnTagReadListener(OnTagReadListener listener) {
         this.listener = listener;
     }
-
+    
     @Override
-public boolean writeEpc(String newEpc, String accessPassword) {
-    return false;
-}
-
-@Override
-public boolean writeUserMemory(int address, String data, String accessPassword) {
-    return false;
-}
-
-@Override
-public String readTid() {
-    return null;
-}
-
-@Override
-public String readUserMemory(int address, int length) {
-    return null;
-}
-
-@Override
-public boolean lockTag(String accessPassword) {
-    return false;
-}
-
-@Override
-public boolean unlockTag(String accessPassword) {
-    return false;
-}
-
-@Override
-public boolean killTag(String accessPassword) {
-    return false;
-}
+    public boolean writeEpc(String newEpc, String accessPassword) {
+        return writeEpcData(newEpc, accessPassword);
+    }
+    
+    @Override
+    public boolean writeUserMemory(int address, String data, String accessPassword) {
+        return false;
+    }
+    
+    @Override
+    public String readTid() {
+        return readTidData("00000000");
+    }
+    
+    @Override
+    public String readUserMemory(int address, int length) {
+        return null;
+    }
+    
+    @Override
+    public boolean lockTag(String accessPassword) {
+        return false;
+    }
+    
+    @Override
+    public boolean unlockTag(String accessPassword) {
+        return false;
+    }
+    
+    @Override
+    public boolean killTag(String accessPassword) {
+        return false;
+    }
 }
