@@ -165,7 +165,7 @@ public class MiraPosFragment extends MiraBaseFragment {
 
         // ✅ الاتصال بالميزان عند فتح الواجهة
         if (scaleConnector != null) {
-            scaleConnector.connect();
+            //scaleConnector.connect();
         }
 
         if (tvCartStatus != null && cartList.isEmpty()) {
@@ -916,7 +916,7 @@ public class MiraPosFragment extends MiraBaseFragment {
         builder.show();
     }
 
-    private void dismissDialog(AlertDialog dialog) {
+    protected void dismissDialog(AlertDialog dialog) {
         try {
             if (dialog != null && dialog.isShowing()) dialog.dismiss();
         } catch (Exception e) {
@@ -1048,4 +1048,4 @@ public class MiraPosFragment extends MiraBaseFragment {
             }
         }
     }
-                                  }
+}
