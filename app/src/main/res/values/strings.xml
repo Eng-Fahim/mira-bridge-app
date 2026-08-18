@@ -1896,7 +1896,8 @@
 <string name="save_currency_settings">💾 حفظ إعدادات العملات</string>
 <string name="refresh_rates">🔄 تحديث الأسعار المباشرة</string>
 
-
+<string name="hardware_connected">الأجهزة متصلة</string>
+<string name="loading">جاري التحميل...</string>
 
 <!-- ✅ للنصين المفقودين -->
 <string name="official_rate">السعر الرسمي</string>
