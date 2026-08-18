@@ -13,7 +13,6 @@ import java.util.Map;
 /**
  * MIRA Price Manager
  * المدير المركزي لأسعار الذهب والعملات
- * يستخدم في جميع أجزاء التطبيق
  */
 public class MiraPriceManager {
 
@@ -25,14 +24,12 @@ public class MiraPriceManager {
     private SharedPreferences prefs;
     private final DecimalFormat decimalFormat = new DecimalFormat("#,##0.00");
 
-    // العملات المدعومة
     public static final String CURRENCY_USD = "USD";
     public static final String CURRENCY_YER = "YER";
     public static final String CURRENCY_EGP = "EGP";
     public static final String CURRENCY_SAR = "SAR";
     public static final String CURRENCY_AED = "AED";
 
-    // العيارات المدعومة
     public static final int KARAT_24 = 24;
     public static final int KARAT_22 = 22;
     public static final int KARAT_21 = 21;
@@ -46,317 +43,314 @@ public class MiraPriceManager {
         loadFromServer();
     }
 
-   /**
- * الحصول على النسخة الوحيدة
- */
-public static synchronized MiraPriceManager getInstance(Context context) {
-    if (instance == null) {
-        instance = new MiraPriceManager(context);
+    public static synchronized MiraPriceManager getInstance(Context context) {
+        if (instance == null) {
+            instance = new MiraPriceManager(context);
+        }
+        return instance;
     }
-    return instance;
-}
 
-// ✅ أضف هذه الدالة هنا
-/**
- * تحديث فوري من السيرفر
- */
-public void refreshNow() {
-    loadFromServer();
-}
+    public void refreshNow() {
+        loadFromServer();
+    }
 
     // ============================================
     // 💰 دوال أسعار الذهب
     // ============================================
 
-    /**
-     * الحصول على سعر الذهب الخام لعيار معين (دولار/جرام)
-     */
     public double getGoldPricePerGram(int karat) {
         String key = "gold_price_" + karat + "k";
-        return getDoubleFromPrefs(key, 0);
+        return getDoubleFromPrefs(key, getDefaultGoldPrice(karat));
     }
 
-    /**
-     * الحصول على هامش الربح لعيار معين
-     */
     public double getMargin(int karat) {
         String key = "margin_" + karat + "k";
-        return getDoubleFromPrefs(key, 100);
+        return getDoubleFromPrefs(key, getDefaultMargin(karat));
     }
 
-    /**
-     * الحصول على المصنعية لعيار معين
-     */
     public double getMakingCharge(int karat) {
         String key = "making_" + karat + "k";
-        return getDoubleFromPrefs(key, 0);
+        return getDoubleFromPrefs(key, getDefaultMaking(karat));
     }
 
-    /**
-     * حساب السعر النهائي للجرام (مع الهامش والمصنعية)
-     */
     public double getFinalPricePerGram(int karat) {
         double basePrice = getGoldPricePerGram(karat);
         double margin = getMargin(karat);
         double making = getMakingCharge(karat);
-
         return basePrice + (basePrice * margin / 100) + making;
     }
 
-    /**
-     * حساب السعر الإجمالي لقطعة ذهب
-     */
     public double calculateGoldPrice(int karat, double weightGrams) {
-        double finalPricePerGram = getFinalPricePerGram(karat);
-        return finalPricePerGram * weightGrams;
+        return getFinalPricePerGram(karat) * weightGrams;
     }
 
-    /**
-     * حساب السعر مع تحويل العملة
-     */
     public double calculateGoldPriceInCurrency(int karat, double weightGrams, String currency) {
         double priceUSD = calculateGoldPrice(karat, weightGrams);
-        double exchangeRate = getExchangeRate(currency);
-        return priceUSD * exchangeRate;
+        return convertFromUSD(priceUSD, currency);
     }
 
     // ============================================
     // 💱 دوال العملات
     // ============================================
 
-    /**
-     * الحصول على العملة الافتراضية
-     */
     public String getDefaultCurrency() {
-    try {
-        // ✅ قراءة من currency_settings JSON
-        String currencySettingsJson = prefs.getString("currency_settings", "");
-        if (!currencySettingsJson.isEmpty()) {
-            JSONObject currencySettings = new JSONObject(currencySettingsJson);
-            String currency = currencySettings.optString("global_default_currency", "");
-            if (!currency.isEmpty()) {
-                return currency;
+        try {
+            String currencySettingsJson = prefs.getString("currency_settings", "");
+            if (!currencySettingsJson.isEmpty()) {
+                JSONObject currencySettings = new JSONObject(currencySettingsJson);
+                String currency = currencySettings.optString("global_default_currency", "");
+                if (!currency.isEmpty()) return currency;
             }
+            String currency = prefs.getString("global_default_currency", "");
+            if (!currency.isEmpty()) return currency;
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting default currency: " + e.getMessage());
         }
-        
-        // ✅ قراءة مباشرة
-        String currency = prefs.getString("global_default_currency", "");
-        if (!currency.isEmpty()) {
-            return currency;
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "Error getting default currency: " + e.getMessage());
+        return CURRENCY_YER;
     }
-    
-    return CURRENCY_YER; // ✅ الافتراضي ريال يمني
-}
 
-    /**
-     * الحصول على سعر الصرف لعملة معينة
-     */
+    // ✅ دالة واحدة فقط لسعر الصرف
     public double getExchangeRate(String currency) {
-    if (currency.equals(CURRENCY_USD)) {
-        return 1.0;
-    }
+        if (currency.equals(CURRENCY_USD)) return 1.0;
 
-    try {
-        // ✅ قراءة الإعدادات من JSON
-        String currencySettingsJson = prefs.getString("currency_settings", "");
-        if (!currencySettingsJson.isEmpty()) {
-            JSONObject currencySettings = new JSONObject(currencySettingsJson);
-            
-            // ✅ قراءة نوع السعر (رسمي أو سوقي)
-            String source = currencySettings.optString("exchange_source_" + currency, "official");
-            
-            // ✅ تحديد المفتاح الصحيح
+        try {
+            // ✅ 1. القراءة المباشرة من prefs
+            boolean useMarketRate = prefs.getBoolean("use_market_rate", false);
+            String source = useMarketRate ? "market" : "official";
             String key = "exchange_" + source + "_" + currency;
-            
-            // ✅ قراءة القيمة
-            double rate = currencySettings.optDouble(key, 0);
-            if (rate > 0) {
-                return rate;
+            String directValue = prefs.getString(key, "");
+            if (!directValue.isEmpty()) {
+                double rate = Double.parseDouble(directValue);
+                if (rate > 0) return rate;
             }
+
+            // ✅ 2. القراءة من currency_settings JSON
+            String currencySettingsJson = prefs.getString("currency_settings", "");
+            if (!currencySettingsJson.isEmpty()) {
+                JSONObject currencySettings = new JSONObject(currencySettingsJson);
+                
+                // قراءة use_market_rate
+                if (currencySettings.has("use_market_rate")) {
+                    Object obj = currencySettings.get("use_market_rate");
+                    if (obj instanceof Boolean) {
+                        useMarketRate = (Boolean) obj;
+                    } else {
+                        String str = obj.toString();
+                        useMarketRate = str.equals("true") || str.equals("1");
+                    }
+                }
+                
+                source = useMarketRate ? "market" : "official";
+                key = "exchange_" + source + "_" + currency;
+                double rate = currencySettings.optDouble(key, 0);
+                if (rate > 0) return rate;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error reading exchange rate: " + e.getMessage());
         }
-        
-        // ✅ محاولة القراءة المباشرة من prefs
-        String source = prefs.getString("exchange_source_" + currency, "official");
-        String key = "exchange_" + source + "_" + currency;
-        double rate = getDoubleFromPrefs(key, 0);
-        if (rate > 0) {
-            return rate;
-        }
-        
+
         // ✅ قيم افتراضية
         switch (currency) {
-            case CURRENCY_YER: return 530; // سعر السوق
+            case CURRENCY_YER: return 530;
             case CURRENCY_EGP: return 47.5;
             case CURRENCY_SAR: return 3.75;
             case CURRENCY_AED: return 3.67;
             default: return 1.0;
         }
-    } catch (Exception e) {
-        Log.e(TAG, "Error getting exchange rate: " + e.getMessage());
     }
-    
-    return 1.0;
-}
 
-    /**
-     * تحويل مبلغ من دولار إلى عملة أخرى
-     */
     public double convertFromUSD(double amountUSD, String toCurrency) {
-        double rate = getExchangeRate(toCurrency);
-        return amountUSD * rate;
+        return amountUSD * getExchangeRate(toCurrency);
     }
 
-    /**
-     * تحويل مبلغ إلى دولار
-     */
     public double convertToUSD(double amount, String fromCurrency) {
         double rate = getExchangeRate(fromCurrency);
         return rate > 0 ? amount / rate : amount;
     }
 
-    /**
-     * تحويل مبلغ من عملة إلى أخرى
-     */
     public double convertCurrency(double amount, String fromCurrency, String toCurrency) {
         double amountUSD = convertToUSD(amount, fromCurrency);
         return convertFromUSD(amountUSD, toCurrency);
     }
 
-    /**
-     * تنسيق السعر حسب العملة
-     */
     public String formatPrice(double priceUSD, String currency) {
         double convertedPrice = convertFromUSD(priceUSD, currency);
         String symbol = getCurrencySymbol(currency);
+        if (currency.equals(CURRENCY_YER) || currency.equals(CURRENCY_EGP)) {
+            DecimalFormat largeFormat = new DecimalFormat("#,##0");
+            return largeFormat.format(convertedPrice) + " " + symbol;
+        }
         return symbol + " " + decimalFormat.format(convertedPrice);
     }
 
-    /**
-     * تنسيق السعر بالعملة الافتراضية
-     */
     public String formatPriceDefault(double priceUSD) {
-        String defaultCurrency = getDefaultCurrency();
-        return formatPrice(priceUSD, defaultCurrency);
+        return formatPrice(priceUSD, getDefaultCurrency());
     }
 
-    /**
-     * الحصول على رمز العملة
-     */
     public String getCurrencySymbol(String currency) {
         switch (currency) {
-            case CURRENCY_USD:
-                return "$";
-            case CURRENCY_YER:
-                return "ريال";
-            case CURRENCY_EGP:
-                return "ج.م";
-            case CURRENCY_SAR:
-                return "ر.س";
-            case CURRENCY_AED:
-                return "د.إ";
-            default:
-                return currency;
+            case CURRENCY_USD: return "$";
+            case CURRENCY_YER: return "ريال";
+            case CURRENCY_EGP: return "ج.م";
+            case CURRENCY_SAR: return "ر.س";
+            case CURRENCY_AED: return "د.إ";
+            default: return currency;
         }
     }
 
-    /**
-     * الحصول على اسم العملة بالعربية
-     */
     public String getCurrencyNameArabic(String currency) {
         switch (currency) {
-            case CURRENCY_USD:
-                return "دولار";
-            case CURRENCY_YER:
-                return "ريال يمني";
-            case CURRENCY_EGP:
-                return "جنيه مصري";
-            case CURRENCY_SAR:
-                return "ريال سعودي";
-            case CURRENCY_AED:
-                return "درهم إماراتي";
-            default:
-                return currency;
+            case CURRENCY_USD: return "دولار";
+            case CURRENCY_YER: return "ريال يمني";
+            case CURRENCY_EGP: return "جنيه مصري";
+            case CURRENCY_SAR: return "ريال سعودي";
+            case CURRENCY_AED: return "درهم إماراتي";
+            default: return currency;
         }
     }
 
     // ============================================
-    // 📊 دوال مساعدة للعرض
+    // 📊 دوال مساعدة
     // ============================================
 
-    /**
-     * الحصول على ملخص سعر قطعة ذهب
-     */
     public String getGoldItemPriceSummary(int karat, double weightGrams) {
         double priceUSD = calculateGoldPrice(karat, weightGrams);
         String defaultCurrency = getDefaultCurrency();
         double priceInCurrency = convertFromUSD(priceUSD, defaultCurrency);
-        
-        return String.format(
-            "%s %s (%s %s)",
+        return String.format("%s %s (%s $)",
             decimalFormat.format(priceInCurrency),
             getCurrencySymbol(defaultCurrency),
-            decimalFormat.format(priceUSD),
-            "$"
-        );
+            decimalFormat.format(priceUSD));
     }
 
-    /**
-     * الحصول على جميع الأسعار الحالية
-     */
     public Map<String, Double> getAllGoldPrices() {
         Map<String, Double> prices = new HashMap<>();
         int[] karats = {KARAT_24, KARAT_22, KARAT_21, KARAT_18, KARAT_14, KARAT_12};
-        
         for (int karat : karats) {
             prices.put(karat + "k_base", getGoldPricePerGram(karat));
             prices.put(karat + "k_final", getFinalPricePerGram(karat));
         }
-        
         return prices;
     }
 
-    /**
-     * الحصول على جميع أسعار الصرف
-     */
     public Map<String, Double> getAllExchangeRates() {
         Map<String, Double> rates = new HashMap<>();
         String[] currencies = {CURRENCY_YER, CURRENCY_EGP, CURRENCY_SAR, CURRENCY_AED};
-        
         for (String currency : currencies) {
             rates.put(currency, getExchangeRate(currency));
         }
-        
         return rates;
     }
 
     // ============================================
-    // 🔄 تحديث الإعدادات
+    // حفظ الإعدادات
     // ============================================
 
-    /**
-     * حفظ إعدادات الذهب
-     */
     public void saveGoldSettings(JSONObject goldSettings) {
-        SharedPreferences.Editor editor = prefs.edit();
-        editor.putString("gold_settings", goldSettings.toString());
-        editor.apply();
+        prefs.edit().putString("gold_settings", goldSettings.toString()).apply();
     }
 
-    /**
-     * حفظ إعدادات العملات
-     */
     public void saveCurrencySettings(JSONObject currencySettings) {
         SharedPreferences.Editor editor = prefs.edit();
         editor.putString("currency_settings", currencySettings.toString());
+        
+        // ✅ حفظ use_market_rate كـ boolean
+        boolean useMarketRate = currencySettings.optBoolean("use_market_rate", false);
+        editor.putBoolean("use_market_rate", useMarketRate);
+        
+        // ✅ حفظ القيم مباشرة
+        String[] currencies = {CURRENCY_YER, CURRENCY_EGP, CURRENCY_SAR, CURRENCY_AED};
+        for (String currency : currencies) {
+            String officialKey = "exchange_official_" + currency;
+            String marketKey = "exchange_market_" + currency;
+            
+            if (currencySettings.has(officialKey)) {
+                editor.putString(officialKey, currencySettings.optString(officialKey, "0"));
+            }
+            if (currencySettings.has(marketKey)) {
+                editor.putString(marketKey, currencySettings.optString(marketKey, "0"));
+            }
+        }
+        
         editor.apply();
     }
 
-    /**
-     * تحديث الإعدادات من السيرفر
-     */
+    // ============================================
+    // القيم الافتراضية
+    // ============================================
+
+    private double getDefaultGoldPrice(int karat) {
+        switch (karat) {
+            case 24: return 75.00;
+            case 22: return 68.75;
+            case 21: return 65.62;
+            case 18: return 56.25;
+            case 14: return 43.75;
+            case 12: return 37.50;
+            default: return 65.62;
+        }
+    }
+
+    private double getDefaultMargin(int karat) {
+        switch (karat) {
+            case 24: return 95.0;
+            case 22: return 88.0;
+            case 21: return 90.0;
+            case 18: return 100.8;
+            case 14: return 105.8;
+            case 12: return 110.0;
+            default: return 90.0;
+        }
+    }
+
+    private double getDefaultMaking(int karat) {
+        switch (karat) {
+            case 24: return 5.0;
+            case 22: return 8.0;
+            case 21: return 10.0;
+            case 18: return 12.0;
+            case 14: return 15.0;
+            case 12: return 18.0;
+            default: return 10.0;
+        }
+    }
+
+    // ============================================
+    // القراءة من التخزين - دالة واحدة فقط
+    // ============================================
+
+    private double getDoubleFromPrefs(String key, double defaultValue) {
+        try {
+            String goldSettingsJson = prefs.getString("gold_settings", "");
+            if (!goldSettingsJson.isEmpty()) {
+                JSONObject goldSettings = new JSONObject(goldSettingsJson);
+                if (goldSettings.has(key)) {
+                    return goldSettings.optDouble(key, defaultValue);
+                }
+            }
+            
+            String currencySettingsJson = prefs.getString("currency_settings", "");
+            if (!currencySettingsJson.isEmpty()) {
+                JSONObject currencySettings = new JSONObject(currencySettingsJson);
+                if (currencySettings.has(key)) {
+                    return currencySettings.optDouble(key, defaultValue);
+                }
+            }
+            
+            String value = prefs.getString(key, "");
+            if (!value.isEmpty()) {
+                return Double.parseDouble(value);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing " + key + ": " + e.getMessage());
+        }
+        return defaultValue;
+    }
+
+    // ============================================
+    // التحديث من السيرفر
+    // ============================================
+
     private void loadFromServer() {
         new Thread(() -> {
             try {
@@ -373,7 +367,6 @@ public void refreshNow() {
                     SharedPreferences.Editor editor = prefs.edit();
                     
                     if (goldData != null) {
-                        // حفظ أسعار الذهب
                         String[] goldKeys = {
                             "gold_price_24k", "gold_price_22k", "gold_price_21k",
                             "gold_price_18k", "gold_price_14k",
@@ -382,7 +375,6 @@ public void refreshNow() {
                             "making_24k", "making_22k", "making_21k",
                             "making_18k", "making_14k", "making_12k"
                         };
-                        
                         for (String key : goldKeys) {
                             if (goldData.has(key)) {
                                 editor.putString(key, goldData.optString(key, "0"));
@@ -391,27 +383,28 @@ public void refreshNow() {
                     }
                     
                     if (currencyData != null) {
-                        // حفظ أسعار العملات
                         String[] currencyKeys = {
                             "global_default_currency", "chart_currency",
                             "exchange_official_YER", "exchange_official_EGP",
                             "exchange_official_SAR", "exchange_official_AED",
                             "exchange_market_YER", "exchange_market_EGP",
                             "exchange_market_SAR", "exchange_market_AED",
-                            "exchange_source_YER", "exchange_source_EGP",
-                            "exchange_source_SAR", "exchange_source_AED"
+                            "use_market_rate"
                         };
-                        
                         for (String key : currencyKeys) {
                             if (currencyData.has(key)) {
-                                editor.putString(key, currencyData.optString(key, "0"));
+                                editor.putString(key, currencyData.optString(key, ""));
                             }
+                        }
+                        
+                        // ✅ حفظ use_market_rate كـ boolean
+                        if (currencyData.has("use_market_rate")) {
+                            boolean useMarket = currencyData.optBoolean("use_market_rate", false);
+                            editor.putBoolean("use_market_rate", useMarket);
                         }
                     }
                     
                     editor.apply();
-                    
-                    // إشعار التحديث
                     notifyPriceUpdated();
                 }
             } catch (Exception e) {
@@ -420,55 +413,12 @@ public void refreshNow() {
         }).start();
     }
 
-    /**
-     * إشعار بأن الأسعار تم تحديثها
-     */
     private void notifyPriceUpdated() {
-        // يمكن استخدام EventBus أو BroadcastReceiver هنا
-        // للتطبيق الحالي نستخدم Broadcast
         android.content.Intent intent = new android.content.Intent("MIRA_PRICES_UPDATED");
         appContext.sendBroadcast(intent);
     }
 
-    /**
-     * التحقق من وجود أسعار محدثة
-     */
     public boolean hasValidPrices() {
         return getGoldPricePerGram(KARAT_24) > 0;
     }
-
-    // ============================================
-    // Helper Methods
-    // ============================================
-
-    private double getDoubleFromPrefs(String key, double defaultValue) {
-    try {
-        // ✅ أولاً: جرب القراءة من gold_settings JSON
-        String goldSettingsJson = prefs.getString("gold_settings", "");
-        if (!goldSettingsJson.isEmpty()) {
-            JSONObject goldSettings = new JSONObject(goldSettingsJson);
-            if (goldSettings.has(key)) {
-                return goldSettings.optDouble(key, defaultValue);
-            }
-        }
-        
-        // ✅ ثانياً: جرب القراءة من currency_settings JSON
-        String currencySettingsJson = prefs.getString("currency_settings", "");
-        if (!currencySettingsJson.isEmpty()) {
-            JSONObject currencySettings = new JSONObject(currencySettingsJson);
-            if (currencySettings.has(key)) {
-                return currencySettings.optDouble(key, defaultValue);
-            }
-        }
-        
-        // ✅ ثالثاً: جرب القراءة المباشرة
-        String value = prefs.getString(key, "");
-        if (!value.isEmpty()) {
-            return Double.parseDouble(value);
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "Error parsing " + key + ": " + e.getMessage());
-    }
-    return defaultValue;
-}
 }
