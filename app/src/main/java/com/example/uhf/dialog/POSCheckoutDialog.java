@@ -25,6 +25,7 @@ import androidx.fragment.app.DialogFragment;
 
 import com.example.uhf.R;
 import com.example.uhf.manager.MiraOrgProfileManager;
+import com.example.uhf.manager.MiraPriceManager;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.Locale;
@@ -56,6 +57,7 @@ public class POSCheckoutDialog extends DialogFragment {
     private OnCheckoutListener listener;
     private boolean isArabic;
     private MiraOrgProfileManager orgProfile;
+    private MiraPriceManager priceManager; // ✅ إضافة مدير الأسعار
 
     private TextView tvDialogTitle, tvItemCount, tvSubtotal, tvDiscountAmount, tvFinalTotal, tvAccountNumber;
     private EditText etCustomerName, etCustomerPhone, etCustomerEmail, etCustomerAddress, etCustomerNotes, etDiscount;
@@ -86,6 +88,7 @@ public class POSCheckoutDialog extends DialogFragment {
         isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         if (getContext() != null) {
             orgProfile = MiraOrgProfileManager.getInstance(getContext());
+            priceManager = MiraPriceManager.getInstance(getContext()); // ✅ تهيئة مدير الأسعار
         }
     }
 
@@ -338,6 +341,9 @@ public class POSCheckoutDialog extends DialogFragment {
         }
     }
 
+    /**
+     * ✅ تحديث عرض الأسعار بالعملة الصحيحة
+     */
     private void updateFinalAmount() {
         double discountPercent = 0.0;
         if (etDiscount != null) {
@@ -350,14 +356,15 @@ public class POSCheckoutDialog extends DialogFragment {
         double discountAmount = totalAmount * (discountPercent / 100.0);
         double finalAmount = totalAmount - discountAmount;
 
+        // ✅ استخدام MiraPriceManager لتنسيق الأسعار بالعملة الصحيحة
         if (tvSubtotal != null) {
-            tvSubtotal.setText(String.format(Locale.US, "%,.0f YER", totalAmount));
+            tvSubtotal.setText(priceManager.formatPriceDefault(totalAmount));
         }
         if (tvDiscountAmount != null) {
-            tvDiscountAmount.setText(String.format(Locale.US, "%,.0f YER", discountAmount));
+            tvDiscountAmount.setText(priceManager.formatPriceDefault(discountAmount));
         }
         if (tvFinalTotal != null) {
-            tvFinalTotal.setText(String.format(Locale.US, "%,.0f YER", finalAmount));
+            tvFinalTotal.setText(priceManager.formatPriceDefault(finalAmount));
         }
     }
 }
