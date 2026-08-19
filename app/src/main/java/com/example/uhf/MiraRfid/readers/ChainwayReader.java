@@ -216,17 +216,19 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
 
     @Override
-    public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
-        if (reader == null) return false;
-        try {
-            // تصحيح: استخدام lockMem المعتمدة في Chainway SDK بدلاً من lockTag
-            String lockCode = shouldLock ? "1" : "0";
-            return reader.lockMem(pwdStr, String.valueOf(bank), lockCode);
-        } catch (Exception e) {
-            Log.e(TAG, "setTagLockState error: " + e.getMessage());
-            return false;
-        }
+public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
+    if (reader == null) return false;
+    try {
+        // مكتبة Chainway تتطلب lockMem(pwd, lockCode)
+        // lockCode: 0x0001 (Open), 0x0002 (Lock)
+        String lockCode = shouldLock ? "0002" : "0001";
+        return reader.lockMem(pwdStr, lockCode);
+    } catch (Exception e) {
+        Log.e("ChainwayReader", "Lock error: " + e.getMessage());
+        return false;
     }
+}
+
 
     @Override
     public boolean setFilter(int bank, int ptr, String filterData) {
@@ -241,15 +243,16 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
 
     @Override
-    public void clearFilter() {
-        if (reader == null) return;
+public void clearFilter() {
+    if (reader != null) {
         try {
-            // تصحيح: استخدام cleanMask المعتمدة في Chainway SDK بدلاً من emptyFilter
-            reader.cleanMask();
+            reader.clearMask(); // أو reader.initFilter() حسب إصدار الـ SDK
         } catch (Exception e) {
-            Log.e(TAG, "clearFilter error: " + e.getMessage());
+            Log.e("ChainwayReader", "Clear mask error: " + e.getMessage());
         }
     }
+}
+
 
     // =========================================================================
     // 🏷️ عمليات الذاكرة عالية المستوى
