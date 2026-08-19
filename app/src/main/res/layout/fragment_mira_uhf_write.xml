@@ -35,6 +35,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
                 android:gravity="center"
+                android:text=""
                 android:textColor="?attr/colorPrimary"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -85,7 +86,9 @@
                             android:layout_width="wrap_content"
                             android:layout_height="48dp"
                             android:layout_marginStart="8dp"
+                            android:backgroundTint="#0284C7"
                             android:text="بحث"
+                            android:textColor="#FFFFFF"
                             android:textSize="14sp" />
                     </LinearLayout>
 
@@ -95,7 +98,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:background="?attr/colorSurfaceVariant"
+                        android:background="#F8FAFC"
                         android:orientation="vertical"
                         android:padding="12dp"
                         android:visibility="gone">
@@ -104,6 +107,7 @@
                             android:id="@+id/tvProgrammerItemTitle"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:text=""
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="14sp"
                             android:textStyle="bold" />
@@ -113,6 +117,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
+                            android:text=""
                             android:textColor="?attr/colorOnSurfaceVariant"
                             android:textSize="12sp" />
                     </LinearLayout>
@@ -123,19 +128,22 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:gravity="center"
+                        android:text=""
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- 🟢 زر البرمجة الكاملة -->
+            <!-- 🟢 زر البرمجة الكاملة (أهم زر) -->
             <Button
                 android:id="@+id/BtProgramTag"
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 android:layout_marginBottom="12dp"
+                android:backgroundTint="#16A34A"
                 android:text="🚀 برمجة القطعة كاملة (بحث + كتابة + تسجيل)"
+                android:textColor="#FFFFFF"
                 android:textSize="14sp"
                 android:textStyle="bold" />
 
@@ -272,7 +280,7 @@
                             android:layout_marginBottom="8dp"
                             android:gravity="top"
                             android:hint="بيانات Hex"
-                            android:inputType="textCapCharacters"
+                            android:inputType="text"
                             android:minLines="2"
                             android:padding="8dp"
                             android:textSize="14sp" />
@@ -305,9 +313,7 @@
                             android:textSize="14sp"
                             android:textStyle="bold" />
 
-                        <!-- إصلاح: إضافة RadioGroup لمنع التحديد المتعدد الخاطئ -->
-                        <RadioGroup
-                            android:id="@+id/rgFilterType"
+                        <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
@@ -337,7 +343,7 @@
                                 android:layout_weight="1"
                                 android:text="User"
                                 android:textSize="12sp" />
-                        </RadioGroup>
+                        </LinearLayout>
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -371,7 +377,7 @@
                             android:layout_height="40dp"
                             android:layout_marginBottom="8dp"
                             android:hint="بيانات Hex"
-                            android:inputType="textCapCharacters"
+                            android:inputType="text"
                             android:padding="8dp"
                             android:textSize="12sp" />
 
@@ -406,7 +412,9 @@
                         android:layout_height="48dp"
                         android:layout_marginEnd="4dp"
                         android:layout_weight="1"
+                        android:backgroundTint="#0284C7"
                         android:text="🔍 قراءة"
+                        android:textColor="#FFFFFF"
                         android:textStyle="bold" />
 
                     <Button
@@ -415,7 +423,9 @@
                         android:layout_height="48dp"
                         android:layout_marginEnd="4dp"
                         android:layout_weight="1"
+                        android:backgroundTint="#16A34A"
                         android:text="✍️ كتابة"
+                        android:textColor="#FFFFFF"
                         android:textStyle="bold" />
 
                     <Button
@@ -423,7 +433,9 @@
                         android:layout_width="0dp"
                         android:layout_height="48dp"
                         android:layout_weight="1"
+                        android:backgroundTint="#7C3AED"
                         android:text="📋 TID"
+                        android:textColor="#FFFFFF"
                         android:textStyle="bold" />
                 </LinearLayout>
 
@@ -439,7 +451,9 @@
                         android:layout_height="48dp"
                         android:layout_marginEnd="4dp"
                         android:layout_weight="1"
+                        android:backgroundTint="#F59E0B"
                         android:text="🎲 توليد EPC"
+                        android:textColor="#FFFFFF"
                         android:textStyle="bold" />
 
                     <Button
@@ -447,7 +461,9 @@
                         android:layout_width="0dp"
                         android:layout_height="48dp"
                         android:layout_weight="1"
+                        android:backgroundTint="#DC2626"
                         android:text="🔐 قفل"
+                        android:textColor="#FFFFFF"
                         android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
@@ -468,9 +484,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:fontFamily="monospace"
+                android:text=""
                 android:textColor="?attr/colorPrimary"
                 android:textSize="12sp"
+                android:fontFamily="monospace"
                 android:visibility="gone" />
 
             <!-- سجل العمليات -->
@@ -499,19 +516,18 @@
 
                     <ScrollView
                         android:layout_width="match_parent"
-                        android:layout_height="120dp"
+                        android:layout_height="150dp"
                         android:background="?attr/colorSurface"
-                        android:nestedScrollingEnabled="true"
                         android:padding="8dp">
 
                         <TextView
                             android:id="@+id/tvOperationLog"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:fontFamily="monospace"
                             android:text="—"
                             android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="11sp" />
+                            android:textSize="11sp"
+                            android:fontFamily="monospace" />
                     </ScrollView>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -522,7 +538,6 @@
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
                 android:indeterminate="true"
                 android:visibility="gone" />
         </LinearLayout>
