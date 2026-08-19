@@ -15,6 +15,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
@@ -97,6 +98,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public boolean loopFlag = false;
     private boolean isArabic = true;
     private int lastActiveBranchId = -1;
+    
+    // ✅ إضافة متغيرات للتعامل مع زر الرجوع
+    private long lastBackPressTime = 0;
+    private static final long DOUBLE_BACK_TIMEOUT = 2000; // 2 ثانية
 
     private PlaySoundThread playSoundThread = null;
     private SoundPool soundPool;
@@ -488,7 +493,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public void openReceiptFragment(String rawJson) {
         try {
             MiraReceiptFragment fragment = MiraReceiptFragment.newInstance(rawJson);
-            loadFragment(fragment, "Receipt");
+            // ✅ استخدام show بدلاً من loadFragment للسماح بالعودة الصحيحة
+            fragment.show(fragmentManager, "Receipt");
         } catch (Exception e) {
             Log.e(TAG, "openReceiptFragment Error: " + e.getMessage());
         }
@@ -551,13 +557,80 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
+    // ==================== ✅ BACK BUTTON HANDLING ====================
+
     @Override
     public void onBackPressed() {
+        // 1️⃣ إذا كان الجرد نشط، اطلب التأكيد أولاً
         if (isInventoryActive()) {
-            checkInventoryLockAndExecute(super::onBackPressed);
+            checkInventoryLockAndExecute(() -> handleBackNavigation());
             return;
         }
-        super.onBackPressed();
+        
+        handleBackNavigation();
+    }
+
+    /**
+     * ✅ التعامل مع زر الرجوع بشكل صحيح
+     */
+    private void handleBackNavigation() {
+        // 2️⃣ إغلاق أي Dialog مفتوح
+        for (Fragment fragment : fragmentManager.getFragments()) {
+            if (fragment instanceof androidx.fragment.app.DialogFragment) {
+                androidx.fragment.app.DialogFragment dialogFragment = 
+                    (androidx.fragment.app.DialogFragment) fragment;
+                if (dialogFragment.getDialog() != null && dialogFragment.getDialog().isShowing()) {
+                    dialogFragment.dismissAllowingStateLoss();
+                    return;
+                }
+            }
+        }
+        
+        // 3️⃣ إذا كان هناك Back Stack، الرجوع إليه
+        if (fragmentManager.getBackStackEntryCount() > 0) {
+            fragmentManager.popBackStack();
+            return;
+        }
+        
+        // 4️⃣ إذا كنا في شاشة غير Dashboard، الرجوع إلى Dashboard
+        if (currentFragment != null && !(currentFragment instanceof MiraDashboardFragment)) {
+            loadFragment(new MiraDashboardFragment(), "Dashboard");
+            return;
+        }
+        
+        // 5️⃣ في الشاشة الرئيسية - الضغط المزدوج للخروج
+        handleDoubleBackToExit();
+    }
+
+    /**
+     * ✅ التعامل مع الضغط المزدوج للخروج من التطبيق
+     */
+    private void handleDoubleBackToExit() {
+        long currentTime = System.currentTimeMillis();
+        
+        if (currentTime - lastBackPressTime < DOUBLE_BACK_TIMEOUT) {
+            // ضغطة ثانية خلال 2 ثانية - الخروج من التطبيق
+            finish();
+            return;
+        }
+        
+        // الضغطة الأولى - عرض رسالة
+        lastBackPressTime = currentTime;
+        Toast.makeText(this, 
+            isArabic ? "اضغط مرة أخرى للخروج" : "Press again to exit", 
+            Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * ✅ معالجة أزرار الأجهزة الفيزيائية
+     */
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            onBackPressed();
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
     }
 
     // ==================== RFID & HARDWARE LISTENERS ====================
@@ -774,4 +847,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
     }
-    }
+                }
