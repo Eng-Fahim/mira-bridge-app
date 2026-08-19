@@ -47,6 +47,33 @@
                 android:textColor="?attr/colorOnSurfaceVariant"/>
         </LinearLayout>
 
+        <!-- ✅ سعر الأوقية العالمي -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="?attr/colorSurfaceVariant"
+            android:padding="12dp"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:id="@+id/tvOuncePrice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="أوقية (31.10g): $0.00"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="?attr/colorPrimary"/>
+
+            <TextView
+                android:id="@+id/tvOuncePriceConverted"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="= 0.00"
+                android:textSize="12sp"
+                android:textColor="?attr/colorOnSurfaceVariant"/>
+        </LinearLayout>
+
         <ProgressBar
             android:id="@+id/pbGoldLoading"
             android:layout_width="match_parent"
@@ -164,7 +191,8 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="0.00"
+                android:digits="0123456789."
+                android:hint="75.00"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
         </LinearLayout>
@@ -187,7 +215,8 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="0.00"
+                android:digits="0123456789."
+                android:hint="68.75"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
         </LinearLayout>
@@ -210,7 +239,8 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="0.00"
+                android:digits="0123456789."
+                android:hint="65.62"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
         </LinearLayout>
@@ -233,7 +263,8 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="0.00"
+                android:digits="0123456789."
+                android:hint="56.25"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
         </LinearLayout>
@@ -256,7 +287,8 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
-                android:hint="0.00"
+                android:digits="0123456789."
+                android:hint="43.75"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
         </LinearLayout>
@@ -288,6 +320,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="95.00"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -311,6 +344,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="88.00"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -334,6 +368,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="90.00"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -357,6 +392,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="100.80"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -380,6 +416,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="105.80"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -403,6 +440,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="110.00"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -435,6 +473,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="5.00"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -458,6 +497,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="8.00"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -481,6 +521,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="10.00"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -504,6 +545,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="12.00"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -527,6 +569,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="15.00"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -550,6 +593,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="18.00"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -695,6 +739,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="250.00"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -718,6 +763,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="30.90"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -741,6 +787,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="3.75"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -764,6 +811,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="3.67"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -796,6 +844,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="530.00"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -819,6 +868,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="47.50"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -842,6 +892,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="3.75"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
@@ -865,6 +916,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:inputType="numberDecimal"
+                android:digits="0123456789."
                 android:hint="3.67"
                 android:background="?attr/colorSurfaceVariant"
                 android:padding="12dp"/>
