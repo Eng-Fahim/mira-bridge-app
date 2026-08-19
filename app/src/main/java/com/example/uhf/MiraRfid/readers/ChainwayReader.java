@@ -53,65 +53,75 @@ public class ChainwayReader implements MiraIRFIDReader {
         }
     }
     
-    // ✅ دوال جديدة للقراءة والكتابة
+    // =========================================================================
+    // 🛠️ تنفيذ دوال الوصول المباشر للبنكات
+    // =========================================================================
+
+    @Override
+    public boolean writeData(String pwdStr, int bank, int ptr, String data) {
+        if (reader == null) return false;
+        try {
+            int writeLen = (int) Math.ceil(data.length() / 4.0);
+            return reader.writeData(pwdStr, bank, ptr, writeLen, data);
+        } catch (Exception e) {
+            Log.e(TAG, "writeData error: " + e.getMessage());
+            return false;
+        }
+    }
+
+    @Override
+    public String readData(String pwdStr, int bank, int ptr, int len) {
+        if (reader == null) return null;
+        try {
+            return reader.readData(pwdStr, bank, ptr, len);
+        } catch (Exception e) {
+            Log.e(TAG, "readData error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    @Override
+    public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
+        if (reader == null) return false;
+        try {
+            // تنفيذ القفل عبر الـ SDK للـ Bank المطلوب
+            String lockCode = shouldLock ? "1" : "0"; 
+            return reader.lockTag(pwdStr, lockCode);
+        } catch (Exception e) {
+            Log.e(TAG, "setTagLockState error: " + e.getMessage());
+            return false;
+        }
+    }
+
+    @Override
+    public void clearFilter() {
+        if (reader == null) return;
+        try {
+            reader.emptyFilter();
+        } catch (Exception e) {
+            Log.e(TAG, "clearFilter error: " + e.getMessage());
+        }
+    }
     
     /**
      * قراءة EPC من الشريحة
      */
     public String readEpcData(String accessPassword) {
-        if (reader == null) return null;
-        
-        try {
-            // قراءة EPC من البنك EPC، العنوان 32، الطول 6
-            String epcData = reader.readData(accessPassword, 
-                RFIDWithUHFUART.Bank_EPC, 32, 6);
-            
-            if (epcData != null && !epcData.isEmpty()) {
-                return epcData;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "readEpcData error: " + e.getMessage());
-        }
-        
-        return null;
+        return readData(accessPassword, RFIDWithUHFUART.Bank_EPC, 32, 6);
     }
     
     /**
      * قراءة TID من الشريحة
      */
     public String readTidData(String accessPassword) {
-        if (reader == null) return null;
-        
-        try {
-            String tidData = reader.readData(accessPassword, 
-                RFIDWithUHFUART.Bank_TID, 0, 6);
-            
-            if (tidData != null && !tidData.isEmpty()) {
-                return tidData;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "readTidData error: " + e.getMessage());
-        }
-        
-        return null;
+        return readData(accessPassword, RFIDWithUHFUART.Bank_TID, 0, 6);
     }
     
     /**
      * كتابة EPC على الشريحة
      */
     public boolean writeEpcData(String newEpc, String accessPassword) {
-        if (reader == null) return false;
-        
-        try {
-            int writeLen = newEpc.length() / 4;
-            boolean success = reader.writeData(accessPassword, 
-                RFIDWithUHFUART.Bank_EPC, 32, writeLen, newEpc);
-            
-            return success;
-        } catch (Exception e) {
-            Log.e(TAG, "writeEpcData error: " + e.getMessage());
-            return false;
-        }
+        return writeData(accessPassword, RFIDWithUHFUART.Bank_EPC, 32, newEpc);
     }
     
     @Override
@@ -251,7 +261,7 @@ public class ChainwayReader implements MiraIRFIDReader {
     
     @Override
     public boolean writeUserMemory(int address, String data, String accessPassword) {
-        return false;
+        return writeData(accessPassword, RFIDWithUHFUART.Bank_USER, address, data);
     }
     
     @Override
@@ -261,17 +271,17 @@ public class ChainwayReader implements MiraIRFIDReader {
     
     @Override
     public String readUserMemory(int address, int length) {
-        return null;
+        return readData("00000000", RFIDWithUHFUART.Bank_USER, address, length);
     }
     
     @Override
     public boolean lockTag(String accessPassword) {
-        return false;
+        return setTagLockState(accessPassword, RFIDWithUHFUART.Bank_EPC, true);
     }
     
     @Override
     public boolean unlockTag(String accessPassword) {
-        return false;
+        return setTagLockState(accessPassword, RFIDWithUHFUART.Bank_EPC, false);
     }
     
     @Override
