@@ -216,19 +216,16 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
 
     @Override
-public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
-    if (reader == null) return false;
-    try {
-        // مكتبة Chainway تتطلب lockMem(pwd, lockCode)
-        // lockCode: 0x0001 (Open), 0x0002 (Lock)
-        String lockCode = shouldLock ? "0002" : "0001";
-        return reader.lockMem(pwdStr, lockCode);
-    } catch (Exception e) {
-        Log.e("ChainwayReader", "Lock error: " + e.getMessage());
-        return false;
+    public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
+        if (reader == null) return false;
+        try {
+            // تنفيذ القفل عبر SDK الشائع لأجهزة C72
+            return reader.lockTag(pwdStr);
+        } catch (Exception e) {
+            Log.e(TAG, "Lock error: " + e.getMessage());
+            return false;
+        }
     }
-}
-
 
     @Override
     public boolean setFilter(int bank, int ptr, String filterData) {
@@ -242,18 +239,17 @@ public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
         }
     }
 
-  @Override
-public void clearFilter() {
-    if (reader != null) {
-        try {
-            reader.initFilter(); // 👈 هذه هي الدالة المعتمدة في SDK Chainway C72
-        } catch (Exception e) {
-            Log.e("ChainwayReader", "Clear filter error: " + e.getMessage());
+    @Override
+    public void clearFilter() {
+        if (reader != null) {
+            try {
+                // إلغاء الفلترة بإرسال طول 0 وسلسلة فارغة
+                reader.setFilter(1, 0, 0, "");
+            } catch (Exception e) {
+                Log.e(TAG, "Clear filter error: " + e.getMessage());
+            }
         }
     }
-}
-
-
 
     // =========================================================================
     // 🏷️ عمليات الذاكرة عالية المستوى
