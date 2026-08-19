@@ -8,7 +8,7 @@ import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 
 /**
- * قارئ Chainway حقيقي - يدعم القراءة والكتابة
+ * قارئ Chainway حقيقي - يدعم القراءة والكتابة والفلترة المباشرة عبر UART SDK
  */
 public class ChainwayReader implements MiraIRFIDReader {
     
@@ -19,6 +19,7 @@ public class ChainwayReader implements MiraIRFIDReader {
     private OnTagReadListener listener;
     private boolean isScanning = false;
     private boolean isConnected = false;
+    private int powerDbm = 30;
     
     public ChainwayReader(Context context) {
         this.context = context;
@@ -49,9 +50,147 @@ public class ChainwayReader implements MiraIRFIDReader {
             }
             return isConnected;
         } catch (Exception e) {
+            Log.e(TAG, "Connection error: " + e.getMessage());
             return false;
         }
     }
+    
+    @Override
+    public void disconnect() {
+        stopScan();
+        isConnected = false;
+        if (listener != null) {
+            listener.onConnectionChanged(false);
+        }
+    }
+    
+    @Override
+    public void release() {
+        disconnect();
+        try {
+            if (reader != null) {
+                reader.free();
+                reader = null;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Release error: " + e.getMessage());
+        }
+    }
+    
+    @Override
+    public boolean isConnected() {
+        return isConnected;
+    }
+    
+    @Override
+    public boolean startScan() {
+        if (reader == null && !connect()) return false;
+        
+        try {
+            boolean success = reader.startInventoryTag();
+            if (success) {
+                isScanning = true;
+                if (listener != null) listener.onScanStarted();
+                
+                // خيط قراءة المكونات في الخلفية Loop
+                new Thread(() -> {
+                    while (isScanning) {
+                        try {
+                            UHFTAGInfo tag;
+                            while (isScanning && (tag = reader.readTagFromBuffer()) != null) {
+                                String epc = tag.getEPC();
+                                String rssiStr = tag.getRssi();
+                                int rssi = -50;
+                                if (rssiStr != null) {
+                                    try { 
+                                        rssi = Integer.parseInt(rssiStr.trim()); 
+                                    } catch (NumberFormatException ignored) {}
+                                }
+                                if (epc != null && !epc.isEmpty() && listener != null) {
+                                    listener.onTagRead(epc, rssi);
+                                }
+                            }
+                            Thread.sleep(10);
+                        } catch (Exception e) {
+                            if (isScanning && listener != null) {
+                                listener.onError(e.getMessage());
+                            }
+                            break;
+                        }
+                    }
+                }).start();
+            }
+            return success;
+        } catch (Exception e) {
+            Log.e(TAG, "startScan error: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    @Override
+    public void stopScan() {
+        isScanning = false;
+        try {
+            if (reader != null) {
+                reader.stopInventory();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Stop scan error: " + e.getMessage());
+        }
+        if (listener != null) listener.onScanStopped();
+    }
+    
+    @Override
+    public boolean isScanning() {
+        return isScanning;
+    }
+    
+    @Override
+    public void setPower(int powerDbm) {
+        this.powerDbm = powerDbm;
+        try {
+            if (reader != null) {
+                reader.setPower(powerDbm);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Set power error: " + e.getMessage());
+        }
+    }
+    
+    @Override
+    public void setRssiThreshold(int threshold) {}
+    
+    @Override
+    public void setScanInterval(int intervalMs) {}
+    
+    @Override
+    public String getDeviceName() {
+        return "Chainway C72 / UHF Terminal";
+    }
+    
+    @Override
+    public String getFirmwareVersion() {
+        try {
+            if (reader != null) {
+                return reader.getVersion();
+            }
+        } catch (Exception ignored) {}
+        return "Unknown";
+    }
+    
+    @Override
+    public int getBatteryLevel() {
+        return -1;
+    }
+    
+    @Override
+    public void setOnTagReadListener(OnTagReadListener listener) {
+        this.listener = listener;
+    }
+
+    // =========================================================================
+    // 🛠️ العمليات المباشرة لقراءة/كتابة الذاكرة وتصحيحات SDK
+    // =========================================================================
 
     @Override
     public boolean writeData(String pwdStr, int bank, int ptr, String data) {
@@ -80,8 +219,9 @@ public class ChainwayReader implements MiraIRFIDReader {
     public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
         if (reader == null) return false;
         try {
-            // استخدام دالة lockMem المتوافقة مع SDK أجهزة Chainway C72
-            return reader.lockMem(pwdStr, String.valueOf(bank), shouldLock ? "1" : "0");
+            // تصحيح: استخدام lockMem المعتمدة في Chainway SDK بدلاً من lockTag
+            String lockCode = shouldLock ? "1" : "0";
+            return reader.lockMem(pwdStr, String.valueOf(bank), lockCode);
         } catch (Exception e) {
             Log.e(TAG, "setTagLockState error: " + e.getMessage());
             return false;
@@ -104,12 +244,17 @@ public class ChainwayReader implements MiraIRFIDReader {
     public void clearFilter() {
         if (reader == null) return;
         try {
+            // تصحيح: استخدام cleanMask المعتمدة في Chainway SDK بدلاً من emptyFilter
             reader.cleanMask();
         } catch (Exception e) {
             Log.e(TAG, "clearFilter error: " + e.getMessage());
         }
     }
-    
+
+    // =========================================================================
+    // 🏷️ عمليات الذاكرة عالية المستوى
+    // =========================================================================
+
     public String readEpcData(String accessPassword) {
         return readData(accessPassword, RFIDWithUHFUART.Bank_EPC, 32, 6);
     }
@@ -121,123 +266,7 @@ public class ChainwayReader implements MiraIRFIDReader {
     public boolean writeEpcData(String newEpc, String accessPassword) {
         return writeData(accessPassword, RFIDWithUHFUART.Bank_EPC, 32, newEpc);
     }
-    
-    @Override
-    public void disconnect() {
-        stopScan();
-        isConnected = false;
-        if (listener != null) {
-            listener.onConnectionChanged(false);
-        }
-    }
-    
-    @Override
-    public void release() {
-        disconnect();
-        try {
-            if (reader != null) {
-                reader.free();
-                reader = null;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Release error: " + e.getMessage());
-        }
-    }
-    
-    @Override
-    public boolean isConnected() { return isConnected; }
-    
-    @Override
-    public boolean startScan() {
-        if (reader == null) return false;
-        try {
-            boolean success = reader.startInventoryTag();
-            if (success) {
-                isScanning = true;
-                if (listener != null) listener.onScanStarted();
-                
-                new Thread(() -> {
-                    while (isScanning) {
-                        try {
-                            UHFTAGInfo tag;
-                            while (isScanning && (tag = reader.readTagFromBuffer()) != null) {
-                                String epc = tag.getEPC();
-                                String rssiStr = tag.getRssi();
-                                int rssi = -50;
-                                if (rssiStr != null) {
-                                    try { rssi = Integer.parseInt(rssiStr.trim()); } catch (NumberFormatException ignored) {}
-                                }
-                                if (epc != null && !epc.isEmpty() && listener != null) {
-                                    listener.onTagRead(epc, rssi);
-                                }
-                            }
-                            Thread.sleep(10);
-                        } catch (Exception e) {
-                            if (isScanning && listener != null) {
-                                listener.onError(e.getMessage());
-                            }
-                            break;
-                        }
-                    }
-                }).start();
-            }
-            return success;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-    
-    @Override
-    public void stopScan() {
-        isScanning = false;
-        try {
-            if (reader != null) {
-                reader.stopInventory();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Stop scan error: " + e.getMessage());
-        }
-        if (listener != null) listener.onScanStopped();
-    }
-    
-    @Override
-    public boolean isScanning() { return isScanning; }
-    
-    @Override
-    public void setPower(int powerDbm) {
-        try {
-            if (reader != null) {
-                reader.setPower(powerDbm);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Set power error: " + e.getMessage());
-        }
-    }
-    
-    @Override
-    public void setRssiThreshold(int threshold) {}
-    @Override
-    public void setScanInterval(int intervalMs) {}
-    
-    @Override
-    public String getDeviceName() { return "Chainway C72"; }
-    
-    @Override
-    public String getFirmwareVersion() {
-        try {
-            if (reader != null) return reader.getVersion();
-        } catch (Exception ignored) {}
-        return "Unknown";
-    }
-    
-    @Override
-    public int getBatteryLevel() { return -1; }
-    
-    @Override
-    public void setOnTagReadListener(OnTagReadListener listener) {
-        this.listener = listener;
-    }
-    
+
     @Override
     public boolean writeEpc(String newEpc, String accessPassword) {
         return writeEpcData(newEpc, accessPassword);
@@ -249,7 +278,9 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
     
     @Override
-    public String readTid() { return readTidData("00000000"); }
+    public String readTid() {
+        return readTidData("00000000");
+    }
     
     @Override
     public String readUserMemory(int address, int length) {
@@ -267,5 +298,13 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
     
     @Override
-    public boolean killTag(String accessPassword) { return false; }
+    public boolean killTag(String accessPassword) {
+        if (reader == null) return false;
+        try {
+            return reader.killTag(accessPassword);
+        } catch (Exception e) {
+            Log.e(TAG, "killTag error: " + e.getMessage());
+            return false;
+        }
+    }
 }
