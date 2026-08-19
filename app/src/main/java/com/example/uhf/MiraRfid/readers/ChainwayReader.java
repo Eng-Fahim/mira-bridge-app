@@ -52,10 +52,6 @@ public class ChainwayReader implements MiraIRFIDReader {
             return false;
         }
     }
-    
-    // =========================================================================
-    // 🛠️ تنفيذ دوال الوصول المباشر للبنكات
-    // =========================================================================
 
     @Override
     public boolean writeData(String pwdStr, int bank, int ptr, String data) {
@@ -84,11 +80,22 @@ public class ChainwayReader implements MiraIRFIDReader {
     public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
         if (reader == null) return false;
         try {
-            // تنفيذ القفل عبر الـ SDK للـ Bank المطلوب
-            String lockCode = shouldLock ? "1" : "0"; 
-            return reader.lockTag(pwdStr, lockCode);
+            // استخدام دالة lockMem المتوافقة مع SDK أجهزة Chainway C72
+            return reader.lockMem(pwdStr, String.valueOf(bank), shouldLock ? "1" : "0");
         } catch (Exception e) {
             Log.e(TAG, "setTagLockState error: " + e.getMessage());
+            return false;
+        }
+    }
+
+    @Override
+    public boolean setFilter(int bank, int ptr, String filterData) {
+        if (reader == null) return false;
+        try {
+            int len = filterData.length() * 4;
+            return reader.setFilter(bank, ptr, len, filterData);
+        } catch (Exception e) {
+            Log.e(TAG, "setFilter error: " + e.getMessage());
             return false;
         }
     }
@@ -97,29 +104,20 @@ public class ChainwayReader implements MiraIRFIDReader {
     public void clearFilter() {
         if (reader == null) return;
         try {
-            reader.emptyFilter();
+            reader.cleanMask();
         } catch (Exception e) {
             Log.e(TAG, "clearFilter error: " + e.getMessage());
         }
     }
     
-    /**
-     * قراءة EPC من الشريحة
-     */
     public String readEpcData(String accessPassword) {
         return readData(accessPassword, RFIDWithUHFUART.Bank_EPC, 32, 6);
     }
     
-    /**
-     * قراءة TID من الشريحة
-     */
     public String readTidData(String accessPassword) {
         return readData(accessPassword, RFIDWithUHFUART.Bank_TID, 0, 6);
     }
     
-    /**
-     * كتابة EPC على الشريحة
-     */
     public boolean writeEpcData(String newEpc, String accessPassword) {
         return writeData(accessPassword, RFIDWithUHFUART.Bank_EPC, 32, newEpc);
     }
@@ -147,14 +145,11 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
     
     @Override
-    public boolean isConnected() {
-        return isConnected;
-    }
+    public boolean isConnected() { return isConnected; }
     
     @Override
     public boolean startScan() {
         if (reader == null) return false;
-        
         try {
             boolean success = reader.startInventoryTag();
             if (success) {
@@ -170,9 +165,7 @@ public class ChainwayReader implements MiraIRFIDReader {
                                 String rssiStr = tag.getRssi();
                                 int rssi = -50;
                                 if (rssiStr != null) {
-                                    try { 
-                                        rssi = Integer.parseInt(rssiStr.trim()); 
-                                    } catch (NumberFormatException ignored) {}
+                                    try { rssi = Integer.parseInt(rssiStr.trim()); } catch (NumberFormatException ignored) {}
                                 }
                                 if (epc != null && !epc.isEmpty() && listener != null) {
                                     listener.onTagRead(epc, rssi);
@@ -208,9 +201,7 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
     
     @Override
-    public boolean isScanning() {
-        return isScanning;
-    }
+    public boolean isScanning() { return isScanning; }
     
     @Override
     public void setPower(int powerDbm) {
@@ -225,29 +216,22 @@ public class ChainwayReader implements MiraIRFIDReader {
     
     @Override
     public void setRssiThreshold(int threshold) {}
-    
     @Override
     public void setScanInterval(int intervalMs) {}
     
     @Override
-    public String getDeviceName() {
-        return "Chainway C72";
-    }
+    public String getDeviceName() { return "Chainway C72"; }
     
     @Override
     public String getFirmwareVersion() {
         try {
-            if (reader != null) {
-                return reader.getVersion();
-            }
+            if (reader != null) return reader.getVersion();
         } catch (Exception ignored) {}
         return "Unknown";
     }
     
     @Override
-    public int getBatteryLevel() {
-        return -1;
-    }
+    public int getBatteryLevel() { return -1; }
     
     @Override
     public void setOnTagReadListener(OnTagReadListener listener) {
@@ -265,9 +249,7 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
     
     @Override
-    public String readTid() {
-        return readTidData("00000000");
-    }
+    public String readTid() { return readTidData("00000000"); }
     
     @Override
     public String readUserMemory(int address, int length) {
@@ -285,7 +267,5 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
     
     @Override
-    public boolean killTag(String accessPassword) {
-        return false;
-    }
+    public boolean killTag(String accessPassword) { return false; }
 }
