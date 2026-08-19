@@ -29,6 +29,7 @@ import androidx.fragment.app.DialogFragment;
 
 import com.example.uhf.R;
 import com.example.uhf.manager.MiraOrgProfileManager;
+import com.example.uhf.manager.MiraPriceManager; // ✅ إضافة import
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -47,7 +48,9 @@ public class MiraReceiptFragment extends DialogFragment {
     private String receiptJsonStr = "{}";
     private boolean isArabic;
     private MiraOrgProfileManager orgProfile;
+    private MiraPriceManager priceManager; // ✅ إضافة مدير الأسعار
     private String orgName = "MIRA Jewelry";
+    private String defaultCurrency = "YER"; // ✅ العملة الافتراضية
 
     private WebView webReceipt;
     private TextView btnCloseReceipt;
@@ -69,7 +72,9 @@ public class MiraReceiptFragment extends DialogFragment {
         isArabic = Locale.getDefault().getLanguage().equals("ar");
         if (getContext() != null) {
             orgProfile = MiraOrgProfileManager.getInstance(getContext());
+            priceManager = MiraPriceManager.getInstance(getContext()); // ✅ تهيئة مدير الأسعار
             orgName = orgProfile.getOrgName();
+            defaultCurrency = priceManager.getDefaultCurrency(); // ✅ الحصول على العملة الافتراضية
         }
     }
 
@@ -225,6 +230,7 @@ public class MiraReceiptFragment extends DialogFragment {
             receiptData.put("saved_at", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()));
             receiptData.put("org_name", orgName);
             receiptData.put("printed", false);
+            receiptData.put("currency", defaultCurrency); // ✅ حفظ العملة
             
             SharedPreferences prefs = getContext().getSharedPreferences("offline_receipts", Context.MODE_PRIVATE);
             String existingJson = prefs.getString("receipts", "[]");
@@ -245,9 +251,12 @@ public class MiraReceiptFragment extends DialogFragment {
 
     // ==================== 🔢 محرك التفقيط المالي ====================
 
-    private String convertToWords(long number) {
+    /**
+     * ✅ تحويل المبلغ إلى كلمات مع العملة الصحيحة
+     */
+    private String convertToWords(long number, String currency) {
         if (number == 0) return "صفر";
-        if (number < 0) return "سالب " + convertToWords(Math.abs(number));
+        if (number < 0) return "سالب " + convertToWords(Math.abs(number), currency);
 
         String[] units = {"", "واحد", "اثنان", "ثلاثة", "أربعة", "خمسة", "ستة", "سبعة", "ثمانية", "تسعة", "عشرة",
                           "أحد عشر", "اثنا عشر", "ثلاثة عشر", "أربعة عشر", "خمسة عشر", "ستة عشر", "سبعة عشر", "ثمانية عشر", "تسعة عشر"};
@@ -257,12 +266,12 @@ public class MiraReceiptFragment extends DialogFragment {
         StringBuilder words = new StringBuilder();
 
         if ((number / 1000000) > 0) {
-            words.append(convertToWords(number / 1000000)).append(" مليون ");
+            words.append(convertToWords(number / 1000000, currency)).append(" مليون ");
             number %= 1000000;
         }
 
         if ((number / 1000) > 0) {
-            words.append(convertToWords(number / 1000)).append(" ألف ");
+            words.append(convertToWords(number / 1000, currency)).append(" ألف ");
             number %= 1000;
         }
 
@@ -281,7 +290,37 @@ public class MiraReceiptFragment extends DialogFragment {
             }
         }
 
-        return words.toString().trim();
+        // ✅ إضافة اسم العملة الصحيح
+        String currencyName = getCurrencyArabicName(currency);
+        return words.toString().trim() + " " + currencyName + " لا غير";
+    }
+
+    /**
+     * ✅ الحصول على اسم العملة بالعربية
+     */
+    private String getCurrencyArabicName(String currency) {
+        switch (currency.toUpperCase()) {
+            case "USD": return "دولار أمريكي";
+            case "YER": return "ريال يمني";
+            case "EGP": return "جنيه مصري";
+            case "SAR": return "ريال سعودي";
+            case "AED": return "درهم إماراتي";
+            default: return currency;
+        }
+    }
+
+    /**
+     * ✅ الحصول على رمز العملة
+     */
+    private String getCurrencySymbol(String currency) {
+        switch (currency.toUpperCase()) {
+            case "USD": return "$";
+            case "YER": return "YER";
+            case "EGP": return "EGP";
+            case "SAR": return "SAR";
+            case "AED": return "AED";
+            default: return currency;
+        }
     }
 
     // ==================== 📄 HTML RECEIPT GENERATOR ====================
@@ -336,6 +375,10 @@ public class MiraReceiptFragment extends DialogFragment {
             String customer = t.optString("customer_name", "عميل نقدي");
             String paymentMethod = t.optString("payment_method", "CASH");
             String accountCode = t.optString("account_code", "110101");
+            
+            // ✅ قراءة العملة من البيانات أو استخدام الافتراضية
+            String currency = t.optString("currency", defaultCurrency);
+            String currencySymbol = getCurrencySymbol(currency);
 
             h.append("<div class='receipt-title'>سند بيع ضريبي / TAX INVOICE</div>");
 
@@ -343,12 +386,13 @@ public class MiraReceiptFragment extends DialogFragment {
              .append("<tr><td class='label'>رقم السند:</td><td class='value'>#").append(saleId).append("</td><td class='label'>التاريخ:</td><td class='value'>").append(dateStr).append("</td></tr>")
              .append("<tr><td class='label'>العميل:</td><td class='value'>").append(customer).append("</td><td class='label'>طريقة الدفع:</td><td class='value'>").append(paymentMethod).append("</td></tr>")
              .append("<tr><td class='label'>الحساب المالي:</td><td class='value' colspan='3'>").append(accountCode).append(" - المبيعات/النقدية</td></tr>")
+             .append("<tr><td class='label'>العملة:</td><td class='value' colspan='3'>").append(currency).append("</td></tr>")
              .append("</table>");
 
             JSONArray items = t.optJSONArray("items");
             if (items != null && items.length() > 0) {
                 h.append("<table class='items'><thead><tr>")
-                 .append("<th>#</th><th>الصنف</th><th>العيار</th><th>الوزن (جم)</th><th>المبلغ</th>")
+                 .append("<th>#</th><th>الصنف</th><th>العيار</th><th>الوزن (جم)</th><th>المبلغ (").append(currencySymbol).append(")</th>")
                  .append("</tr></thead><tbody>");
                 
                 double totalWeight = 0.0;
@@ -357,36 +401,41 @@ public class MiraReceiptFragment extends DialogFragment {
                     if (it == null) continue;
                     double weight = it.optDouble("weight", 0.0);
                     totalWeight += weight;
+                    double itemPrice = it.optDouble("price", it.optDouble("sale_price", 0));
 
                     h.append("<tr>")
                      .append("<td>").append(i + 1).append("</td>")
                      .append("<td style='text-align:right;'>").append(it.optString("title", "—")).append("</td>")
                      .append("<td>").append(it.optString("karat", "—")).append("</td>")
                      .append("<td>").append(String.format(Locale.US, "%.2f", weight)).append("</td>")
-                     .append("<td>").append(String.format(Locale.US, "%,.0f", it.optDouble("price", 0))).append("</td>")
+                     .append("<td>").append(priceManager.formatPriceDefault(itemPrice)).append("</td>") // ✅ استخدام formatPriceDefault
                      .append("</tr>");
                 }
                 h.append("</tbody></table>");
             }
 
-            double subtotal = t.optDouble("subtotal", 0);
+            double subtotal = t.optDouble("subtotal", t.optDouble("total_amount", 0));
             double discount = t.optDouble("discount_amount", 0);
             double finalAmt = t.optDouble("final_amount", subtotal - discount);
 
             h.append("<table class='totals-table'>")
-             .append("<tr><td class='label'>الإجمالي قبل الخصم:</td><td class='value' style='text-align:left;'>").append(String.format(Locale.US, "%,.0f YER", subtotal)).append("</td></tr>");
+             .append("<tr><td class='label'>الإجمالي قبل الخصم:</td><td class='value' style='text-align:left;'>")
+             .append(priceManager.formatPriceDefault(subtotal)).append("</td></tr>"); // ✅ استخدام formatPriceDefault
             
             if (discount > 0) {
-                h.append("<tr><td class='label'>مبلغ الخصم:</td><td class='value' style='text-align:left; color:red;'>- ").append(String.format(Locale.US, "%,.0f YER", discount)).append("</td></tr>");
+                h.append("<tr><td class='label'>مبلغ الخصم:</td><td class='value' style='text-align:left; color:red;'>- ")
+                 .append(priceManager.formatPriceDefault(discount)).append("</td></tr>"); // ✅ استخدام formatPriceDefault
             }
 
-            h.append("<tr class='grand-total'><td class='label' style='color:#1A237E;'>الصافي النهائي:</td><td class='value' style='text-align:left; color:#1A237E;'>").append(String.format(Locale.US, "%,.0f YER", finalAmt)).append("</td></tr>")
+            h.append("<tr class='grand-total'><td class='label' style='color:#1A237E;'>الصافي النهائي:</td><td class='value' style='text-align:left; color:#1A237E;'>")
+             .append(priceManager.formatPriceDefault(finalAmt)).append("</td></tr>") // ✅ استخدام formatPriceDefault
              .append("</table>");
 
-            String tafweetText = convertToWords((long) finalAmt) + " ريال يمني لا غير";
+            // ✅ استخدام العملة الصحيحة في التفقيط
+            String tafweetText = convertToWords((long) finalAmt, currency);
             h.append("<div class='tafweet'><b>المبلغ فقط: </b>").append(tafweetText).append("</div>");
 
-            String qrData = Uri.encode("Org:" + orgName + "|Receipt:" + saleId + "|Total:" + finalAmt + "|Tax:" + taxNumber);
+            String qrData = Uri.encode("Org:" + orgName + "|Receipt:" + saleId + "|Total:" + finalAmt + "|Currency:" + currency + "|Tax:" + taxNumber);
             String qrApiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + qrData;
 
             h.append("<div class='qr-container'>")
@@ -395,6 +444,7 @@ public class MiraReceiptFragment extends DialogFragment {
              .append("</div>");
 
         } catch (Exception e) {
+            Log.e(TAG, "Error rendering receipt", e);
             h.append("<p style='color:red;text-align:center'>خطأ في معالجة بيانات السند</p>");
         }
 
@@ -410,4 +460,4 @@ public class MiraReceiptFragment extends DialogFragment {
         if (!isAdded()) return;
         dismissAllowingStateLoss();
     }
-}
+                }
