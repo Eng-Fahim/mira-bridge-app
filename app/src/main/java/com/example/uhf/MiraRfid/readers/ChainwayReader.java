@@ -215,17 +215,19 @@ public class ChainwayReader implements MiraIRFIDReader {
         }
     }
 
-    @Override
+        @Override
     public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
         if (reader == null) return false;
         try {
-            // تنفيذ القفل عبر SDK الشائع لأجهزة C72
-            return reader.lockTag(pwdStr);
+            // توقيع مكتبة Chainway UART لقفل الذاكرة: lockMem(pwd, lockCode)
+            String lockCode = shouldLock ? "0002" : "0001";
+            return reader.lockMem(pwdStr, lockCode);
         } catch (Exception e) {
             Log.e(TAG, "Lock error: " + e.getMessage());
             return false;
         }
     }
+
 
     @Override
     public boolean setFilter(int bank, int ptr, String filterData) {
