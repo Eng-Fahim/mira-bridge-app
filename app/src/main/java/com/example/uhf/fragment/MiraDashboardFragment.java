@@ -16,6 +16,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
@@ -28,12 +29,14 @@ import com.example.uhf.fragment.MiraUHFReadTagFragment;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
+import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.tools.SessionManager;
 
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -53,12 +56,14 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private SwipeRefreshLayout swipeRefresh;
     private View shimmerLayout;
     private CardView cardGoldPrices;
+    private androidx.gridlayout.widget.GridLayout gridQuickActions;
 
     private MiraApiClient apiClient;
     private SessionManager sessionManager;
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
     private MiraPriceManager priceManager;
+    private MiraQuickAccessSettings quickAccessSettings;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
     private boolean isArabic;
@@ -84,6 +89,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             branchesManager = MiraBranchesManager.getInstance(requireContext());
             orgProfile = MiraOrgProfileManager.getInstance(requireContext());
             priceManager = MiraPriceManager.getInstance(requireContext());
+            quickAccessSettings = MiraQuickAccessSettings.getInstance(requireContext());
             isArabic = Locale.getDefault().getLanguage().equals("ar");
 
             branchPrefs = requireContext().getSharedPreferences("mira_branches_prefs", Context.MODE_PRIVATE);
@@ -91,6 +97,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             initViews(view);
             setupListeners();
             updateHeader();
+            setupQuickAccessGrid();
 
             currentBranchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : -1;
             initBranchCache(currentBranchId);
@@ -136,7 +143,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             shimmerLayout = v.findViewById(R.id.shimmerLayout);
             swipeRefresh = v.findViewById(R.id.swipeRefresh);
 
-            // ✅ عناصر الأسعار العالمية
             tvOuncePrice = v.findViewById(R.id.tvOuncePrice);
             tvPriceSource = v.findViewById(R.id.tvPriceSource);
             tvLastUpdate = v.findViewById(R.id.tvLastUpdate);
@@ -144,6 +150,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             tvGoldChange = v.findViewById(R.id.tvGoldChange);
             btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
             cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
+            gridQuickActions = v.findViewById(R.id.gridQuickActions);
 
             if (swipeRefresh != null) {
                 swipeRefresh.setOnRefreshListener(() -> {
@@ -181,6 +188,169 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 ((UHFMainActivity) getActivity()).loadFragment(new MiraUHFReadTagFragment(), "Scan");
             }
         });
+    }
+
+    // ============================================
+    // ✅ إعداد شبكة الأزرار السريعة المخصصة
+    // ============================================
+    private void setupQuickAccessGrid() {
+        if (gridQuickActions == null) return;
+        
+        gridQuickActions.removeAllViews();
+        
+        List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
+        
+        if (enabledActions.isEmpty()) {
+            showEmptyQuickAccess();
+            return;
+        }
+        
+        gridQuickActions.setColumnCount(3);
+        
+        for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
+            CardView card = createQuickActionCard(action);
+            if (card != null) {
+                gridQuickActions.addView(card);
+            }
+        }
+    }
+
+    /**
+     * ✅ إنشاء بطاقة زر سريع
+     */
+    private CardView createQuickActionCard(MiraQuickAccessSettings.QuickAction action) {
+        Context context = getContext();
+        if (context == null) return null;
+        
+        CardView card = new CardView(context);
+        androidx.gridlayout.widget.GridLayout.LayoutParams params = 
+            new androidx.gridlayout.widget.GridLayout.LayoutParams();
+        params.width = 0;
+        params.height = androidx.gridlayout.widget.GridLayout.LayoutParams.WRAP_CONTENT;
+        params.columnSpec = androidx.gridlayout.widget.GridLayout.spec(
+            androidx.gridlayout.widget.GridLayout.UNDEFINED, 1f);
+        params.setMargins(6, 6, 6, 6);
+        card.setLayoutParams(params);
+        card.setRadius(16);
+        card.setCardElevation(4);
+        card.setUseCompatPadding(true);
+        card.setClickable(true);
+        card.setFocusable(true);
+        
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(context);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(12, 16, 12, 16);
+        layout.setGravity(android.view.Gravity.CENTER);
+        
+        TextView tvIcon = new TextView(context);
+        tvIcon.setText(getActionIcon(action.id));
+        tvIcon.setTextSize(28);
+        tvIcon.setGravity(android.view.Gravity.CENTER);
+        layout.addView(tvIcon);
+        
+        TextView tvTitle = new TextView(context);
+        tvTitle.setText(isArabic ? action.titleAr : action.titleEn);
+        tvTitle.setTextSize(11);
+        tvTitle.setGravity(android.view.Gravity.CENTER);
+        tvTitle.setPadding(0, 6, 0, 0);
+        tvTitle.setTextColor(0xFF1F2937);
+        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        layout.addView(tvTitle);
+        
+        card.addView(layout);
+        
+        card.setOnClickListener(v -> handleQuickAction(action.id));
+        
+        return card;
+    }
+
+    /**
+     * ✅ معالجة النقر على الأزرار السريعة
+     */
+    private void handleQuickAction(String actionId) {
+        if (getActivity() instanceof UHFMainActivity) {
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+            
+            switch (actionId) {
+                case "identity":
+                    activity.loadFragment(new MiraIdentityStudioFragment(), "IdentityStudio");
+                    break;
+                case "radar":
+                    activity.loadFragment(new MiraUHFRadarLocationFragment(), "Radar");
+                    break;
+                case "gate":
+                    activity.loadFragment(new MiraSecureGateFragment(), "SecureGate");
+                    break;
+                case "reports":
+                    activity.loadFragment(new MiraReportsProFragment(), "Reports");
+                    break;
+                case "accounting":
+                    activity.loadFragment(new MiraAccountingFragment(), "Accounting");
+                    break;
+                case "transfers":
+                    activity.loadFragment(new MiraTransferFragment(), "Transfers");
+                    break;
+                case "admin_hub":
+                    activity.loadFragment(new MiraAdminHubFragment(), "AdminHub");
+                    break;
+                case "sales_history":
+                    activity.loadFragment(new MiraSalesHistoryFragment(), "SalesHistory");
+                    break;
+                case "server_config":
+                    activity.loadFragment(new MiraServerConfigFragment(), "ServerConfig");
+                    break;
+                case "gold_rates":
+                    activity.loadFragment(new MiraGoldCurrencyFragment(), "GoldRates");
+                    break;
+                case "users":
+                    activity.loadFragment(new UsersManagementFragment(), "UsersManagement");
+                    break;
+                default:
+                    Toast.makeText(getContext(), 
+                        isArabic ? "غير معروف: " + actionId : "Unknown: " + actionId, 
+                        Toast.LENGTH_SHORT).show();
+                    break;
+            }
+        }
+    }
+
+    /**
+     * ✅ عرض حالة فارغة للأزرار السريعة
+     */
+    private void showEmptyQuickAccess() {
+        if (gridQuickActions == null || getContext() == null) return;
+        
+        TextView tvEmpty = new TextView(getContext());
+        tvEmpty.setText(isArabic ? 
+            "لا توجد أزرار مفعّلة\nقم بتخصيص الأزرار من الإعدادات" : 
+            "No enabled actions\nCustomize buttons from settings");
+        tvEmpty.setTextSize(13);
+        tvEmpty.setGravity(android.view.Gravity.CENTER);
+        tvEmpty.setPadding(16, 16, 16, 16);
+        tvEmpty.setTextColor(0xFF6B7280);
+        
+        gridQuickActions.addView(tvEmpty);
+    }
+
+    /**
+     * ✅ الحصول على أيقونة الإجراء
+     */
+    private String getActionIcon(String actionId) {
+        switch (actionId) {
+            case "identity": return "🏷️";
+            case "radar": return "📡";
+            case "gate": return "🚪";
+            case "reports": return "📊";
+            case "accounting": return "💰";
+            case "transfers": return "🔄";
+            case "admin_hub": return "⚙️";
+            case "sales_history": return "📋";
+            case "server_config": return "🌐";
+            case "gold_rates": return "🥇";
+            case "users": return "👥";
+            case "branches": return "🏢";
+            default: return "📱";
+        }
     }
 
     private void showShimmer(boolean show) {
@@ -221,7 +391,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     // ✅ جلب الأسعار العالمية
     // ============================================
     private void fetchLiveGoldPrices() {
-        if (priceManager == null) return;
+        if (apiClient == null) return;
         
         addDebug("🔄 جلب أسعار الذهب العالمية...");
         
@@ -274,29 +444,24 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 prices.optDouble("ounce_price", price24 * 31.1035));
             String source = data.optString("source", "server");
             
-            // ✅ عرض أسعار العيارات
             setGoldPrice(tvKarat24, "24K", price24);
             setGoldPrice(tvKarat21, "21K", price21);
             setGoldPrice(tvKarat18, "18K", price18);
             
-            // ✅ عرض سعر الأوقية
             if (tvOuncePrice != null && ouncePrice > 0) {
                 tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", ouncePrice));
             }
             
-            // ✅ عرض المصدر
             if (tvPriceSource != null) {
                 String sourceText = getSourceDisplayName(source);
                 tvPriceSource.setText("📡 " + sourceText);
             }
             
-            // ✅ عرض وقت التحديث
             if (tvLastUpdate != null) {
                 String time = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
                 tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
             }
             
-            // ✅ حساب التغير (مقارنة بالكاش)
             calculateTrend(price24);
             
         } catch (Exception e) {
@@ -355,15 +520,15 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 if (change > 0) {
                     tvGoldTrend.setText("📈");
                     tvGoldChange.setText(String.format(Locale.US, "+%.2f%%", changePercent));
-                    tvGoldChange.setTextColor(0xFF16A34A); // أخضر
+                    tvGoldChange.setTextColor(0xFF16A34A);
                 } else if (change < 0) {
                     tvGoldTrend.setText("📉");
                     tvGoldChange.setText(String.format(Locale.US, "%.2f%%", changePercent));
-                    tvGoldChange.setTextColor(0xFFDC2626); // أحمر
+                    tvGoldChange.setTextColor(0xFFDC2626);
                 } else {
                     tvGoldTrend.setText("➡️");
                     tvGoldChange.setText("0.00%");
-                    tvGoldChange.setTextColor(0xFF6B7280); // رمادي
+                    tvGoldChange.setTextColor(0xFF6B7280);
                 }
             } else {
                 tvGoldTrend.setText("📊");
@@ -371,7 +536,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 tvGoldChange.setTextColor(0xFF6B7280);
             }
             
-            // ✅ حفظ السعر الحالي للمقارنة القادمة
             if (offlineCache != null && currentPrice > 0) {
                 offlineCache.edit().putFloat("gold_price_24k_prev", (float) currentPrice).apply();
             }
@@ -517,9 +681,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    /**
-     * ✅ تنسيق العملة
-     */
     private String formatCurrency(double amount) {
         if (amount <= 0) return "—";
         if (priceManager != null) {
@@ -528,9 +689,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         return String.format(Locale.US, "%,.0f", amount);
     }
 
-    /**
-     * ✅ تنسيق الوزن
-     */
     private String formatWeight(double weightInGrams) {
         if (weightInGrams <= 0) return "0.0 g";
         if (weightInGrams >= 1000) {
@@ -539,9 +697,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         return String.format(Locale.US, "%.1f g", weightInGrams);
     }
 
-    /**
-     * ✅ عرض سعر الذهب
-     */
     private void setGoldPrice(TextView tv, String label, double price) {
         if (tv == null) return;
         if (price > 0) {
@@ -578,6 +733,9 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         if (latestBranchId != currentBranchId) {
             onBranchChanged();
         }
+        
+        // ✅ تحديث الأزرار السريعة عند العودة
+        setupQuickAccessGrid();
     }
 
     @Override
@@ -634,4 +792,4 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         super.onDestroyView();
         mainHandler.removeCallbacksAndMessages(null);
     }
-}
+        }
