@@ -54,19 +54,21 @@
                         android:paddingVertical="4dp"
                         android:textSize="10sp" />
                 </LinearLayout>
-<!-- زر عرض الطلبات المعلقة -->
-<com.google.android.material.button.MaterialButton
-    android:id="@+id/btnViewPending"
-    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-    android:layout_width="match_parent"
-    android:layout_height="48dp"
-    android:layout_marginTop="8dp"
-    android:text="📦 عرض الطلبات المحفوظة محلياً"
-    android:textColor="#D97706"
-    app:strokeColor="#D97706"
-    app:cornerRadius="8dp"
-    app:icon="@android:drawable/ic_menu_upload"
-    app:iconTint="#D97706" />
+
+                <!-- زر عرض الطلبات المعلقة -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnViewPending"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="8dp"
+                    android:text="📦 عرض الطلبات المحفوظة محلياً"
+                    android:textColor="#D97706"
+                    app:strokeColor="#D97706"
+                    app:cornerRadius="8dp"
+                    app:icon="@android:drawable/ic_menu_upload"
+                    app:iconTint="#D97706" />
+
                 <!-- حقل EPC -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilEpc"
@@ -126,8 +128,6 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
-                app:checkedIconVisible="true"
-                app:checkedIconEnabled="true"
                 android:text="@string/ring" />
 
             <com.google.android.material.chip.Chip
@@ -135,8 +135,6 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:checkedIconVisible="true"
-                app:checkedIconEnabled="true"
                 android:text="@string/set" />
 
             <com.google.android.material.chip.Chip
@@ -144,8 +142,6 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:checkedIconVisible="true"
-                app:checkedIconEnabled="true"
                 android:text="@string/bracelet" />
 
             <com.google.android.material.chip.Chip
@@ -153,8 +149,6 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:checkedIconVisible="true"
-                app:checkedIconEnabled="true"
                 android:text="@string/necklace" />
         </com.google.android.material.chip.ChipGroup>
 
@@ -199,50 +193,6 @@
             android:layout_marginTop="20dp"
             android:layout_marginBottom="8dp"/>
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/metal_type"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp" />
-
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/chipGroupMetalColor"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:singleSelection="true"
-            app:selectionRequired="true"
-            app:chipSpacingHorizontal="4dp">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipYellowGold"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="true"
-                app:checkedIconVisible="true"
-                app:checkedIconEnabled="true"
-                android:text="@string/yellow_gold" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipWhiteGold"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:checkedIconVisible="true"
-                app:checkedIconEnabled="true"
-                android:text="@string/white_gold" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipRoseGold"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:checkedIconVisible="true"
-                app:checkedIconEnabled="true"
-                android:text="@string/rose_gold" />
-        </com.google.android.material.chip.ChipGroup>
-
         <!-- العيار -->
         <TextView
             android:layout_width="wrap_content"
@@ -265,8 +215,6 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:checkedIconVisible="true"
-                app:checkedIconEnabled="true"
                 android:text="24K" />
 
             <com.google.android.material.chip.Chip
@@ -275,8 +223,6 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
-                app:checkedIconVisible="true"
-                app:checkedIconEnabled="true"
                 android:text="21K" />
 
             <com.google.android.material.chip.Chip
@@ -284,8 +230,6 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:checkedIconVisible="true"
-                app:checkedIconEnabled="true"
                 android:text="18K" />
 
             <com.google.android.material.chip.Chip
@@ -293,8 +237,6 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:checkedIconVisible="true"
-                app:checkedIconEnabled="true"
                 android:text="14K" />
         </com.google.android.material.chip.ChipGroup>
 
@@ -313,18 +255,9 @@
                 android:orientation="vertical"
                 android:padding="14dp">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/gross_weight_label"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textStyle="bold"
-                    android:textSize="13sp" />
-
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
                     android:hint="@string/gross_weight_label">
 
                     <com.google.android.material.textfield.TextInputEditText
@@ -393,15 +326,6 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:padding="12dp">
-                
-                <TextView
-    android:id="@+id/tvSummaryPrice"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:text=""
-    android:textSize="14sp"
-    android:textStyle="bold"
-    android:textColor="?attr/colorPrimary" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -410,6 +334,15 @@
                     android:text="@string/has_stones"
                     android:textColor="?attr/colorOnSurface"
                     android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tvSummaryPrice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
 
                 <com.google.android.material.switchmaterial.SwitchMaterial
                     android:id="@+id/switchHasStones"
@@ -449,7 +382,7 @@
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="4dp"
-                    android:hint="@string/stone_weight_hint">
+                    android:hint="وزن الأحجار (قيراط / ct)">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etStoneWeight"
@@ -523,12 +456,21 @@
             android:layout_gravity="center"
             android:layout_marginTop="4dp" />
 
+        <!-- معاينة الصور -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvPhotosPreview"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal"
+            android:visibility="gone" />
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSaveIdentity"
             android:layout_width="match_parent"
             android:layout_height="54dp"
             android:layout_marginTop="14dp"
-            android:layout_marginBottom="20dp"
+            android:layout_marginBottom="12dp"
             android:text="@string/btn_save_identity"
             android:textSize="15sp"
             android:textStyle="bold"
@@ -537,28 +479,17 @@
             app:cornerRadius="10dp"
             app:icon="@android:drawable/ic_menu_save"
             app:iconTint="?attr/colorOnPrimary" />
-            
-            <!-- عدّاد المزامنة المعلقة -->
-<TextView
-    android:id="@+id/tvPendingSyncCount"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginTop="4dp"
-    android:gravity="center"
-    android:text=""
-    android:textColor="#D97706"
-    android:textSize="11sp"
-    android:textStyle="bold"
-    android:visibility="gone" />
 
-<!-- معاينة الصور -->
-<androidx.recyclerview.widget.RecyclerView
-    android:id="@+id/rvPhotosPreview"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginTop="8dp"
-    android:orientation="horizontal"
-    android:visibility="gone" />
+        <!-- عدّاد المزامنة المعلقة -->
+        <TextView
+            android:id="@+id/tvPendingSyncCount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="#D97706"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
 
     </LinearLayout>
 </ScrollView>
