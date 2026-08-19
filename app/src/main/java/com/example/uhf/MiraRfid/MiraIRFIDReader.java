@@ -10,10 +10,11 @@ public interface MiraIRFIDReader {
         CHAINWAY_C61("Chainway C61", "قارئ مدمج - UHF", true),
         CHAINWAY_C66("Chainway C66", "قارئ مدمج - UHF", true),
         CHAINWAY_C71("Chainway C71", "قارئ مدمج - UHF", true),
+        CHAINWAY_R6("Chainway R6", "قارئ مدمج - UHF", true), // 👈 أضف هذا
         ZEBRA_MC3300("Zebra MC3300", "قارئ مدمج - UHF", true),
         GENERIC_BLUETOOTH("Bluetooth عام (SPP)", "بلوتوث خارجي - أي جهاز", false),
-        HONEYWELL_EDA50, // 👈 أضف هذا
-        UNITECH_RP902,   // 👈 أضف هذا
+        HONEYWELL_EDA50("Honeywell EDA50", "قارئ مدمج - UHF", true), // 👈 عدل هذا
+        UNITECH_RP902("Unitech RP902", "قارئ مدمج - UHF", true),   // 👈 عدل هذا
         SIMULATOR("محاكي", "بدون جهاز - للاختبار", false);
 
         public final String displayName;
@@ -30,6 +31,7 @@ public interface MiraIRFIDReader {
             return displayName + " - " + description;
         }
     }
+
     
     /**
      * دورة حياة القارئ
