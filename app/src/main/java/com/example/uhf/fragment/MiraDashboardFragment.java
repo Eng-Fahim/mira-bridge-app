@@ -10,9 +10,11 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
@@ -25,6 +27,7 @@ import com.example.uhf.fragment.MiraUHFReadTagFragment;
 
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
+import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.tools.SessionManager;
 
 import org.json.JSONObject;
@@ -44,14 +47,18 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
     private TextView tvSalesToday, tvSalesMonth, tvSalesYear;
     private TextView tvKarat24, tvKarat21, tvKarat18;
-    private View btnGate, btnInventory;
+    private TextView tvOuncePrice, tvPriceSource, tvLastUpdate;
+    private TextView tvGoldTrend, tvGoldChange;
+    private View btnGate, btnInventory, btnRefreshGold;
     private SwipeRefreshLayout swipeRefresh;
     private View shimmerLayout;
+    private CardView cardGoldPrices;
 
     private MiraApiClient apiClient;
     private SessionManager sessionManager;
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
+    private MiraPriceManager priceManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
     private boolean isArabic;
@@ -76,6 +83,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             sessionManager = new SessionManager(requireContext());
             branchesManager = MiraBranchesManager.getInstance(requireContext());
             orgProfile = MiraOrgProfileManager.getInstance(requireContext());
+            priceManager = MiraPriceManager.getInstance(requireContext());
             isArabic = Locale.getDefault().getLanguage().equals("ar");
 
             branchPrefs = requireContext().getSharedPreferences("mira_branches_prefs", Context.MODE_PRIVATE);
@@ -90,6 +98,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             showShimmer(true);
             loadOfflineData();
             fetchData();
+            fetchLiveGoldPrices();
 
         } catch (Throwable e) {
             Log.e(TAG, "onViewCreated error", e);
@@ -127,8 +136,24 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             shimmerLayout = v.findViewById(R.id.shimmerLayout);
             swipeRefresh = v.findViewById(R.id.swipeRefresh);
 
+            // ✅ عناصر الأسعار العالمية
+            tvOuncePrice = v.findViewById(R.id.tvOuncePrice);
+            tvPriceSource = v.findViewById(R.id.tvPriceSource);
+            tvLastUpdate = v.findViewById(R.id.tvLastUpdate);
+            tvGoldTrend = v.findViewById(R.id.tvGoldTrend);
+            tvGoldChange = v.findViewById(R.id.tvGoldChange);
+            btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
+            cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
+
             if (swipeRefresh != null) {
-                swipeRefresh.setOnRefreshListener(this::fetchData);
+                swipeRefresh.setOnRefreshListener(() -> {
+                    fetchData();
+                    fetchLiveGoldPrices();
+                });
+            }
+
+            if (btnRefreshGold != null) {
+                btnRefreshGold.setOnClickListener(v2 -> fetchLiveGoldPrices());
             }
 
             if (tvGreeting != null) {
@@ -145,18 +170,18 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     private void setupListeners() {
-    if (btnGate != null) btnGate.setOnClickListener(v -> {
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).loadFragment(new MiraSecureGateFragment(), "SecureGate");
-        }
-    });
-    
-    if (btnInventory != null) btnInventory.setOnClickListener(v -> {
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).loadFragment(new MiraUHFReadTagFragment(), "Scan");
-        }
-    });
-}
+        if (btnGate != null) btnGate.setOnClickListener(v -> {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).loadFragment(new MiraSecureGateFragment(), "SecureGate");
+            }
+        });
+        
+        if (btnInventory != null) btnInventory.setOnClickListener(v -> {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).loadFragment(new MiraUHFReadTagFragment(), "Scan");
+            }
+        });
+    }
 
     private void showShimmer(boolean show) {
         if (shimmerLayout != null) {
@@ -192,28 +217,200 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
+    // ============================================
+    // ✅ جلب الأسعار العالمية
+    // ============================================
+    private void fetchLiveGoldPrices() {
+        if (priceManager == null) return;
+        
+        addDebug("🔄 جلب أسعار الذهب العالمية...");
+        
+        executorService.execute(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.fetchGoldPrice();
+                
+                mainHandler.post(() -> {
+                    if (!isAdded()) return;
+                    
+                    if (response != null && response.isSuccess && response.data != null) {
+                        try {
+                            JSONObject data = response.data.optJSONObject("data");
+                            if (data == null) data = response.data;
+                            
+                            displayGoldPrices(data);
+                            addDebug("✅ تم تحديث أسعار الذهب");
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error parsing gold prices", e);
+                            displayGoldPricesFromCache();
+                        }
+                    } else {
+                        addDebug("⚠️ فشل جلب الأسعار، استخدام الكاش");
+                        displayGoldPricesFromCache();
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error fetching gold prices", e);
+                mainHandler.post(() -> {
+                    if (isAdded()) {
+                        displayGoldPricesFromCache();
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * ✅ عرض أسعار الذهب العالمية
+     */
+    private void displayGoldPrices(JSONObject data) {
+        try {
+            JSONObject prices = data.optJSONObject("prices");
+            if (prices == null) prices = data;
+            
+            double price24 = prices.optDouble("24k", 0);
+            double price21 = prices.optDouble("21k", 0);
+            double price18 = prices.optDouble("18k", 0);
+            double ouncePrice = data.optDouble("price_per_ounce", 
+                prices.optDouble("ounce_price", price24 * 31.1035));
+            String source = data.optString("source", "server");
+            
+            // ✅ عرض أسعار العيارات
+            setGoldPrice(tvKarat24, "24K", price24);
+            setGoldPrice(tvKarat21, "21K", price21);
+            setGoldPrice(tvKarat18, "18K", price18);
+            
+            // ✅ عرض سعر الأوقية
+            if (tvOuncePrice != null && ouncePrice > 0) {
+                tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", ouncePrice));
+            }
+            
+            // ✅ عرض المصدر
+            if (tvPriceSource != null) {
+                String sourceText = getSourceDisplayName(source);
+                tvPriceSource.setText("📡 " + sourceText);
+            }
+            
+            // ✅ عرض وقت التحديث
+            if (tvLastUpdate != null) {
+                String time = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
+                tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
+            }
+            
+            // ✅ حساب التغير (مقارنة بالكاش)
+            calculateTrend(price24);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "displayGoldPrices error", e);
+        }
+    }
+
+    /**
+     * ✅ عرض الأسعار من الكاش
+     */
+    private void displayGoldPricesFromCache() {
+        try {
+            if (priceManager == null) return;
+            
+            double price24 = priceManager.getGoldPricePerGram(24);
+            double price21 = priceManager.getGoldPricePerGram(21);
+            double price18 = priceManager.getGoldPricePerGram(18);
+            
+            setGoldPrice(tvKarat24, "24K", price24);
+            setGoldPrice(tvKarat21, "21K", price21);
+            setGoldPrice(tvKarat18, "18K", price18);
+            
+            if (tvOuncePrice != null && price24 > 0) {
+                double ouncePrice = price24 * 31.1035;
+                tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", ouncePrice));
+            }
+            
+            if (tvPriceSource != null) {
+                tvPriceSource.setText(isArabic ? "📡 كاش محلي" : "📡 Local cache");
+            }
+            
+            if (tvLastUpdate != null) {
+                tvLastUpdate.setText(isArabic ? "⏰ وضع أوفلاين" : "⏰ Offline mode");
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "displayGoldPricesFromCache error", e);
+        }
+    }
+
+    /**
+     * ✅ حساب اتجاه السعر
+     */
+    private void calculateTrend(double currentPrice) {
+        if (tvGoldTrend == null || tvGoldChange == null) return;
+        
+        try {
+            if (offlineCache == null) return;
+            
+            double previousPrice = offlineCache.getFloat("gold_price_24k_prev", 0);
+            
+            if (previousPrice > 0 && currentPrice > 0) {
+                double change = currentPrice - previousPrice;
+                double changePercent = (change / previousPrice) * 100;
+                
+                if (change > 0) {
+                    tvGoldTrend.setText("📈");
+                    tvGoldChange.setText(String.format(Locale.US, "+%.2f%%", changePercent));
+                    tvGoldChange.setTextColor(0xFF16A34A); // أخضر
+                } else if (change < 0) {
+                    tvGoldTrend.setText("📉");
+                    tvGoldChange.setText(String.format(Locale.US, "%.2f%%", changePercent));
+                    tvGoldChange.setTextColor(0xFFDC2626); // أحمر
+                } else {
+                    tvGoldTrend.setText("➡️");
+                    tvGoldChange.setText("0.00%");
+                    tvGoldChange.setTextColor(0xFF6B7280); // رمادي
+                }
+            } else {
+                tvGoldTrend.setText("📊");
+                tvGoldChange.setText("—");
+                tvGoldChange.setTextColor(0xFF6B7280);
+            }
+            
+            // ✅ حفظ السعر الحالي للمقارنة القادمة
+            if (offlineCache != null && currentPrice > 0) {
+                offlineCache.edit().putFloat("gold_price_24k_prev", (float) currentPrice).apply();
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "calculateTrend error", e);
+        }
+    }
+
+    /**
+     * ✅ الحصول على اسم المصدر
+     */
+    private String getSourceDisplayName(String source) {
+        if (source == null) return isArabic ? "غير معروف" : "Unknown";
+        switch (source.toLowerCase()) {
+            case "metalprice": return "MetalPrice";
+            case "goldapi": return "GoldAPI";
+            case "metalsdev": return "Metals.Dev";
+            case "fallback": return isArabic ? "احتياطي" : "Fallback";
+            default: return source;
+        }
+    }
+
     private void loadOfflineData() {
         if (offlineCache == null) return;
         try {
             int items = offlineCache.getInt("total_items", 0);
-            String weight = offlineCache.getString("total_weight", "0.0 g");
+            double weightVal = offlineCache.getFloat("total_weight", 0.0f);
             int sold = offlineCache.getInt("sold_today", 0);
-            String sToday = offlineCache.getString("sales_today", "—");
-            String sMonth = offlineCache.getString("sales_month", "—");
-            String sYear = offlineCache.getString("sales_year", "—");
-            int k24 = offlineCache.getInt("karat_24", 0);
-            int k21 = offlineCache.getInt("karat_21", 0);
-            int k18 = offlineCache.getInt("karat_18", 0);
+            double sToday = offlineCache.getFloat("sales_today", 0.0f);
+            double sMonth = offlineCache.getFloat("sales_month", 0.0f);
+            double sYear = offlineCache.getFloat("sales_year", 0.0f);
 
             setText(tvTotalItems, String.valueOf(items));
-            setText(tvTotalWeight, weight);
+            setText(tvTotalWeight, formatWeight(weightVal));
             setText(tvSoldToday, String.valueOf(sold));
-            setText(tvSalesToday, sToday);
-            setText(tvSalesMonth, sMonth);
-            setText(tvSalesYear, sYear);
-            setKarat(tvKarat24, "24K", k24);
-            setKarat(tvKarat21, "21K", k21);
-            setKarat(tvKarat18, "18K", k18);
+            setText(tvSalesToday, formatCurrency(sToday));
+            setText(tvSalesMonth, formatCurrency(sMonth));
+            setText(tvSalesYear, formatCurrency(sYear));
 
             if (tvLiveStatus != null && offlineCache.contains("last_update")) {
                 tvLiveStatus.setText(isArabic ? "وضع أوفلاين" : "Offline Cache");
@@ -229,28 +426,19 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         try {
             JSONObject inv = data.optJSONObject("inventory");
             JSONObject sales = data.optJSONObject("sales");
-            JSONObject w = inv != null ? inv.optJSONObject("weights") : null;
 
             double totalWeightVal = 0.0;
             if (inv != null) {
                 totalWeightVal = inv.optDouble("total_weight", 0.0);
-                if (Double.isNaN(totalWeightVal)) {
-                    try {
-                        totalWeightVal = Double.parseDouble(inv.optString("total_weight", "0.0"));
-                    } catch (Exception ignored) {}
-                }
             }
 
             offlineCache.edit()
                 .putInt("total_items", inv != null ? inv.optInt("total_items", 0) : 0)
-                .putString("total_weight", String.format(Locale.US, "%.1f g", totalWeightVal))
+                .putFloat("total_weight", (float) totalWeightVal)
                 .putInt("sold_today", sales != null ? sales.optInt("count_today", 0) : 0)
-                .putString("sales_today", sales != null ? cleanAmount(sales.optString("today", "0")) : "—")
-                .putString("sales_month", sales != null ? cleanAmount(sales.optString("month", "0")) : "—")
-                .putString("sales_year", sales != null ? cleanAmount(sales.optString("year", "0")) : "—")
-                .putInt("karat_24", w != null ? w.optInt("k24", 0) : 0)
-                .putInt("karat_21", w != null ? w.optInt("k21", 0) : 0)
-                .putInt("karat_18", w != null ? w.optInt("k18", 0) : 0)
+                .putFloat("sales_today", (float) (sales != null ? sales.optDouble("today", 0.0) : 0.0))
+                .putFloat("sales_month", (float) (sales != null ? sales.optDouble("month", 0.0) : 0.0))
+                .putFloat("sales_year", (float) (sales != null ? sales.optDouble("year", 0.0) : 0.0))
                 .putLong("last_update", System.currentTimeMillis())
                 .apply();
         } catch (Exception e) {
@@ -268,12 +456,10 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             }
 
             final int activeBranchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : -1;
-            addDebug("📋 معرف الفرع النشط: " + activeBranchId);
 
             executorService.execute(() -> {
                 MiraApiClient.ApiResponse response = null;
                 try {
-                    addDebug("📡 إرسال طلب API...");
                     response = apiClient.getDashboardFull(activeBranchId);
                 } catch (Throwable e) {
                     addDebug("❌ خطأ شبكة/اتصال: " + e.getMessage());
@@ -285,15 +471,12 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                     if (!isAdded()) return;
                     try {
                         if (finalResponse != null && finalResponse.isSuccess && finalResponse.data != null) {
-                            addDebug("✅ تم استلام البيانات بنجاح");
                             saveOfflineData(finalResponse.data);
                             processData(finalResponse.data);
                         } else {
-                            addDebug("⚠️ فشل الاتصال، الاعتماد على البيانات المخزنة أوفلاين");
                             loadOfflineData();
                         }
                     } catch (Throwable e) {
-                        addDebug("❌ استثناء معالجة: " + e.getMessage());
                         loadOfflineData();
                     } finally {
                         showShimmer(false);
@@ -302,7 +485,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 });
             });
         } catch (Throwable e) {
-            addDebug("❌ خطأ fetchData: " + e.getMessage());
             showShimmer(false);
             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
             loadOfflineData();
@@ -310,68 +492,68 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     private void processData(JSONObject data) {
-    try {
-        JSONObject inv = data.optJSONObject("inventory");
-        if (inv != null) {
-            setText(tvTotalItems, String.valueOf(inv.optInt("total_items", 0)));
-            double weightVal = inv.optDouble("total_weight", 0.0);
-            setText(tvTotalWeight, String.format(Locale.US, "%.1f g", weightVal));
-
-            JSONObject karats = inv.optJSONObject("karats");
-            if (karats != null) {
-                JSONObject k24 = karats.optJSONObject("24k");
-                JSONObject k21 = karats.optJSONObject("21k");
-                JSONObject k18 = karats.optJSONObject("18k");
-
-                setKarat(tvKarat24, "24K", k24 != null ? k24.optInt("count", 0) : 0);
-                setKarat(tvKarat21, "21K", k21 != null ? k21.optInt("count", 0) : 0);
-                setKarat(tvKarat18, "18K", k18 != null ? k18.optInt("count", 0) : 0);
-            }
-        }
-
-        JSONObject sales = data.optJSONObject("sales");
-        if (sales != null) {
-            setText(tvSoldToday, String.valueOf(sales.optInt("count_today", 0)));
-            setText(tvSalesToday, formatCurrency(sales.optDouble("today", 0.0)));
-            setText(tvSalesMonth, formatCurrency(sales.optDouble("month", 0.0)));
-            setText(tvSalesYear, formatCurrency(sales.optDouble("year", 0.0)));
-        }
-
-        if (tvLiveStatus != null) {
-            tvLiveStatus.setText(isArabic ? "متصل" : "Online");
-            tvLiveStatus.setTextColor(0xFF16A34A);
-        }
-    } catch (Throwable e) {
-        Log.e(TAG, "processData error", e);
-    }
-}
-
-private String formatCurrency(double amount) {
-    if (amount <= 0) return "—";
-    return String.format(Locale.US, "%,.0f YER", amount);
-}
-
-
-    private void setKarat(TextView tv, String label, int count) {
-        if (tv == null) return;
-        tv.setText(count > 0 ? label + " | " + count + (isArabic ? " قطعة" : " pcs") : label + " | —");
-    }
-
-    private String cleanAmount(String amount) {
-        if (amount == null || amount.isEmpty() || amount.equals("$0") || amount.equals("0") || amount.equals("null")) return "—";
         try {
-            double val = Double.parseDouble(amount.replaceAll("[^0-9.]", "").trim());
-            return val == 0 ? "—" : String.format(Locale.US, "%,.0f YER", val);
-        } catch (Exception e) {
-            return amount;
+            JSONObject inv = data.optJSONObject("inventory");
+            if (inv != null) {
+                setText(tvTotalItems, String.valueOf(inv.optInt("total_items", 0)));
+                double weightVal = inv.optDouble("total_weight", 0.0);
+                setText(tvTotalWeight, formatWeight(weightVal));
+            }
+
+            JSONObject sales = data.optJSONObject("sales");
+            if (sales != null) {
+                setText(tvSoldToday, String.valueOf(sales.optInt("count_today", 0)));
+                setText(tvSalesToday, formatCurrency(sales.optDouble("today", 0.0)));
+                setText(tvSalesMonth, formatCurrency(sales.optDouble("month", 0.0)));
+                setText(tvSalesYear, formatCurrency(sales.optDouble("year", 0.0)));
+            }
+
+            if (tvLiveStatus != null) {
+                tvLiveStatus.setText(isArabic ? "متصل" : "Online");
+                tvLiveStatus.setTextColor(0xFF16A34A);
+            }
+        } catch (Throwable e) {
+            Log.e(TAG, "processData error", e);
+        }
+    }
+
+    /**
+     * ✅ تنسيق العملة
+     */
+    private String formatCurrency(double amount) {
+        if (amount <= 0) return "—";
+        if (priceManager != null) {
+            return priceManager.formatPriceDefault(amount);
+        }
+        return String.format(Locale.US, "%,.0f", amount);
+    }
+
+    /**
+     * ✅ تنسيق الوزن
+     */
+    private String formatWeight(double weightInGrams) {
+        if (weightInGrams <= 0) return "0.0 g";
+        if (weightInGrams >= 1000) {
+            return String.format(Locale.US, "%.2f kg", weightInGrams / 1000);
+        }
+        return String.format(Locale.US, "%.1f g", weightInGrams);
+    }
+
+    /**
+     * ✅ عرض سعر الذهب
+     */
+    private void setGoldPrice(TextView tv, String label, double price) {
+        if (tv == null) return;
+        if (price > 0) {
+            tv.setText(String.format(Locale.US, "%s: $%,.2f/g", label, price));
+        } else {
+            tv.setText(label + ": —");
         }
     }
 
     private void setText(TextView tv, String text) {
         if (tv != null) tv.setText(text);
     }
-
-    
 
     public void onBranchChanged() {
         if (!isAdded()) return;
@@ -436,8 +618,8 @@ private String formatCurrency(double amount) {
                         android.content.ClipData clip =
                             android.content.ClipData.newPlainText("debug", message);
                         clipboard.setPrimaryClip(clip);
-                        android.widget.Toast.makeText(requireContext(),
-                            "تم النسخ", android.widget.Toast.LENGTH_SHORT).show();
+                        Toast.makeText(requireContext(),
+                            "تم النسخ", Toast.LENGTH_SHORT).show();
                     }
                 })
                 .setNeutralButton("إغلاق", null)
@@ -452,4 +634,4 @@ private String formatCurrency(double amount) {
         super.onDestroyView();
         mainHandler.removeCallbacksAndMessages(null);
     }
-                                                                                      }
+}
