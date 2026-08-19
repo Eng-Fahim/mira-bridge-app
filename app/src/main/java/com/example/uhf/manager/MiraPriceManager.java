@@ -60,7 +60,8 @@ public class MiraPriceManager {
 
     public double getGoldPricePerGram(int karat) {
         String key = "gold_price_" + karat + "k";
-        return getDoubleFromPrefs(key, getDefaultGoldPrice(karat));
+        // ✅ إرجاع 0 إذا لم يتم التحميل بعد - لا قيم افتراضية
+        return getDoubleFromPrefs(key, 0);
     }
 
     public double getMargin(int karat) {
@@ -75,17 +76,22 @@ public class MiraPriceManager {
 
     public double getFinalPricePerGram(int karat) {
         double basePrice = getGoldPricePerGram(karat);
+        if (basePrice <= 0) return 0;
+        
         double margin = getMargin(karat);
         double making = getMakingCharge(karat);
         return basePrice + (basePrice * margin / 100) + making;
     }
 
     public double calculateGoldPrice(int karat, double weightGrams) {
-        return getFinalPricePerGram(karat) * weightGrams;
+        double finalPrice = getFinalPricePerGram(karat);
+        if (finalPrice <= 0) return 0;
+        return finalPrice * weightGrams;
     }
 
     public double calculateGoldPriceInCurrency(int karat, double weightGrams, String currency) {
         double priceUSD = calculateGoldPrice(karat, weightGrams);
+        if (priceUSD <= 0) return 0;
         return convertFromUSD(priceUSD, currency);
     }
 
@@ -109,12 +115,10 @@ public class MiraPriceManager {
         return CURRENCY_YER;
     }
 
-    // ✅ دالة واحدة فقط لسعر الصرف
     public double getExchangeRate(String currency) {
         if (currency.equals(CURRENCY_USD)) return 1.0;
 
         try {
-            // ✅ 1. القراءة المباشرة من prefs
             boolean useMarketRate = prefs.getBoolean("use_market_rate", false);
             String source = useMarketRate ? "market" : "official";
             String key = "exchange_" + source + "_" + currency;
@@ -124,12 +128,10 @@ public class MiraPriceManager {
                 if (rate > 0) return rate;
             }
 
-            // ✅ 2. القراءة من currency_settings JSON
             String currencySettingsJson = prefs.getString("currency_settings", "");
             if (!currencySettingsJson.isEmpty()) {
                 JSONObject currencySettings = new JSONObject(currencySettingsJson);
                 
-                // قراءة use_market_rate
                 if (currencySettings.has("use_market_rate")) {
                     Object obj = currencySettings.get("use_market_rate");
                     if (obj instanceof Boolean) {
@@ -149,7 +151,6 @@ public class MiraPriceManager {
             Log.e(TAG, "Error reading exchange rate: " + e.getMessage());
         }
 
-        // ✅ قيم افتراضية
         switch (currency) {
             case CURRENCY_YER: return 530;
             case CURRENCY_EGP: return 47.5;
@@ -174,6 +175,8 @@ public class MiraPriceManager {
     }
 
     public String formatPrice(double priceUSD, String currency) {
+        if (priceUSD <= 0) return "—";
+        
         double convertedPrice = convertFromUSD(priceUSD, currency);
         String symbol = getCurrencySymbol(currency);
         if (currency.equals(CURRENCY_YER) || currency.equals(CURRENCY_EGP)) {
@@ -190,17 +193,17 @@ public class MiraPriceManager {
     public String getCurrencySymbol(String currency) {
         switch (currency) {
             case CURRENCY_USD: return "$";
-            case CURRENCY_YER: return "ريال";
-            case CURRENCY_EGP: return "ج.م";
-            case CURRENCY_SAR: return "ر.س";
-            case CURRENCY_AED: return "د.إ";
+            case CURRENCY_YER: return "YER";
+            case CURRENCY_EGP: return "EGP";
+            case CURRENCY_SAR: return "SAR";
+            case CURRENCY_AED: return "AED";
             default: return currency;
         }
     }
 
     public String getCurrencyNameArabic(String currency) {
         switch (currency) {
-            case CURRENCY_USD: return "دولار";
+            case CURRENCY_USD: return "دولار أمريكي";
             case CURRENCY_YER: return "ريال يمني";
             case CURRENCY_EGP: return "جنيه مصري";
             case CURRENCY_SAR: return "ريال سعودي";
@@ -215,9 +218,11 @@ public class MiraPriceManager {
 
     public String getGoldItemPriceSummary(int karat, double weightGrams) {
         double priceUSD = calculateGoldPrice(karat, weightGrams);
+        if (priceUSD <= 0) return "—";
+        
         String defaultCurrency = getDefaultCurrency();
         double priceInCurrency = convertFromUSD(priceUSD, defaultCurrency);
-        return String.format("%s %s (%s $)",
+        return String.format("%s %s ($%s)",
             decimalFormat.format(priceInCurrency),
             getCurrencySymbol(defaultCurrency),
             decimalFormat.format(priceUSD));
@@ -247,18 +252,35 @@ public class MiraPriceManager {
     // ============================================
 
     public void saveGoldSettings(JSONObject goldSettings) {
-        prefs.edit().putString("gold_settings", goldSettings.toString()).apply();
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putString("gold_settings", goldSettings.toString());
+        
+        // ✅ حفظ القيم مباشرة
+        String[] goldKeys = {
+            "gold_price_24k", "gold_price_22k", "gold_price_21k",
+            "gold_price_18k", "gold_price_14k",
+            "margin_24k", "margin_22k", "margin_21k",
+            "margin_18k", "margin_14k", "margin_12k",
+            "making_24k", "making_22k", "making_21k",
+            "making_18k", "making_14k", "making_12k"
+        };
+        
+        for (String key : goldKeys) {
+            if (goldSettings.has(key)) {
+                editor.putString(key, goldSettings.optString(key, "0"));
+            }
+        }
+        
+        editor.apply();
     }
 
     public void saveCurrencySettings(JSONObject currencySettings) {
         SharedPreferences.Editor editor = prefs.edit();
         editor.putString("currency_settings", currencySettings.toString());
         
-        // ✅ حفظ use_market_rate كـ boolean
         boolean useMarketRate = currencySettings.optBoolean("use_market_rate", false);
         editor.putBoolean("use_market_rate", useMarketRate);
         
-        // ✅ حفظ القيم مباشرة
         String[] currencies = {CURRENCY_YER, CURRENCY_EGP, CURRENCY_SAR, CURRENCY_AED};
         for (String currency : currencies) {
             String officialKey = "exchange_official_" + currency;
@@ -276,21 +298,11 @@ public class MiraPriceManager {
     }
 
     // ============================================
-    // القيم الافتراضية
+    // القيم الافتراضية - فقط للهوامش والمصنعية
     // ============================================
 
-    private double getDefaultGoldPrice(int karat) {
-        switch (karat) {
-            case 24: return 75.00;
-            case 22: return 68.75;
-            case 21: return 65.62;
-            case 18: return 56.25;
-            case 14: return 43.75;
-            case 12: return 37.50;
-            default: return 65.62;
-        }
-    }
-
+    // ❌ حذف getDefaultGoldPrice - لا نريد سعر افتراضي قديم
+    
     private double getDefaultMargin(int karat) {
         switch (karat) {
             case 24: return 95.0;
@@ -316,7 +328,7 @@ public class MiraPriceManager {
     }
 
     // ============================================
-    // القراءة من التخزين - دالة واحدة فقط
+    // القراءة من التخزين
     // ============================================
 
     private double getDoubleFromPrefs(String key, double defaultValue) {
@@ -397,7 +409,6 @@ public class MiraPriceManager {
                             }
                         }
                         
-                        // ✅ حفظ use_market_rate كـ boolean
                         if (currencyData.has("use_market_rate")) {
                             boolean useMarket = currencyData.optBoolean("use_market_rate", false);
                             editor.putBoolean("use_market_rate", useMarket);
