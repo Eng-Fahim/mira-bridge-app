@@ -17,7 +17,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 /**
- * خدمة RFID موحدة
+ * خدمة RFID موحدة لربط القارئات وواجهات التطبيق
  */
 public class MiraRfidService {
     private static final String TAG = "MiraRfidService";
@@ -75,7 +75,7 @@ public class MiraRfidService {
     public String getLastReadTid() { return lastReadTid; }
 
     // =========================================================================
-    // 🛠️ دوال الوصول للذاكرة المباشرة المطلوب استدعاؤها في الـ Fragment
+    // 🛠️ دوال الوصول للذاكرة والفلترة المباشرة المرفوعة للـ Fragment
     // =========================================================================
 
     public boolean writeData(String pwdStr, int bank, int ptr, String data) {
@@ -105,7 +105,7 @@ public class MiraRfidService {
     }
 
     // =========================================================================
-    // 🟢 العمليات العالية المستوى
+    // 🟢 العمليات المتقدمة لربط واجهة المستخدم بالشبكة
     // =========================================================================
     
     public String readEpc(String accessPassword) {
