@@ -33,6 +33,7 @@ import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
+import com.example.uhf.manager.MiraPriceManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -45,22 +46,29 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class MiraInventoryProFragment extends KeyDwonFragment {
 
     private static final String TAG = "MiraInventoryPro";
     private static final String OFFLINE_PREFS = "inventory_pro_cache";
+    private static final String PENDING_QUEUE_PREFS = "inventory_pending_queue";
+    private static final int UI_UPDATE_INTERVAL = 250;
+    private static final int MAX_DISPLAY_ITEMS = 500;
+    private static final long VIBRATION_THROTTLE_MS = 100;
 
     // Views
     private TextView tvInventoryStatus, tvExpectedCount, tvScannedCount, tvVariance;
     private TextView tvAccuracy, tvElapsedTime, tvLastScan, tvRssi;
     private TextView tvPrevItems, tvCurrItems, tvDeltaItems;
+    private TextView tvTotalValue, tvTotalWeight;
     private CardView cardComparison;
     private Button btnStartInventory, btnBlindInventory, btnStopInventory, btnGenerateReport, btnArchiveReports;
     private RecyclerView rvInventoryItems;
-    private ProgressBar progressScanned;
+    private ProgressBar progressScanned, progressRssi;
 
     // State & Counters
     private boolean isScanning = false;
@@ -73,28 +81,37 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private int prevTotalItems = 0;
     private int sessionId = 0;
     private long startTime = 0;
+    private long lastVibrationTime = 0;
 
-    // Fast Data Structures (Offline-First Architecture)
+    // Fast Data Structures (Thread-Safe)
     private final Set<String> scannedEpcSet = Collections.synchronizedSet(new HashSet<>());
     private final Map<String, InventoryItem> localCatalog = new ConcurrentHashMap<>();
-    private final List<InventoryItem> scannedItems = Collections.synchronizedList(new ArrayList<>());
+    private final List<InventoryItem> scannedItems = new CopyOnWriteArrayList<>();
+    private final List<InventoryItem> pendingBatch = new CopyOnWriteArrayList<>();
     private InventoryAdapter adapter;
 
     // Managers & Clients
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
+    private MiraPriceManager priceManager;
     private SharedPreferences offlineCache;
+    private SharedPreferences pendingQueue;
 
-    // Handlers & Batched UI Updates
+    // Handlers
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Runnable timerRunnable;
-    private boolean pendingUiUpdate = false;
+    private Runnable batchUpdateRunnable;
+    private boolean isBatchScheduled = false;
 
-    // Hardware Audio/Haptic Settings
+    // Hardware Settings
     private boolean soundEnabled = true;
     private boolean vibrateEnabled = true;
-    private WebView printWebView; // لتفادي تسريب الذاكرة Memory Leak
+    private WebView printWebView;
+    
+    // Sound Pool
+    private android.media.SoundPool soundPool;
+    private int soundScanId, soundFoundId, soundMissingId;
 
     // Simulation Fallback Data
     private final String[] simulationGtins = {
@@ -113,13 +130,17 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             apiClient = MiraApiClient.getInstance(ctx);
             branchesManager = MiraBranchesManager.getInstance(ctx);
             orgProfile = MiraOrgProfileManager.getInstance(ctx);
+            priceManager = MiraPriceManager.getInstance(ctx);
             offlineCache = ctx.getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
+            pendingQueue = ctx.getSharedPreferences(PENDING_QUEUE_PREFS, Context.MODE_PRIVATE);
+            initSoundPool();
         }
         isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         bindViews(v);
         setupRecyclerView();
         setupClickListeners();
         setInitialState();
+        checkPendingQueue();
         return v;
     }
 
@@ -136,6 +157,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     public void onResume() {
         super.onResume();
         updateBranchHeader();
+        syncPendingQueue();
     }
 
     private void updateBranchHeader() {
@@ -161,6 +183,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         tvPrevItems = v.findViewById(R.id.tvPrevItems);
         tvCurrItems = v.findViewById(R.id.tvCurrItems);
         tvDeltaItems = v.findViewById(R.id.tvDeltaItems);
+        tvTotalValue = v.findViewById(R.id.tvTotalValue);
+        tvTotalWeight = v.findViewById(R.id.tvTotalWeight);
         cardComparison = v.findViewById(R.id.cardComparison);
         btnStartInventory = v.findViewById(R.id.btnStartInventory);
         btnBlindInventory = v.findViewById(R.id.btnBlindInventory);
@@ -169,7 +193,36 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         btnArchiveReports = v.findViewById(R.id.btnArchiveReports);
         rvInventoryItems = v.findViewById(R.id.rvInventoryItems);
         progressScanned = v.findViewById(R.id.progressScanned);
+        progressRssi = v.findViewById(R.id.progressRssi);
         applyLanguage();
+    }
+
+    private void initSoundPool() {
+        if (getContext() == null) return;
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                android.media.AudioAttributes audioAttributes = new android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build();
+                
+                soundPool = new android.media.SoundPool.Builder()
+                        .setMaxStreams(5)
+                        .setAudioAttributes(audioAttributes)
+                        .build();
+            } else {
+                soundPool = new android.media.SoundPool(5, android.media.AudioManager.STREAM_MUSIC, 0);
+            }
+            
+            soundScanId = soundPool.load(getContext(), R.raw.barcodebeep, 1);
+            soundFoundId = soundPool.load(getContext(), R.raw.barcodebeep, 2);
+            soundMissingId = soundPool.load(getContext(), R.raw.alarm_breach_security, 3);
+            
+            Log.i(TAG, "✅ SoundPool initialized successfully");
+        } catch (Exception e) {
+            Log.e(TAG, "SoundPool init error: " + e.getMessage());
+            soundPool = null;
+        }
     }
 
     private void applyLanguage() {
@@ -181,7 +234,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private void setupRecyclerView() {
-        adapter = new InventoryAdapter(scannedItems);
+        adapter = new InventoryAdapter();
         if (rvInventoryItems != null) {
             rvInventoryItems.setLayoutManager(new LinearLayoutManager(getContext()));
             rvInventoryItems.setAdapter(adapter);
@@ -204,6 +257,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         expectedCount = localCatalog.isEmpty() ? simulationGtins.length : localCatalog.size();
         if (tvExpectedCount != null) tvExpectedCount.setText(String.valueOf(expectedCount));
         if (cardComparison != null) cardComparison.setVisibility(View.VISIBLE);
+        if (progressRssi != null) progressRssi.setMax(100);
     }
 
     // ==================== OFFLINE CATALOG & PRELOAD ====================
@@ -220,15 +274,19 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     if (items != null) {
                         localCatalog.clear();
                         for (int i = 0; i < items.length(); i++) {
-                            JSONObject obj = items.getJSONObject(i);
-                            String serial = obj.optString("gtin13", obj.optString("serial_number", obj.optString("epc", "")));
-                            if (!serial.isEmpty()) {
-                                String title = obj.optString("title", obj.optString("name", isArabic ? "قطعة ذهب" : "Gold Item"));
-                                String karat = obj.optString("karat", "21K");
-                                double weight = obj.optDouble("weight", 0.0);
-                                String location = obj.optString("location", branchesManager.getActiveBranchDisplayName());
-                                String status = !"sold".equalsIgnoreCase(obj.optString("status", "")) ? "✓" : "⚠️";
-                                localCatalog.put(serial.toUpperCase(), new InventoryItem(serial, title, karat, weight, status, location));
+                            try {
+                                JSONObject obj = items.getJSONObject(i);
+                                String serial = obj.optString("gtin13", obj.optString("serial_number", obj.optString("epc", "")));
+                                if (!serial.isEmpty()) {
+                                    String title = obj.optString("title", obj.optString("name", isArabic ? "قطعة ذهب" : "Gold Item"));
+                                    String karat = obj.optString("karat", "21K");
+                                    double weight = obj.optDouble("weight", 0.0);
+                                    String location = obj.optString("location", branchesManager.getActiveBranchDisplayName());
+                                    String status = !"sold".equalsIgnoreCase(obj.optString("status", "")) ? "✓" : "⚠️";
+                                    localCatalog.put(serial.toUpperCase(), new InventoryItem(serial, title, karat, weight, status, location));
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Parse item error: " + e.getMessage());
                             }
                         }
                         expectedCount = localCatalog.size();
@@ -263,6 +321,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (!isScanning || epcOrGtin == null || epcOrGtin.trim().isEmpty()) return;
         final String cleanCode = epcOrGtin.trim().toUpperCase();
         if (!scannedEpcSet.add(cleanCode)) return;
+        
         InventoryItem matchedItem = localCatalog.get(cleanCode);
         boolean isKnown = matchedItem != null;
         String title = isKnown ? matchedItem.title : (isArabic ? "قطعة غير معرفة" : "Unknown Item");
@@ -270,38 +329,94 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         double weight = isKnown ? matchedItem.numericWeight : 0.0;
         String location = isKnown ? matchedItem.location : (branchesManager != null ? branchesManager.getActiveBranchDisplayName() : "");
         String status = isKnown ? matchedItem.status : "⚠️";
+        
         InventoryItem newItem = new InventoryItem(cleanCode, title, karat, weight, status, location);
         scannedItems.add(0, newItem);
+        pendingBatch.add(0, newItem);
         scannedCount++;
         if ("✓".equals(status)) foundCount++;
-        playInventorySound("scan");
-        scheduleUiUpdate(cleanCode, rssi);
+        
+        playInventorySound(isKnown ? "found" : "missing");
+        updateRssiDisplay(rssi);
+        scheduleBatchUpdate();
     }
 
-    private void scheduleUiUpdate(String lastSerial, String rssi) {
-        if (pendingUiUpdate) return;
-        pendingUiUpdate = true;
-        mainHandler.postDelayed(() -> {
-            pendingUiUpdate = false;
-            if (!isScanning && !isAdded()) return;
-            if (adapter != null) adapter.notifyDataSetChanged();
-            if (rvInventoryItems != null && !scannedItems.isEmpty()) rvInventoryItems.scrollToPosition(0);
-            if (tvScannedCount != null) tvScannedCount.setText(String.valueOf(scannedCount));
-            int remaining = Math.max(0, expectedCount - foundCount);
-            if (tvVariance != null) tvVariance.setText(String.valueOf(remaining));
-            if (tvLastScan != null && lastSerial != null) {
-                tvLastScan.setText(lastSerial.substring(0, Math.min(14, lastSerial.length())));
+    private void scheduleBatchUpdate() {
+        if (isBatchScheduled || !isAdded()) return;
+        isBatchScheduled = true;
+        
+        batchUpdateRunnable = () -> {
+            isBatchScheduled = false;
+            
+            if (!isAdded() || getActivity() == null || getActivity().isFinishing()) {
+                return;
             }
-            if (tvRssi != null && rssi != null) tvRssi.setText(rssi + " dBm");
-            if (progressScanned != null && expectedCount > 0) {
-                progressScanned.setProgress(Math.min(100, (int) ((scannedCount * 100.0) / expectedCount)));
+            
+            try {
+                if (adapter != null && !pendingBatch.isEmpty()) {
+                    List<InventoryItem> batchCopy = new ArrayList<>(pendingBatch);
+                    pendingBatch.clear();
+                    adapter.addItems(batchCopy);
+                }
+                
+                if (tvScannedCount != null) tvScannedCount.setText(String.valueOf(scannedCount));
+                int remaining = Math.max(0, expectedCount - foundCount);
+                if (tvVariance != null) tvVariance.setText(String.valueOf(remaining));
+                
+                if (progressScanned != null && expectedCount > 0) {
+                    progressScanned.setProgress(Math.min(100, (int) ((scannedCount * 100.0) / expectedCount)));
+                }
+                
+                double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 100.0;
+                if (tvAccuracy != null) {
+                    tvAccuracy.setText(String.format(Locale.US, isArabic ? "الدقة: %.1f%%" : "Accuracy: %.1f%%", acc));
+                }
+                
+                updateTotals();
+                updateComparisonCard();
+            } catch (Exception e) {
+                Log.e(TAG, "Batch update error: " + e.getMessage());
             }
-            double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 100.0;
-            if (tvAccuracy != null) {
-                tvAccuracy.setText(String.format(Locale.US, isArabic ? "الدقة: %.1f%%" : "Accuracy: %.1f%%", acc));
+        };
+        
+        mainHandler.postDelayed(batchUpdateRunnable, UI_UPDATE_INTERVAL);
+    }
+
+    private void updateRssiDisplay(String rssi) {
+        if (tvRssi != null) {
+            tvRssi.setText(rssi + " dBm");
+        }
+        
+        if (progressRssi != null) {
+            try {
+                int rssiValue = Integer.parseInt(rssi.replaceAll("[^0-9-]", ""));
+                int percentage = Math.max(0, Math.min(100, (rssiValue + 100) * 100 / 70));
+                progressRssi.setProgress(percentage);
+                
+                if (percentage > 70) {
+                    progressRssi.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#22C55E")));
+                } else if (percentage > 40) {
+                    progressRssi.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#F59E0B")));
+                } else {
+                    progressRssi.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#EF4444")));
+                }
+            } catch (Exception e) {
+                progressRssi.setProgress(0);
             }
-            updateComparisonCard();
-        }, 150);
+        }
+    }
+
+    private void updateTotals() {
+        double totalWt = calculateTotalWeight();
+        double totalVal = calculateTotalValue();
+        
+        if (tvTotalWeight != null) {
+            tvTotalWeight.setText(String.format(Locale.US, "%.2f g", totalWt));
+        }
+        
+        if (tvTotalValue != null && priceManager != null) {
+            tvTotalValue.setText(priceManager.formatPriceDefault(totalVal));
+        }
     }
 
     // ==================== START INVENTORY ====================
@@ -329,11 +444,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     startTime = System.currentTimeMillis();
                     scannedEpcSet.clear();
                     scannedItems.clear();
+                    pendingBatch.clear();
                     scannedCount = 0;
                     foundCount = 0;
                     varianceCount = 0;
 
-                    if (adapter != null) adapter.notifyDataSetChanged();
+                    if (adapter != null) adapter.clearItems();
 
                     setButtonsEnabled(false);
                     if (btnStopInventory != null) btnStopInventory.setEnabled(true);
@@ -341,6 +457,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     if (tvInventoryStatus != null) {
                         tvInventoryStatus.setText(isArabic ? "● جاري الجرد" : "● SCANNING");
                         tvInventoryStatus.setTextColor(Color.parseColor("#38BDF8"));
+                    }
+
+                    if (isBlindMode && tvExpectedCount != null) {
+                        tvExpectedCount.setText("—");
                     }
 
                     playInventorySound("start");
@@ -360,35 +480,35 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private void preloadBranchCatalogSync() {
-    if (apiClient == null || branchesManager == null) return;
-    final int activeBranchId = branchesManager.getActiveBranchId();
-    MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(activeBranchId);
-    if (response != null && response.isSuccess && response.data != null) {
-        JSONArray items = response.data.optJSONArray("items");
-        if (items != null) {
-            localCatalog.clear();
-            for (int i = 0; i < items.length(); i++) {
-                try { // ✅ أضف try-catch
-                    JSONObject obj = items.getJSONObject(i);
-                    String serial = obj.optString("gtin13", obj.optString("serial_number", obj.optString("epc", "")));
-                    if (!serial.isEmpty()) {
-                        localCatalog.put(serial.toUpperCase(), new InventoryItem(
-                            serial,
-                            obj.optString("title", isArabic ? "قطعة ذهب" : "Gold Item"),
-                            obj.optString("karat", "21K"),
-                            obj.optDouble("weight", 0.0),
-                            "✓",
-                            branchesManager.getActiveBranchDisplayName()
-                        ));
+        if (apiClient == null || branchesManager == null) return;
+        final int activeBranchId = branchesManager.getActiveBranchId();
+        MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(activeBranchId);
+        if (response != null && response.isSuccess && response.data != null) {
+            JSONArray items = response.data.optJSONArray("items");
+            if (items != null) {
+                localCatalog.clear();
+                for (int i = 0; i < items.length(); i++) {
+                    try {
+                        JSONObject obj = items.getJSONObject(i);
+                        String serial = obj.optString("gtin13", obj.optString("serial_number", obj.optString("epc", "")));
+                        if (!serial.isEmpty()) {
+                            localCatalog.put(serial.toUpperCase(), new InventoryItem(
+                                serial,
+                                obj.optString("title", isArabic ? "قطعة ذهب" : "Gold Item"),
+                                obj.optString("karat", "21K"),
+                                obj.optDouble("weight", 0.0),
+                                "✓",
+                                branchesManager.getActiveBranchDisplayName()
+                            ));
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Parse item error: " + e.getMessage());
                     }
-                } catch (Exception e) { // ✅ catch
-                    Log.e(TAG, "Parse item error: " + e.getMessage());
                 }
+                expectedCount = localCatalog.size();
             }
-            expectedCount = localCatalog.size();
         }
     }
-}
 
     // ==================== STOP INVENTORY ====================
 
@@ -423,7 +543,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             try {
                 isScanning = false;
                 varianceCount = Math.max(0, expectedCount - foundCount);
-                syncFullInventorySessionSync();
+                
+                boolean synced = syncFullInventorySessionSync();
 
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
@@ -434,15 +555,21 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     if (btnGenerateReport != null) btnGenerateReport.setEnabled(true);
 
                     if (tvInventoryStatus != null) {
-                        tvInventoryStatus.setText(isArabic ? "● مكتمل" : "● COMPLETED");
-                        tvInventoryStatus.setTextColor(Color.parseColor("#22C55E"));
+                        if (synced) {
+                            tvInventoryStatus.setText(isArabic ? "● مكتمل" : "● COMPLETED");
+                            tvInventoryStatus.setTextColor(Color.parseColor("#22C55E"));
+                        } else {
+                            tvInventoryStatus.setText(isArabic ? "● محفوظ محلياً" : "● SAVED LOCALLY");
+                            tvInventoryStatus.setTextColor(Color.parseColor("#F59E0B"));
+                        }
                     }
 
                     if (tvVariance != null) tvVariance.setText(String.valueOf(varianceCount));
                     updateComparisonCard();
+                    updateTotals();
                     stopTimer();
                     playInventorySound("complete");
-                    showSuccessDialog();
+                    showSuccessDialog(synced);
                 });
             } catch (Exception e) {
                 safeRun(() -> {
@@ -457,42 +584,164 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }).start();
     }
 
-    private void syncFullInventorySessionSync() {
-        if (apiClient == null || branchesManager == null) return;
+    private boolean syncFullInventorySessionSync() {
         try {
-            JSONObject payload = new JSONObject();
-            payload.put("session_id", sessionId);
-            payload.put("branch_id", branchesManager.getActiveBranchId());
-            payload.put("location", branchesManager.getActiveBranchDisplayName());
-            payload.put("total_items", foundCount);
-            payload.put("scanned_count", scannedCount);
-            payload.put("expected_count", expectedCount);
-            payload.put("variance", varianceCount);
-            payload.put("total_weight", calculateTotalWeight());
-            JSONArray itemsJson = new JSONArray();
-            synchronized (scannedItems) {
-                for (InventoryItem item : scannedItems) {
-                    JSONObject obj = new JSONObject();
-                    obj.put("serial", item.serial);
-                    obj.put("title", item.title);
-                    obj.put("karat", item.karat);
-                    obj.put("weight", item.numericWeight);
-                    obj.put("status", item.status);
-                    itemsJson.put(obj);
-                }
-            }
-            payload.put("items", itemsJson);
-            apiClient.closeInventorySession(payload);
-            if (offlineCache != null) {
-                offlineCache.edit()
-                    .putString("last_snapshot", payload.toString())
-                    .putInt("prev_total_items", foundCount)
-                    .putLong("snapshot_time", System.currentTimeMillis())
-                    .apply();
+            JSONObject payload = createInventoryPayload();
+            
+            MiraApiClient.ApiResponse response = apiClient.closeInventorySession(payload);
+            
+            if (response != null && response.isSuccess) {
+                saveSnapshotLocally(payload);
+                return true;
+            } else {
+                saveToPendingQueue(payload);
+                return false;
             }
         } catch (Exception e) {
             Log.e(TAG, "Sync error: " + e.getMessage());
+            try {
+                saveToPendingQueue(createInventoryPayload());
+            } catch (Exception ex) {
+                Log.e(TAG, "Failed to save pending: " + ex.getMessage());
+            }
+            return false;
         }
+    }
+
+    private JSONObject createInventoryPayload() throws Exception {
+        JSONObject payload = new JSONObject();
+        payload.put("session_id", sessionId);
+        payload.put("branch_id", branchesManager.getActiveBranchId());
+        payload.put("location", branchesManager.getActiveBranchDisplayName());
+        payload.put("total_items", foundCount);
+        payload.put("scanned_count", scannedCount);
+        payload.put("expected_count", expectedCount);
+        payload.put("variance", varianceCount);
+        payload.put("total_weight", calculateTotalWeight());
+        payload.put("total_value", calculateTotalValue());
+        
+        JSONArray itemsJson = new JSONArray();
+        synchronized (scannedItems) {
+            for (InventoryItem item : scannedItems) {
+                JSONObject obj = new JSONObject();
+                obj.put("serial", item.serial);
+                obj.put("title", item.title);
+                obj.put("karat", item.karat);
+                obj.put("weight", item.numericWeight);
+                obj.put("status", item.status);
+                itemsJson.put(obj);
+            }
+        }
+        payload.put("items", itemsJson);
+        return payload;
+    }
+
+    private void saveSnapshotLocally(JSONObject payload) {
+        if (offlineCache != null) {
+            offlineCache.edit()
+                .putString("last_snapshot", payload.toString())
+                .putInt("prev_total_items", foundCount)
+                .putLong("snapshot_time", System.currentTimeMillis())
+                .apply();
+        }
+    }
+
+    private void saveToPendingQueue(JSONObject payload) {
+        if (pendingQueue == null) return;
+        
+        try {
+            String existingJson = pendingQueue.getString("pending_audits", "[]");
+            JSONArray pendingArray = new JSONArray(existingJson);
+            pendingArray.put(payload);
+            
+            while (pendingArray.length() > 20) {
+                pendingArray.remove(0);
+            }
+            
+            pendingQueue.edit()
+                .putString("pending_audits", pendingArray.toString())
+                .apply();
+            
+            Log.i(TAG, "✅ Audit saved to pending queue: " + pendingArray.length() + " pending");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to save pending queue: " + e.getMessage());
+        }
+    }
+
+    private void checkPendingQueue() {
+        if (pendingQueue == null) return;
+        
+        try {
+            String existingJson = pendingQueue.getString("pending_audits", "[]");
+            JSONArray pendingArray = new JSONArray(existingJson);
+            
+            if (pendingArray.length() > 0) {
+                safeRun(() -> {
+                    Toast.makeText(getContext(), 
+                        isArabic ? "📋 يوجد " + pendingArray.length() + " جرد معلق للمزامنة" : 
+                                   "📋 " + pendingArray.length() + " pending audits to sync", 
+                        Toast.LENGTH_LONG).show();
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Check pending queue error: " + e.getMessage());
+        }
+    }
+
+    private void syncPendingQueue() {
+        if (pendingQueue == null || apiClient == null) return;
+        
+        new Thread(() -> {
+            try {
+                String existingJson = pendingQueue.getString("pending_audits", "[]");
+                JSONArray pendingArray = new JSONArray(existingJson);
+                
+                if (pendingArray.length() == 0) return;
+                
+                JSONArray remainingArray = new JSONArray();
+                int syncedCount = 0;
+                
+                for (int i = 0; i < pendingArray.length(); i++) {
+                    try {
+                        JSONObject audit = pendingArray.getJSONObject(i);
+                        MiraApiClient.ApiResponse response = apiClient.closeInventorySession(audit);
+                        
+                        if (response != null && response.isSuccess) {
+                            syncedCount++;
+                            saveSnapshotLocally(audit);
+                        } else {
+                            remainingArray.put(audit);
+                        }
+                    } catch (Exception e) {
+                        remainingArray.put(pendingArray.getJSONObject(i));
+                    }
+                }
+                
+                pendingQueue.edit()
+                    .putString("pending_audits", remainingArray.toString())
+                    .apply();
+                
+                final int synced = syncedCount;
+                final int remaining = remainingArray.length();
+                
+                safeRun(() -> {
+                    if (synced > 0) {
+                        Toast.makeText(getContext(), 
+                            isArabic ? "✅ تمت مزامنة " + synced + " جرد" : 
+                                       "✅ Synced " + synced + " audits", 
+                            Toast.LENGTH_SHORT).show();
+                    }
+                    
+                    if (remaining > 0 && tvInventoryStatus != null && !isScanning) {
+                        tvInventoryStatus.setText(isArabic ? "📋 " + remaining + " جرد معلق" : 
+                                                           "📋 " + remaining + " pending");
+                        tvInventoryStatus.setTextColor(Color.parseColor("#F59E0B"));
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Sync pending queue error: " + e.getMessage());
+            }
+        }).start();
     }
 
     // ==================== AUXILIARY METHODS ====================
@@ -536,29 +785,86 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private double calculateTotalValue() {
-        // حساب احترافي لأوزان الأسعار القائمة على العيارات المحددة
         double totalValue = 0;
         synchronized (scannedItems) {
             for (InventoryItem item : scannedItems) {
-                double basePrice = 65.0; // سعر الذهب معيار 24K الافتراضي بالدولار
-                double karatFactor = 0.875; // افتراضي 21K
-                if ("24K".equalsIgnoreCase(item.karat)) karatFactor = 1.0;
-                else if ("22K".equalsIgnoreCase(item.karat)) karatFactor = 0.916;
-                else if ("18K".equalsIgnoreCase(item.karat)) karatFactor = 0.750;
-                
-                totalValue += item.numericWeight * (basePrice * karatFactor);
+                int karatNumber = getKaratNumber(item.karat);
+                double pricePerGram = priceManager != null ? 
+                    priceManager.getGoldPricePerGram(karatNumber) : 65.0;
+                totalValue += item.numericWeight * pricePerGram;
             }
         }
         return Math.round(totalValue * 100.0) / 100.0;
     }
 
+    private int getKaratNumber(String karat) {
+        if (karat == null) return 21;
+        switch (karat.toUpperCase()) {
+            case "24K": return 24;
+            case "22K": return 22;
+            case "21K": return 21;
+            case "18K": return 18;
+            case "14K": return 14;
+            default: return 21;
+        }
+    }
+
     private void playInventorySound(String type) {
-        if (!soundEnabled || getContext() == null) return;
-        if (vibrateEnabled && "scan".equals(type)) {
-            try {
-                android.os.Vibrator vib = (android.os.Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
-                if (vib != null && vib.hasVibrator()) vib.vibrate(30);
-            } catch (Exception ignored) {}
+        if (!soundEnabled || soundPool == null) return;
+        
+        try {
+            switch (type) {
+                case "scan":
+                    soundPool.play(soundScanId, 0.5f, 0.5f, 1, 0, 1f);
+                    break;
+                    
+                case "found":
+                    soundPool.play(soundFoundId, 0.7f, 0.7f, 1, 0, 1f);
+                    if (vibrateEnabled) vibrate(30);
+                    break;
+                    
+                case "missing":
+                    soundPool.play(soundMissingId, 1.0f, 1.0f, 1, 0, 1f);
+                    if (vibrateEnabled) vibrate(150);
+                    break;
+                    
+                case "start":
+                    soundPool.play(soundScanId, 0.3f, 0.3f, 1, 0, 1f);
+                    if (vibrateEnabled) vibrate(50);
+                    break;
+                    
+                case "complete":
+                    soundPool.play(soundFoundId, 1.0f, 1.0f, 1, 0, 1f);
+                    if (vibrateEnabled) vibrate(200);
+                    break;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Play sound error: " + e.getMessage());
+        }
+    }
+
+    private void vibrate(long duration) {
+        if (getContext() == null) return;
+        
+        long currentTime = System.currentTimeMillis();
+        
+        if (currentTime - lastVibrationTime < VIBRATION_THROTTLE_MS) {
+            return;
+        }
+        
+        lastVibrationTime = currentTime;
+        
+        try {
+            android.os.Vibrator vib = (android.os.Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
+            if (vib != null && vib.hasVibrator()) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    vib.vibrate(android.os.VibrationEffect.createOneShot(duration, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+                } else {
+                    vib.vibrate(duration);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Vibration error: " + e.getMessage());
         }
     }
 
@@ -573,46 +879,58 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
     private AlertDialog showProfessionalLoadingDialog(String title, String message) {
         Context ctx = getContext();
-        if (ctx == null || !isAdded()) return null;
+        if (ctx == null || !isAdded() || getActivity() == null || getActivity().isFinishing()) {
+            return null;
+        }
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
-        LinearLayout layout = new LinearLayout(ctx);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(50, 40, 50, 40);
-        layout.setGravity(android.view.Gravity.CENTER);
+        try {
+            AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
+            LinearLayout layout = new LinearLayout(ctx);
+            layout.setOrientation(LinearLayout.VERTICAL);
+            layout.setPadding(50, 40, 50, 40);
+            layout.setGravity(android.view.Gravity.CENTER);
 
-        ProgressBar progressBar = new ProgressBar(ctx);
-        progressBar.setIndeterminate(true);
-        progressBar.setScaleX(1.5f);
-        progressBar.setScaleY(1.5f);
-        LinearLayout.LayoutParams pbParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
-        pbParams.gravity = android.view.Gravity.CENTER_HORIZONTAL;
-        progressBar.setLayoutParams(pbParams);
-        layout.addView(progressBar);
+            ProgressBar progressBar = new ProgressBar(ctx);
+            progressBar.setIndeterminate(true);
+            progressBar.setScaleX(1.5f);
+            progressBar.setScaleY(1.5f);
+            LinearLayout.LayoutParams pbParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            pbParams.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+            progressBar.setLayoutParams(pbParams);
+            layout.addView(progressBar);
 
-        TextView tvLoading = new TextView(ctx);
-        tvLoading.setText(title);
-        tvLoading.setTextSize(16);
-        tvLoading.setTypeface(null, android.graphics.Typeface.BOLD);
-        tvLoading.setGravity(android.view.Gravity.CENTER);
-        tvLoading.setPadding(0, 20, 0, 8);
-        layout.addView(tvLoading);
+            TextView tvLoading = new TextView(ctx);
+            tvLoading.setText(title);
+            tvLoading.setTextSize(16);
+            tvLoading.setTypeface(null, android.graphics.Typeface.BOLD);
+            tvLoading.setGravity(android.view.Gravity.CENTER);
+            tvLoading.setPadding(0, 20, 0, 8);
+            layout.addView(tvLoading);
 
-        TextView tvSubtext = new TextView(ctx);
-        tvSubtext.setText(message);
-        tvSubtext.setTextSize(12);
-        tvSubtext.setTextColor(Color.GRAY);
-        tvSubtext.setGravity(android.view.Gravity.CENTER);
-        tvSubtext.setPadding(0, 8, 0, 0);
-        layout.addView(tvSubtext);
+            TextView tvSubtext = new TextView(ctx);
+            tvSubtext.setText(message);
+            tvSubtext.setTextSize(12);
+            tvSubtext.setTextColor(Color.GRAY);
+            tvSubtext.setGravity(android.view.Gravity.CENTER);
+            tvSubtext.setPadding(0, 8, 0, 0);
+            layout.addView(tvSubtext);
 
-        builder.setView(layout);
-        builder.setCancelable(false);
-        AlertDialog dialog = builder.create();
-        dialog.show();
-        return dialog;
+            builder.setView(layout);
+            builder.setCancelable(false);
+            AlertDialog dialog = builder.create();
+            
+            if (isAdded() && getActivity() != null && !getActivity().isFinishing()) {
+                dialog.show();
+                return dialog;
+            }
+            
+            return null;
+        } catch (Exception e) {
+            Log.e(TAG, "showLoadingDialog error: " + e.getMessage());
+            return null;
+        }
     }
 
     private void showRetryDialog(String title, String message, Runnable retryAction) {
@@ -633,7 +951,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
     private void dismissDialog(AlertDialog dialog) {
         try {
-            if (dialog != null && dialog.isShowing()) dialog.dismiss();
+            if (dialog != null && dialog.isShowing() && isAdded() && getActivity() != null && !getActivity().isFinishing()) {
+                dialog.dismiss();
+            }
         } catch (Exception e) {
             Log.e(TAG, "dismissDialog error: " + e.getMessage());
         }
@@ -645,21 +965,31 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (btnArchiveReports != null) btnArchiveReports.setEnabled(enabled);
     }
 
-    private void showSuccessDialog() {
+    private void showSuccessDialog(boolean synced) {
         Context ctx = getContext();
         if (ctx == null || !isAdded()) return;
 
         AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
         builder.setTitle(isArabic ? "✅ اكتمل الجرد" : "✅ Audit Complete");
-        builder.setMessage(isArabic ?
-            "تم إيقاف الجرد وحفظ التقرير بنجاح.\n\n" +
-            "المتوقع: " + expectedCount + "\n" +
-            "الممسوح: " + scannedCount + "\n" +
-            "العجز: " + varianceCount :
-            "Audit completed successfully.\n\n" +
-            "Expected: " + expectedCount + "\n" +
-            "Scanned: " + scannedCount + "\n" +
-            "Variance: " + varianceCount);
+        
+        String message;
+        if (isArabic) {
+            message = "تم إيقاف الجرد وحفظ التقرير.\n\n" +
+                "المتوقع: " + expectedCount + "\n" +
+                "الممسوح: " + scannedCount + "\n" +
+                "العجز: " + varianceCount + "\n" +
+                "الوزن: " + String.format(Locale.US, "%.2fg", calculateTotalWeight()) + "\n" +
+                (synced ? "✅ تمت المزامنة مع السيرفر" : "⚠️ تم الحفظ محلياً - سيتم المزامنة لاحقاً");
+        } else {
+            message = "Audit completed successfully.\n\n" +
+                "Expected: " + expectedCount + "\n" +
+                "Scanned: " + scannedCount + "\n" +
+                "Variance: " + varianceCount + "\n" +
+                "Weight: " + String.format(Locale.US, "%.2fg", calculateTotalWeight()) + "\n" +
+                (synced ? "✅ Synced with server" : "⚠️ Saved locally - will sync later");
+        }
+        
+        builder.setMessage(message);
         builder.setPositiveButton(isArabic ? "🎉 متابعة" : "🎉 Continue", (d, w) -> d.dismiss());
         builder.setCancelable(false);
         builder.show();
@@ -720,11 +1050,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             rows.toString() + "</table>" +
             "<div style='display:flex;justify-content:space-between;margin-top:12px;font-weight:bold'>" +
             "<div>" + (isArabic ? "الوزن الكلي: " : "Total Weight: ") + String.format(Locale.US, "%.2fg", totalWt) + "</div>" +
-            "<div>" + (isArabic ? "القيمة التقديرية: " : "Est. Value: ") + String.format(Locale.US, "%,.0f USD", totalVal) + "</div></div>" +
+            "<div>" + (isArabic ? "القيمة التقديرية: " : "Est. Value: ") + 
+            (priceManager != null ? priceManager.formatPriceDefault(totalVal) : String.format(Locale.US, "%,.0f USD", totalVal)) + 
+            "</div></div>" +
             "<div class='footer'>MIRA Inventory Pro | " + orgName + " © 2026</div>" +
             "</body></html>";
 
-        // إغلاق أي جلسة WebView سابقة لتفادي تسريب الذاكرة
         if (printWebView != null) {
             printWebView.destroy();
         }
@@ -776,7 +1107,15 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private void safeRun(Runnable r) {
-        if (isAdded() && getActivity() != null) getActivity().runOnUiThread(() -> { if (isAdded()) r.run(); });
+        if (!isAdded() || getActivity() == null || getActivity().isFinishing()) {
+            return;
+        }
+        
+        getActivity().runOnUiThread(() -> {
+            if (isAdded() && getActivity() != null && !getActivity().isFinishing()) {
+                r.run();
+            }
+        });
     }
 
     @Override
@@ -799,11 +1138,58 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             this.status = st;
             this.location = l;
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            InventoryItem item = (InventoryItem) o;
+            return Double.compare(item.numericWeight, numericWeight) == 0 &&
+                    Objects.equals(serial, item.serial) &&
+                    Objects.equals(status, item.status) &&
+                    Objects.equals(location, item.location);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(serial, status, numericWeight, location);
+        }
     }
 
     private class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.VH> {
-        private final List<InventoryItem> items;
-        InventoryAdapter(List<InventoryItem> i) { this.items = i; }
+        private final List<InventoryItem> items = new CopyOnWriteArrayList<>();
+        private final List<InventoryItem> displayItems = new ArrayList<>();
+        
+        public void addItems(List<InventoryItem> newItems) {
+            if (newItems == null || newItems.isEmpty()) return;
+            
+            items.addAll(0, newItems);
+            
+            int oldSize = displayItems.size();
+            displayItems.clear();
+            int endIndex = Math.min(items.size(), MAX_DISPLAY_ITEMS);
+            displayItems.addAll(items.subList(0, endIndex));
+            
+            int insertedCount = displayItems.size() - oldSize;
+            
+            if (insertedCount > 0) {
+                if (displayItems.size() >= MAX_DISPLAY_ITEMS) {
+                    notifyDataSetChanged();
+                } else {
+                    notifyItemRangeInserted(0, insertedCount);
+                    
+                    if (rvInventoryItems != null && !displayItems.isEmpty()) {
+                        rvInventoryItems.scrollToPosition(0);
+                    }
+                }
+            }
+        }
+        
+        public void clearItems() {
+            items.clear();
+            displayItems.clear();
+            notifyDataSetChanged();
+        }
 
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup p, int t) {
@@ -812,11 +1198,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
         @Override
         public void onBindViewHolder(@NonNull VH h, int pos) {
-            InventoryItem item;
-            synchronized (items) {
-                if (pos >= items.size()) return;
-                item = items.get(pos);
-            }
+            if (pos >= displayItems.size()) return;
+            
+            InventoryItem item = displayItems.get(pos);
             if (h.s != null) {
                 h.s.setText(item.status);
                 h.s.setTextColor("✓".equals(item.status) ? Color.parseColor("#22C55E") :
@@ -829,7 +1213,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }
 
         @Override public int getItemCount() {
-            synchronized (items) { return items.size(); }
+            return displayItems.size();
         }
 
         class VH extends RecyclerView.ViewHolder {
@@ -850,11 +1234,16 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         isScanning = false;
         stopTimer();
         mainHandler.removeCallbacksAndMessages(null);
+        if (batchUpdateRunnable != null) mainHandler.removeCallbacks(batchUpdateRunnable);
         if (rvInventoryItems != null) rvInventoryItems.setAdapter(null);
         if (printWebView != null) {
             printWebView.destroy();
             printWebView = null;
         }
+        if (soundPool != null) {
+            soundPool.release();
+            soundPool = null;
+        }
         super.onDestroyView();
     }
-            }
+}
