@@ -36,14 +36,15 @@ import com.rscja.deviceapi.entity.UHFTAGInfo;
 import com.rscja.deviceapi.interfaces.IUHFInventoryCallback;
 
 import com.example.uhf.api.MiraApiClient;
-import com.example.uhf.manager.MiraServerConfig;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -65,7 +66,12 @@ public class MiraSecureGateFragment extends Fragment {
     private UHFMainActivity mContext;
     private MiraSettingsManager settingsManager;
     private MiraGatesSettings miraGatesSettings;
+    
+    // Handlers مخصصة لتجنب التداخل
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Handler flashHandler = new Handler(Looper.getMainLooper());
+    private final Handler soundHandler = new Handler(Looper.getMainLooper());
+    
     private ExecutorService gateExecutor;
     private ScheduledExecutorService dbSyncScheduler;
 
@@ -88,20 +94,19 @@ public class MiraSecureGateFragment extends Fragment {
     private int denyCount = 0;
     private int totalCount = 0;
 
-    // محرك الوميض والصوت المتكرر
+    // محركات التنبيه
     private boolean flashState = false;
-    private final Handler flashHandler = new Handler(Looper.getMainLooper());
     private Runnable flashRunnable;
     private Runnable soundLoopRunnable;
 
-    // Cache الذاكرة السريعة لمنع التأخير
+    // Caches وخرائط التبريد
     private final Set<String> localAllowedEpcCache = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<String, Long> scanDebounceMap = new ConcurrentHashMap<>();
 
     private Vibrator vibrator;
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
 
-    // 📷 مشغل مسح الكاميرا
+    // مشغل الكاميرا
     private final ActivityResultLauncher<ScanOptions> barcodeLauncher = registerForActivityResult(
             new ScanContract(),
             result -> {
@@ -315,7 +320,9 @@ public class MiraSecureGateFragment extends Fragment {
         final String cleanedEpc = epc.trim().toUpperCase();
         long currentTime = System.currentTimeMillis();
         
-        // استخدام computeIfAbsent للتحديث الآمن
+        // تنظيف الخريطة الدورية المباشرة لتجنب التراكم
+        cleanupDebounceMap(currentTime);
+
         Long lastTime = scanDebounceMap.putIfAbsent(cleanedEpc, currentTime);
         
         if (lastTime != null) {
@@ -342,6 +349,19 @@ public class MiraSecureGateFragment extends Fragment {
         }
     }
 
+    // تنظيف العناصر القديمة من خريطة التبريد
+    private void cleanupDebounceMap(long currentTime) {
+        if (scanDebounceMap.size() > 100) {
+            Iterator<Map.Entry<String, Long>> iterator = scanDebounceMap.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<String, Long> entry = iterator.next();
+                if (currentTime - entry.getValue() > SCAN_COOL_DOWN_MS * 2) {
+                    iterator.remove();
+                }
+            }
+        }
+    }
+
     private void queryMiraGateServer(String epc) {
         if (isDestroyed || gateExecutor == null || gateExecutor.isShutdown()) return;
         
@@ -350,14 +370,13 @@ public class MiraSecureGateFragment extends Fragment {
             try {
                 MiraApiClient client = MiraApiClient.getInstance(mContext);
                 if (client == null) {
-                    mainHandler.post(() -> handleGateDecision(false, "🚨 خطأ في الاتصال", epc));
+                    mainHandler.post(() -> handleGateDecision(false, "🚨 خطأ أوفلاين / لا يوجد اتصال", epc));
                     return;
                 }
                 
                 JSONObject extraParams = new JSONObject();
                 extraParams.put("context", "gate");
                 
-                // استخدام Future مع timeout
                 final String finalEpc = epc;
                 future = gateExecutor.submit(() -> client.authorize(finalEpc, "gate", extraParams));
                 
@@ -381,20 +400,18 @@ public class MiraSecureGateFragment extends Fragment {
                     final String finalTitle = itemTitle;
                     final String finalSerial = serial;
                     
-                    mainHandler.post(() -> {
-                        handleGateDecision(finalAllowed, finalTitle, finalSerial);
-                    });
+                    mainHandler.post(() -> handleGateDecision(finalAllowed, finalTitle, finalSerial));
                 } else {
-                    mainHandler.post(() -> handleGateDecision(false, "تنبيه - خطأ بالسيرفر", epc));
+                    mainHandler.post(() -> handleGateDecision(false, "🚨 خروج غير مصرح - سيرفر", epc));
                 }
             } catch (TimeoutException e) {
                 Log.e(TAG, "Query gate timeout: " + e.getMessage());
                 if (future != null) future.cancel(true);
-                mainHandler.post(() -> handleGateDecision(false, "⏱️ انتهت المهلة - حاول مرة أخرى", epc));
+                mainHandler.post(() -> handleGateDecision(false, "⚠️ انقطاع اتصال (Timeout) - مرفوض أمنياً", epc));
             } catch (Exception e) {
                 Log.e(TAG, "Query gate error: " + e.getMessage());
                 if (future != null) future.cancel(true);
-                mainHandler.post(() -> handleGateDecision(false, "🚨 تنبيه - خروج غير مصرح (أوفلاين)", epc));
+                mainHandler.post(() -> handleGateDecision(false, "🚨 خروج غير مصرح (أوفلاين)", epc));
             }
         });
     }
@@ -402,7 +419,6 @@ public class MiraSecureGateFragment extends Fragment {
     private void handleGateDecision(boolean allowed, String itemTitle, String serial) {
         if (isDestroyed || !isAdded()) return;
         
-        // تسجيل الحدث في قاعدة البيانات أولاً
         logGateEventToServer(serial, allowed ? "PASS" : "DENY_ALARM", itemTitle);
 
         if (allowed) {
@@ -562,10 +578,10 @@ public class MiraSecureGateFragment extends Fragment {
                 }
 
                 int alarmInterval = miraGatesSettings.getAlarmInterval();
-                flashHandler.postDelayed(this, alarmInterval);
+                soundHandler.postDelayed(this, alarmInterval);
             }
         };
-        flashHandler.post(soundLoopRunnable);
+        soundHandler.post(soundLoopRunnable);
     }
 
     private void stopAlarmEffects() {
@@ -573,7 +589,9 @@ public class MiraSecureGateFragment extends Fragment {
         
         if (flashHandler != null) {
             flashHandler.removeCallbacks(flashRunnable);
-            flashHandler.removeCallbacks(soundLoopRunnable);
+        }
+        if (soundHandler != null) {
+            soundHandler.removeCallbacks(soundLoopRunnable);
         }
 
         if (overlayAlarm != null) {
@@ -649,7 +667,6 @@ public class MiraSecureGateFragment extends Fragment {
     @Override
     public void onPause() {
         super.onPause();
-        // يمكن إيقاف المسح مؤقتاً لتوفير البطارية
         if (gateActive) {
             stopContinuousRfidScan();
         }
@@ -658,7 +675,6 @@ public class MiraSecureGateFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // استئناف المسح إذا كانت البوابة نشطة
         if (gateActive) {
             startContinuousRfidScan();
         }
@@ -670,30 +686,21 @@ public class MiraSecureGateFragment extends Fragment {
         
         isDestroyed = true;
         
-        // إيقاف جميع العمليات
         stopAlarmEffects();
         stopContinuousRfidScan();
         stopRealtimeDbSync();
         
-        // تنظيف المعالجات
-        if (mainHandler != null) {
-            mainHandler.removeCallbacksAndMessages(null);
-        }
-        if (flashHandler != null) {
-            flashHandler.removeCallbacksAndMessages(null);
-        }
+        if (mainHandler != null) mainHandler.removeCallbacksAndMessages(null);
+        if (flashHandler != null) flashHandler.removeCallbacksAndMessages(null);
+        if (soundHandler != null) soundHandler.removeCallbacksAndMessages(null);
         
-        // إيقاف المنفذين بشكل آمن
         shutdownExecutors();
-        
-        // تنظيف الذاكرة
         cleanupResources();
         
         Log.d(TAG, "Fragment destroyed and resources cleaned");
     }
 
     private void shutdownExecutors() {
-        // إيقاف gateExecutor
         if (gateExecutor != null && !gateExecutor.isShutdown()) {
             gateExecutor.shutdown();
             try {
@@ -706,24 +713,20 @@ public class MiraSecureGateFragment extends Fragment {
             }
         }
         
-        // إيقاف dbSyncScheduler
         if (dbSyncScheduler != null && !dbSyncScheduler.isShutdown()) {
             dbSyncScheduler.shutdownNow();
         }
     }
 
     private void cleanupResources() {
-        // تنظيف المراجع
         mContext = null;
         settingsManager = null;
         miraGatesSettings = null;
         vibrator = null;
         
-        // تنظيف الذاكرة المؤقتة
         localAllowedEpcCache.clear();
         scanDebounceMap.clear();
         
-        // تنظيف عناصر الواجهة
         tvGateIcon = null;
         tvGateStatus = null;
         tvLastEvent = null;
@@ -745,7 +748,6 @@ public class MiraSecureGateFragment extends Fragment {
         btnStopAlarm = null;
         scrollDebugLog = null;
         
-        // تنظيف المتغيرات المتطايرة
         gateActive = false;
         isAlarmActive = false;
     }
