@@ -111,7 +111,13 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         BtWrite = v.findViewById(R.id.BtWrite);
         BtReadTid = v.findViewById(R.id.BtReadTid);
         BtLock = v.findViewById(R.id.BtLock);
-        BtUnlock = v.findViewById(R.id.BtUnlock);
+        int unlockResId = v.getResources().getIdentifier("BtUnlock", "id", v.getContext().getPackageName());
+        if (unlockResId != 0) {
+        BtUnlock = v.findViewById(unlockResId);
+        } else {
+        BtUnlock = null;
+        }
+
         BtGenerateEpc = v.findViewById(R.id.BtGenerateEpc);
         BtProgramTag = v.findViewById(R.id.BtProgramTag);
         cbVerifyAfterWrite = v.findViewById(R.id.cbVerifyAfterWrite);
