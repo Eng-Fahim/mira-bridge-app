@@ -9,6 +9,8 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.GridLayout; // ✅ استخدام GridLayout العادي
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -16,7 +18,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
@@ -56,7 +57,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private SwipeRefreshLayout swipeRefresh;
     private View shimmerLayout;
     private CardView cardGoldPrices;
-    private androidx.gridlayout.widget.GridLayout gridQuickActions;
+    private LinearLayout containerQuickActions; // ✅ استخدام LinearLayout بدلاً من GridLayout
 
     private MiraApiClient apiClient;
     private SessionManager sessionManager;
@@ -150,7 +151,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             tvGoldChange = v.findViewById(R.id.tvGoldChange);
             btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
             cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
-            gridQuickActions = v.findViewById(R.id.gridQuickActions);
+            containerQuickActions = v.findViewById(R.id.containerQuickActions); // ✅ LinearLayout
 
             if (swipeRefresh != null) {
                 swipeRefresh.setOnRefreshListener(() -> {
@@ -191,12 +192,12 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     // ============================================
-    // ✅ إعداد شبكة الأزرار السريعة المخصصة
+    // ✅ إعداد شبكة الأزرار السريعة
     // ============================================
     private void setupQuickAccessGrid() {
-        if (gridQuickActions == null) return;
+        if (containerQuickActions == null) return;
         
-        gridQuickActions.removeAllViews();
+        containerQuickActions.removeAllViews();
         
         List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
         
@@ -205,31 +206,41 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             return;
         }
         
-        gridQuickActions.setColumnCount(3);
+        // ✅ إنشاء صفوف من 3 أزرار
+        LinearLayout currentRow = null;
+        int countInRow = 0;
         
         for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
+            if (currentRow == null || countInRow == 0) {
+                currentRow = new LinearLayout(getContext());
+                currentRow.setOrientation(LinearLayout.HORIZONTAL);
+                currentRow.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+                containerQuickActions.addView(currentRow);
+            }
+            
             CardView card = createQuickActionCard(action);
             if (card != null) {
-                gridQuickActions.addView(card);
+                currentRow.addView(card);
+                countInRow++;
+            }
+            
+            if (countInRow >= 3) {
+                countInRow = 0;
+                currentRow = null;
             }
         }
     }
 
-    /**
-     * ✅ إنشاء بطاقة زر سريع
-     */
     private CardView createQuickActionCard(MiraQuickAccessSettings.QuickAction action) {
         Context context = getContext();
         if (context == null) return null;
         
         CardView card = new CardView(context);
-        androidx.gridlayout.widget.GridLayout.LayoutParams params = 
-            new androidx.gridlayout.widget.GridLayout.LayoutParams();
-        params.width = 0;
-        params.height = androidx.gridlayout.widget.GridLayout.LayoutParams.WRAP_CONTENT;
-        params.columnSpec = androidx.gridlayout.widget.GridLayout.spec(
-            androidx.gridlayout.widget.GridLayout.UNDEFINED, 1f);
-        params.setMargins(6, 6, 6, 6);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        params.setMargins(4, 4, 4, 4);
         card.setLayoutParams(params);
         card.setRadius(16);
         card.setCardElevation(4);
@@ -237,22 +248,22 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         card.setClickable(true);
         card.setFocusable(true);
         
-        android.widget.LinearLayout layout = new android.widget.LinearLayout(context);
-        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
-        layout.setPadding(12, 16, 12, 16);
+        LinearLayout layout = new LinearLayout(context);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(8, 12, 8, 12);
         layout.setGravity(android.view.Gravity.CENTER);
         
         TextView tvIcon = new TextView(context);
         tvIcon.setText(getActionIcon(action.id));
-        tvIcon.setTextSize(28);
+        tvIcon.setTextSize(24);
         tvIcon.setGravity(android.view.Gravity.CENTER);
         layout.addView(tvIcon);
         
         TextView tvTitle = new TextView(context);
         tvTitle.setText(isArabic ? action.titleAr : action.titleEn);
-        tvTitle.setTextSize(11);
+        tvTitle.setTextSize(10);
         tvTitle.setGravity(android.view.Gravity.CENTER);
-        tvTitle.setPadding(0, 6, 0, 0);
+        tvTitle.setPadding(0, 4, 0, 0);
         tvTitle.setTextColor(0xFF1F2937);
         tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         layout.addView(tvTitle);
@@ -264,9 +275,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         return card;
     }
 
-    /**
-     * ✅ معالجة النقر على الأزرار السريعة
-     */
     private void handleQuickAction(String actionId) {
         if (getActivity() instanceof UHFMainActivity) {
             UHFMainActivity activity = (UHFMainActivity) getActivity();
@@ -314,27 +322,21 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    /**
-     * ✅ عرض حالة فارغة للأزرار السريعة
-     */
     private void showEmptyQuickAccess() {
-        if (gridQuickActions == null || getContext() == null) return;
+        if (containerQuickActions == null || getContext() == null) return;
         
         TextView tvEmpty = new TextView(getContext());
         tvEmpty.setText(isArabic ? 
-            "لا توجد أزرار مفعّلة\nقم بتخصيص الأزرار من الإعدادات" : 
-            "No enabled actions\nCustomize buttons from settings");
+            "لا توجد أزرار مفعّلة" : 
+            "No enabled actions");
         tvEmpty.setTextSize(13);
         tvEmpty.setGravity(android.view.Gravity.CENTER);
         tvEmpty.setPadding(16, 16, 16, 16);
         tvEmpty.setTextColor(0xFF6B7280);
         
-        gridQuickActions.addView(tvEmpty);
+        containerQuickActions.addView(tvEmpty);
     }
 
-    /**
-     * ✅ الحصول على أيقونة الإجراء
-     */
     private String getActionIcon(String actionId) {
         switch (actionId) {
             case "identity": return "🏷️";
@@ -388,7 +390,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     // ============================================
-    // ✅ جلب الأسعار العالمية
+    // ✅ جلب الأسعار العالمية - مع المعاملات الصحيحة
     // ============================================
     private void fetchLiveGoldPrices() {
         if (apiClient == null) return;
@@ -397,7 +399,11 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         
         executorService.execute(() -> {
             try {
-                MiraApiClient.ApiResponse response = apiClient.fetchGoldPrice();
+                // ✅ تمرير المعاملات المطلوبة
+                String provider = "metalprice"; // أو من الإعدادات
+                String apiKey = ""; // أو من الإعدادات
+                
+                MiraApiClient.ApiResponse response = apiClient.fetchGoldPrice(provider, apiKey);
                 
                 mainHandler.post(() -> {
                     if (!isAdded()) return;
@@ -429,9 +435,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         });
     }
 
-    /**
-     * ✅ عرض أسعار الذهب العالمية
-     */
     private void displayGoldPrices(JSONObject data) {
         try {
             JSONObject prices = data.optJSONObject("prices");
@@ -469,9 +472,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    /**
-     * ✅ عرض الأسعار من الكاش
-     */
     private void displayGoldPricesFromCache() {
         try {
             if (priceManager == null) return;
@@ -502,9 +502,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    /**
-     * ✅ حساب اتجاه السعر
-     */
     private void calculateTrend(double currentPrice) {
         if (tvGoldTrend == null || tvGoldChange == null) return;
         
@@ -545,9 +542,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    /**
-     * ✅ الحصول على اسم المصدر
-     */
     private String getSourceDisplayName(String source) {
         if (source == null) return isArabic ? "غير معروف" : "Unknown";
         switch (source.toLowerCase()) {
@@ -734,7 +728,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             onBranchChanged();
         }
         
-        // ✅ تحديث الأزرار السريعة عند العودة
         setupQuickAccessGrid();
     }
 
@@ -792,4 +785,4 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         super.onDestroyView();
         mainHandler.removeCallbacksAndMessages(null);
     }
-        }
+}
