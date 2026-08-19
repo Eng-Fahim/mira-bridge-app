@@ -720,7 +720,7 @@ public class MiraApiClient {
         }
     }
 
-    private ApiResponse getWithAuth(String endpoint) {
+    public ApiResponse getWithAuth(String endpoint) {
         HttpURLConnection conn = null;
         try {
             String fullUrl = apiUrl + endpoint;
@@ -744,7 +744,7 @@ public class MiraApiClient {
         }
     }
 
-    private ApiResponse postWithAuth(String endpoint, JSONObject payload) {
+    public ApiResponse postWithAuth(String endpoint, JSONObject payload) {
         HttpURLConnection conn = null;
         try {
             String fullUrl = apiUrl + endpoint;
@@ -775,7 +775,131 @@ public class MiraApiClient {
             if (conn != null) conn.disconnect();
         }
     }
+// ===================== 📦 TRANSFERS =====================
 
+public ApiResponse receiveTransferWithAudit(JSONObject payload) {
+    return postWithAuth("/transfers/receive-audit", payload);
+}
+
+public ApiResponse getTransferDetails(int transferId) {
+    return getWithAuth("/transfers/" + transferId);
+}
+
+public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("items", epcs);
+    } catch (Exception ignored) {}
+    return postWithAuth("/transfers/" + transferId + "/items", payload);
+}
+
+public ApiResponse getTransfers(int branchId, String status) {
+    String url = "/transfers?branch_id=" + branchId;
+    if (status != null && !status.isEmpty()) {
+        url += "&status=" + status;
+    }
+    return getWithAuth(url);
+}
+
+public ApiResponse createTransfer(JSONObject payload) {
+    return postWithAuth("/transfers", payload);
+}
+
+public ApiResponse getTransfer(int transferId) {
+    return getWithAuth("/transfers/" + transferId);
+}
+
+public ApiResponse approveTransfer(int transferId) {
+    return postWithAuth("/transfers/" + transferId + "/approve", new JSONObject());
+}
+
+public ApiResponse receiveTransfer(int transferId) {
+    return postWithAuth("/transfers/" + transferId + "/receive", new JSONObject());
+}
+
+public ApiResponse scanTransferItem(int transferId, String epc) {
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("epc", epc);
+    } catch (Exception ignored) {}
+    return postWithAuth("/transfers/" + transferId + "/scan", payload);
+}
+
+public ApiResponse updateTransfer(int transferId, JSONObject payload) {
+    return postWithAuth("/transfers/" + transferId, payload);
+}
+
+// ===================== 📊 REPORTS =====================
+
+public ApiResponse getReportData(String reportType, String fromDate, String toDate, int branchId) {
+    String endpoint = "/reports/data?type=" + (reportType != null ? reportType : "")
+            + "&from=" + (fromDate != null ? fromDate : "")
+            + "&to=" + (toDate != null ? toDate : "")
+            + "&branch_id=" + branchId;
+    return getWithAuth(endpoint);
+}
+
+// ===================== 🏢 BRANCHES =====================
+
+public ApiResponse getBranchItemsByCategory(int branchId, String category) {
+    String endpoint = "/branches/" + branchId + "/inventory/items";
+    if (category != null && !category.isEmpty()) {
+        endpoint += "?category=" + category;
+    }
+    return getWithAuth(endpoint);
+}
+
+public ApiResponse getBranchItemsList(int branchId) {
+    return getWithAuth("/branches/" + branchId + "/inventory/items");
+}
+
+// ===================== 🚪 SECURE GATE =====================
+
+public ApiResponse getAllowedList() {
+    return getWithAuth("/allowed-list");
+}
+
+public ApiResponse sendGateLog(JSONObject payload) {
+    return postWithAuth("/gate-log", payload);
+}
+
+// ===================== 💰 ACCOUNTING =====================
+
+public ApiResponse getJournalEntries(String branchId) {
+    String url = "/accounting/journal-entries";
+    if (branchId != null && !branchId.isEmpty()) {
+        url += "?branch_id=" + branchId;
+    }
+    return getWithAuth(url);
+}
+
+public ApiResponse getJournalEntryDetail(String entryId) {
+    return getWithAuth("/accounting/journal-entries/" + entryId);
+}
+
+public ApiResponse createJournalEntry(JSONObject payload) {
+    return postWithAuth("/accounting/journal-entries/create", payload);
+}
+
+public ApiResponse getChartOfAccounts() {
+    return getWithAuth("/accounting/chart-of-accounts");
+}
+
+public ApiResponse getTrialBalance(String branchId) {
+    String url = "/accounting/trial-balance";
+    if (branchId != null && !branchId.isEmpty()) {
+        url += "?branch_id=" + branchId;
+    }
+    return getWithAuth(url);
+}
+
+public ApiResponse getAccountingSummary(String branchId) {
+    String url = "/accounting/summary";
+    if (branchId != null && !branchId.isEmpty()) {
+        url += "?branch_id=" + branchId;
+    }
+    return getWithAuth(url);
+}
     private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
         int responseCode = conn.getResponseCode();
         InputStream is = (responseCode >= 200 && responseCode < 300) ?
