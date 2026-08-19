@@ -15,8 +15,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * خدمة RFID موحدة
@@ -97,6 +95,106 @@ public class MiraRfidService {
     public String getLastReadTid() {
         return lastReadTid;
     }
+
+    // =========================================================================
+    // 🛠️ الدوال المطلوبة من قبل MiraUHFReadWriteFragment (Low-Level Access)
+    // =========================================================================
+
+    /**
+     * كتابة بيانات عامة إلى بنك محدد في الشريحة
+     */
+    public boolean writeData(String pwdStr, int bank, int ptr, String data) {
+        currentState = OperationState.WRITING;
+        if (activeReader == null) {
+            currentState = OperationState.FAILED;
+            return false;
+        }
+
+        try {
+            boolean success = false;
+            if (activeReader instanceof ChainwayReader) {
+                success = ((ChainwayReader) activeReader).writeData(pwdStr, bank, ptr, data);
+            } else if (activeReader instanceof SimulatorReader) {
+                success = ((SimulatorReader) activeReader).writeData(pwdStr, bank, ptr, data);
+            }
+
+            currentState = success ? OperationState.COMPLETED : OperationState.FAILED;
+            return success;
+        } catch (Exception e) {
+            Log.e(TAG, "writeData error: " + e.getMessage());
+            currentState = OperationState.FAILED;
+            return false;
+        }
+    }
+
+    /**
+     * قراءة بيانات عامة من بنك محدد في الشريحة
+     */
+    public String readData(String pwdStr, int bank, int ptr, int len) {
+        currentState = OperationState.READING;
+        if (activeReader == null) {
+            currentState = OperationState.FAILED;
+            return null;
+        }
+
+        try {
+            String data = null;
+            if (activeReader instanceof ChainwayReader) {
+                data = ((ChainwayReader) activeReader).readData(pwdStr, bank, ptr, len);
+            } else if (activeReader instanceof SimulatorReader) {
+                data = ((SimulatorReader) activeReader).readData(pwdStr, bank, ptr, len);
+            }
+
+            if (data != null && !data.isEmpty()) {
+                currentState = OperationState.COMPLETED;
+                return data;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "readData error: " + e.getMessage());
+        }
+
+        currentState = OperationState.FAILED;
+        return null;
+    }
+
+    /**
+     * تغيير حالة القفل للشريحة (Lock Tag State)
+     */
+    public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
+        if (activeReader == null) return false;
+
+        try {
+            if (activeReader instanceof ChainwayReader) {
+                return ((ChainwayReader) activeReader).setTagLockState(pwdStr, bank, shouldLock);
+            } else if (activeReader instanceof SimulatorReader) {
+                return ((SimulatorReader) activeReader).setTagLockState(pwdStr, bank, shouldLock);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "setTagLockState error: " + e.getMessage());
+        }
+        return isSimulationMode; // إرجاع نجاح تلقائي في المحاكاة
+    }
+
+    /**
+     * إلغاء تفكيك القناع والفلترة
+     */
+    public void clearFilter() {
+        if (activeReader == null) return;
+
+        try {
+            if (activeReader instanceof ChainwayReader) {
+                ((ChainwayReader) activeReader).clearFilter();
+            } else if (activeReader instanceof SimulatorReader) {
+                ((SimulatorReader) activeReader).clearFilter();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "clearFilter error: " + e.getMessage());
+        }
+    }
+
+    // =========================================================================
+    // 🟢 العمليات المرتفعة المستوى (High-Level Operations)
+    // =========================================================================
     
     /**
      * قراءة EPC من الشريحة
