@@ -18,8 +18,6 @@ import java.net.URL;
 
 /**
  * خدمة RFID موحدة
- * تتعامل مع القارئ الحقيقي أو المحاكي تلقائياً
- * وتدير تسجيل الربط مع MIRA API
  */
 public class MiraRfidService {
     private static final String TAG = "MiraRfidService";
@@ -31,7 +29,6 @@ public class MiraRfidService {
     private String lastReadEpc = "";
     private String lastReadTid = "";
     
-    // حالة العملية الحالية
     private OperationState currentState = OperationState.IDLE;
     
     public enum OperationState {
@@ -50,12 +47,8 @@ public class MiraRfidService {
         return instance;
     }
     
-    /**
-     * اكتشاف القارئ المتاح
-     */
     private void detectAndInitializeReader() {
         try {
-            // محاولة تهيئة القارئ الحقيقي
             ChainwayReader chainwayReader = new ChainwayReader(context);
             if (chainwayReader.initialize() && chainwayReader.connect()) {
                 activeReader = chainwayReader;
@@ -67,7 +60,6 @@ public class MiraRfidService {
             Log.w(TAG, "فشل الاتصال بالقارئ الحقيقي: " + e.getMessage());
         }
         
-        // إذا فشل، استخدم المحاكي
         SimulatorReader simulatorReader = new SimulatorReader(context);
         simulatorReader.initialize();
         simulatorReader.connect();
@@ -76,251 +68,99 @@ public class MiraRfidService {
         Log.i(TAG, "🔬 تم التفعيل في وضع المحاكاة");
     }
     
-    public boolean isSimulationMode() {
-        return isSimulationMode;
-    }
-    
-    public MiraIRFIDReader getActiveReader() {
-        return activeReader;
-    }
-    
-    public OperationState getCurrentState() {
-        return currentState;
-    }
-    
-    public String getLastReadEpc() {
-        return lastReadEpc;
-    }
-    
-    public String getLastReadTid() {
-        return lastReadTid;
-    }
+    public boolean isSimulationMode() { return isSimulationMode; }
+    public MiraIRFIDReader getActiveReader() { return activeReader; }
+    public OperationState getCurrentState() { return currentState; }
+    public String getLastReadEpc() { return lastReadEpc; }
+    public String getLastReadTid() { return lastReadTid; }
 
     // =========================================================================
-    // 🛠️ الدوال المطلوبة من قبل MiraUHFReadWriteFragment (Low-Level Access)
+    // 🛠️ دوال الوصول للذاكرة المباشرة المطلوب استدعاؤها في الـ Fragment
     // =========================================================================
 
-    /**
-     * كتابة بيانات عامة إلى بنك محدد في الشريحة
-     */
     public boolean writeData(String pwdStr, int bank, int ptr, String data) {
-        currentState = OperationState.WRITING;
-        if (activeReader == null) {
-            currentState = OperationState.FAILED;
-            return false;
-        }
-
-        try {
-            boolean success = false;
-            if (activeReader instanceof ChainwayReader) {
-                success = ((ChainwayReader) activeReader).writeData(pwdStr, bank, ptr, data);
-            } else if (activeReader instanceof SimulatorReader) {
-                success = ((SimulatorReader) activeReader).writeData(pwdStr, bank, ptr, data);
-            }
-
-            currentState = success ? OperationState.COMPLETED : OperationState.FAILED;
-            return success;
-        } catch (Exception e) {
-            Log.e(TAG, "writeData error: " + e.getMessage());
-            currentState = OperationState.FAILED;
-            return false;
-        }
+        if (activeReader == null) return false;
+        return activeReader.writeData(pwdStr, bank, ptr, data);
     }
 
-    /**
-     * قراءة بيانات عامة من بنك محدد في الشريحة
-     */
     public String readData(String pwdStr, int bank, int ptr, int len) {
-        currentState = OperationState.READING;
-        if (activeReader == null) {
-            currentState = OperationState.FAILED;
-            return null;
-        }
-
-        try {
-            String data = null;
-            if (activeReader instanceof ChainwayReader) {
-                data = ((ChainwayReader) activeReader).readData(pwdStr, bank, ptr, len);
-            } else if (activeReader instanceof SimulatorReader) {
-                data = ((SimulatorReader) activeReader).readData(pwdStr, bank, ptr, len);
-            }
-
-            if (data != null && !data.isEmpty()) {
-                currentState = OperationState.COMPLETED;
-                return data;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "readData error: " + e.getMessage());
-        }
-
-        currentState = OperationState.FAILED;
-        return null;
+        if (activeReader == null) return null;
+        return activeReader.readData(pwdStr, bank, ptr, len);
     }
 
-    /**
-     * تغيير حالة القفل للشريحة (Lock Tag State)
-     */
     public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
         if (activeReader == null) return false;
-
-        try {
-            if (activeReader instanceof ChainwayReader) {
-                return ((ChainwayReader) activeReader).setTagLockState(pwdStr, bank, shouldLock);
-            } else if (activeReader instanceof SimulatorReader) {
-                return ((SimulatorReader) activeReader).setTagLockState(pwdStr, bank, shouldLock);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "setTagLockState error: " + e.getMessage());
-        }
-        return isSimulationMode; // إرجاع نجاح تلقائي في المحاكاة
+        return activeReader.setTagLockState(pwdStr, bank, shouldLock);
     }
 
-    /**
-     * إلغاء تفكيك القناع والفلترة
-     */
-    public void clearFilter() {
-        if (activeReader == null) return;
+    public boolean setFilter(int bank, int ptr, String filterData) {
+        if (activeReader == null) return isSimulationMode;
+        return activeReader.setFilter(bank, ptr, filterData);
+    }
 
-        try {
-            if (activeReader instanceof ChainwayReader) {
-                ((ChainwayReader) activeReader).clearFilter();
-            } else if (activeReader instanceof SimulatorReader) {
-                ((SimulatorReader) activeReader).clearFilter();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "clearFilter error: " + e.getMessage());
+    public void clearFilter() {
+        if (activeReader != null) {
+            activeReader.clearFilter();
         }
     }
 
     // =========================================================================
-    // 🟢 العمليات المرتفعة المستوى (High-Level Operations)
+    // 🟢 العمليات العالية المستوى
     // =========================================================================
     
-    /**
-     * قراءة EPC من الشريحة
-     */
     public String readEpc(String accessPassword) {
         currentState = OperationState.READING;
-        
-        if (activeReader == null) {
-            currentState = OperationState.FAILED;
-            return null;
+        String epc = readData(accessPassword, 1, 32, 6);
+        if (epc != null && !epc.isEmpty()) {
+            lastReadEpc = epc;
+            currentState = OperationState.COMPLETED;
+            return epc;
         }
-        
-        try {
-            String epc = null;
-            if (activeReader instanceof ChainwayReader) {
-                epc = ((ChainwayReader) activeReader).readEpcData(accessPassword);
-            } else if (activeReader instanceof SimulatorReader) {
-                epc = ((SimulatorReader) activeReader).readEpcData(accessPassword);
-            }
-            
-            if (epc != null && !epc.isEmpty()) {
-                lastReadEpc = epc;
-                currentState = OperationState.COMPLETED;
-                return epc;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "readEpc error: " + e.getMessage());
-        }
-        
         currentState = OperationState.FAILED;
         return null;
     }
     
-    /**
-     * قراءة TID من الشريحة
-     */
     public String readTid(String accessPassword) {
         currentState = OperationState.READING;
-        
-        if (activeReader == null) {
-            currentState = OperationState.FAILED;
-            return null;
+        String tid = readData(accessPassword, 2, 0, 6);
+        if (tid != null && !tid.isEmpty()) {
+            lastReadTid = tid;
+            currentState = OperationState.COMPLETED;
+            return tid;
         }
-        
-        try {
-            String tid = null;
-            if (activeReader instanceof ChainwayReader) {
-                tid = ((ChainwayReader) activeReader).readTidData(accessPassword);
-            } else if (activeReader instanceof SimulatorReader) {
-                tid = ((SimulatorReader) activeReader).readTidData(accessPassword);
-            }
-            
-            if (tid != null && !tid.isEmpty()) {
-                lastReadTid = tid;
-                currentState = OperationState.COMPLETED;
-                return tid;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "readTid error: " + e.getMessage());
-        }
-        
         currentState = OperationState.FAILED;
         return null;
     }
     
-    /**
-     * كتابة EPC على الشريحة
-     */
     public boolean writeEpc(String newEpc, String accessPassword) {
         currentState = OperationState.WRITING;
-        
-        if (activeReader == null) {
-            currentState = OperationState.FAILED;
-            return false;
+        boolean success = writeData(accessPassword, 1, 32, newEpc);
+        if (success) {
+            lastReadEpc = newEpc;
+            currentState = OperationState.COMPLETED;
+            return true;
         }
-        
-        try {
-            boolean success = false;
-            if (activeReader instanceof ChainwayReader) {
-                success = ((ChainwayReader) activeReader).writeEpcData(newEpc, accessPassword);
-            } else if (activeReader instanceof SimulatorReader) {
-                success = ((SimulatorReader) activeReader).writeEpcData(newEpc, accessPassword);
-            }
-            
-            if (success) {
-                lastReadEpc = newEpc;
-                currentState = OperationState.COMPLETED;
-                return true;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "writeEpc error: " + e.getMessage());
-        }
-        
         currentState = OperationState.FAILED;
         return false;
     }
     
-    /**
-     * التحقق من الكتابة - قراءة نفس الشريحة
-     */
     public boolean verifyWrite(String expectedEpc, String accessPassword) {
         currentState = OperationState.VERIFYING;
-        
         String readBack = readEpc(accessPassword);
-        
         if (readBack != null && readBack.equalsIgnoreCase(expectedEpc)) {
             currentState = OperationState.COMPLETED;
             return true;
         }
-        
         currentState = OperationState.FAILED;
         return false;
     }
     
-    /**
-     * تسجيل الربط في MIRA API
-     */
     public boolean registerRfidBinding(String miraId, String epc, String tid) {
         currentState = OperationState.REGISTERING;
-        
         try {
             MiraSettingsManager settingsManager = MiraSettingsManager.getInstance(context);
-            String apiUrl = settingsManager.getString("mira_api_url",
-                "https://ams.ibreg.org/wp-json/mira-gate/v1/register_rfid");
-            String apiKey = settingsManager.getString("mira_api_key",
-                "mira_gate_test071234567890abcdefghijklmnop");
+            String apiUrl = settingsManager.getString("mira_api_url", "https://ams.ibreg.org/wp-json/mira-gate/v1/register_rfid");
+            String apiKey = settingsManager.getString("mira_api_key", "mira_gate_test071234567890abcdefghijklmnop");
             
             URL url = new URL(apiUrl);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -344,22 +184,17 @@ public class MiraRfidService {
             }
             
             int responseCode = conn.getResponseCode();
-            
             if (responseCode >= 200 && responseCode < 300) {
                 currentState = OperationState.COMPLETED;
                 return true;
             }
             
-            // في وضع المحاكاة، نقبل العملية حتى لو فشل الاتصال
             if (isSimulationMode) {
                 currentState = OperationState.COMPLETED;
                 return true;
             }
-            
         } catch (Exception e) {
             Log.e(TAG, "registerRfidBinding error: " + e.getMessage());
-            
-            // في وضع المحاكاة، نقبل العملية حتى لو فشل الاتصال
             if (isSimulationMode) {
                 currentState = OperationState.COMPLETED;
                 return true;
@@ -370,16 +205,11 @@ public class MiraRfidService {
         return false;
     }
     
-    /**
-     * البحث عن قطعة في MIRA API
-     */
     public JSONObject searchInMira(String identifier, String identifierType) {
         try {
             MiraSettingsManager settingsManager = MiraSettingsManager.getInstance(context);
-            String apiUrl = settingsManager.getString("mira_api_url",
-                "https://ams.ibreg.org/wp-json/mira-gate/v1/authorize");
-            String apiKey = settingsManager.getString("mira_api_key",
-                "mira_gate_test071234567890abcdefghijklmnop");
+            String apiUrl = settingsManager.getString("mira_api_url", "https://ams.ibreg.org/wp-json/mira-gate/v1/authorize");
+            String apiKey = settingsManager.getString("mira_api_key", "mira_gate_test071234567890abcdefghijklmnop");
             
             URL url = new URL(apiUrl);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -400,30 +230,22 @@ public class MiraRfidService {
             }
             
             int responseCode = conn.getResponseCode();
-            InputStream is = (responseCode >= 200 && responseCode < 300)
-                ? conn.getInputStream() : conn.getErrorStream();
+            InputStream is = (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream();
             BufferedReader reader = new BufferedReader(new InputStreamReader(is, "utf-8"));
             StringBuilder response = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) response.append(line);
             
             return new JSONObject(response.toString());
-            
         } catch (Exception e) {
             Log.e(TAG, "searchInMira error: " + e.getMessage());
-            
-            // في وضع المحاكاة، نرجع بيانات وهمية
             if (isSimulationMode) {
                 return createSimulatedSearchResult(identifier);
             }
-            
             return null;
         }
     }
     
-    /**
-     * إنشاء نتيجة بحث وهمية للمحاكاة
-     */
     private JSONObject createSimulatedSearchResult(String identifier) {
         try {
             JSONObject result = new JSONObject();
@@ -459,17 +281,11 @@ public class MiraRfidService {
         }
     }
     
-    /**
-     * الحصول على اسم الجهاز الحالي
-     */
     public String getDeviceName() {
         if (activeReader == null) return "لا يوجد جهاز";
         return activeReader.getDeviceName() + (isSimulationMode ? " (محاكي)" : "");
     }
     
-    /**
-     * الحصول على وصف الحالة
-     */
     public String getStateDescription() {
         switch (currentState) {
             case IDLE: return "جاهز";
