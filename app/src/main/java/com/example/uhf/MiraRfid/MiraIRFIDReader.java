@@ -12,6 +12,8 @@ public interface MiraIRFIDReader {
         CHAINWAY_C71("Chainway C71", "قارئ مدمج - UHF", true),
         ZEBRA_MC3300("Zebra MC3300", "قارئ مدمج - UHF", true),
         GENERIC_BLUETOOTH("Bluetooth عام (SPP)", "بلوتوث خارجي - أي جهاز", false),
+        HONEYWELL_EDA50, // 👈 أضف هذا
+        UNITECH_RP902,   // 👈 أضف هذا
         SIMULATOR("محاكي", "بدون جهاز - للاختبار", false);
 
         public final String displayName;
