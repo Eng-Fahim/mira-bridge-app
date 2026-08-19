@@ -6,13 +6,19 @@
         android:id="@+id/action_dashboard"
         android:icon="@android:drawable/ic_menu_today"
         android:title="الرئيسية"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_quick_access_settings"
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:title="تخصيص الوصول السريع"
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/action_gold_rates"
         android:icon="@android:drawable/ic_menu_compass"
         android:title="أسعار الذهب والبورصة"
-        app:showAsAction="never" />
+        app:showAsAction="ifRoom" />
 
     <item
         android:id="@+id/action_toggle_language"
