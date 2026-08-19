@@ -9,7 +9,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.GridLayout; // ✅ استخدام GridLayout العادي
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -23,15 +22,12 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
-
-import com.example.uhf.fragment.MiraSecureGateFragment;
-import com.example.uhf.fragment.MiraUHFReadTagFragment;
-
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.tools.SessionManager;
+import com.google.android.material.card.MaterialCardView;
 
 import org.json.JSONObject;
 
@@ -57,7 +53,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private SwipeRefreshLayout swipeRefresh;
     private View shimmerLayout;
     private CardView cardGoldPrices;
-    private LinearLayout containerQuickActions; // ✅ استخدام LinearLayout بدلاً من GridLayout
+    private LinearLayout containerQuickActions;
 
     private MiraApiClient apiClient;
     private SessionManager sessionManager;
@@ -151,7 +147,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             tvGoldChange = v.findViewById(R.id.tvGoldChange);
             btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
             cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
-            containerQuickActions = v.findViewById(R.id.containerQuickActions); // ✅ LinearLayout
+            containerQuickActions = v.findViewById(R.id.containerQuickActions);
 
             if (swipeRefresh != null) {
                 swipeRefresh.setOnRefreshListener(() -> {
@@ -183,7 +179,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 ((UHFMainActivity) getActivity()).loadFragment(new MiraSecureGateFragment(), "SecureGate");
             }
         });
-        
+
         if (btnInventory != null) btnInventory.setOnClickListener(v -> {
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).loadFragment(new MiraUHFReadTagFragment(), "Scan");
@@ -192,40 +188,39 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     // ============================================
-    // ✅ إعداد شبكة الأزرار السريعة
+    // ✅ إعداد شبكة الأزرار السريعة الاحترافية
     // ============================================
     private void setupQuickAccessGrid() {
         if (containerQuickActions == null) return;
-        
+
         containerQuickActions.removeAllViews();
-        
+
         List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
-        
+
         if (enabledActions.isEmpty()) {
             showEmptyQuickAccess();
             return;
         }
-        
-        // ✅ إنشاء صفوف من 3 أزرار
+
         LinearLayout currentRow = null;
         int countInRow = 0;
-        
+
         for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
             if (currentRow == null || countInRow == 0) {
                 currentRow = new LinearLayout(getContext());
                 currentRow.setOrientation(LinearLayout.HORIZONTAL);
                 currentRow.setLayoutParams(new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT));
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT));
                 containerQuickActions.addView(currentRow);
             }
-            
+
             CardView card = createQuickActionCard(action);
             if (card != null) {
                 currentRow.addView(card);
                 countInRow++;
             }
-            
+
             if (countInRow >= 3) {
                 countInRow = 0;
                 currentRow = null;
@@ -236,49 +231,55 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private CardView createQuickActionCard(MiraQuickAccessSettings.QuickAction action) {
         Context context = getContext();
         if (context == null) return null;
-        
-        CardView card = new CardView(context);
+
+        MaterialCardView card = new MaterialCardView(context);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        params.setMargins(4, 4, 4, 4);
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        params.setMargins(6, 6, 6, 6);
         card.setLayoutParams(params);
-        card.setRadius(16);
-        card.setCardElevation(4);
-        card.setUseCompatPadding(true);
+        card.setRadius(12 * context.getResources().getDisplayMetrics().density);
+        card.setCardElevation(2f);
+        card.setStrokeWidth(1);
+        
+        // Dynamic theme stroke color lookup safety
+        try {
+            android.util.TypedValue typedValue = new android.util.TypedValue();
+            context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOutlineVariant, typedValue, true);
+            card.setStrokeColor(typedValue.data);
+        } catch (Exception ignored) {}
+
         card.setClickable(true);
         card.setFocusable(true);
-        
+
         LinearLayout layout = new LinearLayout(context);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(8, 12, 8, 12);
+        layout.setPadding(8, 14, 8, 14);
         layout.setGravity(android.view.Gravity.CENTER);
-        
+
         TextView tvIcon = new TextView(context);
         tvIcon.setText(getActionIcon(action.id));
-        tvIcon.setTextSize(24);
+        tvIcon.setTextSize(22);
         tvIcon.setGravity(android.view.Gravity.CENTER);
         layout.addView(tvIcon);
-        
+
         TextView tvTitle = new TextView(context);
         tvTitle.setText(isArabic ? action.titleAr : action.titleEn);
-        tvTitle.setTextSize(10);
+        tvTitle.setTextSize(11);
         tvTitle.setGravity(android.view.Gravity.CENTER);
-        tvTitle.setPadding(0, 4, 0, 0);
-        tvTitle.setTextColor(0xFF1F2937);
+        tvTitle.setPadding(0, 6, 0, 0);
         tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
         layout.addView(tvTitle);
-        
+
         card.addView(layout);
-        
         card.setOnClickListener(v -> handleQuickAction(action.id));
-        
+
         return card;
     }
 
     private void handleQuickAction(String actionId) {
         if (getActivity() instanceof UHFMainActivity) {
             UHFMainActivity activity = (UHFMainActivity) getActivity();
-            
+
             switch (actionId) {
                 case "identity":
                     activity.loadFragment(new MiraIdentityStudioFragment(), "IdentityStudio");
@@ -314,9 +315,9 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                     activity.loadFragment(new UsersManagementFragment(), "UsersManagement");
                     break;
                 default:
-                    Toast.makeText(getContext(), 
-                        isArabic ? "غير معروف: " + actionId : "Unknown: " + actionId, 
-                        Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(),
+                            isArabic ? "غير معروف: " + actionId : "Unknown: " + actionId,
+                            Toast.LENGTH_SHORT).show();
                     break;
             }
         }
@@ -324,16 +325,16 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
 
     private void showEmptyQuickAccess() {
         if (containerQuickActions == null || getContext() == null) return;
-        
+
         TextView tvEmpty = new TextView(getContext());
-        tvEmpty.setText(isArabic ? 
-            "لا توجد أزرار مفعّلة" : 
-            "No enabled actions");
+        tvEmpty.setText(isArabic ?
+                "لا توجد أزرار مفعّلة" :
+                "No enabled actions");
         tvEmpty.setTextSize(13);
         tvEmpty.setGravity(android.view.Gravity.CENTER);
         tvEmpty.setPadding(16, 16, 16, 16);
         tvEmpty.setTextColor(0xFF6B7280);
-        
+
         containerQuickActions.addView(tvEmpty);
     }
 
@@ -389,30 +390,26 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    // ============================================
-    // ✅ جلب الأسعار العالمية - مع المعاملات الصحيحة
-    // ============================================
     private void fetchLiveGoldPrices() {
         if (apiClient == null) return;
-        
+
         addDebug("🔄 جلب أسعار الذهب العالمية...");
-        
+
         executorService.execute(() -> {
             try {
-                // ✅ تمرير المعاملات المطلوبة
-                String provider = "metalprice"; // أو من الإعدادات
-                String apiKey = ""; // أو من الإعدادات
-                
+                String provider = "metalprice";
+                String apiKey = "";
+
                 MiraApiClient.ApiResponse response = apiClient.fetchGoldPrice(provider, apiKey);
-                
+
                 mainHandler.post(() -> {
                     if (!isAdded()) return;
-                    
+
                     if (response != null && response.isSuccess && response.data != null) {
                         try {
                             JSONObject data = response.data.optJSONObject("data");
                             if (data == null) data = response.data;
-                            
+
                             displayGoldPrices(data);
                             addDebug("✅ تم تحديث أسعار الذهب");
                         } catch (Exception e) {
@@ -439,34 +436,34 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         try {
             JSONObject prices = data.optJSONObject("prices");
             if (prices == null) prices = data;
-            
+
             double price24 = prices.optDouble("24k", 0);
             double price21 = prices.optDouble("21k", 0);
             double price18 = prices.optDouble("18k", 0);
-            double ouncePrice = data.optDouble("price_per_ounce", 
-                prices.optDouble("ounce_price", price24 * 31.1035));
+            double ouncePrice = data.optDouble("price_per_ounce",
+                    prices.optDouble("ounce_price", price24 * 31.1035));
             String source = data.optString("source", "server");
-            
+
             setGoldPrice(tvKarat24, "24K", price24);
             setGoldPrice(tvKarat21, "21K", price21);
             setGoldPrice(tvKarat18, "18K", price18);
-            
+
             if (tvOuncePrice != null && ouncePrice > 0) {
                 tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", ouncePrice));
             }
-            
+
             if (tvPriceSource != null) {
                 String sourceText = getSourceDisplayName(source);
                 tvPriceSource.setText("📡 " + sourceText);
             }
-            
+
             if (tvLastUpdate != null) {
                 String time = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
                 tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
             }
-            
+
             calculateTrend(price24);
-            
+
         } catch (Exception e) {
             Log.e(TAG, "displayGoldPrices error", e);
         }
@@ -475,28 +472,28 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private void displayGoldPricesFromCache() {
         try {
             if (priceManager == null) return;
-            
+
             double price24 = priceManager.getGoldPricePerGram(24);
             double price21 = priceManager.getGoldPricePerGram(21);
             double price18 = priceManager.getGoldPricePerGram(18);
-            
+
             setGoldPrice(tvKarat24, "24K", price24);
             setGoldPrice(tvKarat21, "21K", price21);
             setGoldPrice(tvKarat18, "18K", price18);
-            
+
             if (tvOuncePrice != null && price24 > 0) {
                 double ouncePrice = price24 * 31.1035;
                 tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", ouncePrice));
             }
-            
+
             if (tvPriceSource != null) {
                 tvPriceSource.setText(isArabic ? "📡 كاش محلي" : "📡 Local cache");
             }
-            
+
             if (tvLastUpdate != null) {
                 tvLastUpdate.setText(isArabic ? "⏰ وضع أوفلاين" : "⏰ Offline mode");
             }
-            
+
         } catch (Exception e) {
             Log.e(TAG, "displayGoldPricesFromCache error", e);
         }
@@ -504,16 +501,16 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
 
     private void calculateTrend(double currentPrice) {
         if (tvGoldTrend == null || tvGoldChange == null) return;
-        
+
         try {
             if (offlineCache == null) return;
-            
+
             double previousPrice = offlineCache.getFloat("gold_price_24k_prev", 0);
-            
+
             if (previousPrice > 0 && currentPrice > 0) {
                 double change = currentPrice - previousPrice;
                 double changePercent = (change / previousPrice) * 100;
-                
+
                 if (change > 0) {
                     tvGoldTrend.setText("📈");
                     tvGoldChange.setText(String.format(Locale.US, "+%.2f%%", changePercent));
@@ -532,11 +529,11 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 tvGoldChange.setText("—");
                 tvGoldChange.setTextColor(0xFF6B7280);
             }
-            
+
             if (offlineCache != null && currentPrice > 0) {
                 offlineCache.edit().putFloat("gold_price_24k_prev", (float) currentPrice).apply();
             }
-            
+
         } catch (Exception e) {
             Log.e(TAG, "calculateTrend error", e);
         }
@@ -591,14 +588,14 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             }
 
             offlineCache.edit()
-                .putInt("total_items", inv != null ? inv.optInt("total_items", 0) : 0)
-                .putFloat("total_weight", (float) totalWeightVal)
-                .putInt("sold_today", sales != null ? sales.optInt("count_today", 0) : 0)
-                .putFloat("sales_today", (float) (sales != null ? sales.optDouble("today", 0.0) : 0.0))
-                .putFloat("sales_month", (float) (sales != null ? sales.optDouble("month", 0.0) : 0.0))
-                .putFloat("sales_year", (float) (sales != null ? sales.optDouble("year", 0.0) : 0.0))
-                .putLong("last_update", System.currentTimeMillis())
-                .apply();
+                    .putInt("total_items", inv != null ? inv.optInt("total_items", 0) : 0)
+                    .putFloat("total_weight", (float) totalWeightVal)
+                    .putInt("sold_today", sales != null ? sales.optInt("count_today", 0) : 0)
+                    .putFloat("sales_today", (float) (sales != null ? sales.optDouble("today", 0.0) : 0.0))
+                    .putFloat("sales_month", (float) (sales != null ? sales.optDouble("month", 0.0) : 0.0))
+                    .putFloat("sales_year", (float) (sales != null ? sales.optDouble("year", 0.0) : 0.0))
+                    .putLong("last_update", System.currentTimeMillis())
+                    .apply();
         } catch (Exception e) {
             Log.e(TAG, "saveOfflineData error", e);
         }
@@ -727,7 +724,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         if (latestBranchId != currentBranchId) {
             onBranchChanged();
         }
-        
+
         setupQuickAccessGrid();
     }
 
@@ -758,23 +755,23 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             final String message = rawMessage.isEmpty() ? "لا توجد بيانات تشخيص بعد" : rawMessage;
 
             new android.app.AlertDialog.Builder(requireContext())
-                .setTitle(title)
-                .setMessage(message)
-                .setPositiveButton("مسح", (dialog, which) -> debugLog.setLength(0))
-                .setNegativeButton("نسخ", (dialog, which) -> {
-                    if (getContext() != null) {
-                        android.content.ClipboardManager clipboard =
-                            (android.content.ClipboardManager) requireContext()
-                            .getSystemService(Context.CLIPBOARD_SERVICE);
-                        android.content.ClipData clip =
-                            android.content.ClipData.newPlainText("debug", message);
-                        clipboard.setPrimaryClip(clip);
-                        Toast.makeText(requireContext(),
-                            "تم النسخ", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNeutralButton("إغلاق", null)
-                .show();
+                    .setTitle(title)
+                    .setMessage(message)
+                    .setPositiveButton("مسح", (dialog, which) -> debugLog.setLength(0))
+                    .setNegativeButton("نسخ", (dialog, which) -> {
+                        if (getContext() != null) {
+                            android.content.ClipboardManager clipboard =
+                                    (android.content.ClipboardManager) requireContext()
+                                            .getSystemService(Context.CLIPBOARD_SERVICE);
+                            android.content.ClipData clip =
+                                    android.content.ClipData.newPlainText("debug", message);
+                            clipboard.setPrimaryClip(clip);
+                            Toast.makeText(requireContext(),
+                                    "تم النسخ", Toast.LENGTH_SHORT).show();
+                        }
+                    })
+                    .setNeutralButton("إغلاق", null)
+                    .show();
         } catch (Exception e) {
             Log.e(TAG, "Error showing debug", e);
         }
