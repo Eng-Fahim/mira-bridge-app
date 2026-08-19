@@ -199,38 +199,72 @@ public class GenericBluetoothReader implements MiraIRFIDReader {
             }
         }
     }
+
+    // =========================================================================
+    // 🛠️ تنفيذ دوال الوصول المباشر لحل أخطاء التجميع
+    // =========================================================================
+
     @Override
-public boolean writeEpc(String newEpc, String accessPassword) {
-    return false;
-}
+    public boolean writeData(String pwdStr, int bank, int ptr, String data) {
+        sendCommand("WRITE " + pwdStr + "," + bank + "," + ptr + "," + data + "\r\n");
+        return true;
+    }
 
-@Override
-public boolean writeUserMemory(int address, String data, String accessPassword) {
-    return false;
-}
+    @Override
+    public String readData(String pwdStr, int bank, int ptr, int len) {
+        sendCommand("READ " + pwdStr + "," + bank + "," + ptr + "," + len + "\r\n");
+        return null;
+    }
 
-@Override
-public String readTid() {
-    return null;
-}
+    @Override
+    public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
+        sendCommand("LOCK " + pwdStr + "," + bank + "," + (shouldLock ? "1" : "0") + "\r\n");
+        return true;
+    }
 
-@Override
-public String readUserMemory(int address, int length) {
-    return null;
-}
+    @Override
+    public boolean setFilter(int bank, int ptr, String filterData) {
+        sendCommand("FILTER " + bank + "," + ptr + "," + filterData + "\r\n");
+        return true;
+    }
 
-@Override
-public boolean lockTag(String accessPassword) {
-    return false;
-}
+    @Override
+    public void clearFilter() {
+        sendCommand("CLEAR_FILTER\r\n");
+    }
 
-@Override
-public boolean unlockTag(String accessPassword) {
-    return false;
-}
+    @Override
+    public boolean writeEpc(String newEpc, String accessPassword) {
+        return writeData(accessPassword, 1, 32, newEpc);
+    }
 
-@Override
-public boolean killTag(String accessPassword) {
-    return false;
+    @Override
+    public boolean writeUserMemory(int address, String data, String accessPassword) {
+        return writeData(accessPassword, 3, address, data);
+    }
+
+    @Override
+    public String readTid() {
+        return readData("00000000", 2, 0, 6);
+    }
+
+    @Override
+    public String readUserMemory(int address, int length) {
+        return readData("00000000", 3, address, length);
+    }
+
+    @Override
+    public boolean lockTag(String accessPassword) {
+        return setTagLockState(accessPassword, 1, true);
+    }
+
+    @Override
+    public boolean unlockTag(String accessPassword) {
+        return setTagLockState(accessPassword, 1, false);
+    }
+
+    @Override
+    public boolean killTag(String accessPassword) {
+        return false;
     }
 }
