@@ -243,9 +243,4 @@ public boolean setFilter(int bank, int ptr, String filterData) {
     return true;
 }
 
-@Override
-public void clearFilter() {
-    Log.i("SimulatorReader", "🔬 [Simulation] Filter cleared");
-}
-
 }
