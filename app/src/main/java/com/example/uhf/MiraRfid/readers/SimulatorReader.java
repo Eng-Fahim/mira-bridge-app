@@ -25,13 +25,11 @@ public class SimulatorReader implements MiraIRFIDReader {
     private final Map<String, SimulatedTag> tagsMap = new HashMap<>();
     private String currentSelectedEpc = "";
     
-    // ✅ Constructor يقبل Context
     public SimulatorReader(Context context) {
         this.context = context;
         initializeDemoTags();
     }
     
-    // ✅ Constructor بدون معاملات (للتغلب على مشكلة الـ Factory)
     public SimulatorReader() {
         this(null);
     }
@@ -53,14 +51,44 @@ public class SimulatorReader implements MiraIRFIDReader {
         tag.isLocked = false;
         tagsMap.put(epc, tag);
     }
+
+    // =========================================================================
+    // 🛠️ تنفيذ دوال الوصول المباشر للبنكات في وضع المحاكاة
+    // =========================================================================
+
+    @Override
+    public boolean writeData(String pwdStr, int bank, int ptr, String data) {
+        Log.i(TAG, "🔬 [MOCK WRITE] Bank: " + bank + ", Ptr: " + ptr + ", Data: " + data);
+        if (bank == 1) { // EPC Bank
+            return writeEpcData(data, pwdStr);
+        }
+        return true;
+    }
+
+    @Override
+    public String readData(String pwdStr, int bank, int ptr, int len) {
+        Log.i(TAG, "🔬 [MOCK READ] Bank: " + bank + ", Ptr: " + ptr);
+        if (bank == 1) return readEpcData(pwdStr); // EPC Bank
+        if (bank == 2) return readTidData(pwdStr); // TID Bank
+        return "MIRA-MOCK-DATA-1234";
+    }
+
+    @Override
+    public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
+        Log.i(TAG, "🔬 [MOCK LOCK] Bank: " + bank + " -> " + shouldLock);
+        return true;
+    }
+
+    @Override
+    public void clearFilter() {
+        Log.i(TAG, "🔬 [MOCK FILTER] Clear filter requested");
+    }
     
     public String readEpcData(String accessPassword) {
-        if (tagsMap.isEmpty()) return null;
-        
+        if (tagsMap.isEmpty()) return "300833B2DDD9014000000001";
         if (!currentSelectedEpc.isEmpty() && tagsMap.containsKey(currentSelectedEpc)) {
             return currentSelectedEpc;
         }
-        
         return tagsMap.keySet().iterator().next();
     }
     
@@ -73,7 +101,7 @@ public class SimulatorReader implements MiraIRFIDReader {
                 return tag.tid;
             }
         }
-        return null;
+        return "E2806895000050A1B2C3D4";
     }
     
     public boolean writeEpcData(String newEpc, String accessPassword) {
@@ -84,20 +112,15 @@ public class SimulatorReader implements MiraIRFIDReader {
         
         if (oldEpc != null && tagsMap.containsKey(oldEpc)) {
             SimulatedTag tag = tagsMap.get(oldEpc);
-            if (tag.isLocked) {
-                Log.e(TAG, "❌ الشريحة مقفلة");
-                return false;
-            }
+            if (tag.isLocked) return false;
             
             tagsMap.remove(oldEpc);
             tag.epc = newEpc;
             tagsMap.put(newEpc, tag);
             currentSelectedEpc = newEpc;
-            Log.i(TAG, "✅ تم كتابة EPC: " + newEpc);
             return true;
         }
         
-        // إنشاء شريحة جديدة
         SimulatedTag newTag = new SimulatedTag();
         newTag.epc = newEpc;
         newTag.tid = generateTid();
@@ -105,7 +128,6 @@ public class SimulatorReader implements MiraIRFIDReader {
         newTag.isLocked = false;
         tagsMap.put(newEpc, newTag);
         currentSelectedEpc = newEpc;
-        Log.i(TAG, "✅ تم إنشاء شريحة جديدة: " + newEpc);
         return true;
     }
     
@@ -119,12 +141,8 @@ public class SimulatorReader implements MiraIRFIDReader {
         return tid.toString();
     }
     
-    // ============ باقي دوال الواجهة ============
-    
     @Override
-    public boolean initialize() {
-        return true;
-    }
+    public boolean initialize() { return true; }
     
     @Override
     public boolean connect() {
@@ -147,9 +165,7 @@ public class SimulatorReader implements MiraIRFIDReader {
     }
     
     @Override
-    public boolean isConnected() {
-        return isConnected;
-    }
+    public boolean isConnected() { return isConnected; }
     
     @Override
     public boolean startScan() {
@@ -166,9 +182,7 @@ public class SimulatorReader implements MiraIRFIDReader {
     }
     
     @Override
-    public boolean isScanning() {
-        return isScanning;
-    }
+    public boolean isScanning() { return isScanning; }
     
     @Override
     public void setPower(int powerDbm) {}
@@ -180,19 +194,13 @@ public class SimulatorReader implements MiraIRFIDReader {
     public void setScanInterval(int intervalMs) {}
     
     @Override
-    public String getDeviceName() {
-        return "محاكي RFID";
-    }
+    public String getDeviceName() { return "محاكي RFID"; }
     
     @Override
-    public String getFirmwareVersion() {
-        return "1.0.0-SIM";
-    }
+    public String getFirmwareVersion() { return "1.0.0-SIM"; }
     
     @Override
-    public int getBatteryLevel() {
-        return 100;
-    }
+    public int getBatteryLevel() { return 100; }
     
     @Override
     public void setOnTagReadListener(OnTagReadListener listener) {
@@ -205,34 +213,22 @@ public class SimulatorReader implements MiraIRFIDReader {
     }
     
     @Override
-    public boolean writeUserMemory(int address, String data, String accessPassword) {
-        return true;
-    }
+    public boolean writeUserMemory(int address, String data, String accessPassword) { return true; }
     
     @Override
-    public String readTid() {
-        return readTidData("00000000");
-    }
+    public String readTid() { return readTidData("00000000"); }
     
     @Override
-    public String readUserMemory(int address, int length) {
-        return "MIRA-JWL-001001";
-    }
+    public String readUserMemory(int address, int length) { return "MIRA-JWL-001001"; }
     
     @Override
-    public boolean lockTag(String accessPassword) {
-        return true;
-    }
+    public boolean lockTag(String accessPassword) { return true; }
     
     @Override
-    public boolean unlockTag(String accessPassword) {
-        return true;
-    }
+    public boolean unlockTag(String accessPassword) { return true; }
     
     @Override
-    public boolean killTag(String accessPassword) {
-        return true;
-    }
+    public boolean killTag(String accessPassword) { return true; }
     
     private static class SimulatedTag {
         String epc;
