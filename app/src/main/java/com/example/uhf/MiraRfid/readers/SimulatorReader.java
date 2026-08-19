@@ -236,4 +236,16 @@ public class SimulatorReader implements MiraIRFIDReader {
         String userMemory;
         boolean isLocked;
     }
+
+    @Override
+public boolean setFilter(int bank, int ptr, String filterData) {
+    Log.i("SimulatorReader", "🔬 [Simulation] Filter set: Bank=" + bank + ", Ptr=" + ptr + ", Data=" + filterData);
+    return true;
+}
+
+@Override
+public void clearFilter() {
+    Log.i("SimulatorReader", "🔬 [Simulation] Filter cleared");
+}
+
 }
