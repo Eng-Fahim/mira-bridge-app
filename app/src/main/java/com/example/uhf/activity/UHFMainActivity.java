@@ -35,6 +35,7 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
 import com.example.uhf.R;
+import com.example.uhf.fragment.MiraQuickAccessSettingsFragment;
 import com.example.uhf.fragment.MiraServerConfigFragment;
 import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.fragment.AuthenticateNxpUcodeDnaFragment;
