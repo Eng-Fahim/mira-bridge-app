@@ -27,6 +27,7 @@ public class MiraApiClient {
     private final Context context;
     private final MiraServerConfig serverConfig;
     
+    // ✅ قيم ديناميكية تتحدث بعد تسجيل الدخول
     private String apiUrl;
     private String apiKey;
     private String gateId;
@@ -46,18 +47,27 @@ public class MiraApiClient {
         refreshCredentials();
     }
 
+    /**
+     * ✅ تحديث القيم من MiraServerConfig
+     */
     private void refreshCredentials() {
         this.apiUrl = serverConfig.getBaseUrl() + "mira-gate/v1";
         this.apiKey = serverConfig.getApiKey();
         this.gateId = serverConfig.getGateId();
         
-        Log.d(TAG, "Credentials: URL=" + apiUrl + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "SET"));
+        Log.d(TAG, "Credentials: URL=" + apiUrl + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "SET") + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId));
     }
 
+    /**
+     * إعادة تحميل الإعدادات بعد تغيير الدومين
+     */
     public static synchronized void reloadInstance(Context context) {
         instance = new MiraApiClient(context.getApplicationContext());
     }
 
+    /**
+     * ✅ الحصول على api_key الفعال
+     */
     private String getEffectiveApiKey() {
         if (apiKey == null || apiKey.isEmpty()) {
             return "mira_gate_test071234567890abcdefghijklmnop";
@@ -65,16 +75,14 @@ public class MiraApiClient {
         return apiKey;
     }
 
+    /**
+     * ✅ الحصول على gate_id الفعال
+     */
     private String getEffectiveGateId() {
         if (gateId == null || gateId.isEmpty()) {
             return "handheld_c72";
         }
         return gateId;
-    }
-
-    private String getAuthToken() {
-        SharedPreferences prefs = context.getSharedPreferences(SESSION_PREFS, Context.MODE_PRIVATE);
-        return prefs.getString("authToken", "");
     }
 
     // ===================== 🔑 AUTHENTICATION =====================
@@ -100,11 +108,29 @@ public class MiraApiClient {
             
             if (!newApiKey.isEmpty() || !authToken.isEmpty()) {
                 serverConfig.saveSession(newApiKey, newGateId, authToken);
-                refreshCredentials();
+                refreshCredentials(); // ✅ تحديث فوري
+                
+                Log.d(TAG, "Login success - credentials updated");
             }
         }
         
         return response;
+    }
+
+    public ApiResponse getBranchItemsByCategory(int branchId, String category) {
+        String endpoint = "/branches/" + branchId + "/inventory/items";
+        if (category != null && !category.isEmpty()) {
+            endpoint += "?category=" + category;
+        }
+        return getWithAuth(endpoint);
+    }
+    
+    public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("items", epcs);
+        } catch (Exception ignored) {}
+        return postWithAuth("/transfers/" + transferId + "/items", payload);
     }
 
     public ApiResponse validateToken(String token) {
@@ -112,7 +138,9 @@ public class MiraApiClient {
         try {
             payload.put("token", token);
             payload.put("gate_id", getEffectiveGateId());
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            Log.e(TAG, "Error building validate payload: " + e.getMessage());
+        }
         return post("/auth/validate-token", payload);
     }
 
@@ -121,7 +149,9 @@ public class MiraApiClient {
         try {
             payload.put("token", token);
             payload.put("gate_id", getEffectiveGateId());
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            Log.e(TAG, "Error building logout payload: " + e.getMessage());
+        }
         return post("/auth/logout", payload);
     }
 
@@ -134,8 +164,41 @@ public class MiraApiClient {
         try {
             payload.put("token", oldToken);
             payload.put("gate_id", getEffectiveGateId());
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            Log.e(TAG, "Error building refresh payload: " + e.getMessage());
+        }
         return postWithAuth("/auth/refresh-token", payload);
+    }
+
+    // ===================== 📦 TRANSFERS =====================
+
+    public ApiResponse receiveTransferWithAudit(JSONObject payload) {
+        return postWithAuth("/transfers/receive-audit", payload);
+    }
+
+    public ApiResponse getTransferDetails(int transferId) {
+        return getWithAuth("/transfers/" + transferId);
+    }
+
+    public ApiResponse registerBiometric(String token, String deviceId, String publicKey) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("token", token);
+            payload.put("device_id", deviceId);
+            payload.put("public_key", publicKey);
+            payload.put("gate_id", getEffectiveGateId());
+        } catch (Exception e) {}
+        return post("/auth/register-biometric", payload);
+    }
+
+    public ApiResponse verifyBiometric(String token, String signedChallenge) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("token", token);
+            payload.put("signed_challenge", signedChallenge);
+            payload.put("gate_id", getEffectiveGateId());
+        } catch (Exception e) {}
+        return post("/auth/verify-biometric", payload);
     }
 
     // ===================== 🏢 ORGANIZATION =====================
@@ -337,82 +400,30 @@ public class MiraApiClient {
         return postWithAuth("/encode-item", itemPayload);
     }
 
-    // ===================== 📈 GOLD & CURRENCY =====================
-
-    // ✅ جلب إعدادات الذهب والعملات - يستخدم get (بدون token)
-    public ApiResponse getGoldCurrencySettings() {
-        return get("/gold-currency/settings");
-    }
-
-    // ✅ جلب إعدادات الذهب فقط
-    public ApiResponse getGoldSettings() {
-        return get("/gold/settings");
-    }
-
-    // ✅ حفظ إعدادات الذهب فقط
-    public ApiResponse saveGoldSettings(JSONObject goldSettings) {
-        return post("/gold/settings", goldSettings);
-    }
-
-    // ✅ جلب إعدادات العملات فقط
-    public ApiResponse getCurrencySettings() {
-        return get("/currency/settings");
-    }
-
-    // ✅ حفظ إعدادات العملات فقط
-    public ApiResponse saveCurrencySettings(JSONObject currencySettings) {
-        return post("/currency/settings", currencySettings);
-    }
-
-    // ✅ حفظ كل الإعدادات معاً - الدالة القديمة (معاملين)
-    public ApiResponse saveGoldCurrencySettings(JSONObject goldSettings, JSONObject currencySettings) {
+    public ApiResponse encodeItem(String epc, String barcode, String title, String purityCode,
+                                  double grossWeight, double netWeight, double makingPerGram,
+                                  double profitMargin, String category, String location) {
         JSONObject payload = new JSONObject();
         try {
-            if (goldSettings != null) payload.put("gold", goldSettings);
-            if (currencySettings != null) payload.put("currency", currencySettings);
-        } catch (Exception ignored) {}
-        return post("/gold-currency/settings", payload);
+            payload.put("epc", epc);
+            payload.put("barcode", barcode != null ? barcode : "");
+            payload.put("title", title != null ? title : "قطعة مجوهرات");
+            payload.put("purity_code", purityCode != null ? purityCode : "21K");
+            payload.put("gross_weight", grossWeight);
+            payload.put("net_weight", netWeight);
+            payload.put("making_per_gram", makingPerGram);
+            payload.put("profit_margin", profitMargin);
+            payload.put("category", category != null ? category : "مجوهرات");
+            payload.put("location", location != null ? location : "المعرض الرئيسي");
+            payload.put("gate_id", getEffectiveGateId());
+        } catch (Exception e) {}
+        return encodeItem(payload);
     }
 
-    // ✅ حفظ كل الإعدادات معاً - الدالة الجديدة (معامل واحد)
-    public ApiResponse saveGoldCurrencySettings(JSONObject fullPayload) {
-        return post("/gold-currency/settings", fullPayload);
-    }
+    // ===================== 📈 GOLD =====================
 
-    // ✅ جلب سعر الذهب من API خارجي
-    public ApiResponse fetchGoldPrice(String provider, String apiKey) {
-        JSONObject payload = new JSONObject();
-        try {
-            payload.put("provider", provider);
-            payload.put("api_key", apiKey);
-        } catch (Exception ignored) {}
-        return post("/gold/price/fetch", payload);
-    }
-
-    // ✅ جلب سعر الذهب
-    public ApiResponse getGoldPrice() {
-        return get("/gold/price");
-    }
-
-    // ✅ تحديث سعر الذهب
-    public ApiResponse updateGoldPrice(JSONObject prices) {
-        return post("/gold/price", prices);
-    }
-
-    // ✅ جلب أسعار الصرف
-    public ApiResponse getExchangeRates() {
-        return get("/currency/rates");
-    }
-
-    // ✅ حساب سعر الذهب
-    public ApiResponse calculateGoldPrice(int karat, double weight, String currency) {
-        JSONObject payload = new JSONObject();
-        try {
-            payload.put("karat", karat);
-            payload.put("weight", weight);
-            payload.put("currency", currency);
-        } catch (Exception ignored) {}
-        return post("/gold/calculate", payload);
+    public ApiResponse getGoldRatesAndSettings() {
+        return get("/gold-rates");
     }
 
     // ===================== 🚪 GATES =====================
@@ -475,6 +486,67 @@ public class MiraApiClient {
             payload.put("gate_id", getEffectiveGateId());
         } catch (Exception ignored) {}
         return post("/program", payload);
+    }
+
+    public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary, String altText) {
+        HttpURLConnection conn = null;
+        try {
+            String fullUrl = apiUrl + "/items/" + itemId + "/images";
+            URL url = new URL(fullUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
+            
+            String token = getAuthToken();
+            if (!token.isEmpty()) {
+                conn.setRequestProperty("Authorization", "Bearer " + token);
+            }
+            
+            conn.setConnectTimeout(30000);
+            conn.setReadTimeout(30000);
+            conn.setDoOutput(true);
+            
+            String boundary = "----MiraBoundary" + System.currentTimeMillis();
+            conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+            
+            try (OutputStream os = conn.getOutputStream()) {
+                StringBuilder sb = new StringBuilder();
+                sb.append("--").append(boundary).append("\r\n");
+                sb.append("Content-Disposition: form-data; name=\"image\"; filename=\"")
+                  .append(imageFile.getName()).append("\"\r\n");
+                sb.append("Content-Type: image/jpeg\r\n\r\n");
+                os.write(sb.toString().getBytes("utf-8"));
+                
+                FileInputStream fis = new FileInputStream(imageFile);
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = fis.read(buffer)) != -1) {
+                    os.write(buffer, 0, bytesRead);
+                }
+                fis.close();
+                
+                sb = new StringBuilder();
+                sb.append("\r\n--").append(boundary).append("\r\n");
+                sb.append("Content-Disposition: form-data; name=\"is_primary\"\r\n\r\n");
+                sb.append(isPrimary ? "1" : "0");
+                os.write(sb.toString().getBytes("utf-8"));
+                
+                sb = new StringBuilder();
+                sb.append("\r\n--").append(boundary).append("\r\n");
+                sb.append("Content-Disposition: form-data; name=\"alt_text\"\r\n\r\n");
+                sb.append(altText != null ? altText : "");
+                os.write(sb.toString().getBytes("utf-8"));
+                
+                os.write(("\r\n--" + boundary + "--\r\n").getBytes("utf-8"));
+                os.flush();
+            }
+            
+            return buildResponse(conn);
+        } catch (Exception e) {
+            return new ApiResponse(-1, null, e.getMessage());
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
     }
 
     public ApiResponse lockTag(String serial) {
@@ -609,115 +681,19 @@ public class MiraApiClient {
         return getWithAuth(url);
     }
 
-    // ===================== 📤 IMAGE UPLOAD =====================
-
-    public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary, String altText) {
-        HttpURLConnection conn = null;
-        try {
-            String fullUrl = apiUrl + "/items/" + itemId + "/images";
-            URL url = new URL(fullUrl);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
-            
-            String token = getAuthToken();
-            if (!token.isEmpty()) {
-                conn.setRequestProperty("Authorization", "Bearer " + token);
-            }
-            
-            conn.setConnectTimeout(30000);
-            conn.setReadTimeout(30000);
-            conn.setDoOutput(true);
-            
-            String boundary = "----MiraBoundary" + System.currentTimeMillis();
-            conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
-            
-            try (OutputStream os = conn.getOutputStream()) {
-                StringBuilder sb = new StringBuilder();
-                sb.append("--").append(boundary).append("\r\n");
-                sb.append("Content-Disposition: form-data; name=\"image\"; filename=\"")
-                  .append(imageFile.getName()).append("\"\r\n");
-                sb.append("Content-Type: image/jpeg\r\n\r\n");
-                os.write(sb.toString().getBytes("utf-8"));
-                
-                FileInputStream fis = new FileInputStream(imageFile);
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while ((bytesRead = fis.read(buffer)) != -1) {
-                    os.write(buffer, 0, bytesRead);
-                }
-                fis.close();
-                
-                sb = new StringBuilder();
-                sb.append("\r\n--").append(boundary).append("\r\n");
-                sb.append("Content-Disposition: form-data; name=\"is_primary\"\r\n\r\n");
-                sb.append(isPrimary ? "1" : "0");
-                os.write(sb.toString().getBytes("utf-8"));
-                
-                sb = new StringBuilder();
-                sb.append("\r\n--").append(boundary).append("\r\n");
-                sb.append("Content-Disposition: form-data; name=\"alt_text\"\r\n\r\n");
-                sb.append(altText != null ? altText : "");
-                os.write(sb.toString().getBytes("utf-8"));
-                
-                os.write(("\r\n--" + boundary + "--\r\n").getBytes("utf-8"));
-                os.flush();
-            }
-            
-            return buildResponse(conn);
-        } catch (Exception e) {
-            return new ApiResponse(-1, null, e.getMessage());
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
+    public ApiResponse getReportData(String reportType, String fromDate, String toDate, int branchId) {
+        String endpoint = "/reports/data?type=" + (reportType != null ? reportType : "")
+                + "&from=" + (fromDate != null ? fromDate : "")
+                + "&to=" + (toDate != null ? toDate : "")
+                + "&branch_id=" + branchId;
+        return getWithAuth(endpoint);
     }
 
     // ===================== CORE HTTP =====================
 
-    private ApiResponse get(String endpoint) {
-        HttpURLConnection conn = null;
-        try {
-            String fullUrl = apiUrl + endpoint;
-            URL url = new URL(fullUrl);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
-            return buildResponse(conn);
-        } catch (Exception e) {
-            return new ApiResponse(-1, null, e.getMessage());
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
-    }
-
-    private ApiResponse post(String endpoint, JSONObject payload) {
-        HttpURLConnection conn = null;
-        try {
-            String fullUrl = apiUrl + endpoint;
-            URL url = new URL(fullUrl);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
-            conn.setDoOutput(true);
-            if (payload != null) {
-                String jsonString = payload.toString();
-                try (OutputStream os = conn.getOutputStream()) {
-                    byte[] input = jsonString.getBytes("utf-8");
-                    os.write(input, 0, input.length);
-                }
-            }
-            return buildResponse(conn);
-        } catch (Exception e) {
-            return new ApiResponse(-1, null, e.getMessage());
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
+    private String getAuthToken() {
+        SharedPreferences prefs = context.getSharedPreferences(SESSION_PREFS, Context.MODE_PRIVATE);
+        return prefs.getString("authToken", "");
     }
 
     public ApiResponse getWithAuth(String endpoint) {
@@ -775,131 +751,53 @@ public class MiraApiClient {
             if (conn != null) conn.disconnect();
         }
     }
-// ===================== 📦 TRANSFERS =====================
 
-public ApiResponse receiveTransferWithAudit(JSONObject payload) {
-    return postWithAuth("/transfers/receive-audit", payload);
-}
-
-public ApiResponse getTransferDetails(int transferId) {
-    return getWithAuth("/transfers/" + transferId);
-}
-
-public ApiResponse addItemsToTransfer(int transferId, JSONArray epcs) {
-    JSONObject payload = new JSONObject();
-    try {
-        payload.put("items", epcs);
-    } catch (Exception ignored) {}
-    return postWithAuth("/transfers/" + transferId + "/items", payload);
-}
-
-public ApiResponse getTransfers(int branchId, String status) {
-    String url = "/transfers?branch_id=" + branchId;
-    if (status != null && !status.isEmpty()) {
-        url += "&status=" + status;
+    private ApiResponse post(String endpoint, JSONObject payload) {
+        HttpURLConnection conn = null;
+        try {
+            String fullUrl = apiUrl + endpoint;
+            URL url = new URL(fullUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            conn.setDoOutput(true);
+            if (payload != null) {
+                String jsonString = payload.toString();
+                try (OutputStream os = conn.getOutputStream()) {
+                    byte[] input = jsonString.getBytes("utf-8");
+                    os.write(input, 0, input.length);
+                }
+            }
+            return buildResponse(conn);
+        } catch (Exception e) {
+            return new ApiResponse(-1, null, e.getMessage());
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
     }
-    return getWithAuth(url);
-}
 
-public ApiResponse createTransfer(JSONObject payload) {
-    return postWithAuth("/transfers", payload);
-}
-
-public ApiResponse getTransfer(int transferId) {
-    return getWithAuth("/transfers/" + transferId);
-}
-
-public ApiResponse approveTransfer(int transferId) {
-    return postWithAuth("/transfers/" + transferId + "/approve", new JSONObject());
-}
-
-public ApiResponse receiveTransfer(int transferId) {
-    return postWithAuth("/transfers/" + transferId + "/receive", new JSONObject());
-}
-
-public ApiResponse scanTransferItem(int transferId, String epc) {
-    JSONObject payload = new JSONObject();
-    try {
-        payload.put("epc", epc);
-    } catch (Exception ignored) {}
-    return postWithAuth("/transfers/" + transferId + "/scan", payload);
-}
-
-public ApiResponse updateTransfer(int transferId, JSONObject payload) {
-    return postWithAuth("/transfers/" + transferId, payload);
-}
-
-// ===================== 📊 REPORTS =====================
-
-public ApiResponse getReportData(String reportType, String fromDate, String toDate, int branchId) {
-    String endpoint = "/reports/data?type=" + (reportType != null ? reportType : "")
-            + "&from=" + (fromDate != null ? fromDate : "")
-            + "&to=" + (toDate != null ? toDate : "")
-            + "&branch_id=" + branchId;
-    return getWithAuth(endpoint);
-}
-
-// ===================== 🏢 BRANCHES =====================
-
-public ApiResponse getBranchItemsByCategory(int branchId, String category) {
-    String endpoint = "/branches/" + branchId + "/inventory/items";
-    if (category != null && !category.isEmpty()) {
-        endpoint += "?category=" + category;
+    private ApiResponse get(String endpoint) {
+        HttpURLConnection conn = null;
+        try {
+            String fullUrl = apiUrl + endpoint;
+            URL url = new URL(fullUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            return buildResponse(conn);
+        } catch (Exception e) {
+            return new ApiResponse(-1, null, e.getMessage());
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
     }
-    return getWithAuth(endpoint);
-}
 
-public ApiResponse getBranchItemsList(int branchId) {
-    return getWithAuth("/branches/" + branchId + "/inventory/items");
-}
-
-// ===================== 🚪 SECURE GATE =====================
-
-public ApiResponse getAllowedList() {
-    return getWithAuth("/allowed-list");
-}
-
-public ApiResponse sendGateLog(JSONObject payload) {
-    return postWithAuth("/gate-log", payload);
-}
-
-// ===================== 💰 ACCOUNTING =====================
-
-public ApiResponse getJournalEntries(String branchId) {
-    String url = "/accounting/journal-entries";
-    if (branchId != null && !branchId.isEmpty()) {
-        url += "?branch_id=" + branchId;
-    }
-    return getWithAuth(url);
-}
-
-public ApiResponse getJournalEntryDetail(String entryId) {
-    return getWithAuth("/accounting/journal-entries/" + entryId);
-}
-
-public ApiResponse createJournalEntry(JSONObject payload) {
-    return postWithAuth("/accounting/journal-entries/create", payload);
-}
-
-public ApiResponse getChartOfAccounts() {
-    return getWithAuth("/accounting/chart-of-accounts");
-}
-
-public ApiResponse getTrialBalance(String branchId) {
-    String url = "/accounting/trial-balance";
-    if (branchId != null && !branchId.isEmpty()) {
-        url += "?branch_id=" + branchId;
-    }
-    return getWithAuth(url);
-}
-
-public ApiResponse getAccountingSummary(String branchId) {
-    String url = "/accounting/summary";
-    if (branchId != null && !branchId.isEmpty()) {
-        url += "?branch_id=" + branchId;
-    }
-    return getWithAuth(url);
-}
     private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
         int responseCode = conn.getResponseCode();
         InputStream is = (responseCode >= 200 && responseCode < 300) ?
@@ -919,10 +817,111 @@ public ApiResponse getAccountingSummary(String branchId) {
         return new ApiResponse(responseCode, json, null);
     }
 
-    // ===================== GETTERS =====================
-
     public String getGateId() { return getEffectiveGateId(); }
     public String getApiUrl() { return apiUrl; }
+
+    public void submitInventoryAuditReport(JSONObject payload) {
+        HttpURLConnection conn = null;
+        try {
+            String fullUrl = apiUrl + "/inventory/submit-audit";
+            URL url = new URL(fullUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
+            String token = getAuthToken();
+            if (!token.isEmpty()) {
+                conn.setRequestProperty("Authorization", "Bearer " + token);
+            }
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            conn.setDoOutput(true);
+            if (payload != null) {
+                String jsonString = payload.toString();
+                try (OutputStream os = conn.getOutputStream()) {
+                    byte[] input = jsonString.getBytes("utf-8");
+                    os.write(input, 0, input.length);
+                }
+            }
+            conn.getResponseCode();
+        } catch (Exception e) {
+            Log.e(TAG, "submitInventoryAuditReport error: " + e.getMessage());
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    // ===================== 💰 GOLD & CURRENCY =====================
+
+    public ApiResponse getGoldCurrencySettings() {
+        return getWithAuth("/gold-currency/settings");
+    }
+
+    public ApiResponse getGoldSettings() {
+        return getWithAuth("/gold/settings");
+    }
+
+    public ApiResponse saveGoldSettings(JSONObject goldSettings) {
+        return postWithAuth("/gold/settings", goldSettings);
+    }
+
+    public ApiResponse getCurrencySettings() {
+        return getWithAuth("/currency/settings");
+    }
+
+    public ApiResponse saveCurrencySettings(JSONObject currencySettings) {
+        return postWithAuth("/currency/settings", currencySettings);
+    }
+
+    public ApiResponse saveGoldCurrencySettings(JSONObject goldSettings, JSONObject currencySettings) {
+        JSONObject payload = new JSONObject();
+        try {
+            if (goldSettings != null) payload.put("gold", goldSettings);
+            if (currencySettings != null) payload.put("currency", currencySettings);
+        } catch (Exception ignored) {}
+        return postWithAuth("/gold-currency/settings", payload);
+    }
+    
+    
+// ✅ الدالة الجديدة (معامل واحد)
+public ApiResponse saveGoldCurrencySettings(JSONObject fullPayload) {
+    return postWithAuth("/gold-currency/settings", fullPayload);
+}
+
+    public ApiResponse fetchGoldPrice(String provider, String apiKey) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("provider", provider);
+            payload.put("api_key", apiKey);
+        } catch (Exception ignored) {}
+        return postWithAuth("/gold/price/fetch", payload);
+    }
+
+    public ApiResponse getGoldPrice() {
+        return getWithAuth("/gold/price");
+    }
+
+    public ApiResponse updateGoldPrice(JSONObject prices) {
+        return postWithAuth("/gold/price", prices);
+    }
+
+    public ApiResponse getExchangeRates() {
+        return getWithAuth("/currency/rates");
+    }
+
+    public ApiResponse calculateGoldPrice(int karat, double weight, String currency) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("karat", karat);
+            payload.put("weight", weight);
+            payload.put("currency", currency);
+        } catch (Exception ignored) {}
+        return postWithAuth("/gold/calculate", payload);
+    }
+
+    public ApiResponse getLivePrices() {
+        return getWithAuth("/gold-currency/live-prices");
+    }
 
     // ===================== ApiResponse =====================
 
@@ -959,4 +958,4 @@ public ApiResponse getAccountingSummary(String branchId) {
             return null;
         }
     }
-    }
+                                                       }
