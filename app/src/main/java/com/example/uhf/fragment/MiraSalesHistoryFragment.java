@@ -21,6 +21,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -30,6 +32,7 @@ import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
+import com.example.uhf.manager.MiraPriceManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -66,6 +69,7 @@ public class MiraSalesHistoryFragment extends Fragment {
 
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
+    private MiraPriceManager priceManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isArabic;
 
@@ -89,6 +93,7 @@ public class MiraSalesHistoryFragment extends Fragment {
         if (getContext() != null) {
             apiClient = MiraApiClient.getInstance(getContext());
             branchesManager = MiraBranchesManager.getInstance(getContext());
+            priceManager = MiraPriceManager.getInstance(getContext());
             offlineCache = requireContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
         }
 
@@ -117,7 +122,7 @@ public class MiraSalesHistoryFragment extends Fragment {
     private void setupRecyclerView() {
         if (rvSales != null) {
             rvSales.setLayoutManager(new LinearLayoutManager(getContext()));
-            adapter = new MiraSalesAdapter(filteredList, this::openReceipt, isArabic);
+            adapter = new MiraSalesAdapter(filteredList, this::openReceipt, isArabic, priceManager);
             rvSales.setAdapter(adapter);
         }
     }
@@ -309,7 +314,7 @@ public class MiraSalesHistoryFragment extends Fragment {
         }
 
         if (tvTotalRevenue != null) {
-            tvTotalRevenue.setText(String.format(Locale.US, "%,.0f YER", totalRevenue));
+            tvTotalRevenue.setText(priceManager.formatPriceDefault(totalRevenue));
         }
         if (tvInvoicesCount != null) {
             tvInvoicesCount.setText(String.valueOf(list.size()));
@@ -344,20 +349,74 @@ public class MiraSalesHistoryFragment extends Fragment {
         if (layoutEmptyState != null) layoutEmptyState.setVisibility(View.GONE);
     }
 
+    /**
+     * ✅ الإصلاح: فتح السند بطريقة صحيحة مع الحفاظ على شاشة المبيعات
+     */
     private void openReceipt(MiraSaleItem sale) {
         try {
             if (getActivity() instanceof UHFMainActivity) {
+                // ✅ استخدام الطريقة الموجودة في UHFMainActivity
                 ((UHFMainActivity) getActivity()).openReceiptFragment(sale.rawJson);
             } else if (isAdded()) {
-                MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(sale.rawJson);
+                // ✅ الحل: استخدام add بدلاً من replace مع إخفاء الـ Fragment الحالي
+                openReceiptWithAdd(sale.rawJson);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error opening receipt", e);
+            if (getContext() != null) {
+                Toast.makeText(getContext(), isArabic ? "خطأ في فتح الإيصال" : "Error opening receipt", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    /**
+     * ✅ فتح السند مع الحفاظ على شاشة المبيعات
+     */
+    private void openReceiptWithAdd(String receiptJson) {
+        try {
+            MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(receiptJson);
+            
+            FragmentManager fm = getParentFragmentManager();
+            FragmentTransaction ft = fm.beginTransaction();
+            
+            // ✅ إخفاء الـ Fragment الحالي بدلاً من استبداله
+            ft.hide(this);
+            
+            // ✅ إضافة السند فوق شاشة المبيعات
+            ft.add(android.R.id.content, receipt, "mira_receipt");
+            
+            // ✅ إضافة إلى Back Stack للعودة الصحيحة
+            ft.addToBackStack("mira_receipt");
+            
+            ft.commit();
+            
+            // ✅ إضافة مستمع للعودة لإظهار شاشة المبيعات مرة أخرى
+            fm.addOnBackStackChangedListener(new FragmentManager.OnBackStackChangedListener() {
+                @Override
+                public void onBackStackChanged() {
+                    if (fm.getBackStackEntryCount() == 0) {
+                        // ✅ تم العودة من السند، إظهار شاشة المبيعات
+                        FragmentTransaction showFt = fm.beginTransaction();
+                        showFt.show(MiraSalesHistoryFragment.this);
+                        showFt.commit();
+                        
+                        // ✅ إزالة المستمع بعد الاستخدام
+                        fm.removeOnBackStackChangedListener(this);
+                    }
+                }
+            });
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error in openReceiptWithAdd", e);
+            // ✅ في حالة الفشل، استخدم الطريقة التقليدية
+            try {
+                MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(receiptJson);
                 getParentFragmentManager().beginTransaction()
                         .replace(android.R.id.content, receipt)
                         .addToBackStack("mira_receipt")
                         .commit();
-            }
-        } catch (Exception e) {
-            if (getContext() != null) {
-                Toast.makeText(getContext(), isArabic ? "خطأ في فتح الإيصال" : "Error opening receipt", Toast.LENGTH_SHORT).show();
+            } catch (Exception ex) {
+                Log.e(TAG, "Fallback also failed", ex);
             }
         }
     }
@@ -394,11 +453,13 @@ public class MiraSalesHistoryFragment extends Fragment {
         private final List<MiraSaleItem> items;
         private final OnMiraSaleClickListener listener;
         private final boolean isArabic;
+        private final MiraPriceManager priceManager;
 
-        MiraSalesAdapter(List<MiraSaleItem> items, OnMiraSaleClickListener listener, boolean isArabic) {
+        MiraSalesAdapter(List<MiraSaleItem> items, OnMiraSaleClickListener listener, boolean isArabic, MiraPriceManager priceManager) {
             this.items = new ArrayList<>(items);
             this.listener = listener;
             this.isArabic = isArabic;
+            this.priceManager = priceManager;
         }
 
         public void updateData(List<MiraSaleItem> newItems) {
@@ -437,7 +498,9 @@ public class MiraSalesHistoryFragment extends Fragment {
 
             if (h.tvSaleId != null) h.tvSaleId.setText("#" + (s.saleId != null ? s.saleId : "—"));
             if (h.tvCustomer != null) h.tvCustomer.setText(s.customerName);
-            if (h.tvAmount != null) h.tvAmount.setText(String.format(Locale.US, "%,.0f YER", s.amount));
+            
+            if (h.tvAmount != null) h.tvAmount.setText(priceManager.formatPriceDefault(s.amount));
+            
             if (h.tvItems != null) h.tvItems.setText(s.itemCount + " " + (isArabic ? "قطع" : "pcs"));
 
             if (h.tvPayment != null) {
@@ -446,6 +509,8 @@ public class MiraSalesHistoryFragment extends Fragment {
                     case "CASH": paymentText = isArabic ? "نقداً" : "Cash"; break;
                     case "CARD": paymentText = isArabic ? "بطاقة" : "Card"; break;
                     case "TRANSFER": paymentText = isArabic ? "تحويل" : "Transfer"; break;
+                    case "BANK_TRANSFER": paymentText = isArabic ? "تحويل بنكي" : "Bank Transfer"; break;
+                    case "CREDIT": paymentText = isArabic ? "آجل" : "Credit"; break;
                     default: paymentText = s.paymentMethod != null ? s.paymentMethod : "—";
                 }
                 h.tvPayment.setText(paymentText);
