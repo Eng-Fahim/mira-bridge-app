@@ -21,25 +21,16 @@ public class RFIDReaderFactory {
             return new SimulatorReader(appContext);
         }
         
-        switch (type) {
-            case CHAINWAY_C72:
-            case CHAINWAY_C66:
-            case CHAINWAY_R6:
-                return new ChainwayReader(appContext);
-
-            case TSL_1128:
-            case TSL_2128:
-            case TSL_3166:
-            case NORDIC_ID_NUR2:
-            case IMPINJ_RS1000:
-            case ZEBRA_RFD8500:
-            case ZEBRA_RFD40:
-            case GENERIC_BLUETOOTH:
-                return new GenericBluetoothReader(address);
-
-            case SIMULATOR:
-            default:
-                return new SimulatorReader(appContext);
+        if (type == MiraIRFIDReader.ReaderType.CHAINWAY_C72 ||
+            type == MiraIRFIDReader.ReaderType.CHAINWAY_C66 ||
+            type == MiraIRFIDReader.ReaderType.CHAINWAY_R6) {
+            return new ChainwayReader(appContext);
+        } 
+        else if (type == MiraIRFIDReader.ReaderType.SIMULATOR) {
+            return new SimulatorReader(appContext);
+        } 
+        else {
+            return new GenericBluetoothReader(address);
         }
     }
 }
