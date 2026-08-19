@@ -18,10 +18,10 @@ import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
-import com.example.uhf.tools.AppConfigManager;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.switchmaterial.SwitchMaterial;
 
 import org.json.JSONObject;
 
@@ -30,7 +30,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -38,11 +37,13 @@ public class MiraProfileFragment extends Fragment {
 
     private static final String TAG = "MiraProfileFragment";
 
-    private TextView tvProfileName, tvRole, tvAccountNum;
+    private TextView tvProfileName, tvRole, tvAccountNum, tvAltNum;
     private TextView tvOrgNameAr, tvOrgNameEn, tvPhone, tvEmail, tvTaxNum;
+    private ImageView imgArrowSecurity, imgArrowTheme;
+    private LinearLayout layoutSecurityExpandable, layoutAppThemeExpandable;
+    private SwitchMaterial switchBiometricLogin, switchBiometricConfirm;
 
     private SessionManager sessionManager;
-    private AppConfigManager configManager;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     @Nullable
@@ -52,7 +53,6 @@ public class MiraProfileFragment extends Fragment {
         try {
             root = inflater.inflate(R.layout.fragment_mira_profile, container, false);
             sessionManager = new SessionManager(requireContext());
-            configManager = new AppConfigManager(requireContext());
 
             initViews(root);
             setupListeners(root);
@@ -71,12 +71,22 @@ public class MiraProfileFragment extends Fragment {
         tvProfileName = root.findViewById(R.id.tvProfileName);
         tvRole = root.findViewById(R.id.tvRole);
         tvAccountNum = root.findViewById(R.id.tvAccountNum);
+        tvAltNum = root.findViewById(R.id.tvAltNum);
 
         tvOrgNameAr = root.findViewById(R.id.tvOrgNameAr);
         tvOrgNameEn = root.findViewById(R.id.tvOrgNameEn);
         tvPhone = root.findViewById(R.id.tvPhone);
         tvEmail = root.findViewById(R.id.tvEmail);
         tvTaxNum = root.findViewById(R.id.tvTaxNum);
+
+        imgArrowSecurity = root.findViewById(R.id.imgArrowSecurity);
+        imgArrowTheme = root.findViewById(R.id.imgArrowTheme);
+
+        layoutSecurityExpandable = root.findViewById(R.id.layoutSecurityExpandable);
+        layoutAppThemeExpandable = root.findViewById(R.id.layoutAppThemeExpandable);
+
+        switchBiometricLogin = root.findViewById(R.id.switchBiometricLogin);
+        switchBiometricConfirm = root.findViewById(R.id.switchBiometricConfirm);
     }
 
     private void setupListeners(View root) {
@@ -86,6 +96,25 @@ public class MiraProfileFragment extends Fragment {
         if (btnEditProfile != null) {
             btnEditProfile.setOnClickListener(v -> showEditProfileDialog());
         }
+
+        View headerSecurity = root.findViewById(R.id.headerSecurity);
+        if (headerSecurity != null) {
+            headerSecurity.setOnClickListener(v -> toggleSection(layoutSecurityExpandable, imgArrowSecurity));
+        }
+
+        View headerAppTheme = root.findViewById(R.id.headerAppTheme);
+        if (headerAppTheme != null) {
+            headerAppTheme.setOnClickListener(v -> toggleSection(layoutAppThemeExpandable, imgArrowTheme));
+        }
+    }
+
+    private void toggleSection(LinearLayout layout, ImageView arrow) {
+        if (layout == null) return;
+        boolean isVisible = layout.getVisibility() == View.VISIBLE;
+        layout.setVisibility(isVisible ? View.GONE : View.VISIBLE);
+        if (arrow != null) {
+            arrow.animate().rotation(isVisible ? 0 : 180).setDuration(200).start();
+        }
     }
 
     private void fetchProfileDataFromServer() {
@@ -94,13 +123,18 @@ public class MiraProfileFragment extends Fragment {
         executor.execute(() -> {
             try {
                 String baseUrl = sessionManager.getServerUrl();
+                if (baseUrl == null) baseUrl = "";
                 if (!baseUrl.endsWith("/")) baseUrl += "/";
                 URL url = new URL(baseUrl + "wp-json/mira-gate/v1/profile/get");
 
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
-                conn.setRequestProperty("X-MIRA-API-KEY", sessionManager.getApiKey());
-                conn.setRequestProperty("X-MIRA-Auth-Token", sessionManager.getAuthToken());
+
+                String token = sessionManager.getAuthToken();
+                if (!TextUtils.isEmpty(token)) {
+                    conn.setRequestProperty("X-MIRA-Auth-Token", token);
+                }
+
                 conn.setConnectTimeout(8000);
 
                 if (conn.getResponseCode() == 200) {
@@ -114,21 +148,6 @@ public class MiraProfileFragment extends Fragment {
                     if (json.optBoolean("success")) {
                         JSONObject user = json.optJSONObject("user");
                         JSONObject org = json.optJSONObject("organization");
-                        JSONObject config = json.optJSONObject("system_config");
-
-                        if (org != null && config != null) {
-                            configManager.saveConfig(
-                                    org.optString("name_ar"),
-                                    org.optString("name_en"),
-                                    org.optString("phone"),
-                                    org.optString("email"),
-                                    org.optString("tax_number"),
-                                    config.optString("currency_ar"),
-                                    config.optString("currency_en"),
-                                    config.optBoolean("enable_rfid"),
-                                    config.optBoolean("enable_biometric")
-                            );
-                        }
 
                         if (getActivity() != null) {
                             getActivity().runOnUiThread(() -> {
@@ -142,7 +161,7 @@ public class MiraProfileFragment extends Fragment {
                                     if (tvOrgNameEn != null) tvOrgNameEn.setText(org.optString("name_en", ""));
                                     if (tvPhone != null) tvPhone.setText(org.optString("phone", ""));
                                     if (tvEmail != null) tvEmail.setText(org.optString("email", ""));
-                                    if (tvTaxNum != null) tvTaxNum.setText(org.optString("tax_number", ""));
+                                    if (tvTaxNum != null) tvTaxNum.setText("الرقم الضريبي: " + org.optString("tax_number", ""));
                                 }
                             });
                         }
@@ -173,11 +192,10 @@ public class MiraProfileFragment extends Fragment {
             if (tvOrgNameEn != null && etNameEn != null) etNameEn.setText(tvOrgNameEn.getText());
             if (tvPhone != null && etPhone != null) etPhone.setText(tvPhone.getText());
             if (tvEmail != null && etEmail != null) etEmail.setText(tvEmail.getText());
-            if (tvTaxNum != null && etTax != null) etTax.setText(tvTaxNum.getText());
 
             new MaterialAlertDialogBuilder(getContext())
                     .setView(dialogView)
-                    .setPositiveButton("حفظ / Save", (dialog, which) -> {
+                    .setPositiveButton("حفظ", (dialog, which) -> {
                         String nameAr = etNameAr != null ? etNameAr.getText().toString().trim() : "";
                         String nameEn = etNameEn != null ? etNameEn.getText().toString().trim() : "";
                         String phone  = etPhone != null ? etPhone.getText().toString().trim() : "";
@@ -189,7 +207,7 @@ public class MiraProfileFragment extends Fragment {
                     .setNegativeButton("إلغاء", (dialog, which) -> dialog.dismiss())
                     .show();
         } catch (Exception e) {
-            Log.e(TAG, "Error in edit dialog: ", e);
+            Log.e(TAG, "Error in dialog: ", e);
         }
     }
 
@@ -199,14 +217,19 @@ public class MiraProfileFragment extends Fragment {
         executor.execute(() -> {
             try {
                 String baseUrl = sessionManager.getServerUrl();
+                if (baseUrl == null) baseUrl = "";
                 if (!baseUrl.endsWith("/")) baseUrl += "/";
                 URL url = new URL(baseUrl + "wp-json/mira-gate/v1/profile/update");
 
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-                conn.setRequestProperty("X-MIRA-API-KEY", sessionManager.getApiKey());
-                conn.setRequestProperty("X-MIRA-Auth-Token", sessionManager.getAuthToken());
+
+                String token = sessionManager.getAuthToken();
+                if (!TextUtils.isEmpty(token)) {
+                    conn.setRequestProperty("X-MIRA-Auth-Token", token);
+                }
+
                 conn.setDoOutput(true);
 
                 JSONObject body = new JSONObject();
@@ -223,25 +246,18 @@ public class MiraProfileFragment extends Fragment {
                 if (conn.getResponseCode() == 200) {
                     if (getActivity() != null) {
                         getActivity().runOnUiThread(() -> {
-                            boolean isArabic = Locale.getDefault().getLanguage().equals("ar");
-                            configManager.saveConfig(nameAr, nameEn, phone, email, tax, 
-                                    configManager.getLocalizedCurrency(true), 
-                                    configManager.getLocalizedCurrency(false), 
-                                    configManager.isRfidEnabled(), 
-                                    configManager.isBiometricEnabled());
-
                             if (tvOrgNameAr != null) tvOrgNameAr.setText(nameAr);
                             if (tvOrgNameEn != null) tvOrgNameEn.setText(nameEn);
                             if (tvPhone != null) tvPhone.setText(phone);
                             if (tvEmail != null) tvEmail.setText(email);
-                            if (tvTaxNum != null) tvTaxNum.setText(tax);
+                            if (tvTaxNum != null) tvTaxNum.setText("الرقم الضريبي: " + tax);
 
-                            Toast.makeText(getContext(), isArabic ? "تم حفظ التكوينات بنجاح" : "Settings saved successfully", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getContext(), "تم حفظ البيانات بنجاح", Toast.LENGTH_SHORT).show();
                         });
                     }
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Error updating config: ", e);
+                Log.e(TAG, "Error updating profile: ", e);
             } finally {
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> showLoading(false));
@@ -252,7 +268,9 @@ public class MiraProfileFragment extends Fragment {
 
     private void showLoading(boolean show) {
         if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).showLoading();
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+            if (show) activity.showLoading();
+            else activity.hideLoading();
         }
     }
 
