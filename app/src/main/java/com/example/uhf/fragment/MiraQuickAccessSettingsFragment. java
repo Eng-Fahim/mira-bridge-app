@@ -1,0 +1,253 @@
+package com.example.uhf.fragment;
+
+import android.content.Context;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.widget.SwitchCompat;
+import androidx.fragment.app.Fragment;
+
+import com.example.uhf.R;
+import com.example.uhf.manager.MiraQuickAccessSettings;
+
+import java.util.List;
+import java.util.Locale;
+
+public class MiraQuickAccessSettingsFragment extends Fragment {
+
+    private static final String TAG = "QuickAccessSettings";
+    
+    private MiraQuickAccessSettings quickAccess;
+    private boolean isArabic;
+    private LinearLayout containerActions;
+    private TextView tvTitle, tvSubtitle;
+    private Button btnSave, btnReset;
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.fragment_quick_access_settings, container, false);
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        
+        if (getContext() == null) return;
+        
+        quickAccess = MiraQuickAccessSettings.getInstance(getContext());
+        isArabic = Locale.getDefault().getLanguage().equals("ar");
+        
+        initViews(view);
+        setupListeners();
+        renderActionToggles();
+    }
+
+    private void initViews(View view) {
+        containerActions = view.findViewById(R.id.containerActions);
+        tvTitle = view.findViewById(R.id.tvQuickAccessTitle);
+        tvSubtitle = view.findViewById(R.id.tvQuickAccessSubtitle);
+        btnSave = view.findViewById(R.id.btnSaveQuickAccess);
+        btnReset = view.findViewById(R.id.btnResetQuickAccess);
+        
+        // ✅ تطبيق اللغة
+        if (tvTitle != null) {
+            tvTitle.setText(isArabic ? "⚙️ تخصيص أزرار الوصول السريع" : "⚙️ Customize Quick Access");
+        }
+        
+        if (tvSubtitle != null) {
+            tvSubtitle.setText(isArabic ? 
+                "فعّل أو عطّل الأزرار التي تريد ظهورها في الشاشة الرئيسية" : 
+                "Enable or disable buttons you want to show on the dashboard");
+        }
+        
+        if (btnSave != null) {
+            btnSave.setText(isArabic ? "✅ حفظ والعودة" : "✅ Save & Back");
+        }
+        
+        if (btnReset != null) {
+            btnReset.setText(isArabic ? "🔄 إعادة تعيين" : "🔄 Reset");
+        }
+    }
+
+    private void setupListeners() {
+        if (btnSave != null) {
+            btnSave.setOnClickListener(v -> {
+                Toast.makeText(getContext(), 
+                    isArabic ? "✅ تم حفظ الإعدادات بنجاح" : "✅ Settings saved successfully", 
+                    Toast.LENGTH_SHORT).show();
+                
+                // ✅ العودة للشاشة السابقة
+                if (getActivity() != null) {
+                    getActivity().getSupportFragmentManager().popBackStack();
+                }
+            });
+        }
+        
+        if (btnReset != null) {
+            btnReset.setOnClickListener(v -> showResetConfirmation());
+        }
+    }
+
+    /**
+     * ✅ عرض جميع الإجراءات مع مفاتيح التفعيل
+     */
+    private void renderActionToggles() {
+        if (containerActions == null) return;
+        
+        containerActions.removeAllViews();
+        
+        List<MiraQuickAccessSettings.QuickAction> allActions = quickAccess.getAllActions();
+        
+        for (MiraQuickAccessSettings.QuickAction action : allActions) {
+            View actionView = createActionToggle(action);
+            if (actionView != null) {
+                containerActions.addView(actionView);
+                
+                // ✅ إضافة خط فاصل
+                View divider = new View(getContext());
+                divider.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 1));
+                divider.setBackgroundColor(0xFFE5E7EB);
+                containerActions.addView(divider);
+            }
+        }
+    }
+
+    /**
+     * ✅ إنشاء صف تبديل للإجراء
+     */
+    private View createActionToggle(MiraQuickAccessSettings.QuickAction action) {
+        Context context = getContext();
+        if (context == null) return null;
+        
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(16, 16, 16, 16);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setBackgroundColor(0xFFFFFFFF);
+        
+        // ✅ الأيقونة
+        TextView tvIcon = new TextView(context);
+        tvIcon.setText(getActionIcon(action.id));
+        tvIcon.setTextSize(28);
+        tvIcon.setPadding(0, 0, 16, 0);
+        tvIcon.setGravity(android.view.Gravity.CENTER);
+        row.addView(tvIcon);
+        
+        // ✅ العنوان والوصف
+        LinearLayout textContainer = new LinearLayout(context);
+        textContainer.setOrientation(LinearLayout.VERTICAL);
+        textContainer.setLayoutParams(new LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        
+        TextView tvTitle = new TextView(context);
+        tvTitle.setText(isArabic ? action.titleAr : action.titleEn);
+        tvTitle.setTextSize(15);
+        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvTitle.setTextColor(0xFF1F2937);
+        textContainer.addView(tvTitle);
+        
+        TextView tvId = new TextView(context);
+        tvId.setText(action.id);
+        tvId.setTextSize(11);
+        tvId.setTextColor(0xFF9CA3AF);
+        tvId.setPadding(0, 2, 0, 0);
+        textContainer.addView(tvId);
+        
+        row.addView(textContainer);
+        
+        // ✅ المفتاح
+        SwitchCompat switchCompat = new SwitchCompat(context);
+        switchCompat.setChecked(action.enabled);
+        switchCompat.setShowText(false);
+        switchCompat.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            quickAccess.setActionEnabled(action.id, isChecked);
+            
+            // ✅ رسالة تأكيد قصيرة
+            String actionName = isArabic ? action.titleAr : action.titleEn;
+            String status = isChecked ? 
+                (isArabic ? "تم التفعيل" : "Enabled") : 
+                (isArabic ? "تم التعطيل" : "Disabled");
+            
+            Toast.makeText(context, 
+                status + ": " + actionName, 
+                Toast.LENGTH_SHORT).show();
+        });
+        row.addView(switchCompat);
+        
+        return row;
+    }
+
+    /**
+     * ✅ عرض تأكيد إعادة التعيين
+     */
+    private void showResetConfirmation() {
+        if (getContext() == null) return;
+        
+        new androidx.appcompat.app.AlertDialog.Builder(getContext())
+            .setTitle(isArabic ? "🔄 إعادة تعيين" : "🔄 Reset")
+            .setMessage(isArabic ? 
+                "هل تريد إعادة تعيين جميع الأزرار إلى الوضع الافتراضي؟" : 
+                "Do you want to reset all buttons to default?")
+            .setPositiveButton(isArabic ? "نعم" : "Yes", (dialog, which) -> {
+                resetToDefaults();
+                dialog.dismiss();
+            })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", (dialog, which) -> {
+                dialog.dismiss();
+            })
+            .show();
+    }
+
+    /**
+     * ✅ إعادة التعيين للوضع الافتراضي
+     */
+    private void resetToDefaults() {
+        List<MiraQuickAccessSettings.QuickAction> allActions = quickAccess.getAllActions();
+        
+        for (MiraQuickAccessSettings.QuickAction action : allActions) {
+            boolean defaultEnabled = !action.id.equals("gold_rates") && 
+                                     !action.id.equals("users") && 
+                                     !action.id.equals("branches");
+            quickAccess.setActionEnabled(action.id, defaultEnabled);
+        }
+        
+        // ✅ إعادة رسم القائمة
+        renderActionToggles();
+        
+        Toast.makeText(getContext(), 
+            isArabic ? "✅ تمت إعادة التعيين للوضع الافتراضي" : "✅ Reset to defaults", 
+            Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * ✅ الحصول على أيقونة الإجراء
+     */
+    private String getActionIcon(String actionId) {
+        switch (actionId) {
+            case "identity": return "🏷️";
+            case "radar": return "📡";
+            case "gate": return "🚪";
+            case "reports": return "📊";
+            case "accounting": return "💰";
+            case "transfers": return "🔄";
+            case "admin_hub": return "⚙️";
+            case "sales_history": return "📋";
+            case "server_config": return "🌐";
+            case "gold_rates": return "🥇";
+            case "users": return "👥";
+            case "branches": return "🏢";
+            default: return "📱";
+        }
+    }
+}
