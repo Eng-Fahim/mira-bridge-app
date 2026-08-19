@@ -200,29 +200,32 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        int id = item.getItemId();
+public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+    int id = item.getItemId();
 
-        if (id == R.id.action_dashboard) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraDashboardFragment(), "Dashboard"));
-            return true;
-        } else if (id == R.id.action_gold_rates) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraGoldCurrencyFragment(), "GoldRates"));
-            return true;
-        } else if (id == R.id.action_toggle_language) {
-            toggleLanguage();
-            return true;
-        } else if (id == R.id.action_profile) {
-    // ✅ فتح واجهة الملف الشخصي MiraProfileFragment
-    checkInventoryLockAndExecute(() -> loadFragment(new MiraProfileFragment(), "Profile"));
-    return true;
-        } else if (id == R.id.action_logout) {
-            confirmLogout();
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
+    if (id == R.id.action_dashboard) {
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraDashboardFragment(), "Dashboard"));
+        return true;
+    } else if (id == R.id.action_gold_rates) {
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraGoldCurrencyFragment(), "GoldRates"));
+        return true;
+    } else if (id == R.id.action_quick_access_settings) {
+        // ✅ فتح صفحة تخصيص الوصول السريع
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
+        return true;
+    } else if (id == R.id.action_toggle_language) {
+        toggleLanguage();
+        return true;
+    } else if (id == R.id.action_profile) {
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraProfileFragment(), "Profile"));
+        return true;
+    } else if (id == R.id.action_logout) {
+        confirmLogout();
+        return true;
     }
+
+    return super.onOptionsItemSelected(item);
+}
 
     private void toggleLanguage() {
         String newLang = isArabic ? "en" : "ar";
