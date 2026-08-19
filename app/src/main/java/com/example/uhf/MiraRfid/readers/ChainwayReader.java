@@ -242,16 +242,17 @@ public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
         }
     }
 
-    @Override
+  @Override
 public void clearFilter() {
     if (reader != null) {
         try {
-            reader.clearMask(); // أو reader.initFilter() حسب إصدار الـ SDK
+            reader.initFilter(); // 👈 هذه هي الدالة المعتمدة في SDK Chainway C72
         } catch (Exception e) {
-            Log.e("ChainwayReader", "Clear mask error: " + e.getMessage());
+            Log.e("ChainwayReader", "Clear filter error: " + e.getMessage());
         }
     }
 }
+
 
 
     // =========================================================================
