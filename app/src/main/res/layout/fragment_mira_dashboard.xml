@@ -464,14 +464,12 @@
                     android:textSize="13sp"
                     android:textStyle="bold" />
 
-                <androidx.gridlayout.widget.GridLayout
-                    android:id="@+id/gridQuickActions"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    android:columnCount="3"
-                    android:alignmentMode="alignMargins"
-                    android:columnOrderPreserved="false" />
+                <LinearLayout
+    android:id="@+id/containerQuickActions"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:layout_marginBottom="16dp" />
 
                 <!-- Inventory Section -->
                 <TextView
