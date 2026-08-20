@@ -34,6 +34,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
+// يجب إضافة:
+import com.example.uhf.MiraRfid.readers.ChainwayReader;
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.RFIDManager;
 import com.example.uhf.MiraRfid.model.RFIDDevice;
@@ -57,6 +59,7 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     
     private RecyclerView rvDevices;
     private MaterialButton btnAddDevice;
+    private MaterialButton btnAdvancedSettings;
     private MaterialButton btnTestConnection;
     private MaterialButton btnDetectAuto;
     private MaterialButton btnBluetoothScan;
@@ -179,6 +182,7 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     private void bindViews(View view) {
         rvDevices = view.findViewById(R.id.rvReaderDevices);
         btnAddDevice = view.findViewById(R.id.btnAddReader);
+        btnAdvancedSettings = view.findViewById(R.id.btnAdvancedSettings);
         btnTestConnection = view.findViewById(R.id.btnTestConnection);
         btnDetectAuto = view.findViewById(R.id.btnDetectAuto);
         btnBluetoothScan = view.findViewById(R.id.btnBluetoothScan);
@@ -210,6 +214,14 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
                     showAddDeviceDialog();
                 });
             }
+            
+            if (btnAdvancedSettings != null) {
+            btnAdvancedSettings.setOnClickListener(v -> {
+            playClickSound();
+        vibrateShort();
+        showAdvancedReaderSettings();
+        });
+        }
             
             if (btnTestConnection != null) {
                 btnTestConnection.setOnClickListener(v -> {
