@@ -82,30 +82,51 @@
             android:indeterminateTint="?attr/colorPrimary"
             style="?android:attr/progressBarStyleHorizontal"/>
 
-        <!-- مزود API والعملة -->
+        <!-- مزود API -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="8dp"
-            android:gravity="center_vertical">
+            android:orientation="vertical"
+            android:layout_marginBottom="8dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/api_provider"
+                    android:textSize="16sp"/>
+                <Spinner
+                    android:id="@+id/spGoldApiProvider"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"/>
+            </LinearLayout>
+
+            <!-- عرض المزود المحدد -->
             <TextView
-                android:layout_width="0dp"
+                android:id="@+id/tvSelectedProvider"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/api_provider"
-                android:textSize="16sp"/>
-            <Spinner
-                android:id="@+id/spGoldApiProvider"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"/>
+                android:text=""
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="?attr/colorPrimary"
+                android:layout_marginTop="4dp"
+                android:visibility="gone"/>
         </LinearLayout>
 
+        <!-- حقل API Key - مخفي عن المستخدم -->
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilGoldApiKey"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
+            android:visibility="gone"
             app:boxBackgroundColor="?attr/colorSurface"
             app:boxStrokeColor="?attr/colorPrimary"
             app:boxCornerRadiusTopStart="8dp"
@@ -117,7 +138,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="@string/api_key_hint"
-                android:inputType="textPassword"/>
+                android:inputType="textPassword"
+                android:enabled="false"/>
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- ✅ عملة الذهب المحددة -->
@@ -613,28 +635,40 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="24k: $0.00/g"
-            android:layout_marginBottom="4dp"/>
+            android:layout_marginBottom="4dp"
+            android:textSize="14sp"
+            android:padding="8dp"
+            android:background="?attr/colorSurfaceVariant"/>
 
         <TextView
             android:id="@+id/tvLiveGold22k"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="22k: $0.00/g"
-            android:layout_marginBottom="4dp"/>
+            android:layout_marginBottom="4dp"
+            android:textSize="14sp"
+            android:padding="8dp"
+            android:background="?attr/colorSurfaceVariant"/>
 
         <TextView
             android:id="@+id/tvLiveGold21k"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="21k: $0.00/g"
-            android:layout_marginBottom="4dp"/>
+            android:layout_marginBottom="4dp"
+            android:textSize="14sp"
+            android:padding="8dp"
+            android:background="?attr/colorSurfaceVariant"/>
 
         <TextView
             android:id="@+id/tvLiveGold18k"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="18k: $0.00/g"
-            android:layout_marginBottom="24dp"/>
+            android:layout_marginBottom="24dp"
+            android:textSize="14sp"
+            android:padding="8dp"
+            android:background="?attr/colorSurfaceVariant"/>
 
         <!-- ============================================ -->
         <!-- 💱 قسم العملات -->
@@ -928,28 +962,40 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="1 USD = 250.00 YER"
-            android:layout_marginBottom="4dp"/>
+            android:layout_marginBottom="4dp"
+            android:textSize="14sp"
+            android:padding="8dp"
+            android:background="?attr/colorSurfaceVariant"/>
 
         <TextView
             android:id="@+id/tvLiveUSD_EGP"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="1 USD = 30.90 EGP"
-            android:layout_marginBottom="4dp"/>
+            android:layout_marginBottom="4dp"
+            android:textSize="14sp"
+            android:padding="8dp"
+            android:background="?attr/colorSurfaceVariant"/>
 
         <TextView
             android:id="@+id/tvLiveUSD_SAR"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="1 USD = 3.75 SAR"
-            android:layout_marginBottom="4dp"/>
+            android:layout_marginBottom="4dp"
+            android:textSize="14sp"
+            android:padding="8dp"
+            android:background="?attr/colorSurfaceVariant"/>
 
         <TextView
             android:id="@+id/tvLiveUSD_AED"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="1 USD = 3.67 AED"
-            android:layout_marginBottom="16dp"/>
+            android:layout_marginBottom="16dp"
+            android:textSize="14sp"
+            android:padding="8dp"
+            android:background="?attr/colorSurfaceVariant"/>
 
         <!-- ProgressBar للعملات -->
         <ProgressBar
