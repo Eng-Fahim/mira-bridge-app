@@ -335,6 +335,35 @@ public class MiraApiClient {
     public ApiResponse getInventoryHistory(String location, int limit) {
         return get("/inventory/history/" + location + "?limit=" + limit);
     }
+    public ApiResponse getInventoryReports(int branchId, int page, int perPage) {
+    HttpURLConnection conn = null;
+    try {
+        String fullUrl = apiUrl + "/inventory/sessions?branch_id=" + branchId 
+                       + "&page=" + page + "&per_page=" + perPage;
+        
+        URL url = new URL(fullUrl);
+        conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
+        
+        String token = getAuthToken();
+        if (!token.isEmpty()) {
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+            conn.setRequestProperty("X-MIRA-Auth-Token", token);
+        }
+        
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(15000);
+        
+        return buildResponse(conn);
+    } catch (Exception e) {
+        Log.e(TAG, "getInventoryReports error: " + e.getMessage());
+        return new ApiResponse(-1, null, e.getMessage());
+    } finally {
+        if (conn != null) conn.disconnect();
+    }
+}
 
     public ApiResponse getHighValueItems(String location, double threshold) {
         return get("/inventory/high-value?location=" + (location != null ? location : "Main Showroom") + "&threshold=" + threshold);
@@ -958,4 +987,4 @@ public ApiResponse saveGoldCurrencySettings(JSONObject fullPayload) {
             return null;
         }
     }
-                                                       }
+        }
