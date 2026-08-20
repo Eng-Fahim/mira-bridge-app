@@ -486,10 +486,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                             
                             if (serial.isEmpty()) continue;
                             
-                            String title = obj.optString("title", 
-                                obj.optString("name", 
-                                obj.optString("item_name", 
-                                isArabic ? "قطعة ذهب" : "Gold Item"))));
+                            String title = obj.optString("title", obj.optString("name", isArabic ? "قطعة ذهب" : "Gold Item"));
+
                             
                             String karat = obj.optString("karat", 
                                 obj.optString("purity_code", 
