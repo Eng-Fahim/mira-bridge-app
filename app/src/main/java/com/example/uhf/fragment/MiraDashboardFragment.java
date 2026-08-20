@@ -217,7 +217,7 @@ private void updateLiveStatus() {
 
         if (btnInventory != null) btnInventory.setOnClickListener(v -> {
             if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).loadFragment(new MiraUHFReadTagFragment(), "Scan");
+                ((UHFMainActivity) getActivity()).loadFragment(new MiraInventoryProFragment(), "Scan");
             }
         });
     }
