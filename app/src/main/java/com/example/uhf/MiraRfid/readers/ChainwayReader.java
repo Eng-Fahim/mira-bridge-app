@@ -1,28 +1,85 @@
 package com.example.uhf.MiraRfid.readers;
 
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.os.Build;
 import android.util.Log;
 
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 /**
- * قارئ Chainway حقيقي - يدعم القراءة والكتابة والفلترة المباشرة عبر UART SDK
+ * قارئ Chainway حقيقي - مع إعدادات ديناميكية كاملة
  */
 public class ChainwayReader implements MiraIRFIDReader {
     
     private static final String TAG = "ChainwayReader";
+    private static final String PREFS_NAME = "mira_rfid_dynamic_settings";
     
     private Context context;
     private RFIDWithUHFUART reader;
     private OnTagReadListener listener;
-    private boolean isScanning = false;
-    private boolean isConnected = false;
-    private int powerDbm = 30;
+    private volatile boolean isScanning = false;
+    private volatile boolean isConnected = false;
+    
+    // إعدادات ديناميكية
+    private int powerDbm = 28;
+    private int rssiThreshold = -70;
+    private int scanIntervalMs = 200;
+    private int beepMode = 1; // 0=off, 1=on
+    private int vibrationMode = 1; // 0=off, 1=on
+    private int continuousMode = 1; // 0=single, 1=continuous
+    private int session = 0; // S0, S1, S2, S3
+    private int target = 0; // A, B
+    private int qValue = 4; // 0-15
+    
+    // للتحكم في دورة القراءة
+    private final ExecutorService scanExecutor = Executors.newSingleThreadExecutor();
+    private SharedPreferences prefs;
     
     public ChainwayReader(Context context) {
-        this.context = context;
+        this.context = context.getApplicationContext();
+        this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        loadSettings();
+    }
+    
+    /**
+     * تحميل الإعدادات المحفوظة
+     */
+    private void loadSettings() {
+        powerDbm = prefs.getInt("power_dbm", 28);
+        rssiThreshold = prefs.getInt("rssi_threshold", -70);
+        scanIntervalMs = prefs.getInt("scan_interval_ms", 200);
+        beepMode = prefs.getInt("beep_mode", 1);
+        vibrationMode = prefs.getInt("vibration_mode", 1);
+        continuousMode = prefs.getInt("continuous_mode", 1);
+        session = prefs.getInt("session", 0);
+        target = prefs.getInt("target", 0);
+        qValue = prefs.getInt("q_value", 4);
+        
+        Log.d(TAG, "Settings loaded: power=" + powerDbm + ", rssi=" + rssiThreshold + 
+              ", interval=" + scanIntervalMs + "ms");
+    }
+    
+    /**
+     * حفظ الإعدادات
+     */
+    private void saveSettings() {
+        prefs.edit()
+            .putInt("power_dbm", powerDbm)
+            .putInt("rssi_threshold", rssiThreshold)
+            .putInt("scan_interval_ms", scanIntervalMs)
+            .putInt("beep_mode", beepMode)
+            .putInt("vibration_mode", vibrationMode)
+            .putInt("continuous_mode", continuousMode)
+            .putInt("session", session)
+            .putInt("target", target)
+            .putInt("q_value", qValue)
+            .apply();
     }
     
     @Override
@@ -30,11 +87,78 @@ public class ChainwayReader implements MiraIRFIDReader {
         try {
             reader = RFIDWithUHFUART.getInstance();
             boolean success = reader.init(context);
-            Log.i(TAG, "Chainway init: " + success);
+            
+            if (success) {
+                // تطبيق الإعدادات بعد التهيئة
+                applyAllSettings();
+                
+                Log.i(TAG, "✅ Chainway initialized successfully");
+                Log.i(TAG, "📌 SDK Version: " + getFirmwareVersion());
+                Log.i(TAG, "📌 Device: " + Build.MANUFACTURER + " " + Build.MODEL);
+            } else {
+                Log.e(TAG, "❌ Chainway init failed");
+            }
+            
             return success;
         } catch (Exception e) {
-            Log.e(TAG, "Init error: " + e.getMessage());
+            Log.e(TAG, "Init error", e);
             return false;
+        }
+    }
+    
+    /**
+     * تطبيق جميع الإعدادات على القارئ
+     */
+    private void applyAllSettings() {
+        if (reader == null) return;
+        
+        try {
+            // قوة الإرسال
+            reader.setPower(powerDbm);
+            Log.d(TAG, "Applied power: " + powerDbm + " dBm");
+            
+            // وضع الجلسة (S0-S3)
+            try {
+                reader.setSession(session);
+                Log.d(TAG, "Applied session: S" + session);
+            } catch (Exception e) {
+                Log.w(TAG, "Session not supported: " + e.getMessage());
+            }
+            
+            // الهدف (A/B)
+            try {
+                reader.setTarget(target);
+                Log.d(TAG, "Applied target: " + (target == 0 ? "A" : "B"));
+            } catch (Exception e) {
+                Log.w(TAG, "Target not supported: " + e.getMessage());
+            }
+            
+            // Q Value
+            try {
+                reader.setQ(qValue);
+                Log.d(TAG, "Applied Q value: " + qValue);
+            } catch (Exception e) {
+                Log.w(TAG, "Q value not supported: " + e.getMessage());
+            }
+            
+            // وضع الصوت
+            try {
+                reader.setBeepMode(beepMode);
+                Log.d(TAG, "Applied beep mode: " + beepMode);
+            } catch (Exception e) {
+                Log.w(TAG, "Beep mode not supported: " + e.getMessage());
+            }
+            
+            // وضع الاهتزاز
+            try {
+                reader.setVibrationMode(vibrationMode);
+                Log.d(TAG, "Applied vibration mode: " + vibrationMode);
+            } catch (Exception e) {
+                Log.w(TAG, "Vibration mode not supported: " + e.getMessage());
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error applying settings", e);
         }
     }
     
@@ -45,12 +169,16 @@ public class ChainwayReader implements MiraIRFIDReader {
                 initialize();
             }
             isConnected = reader != null;
-            if (isConnected && listener != null) {
-                listener.onConnectionChanged(true);
+            if (isConnected) {
+                // إعادة تطبيق الإعدادات عند الاتصال
+                applyAllSettings();
+                if (listener != null) {
+                    listener.onConnectionChanged(true);
+                }
             }
             return isConnected;
         } catch (Exception e) {
-            Log.e(TAG, "Connection error: " + e.getMessage());
+            Log.e(TAG, "Connection error", e);
             return false;
         }
     }
@@ -67,13 +195,14 @@ public class ChainwayReader implements MiraIRFIDReader {
     @Override
     public void release() {
         disconnect();
+        scanExecutor.shutdown();
         try {
             if (reader != null) {
                 reader.free();
                 reader = null;
             }
         } catch (Exception e) {
-            Log.e(TAG, "Release error: " + e.getMessage());
+            Log.e(TAG, "Release error", e);
         }
     }
     
@@ -87,43 +216,91 @@ public class ChainwayReader implements MiraIRFIDReader {
         if (reader == null && !connect()) return false;
         
         try {
-            boolean success = reader.startInventoryTag();
+            // تطبيق الإعدادات قبل البدء
+            applyAllSettings();
+            
+            // بدء الجرد حسب الوضع
+            boolean success;
+            if (continuousMode == 1) {
+                success = reader.startInventoryTag();
+            } else {
+                success = reader.startInventoryTag(); // Single mode يعتمد على SDK
+            }
+            
             if (success) {
                 isScanning = true;
                 if (listener != null) listener.onScanStarted();
                 
-                // خيط قراءة المكونات في الخلفية Loop
-                new Thread(() -> {
-                    while (isScanning) {
-                        try {
-                            UHFTAGInfo tag;
-                            while (isScanning && (tag = reader.readTagFromBuffer()) != null) {
-                                String epc = tag.getEPC();
-                                String rssiStr = tag.getRssi();
-                                int rssi = -50;
-                                if (rssiStr != null) {
-                                    try { 
-                                        rssi = Integer.parseInt(rssiStr.trim()); 
-                                    } catch (NumberFormatException ignored) {}
-                                }
-                                if (epc != null && !epc.isEmpty() && listener != null) {
-                                    listener.onTagRead(epc, rssi);
-                                }
-                            }
-                            Thread.sleep(10);
-                        } catch (Exception e) {
-                            if (isScanning && listener != null) {
-                                listener.onError(e.getMessage());
-                            }
-                            break;
-                        }
-                    }
-                }).start();
+                // حلقة القراءة
+                scanExecutor.execute(this::scanLoop);
             }
             return success;
         } catch (Exception e) {
-            Log.e(TAG, "startScan error: " + e.getMessage());
+            Log.e(TAG, "startScan error", e);
             return false;
+        }
+    }
+    
+    /**
+     * حلقة القراءة المستمرة
+     */
+    private void scanLoop() {
+        while (isScanning) {
+            try {
+                UHFTAGInfo tag;
+                while (isScanning && (tag = reader.readTagFromBuffer()) != null) {
+                    processTag(tag);
+                }
+                
+                // النوم حسب الفترة المحددة
+                Thread.sleep(scanIntervalMs);
+                
+            } catch (InterruptedException e) {
+                Log.d(TAG, "Scan loop interrupted");
+                break;
+            } catch (Exception e) {
+                if (isScanning && listener != null) {
+                    listener.onError(e.getMessage());
+                }
+                Log.e(TAG, "Scan loop error", e);
+                break;
+            }
+        }
+    }
+    
+    /**
+     * معالجة الوسم المقروء
+     */
+    private void processTag(UHFTAGInfo tag) {
+        try {
+            String epc = tag.getEPC();
+            String rssiStr = tag.getRssi();
+            int rssi = parseRssi(rssiStr);
+            
+            // تطبيق عتبة RSSI
+            if (rssi < rssiThreshold) {
+                return; // تجاهل الوسوم الضعيفة
+            }
+            
+            if (epc != null && !epc.isEmpty() && listener != null) {
+                listener.onTagRead(epc, rssi);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Process tag error", e);
+        }
+    }
+    
+    /**
+     * تحويل RSSI من سلسلة إلى رقم
+     */
+    private int parseRssi(String rssiStr) {
+        if (rssiStr == null || rssiStr.isEmpty()) return -50;
+        try {
+            String cleaned = rssiStr.replace("dBm", "").replace("dbm", "").trim();
+            int rssi = Integer.parseInt(cleaned);
+            return rssi > 0 ? -rssi : rssi;
+        } catch (NumberFormatException e) {
+            return -50;
         }
     }
     
@@ -135,7 +312,7 @@ public class ChainwayReader implements MiraIRFIDReader {
                 reader.stopInventory();
             }
         } catch (Exception e) {
-            Log.e(TAG, "Stop scan error: " + e.getMessage());
+            Log.e(TAG, "Stop scan error", e);
         }
         if (listener != null) listener.onScanStopped();
     }
@@ -145,27 +322,116 @@ public class ChainwayReader implements MiraIRFIDReader {
         return isScanning;
     }
     
+    // ==================== SETTERS مع حفظ الإعدادات ====================
+    
     @Override
     public void setPower(int powerDbm) {
         this.powerDbm = powerDbm;
+        saveSettings();
         try {
             if (reader != null) {
                 reader.setPower(powerDbm);
+                Log.d(TAG, "Power updated to: " + powerDbm + " dBm");
             }
         } catch (Exception e) {
-            Log.e(TAG, "Set power error: " + e.getMessage());
+            Log.e(TAG, "Set power error", e);
         }
     }
     
     @Override
-    public void setRssiThreshold(int threshold) {}
+    public void setRssiThreshold(int threshold) {
+        this.rssiThreshold = threshold;
+        saveSettings();
+        Log.d(TAG, "RSSI threshold updated to: " + threshold);
+    }
     
     @Override
-    public void setScanInterval(int intervalMs) {}
+    public void setScanInterval(int intervalMs) {
+        this.scanIntervalMs = Math.max(50, intervalMs); // حد أدنى 50ms
+        saveSettings();
+        Log.d(TAG, "Scan interval updated to: " + scanIntervalMs + "ms");
+    }
+    
+    // إعدادات إضافية
+    public void setBeepMode(int mode) {
+        this.beepMode = mode;
+        saveSettings();
+        try {
+            if (reader != null) {
+                reader.setBeepMode(mode);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Set beep mode error", e);
+        }
+    }
+    
+    public void setVibrationMode(int mode) {
+        this.vibrationMode = mode;
+        saveSettings();
+        try {
+            if (reader != null) {
+                reader.setVibrationMode(mode);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Set vibration mode error", e);
+        }
+    }
+    
+    public void setContinuousMode(int mode) {
+        this.continuousMode = mode;
+        saveSettings();
+    }
+    
+    public void setSession(int session) {
+        this.session = session;
+        saveSettings();
+        try {
+            if (reader != null) {
+                reader.setSession(session);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Set session error", e);
+        }
+    }
+    
+    public void setTarget(int target) {
+        this.target = target;
+        saveSettings();
+        try {
+            if (reader != null) {
+                reader.setTarget(target);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Set target error", e);
+        }
+    }
+    
+    public void setQValue(int qValue) {
+        this.qValue = qValue;
+        saveSettings();
+        try {
+            if (reader != null) {
+                reader.setQ(qValue);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Set Q value error", e);
+        }
+    }
+    
+    // Getters
+    public int getPowerDbm() { return powerDbm; }
+    public int getRssiThreshold() { return rssiThreshold; }
+    public int getScanIntervalMs() { return scanIntervalMs; }
+    public int getBeepMode() { return beepMode; }
+    public int getVibrationMode() { return vibrationMode; }
+    public int getContinuousMode() { return continuousMode; }
+    public int getSession() { return session; }
+    public int getTarget() { return target; }
+    public int getQValue() { return qValue; }
     
     @Override
     public String getDeviceName() {
-        return "Chainway C72 / UHF Terminal";
+        return "Chainway " + Build.MODEL + " / UHF Terminal";
     }
     
     @Override
@@ -180,6 +446,11 @@ public class ChainwayReader implements MiraIRFIDReader {
     
     @Override
     public int getBatteryLevel() {
+        try {
+            if (reader != null) {
+                return reader.getBattery();
+            }
+        } catch (Exception ignored) {}
         return -1;
     }
     
@@ -188,10 +459,8 @@ public class ChainwayReader implements MiraIRFIDReader {
         this.listener = listener;
     }
 
-    // =========================================================================
-    // 🛠️ العمليات المباشرة لقراءة/كتابة الذاكرة وتصحيحات SDK
-    // =========================================================================
-
+    // ==================== عمليات القراءة والكتابة (بدون تغيير) ====================
+    
     @Override
     public boolean writeData(String pwdStr, int bank, int ptr, String data) {
         if (reader == null) return false;
@@ -199,7 +468,7 @@ public class ChainwayReader implements MiraIRFIDReader {
             int writeLen = (int) Math.ceil(data.length() / 4.0);
             return reader.writeData(pwdStr, bank, ptr, writeLen, data);
         } catch (Exception e) {
-            Log.e(TAG, "writeData error: " + e.getMessage());
+            Log.e(TAG, "writeData error", e);
             return false;
         }
     }
@@ -210,24 +479,22 @@ public class ChainwayReader implements MiraIRFIDReader {
         try {
             return reader.readData(pwdStr, bank, ptr, len);
         } catch (Exception e) {
-            Log.e(TAG, "readData error: " + e.getMessage());
+            Log.e(TAG, "readData error", e);
             return null;
         }
     }
 
-        @Override
+    @Override
     public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
         if (reader == null) return false;
         try {
-            // توقيع مكتبة Chainway UART لقفل الذاكرة: lockMem(pwd, lockCode)
             String lockCode = shouldLock ? "0002" : "0001";
             return reader.lockMem(pwdStr, lockCode);
         } catch (Exception e) {
-            Log.e(TAG, "Lock error: " + e.getMessage());
+            Log.e(TAG, "Lock error", e);
             return false;
         }
     }
-
 
     @Override
     public boolean setFilter(int bank, int ptr, String filterData) {
@@ -236,7 +503,7 @@ public class ChainwayReader implements MiraIRFIDReader {
             int len = filterData.length() * 4;
             return reader.setFilter(bank, ptr, len, filterData);
         } catch (Exception e) {
-            Log.e(TAG, "setFilter error: " + e.getMessage());
+            Log.e(TAG, "setFilter error", e);
             return false;
         }
     }
@@ -245,17 +512,12 @@ public class ChainwayReader implements MiraIRFIDReader {
     public void clearFilter() {
         if (reader != null) {
             try {
-                // إلغاء الفلترة بإرسال طول 0 وسلسلة فارغة
                 reader.setFilter(1, 0, 0, "");
             } catch (Exception e) {
-                Log.e(TAG, "Clear filter error: " + e.getMessage());
+                Log.e(TAG, "Clear filter error", e);
             }
         }
     }
-
-    // =========================================================================
-    // 🏷️ عمليات الذاكرة عالية المستوى
-    // =========================================================================
 
     public String readEpcData(String accessPassword) {
         return readData(accessPassword, RFIDWithUHFUART.Bank_EPC, 32, 6);
@@ -305,7 +567,7 @@ public class ChainwayReader implements MiraIRFIDReader {
         try {
             return reader.killTag(accessPassword);
         } catch (Exception e) {
-            Log.e(TAG, "killTag error: " + e.getMessage());
+            Log.e(TAG, "killTag error", e);
             return false;
         }
     }
