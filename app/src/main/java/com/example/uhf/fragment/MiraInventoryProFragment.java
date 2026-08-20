@@ -439,6 +439,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
 
+                    // ✅ إعادة تعيين sessionId كرقم دائماً
+                    sessionId = (int) (System.currentTimeMillis() / 1000);
+                    Log.d(TAG, "✅ New numeric session ID: " + sessionId);
+
                     isBlindMode = blindMode;
                     isScanning = true;
                     startTime = System.currentTimeMillis();
@@ -448,13 +452,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     scannedCount = 0;
                     foundCount = 0;
                     varianceCount = 0;
-                    
-                    // ✅ إنشاء session_id محلياً إذا لم يكن موجوداً
-                     // ✅ إنشاء session_id رقمي
-    if (sessionId == 0) {
-        sessionId = (int) (System.currentTimeMillis() / 1000);
-        Log.d(TAG, "✅ Created session ID: " + sessionId);
-    }
 
                     if (adapter != null) adapter.clearItems();
 
@@ -592,127 +589,132 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private boolean syncFullInventorySessionSync() {
-    try {
-        JSONObject payload = createInventoryPayload();
-        
-        Log.d(TAG, "📤 Sending payload: " + payload.toString());
-        
-        MiraApiClient.ApiResponse response = apiClient.closeInventorySession(payload);
-        
-        if (response != null) {
-            Log.d(TAG, "📥 Server response code: " + response.code);
-            Log.d(TAG, "📥 Server response success: " + response.isSuccess);
-            Log.d(TAG, "📥 Server response data: " + (response.data != null ? response.data.toString() : "null"));
+        try {
+            JSONObject payload = createInventoryPayload();
             
-            // ✅ استخدام error بدلاً من message
-            if (response.error != null && !response.error.isEmpty()) {
-                Log.d(TAG, "📥 Server response error: " + response.error);
-            }
+            Log.d(TAG, "📤 Sending payload: " + payload.toString());
             
-            if (response.isSuccess) {
-                if (response.data != null) {
-                    try {
-                        int serverSessionId = response.data.optInt("session_id", 0);
-                        if (serverSessionId > 0) {
-                            sessionId = serverSessionId;
-                            Log.d(TAG, "✅ Updated session ID from server: " + sessionId);
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Parse session_id error: " + e.getMessage());
-                    }
+            MiraApiClient.ApiResponse response = apiClient.closeInventorySession(payload);
+            
+            if (response != null) {
+                Log.d(TAG, "📥 Server response code: " + response.code);
+                Log.d(TAG, "📥 Server response success: " + response.isSuccess);
+                Log.d(TAG, "📥 Server response data: " + (response.data != null ? response.data.toString() : "null"));
+                
+                if (response.error != null && !response.error.isEmpty()) {
+                    Log.d(TAG, "📥 Server response error: " + response.error);
                 }
                 
-                saveSnapshotLocally(payload);
-                return true;
+                if (response.isSuccess) {
+                    if (response.data != null) {
+                        try {
+                            int serverSessionId = response.data.optInt("session_id", 0);
+                            if (serverSessionId > 0) {
+                                sessionId = serverSessionId;
+                                Log.d(TAG, "✅ Updated session ID from server: " + sessionId);
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Parse session_id error: " + e.getMessage());
+                        }
+                    }
+                    
+                    saveSnapshotLocally(payload);
+                    return true;
+                } else {
+                    String errorMsg = response.error != null ? response.error : "Unknown error";
+                    Log.e(TAG, "❌ Server rejected: " + errorMsg);
+                    saveToPendingQueue(payload);
+                    return false;
+                }
             } else {
-                // ✅ استخدام error بدلاً من message
-                String errorMsg = response.error != null ? response.error : "Unknown error";
-                Log.e(TAG, "❌ Server rejected: " + errorMsg);
+                Log.e(TAG, "❌ Response is null");
                 saveToPendingQueue(payload);
                 return false;
             }
-        } else {
-            Log.e(TAG, "❌ Response is null");
-            saveToPendingQueue(payload);
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Sync error: " + e.getMessage());
+            e.printStackTrace();
+            try {
+                saveToPendingQueue(createInventoryPayload());
+            } catch (Exception ex) {
+                Log.e(TAG, "Failed to save pending: " + ex.getMessage());
+            }
             return false;
         }
-    } catch (Exception e) {
-        Log.e(TAG, "❌ Sync error: " + e.getMessage());
-        e.printStackTrace();
-        try {
-            saveToPendingQueue(createInventoryPayload());
-        } catch (Exception ex) {
-            Log.e(TAG, "Failed to save pending: " + ex.getMessage());
-        }
-        return false;
     }
-}
 
     private JSONObject createInventoryPayload() throws Exception {
-    JSONObject payload = new JSONObject();
-    
-    // ✅ المشكلة: sessionId كنص "AUDIT-..." بدلاً من رقم
-    // الحل: استخدم رقم فقط
-    payload.put("session_id", sessionId); // تأكد أن sessionId رقم صحيح
-    payload.put("branch_id", branchesManager.getActiveBranchId());
-    payload.put("zone", branchesManager.getActiveBranchDisplayName());
-    payload.put("location", branchesManager.getActiveBranchDisplayName());
-    payload.put("expected_count", expectedCount);
-    payload.put("total_scanned", scannedCount);
-    payload.put("unique_count", foundCount);
-    payload.put("found_count", foundCount);
-    payload.put("missing_count", varianceCount);
-    payload.put("unexpected_count", 0);
-    payload.put("total_weight", calculateTotalWeight());
-    payload.put("total_value", calculateTotalValue());
-    payload.put("connection_type", "SIMULATOR");
-    
-    // ✅ إضافة user_id
-    if (getContext() != null) {
-        SharedPreferences authPrefs = getContext().getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
-        int userId = authPrefs.getInt("user_id", 0);
-        if (userId > 0) {
-            payload.put("user_id", userId);
+        JSONObject payload = new JSONObject();
+        
+        // ✅ session_id رقمي
+        payload.put("session_id", sessionId);
+        Log.d(TAG, "📋 Session ID in payload: " + sessionId);
+        
+        // ✅ branch_id
+        int branchId = branchesManager.getActiveBranchId();
+        payload.put("branch_id", branchId);
+        Log.d(TAG, "📋 Branch ID in payload: " + branchId);
+        
+        payload.put("zone", branchesManager.getActiveBranchDisplayName());
+        payload.put("location", branchesManager.getActiveBranchDisplayName());
+        payload.put("expected_count", expectedCount);
+        payload.put("total_scanned", scannedCount);
+        payload.put("unique_count", foundCount);
+        payload.put("found_count", foundCount);
+        payload.put("missing_count", varianceCount);
+        payload.put("unexpected_count", 0);
+        payload.put("total_weight", calculateTotalWeight());
+        payload.put("total_value", calculateTotalValue());
+        payload.put("connection_type", "SIMULATOR");
+        
+        // ✅ user_id
+        if (getContext() != null) {
+            SharedPreferences authPrefs = getContext().getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
+            int userId = authPrefs.getInt("user_id", authPrefs.getInt("userId", 0));
+            if (userId > 0) {
+                payload.put("user_id", userId);
+                Log.d(TAG, "📋 User ID: " + userId);
+            } else {
+                Log.e(TAG, "⚠️ User ID is 0 - check login");
+            }
+            
+            String token = authPrefs.getString("auth_token", "");
+            if (token.isEmpty()) {
+                token = authPrefs.getString("session_token", "");
+            }
+            if (!token.isEmpty()) {
+                payload.put("token", token);
+            }
         }
         
-        String token = authPrefs.getString("auth_token", "");
-        if (token.isEmpty()) {
-            token = authPrefs.getString("session_token", "");
+        // ✅ items
+        JSONArray itemsJson = new JSONArray();
+        synchronized (scannedItems) {
+            for (InventoryItem item : scannedItems) {
+                JSONObject obj = new JSONObject();
+                obj.put("code", item.serial);
+                obj.put("serial", item.serial);
+                obj.put("title", item.title);
+                obj.put("karat", item.karat);
+                obj.put("weight", item.numericWeight);
+                obj.put("status", item.status);
+                itemsJson.put(obj);
+            }
         }
-        if (!token.isEmpty()) {
-            payload.put("token", token);
+        payload.put("items", itemsJson);
+        Log.d(TAG, "📋 Items count: " + itemsJson.length());
+        
+        // ✅ scanned_epcs للتوافق
+        JSONArray epcsArray = new JSONArray();
+        synchronized (scannedItems) {
+            for (InventoryItem item : scannedItems) {
+                epcsArray.put(item.serial);
+            }
         }
+        payload.put("scanned_epcs", epcsArray);
+        
+        return payload;
     }
-    
-    // ✅ إضافة items كـ JSONArray وليس scanned_epcs
-    JSONArray itemsJson = new JSONArray();
-    synchronized (scannedItems) {
-        for (InventoryItem item : scannedItems) {
-            JSONObject obj = new JSONObject();
-            obj.put("code", item.serial);
-            obj.put("serial", item.serial);
-            obj.put("title", item.title);
-            obj.put("karat", item.karat);
-            obj.put("weight", item.numericWeight);
-            obj.put("status", item.status);
-            obj.put("rssi", ""); // أضف RSSI إذا كان متوفراً
-            itemsJson.put(obj);
-        }
-    }
-    payload.put("items", itemsJson); // ✅ استخدم "items" وليس "scanned_epcs"
-    
-    // ✅ احتفظ بـ scanned_epcs للتوافق
-    JSONArray epcsArray = new JSONArray();
-    synchronized (scannedItems) {
-        for (InventoryItem item : scannedItems) {
-            epcsArray.put(item.serial);
-        }
-    }
-    payload.put("scanned_epcs", epcsArray);
-    
-    return payload;
-}
-
 
     private void saveSnapshotLocally(JSONObject payload) {
         if (offlineCache != null) {
@@ -767,69 +769,68 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private void syncPendingQueue() {
-    if (pendingQueue == null || apiClient == null) return;
-    
-    new Thread(() -> {
-        try {
-            String existingJson = pendingQueue.getString("pending_audits", "[]");
-            JSONArray pendingArray = new JSONArray(existingJson);
-            
-            if (pendingArray.length() == 0) return;
-            
-            JSONArray remainingArray = new JSONArray();
-            int syncedCount = 0;
-            
-            for (int i = 0; i < pendingArray.length(); i++) {
-                try {
-                    JSONObject audit = pendingArray.getJSONObject(i);
-                    MiraApiClient.ApiResponse response = apiClient.closeInventorySession(audit);
-                    
-                    if (response != null && response.isSuccess) {
-                        syncedCount++;
-                        saveSnapshotLocally(audit);
-                    } else {
-                        remainingArray.put(audit);
-                        // ✅ سجل الخطأ إذا كان موجوداً
-                        if (response != null && response.error != null) {
-                            Log.e(TAG, "Pending sync error: " + response.error);
+        if (pendingQueue == null || apiClient == null) return;
+        
+        new Thread(() -> {
+            try {
+                String existingJson = pendingQueue.getString("pending_audits", "[]");
+                JSONArray pendingArray = new JSONArray(existingJson);
+                
+                if (pendingArray.length() == 0) return;
+                
+                JSONArray remainingArray = new JSONArray();
+                int syncedCount = 0;
+                
+                for (int i = 0; i < pendingArray.length(); i++) {
+                    try {
+                        JSONObject audit = pendingArray.getJSONObject(i);
+                        MiraApiClient.ApiResponse response = apiClient.closeInventorySession(audit);
+                        
+                        if (response != null && response.isSuccess) {
+                            syncedCount++;
+                            saveSnapshotLocally(audit);
+                        } else {
+                            remainingArray.put(audit);
+                            if (response != null && response.error != null) {
+                                Log.e(TAG, "Pending sync error: " + response.error);
+                            }
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Pending item sync error: " + e.getMessage());
+                        try {
+                            remainingArray.put(pendingArray.getJSONObject(i));
+                        } catch (Exception ex) {
+                            Log.e(TAG, "Failed to add to remaining: " + ex.getMessage());
                         }
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "Pending item sync error: " + e.getMessage());
-                    try {
-                        remainingArray.put(pendingArray.getJSONObject(i));
-                    } catch (Exception ex) {
-                        Log.e(TAG, "Failed to add to remaining: " + ex.getMessage());
-                    }
-                }
-            }
-            
-            pendingQueue.edit()
-                .putString("pending_audits", remainingArray.toString())
-                .apply();
-            
-            final int synced = syncedCount;
-            final int remaining = remainingArray.length();
-            
-            safeRun(() -> {
-                if (synced > 0) {
-                    Toast.makeText(getContext(), 
-                        isArabic ? "✅ تمت مزامنة " + synced + " جرد" : 
-                                   "✅ Synced " + synced + " audits", 
-                        Toast.LENGTH_SHORT).show();
                 }
                 
-                if (remaining > 0 && tvInventoryStatus != null && !isScanning) {
-                    tvInventoryStatus.setText(isArabic ? "📋 " + remaining + " جرد معلق" : 
-                                                       "📋 " + remaining + " pending");
-                    tvInventoryStatus.setTextColor(Color.parseColor("#F59E0B"));
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Sync pending queue error: " + e.getMessage());
-        }
-    }).start();
-}
+                pendingQueue.edit()
+                    .putString("pending_audits", remainingArray.toString())
+                    .apply();
+                
+                final int synced = syncedCount;
+                final int remaining = remainingArray.length();
+                
+                safeRun(() -> {
+                    if (synced > 0) {
+                        Toast.makeText(getContext(), 
+                            isArabic ? "✅ تمت مزامنة " + synced + " جرد" : 
+                                       "✅ Synced " + synced + " audits", 
+                            Toast.LENGTH_SHORT).show();
+                    }
+                    
+                    if (remaining > 0 && tvInventoryStatus != null && !isScanning) {
+                        tvInventoryStatus.setText(isArabic ? "📋 " + remaining + " جرد معلق" : 
+                                                           "📋 " + remaining + " pending");
+                        tvInventoryStatus.setTextColor(Color.parseColor("#F59E0B"));
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Sync pending queue error: " + e.getMessage());
+            }
+        }).start();
+    }
 
     // ==================== AUXILIARY METHODS ====================
 
@@ -1335,4 +1336,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }
         super.onDestroyView();
     }
-    }
+}
