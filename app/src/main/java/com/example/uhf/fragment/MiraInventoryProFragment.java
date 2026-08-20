@@ -448,6 +448,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     scannedCount = 0;
                     foundCount = 0;
                     varianceCount = 0;
+                    
+                    // ✅ إنشاء session_id محلياً إذا لم يكن موجوداً
+                    if (sessionId == 0) {
+                        sessionId = (int) (System.currentTimeMillis() / 1000);
+                        Log.d(TAG, "✅ Created local session ID: " + sessionId);
+                    }
 
                     if (adapter != null) adapter.clearItems();
 
@@ -588,17 +594,43 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         try {
             JSONObject payload = createInventoryPayload();
             
+            Log.d(TAG, "📤 Sending payload: " + payload.toString());
+            
             MiraApiClient.ApiResponse response = apiClient.closeInventorySession(payload);
             
-            if (response != null && response.isSuccess) {
-                saveSnapshotLocally(payload);
-                return true;
+            if (response != null) {
+                Log.d(TAG, "📥 Server response success: " + response.isSuccess);
+                Log.d(TAG, "📥 Server response data: " + (response.data != null ? response.data.toString() : "null"));
+                Log.d(TAG, "📥 Server response message: " + response.message);
+                
+                if (response.isSuccess) {
+                    if (response.data != null) {
+                        try {
+                            int serverSessionId = response.data.optInt("session_id", 0);
+                            if (serverSessionId > 0) {
+                                sessionId = serverSessionId;
+                                Log.d(TAG, "✅ Updated session ID from server: " + sessionId);
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Parse session_id error: " + e.getMessage());
+                        }
+                    }
+                    
+                    saveSnapshotLocally(payload);
+                    return true;
+                } else {
+                    Log.e(TAG, "❌ Server rejected: " + response.message);
+                    saveToPendingQueue(payload);
+                    return false;
+                }
             } else {
+                Log.e(TAG, "❌ Response is null");
                 saveToPendingQueue(payload);
                 return false;
             }
         } catch (Exception e) {
-            Log.e(TAG, "Sync error: " + e.getMessage());
+            Log.e(TAG, "❌ Sync error: " + e.getMessage());
+            e.printStackTrace();
             try {
                 saveToPendingQueue(createInventoryPayload());
             } catch (Exception ex) {
@@ -610,20 +642,45 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
     private JSONObject createInventoryPayload() throws Exception {
         JSONObject payload = new JSONObject();
+        
         payload.put("session_id", sessionId);
         payload.put("branch_id", branchesManager.getActiveBranchId());
+        payload.put("zone", branchesManager.getActiveBranchDisplayName());
         payload.put("location", branchesManager.getActiveBranchDisplayName());
-        payload.put("total_items", foundCount);
-        payload.put("scanned_count", scannedCount);
         payload.put("expected_count", expectedCount);
-        payload.put("variance", varianceCount);
+        payload.put("total_scanned", scannedCount);
+        payload.put("unique_count", foundCount);
+        payload.put("found_count", foundCount);
+        payload.put("missing_count", varianceCount);
+        payload.put("unexpected_count", 0);
         payload.put("total_weight", calculateTotalWeight());
         payload.put("total_value", calculateTotalValue());
         
+        // ✅ إضافة user_id والتوكن من SharedPreferences
+        if (getContext() != null) {
+            SharedPreferences authPrefs = getContext().getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
+            int userId = authPrefs.getInt("user_id", 0);
+            if (userId > 0) {
+                payload.put("user_id", userId);
+                Log.d(TAG, "👤 User ID: " + userId);
+            }
+            
+            String token = authPrefs.getString("auth_token", "");
+            if (token.isEmpty()) {
+                token = authPrefs.getString("session_token", "");
+            }
+            if (!token.isEmpty()) {
+                payload.put("token", token);
+                Log.d(TAG, "🔑 Token: " + token.substring(0, Math.min(10, token.length())) + "...");
+            }
+        }
+        
+        // ✅ إضافة العناصر الممسوحة
         JSONArray itemsJson = new JSONArray();
         synchronized (scannedItems) {
             for (InventoryItem item : scannedItems) {
                 JSONObject obj = new JSONObject();
+                obj.put("code", item.serial);
                 obj.put("serial", item.serial);
                 obj.put("title", item.title);
                 obj.put("karat", item.karat);
@@ -633,6 +690,17 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             }
         }
         payload.put("items", itemsJson);
+        
+        // ✅ تسجيل البيانات للتصحيح
+        Log.d(TAG, "=== 📋 Inventory Payload ===");
+        Log.d(TAG, "session_id: " + sessionId);
+        Log.d(TAG, "branch_id: " + branchesManager.getActiveBranchId());
+        Log.d(TAG, "expected_count: " + expectedCount);
+        Log.d(TAG, "total_scanned: " + scannedCount);
+        Log.d(TAG, "found_count: " + foundCount);
+        Log.d(TAG, "missing_count: " + varianceCount);
+        Log.d(TAG, "items_count: " + itemsJson.length());
+        
         return payload;
     }
 
@@ -975,6 +1043,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         String message;
         if (isArabic) {
             message = "تم إيقاف الجرد وحفظ التقرير.\n\n" +
+                "رقم الجلسة: " + sessionId + "\n" +
                 "المتوقع: " + expectedCount + "\n" +
                 "الممسوح: " + scannedCount + "\n" +
                 "العجز: " + varianceCount + "\n" +
@@ -982,6 +1051,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                 (synced ? "✅ تمت المزامنة مع السيرفر" : "⚠️ تم الحفظ محلياً - سيتم المزامنة لاحقاً");
         } else {
             message = "Audit completed successfully.\n\n" +
+                "Session ID: " + sessionId + "\n" +
                 "Expected: " + expectedCount + "\n" +
                 "Scanned: " + scannedCount + "\n" +
                 "Variance: " + varianceCount + "\n" +
@@ -1246,4 +1316,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }
         super.onDestroyView();
     }
-}
+    }
