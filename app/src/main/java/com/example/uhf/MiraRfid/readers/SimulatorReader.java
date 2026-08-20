@@ -7,13 +7,26 @@ import android.os.Looper;
 import android.util.Log;
 
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
+import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.manager.MiraBranchesManager;
+import com.example.uhf.model.InventoryItem;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * قارئ محاكي - يدعم الإعدادات الديناميكية مثل القارئ الحقيقي
+ * قارئ محاكي متقدم - يحاكي القارئ الحقيقي بالكامل
+ * - يجلب الوسوم من قاعدة البيانات
+ * - يطبق الإعدادات الديناميكية
+ * - يحاكي RSSI واقعياً
  */
 public class SimulatorReader implements MiraIRFIDReader {
     
@@ -41,25 +54,22 @@ public class SimulatorReader implements MiraIRFIDReader {
     private SharedPreferences prefs;
     private final Random random = new Random();
     
-    // وسوم محاكاة
-    private final String[] simulationTags = {
-        "E28068940000501A2B3C4D5E6F",
-        "E28068940000501A2B3C4D5E70",
-        "E28068940000501A2B3C4D5E71",
-        "E28068940000501A2B3C4D5E72",
-        "E28068940000501A2B3C4D5E73",
-        "E28068940000501A2B3C4D5E74",
-        "E28068940000501A2B3C4D5E75",
-        "E28068940000501A2B3C4D5E76",
-        "E28068940000501A2B3C4D5E77",
-        "E28068940000501A2B3C4D5E78"
-    };
+    // وسوم من قاعدة البيانات
+    private final List<String> databaseTags = new ArrayList<>();
+    private final List<String> fallbackTags = new ArrayList<>();
+    
+    // API للجلب من قاعدة البيانات
+    private MiraApiClient apiClient;
+    private MiraBranchesManager branchesManager;
     
     public SimulatorReader(Context context) {
         this.context = context != null ? context.getApplicationContext() : null;
         if (this.context != null) {
             this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            this.apiClient = MiraApiClient.getInstance(context);
+            this.branchesManager = MiraBranchesManager.getInstance(context);
             loadSettings();
+            initFallbackTags();
         }
     }
     
@@ -91,6 +101,71 @@ public class SimulatorReader implements MiraIRFIDReader {
             .apply();
     }
     
+    /**
+     * وسوم احتياطية إذا فشل الجلب من قاعدة البيانات
+     */
+    private void initFallbackTags() {
+        fallbackTags.clear();
+        fallbackTags.add("E28068940000501A2B3C4D5E6F");
+        fallbackTags.add("E28068940000501A2B3C4D5E70");
+        fallbackTags.add("E28068940000501A2B3C4D5E71");
+        fallbackTags.add("E28068940000501A2B3C4D5E72");
+        fallbackTags.add("E28068940000501A2B3C4D5E73");
+        fallbackTags.add("E28068940000501A2B3C4D5E74");
+        fallbackTags.add("E28068940000501A2B3C4D5E75");
+        fallbackTags.add("E28068940000501A2B3C4D5E76");
+        fallbackTags.add("E28068940000501A2B3C4D5E77");
+        fallbackTags.add("E28068940000501A2B3C4D5E78");
+    }
+    
+    /**
+     * جلب الوسوم من قاعدة البيانات
+     */
+    private void fetchTagsFromDatabase() {
+        databaseTags.clear();
+        
+        try {
+            if (apiClient != null && branchesManager != null) {
+                int branchId = branchesManager.getActiveBranchId();
+                MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(branchId);
+                
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONArray items = response.data.optJSONArray("items");
+                    
+                    if (items == null) {
+                        JSONObject dataObj = response.data.optJSONObject("data");
+                        if (dataObj != null) {
+                            items = dataObj.optJSONArray("items");
+                        }
+                    }
+                    
+                    if (items != null) {
+                        for (int i = 0; i < items.length(); i++) {
+                            JSONObject obj = items.getJSONObject(i);
+                            String epc = obj.optString("gtin13", 
+                                obj.optString("serial_number", 
+                                obj.optString("epc", ""))).trim();
+                            
+                            if (!epc.isEmpty()) {
+                                databaseTags.add(epc.toUpperCase());
+                            }
+                        }
+                        
+                        Log.i(TAG, "✅ Loaded " + databaseTags.size() + " tags from database");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error fetching tags from database", e);
+        }
+        
+        // إذا فشل الجلب، استخدم الوسوم الاحتياطية
+        if (databaseTags.isEmpty()) {
+            databaseTags.addAll(fallbackTags);
+            Log.w(TAG, "⚠️ Using fallback tags: " + databaseTags.size() + " tags");
+        }
+    }
+    
     @Override
     public boolean initialize() {
         Log.i(TAG, "✅ Simulator initialized");
@@ -100,10 +175,14 @@ public class SimulatorReader implements MiraIRFIDReader {
     @Override
     public boolean connect() {
         isConnected = true;
+        
+        // جلب الوسوم من قاعدة البيانات عند الاتصال
+        fetchTagsFromDatabase();
+        
         if (listener != null) {
             mainHandler.post(() -> listener.onConnectionChanged(true));
         }
-        Log.i(TAG, "✅ Simulator connected");
+        Log.i(TAG, "✅ Simulator connected with " + databaseTags.size() + " tags");
         return true;
     }
     
@@ -120,6 +199,7 @@ public class SimulatorReader implements MiraIRFIDReader {
     public void release() {
         disconnect();
         scanExecutor.shutdown();
+        databaseTags.clear();
     }
     
     @Override
@@ -140,40 +220,68 @@ public class SimulatorReader implements MiraIRFIDReader {
         
         scanExecutor.execute(this::simulationLoop);
         
-        Log.i(TAG, "📡 Simulation started with settings:");
+        Log.i(TAG, "📡 Simulation started:");
         Log.i(TAG, "  - Power: " + powerDbm + " dBm");
         Log.i(TAG, "  - RSSI Threshold: " + rssiThreshold);
         Log.i(TAG, "  - Scan Interval: " + scanIntervalMs + "ms");
         Log.i(TAG, "  - Session: S" + session);
         Log.i(TAG, "  - Target: " + (target == 0 ? "A" : "B"));
         Log.i(TAG, "  - Q Value: " + qValue);
+        Log.i(TAG, "  - Tags available: " + databaseTags.size());
         
         return true;
     }
     
+    /**
+     * حلقة المحاكاة الواقعية
+     */
     private void simulationLoop() {
         int index = 0;
+        int consecutiveMisses = 0;
         
         while (isScanning) {
             try {
-                // محاكاة قراءة وسم
-                String epc = simulationTags[index % simulationTags.length];
+                if (databaseTags.isEmpty()) {
+                    // لا توجد وسوم - انتظر
+                    Thread.sleep(1000);
+                    continue;
+                }
                 
-                // محاكاة RSSI بناءً على قوة الإرسال
-                // كلما زادت القوة، كانت الإشارة أقوى
-                int baseRssi = -90 + (powerDbm - 10); // 10dBm → -90, 30dBm → -70
-                int rssiVariation = random.nextInt(20) - 10; // -10 إلى +10
-                int rssi = Math.max(-100, Math.min(-30, baseRssi + rssiVariation));
+                // اختيار وسم
+                String epc = databaseTags.get(index % databaseTags.size());
+                
+                // محاكاة RSSI واقعية
+                int rssi = simulateRssi();
                 
                 // تطبيق عتبة RSSI
-                if (rssi >= rssiThreshold && listener != null) {
-                    listener.onTagRead(epc, rssi);
+                if (rssi >= rssiThreshold) {
+                    consecutiveMisses = 0;
+                    if (listener != null) {
+                        final String finalEpc = epc;
+                        final int finalRssi = rssi;
+                        mainHandler.post(() -> listener.onTagRead(finalEpc, finalRssi));
+                    }
+                } else {
+                    consecutiveMisses++;
+                    // إذا فشل القراءة عدة مرات، تخطى هذا الوسم
+                    if (consecutiveMisses > 3) {
+                        consecutiveMisses = 0;
+                        index++;
+                    }
                 }
                 
                 index++;
                 
-                // النوم حسب فترة المسح
-                Thread.sleep(scanIntervalMs);
+                // محاكاة تداخل الإشارات - أحياناً يقرأ نفس الوسم مرتين
+                if (random.nextInt(100) < 15) { // 15% احتمال تكرار
+                    // لا تزيد index لقراءة نفس الوسم مرة أخرى
+                } else {
+                    index++;
+                }
+                
+                // النوم حسب فترة المسح مع بعض العشوائية
+                long actualDelay = scanIntervalMs + random.nextInt(50) - 25;
+                Thread.sleep(Math.max(50, actualDelay));
                 
             } catch (InterruptedException e) {
                 Log.d(TAG, "Simulation loop interrupted");
@@ -182,9 +290,37 @@ public class SimulatorReader implements MiraIRFIDReader {
                 if (isScanning && listener != null) {
                     mainHandler.post(() -> listener.onError(e.getMessage()));
                 }
+                Log.e(TAG, "Simulation loop error", e);
                 break;
             }
         }
+    }
+    
+    /**
+     * محاكاة RSSI واقعية بناءً على:
+     * - قوة الإرسال
+     * - المسافة (عشوائية)
+     * - التداخل (عشوائي)
+     * - Q Value (كلما زاد Q، زادت الدقة لكن قل المدى)
+     */
+    private int simulateRssi() {
+        // القوة الأساسية تعتمد على powerDbm
+        int baseRssi = -95 + (powerDbm - 10) * 2; // 10dBm → -95, 30dBm → -55
+        
+        // تأثير Q Value على المدى
+        int qPenalty = qValue * 2; // Q=0 → 0, Q=15 → -30
+        
+        // المسافة العشوائية (0-5 متر)
+        int distancePenalty = random.nextInt(30); // 0 إلى -30
+        
+        // التداخل العشوائي
+        int interference = random.nextInt(20) - 10; // -10 إلى +10
+        
+        // الحساب النهائي
+        int rssi = baseRssi - qPenalty - distancePenalty + interference;
+        
+        // تحديد النطاق
+        return Math.max(-100, Math.min(-30, rssi));
     }
     
     @Override
@@ -228,6 +364,7 @@ public class SimulatorReader implements MiraIRFIDReader {
     public int getSession() { return session; }
     public int getTarget() { return target; }
     public int getQValue() { return qValue; }
+    public int getAvailableTagsCount() { return databaseTags.size(); }
     
     public void setSession(int session) {
         this.session = Math.max(0, Math.min(3, session));
@@ -246,12 +383,12 @@ public class SimulatorReader implements MiraIRFIDReader {
     
     @Override
     public String getDeviceName() {
-        return "Simulator (Test Mode)";
+        return "Simulator (Database Mode)";
     }
     
     @Override
     public String getFirmwareVersion() {
-        return "1.0.0-sim";
+        return "2.0.0-sim-db";
     }
     
     @Override
@@ -267,13 +404,12 @@ public class SimulatorReader implements MiraIRFIDReader {
     // عمليات القراءة والكتابة - محاكاة
     @Override
     public boolean writeData(String pwdStr, int bank, int ptr, String data) {
-        Log.d(TAG, "Simulator writeData: bank=" + bank + ", ptr=" + ptr + ", data=" + data);
+        Log.d(TAG, "Simulator writeData: bank=" + bank + ", ptr=" + ptr);
         return true;
     }
     
     @Override
     public String readData(String pwdStr, int bank, int ptr, int len) {
-        Log.d(TAG, "Simulator readData: bank=" + bank + ", ptr=" + ptr + ", len=" + len);
         return "00000000";
     }
     
@@ -294,7 +430,6 @@ public class SimulatorReader implements MiraIRFIDReader {
     
     @Override
     public boolean writeEpc(String newEpc, String accessPassword) {
-        Log.d(TAG, "Simulator writeEpc: " + newEpc);
         return true;
     }
     
