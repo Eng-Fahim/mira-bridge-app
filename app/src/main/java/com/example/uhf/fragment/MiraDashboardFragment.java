@@ -263,7 +263,8 @@ private void updateLiveStatus() {
         }
     }
 
-    private CardView createQuickActionCard(MiraQuickAccessSettings.QuickAction action) {
+    // في createQuickActionCard()
+private CardView createQuickActionCard(MiraQuickAccessSettings.QuickAction action) {
     Context context = getContext();
     if (context == null) return null;
 
@@ -276,52 +277,65 @@ private void updateLiveStatus() {
     card.setCardElevation(2f);
     card.setStrokeWidth(1);
     
+    // ✅ لون الحدود
     try {
         android.util.TypedValue typedValue = new android.util.TypedValue();
         context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOutlineVariant, typedValue, true);
         card.setStrokeColor(typedValue.data);
     } catch (Exception ignored) {}
+    
+    // ✅ لون خلفية البطاقة من الثيم
+    try {
+        android.util.TypedValue bgTypedValue = new android.util.TypedValue();
+        context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorSurface, bgTypedValue, true);
+        card.setCardBackgroundColor(bgTypedValue.data);
+    } catch (Exception ignored) {}
 
     card.setClickable(true);
     card.setFocusable(true);
+    card.setRippleColor(0x22000000); // تأثير الضغط
 
     LinearLayout layout = new LinearLayout(context);
     layout.setOrientation(LinearLayout.VERTICAL);
     layout.setPadding(8, 14, 8, 14);
     layout.setGravity(android.view.Gravity.CENTER);
 
-    // ✅ تحميل خط Cairo
-    android.graphics.Typeface cairoRegular = null;
+    // ✅ تحميل خط Cairo مرة واحدة
     android.graphics.Typeface cairoBold = null;
     try {
-        cairoRegular = android.graphics.Typeface.createFromAsset(
-            context.getAssets(), "fonts/cairo_regular.ttf");
         cairoBold = android.graphics.Typeface.createFromAsset(
             context.getAssets(), "fonts/cairo_bold.ttf");
     } catch (Exception e) {
         Log.e(TAG, "Cairo font load error: " + e.getMessage());
     }
 
+    // ✅ الأيقونة
     TextView tvIcon = new TextView(context);
     tvIcon.setText(getActionIcon(action.id));
     tvIcon.setTextSize(22);
     tvIcon.setGravity(android.view.Gravity.CENTER);
     layout.addView(tvIcon);
 
+    // ✅ العنوان مع خط Cairo
     TextView tvTitle = new TextView(context);
     tvTitle.setText(isArabic ? action.titleAr : action.titleEn);
     tvTitle.setTextSize(11);
     tvTitle.setGravity(android.view.Gravity.CENTER);
     tvTitle.setPadding(0, 6, 0, 0);
     
-    // ✅ استخدام خط Cairo
-    if (isArabic && cairoBold != null) {
-        tvTitle.setTypeface(cairoBold);
-    } else if (cairoBold != null) {
+    // ✅ استخدام خط Cairo دائماً
+    if (cairoBold != null) {
         tvTitle.setTypeface(cairoBold);
     } else {
-        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvTitle.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
     }
+    
+    // ✅ لون النص من الثيم
+    try {
+        android.util.TypedValue textColorTypedValue = new android.util.TypedValue();
+        context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOnSurface, textColorTypedValue, true);
+        tvTitle.setTextColor(textColorTypedValue.data);
+    } catch (Exception ignored) {}
     
     layout.addView(tvTitle);
 
@@ -330,7 +344,6 @@ private void updateLiveStatus() {
 
     return card;
 }
-
     private void handleQuickAction(String actionId) {
         if (getActivity() instanceof UHFMainActivity) {
             UHFMainActivity activity = (UHFMainActivity) getActivity();
@@ -837,4 +850,4 @@ private void updateLiveStatus() {
         super.onDestroyView();
         mainHandler.removeCallbacksAndMessages(null);
     }
-}
+                                       }
