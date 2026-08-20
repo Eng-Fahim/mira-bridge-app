@@ -522,22 +522,38 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     // ==================== STOP INVENTORY ====================
 
     private void stopInventory() {
-        Context ctx = getContext();
-        if (ctx == null || !isAdded()) return;
+    Context ctx = getContext();
+    if (ctx == null || !isAdded()) {
+        Log.e(TAG, "❌ Cannot show dialog: context is null or fragment not added");
+        return;
+    }
 
+    Log.d(TAG, "🛑 stopInventory() called - showing confirmation dialog");
+
+    try {
         AlertDialog.Builder confirmDialog = new AlertDialog.Builder(ctx);
         confirmDialog.setTitle(isArabic ? "⚠️ إيقاف الجرد؟" : "⚠️ Stop Audit?");
         confirmDialog.setMessage(isArabic ?
             "هل أنت متأكد من إيقاف الجرد؟\nسيتم حفظ التقرير وإرساله مع لقطة الشاشة." :
             "Are you sure you want to stop?\nReport and screenshot will be saved.");
         confirmDialog.setPositiveButton(isArabic ? "نعم، إيقاف" : "Yes, Stop", (d, w) -> {
+            Log.d(TAG, "✅ User confirmed stop");
             d.dismiss();
             finishInventory();
         });
-        confirmDialog.setNegativeButton(isArabic ? "متابعة" : "Continue", (d, w) -> d.dismiss());
+        confirmDialog.setNegativeButton(isArabic ? "متابعة" : "Continue", (d, w) -> {
+            Log.d(TAG, "❌ User cancelled stop");
+            d.dismiss();
+        });
         confirmDialog.setCancelable(false);
         confirmDialog.show();
+        
+        Log.d(TAG, "✅ Confirmation dialog shown");
+    } catch (Exception e) {
+        Log.e(TAG, "❌ Error showing dialog: " + e.getMessage());
+        e.printStackTrace();
     }
+}
 
     private void finishInventory() {
         Context ctx = getContext();
@@ -1384,4 +1400,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }
         super.onDestroyView();
     }
-            }
+                }
