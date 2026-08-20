@@ -56,6 +56,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private static final String TAG = "MiraInventoryPro";
     private ScannedItemsAdapter scannedItemsAdapter;
     private List<ScannedItemDisplay> scannedItemsDisplayList = new ArrayList<>();
+    
     // Constants
     private static final long UI_UPDATE_THROTTLE_MS = 200;
     private static final long SIMULATION_INITIAL_DELAY_MS = 500;
@@ -69,7 +70,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private static final int BEEP_PRIORITY = 0;
     private static final int BEEP_LOOP = 0;
     
-    // Hardware key codes for RFID trigger
     private static final int KEYCODE_RFID_TRIGGER_1 = 139;
     private static final int KEYCODE_RFID_TRIGGER_2 = 280;
     private static final int KEYCODE_RFID_TRIGGER_3 = 293;
@@ -101,22 +101,16 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private MaterialButton btnViewSnapshots;
 
     private MiraInventoryEngine inventoryEngine;
-    
-    // Use single-thread executor for sequential tag processing
     private final ExecutorService backgroundExecutor = Executors.newSingleThreadExecutor();
-    
     private final Handler mainThreadHandler = new Handler(Looper.getMainLooper());
     private volatile boolean isScanning = false;
     
     private RFIDManager rfidManager;
-    
-    // Sound & Beeper Controls
     private SoundPool soundPool;
     private int beepSoundId;
     private boolean soundLoaded = false;
     private long lastBeepTime = 0;
 
-    // Simulation Controls
     private final Handler simulationHandler = new Handler(Looper.getMainLooper());
     private Runnable simulationRunnable;
     private int simulationIndex = 0;
@@ -125,10 +119,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         "A000006", "A000007", "A000008", "A000009", "A000010"
     };
     
-    // Catalog EPCs for simulation
     private final Set<String> catalogEpcs = new HashSet<>();
     
-    // UI-update throttling
     private final Runnable uiUpdateRunnable = new Runnable() {
         @Override
         public void run() {
@@ -138,7 +130,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     };
     private volatile boolean pendingUiUpdate = false;
     
-    // Timer for elapsed time
     private final Runnable timerRunnable = new Runnable() {
         @Override
         public void run() {
@@ -152,8 +143,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
-    
-    // Local variables
     private int expectedCount = 0;
     private List<InventoryItem> scannedItemsList = new ArrayList<>();
 
@@ -214,80 +203,69 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
 
     private void initViews(View view) {
-    // Counts
-    tvExpectedCount = view.findViewById(R.id.tvExpectedCount);
-    tvScannedCount = view.findViewById(R.id.tvScannedCount);
-    tvVariance = view.findViewById(R.id.tvVariance);
-    tvAccuracy = view.findViewById(R.id.tvAccuracy);
-    
-    // Progress
-    tvProgressPercent = view.findViewById(R.id.tvProgressPercent);
-    progressScanned = view.findViewById(R.id.progressScanned);
-    progressRssi = view.findViewById(R.id.progressRssi);
-    
-    // Status
-    tvInventoryStatus = view.findViewById(R.id.tvInventoryStatus);
-    tvElapsedTime = view.findViewById(R.id.tvElapsedTime);
-    tvRssi = view.findViewById(R.id.tvRssi);
-    tvLastScan = view.findViewById(R.id.tvLastScan);
-    
-    // Info
-    tvTotalWeight = view.findViewById(R.id.tvTotalWeight);
-    tvTotalValue = view.findViewById(R.id.tvTotalValue);
-    tvItemCount = view.findViewById(R.id.tvItemCount);
-    tvEmptyState = view.findViewById(R.id.tvEmptyState);
-    
-    // ✅ RecyclerView - تهيئة واحدة فقط
-    rvInventoryItems = view.findViewById(R.id.rvInventoryItems);
-    if (rvInventoryItems != null) {
-        rvInventoryItems.setLayoutManager(new LinearLayoutManager(requireContext()));
-        scannedItemsAdapter = new ScannedItemsAdapter(scannedItemsDisplayList);
-        rvInventoryItems.setAdapter(scannedItemsAdapter);
+        tvExpectedCount = view.findViewById(R.id.tvExpectedCount);
+        tvScannedCount = view.findViewById(R.id.tvScannedCount);
+        tvVariance = view.findViewById(R.id.tvVariance);
+        tvAccuracy = view.findViewById(R.id.tvAccuracy);
         
-        // ✅ إضافة تحسين للأداء
-        rvInventoryItems.setHasFixedSize(false); // لأن العناصر تتغير ديناميكياً
-        rvInventoryItems.setItemAnimator(null); // تعطيل الأنيميشن للأداء الأفضل
-    }
-    
-    // Tabs
-    tabInventoryModes = view.findViewById(R.id.tabInventoryModes);
-    if (tabInventoryModes != null) {
-        tabInventoryModes.addTab(tabInventoryModes.newTab().setText("جرد شامل"));
-        tabInventoryModes.addTab(tabInventoryModes.newTab().setText("جرد فئوي"));
-    }
-    
-    // Buttons
-    btnStartInventory = view.findViewById(R.id.btnStartInventory);
-    btnBlindInventory = view.findViewById(R.id.btnBlindInventory);
-    btnStopInventory = view.findViewById(R.id.btnStopInventory);
-    btnGenerateReport = view.findViewById(R.id.btnGenerateReport);
-    btnArchiveReports = view.findViewById(R.id.btnArchiveReports);
-    btnViewSnapshots = view.findViewById(R.id.btnViewSnapshots);
+        tvProgressPercent = view.findViewById(R.id.tvProgressPercent);
+        progressScanned = view.findViewById(R.id.progressScanned);
+        progressRssi = view.findViewById(R.id.progressRssi);
+        
+        tvInventoryStatus = view.findViewById(R.id.tvInventoryStatus);
+        tvElapsedTime = view.findViewById(R.id.tvElapsedTime);
+        tvRssi = view.findViewById(R.id.tvRssi);
+        tvLastScan = view.findViewById(R.id.tvLastScan);
+        
+        tvTotalWeight = view.findViewById(R.id.tvTotalWeight);
+        tvTotalValue = view.findViewById(R.id.tvTotalValue);
+        tvItemCount = view.findViewById(R.id.tvItemCount);
+        tvEmptyState = view.findViewById(R.id.tvEmptyState);
+        
+        // ✅ RecyclerView - تهيئة واحدة فقط
+        rvInventoryItems = view.findViewById(R.id.rvInventoryItems);
+        if (rvInventoryItems != null) {
+            rvInventoryItems.setLayoutManager(new LinearLayoutManager(requireContext()));
+            scannedItemsAdapter = new ScannedItemsAdapter(scannedItemsDisplayList);
+            rvInventoryItems.setAdapter(scannedItemsAdapter);
+            rvInventoryItems.setHasFixedSize(false);
+            rvInventoryItems.setItemAnimator(null);
+        }
+        
+        tabInventoryModes = view.findViewById(R.id.tabInventoryModes);
+        if (tabInventoryModes != null) {
+            tabInventoryModes.addTab(tabInventoryModes.newTab().setText("جرد شامل"));
+            tabInventoryModes.addTab(tabInventoryModes.newTab().setText("جرد فئوي"));
+        }
+        
+        btnStartInventory = view.findViewById(R.id.btnStartInventory);
+        btnBlindInventory = view.findViewById(R.id.btnBlindInventory);
+        btnStopInventory = view.findViewById(R.id.btnStopInventory);
+        btnGenerateReport = view.findViewById(R.id.btnGenerateReport);
+        btnArchiveReports = view.findViewById(R.id.btnArchiveReports);
+        btnViewSnapshots = view.findViewById(R.id.btnViewSnapshots);
 
-    if (btnStartInventory != null) {
-        btnStartInventory.setOnClickListener(v -> startScanning());
+        if (btnStartInventory != null) {
+            btnStartInventory.setOnClickListener(v -> startScanning());
+        }
+        if (btnBlindInventory != null) {
+            btnBlindInventory.setOnClickListener(v -> startBlindInventory());
+        }
+        if (btnStopInventory != null) {
+            btnStopInventory.setOnClickListener(v -> stopScanning());
+            btnStopInventory.setEnabled(false);
+        }
+        if (btnGenerateReport != null) {
+            btnGenerateReport.setOnClickListener(v -> showCommitConfirmationDialog());
+            btnGenerateReport.setEnabled(false);
+        }
+        if (btnArchiveReports != null) {
+            btnArchiveReports.setOnClickListener(v -> showArchiveReports());
+        }
+        if (btnViewSnapshots != null) {
+            btnViewSnapshots.setOnClickListener(v -> showSnapshotsDialog());
+        }
     }
-    if (btnBlindInventory != null) {
-        btnBlindInventory.setOnClickListener(v -> startBlindInventory());
-    }
-    if (btnStopInventory != null) {
-        btnStopInventory.setOnClickListener(v -> stopScanning());
-        btnStopInventory.setEnabled(false);
-    }
-    if (btnGenerateReport != null) {
-        btnGenerateReport.setOnClickListener(v -> showCommitConfirmationDialog());
-        btnGenerateReport.setEnabled(false);
-    }
-    if (btnArchiveReports != null) {
-        btnArchiveReports.setOnClickListener(v -> showArchiveReports());
-    }
-    if (btnViewSnapshots != null) {
-        btnViewSnapshots.setOnClickListener(v -> showSnapshotsDialog());
-    }
-}
-
-
-    // ==================== HARDWARE KEY TRIGGER ====================
 
     public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
         if (keyCode == KEYCODE_RFID_TRIGGER_1 || keyCode == KEYCODE_RFID_TRIGGER_2 || keyCode == KEYCODE_RFID_TRIGGER_3) {
@@ -303,125 +281,116 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         return false;
     }
 
-    // ==================== RFID CALLBACKS ====================
-    
-    
-// تعديل onTagRead لإضافة القطعة للقائمة:
-@Override
-public void onTagRead(String epc, int rssi) {
-    if (!isScanning || epc == null || epc.isEmpty()) return;
-
-    final String normalizedEpc = epc.trim().toUpperCase();
-    final int finalRssi = rssi;
-    
-    backgroundExecutor.execute(() -> {
-        try {
-            InventoryItem item = inventoryEngine.onTagScanned(normalizedEpc, finalRssi);
-            
-            mainThreadHandler.post(() -> {
-                playScanBeep();
-                updateLastScan(normalizedEpc, finalRssi);
-                
-                // ✅ إضافة القطعة للقائمة المرئية
-                addScannedItemToDisplay(normalizedEpc, finalRssi, item);
-                
-                scheduleUiUpdate();
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Error processing tag: " + normalizedEpc, e);
-        }
-    });
-}
-
-// دالة جديدة لإضافة القطعة للعرض:
-private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
-    if (scannedItemsAdapter == null) return;
-    
-    // التحقق من عدم وجود القطعة مسبقاً
-    boolean exists = false;
-    for (ScannedItemDisplay display : scannedItemsDisplayList) {
-        if (display.epc.equals(epc)) {
-            display.count++;
-            display.rssi = rssi;
-            exists = true;
-            break;
-        }
-    }
-    
-    if (!exists) {
-        ScannedItemDisplay display = new ScannedItemDisplay(
-            epc,
-            item != null ? item.getTitle() : "Unknown",
-            item != null ? item.getKarat() : "—",
-            1,
-            rssi
-        );
-        scannedItemsDisplayList.add(0, display); // إضافة في البداية
-    }
-    
-    scannedItemsAdapter.notifyDataSetChanged();
-    
-    // إخفاء رسالة "لا توجد قطع"
-    if (tvEmptyState != null && !scannedItemsDisplayList.isEmpty()) {
-        tvEmptyState.setVisibility(View.GONE);
-    }
-}
-
-// ==================== ADAPTER CLASS ====================
-private static class ScannedItemDisplay {
-    String epc;
-    String title;
-    String karat;
-    int count;
-    int rssi;
-    
-    ScannedItemDisplay(String epc, String title, String karat, int count, int rssi) {
-        this.epc = epc;
-        this.title = title;
-        this.karat = karat;
-        this.count = count;
-        this.rssi = rssi;
-    }
-}
-
-private class ScannedItemsAdapter extends RecyclerView.Adapter<ScannedItemsAdapter.ViewHolder> {
-    
-    private List<ScannedItemDisplay> items;
-    
-    ScannedItemsAdapter(List<ScannedItemDisplay> items) {
-        this.items = items;
-    }
-    
-    @NonNull
     @Override
-    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext())
-            .inflate(android.R.layout.simple_list_item_2, parent, false);
-        return new ViewHolder(view);
-    }
-    
-    @Override
-    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        ScannedItemDisplay item = items.get(position);
-        holder.tvTitle.setText(item.title + " (" + item.karat + ")");
-        holder.tvSubtitle.setText("EPC: " + item.epc + " | RSSI: " + item.rssi + " | Count: " + item.count);
-    }
-    
-    @Override
-    public int getItemCount() {
-        return items.size();
-    }
-    
-    class ViewHolder extends RecyclerView.ViewHolder {
-        TextView tvTitle;
-        TextView tvSubtitle;
+    public void onTagRead(String epc, int rssi) {
+        if (!isScanning || epc == null || epc.isEmpty()) return;
+
+        final String normalizedEpc = epc.trim().toUpperCase();
+        final int finalRssi = rssi;
         
-        ViewHolder(View itemView) {
-            super(itemView);
-            tvTitle = itemView.findViewById(android.R.id.text1);
-            tvSubtitle = itemView.findViewById(android.R.id.text2);
+        backgroundExecutor.execute(() -> {
+            try {
+                InventoryItem item = inventoryEngine.onTagScanned(normalizedEpc, finalRssi);
+                
+                mainThreadHandler.post(() -> {
+                    playScanBeep();
+                    updateLastScan(normalizedEpc, finalRssi);
+                    addScannedItemToDisplay(normalizedEpc, finalRssi, item);
+                    scheduleUiUpdate();
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error processing tag: " + normalizedEpc, e);
+            }
+        });
+    }
+
+    private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
+        if (scannedItemsAdapter == null) return;
+        
+        boolean exists = false;
+        for (ScannedItemDisplay display : scannedItemsDisplayList) {
+            if (display.epc.equals(epc)) {
+                display.count++;
+                display.rssi = rssi;
+                exists = true;
+                break;
+            }
+        }
+        
+        if (!exists) {
+            ScannedItemDisplay display = new ScannedItemDisplay(
+                epc,
+                item != null ? item.getTitle() : "Unknown",
+                item != null ? item.getKarat() : "—",
+                1,
+                rssi
+            );
+            scannedItemsDisplayList.add(0, display);
+        }
+        
+        scannedItemsAdapter.notifyDataSetChanged();
+        
+        if (tvEmptyState != null && !scannedItemsDisplayList.isEmpty()) {
+            tvEmptyState.setVisibility(View.GONE);
         }
     }
+
+    private static class ScannedItemDisplay {
+        String epc;
+        String title;
+        String karat;
+        int count;
+        int rssi;
+        
+        ScannedItemDisplay(String epc, String title, String karat, int count, int rssi) {
+            this.epc = epc;
+            this.title = title;
+            this.karat = karat;
+            this.count = count;
+            this.rssi = rssi;
+        }
+    }
+
+    private class ScannedItemsAdapter extends RecyclerView.Adapter<ScannedItemsAdapter.ViewHolder> {
+        
+        private List<ScannedItemDisplay> items;
+        
+        ScannedItemsAdapter(List<ScannedItemDisplay> items) {
+            this.items = items;
+        }
+        
+        @NonNull
+        @Override
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext())
+                .inflate(android.R.layout.simple_list_item_2, parent, false);
+            return new ViewHolder(view);
+        }
+        
+        @Override
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+            ScannedItemDisplay item = items.get(position);
+            holder.tvTitle.setText(item.title + " (" + item.karat + ")");
+            holder.tvSubtitle.setText("EPC: " + item.epc + " | RSSI: " + item.rssi + " | Count: " + item.count);
+        }
+        
+        @Override
+        public int getItemCount() {
+            return items.size();
+        }
+        
+        class ViewHolder extends RecyclerView.ViewHolder {
+            TextView tvTitle;
+            TextView tvSubtitle;
+            
+            ViewHolder(View itemView) {
+                super(itemView);
+                tvTitle = itemView.findViewById(android.R.id.text1);
+                tvSubtitle = itemView.findViewById(android.R.id.text2);
+            }
+        }
+    }
+
     private void updateLastScan(String epc, int rssi) {
         if (tvLastScan != null) {
             tvLastScan.setText("آخر قراءة: " + epc);
@@ -470,8 +439,6 @@ private class ScannedItemsAdapter extends RecyclerView.Adapter<ScannedItemsAdapt
         }
     }
 
-    // ==================== UI & PROGRESS UPDATE ====================
-    
     private void updateUI() {
         if (!isAdded() || inventoryEngine == null) return;
         
@@ -537,8 +504,6 @@ private class ScannedItemsAdapter extends RecyclerView.Adapter<ScannedItemsAdapt
         }
     }
 
-    // ==================== START SCANNING ====================
-    
     private void startScanning() {
         if (isScanning) return;
         isScanning = true;
@@ -689,8 +654,6 @@ private class ScannedItemsAdapter extends RecyclerView.Adapter<ScannedItemsAdapt
         if (btnViewSnapshots != null) btnViewSnapshots.setEnabled(false);
     }
 
-    // ==================== STOP SCANNING ====================
-    
     private void stopScanning() {
         if (!isScanning) return;
         isScanning = false;
@@ -732,8 +695,6 @@ private class ScannedItemsAdapter extends RecyclerView.Adapter<ScannedItemsAdapt
         });
     }
 
-    // ==================== COMMIT & UPLOAD ====================
-
     private void showCommitConfirmationDialog() {
         if (!isAdded() || inventoryEngine == null) return;
         
@@ -752,91 +713,83 @@ private class ScannedItemsAdapter extends RecyclerView.Adapter<ScannedItemsAdapt
     }
 
     private void commitInventoryToServer() {
-    if (!isAdded()) return;
-    
-    Toast.makeText(requireContext(), "⏳ جاري إرسال البيانات...", Toast.LENGTH_SHORT).show();
-    
-    backgroundExecutor.execute(() -> {
-        try {
-            JSONObject payload = inventoryEngine.buildEvidencePayload();
-            
-            // ✅ إضافة بيانات إضافية
-            int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-            payload.put("branch_id", branchId);
-            
-            // ✅ إضافة قائمة القطع الممسوحة
-            JSONArray itemsArray = new JSONArray();
-            for (ScannedItemDisplay item : scannedItemsDisplayList) {
-                JSONObject itemObj = new JSONObject();
-                itemObj.put("code", item.epc);
-                itemObj.put("serial", item.epc);
-                itemObj.put("rssi", item.rssi);
-                itemsArray.put(itemObj);
-            }
-            payload.put("items", itemsArray);
-            
-            // ✅ حفظ في السيرفر
-            MiraApiClient.ApiResponse response = apiClient.closeInventorySession(payload);
-            
-            mainThreadHandler.post(() -> {
-                if (!isAdded()) return;
+        if (!isAdded()) return;
+        
+        Toast.makeText(requireContext(), "⏳ جاري إرسال البيانات...", Toast.LENGTH_SHORT).show();
+        
+        backgroundExecutor.execute(() -> {
+            try {
+                JSONObject payload = inventoryEngine.buildEvidencePayload();
                 
-                if (response != null && response.isSuccess) {
-                    Toast.makeText(requireContext(), "✅ تم اعتماد الجرد وحفظ التقرير بنجاح", Toast.LENGTH_LONG).show();
-                    if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
+                int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+                payload.put("branch_id", branchId);
+                
+                JSONArray itemsArray = new JSONArray();
+                for (ScannedItemDisplay item : scannedItemsDisplayList) {
+                    JSONObject itemObj = new JSONObject();
+                    itemObj.put("code", item.epc);
+                    itemObj.put("serial", item.epc);
+                    itemObj.put("rssi", item.rssi);
+                    itemsArray.put(itemObj);
+                }
+                payload.put("items", itemsArray);
+                
+                MiraApiClient.ApiResponse response = apiClient.closeInventorySession(payload);
+                
+                mainThreadHandler.post(() -> {
+                    if (!isAdded()) return;
                     
-                    // ✅ عرض ملخص الرد
-                    showCommitSuccessDialog(response);
-                } else {
-                    Toast.makeText(requireContext(), "❌ خطأ في إرسال البيانات", Toast.LENGTH_LONG).show();
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Error committing inventory", e);
-            mainThreadHandler.post(() -> {
-                if (isAdded()) {
-                    Toast.makeText(requireContext(), "❌ خطأ في إرسال البيانات", Toast.LENGTH_LONG).show();
-                }
-            });
-        }
-    });
-}
-
-private void showCommitSuccessDialog(MiraApiClient.ApiResponse response) {
-    if (!isAdded() || response.data == null) return;
-    
-    try {
-        JSONObject report = response.data.optJSONObject("report");
-        if (report == null) report = response.data;
-        
-        String accuracy = report.optString("accuracy", "0");
-        String riskLevel = report.optString("risk_level", "unknown");
-        String recommendation = report.optString("recommendation", "");
-        
-        String message = String.format(
-            "✅ تم اعتماد الجرد بنجاح:\n\n" +
-            "• الدقة: %s%%\n" +
-            "• مستوى الخطورة: %s\n" +
-            "• التوصية: %s",
-            accuracy, riskLevel, recommendation
-        );
-        
-        new MaterialAlertDialogBuilder(requireContext())
-            .setTitle("🎉 نجاح العملية")
-            .setMessage(message)
-            .setPositiveButton("إغلاق", null)
-            .show();
-    } catch (Exception e) {
-        Log.e(TAG, "Error showing success dialog", e);
+                    if (response != null && response.isSuccess) {
+                        Toast.makeText(requireContext(), "✅ تم اعتماد الجرد وحفظ التقرير بنجاح", Toast.LENGTH_LONG).show();
+                        if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
+                        showCommitSuccessDialog(response);
+                    } else {
+                        Toast.makeText(requireContext(), "❌ خطأ في إرسال البيانات", Toast.LENGTH_LONG).show();
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error committing inventory", e);
+                mainThreadHandler.post(() -> {
+                    if (isAdded()) {
+                        Toast.makeText(requireContext(), "❌ خطأ في إرسال البيانات", Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        });
     }
-}
 
-    // ==================== ARCHIVE & REPORTS ====================
-    
+    private void showCommitSuccessDialog(MiraApiClient.ApiResponse response) {
+        if (!isAdded() || response.data == null) return;
+        
+        try {
+            JSONObject report = response.data.optJSONObject("report");
+            if (report == null) report = response.data;
+            
+            String accuracy = report.optString("accuracy", "0");
+            String riskLevel = report.optString("risk_level", "unknown");
+            String recommendation = report.optString("recommendation", "");
+            
+            String message = String.format(
+                "✅ تم اعتماد الجرد بنجاح:\n\n" +
+                "• الدقة: %s%%\n" +
+                "• مستوى الخطورة: %s\n" +
+                "• التوصية: %s",
+                accuracy, riskLevel, recommendation
+            );
+            
+            new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("🎉 نجاح العملية")
+                .setMessage(message)
+                .setPositiveButton("إغلاق", null)
+                .show();
+        } catch (Exception e) {
+            Log.e(TAG, "Error showing success dialog", e);
+        }
+    }
+
     private void showArchiveReports() {
         if (!isAdded()) return;
         
-        // Show loading dialog
         MaterialAlertDialogBuilder loadingDialog = new MaterialAlertDialogBuilder(requireContext())
                 .setTitle("📂 جاري تحميل الأرشيف...")
                 .setMessage("يرجى الانتظار")
@@ -866,50 +819,47 @@ private void showCommitSuccessDialog(MiraApiClient.ApiResponse response) {
     }
     
     private List<InventoryReport> fetchArchiveReports() {
-    List<InventoryReport> reports = new ArrayList<>();
-    
-    try {
-        if (apiClient != null && branchesManager != null) {
-            int branchId = branchesManager.getActiveBranchId();
-            
-            // ✅ استخدام الـ endpoint الصحيح
-            MiraApiClient.ApiResponse response = apiClient.getInventoryReports(branchId, 1, 50);
-            
-            if (response != null && response.isSuccess && response.data != null) {
-                // ✅ استخراج البيانات من الاستجابة
-                JSONObject dataObj = response.data.optJSONObject("data");
-                JSONArray sessions = null;
+        List<InventoryReport> reports = new ArrayList<>();
+        
+        try {
+            if (apiClient != null && branchesManager != null) {
+                int branchId = branchesManager.getActiveBranchId();
+                MiraApiClient.ApiResponse response = apiClient.getInventoryReports(branchId, 1, 50);
                 
-                if (dataObj != null) {
-                    sessions = dataObj.optJSONArray("sessions");
-                } else {
-                    sessions = response.data.optJSONArray("sessions");
-                }
-                
-                if (sessions != null) {
-                    for (int i = 0; i < sessions.length(); i++) {
-                        JSONObject obj = sessions.getJSONObject(i);
-                        
-                        InventoryReport report = new InventoryReport(
-                            obj.optInt("id", i + 1),
-                            obj.optString("client_session_id", obj.optString("session_id", "SESS-" + (i + 1))),
-                            obj.optString("started_at", obj.optString("created_at", "")),
-                            obj.optInt("expected_count", 0),
-                            obj.optInt("unique_items_found", obj.optInt("scanned_count", 0)),
-                            obj.optInt("missing_count", 0),
-                            obj.optString("status", "completed")
-                        );
-                        reports.add(report);
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONObject dataObj = response.data.optJSONObject("data");
+                    JSONArray sessions = null;
+                    
+                    if (dataObj != null) {
+                        sessions = dataObj.optJSONArray("sessions");
+                    } else {
+                        sessions = response.data.optJSONArray("sessions");
+                    }
+                    
+                    if (sessions != null) {
+                        for (int i = 0; i < sessions.length(); i++) {
+                            JSONObject obj = sessions.getJSONObject(i);
+                            
+                            InventoryReport report = new InventoryReport(
+                                obj.optInt("id", i + 1),
+                                obj.optString("client_session_id", obj.optString("session_id", "SESS-" + (i + 1))),
+                                obj.optString("started_at", obj.optString("created_at", "")),
+                                obj.optInt("expected_count", 0),
+                                obj.optInt("unique_items_found", obj.optInt("scanned_count", 0)),
+                                obj.optInt("missing_count", 0),
+                                obj.optString("status", "completed")
+                            );
+                            reports.add(report);
+                        }
                     }
                 }
             }
+        } catch (Exception e) {
+            Log.e(TAG, "Error fetching archive reports", e);
         }
-    } catch (Exception e) {
-        Log.e(TAG, "Error fetching archive reports", e);
+        
+        return reports;
     }
-    
-    return reports;
-}
     
     private void displayArchiveDialog(List<InventoryReport> reports) {
         if (!isAdded() || reports.isEmpty()) {
@@ -917,7 +867,6 @@ private void showCommitSuccessDialog(MiraApiClient.ApiResponse response) {
             return;
         }
         
-        // Build list of report titles
         String[] reportTitles = new String[reports.size()];
         for (int i = 0; i < reports.size(); i++) {
             InventoryReport r = reports.get(i);
@@ -947,8 +896,7 @@ private void showCommitSuccessDialog(MiraApiClient.ApiResponse response) {
             "• المتوقع: %d\n" +
             "• الممسوح: %d\n" +
             "• المفقود: %d\n" +
-            "• الحالة: %s\n\n" +
-            "خيارات:",
+            "• الحالة: %s",
             report.sessionId, report.date, report.expectedCount,
             report.scannedCount, report.missingCount, report.status
         );
@@ -974,14 +922,12 @@ private void showCommitSuccessDialog(MiraApiClient.ApiResponse response) {
     private void printReport(InventoryReport report) {
         if (isAdded()) {
             Toast.makeText(requireContext(), "🖨️ جاري طباعة التقرير: " + report.sessionId, Toast.LENGTH_SHORT).show();
-            // TODO: Implement actual printing logic
         }
     }
     
     private void printAllReports(List<InventoryReport> reports) {
         if (isAdded()) {
             Toast.makeText(requireContext(), "🖨️ جاري طباعة " + reports.size() + " تقرير", Toast.LENGTH_SHORT).show();
-            // TODO: Implement actual printing logic
         }
     }
     
@@ -1018,8 +964,6 @@ private void showCommitSuccessDialog(MiraApiClient.ApiResponse response) {
                 .show();
     }
 
-    // ==================== SNAPSHOTS ====================
-    
     private void showSnapshotsDialog() {
         if (!isAdded()) return;
         
@@ -1045,314 +989,287 @@ private void showCommitSuccessDialog(MiraApiClient.ApiResponse response) {
     }
     
     private void showSnapshotsList() {
-    if (!isAdded()) return;
-    
-    MaterialAlertDialogBuilder loadingDialog = new MaterialAlertDialogBuilder(requireContext())
-            .setTitle("📸 جاري تحميل اللقطات...")
-            .setMessage("يرجى الانتظار")
-            .setCancelable(false);
-    AlertDialog loading = loadingDialog.show();
-    
-    backgroundExecutor.execute(() -> {
-        try {
-            List<String> snapshots = fetchSnapshotsFromServer();
-            
-            mainThreadHandler.post(() -> {
-                loading.dismiss();
-                if (isAdded()) {
-                    displaySnapshotsDialog(snapshots);
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Error fetching snapshots", e);
-            mainThreadHandler.post(() -> {
-                loading.dismiss();
-                if (isAdded()) {
-                    Toast.makeText(requireContext(), "❌ فشل تحميل اللقطات", Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
-    });
-}
+        if (!isAdded()) return;
+        
+        MaterialAlertDialogBuilder loadingDialog = new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("📸 جاري تحميل اللقطات...")
+                .setMessage("يرجى الانتظار")
+                .setCancelable(false);
+        AlertDialog loading = loadingDialog.show();
+        
+        backgroundExecutor.execute(() -> {
+            try {
+                List<String> snapshots = fetchSnapshotsFromServer();
+                
+                mainThreadHandler.post(() -> {
+                    loading.dismiss();
+                    if (isAdded()) {
+                        displaySnapshotsDialog(snapshots);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error fetching snapshots", e);
+                mainThreadHandler.post(() -> {
+                    loading.dismiss();
+                    if (isAdded()) {
+                        Toast.makeText(requireContext(), "❌ فشل تحميل اللقطات", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        });
+    }
 
-private List<String> fetchSnapshotsFromServer() {
-    List<String> snapshots = new ArrayList<>();
-    
-    try {
-        if (apiClient != null) {
-            MiraApiClient.ApiResponse response = apiClient.getLastSnapshot("Main Showroom");
-            
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONObject snapshot = response.data.optJSONObject("snapshot");
-                if (snapshot == null) {
-                    snapshot = response.data;
+    private List<String> fetchSnapshotsFromServer() {
+        List<String> snapshots = new ArrayList<>();
+        
+        try {
+            if (apiClient != null) {
+                MiraApiClient.ApiResponse response = apiClient.getLastSnapshot("Main Showroom");
+                
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONObject snapshot = response.data.optJSONObject("snapshot");
+                    if (snapshot == null) snapshot = response.data;
+                    
+                    if (snapshot != null && snapshot.length() > 0) {
+                        String date = snapshot.optString("snapshot_date", "غير معروف");
+                        int items = snapshot.optInt("total_items", 0);
+                        double weight = snapshot.optDouble("total_weight", 0);
+                        double value = snapshot.optDouble("total_value", 0);
+                        
+                        snapshots.add(String.format("📸 %s - %d قطعة - %.2fg - $%.2f", 
+                            date, items, weight, value));
+                    }
                 }
                 
-                if (snapshot != null && snapshot.length() > 0) {
-                    String date = snapshot.optString("snapshot_date", "غير معروف");
-                    int items = snapshot.optInt("total_items", 0);
-                    double weight = snapshot.optDouble("total_weight", 0);
-                    double value = snapshot.optDouble("total_value", 0);
-                    
-                    snapshots.add(String.format("📸 %s - %d قطعة - %.2fg - $%.2f", 
-                        date, items, weight, value));
-                }
-            }
-            
-            // جلب التاريخ الكامل
-            MiraApiClient.ApiResponse historyResponse = apiClient.getInventoryHistory("Main Showroom", 10);
-            if (historyResponse != null && historyResponse.isSuccess && historyResponse.data != null) {
-                JSONArray history = historyResponse.data.optJSONArray("history");
-                if (history != null) {
-                    for (int i = 0; i < history.length(); i++) {
-                        JSONObject obj = history.getJSONObject(i);
-                        String date = obj.optString("snapshot_date", "");
-                        int items = obj.optInt("total_items", 0);
-                        double weight = obj.optDouble("total_weight", 0);
-                        double value = obj.optDouble("total_value", 0);
-                        
-                        snapshots.add(String.format("📸 %s - %d قطعة - %.2fkg - $%.2f", 
-                            date, items, weight / 1000, value));
+                MiraApiClient.ApiResponse historyResponse = apiClient.getInventoryHistory("Main Showroom", 10);
+                if (historyResponse != null && historyResponse.isSuccess && historyResponse.data != null) {
+                    JSONArray history = historyResponse.data.optJSONArray("history");
+                    if (history != null) {
+                        for (int i = 0; i < history.length(); i++) {
+                            JSONObject obj = history.getJSONObject(i);
+                            String date = obj.optString("snapshot_date", "");
+                            int items = obj.optInt("total_items", 0);
+                            double weight = obj.optDouble("total_weight", 0);
+                            double value = obj.optDouble("total_value", 0);
+                            
+                            snapshots.add(String.format("📸 %s - %d قطعة - %.2fkg - $%.2f", 
+                                date, items, weight / 1000, value));
+                        }
                     }
                 }
             }
+        } catch (Exception e) {
+            Log.e(TAG, "Error fetching snapshots", e);
         }
-    } catch (Exception e) {
-        Log.e(TAG, "Error fetching snapshots", e);
+        
+        return snapshots;
     }
-    
-    return snapshots;
-}
 
-private void displaySnapshotsDialog(List<String> snapshots) {
-    if (!isAdded()) return;
-    
-    if (snapshots.isEmpty()) {
-        Toast.makeText(requireContext(), "لا توجد لقطات سابقة", Toast.LENGTH_SHORT).show();
-        return;
+    private void displaySnapshotsDialog(List<String> snapshots) {
+        if (!isAdded()) return;
+        
+        if (snapshots.isEmpty()) {
+            Toast.makeText(requireContext(), "لا توجد لقطات سابقة", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        String[] snapshotArray = snapshots.toArray(new String[0]);
+        
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("📸 لقطات الجرد السابقة")
+                .setItems(snapshotArray, (dialog, which) -> {
+                    Toast.makeText(requireContext(), "تم اختيار: " + snapshotArray[which], Toast.LENGTH_SHORT).show();
+                })
+                .setPositiveButton("إغلاق", null)
+                .show();
     }
-    
-    String[] snapshotArray = snapshots.toArray(new String[0]);
-    
-    new MaterialAlertDialogBuilder(requireContext())
-            .setTitle("📸 لقطات الجرد السابقة")
-            .setItems(snapshotArray, (dialog, which) -> {
-                Toast.makeText(requireContext(), "تم اختيار: " + snapshotArray[which], Toast.LENGTH_SHORT).show();
-            })
-            .setPositiveButton("إغلاق", null)
-            .show();
-}
     
     private void showSnapshotComparison() {
-    if (!isAdded()) return;
-    
-    // ✅ عرض loading
-    MaterialAlertDialogBuilder loadingDialog = new MaterialAlertDialogBuilder(requireContext())
-            .setTitle("📊 جاري تحميل الجلسات...")
-            .setMessage("يرجى الانتظار")
-            .setCancelable(false);
-    AlertDialog loading = loadingDialog.show();
-    
-    backgroundExecutor.execute(() -> {
-        try {
-            // 1️⃣ جلب الجلسات السابقة
-            List<InventoryReport> sessions = fetchArchiveReports();
-            
-            mainThreadHandler.post(() -> {
-                loading.dismiss();
-                if (!isAdded()) return;
-                
-                if (sessions.size() < 2) {
-                    Toast.makeText(requireContext(), 
-                        "⚠️ تحتاج إلى جلستين على الأقل للمقارنة", 
-                        Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                
-                // 2️⃣ عرض اختيار الجلستين للمقارنة
-                showSessionSelectionDialog(sessions);
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Error fetching sessions for comparison", e);
-            mainThreadHandler.post(() -> {
-                loading.dismiss();
-                if (isAdded()) {
-                    Toast.makeText(requireContext(), 
-                        "❌ فشل تحميل الجلسات", 
-                        Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
-    });
-}
-
-/**
- * ✅ عرض اختيار الجلستين للمقارنة
- */
-private void showSessionSelectionDialog(List<InventoryReport> sessions) {
-    if (!isAdded()) return;
-    
-    // عرض أحدث جلستين
-    InventoryReport session1 = sessions.get(0);
-    InventoryReport session2 = sessions.get(1);
-    
-    String[] sessionTitles = new String[sessions.size()];
-    for (int i = 0; i < sessions.size(); i++) {
-        InventoryReport r = sessions.get(i);
-        sessionTitles[i] = String.format("📋 %s - %s (%d/%d)", 
-            r.sessionId, r.date, r.scannedCount, r.expectedCount);
-    }
-    
-    // اختيار الجلسة الأولى
-    new MaterialAlertDialogBuilder(requireContext())
-            .setTitle("📊 اختر الجلسة الأولى")
-            .setItems(sessionTitles, (dialog1, which1) -> {
-                InventoryReport firstSession = sessions.get(which1);
-                
-                // اختيار الجلسة الثانية
-                new MaterialAlertDialogBuilder(requireContext())
-                        .setTitle("📊 اختر الجلسة الثانية")
-                        .setItems(sessionTitles, (dialog2, which2) -> {
-                            InventoryReport secondSession = sessions.get(which2);
-                            
-                            // التحقق من أن الجلستين مختلفتين
-                            if (firstSession.id == secondSession.id) {
-                                Toast.makeText(requireContext(), 
-                                    "⚠️ اختر جلستين مختلفتين", 
-                                    Toast.LENGTH_SHORT).show();
-                                return;
-                            }
-                            
-                            // جلب المقارنة من السيرفر
-                            fetchAndShowComparison(firstSession.id, secondSession.id);
-                        })
-                        .show();
-            })
-            .setNegativeButton("إلغاء", null)
-            .show();
-}
-
-/**
- * ✅ جلب المقارنة من السيرفر
- */
-private void fetchAndShowComparison(int sessionId1, int sessionId2) {
-    if (!isAdded()) return;
-    
-    MaterialAlertDialogBuilder loadingDialog = new MaterialAlertDialogBuilder(requireContext())
-            .setTitle("📊 جاري المقارنة...")
-            .setMessage("يرجى الانتظار")
-            .setCancelable(false);
-    AlertDialog loading = loadingDialog.show();
-    
-    backgroundExecutor.execute(() -> {
-        try {
-            MiraApiClient.ApiResponse response = apiClient.compareInventorySessions(sessionId1, sessionId2);
-            
-            mainThreadHandler.post(() -> {
-                loading.dismiss();
-                if (!isAdded()) return;
-                
-                if (response != null && response.isSuccess && response.data != null) {
-                    displayComparisonResult(response.data);
-                } else {
-                    Toast.makeText(requireContext(), 
-                        "❌ فشل المقارنة", 
-                        Toast.LENGTH_SHORT).show();
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Error comparing sessions", e);
-            mainThreadHandler.post(() -> {
-                loading.dismiss();
-                if (isAdded()) {
-                    Toast.makeText(requireContext(), 
-                        "❌ خطأ في المقارنة", 
-                        Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
-    });
-}
-
-/**
- * ✅ عرض نتيجة المقارنة
- */
-private void displayComparisonResult(JSONObject data) {
-    if (!isAdded()) return;
-    
-    try {
-        JSONObject comparison = data.optJSONObject("comparison");
-        if (comparison == null) comparison = data;
+        if (!isAdded()) return;
         
-        JSONObject session1 = comparison.optJSONObject("session_1");
-        JSONObject session2 = comparison.optJSONObject("session_2");
-        JSONObject difference = comparison.optJSONObject("difference");
+        MaterialAlertDialogBuilder loadingDialog = new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("📊 جاري تحميل الجلسات...")
+                .setMessage("يرجى الانتظار")
+                .setCancelable(false);
+        AlertDialog loading = loadingDialog.show();
         
-        if (session1 != null && session2 != null) {
-            int found1 = session1.optInt("found", session1.optInt("unique_items_found", 0));
-            int expected1 = session1.optInt("expected", session1.optInt("expected_count", 0));
-            int found2 = session2.optInt("found", session2.optInt("unique_items_found", 0));
-            int expected2 = session2.optInt("expected", session2.optInt("expected_count", 0));
-            
-            int missing1 = Math.max(0, expected1 - found1);
-            int missing2 = Math.max(0, expected2 - found2);
-            
-            int foundDiff = difference != null ? difference.optInt("found_diff", found2 - found1) : found2 - found1;
-            int missingDiff = missing2 - missing1;
-            
-            String date1 = session1.optString("date", session1.optString("started_at", "غير معروف"));
-            String date2 = session2.optString("date", session2.optString("started_at", "غير معروف"));
-            
-            String comparisonText = String.format(
-                "📊 مقارنة الجلسات:\n\n" +
-                "الجلسة الأولى (%s):\n" +
-                "• المتوقع: %d\n" +
-                "• الممسوح: %d\n" +
-                "• المفقود: %d\n\n" +
-                "الجلسة الثانية (%s):\n" +
-                "• المتوقع: %d\n" +
-                "• الممسوح: %d\n" +
-                "• المفقود: %d\n\n" +
-                "الفرق بين الجلستين:\n" +
-                "• تغير في الممسوح: %+d قطعة\n" +
-                "• تغير في المفقود: %+d قطعة",
-                date1, expected1, found1, missing1,
-                date2, expected2, found2, missing2,
-                foundDiff, missingDiff
-            );
-            
-            // إضافة تقييم للنتيجة
-            String assessment = "";
-            if (foundDiff > 0) {
-                assessment = "\n\n✅ تحسن: تم العثور على " + foundDiff + " قطعة إضافية";
-            } else if (foundDiff < 0) {
-                assessment = "\n\n⚠️ تراجع: انخفض عدد القطع الممسوحة بـ " + Math.abs(foundDiff) + " قطعة";
-            } else {
-                assessment = "\n\n➡️ لا تغيير في عدد القطع الممسوحة";
-            }
-            
-            new MaterialAlertDialogBuilder(requireContext())
-                    .setTitle("📊 نتيجة المقارنة")
-                    .setMessage(comparisonText + assessment)
-                    .setPositiveButton("🖨️ طباعة", (dialog, which) -> {
+        backgroundExecutor.execute(() -> {
+            try {
+                List<InventoryReport> sessions = fetchArchiveReports();
+                
+                mainThreadHandler.post(() -> {
+                    loading.dismiss();
+                    if (!isAdded()) return;
+                    
+                    if (sessions.size() < 2) {
                         Toast.makeText(requireContext(), 
-                            "🖨️ جاري الطباعة...", 
+                            "⚠️ تحتاج إلى جلستين على الأقل للمقارنة", 
                             Toast.LENGTH_SHORT).show();
-                        // TODO: Implement printing
-                    })
-                    .setNegativeButton("إغلاق", null)
-                    .show();
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "Error displaying comparison", e);
-        Toast.makeText(requireContext(), 
-            "❌ خطأ في عرض المقارنة", 
-            Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    
+                    showSessionSelectionDialog(sessions);
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error fetching sessions for comparison", e);
+                mainThreadHandler.post(() -> {
+                    loading.dismiss();
+                    if (isAdded()) {
+                        Toast.makeText(requireContext(), 
+                            "❌ فشل تحميل الجلسات", 
+                            Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        });
     }
-}
 
-    // ==================== EXIT WARNING ====================
-    
+    private void showSessionSelectionDialog(List<InventoryReport> sessions) {
+        if (!isAdded()) return;
+        
+        String[] sessionTitles = new String[sessions.size()];
+        for (int i = 0; i < sessions.size(); i++) {
+            InventoryReport r = sessions.get(i);
+            sessionTitles[i] = String.format("📋 %s - %s (%d/%d)", 
+                r.sessionId, r.date, r.scannedCount, r.expectedCount);
+        }
+        
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("📊 اختر الجلسة الأولى")
+                .setItems(sessionTitles, (dialog1, which1) -> {
+                    InventoryReport firstSession = sessions.get(which1);
+                    
+                    new MaterialAlertDialogBuilder(requireContext())
+                            .setTitle("📊 اختر الجلسة الثانية")
+                            .setItems(sessionTitles, (dialog2, which2) -> {
+                                InventoryReport secondSession = sessions.get(which2);
+                                
+                                if (firstSession.id == secondSession.id) {
+                                    Toast.makeText(requireContext(), 
+                                        "⚠️ اختر جلستين مختلفتين", 
+                                        Toast.LENGTH_SHORT).show();
+                                    return;
+                                }
+                                
+                                fetchAndShowComparison(firstSession.id, secondSession.id);
+                            })
+                            .show();
+                })
+                .setNegativeButton("إلغاء", null)
+                .show();
+    }
+
+    private void fetchAndShowComparison(int sessionId1, int sessionId2) {
+        if (!isAdded()) return;
+        
+        MaterialAlertDialogBuilder loadingDialog = new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("📊 جاري المقارنة...")
+                .setMessage("يرجى الانتظار")
+                .setCancelable(false);
+        AlertDialog loading = loadingDialog.show();
+        
+        backgroundExecutor.execute(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.compareInventorySessions(sessionId1, sessionId2);
+                
+                mainThreadHandler.post(() -> {
+                    loading.dismiss();
+                    if (!isAdded()) return;
+                    
+                    if (response != null && response.isSuccess && response.data != null) {
+                        displayComparisonResult(response.data);
+                    } else {
+                        Toast.makeText(requireContext(), 
+                            "❌ فشل المقارنة", 
+                            Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error comparing sessions", e);
+                mainThreadHandler.post(() -> {
+                    loading.dismiss();
+                    if (isAdded()) {
+                        Toast.makeText(requireContext(), 
+                            "❌ خطأ في المقارنة", 
+                            Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        });
+    }
+
+    private void displayComparisonResult(JSONObject data) {
+        if (!isAdded()) return;
+        
+        try {
+            JSONObject comparison = data.optJSONObject("comparison");
+            if (comparison == null) comparison = data;
+            
+            JSONObject session1 = comparison.optJSONObject("session_1");
+            JSONObject session2 = comparison.optJSONObject("session_2");
+            JSONObject difference = comparison.optJSONObject("difference");
+            
+            if (session1 != null && session2 != null) {
+                int found1 = session1.optInt("found", session1.optInt("unique_items_found", 0));
+                int expected1 = session1.optInt("expected", session1.optInt("expected_count", 0));
+                int found2 = session2.optInt("found", session2.optInt("unique_items_found", 0));
+                int expected2 = session2.optInt("expected", session2.optInt("expected_count", 0));
+                
+                int missing1 = Math.max(0, expected1 - found1);
+                int missing2 = Math.max(0, expected2 - found2);
+                
+                int foundDiff = difference != null ? difference.optInt("found_diff", found2 - found1) : found2 - found1;
+                int missingDiff = missing2 - missing1;
+                
+                String date1 = session1.optString("date", session1.optString("started_at", "غير معروف"));
+                String date2 = session2.optString("date", session2.optString("started_at", "غير معروف"));
+                
+                String comparisonText = String.format(
+                    "📊 مقارنة الجلسات:\n\n" +
+                    "الجلسة الأولى (%s):\n" +
+                    "• المتوقع: %d\n" +
+                    "• الممسوح: %d\n" +
+                    "• المفقود: %d\n\n" +
+                    "الجلسة الثانية (%s):\n" +
+                    "• المتوقع: %d\n" +
+                    "• الممسوح: %d\n" +
+                    "• المفقود: %d\n\n" +
+                    "الفرق بين الجلستين:\n" +
+                    "• تغير في الممسوح: %+d قطعة\n" +
+                    "• تغير في المفقود: %+d قطعة",
+                    date1, expected1, found1, missing1,
+                    date2, expected2, found2, missing2,
+                    foundDiff, missingDiff
+                );
+                
+                String assessment = "";
+                if (foundDiff > 0) {
+                    assessment = "\n\n✅ تحسن: تم العثور على " + foundDiff + " قطعة إضافية";
+                } else if (foundDiff < 0) {
+                    assessment = "\n\n⚠️ تراجع: انخفض عدد القطع الممسوحة بـ " + Math.abs(foundDiff) + " قطعة";
+                } else {
+                    assessment = "\n\n➡️ لا تغيير في عدد القطع الممسوحة";
+                }
+                
+                new MaterialAlertDialogBuilder(requireContext())
+                        .setTitle("📊 نتيجة المقارنة")
+                        .setMessage(comparisonText + assessment)
+                        .setPositiveButton("🖨️ طباعة", (dialog, which) -> {
+                            Toast.makeText(requireContext(), 
+                                "🖨️ جاري الطباعة...", 
+                                Toast.LENGTH_SHORT).show();
+                        })
+                        .setNegativeButton("إغلاق", null)
+                        .show();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error displaying comparison", e);
+            Toast.makeText(requireContext(), 
+                "❌ خطأ في عرض المقارنة", 
+                Toast.LENGTH_SHORT).show();
+        }
+    }
+
     @Override
     public void onPause() {
         super.onPause();
@@ -1373,15 +1290,12 @@ private void displayComparisonResult(JSONObject data) {
                     stopScanning();
                 })
                 .setNegativeButton("البقاء في الجرد", (dialog, which) -> {
-                    // Stay on current screen
                     dialog.dismiss();
                 })
                 .setCancelable(false)
                 .show();
     }
 
-    // ==================== SIMULATION ====================
-    
     private void startSimulationLoop() {
         simulationIndex = 0;
         
@@ -1422,8 +1336,6 @@ private void displayComparisonResult(JSONObject data) {
         }
     }
 
-    // ==================== DESTROY ====================
-    
     @Override
     public void onDestroyView() {
         super.onDestroyView();
@@ -1469,8 +1381,6 @@ private void displayComparisonResult(JSONObject data) {
         }
     }
     
-    // ==================== MODEL CLASS ====================
-    
     private static class InventoryReport {
         int id;
         String sessionId;
@@ -1491,4 +1401,4 @@ private void displayComparisonResult(JSONObject data) {
             this.status = status;
         }
     }
-                        }
+} // ✅ نهاية الكلاس
