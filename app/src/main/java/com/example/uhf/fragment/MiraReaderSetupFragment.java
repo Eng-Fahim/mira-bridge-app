@@ -34,8 +34,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
-// يجب إضافة:
 import com.example.uhf.MiraRfid.readers.ChainwayReader;
+import com.example.uhf.MiraRfid.readers.SimulatorReader;
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.RFIDManager;
 import com.example.uhf.MiraRfid.model.RFIDDevice;
@@ -60,6 +60,8 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     private RecyclerView rvDevices;
     private MaterialButton btnAddDevice;
     private MaterialButton btnAdvancedSettings;
+    
+    private MaterialButton btnApplySettings;
     private MaterialButton btnTestConnection;
     private MaterialButton btnDetectAuto;
     private MaterialButton btnBluetoothScan;
@@ -189,6 +191,9 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         btnSoundToggle = view.findViewById(R.id.btnSoundToggle);
         btnVibrationToggle = view.findViewById(R.id.btnVibrationToggle);
         tvActiveDeviceStatus = view.findViewById(R.id.tvActiveDeviceStatus);
+        btnApplySettings = view.findViewById(R.id.btnApplySettings);
+
+
     }
     
     private void setupRecyclerView() {
@@ -222,6 +227,15 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         showAdvancedReaderSettings();
         });
         }
+        
+        // في setupButtons:
+if (btnApplySettings != null) {
+    btnApplySettings.setOnClickListener(v -> {
+        playClickSound();
+        vibrateShort();
+        applySettingsImmediately();
+    });
+}
             
             if (btnTestConnection != null) {
                 btnTestConnection.setOnClickListener(v -> {
@@ -1162,6 +1176,54 @@ private void showAdvancedReaderSettings() {
             Log.e(TAG, "Cleanup error: " + e.getMessage());
         }
     }
+    
+    /**
+ * تطبيق الإعدادات فوراً على القارئ النشط
+ */
+private void applySettingsImmediately() {
+    try {
+        MiraIRFIDReader reader = rfidManager.getActiveReader();
+        if (reader == null) {
+            showToast(isArabic ? "لا يوجد قارئ نشط" : "No active reader");
+            return;
+        }
+        
+        if (reader instanceof ChainwayReader) {
+            ChainwayReader chainwayReader = (ChainwayReader) reader;
+            
+            // إعادة تهيئة الإعدادات
+            if (reader.isConnected()) {
+                reader.setPower(chainwayReader.getPowerDbm());
+                reader.setRssiThreshold(chainwayReader.getRssiThreshold());
+                reader.setScanInterval(chainwayReader.getScanIntervalMs());
+                chainwayReader.setSession(chainwayReader.getSession());
+                chainwayReader.setTarget(chainwayReader.getTarget());
+                chainwayReader.setQValue(chainwayReader.getQValue());
+                
+                playSuccessSound();
+                vibrateSuccess();
+                showToast("✅ " + (isArabic ? "تم تطبيق الإعدادات على القارئ" : "Settings applied"));
+            } else {
+                showToast("ℹ️ " + (isArabic ? "سيتم التطبيق عند الاتصال" : "Will apply on connect"));
+            }
+        } else if (reader instanceof SimulatorReader) {
+            SimulatorReader simReader = (SimulatorReader) reader;
+            
+            reader.setPower(simReader.getPowerDbm());
+            reader.setRssiThreshold(simReader.getRssiThreshold());
+            reader.setScanInterval(simReader.getScanIntervalMs());
+            
+            playSuccessSound();
+            vibrateSuccess();
+            showToast("✅ " + (isArabic ? "تم تطبيق الإعدادات على المحاكي" : "Settings applied to simulator"));
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Apply settings error: " + e.getMessage());
+        playErrorSound();
+        vibrateError();
+        showToast("❌ " + (isArabic ? "فشل تطبيق الإعدادات" : "Failed to apply settings"));
+    }
+}
     
     // ==================== Adapter ====================
     
