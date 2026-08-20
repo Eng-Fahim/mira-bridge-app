@@ -16,10 +16,7 @@ import androidx.annotation.Nullable;
 
 import com.example.uhf.R;
 import com.example.uhf.engine.MiraInventoryEngine;
-import com.example.uhf.model.InventoryItem;
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
-
-import org.json.JSONObject;
 
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -92,8 +89,13 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
 
     @Override
+    public void onError(String errorMessage) {
+        Log.e(TAG, "RFID Read Error: " + errorMessage);
+    }
+
+    @Override
     public void onConnectionChanged(boolean isConnected) {
-        Log.i(TAG, "RFID Hardware connection state: " + isConnected);
+        Log.i(TAG, "RFID Connection status: " + isConnected);
     }
 
     private void updateUI() {
@@ -113,7 +115,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         scannerExecutor.execute(() -> {
             inventoryEngine.processSessionClose();
             mainThreadHandler.post(() -> 
-                Toast.makeText(requireContext(), "تم إيقاف الجرد وحفظ الحزمة مشفرة", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "تم إيقاف الجرد وحفظ الحزمة", Toast.LENGTH_SHORT).show()
             );
         });
     }
