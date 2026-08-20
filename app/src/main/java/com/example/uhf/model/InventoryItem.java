@@ -7,6 +7,7 @@ public class InventoryItem {
     private final String gtin;
     private final String serial;
     private final String title;
+    private String karat; // إضافة متغير العيار
     
     private int readCount = 0;
     private int lastRssi = -128;
@@ -18,6 +19,13 @@ public class InventoryItem {
         this.gtin = gtin != null ? gtin : "";
         this.serial = serial != null ? serial : "";
         this.title = title != null ? title : "";
+        this.karat = "";
+    }
+
+    // Overloaded Constructor ليدعم العيار مباشرة عند الإنشاء
+    public InventoryItem(String epc, String gtin, String serial, String title, String karat) {
+        this(epc, gtin, serial, title);
+        this.karat = karat != null ? karat : "";
     }
 
     public static String normalizeEpc(String rawEpc) {
@@ -43,6 +51,11 @@ public class InventoryItem {
     public String getGtin() { return gtin; }
     public String getSerial() { return serial; }
     public String getTitle() { return title; }
+    
+    // الميثود التي كان يبحث عنها المترجم (Compiler)
+    public String getKarat() { return karat; }
+    public void setKarat(String karat) { this.karat = karat; }
+
     public int getReadCount() { return readCount; }
     public int getLastRssi() { return lastRssi; }
     public long getFirstSeenTimestamp() { return firstSeenTimestamp; }
