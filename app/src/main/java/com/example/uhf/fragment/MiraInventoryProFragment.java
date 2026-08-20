@@ -96,9 +96,13 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         Log.i(TAG, "RFID Connection status: " + isConnected);
     }
 
-    @Override
     public void onScanStopped() {
         Log.i(TAG, "RFID Hardware scan cycle stopped");
+    }
+
+    @Override
+    public void onScanStarted() {
+        Log.i(TAG, "RFID Hardware scan cycle started");
     }
 
     private void updateUI() {
