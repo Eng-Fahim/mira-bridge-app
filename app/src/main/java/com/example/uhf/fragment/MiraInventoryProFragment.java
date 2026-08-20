@@ -63,7 +63,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private static final int UI_UPDATE_INTERVAL = 250;
     private static final int MAX_DISPLAY_ITEMS = 500;
     private static final long VIBRATION_THROTTLE_MS = 100;
-    private static final int SCREENSHOT_QUALITY = 70; // جودة الصورة 70%
+    private static final int SCREENSHOT_QUALITY = 70;
 
     // Views
     private TextView tvInventoryStatus, tvExpectedCount, tvScannedCount, tvVariance;
@@ -74,6 +74,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private Button btnStartInventory, btnBlindInventory, btnStopInventory, btnGenerateReport, btnArchiveReports;
     private RecyclerView rvInventoryItems;
     private ProgressBar progressScanned, progressRssi;
+    private com.google.android.material.tabs.TabLayout tabInventoryModes;
 
     // State & Counters
     private boolean isScanning = false;
@@ -88,10 +89,15 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private long startTime = 0;
     private long lastVibrationTime = 0;
 
-    // Fast Data Structures (Thread-Safe)
+    // Simulation Flags & Handlers
+    private boolean isHardwareConnected = false; // يتم ضبطه لـ true عند ربط SDK العتاد
+    private Handler simulationHandler;
+    private Runnable simulationRunnable;
+
+    // Thread-Safe Data Structures
     private final Set<String> scannedEpcSet = Collections.synchronizedSet(new HashSet<>());
     private final Map<String, InventoryItem> localCatalog = new ConcurrentHashMap<>();
-    private final List<InventoryItem> scannedItems = new CopyOnWriteArrayList<>();
+    private final List<InventoryItem> scannedItems = Collections.synchronizedList(new ArrayList<>());
     private final List<InventoryItem> pendingBatch = new CopyOnWriteArrayList<>();
     private InventoryAdapter adapter;
 
@@ -108,15 +114,11 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private Runnable timerRunnable;
     private Runnable batchUpdateRunnable;
     private boolean isBatchScheduled = false;
-    
-    private com.google.android.material.tabs.TabLayout tabInventoryModes;
 
-    // Hardware Settings
+    // Hardware Settings & Sound
     private boolean soundEnabled = true;
     private boolean vibrateEnabled = true;
     private WebView printWebView;
-    
-    // Sound Pool
     private android.media.SoundPool soundPool;
     private int soundScanId, soundFoundId, soundMissingId;
 
@@ -179,7 +181,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private void bindViews(View v) {
-    tabInventoryModes = v.findViewById(R.id.tabInventoryModes);
+        tabInventoryModes = v.findViewById(R.id.tabInventoryModes);
         tvInventoryStatus = v.findViewById(R.id.tvInventoryStatus);
         tvExpectedCount = v.findViewById(R.id.tvExpectedCount);
         tvScannedCount = v.findViewById(R.id.tvScannedCount);
@@ -213,7 +215,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                         .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
                         .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build();
-                
+
                 soundPool = new android.media.SoundPool.Builder()
                         .setMaxStreams(5)
                         .setAudioAttributes(audioAttributes)
@@ -221,12 +223,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             } else {
                 soundPool = new android.media.SoundPool(5, android.media.AudioManager.STREAM_MUSIC, 0);
             }
-            
+
             soundScanId = soundPool.load(getContext(), R.raw.barcodebeep, 1);
             soundFoundId = soundPool.load(getContext(), R.raw.barcodebeep, 2);
             soundMissingId = soundPool.load(getContext(), R.raw.alarm_breach_security, 3);
-            
-            Log.i(TAG, "✅ SoundPool initialized successfully");
         } catch (Exception e) {
             Log.e(TAG, "SoundPool init error: " + e.getMessage());
             soundPool = null;
@@ -255,206 +255,48 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (btnStopInventory != null) btnStopInventory.setOnClickListener(v -> stopInventory());
         if (btnGenerateReport != null) btnGenerateReport.setOnClickListener(v -> generateProReport());
         if (btnArchiveReports != null) btnArchiveReports.setOnClickListener(v -> showAuditHistoryDialog());
-        
+
         if (tabInventoryModes != null) {
-    tabInventoryModes.addOnTabSelectedListener(new com.google.android.material.tabs.TabLayout.OnTabSelectedListener() {
-        @Override
-        public void onTabSelected(com.google.android.material.tabs.TabLayout.Tab tab) {
-            handleTabSelection(tab.getPosition());
-        }
-
-        @Override
-        public void onTabUnselected(com.google.android.material.tabs.TabLayout.Tab tab) {
-            // لا شيء
-        }
-
-        @Override
-        public void onTabReselected(com.google.android.material.tabs.TabLayout.Tab tab) {
-            handleTabSelection(tab.getPosition());
-        }
-    });
-}
-
-    }
-    
-    // دالة معالجة التبويبات
-private void handleTabSelection(int position) {
-    switch (position) {
-        case 0: // جرد كامل
-            Log.d(TAG, "📋 Full Inventory tab selected");
-            isBlindMode = false;
-            if (tvExpectedCount != null) tvExpectedCount.setVisibility(View.VISIBLE);
-            if (tvVariance != null) tvVariance.setVisibility(View.VISIBLE);
-            if (btnStartInventory != null) btnStartInventory.setEnabled(true);
-            if (btnBlindInventory != null) btnBlindInventory.setEnabled(true);
-            if (rvInventoryItems != null) rvInventoryItems.setVisibility(View.VISIBLE);
-            break;
-            
-        case 1: // جرد أعمى
-            Log.d(TAG, "⚡ Blind Inventory tab selected");
-            isBlindMode = true;
-            if (tvExpectedCount != null) tvExpectedCount.setVisibility(View.GONE);
-            if (tvVariance != null) tvVariance.setVisibility(View.GONE);
-            if (btnStartInventory != null) btnStartInventory.setEnabled(true);
-            if (btnBlindInventory != null) btnBlindInventory.setEnabled(false);
-            if (rvInventoryItems != null) rvInventoryItems.setVisibility(View.VISIBLE);
-            break;
-            
-        case 2: // التقارير
-            Log.d(TAG, "📊 Reports tab selected");
-            // ✅ إظهار التقارير وإخفاء عناصر الجرد
-            if (rvInventoryItems != null) rvInventoryItems.setVisibility(View.GONE);
-            if (btnStartInventory != null) btnStartInventory.setEnabled(false);
-            if (btnBlindInventory != null) btnBlindInventory.setEnabled(false);
-            if (btnStopInventory != null) btnStopInventory.setEnabled(false);
-            
-            // ✅ عرض التقارير المحفوظة
-            showSavedReports();
-            break;
-    }
-}
-
-// دالة عرض التقارير المحفوظة
-private void showSavedReports() {
-    Context ctx = getContext();
-    if (ctx == null || apiClient == null) return;
-    
-    Log.d(TAG, "📊 Loading reports from server...");
-    
-    // ✅ عرض مؤشر تحميل
-    Toast.makeText(ctx, isArabic ? "🔄 جاري تحميل التقارير..." : "🔄 Loading reports...", Toast.LENGTH_SHORT).show();
-    
-    new Thread(() -> {
-        try {
-            int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-            
-            // ✅ جلب التقارير من السيرفر
-            MiraApiClient.ApiResponse response = apiClient.getInventoryReports(branchId, 1, 50);
-            
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONObject data = response.data.optJSONObject("data");
-                if (data != null) {
-                    JSONArray sessionsArr = data.optJSONArray("sessions");
-                    
-                    if (sessionsArr != null && sessionsArr.length() > 0) {
-                        List<String> reportList = new ArrayList<>();
-                        List<JSONObject> sessionObjects = new ArrayList<>();
-                        
-                        for (int i = 0; i < sessionsArr.length(); i++) {
-                            JSONObject session = sessionsArr.optJSONObject(i);
-                            if (session != null) {
-                                sessionObjects.add(session);
-                                
-                                int id = session.optInt("id", 0);
-                                String date = session.optString("closed_at", session.optString("started_at", ""));
-                                int expected = session.optInt("expected_count", 0);
-                                int scanned = session.optInt("scanned_count", 0);
-                                int found = session.optInt("unique_items_found", 0);
-                                double accuracy = session.optDouble("accuracy", 0);
-                                String riskLevel = session.optString("risk_level", "none");
-                                
-                                String riskEmoji = "✅";
-                                switch (riskLevel) {
-                                    case "none": riskEmoji = "✅"; break;
-                                    case "low": riskEmoji = "🟢"; break;
-                                    case "medium": riskEmoji = "🟡"; break;
-                                    case "high": riskEmoji = "🟠"; break;
-                                    case "critical": riskEmoji = "🔴"; break;
-                                }
-                                
-                                String title = String.format(Locale.US,
-                                    "%s جلسة #%d | %s | المتوقع: %d | الممسوح: %d | الدقة: %.1f%%",
-                                    riskEmoji, id, date, expected, scanned, accuracy);
-                                
-                                reportList.add(title);
-                            }
-                        }
-                        
-                        safeRun(() -> {
-                            new AlertDialog.Builder(requireContext())
-                                .setTitle(isArabic ? "📊 تقارير الجرد" : "📊 Inventory Reports")
-                                .setItems(reportList.toArray(new String[0]), (dialog, which) -> {
-                                    // ✅ عند اختيار تقرير
-                                    if (which < sessionObjects.size()) {
-                                        showReportDetail(sessionObjects.get(which));
-                                    }
-                                })
-                                .setPositiveButton(isArabic ? "🖨️ طباعة آخر تقرير" : "🖨️ Print Last Report", (d, w) -> {
-                                    d.dismiss();
-                                    generateProReport();
-                                })
-                                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                                .show();
-                        });
-                    } else {
-                        safeRun(() -> {
-                            Toast.makeText(getContext(), 
-                                isArabic ? "لا توجد تقارير سابقة" : "No previous reports", 
-                                Toast.LENGTH_SHORT).show();
-                        });
-                    }
+            tabInventoryModes.addOnTabSelectedListener(new com.google.android.material.tabs.TabLayout.OnTabSelectedListener() {
+                @Override
+                public void onTabSelected(com.google.android.material.tabs.TabLayout.Tab tab) {
+                    handleTabSelection(tab.getPosition());
                 }
-            } else {
-                safeRun(() -> {
-                    Toast.makeText(getContext(), 
-                        isArabic ? "❌ فشل تحميل التقارير" : "❌ Failed to load reports", 
-                        Toast.LENGTH_SHORT).show();
-                });
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Show reports error: " + e.getMessage());
-            safeRun(() -> {
-                Toast.makeText(getContext(), 
-                    isArabic ? "❌ خطأ: " + e.getMessage() : "❌ Error: " + e.getMessage(), 
-                    Toast.LENGTH_LONG).show();
+                @Override public void onTabUnselected(com.google.android.material.tabs.TabLayout.Tab tab) {}
+                @Override public void onTabReselected(com.google.android.material.tabs.TabLayout.Tab tab) {
+                    handleTabSelection(tab.getPosition());
+                }
             });
         }
-    }).start();
-}
-
-// ✅ دالة عرض تفاصيل تقرير محدد
-private void showReportDetail(JSONObject session) {
-    try {
-        int id = session.optInt("id", 0);
-        String date = session.optString("closed_at", session.optString("started_at", ""));
-        String location = session.optString("location", "");
-        int expected = session.optInt("expected_count", 0);
-        int scanned = session.optInt("scanned_count", 0);
-        int found = session.optInt("unique_items_found", 0);
-        int missing = session.optInt("missing_count", 0);
-        double accuracy = session.optDouble("accuracy", 0);
-        String riskLevel = session.optString("risk_level", "none");
-        String screenshotPath = session.optString("screenshot_path", "");
-        
-        String message = isArabic ?
-            "📋 تفاصيل الجلسة #" + id + "\n\n" +
-            "📅 التاريخ: " + date + "\n" +
-            "📍 الموقع: " + location + "\n" +
-            "📦 المتوقع: " + expected + "\n" +
-            "✅ الممسوح: " + scanned + "\n" +
-            "🎯 الموجود: " + found + "\n" +
-            "⚠️ العجز: " + missing + "\n" +
-            "📊 الدقة: " + accuracy + "%\n" +
-            "🚨 مستوى الخطورة: " + riskLevel + "\n" :
-            "📋 Session #" + id + " Details\n\n" +
-            "📅 Date: " + date + "\n" +
-            "📍 Location: " + location + "\n" +
-            "📦 Expected: " + expected + "\n" +
-            "✅ Scanned: " + scanned + "\n" +
-            "🎯 Found: " + found + "\n" +
-            "⚠️ Missing: " + missing + "\n" +
-            "📊 Accuracy: " + accuracy + "%\n" +
-            "🚨 Risk: " + riskLevel + "\n";
-        
-        new AlertDialog.Builder(requireContext())
-            .setTitle(isArabic ? "📋 تفاصيل التقرير" : "📋 Report Details")
-            .setMessage(message)
-            .setPositiveButton(isArabic ? "إغلاق" : "Close", null)
-            .show();
-    } catch (Exception e) {
-        Log.e(TAG, "Show report detail error: " + e.getMessage());
     }
-}
+
+    private void handleTabSelection(int position) {
+        switch (position) {
+            case 0:
+                isBlindMode = false;
+                if (tvExpectedCount != null) tvExpectedCount.setVisibility(View.VISIBLE);
+                if (tvVariance != null) tvVariance.setVisibility(View.VISIBLE);
+                if (btnStartInventory != null) btnStartInventory.setEnabled(!isScanning);
+                if (btnBlindInventory != null) btnBlindInventory.setEnabled(!isScanning);
+                if (rvInventoryItems != null) rvInventoryItems.setVisibility(View.VISIBLE);
+                break;
+            case 1:
+                isBlindMode = true;
+                if (tvExpectedCount != null) tvExpectedCount.setVisibility(View.GONE);
+                if (tvVariance != null) tvVariance.setVisibility(View.GONE);
+                if (btnStartInventory != null) btnStartInventory.setEnabled(!isScanning);
+                if (btnBlindInventory != null) btnBlindInventory.setEnabled(false);
+                if (rvInventoryItems != null) rvInventoryItems.setVisibility(View.VISIBLE);
+                break;
+            case 2:
+                if (rvInventoryItems != null) rvInventoryItems.setVisibility(View.GONE);
+                if (btnStartInventory != null) btnStartInventory.setEnabled(false);
+                if (btnBlindInventory != null) btnBlindInventory.setEnabled(false);
+                if (btnStopInventory != null) btnStopInventory.setEnabled(false);
+                showSavedReports();
+                break;
+        }
+    }
 
     private void setInitialState() {
         if (btnStartInventory != null) btnStartInventory.setEnabled(true);
@@ -510,186 +352,6 @@ private void showReportDetail(JSONObject session) {
         }).start();
     }
 
-    private void loadLastSnapshotOffline() {
-        try {
-            prevTotalItems = offlineCache.getInt("prev_total_items", 0);
-            if (tvPrevItems != null) tvPrevItems.setText(String.valueOf(prevTotalItems));
-            updateComparisonCard();
-        } catch (Exception ignored) {}
-    }
-
-    // ==================== HIGH-SPEED TAG PROCESSING ====================
-
-    public void processScannedTag(String epcOrGtin, int rssi) {
-        processScannedTag(epcOrGtin, String.valueOf(rssi));
-    }
-
-    public void processScannedTag(String epcOrGtin, String rssi) {
-        if (!isScanning || epcOrGtin == null || epcOrGtin.trim().isEmpty()) return;
-        final String cleanCode = epcOrGtin.trim().toUpperCase();
-        if (!scannedEpcSet.add(cleanCode)) return;
-        
-        InventoryItem matchedItem = localCatalog.get(cleanCode);
-        boolean isKnown = matchedItem != null;
-        String title = isKnown ? matchedItem.title : (isArabic ? "قطعة غير معرفة" : "Unknown Item");
-        String karat = isKnown ? matchedItem.karat : "21K";
-        double weight = isKnown ? matchedItem.numericWeight : 0.0;
-        String location = isKnown ? matchedItem.location : (branchesManager != null ? branchesManager.getActiveBranchDisplayName() : "");
-        String status = isKnown ? matchedItem.status : "⚠️";
-        
-        InventoryItem newItem = new InventoryItem(cleanCode, title, karat, weight, status, location);
-        scannedItems.add(0, newItem);
-        pendingBatch.add(0, newItem);
-        scannedCount++;
-        if ("✓".equals(status)) foundCount++;
-        
-        playInventorySound(isKnown ? "found" : "missing");
-        updateRssiDisplay(rssi);
-        scheduleBatchUpdate();
-    }
-
-    private void scheduleBatchUpdate() {
-        if (isBatchScheduled || !isAdded()) return;
-        isBatchScheduled = true;
-        
-        batchUpdateRunnable = () -> {
-            isBatchScheduled = false;
-            
-            if (!isAdded() || getActivity() == null || getActivity().isFinishing()) {
-                return;
-            }
-            
-            try {
-                if (adapter != null && !pendingBatch.isEmpty()) {
-                    List<InventoryItem> batchCopy = new ArrayList<>(pendingBatch);
-                    pendingBatch.clear();
-                    adapter.addItems(batchCopy);
-                }
-                
-                if (tvScannedCount != null) tvScannedCount.setText(String.valueOf(scannedCount));
-                int remaining = Math.max(0, expectedCount - foundCount);
-                if (tvVariance != null) tvVariance.setText(String.valueOf(remaining));
-                
-                if (progressScanned != null && expectedCount > 0) {
-                    progressScanned.setProgress(Math.min(100, (int) ((scannedCount * 100.0) / expectedCount)));
-                }
-                
-                double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 100.0;
-                if (tvAccuracy != null) {
-                    tvAccuracy.setText(String.format(Locale.US, isArabic ? "الدقة: %.1f%%" : "Accuracy: %.1f%%", acc));
-                }
-                
-                updateTotals();
-                updateComparisonCard();
-            } catch (Exception e) {
-                Log.e(TAG, "Batch update error: " + e.getMessage());
-            }
-        };
-        
-        mainHandler.postDelayed(batchUpdateRunnable, UI_UPDATE_INTERVAL);
-    }
-
-    private void updateRssiDisplay(String rssi) {
-        if (tvRssi != null) {
-            tvRssi.setText(rssi + " dBm");
-        }
-        
-        if (progressRssi != null) {
-            try {
-                int rssiValue = Integer.parseInt(rssi.replaceAll("[^0-9-]", ""));
-                int percentage = Math.max(0, Math.min(100, (rssiValue + 100) * 100 / 70));
-                progressRssi.setProgress(percentage);
-                
-                if (percentage > 70) {
-                    progressRssi.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#22C55E")));
-                } else if (percentage > 40) {
-                    progressRssi.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#F59E0B")));
-                } else {
-                    progressRssi.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#EF4444")));
-                }
-            } catch (Exception e) {
-                progressRssi.setProgress(0);
-            }
-        }
-    }
-
-    private void updateTotals() {
-        double totalWt = calculateTotalWeight();
-        double totalVal = calculateTotalValue();
-        
-        if (tvTotalWeight != null) {
-            tvTotalWeight.setText(String.format(Locale.US, "%.2f g", totalWt));
-        }
-        
-        if (tvTotalValue != null && priceManager != null) {
-            tvTotalValue.setText(priceManager.formatPriceDefault(totalVal));
-        }
-    }
-
-    // ==================== START INVENTORY ====================
-
-    private void startInventory(boolean blindMode) {
-        Context ctx = getContext();
-        if (ctx == null || !isAdded()) return;
-
-        final AlertDialog loadingDialog = showProfessionalLoadingDialog(
-            isArabic ? "🔄 جاري تجهيز الجرد..." : "🔄 Preparing audit...",
-            isArabic ? "يرجى الانتظار - تحميل الكتالوج المحلي" : "Please wait - Loading local catalog"
-        );
-
-        new Thread(() -> {
-            try {
-                if (localCatalog.isEmpty()) {
-                    preloadBranchCatalogSync();
-                }
-
-                safeRun(() -> {
-                    dismissDialog(loadingDialog);
-
-                    // ✅ إعادة تعيين sessionId كرقم دائماً
-                    sessionId = (int) (System.currentTimeMillis() / 1000);
-                    Log.d(TAG, "✅ New numeric session ID: " + sessionId);
-
-                    isBlindMode = blindMode;
-                    isScanning = true;
-                    startTime = System.currentTimeMillis();
-                    scannedEpcSet.clear();
-                    scannedItems.clear();
-                    pendingBatch.clear();
-                    scannedCount = 0;
-                    foundCount = 0;
-                    varianceCount = 0;
-
-                    if (adapter != null) adapter.clearItems();
-
-                    setButtonsEnabled(false);
-                    if (btnStopInventory != null) btnStopInventory.setEnabled(true);
-
-                    if (tvInventoryStatus != null) {
-                        tvInventoryStatus.setText(isArabic ? "● جاري الجرد" : "● SCANNING");
-                        tvInventoryStatus.setTextColor(Color.parseColor("#38BDF8"));
-                    }
-
-                    if (isBlindMode && tvExpectedCount != null) {
-                        tvExpectedCount.setText("—");
-                    }
-
-                    playInventorySound("start");
-                    startTimer();
-                });
-            } catch (Exception e) {
-                safeRun(() -> {
-                    dismissDialog(loadingDialog);
-                    showRetryDialog(
-                        isArabic ? "❌ فشل تجهيز الجرد" : "❌ Failed to prepare audit",
-                        e.getMessage(),
-                        () -> startInventory(blindMode)
-                    );
-                });
-            }
-        }).start();
-    }
-
     private void preloadBranchCatalogSync() {
         if (apiClient == null || branchesManager == null) return;
         final int activeBranchId = branchesManager.getActiveBranchId();
@@ -713,7 +375,7 @@ private void showReportDetail(JSONObject session) {
                             ));
                         }
                     } catch (Exception e) {
-                        Log.e(TAG, "Parse item error: " + e.getMessage());
+                        Log.e(TAG, "Parse item sync error: " + e.getMessage());
                     }
                 }
                 expectedCount = localCatalog.size();
@@ -721,45 +383,258 @@ private void showReportDetail(JSONObject session) {
         }
     }
 
-    // ==================== STOP INVENTORY ====================
+    private void loadLastSnapshotOffline() {
+        try {
+            prevTotalItems = offlineCache.getInt("prev_total_items", 0);
+            if (tvPrevItems != null) tvPrevItems.setText(String.valueOf(prevTotalItems));
+            updateComparisonCard();
+        } catch (Exception ignored) {}
+    }
+
+    // ==================== HIGH-SPEED TAG PROCESSING ====================
+
+    public void processScannedTag(String epcOrGtin, int rssi) {
+        processScannedTag(epcOrGtin, String.valueOf(rssi));
+    }
+
+    public void processScannedTag(String epcOrGtin, String rssi) {
+        if (!isScanning || epcOrGtin == null || epcOrGtin.trim().isEmpty()) return;
+        final String cleanCode = epcOrGtin.trim().toUpperCase();
+        if (!scannedEpcSet.add(cleanCode)) return;
+
+        InventoryItem matchedItem = localCatalog.get(cleanCode);
+        boolean isKnown = matchedItem != null;
+        String title = isKnown ? matchedItem.title : (isArabic ? "قطعة غير معرفة" : "Unknown Item");
+        String karat = isKnown ? matchedItem.karat : "21K";
+        double weight = isKnown ? matchedItem.numericWeight : 0.0;
+        String location = isKnown ? matchedItem.location : (branchesManager != null ? branchesManager.getActiveBranchDisplayName() : "");
+        String status = isKnown ? matchedItem.status : "⚠️";
+
+        InventoryItem newItem = new InventoryItem(cleanCode, title, karat, weight, status, location);
+        scannedItems.add(0, newItem);
+        pendingBatch.add(0, newItem);
+        scannedCount++;
+        if ("✓".equals(status)) foundCount++;
+
+        playInventorySound(isKnown ? "found" : "missing");
+        safeRun(() -> {
+            if (tvLastScan != null) tvLastScan.setText(cleanCode);
+            updateRssiDisplay(rssi);
+        });
+        scheduleBatchUpdate();
+    }
+
+    private void scheduleBatchUpdate() {
+        if (isBatchScheduled || !isAdded()) return;
+        isBatchScheduled = true;
+
+        batchUpdateRunnable = () -> {
+            isBatchScheduled = false;
+
+            if (!isAdded() || getActivity() == null || getActivity().isFinishing()) return;
+
+            try {
+                if (adapter != null && !pendingBatch.isEmpty()) {
+                    List<InventoryItem> batchCopy = new ArrayList<>(pendingBatch);
+                    pendingBatch.clear();
+                    adapter.addItems(batchCopy);
+                }
+
+                if (tvScannedCount != null) tvScannedCount.setText(String.valueOf(scannedCount));
+                int remaining = Math.max(0, expectedCount - foundCount);
+                if (tvVariance != null) tvVariance.setText(String.valueOf(remaining));
+
+                if (progressScanned != null && expectedCount > 0) {
+                    progressScanned.setProgress(Math.min(100, (int) ((scannedCount * 100.0) / expectedCount)));
+                }
+
+                double acc = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 100.0;
+                if (tvAccuracy != null) {
+                    tvAccuracy.setText(String.format(Locale.US, isArabic ? "الدقة: %.1f%%" : "Accuracy: %.1f%%", acc));
+                }
+
+                updateTotals();
+                updateComparisonCard();
+            } catch (Exception e) {
+                Log.e(TAG, "Batch update error: " + e.getMessage());
+            }
+        };
+
+        mainHandler.postDelayed(batchUpdateRunnable, UI_UPDATE_INTERVAL);
+    }
+
+    private void updateRssiDisplay(String rssi) {
+        if (tvRssi != null) tvRssi.setText(rssi + " dBm");
+
+        if (progressRssi != null) {
+            try {
+                int rssiValue = Integer.parseInt(rssi.replaceAll("[^0-9-]", ""));
+                int percentage = Math.max(0, Math.min(100, (rssiValue + 100) * 100 / 70));
+                progressRssi.setProgress(percentage);
+
+                if (percentage > 70) {
+                    progressRssi.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#22C55E")));
+                } else if (percentage > 40) {
+                    progressRssi.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#F59E0B")));
+                } else {
+                    progressRssi.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#EF4444")));
+                }
+            } catch (Exception e) {
+                progressRssi.setProgress(0);
+            }
+        }
+    }
+
+    private void updateTotals() {
+        double totalWt = calculateTotalWeight();
+        double totalVal = calculateTotalValue();
+
+        if (tvTotalWeight != null) {
+            tvTotalWeight.setText(String.format(Locale.US, "%.2f g", totalWt));
+        }
+
+        if (tvTotalValue != null && priceManager != null) {
+            tvTotalValue.setText(priceManager.formatPriceDefault(totalVal));
+        }
+    }
+
+    // ==================== SMART SIMULATION ENGINE ====================
+
+    private void startSimulationLoop() {
+        if (simulationHandler == null) {
+            simulationHandler = new Handler(Looper.getMainLooper());
+        }
+
+        final List<String> availableCodes = new ArrayList<>(localCatalog.keySet());
+        if (availableCodes.isEmpty()) {
+            Collections.addAll(availableCodes, simulationGtins);
+        }
+
+        final int[] index = {0};
+
+        simulationRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!isScanning) return;
+
+                if (index[0] < availableCodes.size()) {
+                    String epcToScan = availableCodes.get(index[0]);
+                    int randomRssi = -42 - (int) (Math.random() * 35);
+
+                    processScannedTag(epcToScan, randomRssi);
+                    index[0]++;
+
+                    long delay = 250 + (long) (Math.random() * 350);
+                    simulationHandler.postDelayed(this, delay);
+                } else {
+                    Log.d(TAG, "🤖 Simulation finished processing available catalog.");
+                }
+            }
+        };
+
+        simulationHandler.postDelayed(simulationRunnable, 600);
+    }
+
+    private void stopSimulationLoop() {
+        if (simulationHandler != null && simulationRunnable != null) {
+            simulationHandler.removeCallbacks(simulationRunnable);
+        }
+    }
+
+    // ==================== START & STOP INVENTORY ====================
+
+    private void startInventory(boolean blindMode) {
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return;
+
+        final AlertDialog loadingDialog = showProfessionalLoadingDialog(
+            isArabic ? "🔄 جاري تجهيز الجرد..." : "🔄 Preparing audit...",
+            isArabic ? "يرجى الانتظار - تحميل الكتالوج" : "Please wait - Loading catalog"
+        );
+
+        new Thread(() -> {
+            try {
+                if (localCatalog.isEmpty()) {
+                    preloadBranchCatalogSync();
+                }
+
+                safeRun(() -> {
+                    dismissDialog(loadingDialog);
+
+                    sessionId = (int) (System.currentTimeMillis() / 1000);
+                    isBlindMode = blindMode;
+                    isScanning = true;
+                    startTime = System.currentTimeMillis();
+
+                    scannedEpcSet.clear();
+                    scannedItems.clear();
+                    pendingBatch.clear();
+                    scannedCount = 0;
+                    foundCount = 0;
+                    varianceCount = 0;
+
+                    if (adapter != null) adapter.clearItems();
+
+                    setButtonsEnabled(false);
+                    if (btnStopInventory != null) btnStopInventory.setEnabled(true);
+
+                    if (tvInventoryStatus != null) {
+                        tvInventoryStatus.setText(isArabic ? "● جاري الجرد" : "● SCANNING");
+                        tvInventoryStatus.setTextColor(Color.parseColor("#38BDF8"));
+                    }
+
+                    if (isBlindMode && tvExpectedCount != null) {
+                        tvExpectedCount.setText("—");
+                    }
+
+                    playInventorySound("start");
+                    startTimer();
+
+                    // إطلاق المحاكي الذكي إذا لم يكن العتاد متصلاً
+                    if (!isHardwareConnected) {
+                        startSimulationLoop();
+                    }
+                });
+            } catch (Exception e) {
+                safeRun(() -> {
+                    dismissDialog(loadingDialog);
+                    showRetryDialog(
+                        isArabic ? "❌ فشل تجهيز الجرد" : "❌ Failed to prepare audit",
+                        e.getMessage(),
+                        () -> startInventory(blindMode)
+                    );
+                });
+            }
+        }).start();
+    }
 
     private void stopInventory() {
-    Context ctx = getContext();
-    if (ctx == null || !isAdded()) {
-        Log.e(TAG, "❌ Cannot show dialog: context is null or fragment not added");
-        return;
-    }
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return;
 
-    Log.d(TAG, "🛑 stopInventory() called - showing confirmation dialog");
-
-    try {
-        AlertDialog.Builder confirmDialog = new AlertDialog.Builder(ctx);
-        confirmDialog.setTitle(isArabic ? "⚠️ إيقاف الجرد؟" : "⚠️ Stop Audit?");
-        confirmDialog.setMessage(isArabic ?
-            "هل أنت متأكد من إيقاف الجرد؟\nسيتم حفظ التقرير وإرساله مع لقطة الشاشة." :
-            "Are you sure you want to stop?\nReport and screenshot will be saved.");
-        confirmDialog.setPositiveButton(isArabic ? "نعم، إيقاف" : "Yes, Stop", (d, w) -> {
-            Log.d(TAG, "✅ User confirmed stop");
-            d.dismiss();
-            finishInventory();
-        });
-        confirmDialog.setNegativeButton(isArabic ? "متابعة" : "Continue", (d, w) -> {
-            Log.d(TAG, "❌ User cancelled stop");
-            d.dismiss();
-        });
-        confirmDialog.setCancelable(false);
-        confirmDialog.show();
-        
-        Log.d(TAG, "✅ Confirmation dialog shown");
-    } catch (Exception e) {
-        Log.e(TAG, "❌ Error showing dialog: " + e.getMessage());
-        e.printStackTrace();
+        try {
+            AlertDialog.Builder confirmDialog = new AlertDialog.Builder(ctx);
+            confirmDialog.setTitle(isArabic ? "⚠️ إيقاف الجرد؟" : "⚠️ Stop Audit?");
+            confirmDialog.setMessage(isArabic ?
+                "هل أنت متأكد من إيقاف الجرد؟\nسيتم حفظ التقرير وإرساله مع لقطة الشاشة." :
+                "Are you sure you want to stop?\nReport and screenshot will be saved.");
+            confirmDialog.setPositiveButton(isArabic ? "نعم، إيقاف" : "Yes, Stop", (d, w) -> {
+                d.dismiss();
+                finishInventory();
+            });
+            confirmDialog.setNegativeButton(isArabic ? "متابعة" : "Continue", (d, w) -> d.dismiss());
+            confirmDialog.setCancelable(false);
+            confirmDialog.show();
+        } catch (Exception e) {
+            Log.e(TAG, "Error showing stop dialog: " + e.getMessage());
+        }
     }
-}
 
     private void finishInventory() {
         Context ctx = getContext();
         if (ctx == null || !isAdded()) return;
+
+        stopSimulationLoop();
 
         final AlertDialog loadingDialog = showProfessionalLoadingDialog(
             isArabic ? "🔄 جاري إيقاف الجرد..." : "🔄 Stopping audit...",
@@ -770,12 +645,8 @@ private void showReportDetail(JSONObject session) {
             try {
                 isScanning = false;
                 varianceCount = Math.max(0, expectedCount - foundCount);
-                
-                // ✅ التقاط لقطة الشاشة أولاً
+
                 final String screenshotBase64 = captureScreenshot();
-                Log.d(TAG, "📸 Screenshot captured: " + (screenshotBase64 != null ? screenshotBase64.length() + " chars" : "null"));
-                
-                // ✅ إرسال البيانات مع اللقطة
                 boolean synced = syncFullInventorySessionSync(screenshotBase64);
 
                 safeRun(() -> {
@@ -816,26 +687,14 @@ private void showReportDetail(JSONObject session) {
         }).start();
     }
 
-    // ==================== SCREENSHOT CAPTURE ====================
+    // ==================== SCREENSHOT & SYNC ====================
 
-    /**
-     * التقاط لقطة شاشة للشاشة الحالية
-     * @return Base64 encoded image or null if failed
-     */
     private String captureScreenshot() {
         try {
-            if (getActivity() == null || getView() == null) {
-                Log.e(TAG, "Cannot capture: activity or view is null");
-                return null;
-            }
+            if (getActivity() == null || getView() == null) return null;
 
             View rootView = getView();
-            Bitmap bitmap = Bitmap.createBitmap(
-                rootView.getWidth(),
-                rootView.getHeight(),
-                Bitmap.Config.ARGB_8888
-            );
-
+            Bitmap bitmap = Bitmap.createBitmap(rootView.getWidth(), rootView.getHeight(), Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(bitmap);
             rootView.draw(canvas);
 
@@ -844,84 +703,41 @@ private void showReportDetail(JSONObject session) {
             byte[] imageBytes = baos.toByteArray();
             bitmap.recycle();
 
-            String base64 = Base64.encodeToString(imageBytes, Base64.NO_WRAP);
-            
-            Log.d(TAG, "📸 Screenshot captured: " + imageBytes.length + " bytes");
-            
-            return base64;
+            return Base64.encodeToString(imageBytes, Base64.NO_WRAP);
         } catch (Exception e) {
-            Log.e(TAG, "❌ Screenshot error: " + e.getMessage());
+            Log.e(TAG, "Screenshot error: " + e.getMessage());
             return null;
         }
     }
 
-    // ==================== SYNC WITH SCREENSHOT ====================
-
     private boolean syncFullInventorySessionSync(String screenshotBase64) {
         try {
             JSONObject payload = createInventoryPayload();
-            
-            // ✅ إضافة اللقطة إلى payload
             if (screenshotBase64 != null && !screenshotBase64.isEmpty()) {
                 payload.put("screenshot_base64", screenshotBase64);
-                Log.d(TAG, "📸 Screenshot added to payload");
             }
-            
-            Log.d(TAG, "📤 Sending payload with screenshot");
-            
+
             MiraApiClient.ApiResponse response = apiClient.closeInventorySession(payload);
-            
-            if (response != null) {
-                Log.d(TAG, "📥 Server response code: " + response.code);
-                Log.d(TAG, "📥 Server response success: " + response.isSuccess);
-                
-                if (response.isSuccess) {
-                    if (response.data != null) {
-                        try {
-                            int serverSessionId = response.data.optInt("session_id", 0);
-                            if (serverSessionId > 0) {
-                                sessionId = serverSessionId;
-                                Log.d(TAG, "✅ Updated session ID from server: " + sessionId);
-                            }
-                            
-                            // ✅ التحقق من حفظ اللقطة
-                            String screenshotUrl = response.data.optString("screenshot_url", "");
-                            if (!screenshotUrl.isEmpty()) {
-                                Log.d(TAG, "📸 Screenshot saved at: " + screenshotUrl);
-                            }
-                        } catch (Exception e) {
-                            Log.e(TAG, "Parse response error: " + e.getMessage());
-                        }
-                    }
-                    
-                    saveSnapshotLocally(payload);
-                    return true;
-                } else {
-                    String errorMsg = response.error != null ? response.error : "Unknown error";
-                    Log.e(TAG, "❌ Server rejected: " + errorMsg);
-                    saveToPendingQueue(payload);
-                    return false;
+            if (response != null && response.isSuccess) {
+                if (response.data != null) {
+                    int serverSessionId = response.data.optInt("session_id", 0);
+                    if (serverSessionId > 0) sessionId = serverSessionId;
                 }
+                saveSnapshotLocally(payload);
+                return true;
             } else {
-                Log.e(TAG, "❌ Response is null");
                 saveToPendingQueue(payload);
                 return false;
             }
         } catch (Exception e) {
-            Log.e(TAG, "❌ Sync error: " + e.getMessage());
-            e.printStackTrace();
-            try {
-                saveToPendingQueue(createInventoryPayload());
-            } catch (Exception ex) {
-                Log.e(TAG, "Failed to save pending: " + ex.getMessage());
-            }
+            Log.e(TAG, "Sync error: " + e.getMessage());
+            try { saveToPendingQueue(createInventoryPayload()); } catch (Exception ignored) {}
             return false;
         }
     }
 
     private JSONObject createInventoryPayload() throws Exception {
         JSONObject payload = new JSONObject();
-        
         payload.put("session_id", sessionId);
         payload.put("branch_id", branchesManager.getActiveBranchId());
         payload.put("zone", branchesManager.getActiveBranchDisplayName());
@@ -934,26 +750,16 @@ private void showReportDetail(JSONObject session) {
         payload.put("unexpected_count", 0);
         payload.put("total_weight", calculateTotalWeight());
         payload.put("total_value", calculateTotalValue());
-        payload.put("connection_type", "SIMULATOR");
-        
-        // ✅ user_id
+        payload.put("connection_type", isHardwareConnected ? "HARDWARE_RFID" : "SIMULATOR");
+
         if (getContext() != null) {
             SharedPreferences authPrefs = getContext().getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
             int userId = authPrefs.getInt("user_id", authPrefs.getInt("userId", 0));
-            if (userId > 0) {
-                payload.put("user_id", userId);
-            }
-            
-            String token = authPrefs.getString("auth_token", "");
-            if (token.isEmpty()) {
-                token = authPrefs.getString("session_token", "");
-            }
-            if (!token.isEmpty()) {
-                payload.put("token", token);
-            }
+            if (userId > 0) payload.put("user_id", userId);
+            String token = authPrefs.getString("auth_token", authPrefs.getString("session_token", ""));
+            if (!token.isEmpty()) payload.put("token", token);
         }
-        
-        // ✅ items
+
         JSONArray itemsJson = new JSONArray();
         synchronized (scannedItems) {
             for (InventoryItem item : scannedItems) {
@@ -968,8 +774,7 @@ private void showReportDetail(JSONObject session) {
             }
         }
         payload.put("items", itemsJson);
-        
-        // ✅ scanned_epcs للتوافق
+
         JSONArray epcsArray = new JSONArray();
         synchronized (scannedItems) {
             for (InventoryItem item : scannedItems) {
@@ -977,7 +782,7 @@ private void showReportDetail(JSONObject session) {
             }
         }
         payload.put("scanned_epcs", epcsArray);
-        
+
         return payload;
     }
 
@@ -993,41 +798,27 @@ private void showReportDetail(JSONObject session) {
 
     private void saveToPendingQueue(JSONObject payload) {
         if (pendingQueue == null) return;
-        
         try {
             String existingJson = pendingQueue.getString("pending_audits", "[]");
             JSONArray pendingArray = new JSONArray(existingJson);
             pendingArray.put(payload);
-            
-            while (pendingArray.length() > 20) {
-                pendingArray.remove(0);
-            }
-            
-            pendingQueue.edit()
-                .putString("pending_audits", pendingArray.toString())
-                .apply();
-            
-            Log.i(TAG, "✅ Audit saved to pending queue");
+            while (pendingArray.length() > 20) pendingArray.remove(0);
+            pendingQueue.edit().putString("pending_audits", pendingArray.toString()).apply();
         } catch (Exception e) {
             Log.e(TAG, "Failed to save pending queue: " + e.getMessage());
         }
     }
 
-
     private void checkPendingQueue() {
         if (pendingQueue == null) return;
-        
         try {
             String existingJson = pendingQueue.getString("pending_audits", "[]");
             JSONArray pendingArray = new JSONArray(existingJson);
-            
             if (pendingArray.length() > 0) {
-                safeRun(() -> {
-                    Toast.makeText(getContext(), 
-                        isArabic ? "📋 يوجد " + pendingArray.length() + " جرد معلق للمزامنة" : 
-                                   "📋 " + pendingArray.length() + " pending audits to sync", 
-                        Toast.LENGTH_LONG).show();
-                });
+                safeRun(() -> Toast.makeText(getContext(),
+                    isArabic ? "📋 يوجد " + pendingArray.length() + " جرد معلق للمزامنة" :
+                               "📋 " + pendingArray.length() + " pending audits to sync",
+                    Toast.LENGTH_LONG).show());
             }
         } catch (Exception e) {
             Log.e(TAG, "Check pending queue error: " + e.getMessage());
@@ -1036,66 +827,139 @@ private void showReportDetail(JSONObject session) {
 
     private void syncPendingQueue() {
         if (pendingQueue == null || apiClient == null) return;
-        
         new Thread(() -> {
             try {
                 String existingJson = pendingQueue.getString("pending_audits", "[]");
                 JSONArray pendingArray = new JSONArray(existingJson);
-                
                 if (pendingArray.length() == 0) return;
-                
+
                 JSONArray remainingArray = new JSONArray();
                 int syncedCount = 0;
-                
+
                 for (int i = 0; i < pendingArray.length(); i++) {
                     try {
                         JSONObject audit = pendingArray.getJSONObject(i);
                         MiraApiClient.ApiResponse response = apiClient.closeInventorySession(audit);
-                        
                         if (response != null && response.isSuccess) {
                             syncedCount++;
                             saveSnapshotLocally(audit);
                         } else {
                             remainingArray.put(audit);
-                            if (response != null && response.error != null) {
-                                Log.e(TAG, "Pending sync error: " + response.error);
-                            }
                         }
                     } catch (Exception e) {
-                        Log.e(TAG, "Pending item sync error: " + e.getMessage());
-                        try {
-                            remainingArray.put(pendingArray.getJSONObject(i));
-                        } catch (Exception ex) {
-                            Log.e(TAG, "Failed to add to remaining: " + ex.getMessage());
-                        }
+                        try { remainingArray.put(pendingArray.getJSONObject(i)); } catch (Exception ignored) {}
                     }
                 }
-                
-                pendingQueue.edit()
-                    .putString("pending_audits", remainingArray.toString())
-                    .apply();
-                
+
+                pendingQueue.edit().putString("pending_audits", remainingArray.toString()).apply();
                 final int synced = syncedCount;
-                final int remaining = remainingArray.length();
-                
                 safeRun(() -> {
                     if (synced > 0) {
-                        Toast.makeText(getContext(), 
-                            isArabic ? "✅ تمت مزامنة " + synced + " جرد" : 
-                                       "✅ Synced " + synced + " audits", 
+                        Toast.makeText(getContext(),
+                            isArabic ? "✅ تمت مزامنة " + synced + " جرد" : "✅ Synced " + synced + " audits",
                             Toast.LENGTH_SHORT).show();
-                    }
-                    
-                    if (remaining > 0 && tvInventoryStatus != null && !isScanning) {
-                        tvInventoryStatus.setText(isArabic ? "📋 " + remaining + " جرد معلق" : 
-                                                           "📋 " + remaining + " pending");
-                        tvInventoryStatus.setTextColor(Color.parseColor("#F59E0B"));
                     }
                 });
             } catch (Exception e) {
-                Log.e(TAG, "Sync pending queue error: " + e.getMessage());
+                Log.e(TAG, "Sync pending error: " + e.getMessage());
             }
         }).start();
+    }
+
+    // ==================== REPORTS & DIALOGS ====================
+
+    private void showSavedReports() {
+        Context ctx = getContext();
+        if (ctx == null || apiClient == null) return;
+
+        Toast.makeText(ctx, isArabic ? "🔄 جاري تحميل التقارير..." : "🔄 Loading reports...", Toast.LENGTH_SHORT).show();
+
+        new Thread(() -> {
+            try {
+                int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+                MiraApiClient.ApiResponse response = apiClient.getInventoryReports(branchId, 1, 50);
+
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONObject data = response.data.optJSONObject("data");
+                    if (data != null) {
+                        JSONArray sessionsArr = data.optJSONArray("sessions");
+                        if (sessionsArr != null && sessionsArr.length() > 0) {
+                            List<String> reportList = new ArrayList<>();
+                            List<JSONObject> sessionObjects = new ArrayList<>();
+
+                            for (int i = 0; i < sessionsArr.length(); i++) {
+                                JSONObject session = sessionsArr.optJSONObject(i);
+                                if (session != null) {
+                                    sessionObjects.add(session);
+                                    int id = session.optInt("id", 0);
+                                    String date = session.optString("closed_at", session.optString("started_at", ""));
+                                    int expected = session.optInt("expected_count", 0);
+                                    int scanned = session.optInt("scanned_count", 0);
+                                    double accuracy = session.optDouble("accuracy", 0);
+                                    String riskLevel = session.optString("risk_level", "none");
+
+                                    String riskEmoji = "none".equals(riskLevel) ? "✅" : "critical".equals(riskLevel) ? "🔴" : "🟢";
+                                    reportList.add(String.format(Locale.US, "%s جلسة #%d | %s | المتوقع: %d | الممسوح: %d | الدقة: %.1f%%",
+                                            riskEmoji, id, date, expected, scanned, accuracy));
+                                }
+                            }
+
+                            safeRun(() -> new AlertDialog.Builder(requireContext())
+                                .setTitle(isArabic ? "📊 تقارير الجرد" : "📊 Inventory Reports")
+                                .setItems(reportList.toArray(new String[0]), (dialog, which) -> {
+                                    if (which < sessionObjects.size()) showReportDetail(sessionObjects.get(which));
+                                })
+                                .setPositiveButton(isArabic ? "🖨️ طباعة آخر تقرير" : "🖨️ Print Last Report", (d, w) -> {
+                                    d.dismiss();
+                                    generateProReport();
+                                })
+                                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+                                .show());
+                            return;
+                        }
+                    }
+                }
+                safeRun(() -> Toast.makeText(getContext(), isArabic ? "لا توجد تقارير سابقة" : "No previous reports", Toast.LENGTH_SHORT).show());
+            } catch (Exception e) {
+                Log.e(TAG, "Show reports error: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    private void showReportDetail(JSONObject session) {
+        try {
+            int id = session.optInt("id", 0);
+            String date = session.optString("closed_at", session.optString("started_at", ""));
+            String location = session.optString("location", "");
+            int expected = session.optInt("expected_count", 0);
+            int scanned = session.optInt("scanned_count", 0);
+            int missing = session.optInt("missing_count", 0);
+            double accuracy = session.optDouble("accuracy", 0);
+
+            String message = isArabic ?
+                "📋 تفاصيل الجلسة #" + id + "\n\n" +
+                "📅 التاريخ: " + date + "\n" +
+                "📍 الموقع: " + location + "\n" +
+                "📦 المتوقع: " + expected + "\n" +
+                "✅ الممسوح: " + scanned + "\n" +
+                "⚠️ العجز: " + missing + "\n" +
+                "📊 الدقة: " + accuracy + "%\n" :
+                "📋 Session #" + id + " Details\n\n" +
+                "📅 Date: " + date + "\n" +
+                "📍 Location: " + location + "\n" +
+                "📦 Expected: " + expected + "\n" +
+                "✅ Scanned: " + scanned + "\n" +
+                "⚠️ Missing: " + missing + "\n" +
+                "📊 Accuracy: " + accuracy + "%\n";
+
+            new AlertDialog.Builder(requireContext())
+                .setTitle(isArabic ? "📋 تفاصيل التقرير" : "📋 Report Details")
+                .setMessage(message)
+                .setPositiveButton(isArabic ? "إغلاق" : "Close", null)
+                .show();
+        } catch (Exception e) {
+            Log.e(TAG, "Report detail error: " + e.getMessage());
+        }
     }
 
     // ==================== AUXILIARY METHODS ====================
@@ -1143,8 +1007,7 @@ private void showReportDetail(JSONObject session) {
         synchronized (scannedItems) {
             for (InventoryItem item : scannedItems) {
                 int karatNumber = getKaratNumber(item.karat);
-                double pricePerGram = priceManager != null ? 
-                    priceManager.getGoldPricePerGram(karatNumber) : 65.0;
+                double pricePerGram = priceManager != null ? priceManager.getGoldPricePerGram(karatNumber) : 65.0;
                 totalValue += item.numericWeight * pricePerGram;
             }
         }
@@ -1165,28 +1028,21 @@ private void showReportDetail(JSONObject session) {
 
     private void playInventorySound(String type) {
         if (!soundEnabled || soundPool == null) return;
-        
         try {
             switch (type) {
-                case "scan":
-                    soundPool.play(soundScanId, 0.5f, 0.5f, 1, 0, 1f);
-                    break;
-                    
+                case "scan": soundPool.play(soundScanId, 0.5f, 0.5f, 1, 0, 1f); break;
                 case "found":
                     soundPool.play(soundFoundId, 0.7f, 0.7f, 1, 0, 1f);
                     if (vibrateEnabled) vibrate(30);
                     break;
-                    
                 case "missing":
                     soundPool.play(soundMissingId, 1.0f, 1.0f, 1, 0, 1f);
                     if (vibrateEnabled) vibrate(150);
                     break;
-                    
                 case "start":
                     soundPool.play(soundScanId, 0.3f, 0.3f, 1, 0, 1f);
                     if (vibrateEnabled) vibrate(50);
                     break;
-                    
                 case "complete":
                     soundPool.play(soundFoundId, 1.0f, 1.0f, 1, 0, 1f);
                     if (vibrateEnabled) vibrate(200);
@@ -1198,18 +1054,14 @@ private void showReportDetail(JSONObject session) {
     }
 
     private void vibrate(long duration) {
-        if (getContext() == null) return;
-        
+        Context ctx = getContext();
+        if (ctx == null) return;
         long currentTime = System.currentTimeMillis();
-        
-        if (currentTime - lastVibrationTime < VIBRATION_THROTTLE_MS) {
-            return;
-        }
-        
+        if (currentTime - lastVibrationTime < VIBRATION_THROTTLE_MS) return;
         lastVibrationTime = currentTime;
-        
+
         try {
-            android.os.Vibrator vib = (android.os.Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
+            android.os.Vibrator vib = (android.os.Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
             if (vib != null && vib.hasVibrator()) {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                     vib.vibrate(android.os.VibrationEffect.createOneShot(duration, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
@@ -1223,19 +1075,16 @@ private void showReportDetail(JSONObject session) {
     }
 
     private void loadInventorySettings() {
-        if (getContext() == null) return;
-        SharedPreferences p = getContext().getSharedPreferences("MIRA_BRIDGE_SETTINGS", Context.MODE_PRIVATE);
+        Context ctx = getContext();
+        if (ctx == null) return;
+        SharedPreferences p = ctx.getSharedPreferences("MIRA_BRIDGE_SETTINGS", Context.MODE_PRIVATE);
         soundEnabled = "true".equals(p.getString("inventory_sound", "true"));
         vibrateEnabled = "true".equals(p.getString("inventory_vibrate", "true"));
     }
 
-    // ==================== DIALOGS ====================
-
     private AlertDialog showProfessionalLoadingDialog(String title, String message) {
         Context ctx = getContext();
-        if (ctx == null || !isAdded() || getActivity() == null || getActivity().isFinishing()) {
-            return null;
-        }
+        if (ctx == null || !isAdded() || getActivity() == null || getActivity().isFinishing()) return null;
 
         try {
             AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
@@ -1248,11 +1097,6 @@ private void showReportDetail(JSONObject session) {
             progressBar.setIndeterminate(true);
             progressBar.setScaleX(1.5f);
             progressBar.setScaleY(1.5f);
-            LinearLayout.LayoutParams pbParams = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT);
-            pbParams.gravity = android.view.Gravity.CENTER_HORIZONTAL;
-            progressBar.setLayoutParams(pbParams);
             layout.addView(progressBar);
 
             TextView tvLoading = new TextView(ctx);
@@ -1268,21 +1112,14 @@ private void showReportDetail(JSONObject session) {
             tvSubtext.setTextSize(12);
             tvSubtext.setTextColor(Color.GRAY);
             tvSubtext.setGravity(android.view.Gravity.CENTER);
-            tvSubtext.setPadding(0, 8, 0, 0);
             layout.addView(tvSubtext);
 
             builder.setView(layout);
             builder.setCancelable(false);
             AlertDialog dialog = builder.create();
-            
-            if (isAdded() && getActivity() != null && !getActivity().isFinishing()) {
-                dialog.show();
-                return dialog;
-            }
-            
-            return null;
+            dialog.show();
+            return dialog;
         } catch (Exception e) {
-            Log.e(TAG, "showLoadingDialog error: " + e.getMessage());
             return null;
         }
     }
@@ -1305,12 +1142,8 @@ private void showReportDetail(JSONObject session) {
 
     private void dismissDialog(AlertDialog dialog) {
         try {
-            if (dialog != null && dialog.isShowing() && isAdded() && getActivity() != null && !getActivity().isFinishing()) {
-                dialog.dismiss();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "dismissDialog error: " + e.getMessage());
-        }
+            if (dialog != null && dialog.isShowing() && isAdded()) dialog.dismiss();
+        } catch (Exception ignored) {}
     }
 
     private void setButtonsEnabled(boolean enabled) {
@@ -1325,26 +1158,23 @@ private void showReportDetail(JSONObject session) {
 
         AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
         builder.setTitle(isArabic ? "✅ اكتمل الجرد" : "✅ Audit Complete");
-        
-        String message;
-        if (isArabic) {
-            message = "تم إيقاف الجرد وحفظ التقرير.\n\n" +
-                "رقم الجلسة: " + sessionId + "\n" +
-                "المتوقع: " + expectedCount + "\n" +
-                "الممسوح: " + scannedCount + "\n" +
-                "العجز: " + varianceCount + "\n" +
-                "الوزن: " + String.format(Locale.US, "%.2fg", calculateTotalWeight()) + "\n" +
-                (synced ? "✅ تمت المزامنة مع السيرفر" : "⚠️ تم الحفظ محلياً - سيتم المزامنة لاحقاً");
-        } else {
-            message = "Audit completed successfully.\n\n" +
-                "Session ID: " + sessionId + "\n" +
-                "Expected: " + expectedCount + "\n" +
-                "Scanned: " + scannedCount + "\n" +
-                "Variance: " + varianceCount + "\n" +
-                "Weight: " + String.format(Locale.US, "%.2fg", calculateTotalWeight()) + "\n" +
-                (synced ? "✅ Synced with server" : "⚠️ Saved locally - will sync later");
-        }
-        
+
+        String message = isArabic ?
+            "تم إيقاف الجرد وحفظ التقرير.\n\n" +
+            "رقم الجلسة: " + sessionId + "\n" +
+            "المتوقع: " + expectedCount + "\n" +
+            "الممسوح: " + scannedCount + "\n" +
+            "العجز: " + varianceCount + "\n" +
+            "الوزن: " + String.format(Locale.US, "%.2fg", calculateTotalWeight()) + "\n" +
+            (synced ? "✅ تمت المزامنة مع السيرفر" : "⚠️ تم الحفظ محلياً - سيتم المزامنة لاحقاً") :
+            "Audit completed successfully.\n\n" +
+            "Session ID: " + sessionId + "\n" +
+            "Expected: " + expectedCount + "\n" +
+            "Scanned: " + scannedCount + "\n" +
+            "Variance: " + varianceCount + "\n" +
+            "Weight: " + String.format(Locale.US, "%.2fg", calculateTotalWeight()) + "\n" +
+            (synced ? "✅ Synced with server" : "⚠️ Saved locally - will sync later");
+
         builder.setMessage(message);
         builder.setPositiveButton(isArabic ? "🎉 متابعة" : "🎉 Continue", (d, w) -> d.dismiss());
         builder.setCancelable(false);
@@ -1406,16 +1236,13 @@ private void showReportDetail(JSONObject session) {
             rows.toString() + "</table>" +
             "<div style='display:flex;justify-content:space-between;margin-top:12px;font-weight:bold'>" +
             "<div>" + (isArabic ? "الوزن الكلي: " : "Total Weight: ") + String.format(Locale.US, "%.2fg", totalWt) + "</div>" +
-            "<div>" + (isArabic ? "القيمة التقديرية: " : "Est. Value: ") + 
-            (priceManager != null ? priceManager.formatPriceDefault(totalVal) : String.format(Locale.US, "%,.0f USD", totalVal)) + 
+            "<div>" + (isArabic ? "القيمة التقديرية: " : "Est. Value: ") +
+            (priceManager != null ? priceManager.formatPriceDefault(totalVal) : String.format(Locale.US, "%,.0f USD", totalVal)) +
             "</div></div>" +
             "<div class='footer'>MIRA Inventory Pro | " + orgName + " © 2026</div>" +
             "</body></html>";
 
-        if (printWebView != null) {
-            printWebView.destroy();
-        }
-        
+        if (printWebView != null) printWebView.destroy();
         printWebView = new WebView(requireContext());
         printWebView.getSettings().setJavaScriptEnabled(true);
         printWebView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
@@ -1463,10 +1290,7 @@ private void showReportDetail(JSONObject session) {
     }
 
     private void safeRun(Runnable r) {
-        if (!isAdded() || getActivity() == null || getActivity().isFinishing()) {
-            return;
-        }
-        
+        if (!isAdded() || getActivity() == null || getActivity().isFinishing()) return;
         getActivity().runOnUiThread(() -> {
             if (isAdded() && getActivity() != null && !getActivity().isFinishing()) {
                 r.run();
@@ -1513,34 +1337,35 @@ private void showReportDetail(JSONObject session) {
     }
 
     private class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.VH> {
-        private final List<InventoryItem> items = new CopyOnWriteArrayList<>();
+        private final List<InventoryItem> items = Collections.synchronizedList(new ArrayList<>());
         private final List<InventoryItem> displayItems = new ArrayList<>();
-        
+
         public void addItems(List<InventoryItem> newItems) {
             if (newItems == null || newItems.isEmpty()) return;
-            
+
             items.addAll(0, newItems);
-            
+
             int oldSize = displayItems.size();
             displayItems.clear();
-            int endIndex = Math.min(items.size(), MAX_DISPLAY_ITEMS);
-            displayItems.addAll(items.subList(0, endIndex));
-            
+            synchronized (items) {
+                int endIndex = Math.min(items.size(), MAX_DISPLAY_ITEMS);
+                displayItems.addAll(items.subList(0, endIndex));
+            }
+
             int insertedCount = displayItems.size() - oldSize;
-            
+
             if (insertedCount > 0) {
                 if (displayItems.size() >= MAX_DISPLAY_ITEMS) {
                     notifyDataSetChanged();
                 } else {
                     notifyItemRangeInserted(0, insertedCount);
-                    
                     if (rvInventoryItems != null && !displayItems.isEmpty()) {
                         rvInventoryItems.scrollToPosition(0);
                     }
                 }
             }
         }
-        
+
         public void clearItems() {
             items.clear();
             displayItems.clear();
@@ -1555,7 +1380,7 @@ private void showReportDetail(JSONObject session) {
         @Override
         public void onBindViewHolder(@NonNull VH h, int pos) {
             if (pos >= displayItems.size()) return;
-            
+
             InventoryItem item = displayItems.get(pos);
             if (h.s != null) {
                 h.s.setText(item.status);
@@ -1588,6 +1413,7 @@ private void showReportDetail(JSONObject session) {
     @Override
     public void onDestroyView() {
         isScanning = false;
+        stopSimulationLoop();
         stopTimer();
         mainHandler.removeCallbacksAndMessages(null);
         if (batchUpdateRunnable != null) mainHandler.removeCallbacks(batchUpdateRunnable);
@@ -1602,4 +1428,4 @@ private void showReportDetail(JSONObject session) {
         }
         super.onDestroyView();
     }
-                                }
+}
