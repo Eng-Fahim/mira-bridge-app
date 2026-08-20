@@ -118,6 +118,16 @@
                 android:textColor="?attr/colorPrimary"
                 android:layout_marginTop="4dp"
                 android:visibility="gone"/>
+                
+                <TextView
+    android:id="@+id/tvActiveProviderStatus"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text=""
+    android:textSize="11sp"
+    android:textStyle="bold"
+    android:layout_marginTop="2dp"
+    android:visibility="gone"/>
         </LinearLayout>
 
         <!-- حقل API Key - مخفي عن المستخدم -->
