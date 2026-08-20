@@ -98,7 +98,18 @@ public class MiraApiClient {
         
         return providers;
     }
-    
+   /**
+ * ✅ تفعيل مزود محدد وتعطيل الآخرين
+ */
+public ApiResponse activateProvider(int providerId) {
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("provider_id", providerId);
+    } catch (Exception e) {
+        Log.e(TAG, "Error building activate payload: " + e.getMessage());
+    }
+    return postWithAuth("/gold/providers/activate", payload);
+} 
     // دالة لجلب الأسعار تلقائياً باستخدام المزود المحفوظ
     public ApiResponse fetchGoldPriceWithProvider(int providerId) {
         try {
