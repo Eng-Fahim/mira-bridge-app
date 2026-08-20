@@ -4,7 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:attr/colorBackground"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:layoutDirection="locale">
 
     <!-- ==================== 1. HEADER ثابت بدون Scroll ==================== -->
     <LinearLayout
@@ -19,58 +20,96 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="6dp"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp"
-            app:strokeWidth="0dp">
+            app:cardCornerRadius="16dp"
+            app:cardElevation="4dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="?attr/colorOutlineVariant">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="10dp">
+                android:padding="12dp">
 
                 <!-- الحالة والوقت -->
                 <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content">
 
-                    <TextView
-                        android:id="@+id/tvInventoryStatus"
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_alignParentStart="true"
-                        android:text="📡 جاهز للجرد"
-                        android:textColor="?attr/colorPrimary"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/tvElapsedTime"
+                        <!-- مؤشر حالة -->
+                        <View
+                            android:id="@+id/statusIndicator"
+                            android:layout_width="10dp"
+                            android:layout_height="10dp"
+                            android:layout_marginEnd="6dp"
+                            android:background="@drawable/status_dot_ready"
+                            android:contentDescription="مؤشر الحالة" />
+
+                        <TextView
+                            android:id="@+id/tvInventoryStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="📡 جاهز للجرد"
+                            android:textColor="?attr/colorPrimary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_alignParentEnd="true"
-                        android:background="?android:attr/colorBackground"
-                        android:paddingHorizontal="8dp"
-                        android:paddingVertical="3dp"
-                        android:text="00:00:00"
-                        android:textColor="?attr/colorSecondary"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="4dp"
+                            android:text="⏱"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/tvElapsedTime"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="?android:attr/colorBackground"
+                            android:paddingHorizontal="10dp"
+                            android:paddingVertical="4dp"
+                            android:text="00:00:00"
+                            android:textColor="?attr/colorSecondary"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
                 </RelativeLayout>
 
                 <!-- RSSI مع مؤشر بصري -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="8dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
                     <TextView
-                        android:id="@+id/tvRssi"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="إشارة: -0 dBm"
+                        android:layout_marginEnd="4dp"
+                        android:text="📶"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/tvRssi"
+                        android:layout_width="70dp"
+                        android:layout_height="wrap_content"
+                        android:text="إشارة: -0"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp" />
 
@@ -78,12 +117,13 @@
                         android:id="@+id/progressRssi"
                         style="?android:attr/progressBarStyleHorizontal"
                         android:layout_width="0dp"
-                        android:layout_height="4dp"
+                        android:layout_height="6dp"
                         android:layout_weight="1"
                         android:layout_marginStart="6dp"
                         android:max="100"
                         android:progress="0"
-                        android:progressTint="?attr/colorPrimary" />
+                        android:progressTint="?attr/colorPrimary"
+                        android:progressBackgroundTint="?attr/colorOutlineVariant" />
                 </LinearLayout>
 
                 <!-- آخر قراءة -->
@@ -91,22 +131,42 @@
                     android:id="@+id/tvLastScan"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="6dp"
                     android:text="آخر قراءة: لا يوجد"
                     android:textAlignment="viewStart"
                     android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="9sp" />
+                    android:textSize="10sp"
+                    android:fontFamily="sans-serif" />
 
                 <!-- شريط التقدم الرئيسي -->
-                <ProgressBar
-                    android:id="@+id/progressScanned"
-                    style="?android:attr/progressBarStyleHorizontal"
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="6dp"
-                    android:layout_marginTop="6dp"
-                    android:max="100"
-                    android:progress="0"
-                    android:progressTint="?attr/colorPrimary" />
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ProgressBar
+                        android:id="@+id/progressScanned"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="0dp"
+                        android:layout_height="8dp"
+                        android:layout_weight="1"
+                        android:max="100"
+                        android:progress="0"
+                        android:progressTint="?attr/colorPrimary"
+                        android:progressBackgroundTint="?attr/colorOutlineVariant" />
+
+                    <TextView
+                        android:id="@+id/tvProgressPercent"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="0%"
+                        android:textColor="?attr/colorPrimary"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -122,18 +182,20 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="3dp"
+                android:layout_marginEnd="4dp"
                 android:layout_weight="1"
                 app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="10dp"
-                app:cardElevation="1dp">
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="?attr/colorOutlineVariant">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="8dp">
+                    android:padding="10dp">
 
                     <TextView
                         android:id="@+id/tvExpectedCount"
@@ -141,13 +203,15 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="?attr/colorOnSurface"
-                        android:textSize="24sp"
-                        android:textStyle="bold" />
+                        android:textSize="28sp"
+                        android:textStyle="bold"
+                        android:fontFamily="sans-serif-medium" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="المتوقع"
+                        android:layout_marginTop="2dp"
+                        android:text="📦 المتوقع"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp" />
                 </LinearLayout>
@@ -157,18 +221,20 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="1.5dp"
+                android:layout_marginHorizontal="2dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="10dp"
-                app:cardElevation="1dp">
+                app:cardBackgroundColor="?attr/colorPrimaryContainer"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="?attr/colorPrimary">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="8dp">
+                    android:padding="10dp">
 
                     <TextView
                         android:id="@+id/tvScannedCount"
@@ -176,14 +242,16 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="?attr/colorPrimary"
-                        android:textSize="24sp"
-                        android:textStyle="bold" />
+                        android:textSize="28sp"
+                        android:textStyle="bold"
+                        android:fontFamily="sans-serif-medium" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="الممسوح"
-                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:layout_marginTop="2dp"
+                        android:text="✅ الممسوح"
+                        android:textColor="?attr/colorPrimary"
                         android:textSize="10sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -192,18 +260,20 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="3dp"
+                android:layout_marginStart="4dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="10dp"
-                app:cardElevation="1dp">
+                app:cardBackgroundColor="?attr/colorErrorContainer"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="2dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="?attr/colorError">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="8dp">
+                    android:padding="10dp">
 
                     <TextView
                         android:id="@+id/tvVariance"
@@ -211,14 +281,16 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="?attr/colorError"
-                        android:textSize="24sp"
-                        android:textStyle="bold" />
+                        android:textSize="28sp"
+                        android:textStyle="bold"
+                        android:fontFamily="sans-serif-medium" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="العجز"
-                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:layout_marginTop="2dp"
+                        android:text="⚠️ العجز"
+                        android:textColor="?attr/colorError"
                         android:textSize="10sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -230,50 +302,94 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="6dp"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="10dp"
-            app:cardElevation="1dp">
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="?attr/colorOutlineVariant">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="8dp">
+                android:padding="10dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/tvAccuracy"
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="الدقة: 0.0%"
-                        android:textAlignment="viewStart"
-                        android:textColor="?attr/colorPrimary"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/tvTotalWeight"
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="4dp"
+                            android:text="🎯"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/tvAccuracy"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="الدقة: 0.0%"
+                            android:textAlignment="viewStart"
+                            android:textColor="?attr/colorPrimary"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="0.00 g"
-                        android:textColor="?attr/colorSecondary"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="4dp"
+                            android:text="⚖️"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/tvTotalWeight"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0.00 g"
+                            android:textColor="?attr/colorSecondary"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/tvTotalValue"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="القيمة: —"
-                    android:textAlignment="viewStart"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="10sp" />
+                    android:layout_marginTop="6dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="4dp"
+                        android:text="💰"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/tvTotalValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="القيمة: —"
+                        android:textAlignment="viewStart"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="11sp" />
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -285,86 +401,116 @@
             android:layout_marginBottom="6dp"
             android:visibility="visible"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="10dp"
-            app:cardElevation="1dp">
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="?attr/colorOutlineVariant">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="8dp"
-                android:weightSum="3">
+                android:orientation="vertical"
+                android:padding="10dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="📊 مقارنة الجرد"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
 
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal"
+                    android:weightSum="3">
 
-                    <TextView
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="السابق"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="9sp" />
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
 
-                    <TextView
-                        android:id="@+id/tvPrevItems"
-                        android:layout_width="wrap_content"
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="السابق"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="9sp" />
+
+                        <TextView
+                            android:id="@+id/tvPrevItems"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="0"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="match_parent"
+                        android:background="?attr/colorOutlineVariant" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="الحالي"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="9sp" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
+                        <TextView
+                            android:id="@+id/tvCurrItems"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="0"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="match_parent"
+                        android:background="?attr/colorOutlineVariant" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="الحالي"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="9sp" />
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
 
-                    <TextView
-                        android:id="@+id/tvCurrItems"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="الفارق"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="9sp" />
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="الفارق"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="9sp" />
-
-                    <TextView
-                        android:id="@+id/tvDeltaItems"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textColor="?attr/colorPrimary"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        <TextView
+                            android:id="@+id/tvDeltaItems"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="0"
+                            android:textColor="?attr/colorPrimary"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -378,42 +524,61 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnStartInventory"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="52dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="3dp"
+                android:layout_marginEnd="4dp"
                 android:backgroundTint="?attr/colorPrimary"
                 android:text="📡 بدء"
                 android:textColor="?attr/colorOnPrimary"
-                android:textSize="12sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
-                app:cornerRadius="8dp" />
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_scan"
+                app:iconGravity="textStart"
+                app:iconPadding="8dp"
+                app:iconTint="?attr/colorOnPrimary" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnBlindInventory"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="52dp"
                 android:layout_weight="1"
-                android:layout_marginHorizontal="1.5dp"
+                android:layout_marginHorizontal="2dp"
                 android:backgroundTint="?attr/colorSecondary"
                 android:text="⚡ أعمى"
                 android:textColor="?attr/colorOnSecondary"
-                android:textSize="12sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
-                app:cornerRadius="8dp" />
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_blind"
+                app:iconGravity="textStart"
+                app:iconPadding="8dp"
+                app:iconTint="?attr/colorOnSecondary" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnStopInventory"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="52dp"
                 android:layout_weight="1"
-                android:layout_marginStart="3dp"
+                android:layout_marginStart="4dp"
                 android:backgroundTint="?attr/colorError"
                 android:enabled="false"
+                android:alpha="0.5"
                 android:text="🛑 إيقاف"
                 android:textColor="?attr/colorOnError"
-                android:textSize="12sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
-                app:cornerRadius="8dp" />
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:cornerRadius="12dp"
+                app:icon="@drawable/ic_stop"
+                app:iconGravity="textStart"
+                app:iconPadding="8dp"
+                app:iconTint="?attr/colorOnError" />
         </LinearLayout>
 
         <!-- أزرار ثانوية -->
@@ -426,27 +591,32 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnGenerateReport"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="44dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="3dp"
+                android:layout_marginEnd="4dp"
                 android:backgroundTint="?attr/colorTertiary"
                 android:enabled="false"
+                android:alpha="0.5"
                 android:text="📄 تقرير"
                 android:textColor="?attr/colorOnTertiary"
                 android:textSize="11sp"
-                app:cornerRadius="8dp" />
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:cornerRadius="10dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnArchiveReports"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="44dp"
                 android:layout_weight="1"
-                android:layout_marginStart="3dp"
+                android:layout_marginStart="4dp"
                 android:backgroundTint="?attr/colorSurfaceVariant"
                 android:text="📂 الأرشيف"
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="11sp"
-                app:cornerRadius="8dp" />
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:cornerRadius="10dp" />
         </LinearLayout>
     </LinearLayout>
 
@@ -456,10 +626,12 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:layout_margin="8dp"
+        android:layout_marginTop="0dp"
         app:cardBackgroundColor="?attr/colorSurface"
-        app:cardCornerRadius="12dp"
-        app:cardElevation="2dp"
-        app:strokeWidth="0dp">
+        app:cardCornerRadius="16dp"
+        app:cardElevation="4dp"
+        app:strokeWidth="1dp"
+        app:strokeColor="?attr/colorOutlineVariant">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -467,15 +639,35 @@
             android:orientation="vertical">
 
             <!-- عنوان القائمة -->
-            <TextView
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:padding="8dp"
-                android:text="📋 القطع الممسوحة"
-                android:textAlignment="viewStart"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="10dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="📋 القطع الممسوحة"
+                    android:textAlignment="viewStart"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvItemCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/colorPrimaryContainer"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="4dp"
+                    android:text="0"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <View
                 android:layout_width="match_parent"
@@ -489,7 +681,9 @@
                 android:layout_height="match_parent"
                 android:scrollbars="vertical"
                 android:clipToPadding="false"
-                android:padding="4dp" />
+                android:padding="4dp"
+                android:fadeScrollbars="true"
+                android:overScrollMode="ifContentScrolls" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
