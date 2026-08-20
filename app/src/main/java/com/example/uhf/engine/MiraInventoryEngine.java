@@ -4,6 +4,10 @@ import android.content.Context;
 import android.os.SystemClock;
 import android.util.Log;
 
+import com.example.uhf.model.InventoryItem;
+import com.example.uhf.security.KeystoreSigner;
+import com.example.uhf.storage.EncryptedQueueManager;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -52,7 +56,6 @@ public class MiraInventoryEngine {
             }
         }
         this.sessionStartTime = SystemClock.elapsedRealtime();
-        Log.i(TAG, "Engine session started with expected catalog size: " + catalogByEpc.size());
     }
 
     public void onTagScanned(String rawEpc, int rssi) {
