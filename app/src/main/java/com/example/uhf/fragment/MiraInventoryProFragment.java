@@ -72,24 +72,17 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         }
     }
 
-    // ✅ يجب تطبيق جميع دوال الواجهة
+    // ✅ الصحيح - int rssi وليس String
     @Override
-    public void onTagRead(String epc, String rssi) {
+    public void onTagRead(String epc, int rssi) {
         if (!isScanning || epc == null) return;
 
-        int parsedRssi = -60;
-        try {
-            parsedRssi = Integer.parseInt(rssi);
-        } catch (Exception ignored) {}
-
-        final int finalRssi = parsedRssi;
         scannerExecutor.execute(() -> {
-            inventoryEngine.onTagScanned(epc, finalRssi);
+            inventoryEngine.onTagScanned(epc, rssi);
             mainThreadHandler.post(this::updateUI);
         });
     }
 
-    // ✅ أضف هذه الدوال - مطلوبة من الواجهة
     @Override
     public void onScanStarted() {
         Log.i(TAG, "RFID Hardware scan cycle started");
