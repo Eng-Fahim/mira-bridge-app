@@ -68,24 +68,28 @@ public class MiraApiClient {
         List<ApiProvider> providers = new ArrayList<>();
         
         try {
-            // افترض أن لديك endpoint يجلب المزودين
-            String response = httpGet(BASE_URL + "/api/providers/active");
-            JSONObject jsonResponse = new JSONObject(response);
+            // استخدام getWithAuth بدلاً من httpGet المباشر
+            ApiResponse response = getWithAuth("/gold/providers/active");
             
-            if (jsonResponse.getBoolean("success")) {
-                JSONArray providersArray = jsonResponse.getJSONArray("data");
+            if (response.isSuccess && response.data != null) {
+                JSONArray providersArray = response.data.optJSONArray("providers");
+                if (providersArray == null) {
+                    providersArray = response.data.optJSONArray("data");
+                }
                 
-                for (int i = 0; i < providersArray.length(); i++) {
-                    JSONObject providerJson = providersArray.getJSONObject(i);
-                    ApiProvider provider = new ApiProvider();
-                    provider.setId(providerJson.getInt("id"));
-                    provider.setProviderName(providerJson.getString("name"));
-                    provider.setProviderType(providerJson.getString("type"));
-                    provider.setApiKey(providerJson.getString("api_key"));
-                    provider.setBaseUrl(providerJson.getString("base_url"));
-                    provider.setActive(providerJson.getBoolean("is_active"));
-                    
-                    providers.add(provider);
+                if (providersArray != null) {
+                    for (int i = 0; i < providersArray.length(); i++) {
+                        JSONObject providerJson = providersArray.getJSONObject(i);
+                        ApiProvider provider = new ApiProvider();
+                        provider.setId(providerJson.optInt("id", 0));
+                        provider.setProviderName(providerJson.optString("name", ""));
+                        provider.setProviderType(providerJson.optString("type", ""));
+                        provider.setApiKey(providerJson.optString("api_key", ""));
+                        provider.setBaseUrl(providerJson.optString("base_url", ""));
+                        provider.setActive(providerJson.optBoolean("is_active", true));
+                        
+                        providers.add(provider);
+                    }
                 }
             }
         } catch (Exception e) {
@@ -97,27 +101,30 @@ public class MiraApiClient {
     
     // دالة لجلب الأسعار تلقائياً باستخدام المزود المحفوظ
     public ApiResponse fetchGoldPriceWithProvider(int providerId) {
-        ApiResponse response = new ApiResponse();
-        
         try {
             // جلب بيانات المزود من السيرفر
-            String providerResponse = httpGet(BASE_URL + "/api/providers/" + providerId);
-            JSONObject providerJson = new JSONObject(providerResponse);
+            ApiResponse providerResponse = getWithAuth("/gold/providers/" + providerId);
             
-            if (providerJson.getBoolean("success")) {
-                JSONObject providerData = providerJson.getJSONObject("data");
-                String providerType = providerData.getString("type");
-                String apiKey = providerData.getString("api_key");
+            if (providerResponse.isSuccess && providerResponse.data != null) {
+                JSONObject providerData = providerResponse.data.optJSONObject("provider");
+                if (providerData == null) {
+                    providerData = providerResponse.data.optJSONObject("data");
+                }
                 
-                // استخدام المزود لجلب الأسعار
-                return fetchGoldPrice(providerType, apiKey);
+                if (providerData != null) {
+                    String providerType = providerData.optString("type", "");
+                    String apiKey = providerData.optString("api_key", "");
+                    
+                    // استخدام المزود لجلب الأسعار
+                    return fetchGoldPrice(providerType, apiKey);
+                }
             }
+            
+            return new ApiResponse(-1, null, "Provider not found");
         } catch (Exception e) {
-            response.isSuccess = false;
-            response.message = e.getMessage();
+            Log.e(TAG, "Error fetching price with provider: " + e.getMessage());
+            return new ApiResponse(-1, null, e.getMessage());
         }
-        
-        return response;
     }
 
     /**
@@ -129,22 +136,33 @@ public class MiraApiClient {
 
     /**
      * ✅ الحصول على api_key الفعال
+     * لا توجد قيم افتراضية - يجب أن تكون من السيرفر
      */
     private String getEffectiveApiKey() {
         if (apiKey == null || apiKey.isEmpty()) {
-            return "mira_gate_test071234567890abcdefghijklmnop";
+            Log.e(TAG, "API Key is empty! User must login first.");
+            return "";
         }
         return apiKey;
     }
 
     /**
      * ✅ الحصول على gate_id الفعال
+     * لا توجد قيم افتراضية - يجب أن تكون من السيرفر
      */
     private String getEffectiveGateId() {
         if (gateId == null || gateId.isEmpty()) {
-            return "handheld_c72";
+            Log.e(TAG, "Gate ID is empty! User must login first.");
+            return "";
         }
         return gateId;
+    }
+
+    /**
+     * ✅ التحقق من أن المستخدم مسجل دخول ولديه credentials صالحة
+     */
+    public boolean hasValidCredentials() {
+        return !getEffectiveApiKey().isEmpty() && !getEffectiveGateId().isEmpty();
     }
 
     // ===================== 🔑 AUTHENTICATION =====================
@@ -179,6 +197,9 @@ public class MiraApiClient {
         return response;
     }
 
+    // ... باقي الدوال تبقى كما هي...
+    
+    
     public ApiResponse getBranchItemsByCategory(int branchId, String category) {
         String endpoint = "/branches/" + branchId + "/inventory/items";
         if (category != null && !category.isEmpty()) {
@@ -397,35 +418,36 @@ public class MiraApiClient {
     public ApiResponse getInventoryHistory(String location, int limit) {
         return get("/inventory/history/" + location + "?limit=" + limit);
     }
+    
     public ApiResponse getInventoryReports(int branchId, int page, int perPage) {
-    HttpURLConnection conn = null;
-    try {
-        String fullUrl = apiUrl + "/inventory/sessions?branch_id=" + branchId 
-                       + "&page=" + page + "&per_page=" + perPage;
-        
-        URL url = new URL(fullUrl);
-        conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("GET");
-        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-        conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
-        
-        String token = getAuthToken();
-        if (!token.isEmpty()) {
-            conn.setRequestProperty("Authorization", "Bearer " + token);
-            conn.setRequestProperty("X-MIRA-Auth-Token", token);
+        HttpURLConnection conn = null;
+        try {
+            String fullUrl = apiUrl + "/inventory/sessions?branch_id=" + branchId 
+                           + "&page=" + page + "&per_page=" + perPage;
+            
+            URL url = new URL(fullUrl);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
+            
+            String token = getAuthToken();
+            if (!token.isEmpty()) {
+                conn.setRequestProperty("Authorization", "Bearer " + token);
+                conn.setRequestProperty("X-MIRA-Auth-Token", token);
+            }
+            
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            
+            return buildResponse(conn);
+        } catch (Exception e) {
+            Log.e(TAG, "getInventoryReports error: " + e.getMessage());
+            return new ApiResponse(-1, null, e.getMessage());
+        } finally {
+            if (conn != null) conn.disconnect();
         }
-        
-        conn.setConnectTimeout(15000);
-        conn.setReadTimeout(15000);
-        
-        return buildResponse(conn);
-    } catch (Exception e) {
-        Log.e(TAG, "getInventoryReports error: " + e.getMessage());
-        return new ApiResponse(-1, null, e.getMessage());
-    } finally {
-        if (conn != null) conn.disconnect();
     }
-}
 
     public ApiResponse getHighValueItems(String location, double threshold) {
         return get("/inventory/high-value?location=" + (location != null ? location : "Main Showroom") + "&threshold=" + threshold);
@@ -780,6 +802,7 @@ public class MiraApiClient {
         return getWithAuth(endpoint);
     }
 
+
     // ===================== CORE HTTP =====================
 
     private String getAuthToken() {
@@ -788,6 +811,12 @@ public class MiraApiClient {
     }
 
     public ApiResponse getWithAuth(String endpoint) {
+        // ✅ التحقق من وجود credentials صالحة
+        if (!hasValidCredentials()) {
+            Log.e(TAG, "Attempting API call without valid credentials: " + endpoint);
+            return new ApiResponse(401, null, "Unauthorized - Please login first");
+        }
+        
         HttpURLConnection conn = null;
         try {
             String fullUrl = apiUrl + endpoint;
@@ -812,6 +841,12 @@ public class MiraApiClient {
     }
 
     public ApiResponse postWithAuth(String endpoint, JSONObject payload) {
+        // ✅ التحقق من وجود credentials صالحة
+        if (!hasValidCredentials()) {
+            Log.e(TAG, "Attempting API call without valid credentials: " + endpoint);
+            return new ApiResponse(401, null, "Unauthorized - Please login first");
+        }
+        
         HttpURLConnection conn = null;
         try {
             String fullUrl = apiUrl + endpoint;
@@ -844,6 +879,7 @@ public class MiraApiClient {
     }
 
     private ApiResponse post(String endpoint, JSONObject payload) {
+        // للـ login فقط - لا يتطلب credentials مسبقة
         HttpURLConnection conn = null;
         try {
             String fullUrl = apiUrl + endpoint;
@@ -851,7 +887,13 @@ public class MiraApiClient {
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
+            
+            // ✅ نستخدم apiKey فقط إذا كان موجوداً
+            String effectiveKey = getEffectiveApiKey();
+            if (!effectiveKey.isEmpty()) {
+                conn.setRequestProperty("X-MIRA-API-Key", effectiveKey);
+            }
+            
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(15000);
             conn.setDoOutput(true);
@@ -871,6 +913,7 @@ public class MiraApiClient {
     }
 
     private ApiResponse get(String endpoint) {
+        // للـ endpoints العامة - لا يتطلب auth
         HttpURLConnection conn = null;
         try {
             String fullUrl = apiUrl + endpoint;
@@ -878,7 +921,13 @@ public class MiraApiClient {
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
+            
+            // ✅ نستخدم apiKey فقط إذا كان موجوداً
+            String effectiveKey = getEffectiveApiKey();
+            if (!effectiveKey.isEmpty()) {
+                conn.setRequestProperty("X-MIRA-API-Key", effectiveKey);
+            }
+            
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(15000);
             return buildResponse(conn);
@@ -911,7 +960,8 @@ public class MiraApiClient {
     public String getGateId() { return getEffectiveGateId(); }
     public String getApiUrl() { return apiUrl; }
 
-    public void submitInventoryAuditReport(JSONObject payload) {
+    // ... باقي الكود كما هو ...
+public void submitInventoryAuditReport(JSONObject payload) {
         HttpURLConnection conn = null;
         try {
             String fullUrl = apiUrl + "/inventory/submit-audit";
@@ -973,11 +1023,10 @@ public class MiraApiClient {
         return postWithAuth("/gold-currency/settings", payload);
     }
     
-    
-// ✅ الدالة الجديدة (معامل واحد)
-public ApiResponse saveGoldCurrencySettings(JSONObject fullPayload) {
-    return postWithAuth("/gold-currency/settings", fullPayload);
-}
+    // ✅ الدالة الجديدة (معامل واحد)
+    public ApiResponse saveGoldCurrencySettings(JSONObject fullPayload) {
+        return postWithAuth("/gold-currency/settings", fullPayload);
+    }
 
     public ApiResponse fetchGoldPrice(String provider, String apiKey) {
         JSONObject payload = new JSONObject();
@@ -1013,7 +1062,6 @@ public ApiResponse saveGoldCurrencySettings(JSONObject fullPayload) {
     public ApiResponse getLivePrices() {
         return getWithAuth("/gold-currency/live-prices");
     }
-
     // ===================== ApiResponse =====================
 
     public static class ApiResponse {
@@ -1049,4 +1097,4 @@ public ApiResponse saveGoldCurrencySettings(JSONObject fullPayload) {
             return null;
         }
     }
-        }
+}
