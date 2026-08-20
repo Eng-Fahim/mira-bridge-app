@@ -361,6 +361,19 @@
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 app:cornerRadius="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnViewSnapshots"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="4dp"
+                android:backgroundTint="?attr/colorSecondaryContainer"
+                android:text="📸"
+                android:textColor="?attr/colorOnSecondaryContainer"
+                android:textSize="10sp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:cornerRadius="8dp" />
         </LinearLayout>
 
         <!-- بطاقة المقارنة - مصغرة -->
