@@ -293,7 +293,7 @@ private CardView createQuickActionCard(MiraQuickAccessSettings.QuickAction actio
 
     card.setClickable(true);
     card.setFocusable(true);
-    card.setRippleColor(0x22000000); // تأثير الضغط
+    card.setRippleColor(android.content.res.ColorStateList.valueOf(0x22000000));
 
     LinearLayout layout = new LinearLayout(context);
     layout.setOrientation(LinearLayout.VERTICAL);
@@ -850,4 +850,4 @@ private CardView createQuickActionCard(MiraQuickAccessSettings.QuickAction actio
         super.onDestroyView();
         mainHandler.removeCallbacksAndMessages(null);
     }
-                                       }
+}
