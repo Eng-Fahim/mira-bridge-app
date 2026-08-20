@@ -2,8 +2,6 @@ package com.example.uhf.fragment;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -37,11 +35,9 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
-import com.example.uhf.database.InventoryDatabaseHelper;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
-import com.example.uhf.model.InventoryItemModel;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -70,8 +66,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private static final long VIBRATION_THROTTLE_MS = 100;
     private static final int SCREENSHOT_QUALITY = 70;
     private static final int SIMULATION_BATCH_SIZE = 5;
-    private static final long SIMULATION_MIN_DELAY = 150;
-    private static final long SIMULATION_MAX_DELAY = 400;
+    private static final long SIMULATION_MIN_DELAY = 200;
+    private static final long SIMULATION_MAX_DELAY = 500;
 
     // Views
     private TextView tvInventoryStatus, tvExpectedCount, tvScannedCount, tvVariance;
@@ -107,7 +103,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
     // Thread-Safe Data Structures
     private final Set<String> scannedEpcSet = Collections.synchronizedSet(new HashSet<>());
-    private final Map<String, InventoryItem> localCatalog = new ConcurrentHashMap<>();
+    private final Map<String, InventoryItem> serverCatalog = new ConcurrentHashMap<>();
     private final List<InventoryItem> scannedItems = Collections.synchronizedList(new ArrayList<>());
     private final List<InventoryItem> pendingBatch = new CopyOnWriteArrayList<>();
     private InventoryAdapter adapter;
@@ -119,7 +115,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private MiraPriceManager priceManager;
     private SharedPreferences offlineCache;
     private SharedPreferences pendingQueue;
-    private InventoryDatabaseHelper dbHelper;
 
     // Handlers
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -147,7 +142,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             priceManager = MiraPriceManager.getInstance(ctx);
             offlineCache = ctx.getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
             pendingQueue = ctx.getSharedPreferences(PENDING_QUEUE_PREFS, Context.MODE_PRIVATE);
-            dbHelper = InventoryDatabaseHelper.getInstance(ctx);
             initSoundPool();
         }
         isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
@@ -166,8 +160,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         loadInventorySettings();
         updateBranchHeader();
         loadLastSnapshotOffline();
-        loadCatalogFromLocalDatabase();
-        preloadBranchCatalog();
+        fetchInventoryFromServer();
     }
 
     @Override
@@ -326,251 +319,217 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (btnBlindInventory != null) btnBlindInventory.setEnabled(true);
         if (btnStopInventory != null) btnStopInventory.setEnabled(false);
         if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
-        expectedCount = localCatalog.size();
+        expectedCount = serverCatalog.size();
         if (tvExpectedCount != null) tvExpectedCount.setText(String.valueOf(expectedCount));
         if (cardComparison != null) cardComparison.setVisibility(View.VISIBLE);
         if (progressRssi != null) progressRssi.setMax(100);
     }
 
-    // ==================== DATABASE CATALOG PRELOAD ====================
+    // ==================== FETCH INVENTORY FROM SERVER ====================
 
     /**
-     * تحميل الكتالوج من قاعدة البيانات المحلية SQLite
+     * جلب المخزون الحقيقي من MySQL عبر API
      */
-    private void loadCatalogFromLocalDatabase() {
-        if (dbHelper == null) return;
-        
-        new Thread(() -> {
-            try {
-                SQLiteDatabase db = dbHelper.getReadableDatabase();
-                List<InventoryItem> items = new ArrayList<>();
-                
-                Cursor cursor = db.query(
-                    InventoryDatabaseHelper.TABLE_ITEMS,
-                    null,
-                    InventoryDatabaseHelper.COLUMN_BRANCH_ID + " = ?",
-                    new String[]{String.valueOf(branchesManager != null ? branchesManager.getActiveBranchId() : 0)},
-                    null, null,
-                    InventoryDatabaseHelper.COLUMN_TITLE + " ASC"
-                );
-                
-                if (cursor != null && cursor.moveToFirst()) {
-                    do {
-                        String serial = cursor.getString(cursor.getColumnIndexOrThrow(InventoryDatabaseHelper.COLUMN_SERIAL));
-                        String title = cursor.getString(cursor.getColumnIndexOrThrow(InventoryDatabaseHelper.COLUMN_TITLE));
-                        String karat = cursor.getString(cursor.getColumnIndexOrThrow(InventoryDatabaseHelper.COLUMN_KARAT));
-                        double weight = cursor.getDouble(cursor.getColumnIndexOrThrow(InventoryDatabaseHelper.COLUMN_WEIGHT));
-                        String status = cursor.getString(cursor.getColumnIndexOrThrow(InventoryDatabaseHelper.COLUMN_STATUS));
-                        String location = cursor.getString(cursor.getColumnIndexOrThrow(InventoryDatabaseHelper.COLUMN_LOCATION));
-                        
-                        items.add(new InventoryItem(serial, title, karat, weight, status, location));
-                    } while (cursor.moveToNext());
-                    cursor.close();
-                }
-                
-                if (!items.isEmpty()) {
-                    localCatalog.clear();
-                    for (InventoryItem item : items) {
-                        localCatalog.put(item.serial.toUpperCase(), item);
-                    }
-                    expectedCount = localCatalog.size();
-                    
-                    safeRun(() -> {
-                        if (tvExpectedCount != null && !isBlindMode) {
-                            tvExpectedCount.setText(String.valueOf(expectedCount));
-                        }
-                        Log.d(TAG, "📦 Loaded " + expectedCount + " items from local database");
-                    });
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Load local catalog error: " + e.getMessage());
-            }
-        }).start();
-    }
-
-    /**
-     * تحميل الكتالوج من السيرفر وتحديث قاعدة البيانات المحلية
-     */
-    private void preloadBranchCatalog() {
+    private void fetchInventoryFromServer() {
         if (apiClient == null || branchesManager == null) return;
         final int activeBranchId = branchesManager.getActiveBranchId();
+
+        // عرض مؤشر تحميل
+        safeRun(() -> {
+            if (tvInventoryStatus != null) {
+                tvInventoryStatus.setText(isArabic ? "🔄 جاري تحميل المخزون..." : "🔄 Loading inventory...");
+                tvInventoryStatus.setTextColor(Color.parseColor("#F59E0B"));
+            }
+        });
 
         new Thread(() -> {
             try {
                 MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(activeBranchId);
+                
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray items = response.data.optJSONArray("items");
-                    if (items != null) {
-                        localCatalog.clear();
-                        List<InventoryItem> itemsToSave = new ArrayList<>();
+                    
+                    if (items == null) {
+                        // محاولة قراءة البيانات من مسار مختلف
+                        JSONObject dataObj = response.data.optJSONObject("data");
+                        if (dataObj != null) {
+                            items = dataObj.optJSONArray("items");
+                        }
+                    }
+                    
+                    if (items != null && items.length() > 0) {
+                        serverCatalog.clear();
                         
                         for (int i = 0; i < items.length(); i++) {
                             try {
                                 JSONObject obj = items.getJSONObject(i);
-                                String serial = obj.optString("gtin13", obj.optString("serial_number", obj.optString("epc", "")));
-                                if (!serial.isEmpty()) {
-                                    String title = obj.optString("title", obj.optString("name", isArabic ? "قطعة ذهب" : "Gold Item"));
-                                    String karat = obj.optString("karat", "21K");
-                                    double weight = obj.optDouble("weight", 0.0);
-                                    String location = obj.optString("location", branchesManager.getActiveBranchDisplayName());
-                                    String status = !"sold".equalsIgnoreCase(obj.optString("status", "")) ? "✓" : "⚠️";
-                                    
-                                    InventoryItem item = new InventoryItem(serial, title, karat, weight, status, location);
-                                    localCatalog.put(serial.toUpperCase(), item);
-                                    itemsToSave.add(item);
-                                }
+                                
+                                // قراءة الحقول المختلفة المحتملة
+                                String serial = obj.optString("gtin13", 
+                                    obj.optString("serial_number", 
+                                    obj.optString("epc", 
+                                    obj.optString("barcode", 
+                                    obj.optString("code", "")))));
+                                
+                                if (serial.isEmpty()) continue;
+                                
+                                String title = obj.optString("title", 
+                                    obj.optString("name", 
+                                    obj.optString("item_name", 
+                                    isArabic ? "قطعة ذهب" : "Gold Item"))));
+                                
+                                String karat = obj.optString("karat", 
+                                    obj.optString("purity_code", 
+                                    obj.optString("purity", "21K")));
+                                
+                                double weight = obj.optDouble("weight", 
+                                    obj.optDouble("net_weight", 
+                                    obj.optDouble("gross_weight", 0.0)));
+                                
+                                String location = obj.optString("location", 
+                                    obj.optString("branch_name", 
+                                    branchesManager.getActiveBranchDisplayName()));
+                                
+                                String status = !"sold".equalsIgnoreCase(obj.optString("status", "")) ? "✓" : "⚠️";
+                                
+                                InventoryItem item = new InventoryItem(
+                                    serial.toUpperCase(), 
+                                    title, 
+                                    karat, 
+                                    weight, 
+                                    status, 
+                                    location
+                                );
+                                
+                                serverCatalog.put(serial.toUpperCase(), item);
+                                
                             } catch (Exception e) {
                                 Log.e(TAG, "Parse item error: " + e.getMessage());
                             }
                         }
                         
-                        expectedCount = localCatalog.size();
-                        
-                        // حفظ في قاعدة البيانات المحلية
-                        saveItemsToLocalDatabase(itemsToSave);
+                        expectedCount = serverCatalog.size();
                         
                         safeRun(() -> {
                             if (tvExpectedCount != null && !isBlindMode) {
                                 tvExpectedCount.setText(String.valueOf(expectedCount));
                             }
-                            Log.d(TAG, "📦 Loaded " + expectedCount + " items from server");
+                            if (tvInventoryStatus != null) {
+                                tvInventoryStatus.setText("📍 " + branchesManager.getActiveBranchDisplayName());
+                                tvInventoryStatus.setTextColor(Color.parseColor("#1E293B"));
+                            }
+                            Log.d(TAG, "✅ Loaded " + expectedCount + " items from MySQL server");
+                        });
+                        
+                    } else {
+                        safeRun(() -> {
+                            if (tvInventoryStatus != null) {
+                                tvInventoryStatus.setText(isArabic ? "⚠️ لا توجد عناصر" : "⚠️ No items found");
+                                tvInventoryStatus.setTextColor(Color.parseColor("#EF4444"));
+                            }
                         });
                     }
+                } else {
+                    String errorMsg = response != null ? response.error : "Unknown error";
+                    Log.e(TAG, "Server error: " + errorMsg);
+                    safeRun(() -> {
+                        if (tvInventoryStatus != null) {
+                            tvInventoryStatus.setText(isArabic ? "❌ فشل التحميل" : "❌ Load failed");
+                            tvInventoryStatus.setTextColor(Color.parseColor("#EF4444"));
+                        }
+                    });
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Catalog Preload Error: " + e.getMessage());
-                // في حالة فشل السيرفر، نعتمد على قاعدة البيانات المحلية
-                loadCatalogFromLocalDatabase();
+                Log.e(TAG, "Fetch inventory error: " + e.getMessage());
+                safeRun(() -> {
+                    if (tvInventoryStatus != null) {
+                        tvInventoryStatus.setText(isArabic ? "❌ خطأ في الاتصال" : "❌ Connection error");
+                        tvInventoryStatus.setTextColor(Color.parseColor("#EF4444"));
+                    }
+                });
             }
         }).start();
     }
 
     /**
-     * حفظ العناصر في قاعدة البيانات المحلية
+     * جلب المخزون بشكل متزامن (للاستخدام قبل بدء الجرد)
      */
-    private void saveItemsToLocalDatabase(List<InventoryItem> items) {
-        if (dbHelper == null || items.isEmpty()) return;
-        
-        new Thread(() -> {
-            try {
-                SQLiteDatabase db = dbHelper.getWritableDatabase();
-                db.beginTransaction();
-                
-                try {
-                    // حذف العناصر القديمة للفرع الحالي
-                    db.delete(
-                        InventoryDatabaseHelper.TABLE_ITEMS,
-                        InventoryDatabaseHelper.COLUMN_BRANCH_ID + " = ?",
-                        new String[]{String.valueOf(branchesManager.getActiveBranchId())}
-                    );
-                    
-                    // إضافة العناصر الجديدة
-                    for (InventoryItem item : items) {
-                        android.content.ContentValues values = new android.content.ContentValues();
-                        values.put(InventoryDatabaseHelper.COLUMN_SERIAL, item.serial);
-                        values.put(InventoryDatabaseHelper.COLUMN_TITLE, item.title);
-                        values.put(InventoryDatabaseHelper.COLUMN_KARAT, item.karat);
-                        values.put(InventoryDatabaseHelper.COLUMN_WEIGHT, item.numericWeight);
-                        values.put(InventoryDatabaseHelper.COLUMN_STATUS, item.status);
-                        values.put(InventoryDatabaseHelper.COLUMN_LOCATION, item.location);
-                        values.put(InventoryDatabaseHelper.COLUMN_BRANCH_ID, branchesManager.getActiveBranchId());
-                        values.put(InventoryDatabaseHelper.COLUMN_UPDATED_AT, System.currentTimeMillis());
-                        
-                        db.insert(InventoryDatabaseHelper.TABLE_ITEMS, null, values);
-                    }
-                    
-                    db.setTransactionSuccessful();
-                    Log.d(TAG, "💾 Saved " + items.size() + " items to local database");
-                } finally {
-                    db.endTransaction();
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Save to local database error: " + e.getMessage());
-            }
-        }).start();
-    }
-
-    private void preloadBranchCatalogSync() {
-        if (apiClient == null || branchesManager == null) return;
-        final int activeBranchId = branchesManager.getActiveBranchId();
-        
-        // محاولة التحميل من قاعدة البيانات المحلية أولاً
-        loadCatalogFromLocalDatabaseSync();
-        
-        // ثم محاولة التحديث من السيرفر
-        MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(activeBranchId);
-        if (response != null && response.isSuccess && response.data != null) {
-            JSONArray items = response.data.optJSONArray("items");
-            if (items != null) {
-                localCatalog.clear();
-                List<InventoryItem> itemsToSave = new ArrayList<>();
-                
-                for (int i = 0; i < items.length(); i++) {
-                    try {
-                        JSONObject obj = items.getJSONObject(i);
-                        String serial = obj.optString("gtin13", obj.optString("serial_number", obj.optString("epc", "")));
-                        if (!serial.isEmpty()) {
-                            InventoryItem item = new InventoryItem(
-                                serial,
-                                obj.optString("title", isArabic ? "قطعة ذهب" : "Gold Item"),
-                                obj.optString("karat", "21K"),
-                                obj.optDouble("weight", 0.0),
-                                "✓",
-                                branchesManager.getActiveBranchDisplayName()
-                            );
-                            localCatalog.put(serial.toUpperCase(), item);
-                            itemsToSave.add(item);
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Parse item sync error: " + e.getMessage());
-                    }
-                }
-                expectedCount = localCatalog.size();
-                saveItemsToLocalDatabase(itemsToSave);
-            }
-        }
-    }
-
-    private void loadCatalogFromLocalDatabaseSync() {
-        if (dbHelper == null) return;
+    private boolean fetchInventoryFromServerSync() {
+        if (apiClient == null || branchesManager == null) return false;
         
         try {
-            SQLiteDatabase db = dbHelper.getReadableDatabase();
-            List<InventoryItem> items = new ArrayList<>();
+            final int activeBranchId = branchesManager.getActiveBranchId();
+            MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(activeBranchId);
             
-            Cursor cursor = db.query(
-                InventoryDatabaseHelper.TABLE_ITEMS,
-                null,
-                InventoryDatabaseHelper.COLUMN_BRANCH_ID + " = ?",
-                new String[]{String.valueOf(branchesManager.getActiveBranchId())},
-                null, null,
-                InventoryDatabaseHelper.COLUMN_TITLE + " ASC"
-            );
-            
-            if (cursor != null && cursor.moveToFirst()) {
-                do {
-                    String serial = cursor.getString(cursor.getColumnIndexOrThrow(InventoryDatabaseHelper.COLUMN_SERIAL));
-                    String title = cursor.getString(cursor.getColumnIndexOrThrow(InventoryDatabaseHelper.COLUMN_TITLE));
-                    String karat = cursor.getString(cursor.getColumnIndexOrThrow(InventoryDatabaseHelper.COLUMN_KARAT));
-                    double weight = cursor.getDouble(cursor.getColumnIndexOrThrow(InventoryDatabaseHelper.COLUMN_WEIGHT));
-                    String status = cursor.getString(cursor.getColumnIndexOrThrow(InventoryDatabaseHelper.COLUMN_STATUS));
-                    String location = cursor.getString(cursor.getColumnIndexOrThrow(InventoryDatabaseHelper.COLUMN_LOCATION));
-                    
-                    items.add(new InventoryItem(serial, title, karat, weight, status, location));
-                } while (cursor.moveToNext());
-                cursor.close();
-            }
-            
-            if (!items.isEmpty()) {
-                localCatalog.clear();
-                for (InventoryItem item : items) {
-                    localCatalog.put(item.serial.toUpperCase(), item);
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONArray items = response.data.optJSONArray("items");
+                
+                if (items == null) {
+                    JSONObject dataObj = response.data.optJSONObject("data");
+                    if (dataObj != null) {
+                        items = dataObj.optJSONArray("items");
+                    }
                 }
-                expectedCount = localCatalog.size();
+                
+                if (items != null && items.length() > 0) {
+                    serverCatalog.clear();
+                    
+                    for (int i = 0; i < items.length(); i++) {
+                        try {
+                            JSONObject obj = items.getJSONObject(i);
+                            
+                            String serial = obj.optString("gtin13", 
+                                obj.optString("serial_number", 
+                                obj.optString("epc", 
+                                obj.optString("barcode", 
+                                obj.optString("code", "")))));
+                            
+                            if (serial.isEmpty()) continue;
+                            
+                            String title = obj.optString("title", 
+                                obj.optString("name", 
+                                obj.optString("item_name", 
+                                isArabic ? "قطعة ذهب" : "Gold Item"))));
+                            
+                            String karat = obj.optString("karat", 
+                                obj.optString("purity_code", 
+                                obj.optString("purity", "21K")));
+                            
+                            double weight = obj.optDouble("weight", 
+                                obj.optDouble("net_weight", 
+                                obj.optDouble("gross_weight", 0.0)));
+                            
+                            String location = obj.optString("location", 
+                                obj.optString("branch_name", 
+                                branchesManager.getActiveBranchDisplayName()));
+                            
+                            String status = !"sold".equalsIgnoreCase(obj.optString("status", "")) ? "✓" : "⚠️";
+                            
+                            InventoryItem item = new InventoryItem(
+                                serial.toUpperCase(), 
+                                title, 
+                                karat, 
+                                weight, 
+                                status, 
+                                location
+                            );
+                            
+                            serverCatalog.put(serial.toUpperCase(), item);
+                            
+                        } catch (Exception e) {
+                            Log.e(TAG, "Parse item error: " + e.getMessage());
+                        }
+                    }
+                    
+                    expectedCount = serverCatalog.size();
+                    return true;
+                }
             }
         } catch (Exception e) {
-            Log.e(TAG, "Load local catalog sync error: " + e.getMessage());
+            Log.e(TAG, "Fetch inventory sync error: " + e.getMessage());
         }
+        
+        return false;
     }
 
     private void loadLastSnapshotOffline() {
@@ -592,11 +551,11 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         final String cleanCode = epcOrGtin.trim().toUpperCase();
         if (!scannedEpcSet.add(cleanCode)) return;
 
-        InventoryItem matchedItem = localCatalog.get(cleanCode);
+        InventoryItem matchedItem = serverCatalog.get(cleanCode);
         boolean isKnown = matchedItem != null;
 
         if (!isKnown && !isBlindMode) {
-            if (localCatalog.isEmpty()) {
+            if (serverCatalog.isEmpty()) {
                 safeRun(() -> {
                     Toast.makeText(getContext(),
                         isArabic ? "⚠️ قاعدة البيانات فارغة - جاري القراءة بدون تحقق" : 
@@ -718,17 +677,17 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     // ==================== REAL DATABASE-DRIVEN SIMULATION ====================
 
     /**
-     * بدء محاكاة حقيقية من قاعدة البيانات
-     * تقوم بقراءة العناصر الفعلية من قاعدة البيانات وتحاكي حركة الماسح الضوئي
+     * بدء محاكاة حقيقية من بيانات MySQL
+     * تقوم بقراءة العناصر الفعلية من السيرفر وتحاكي حركة الماسح الضوئي
      */
     private void startSimulationLoop() {
         if (simulationHandler == null) {
             simulationHandler = new Handler(Looper.getMainLooper());
         }
 
-        // تجهيز قائمة المحاكاة من العناصر الفعلية
+        // تجهيز قائمة المحاكاة من العناصر الفعلية من السيرفر
         simulationQueue.clear();
-        simulationQueue.addAll(localCatalog.values());
+        simulationQueue.addAll(serverCatalog.values());
         
         // خلط العناصر لمحاكاة واقعية
         Collections.shuffle(simulationQueue);
@@ -743,7 +702,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }
 
         isSimulationMode = true;
-        Log.d(TAG, "🎯 Starting real database simulation with " + simulationQueue.size() + " items");
+        Log.d(TAG, "🎯 Starting real MySQL simulation with " + simulationQueue.size() + " items");
 
         simulationRunnable = new Runnable() {
             @Override
@@ -767,7 +726,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     long delay = SIMULATION_MIN_DELAY + (long) (Math.random() * (SIMULATION_MAX_DELAY - SIMULATION_MIN_DELAY));
                     simulationHandler.postDelayed(this, delay);
                 } else {
-                    Log.d(TAG, "✅ Real database simulation completed. Scanned " + simulationIndex + " items");
+                    Log.d(TAG, "✅ Real MySQL simulation completed. Scanned " + simulationIndex + " items");
                     isSimulationMode = false;
                 }
             }
@@ -810,28 +769,22 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
         final AlertDialog loadingDialog = showProfessionalLoadingDialog(
             isArabic ? "🔄 جاري تجهيز الجرد..." : "🔄 Preparing audit...",
-            isArabic ? "يرجى الانتظار - جاري تحميل قاعدة البيانات" : "Please wait - Loading database"
+            isArabic ? "يرجى الانتظار - جاري تحميل البيانات من السيرفر" : "Please wait - Loading data from server"
         );
 
         new Thread(() -> {
             try {
-                // محاولة التحميل من قاعدة البيانات المحلية أولاً
-                loadCatalogFromLocalDatabaseSync();
+                // جلب البيانات من MySQL عبر API
+                boolean success = fetchInventoryFromServerSync();
                 
-                // إذا كانت قاعدة البيانات المحلية فارغة، حاول التحميل من السيرفر
-                if (localCatalog.isEmpty()) {
-                    preloadBranchCatalogSync();
-                }
-                
-                // التحقق من وجود بيانات بعد المحاولة
-                if (localCatalog.isEmpty()) {
+                if (!success || serverCatalog.isEmpty()) {
                     safeRun(() -> {
                         dismissDialog(loadingDialog);
                         showRetryDialog(
-                            isArabic ? "⚠️ قاعدة البيانات فارغة" : "⚠️ Database is empty",
-                            isArabic ? "لم يتم العثور على عناصر في قاعدة البيانات. هل تريد المتابعة بدون تحقق؟" : 
-                                       "No items found in database. Continue without verification?",
-                            () -> startInventoryWithoutCatalog(blindMode)
+                            isArabic ? "⚠️ فشل تحميل البيانات" : "⚠️ Failed to load data",
+                            isArabic ? "تعذر تحميل البيانات من السيرفر. تحقق من اتصالك وحاول مرة أخرى." : 
+                                       "Could not load data from server. Check your connection and try again.",
+                            () -> startInventory(blindMode)
                         );
                     });
                     return;
@@ -852,11 +805,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                 });
             }
         }).start();
-    }
-
-    private void startInventoryWithoutCatalog(boolean blindMode) {
-        localCatalog.clear();
-        safeRun(() -> initializeInventorySession(blindMode));
     }
 
     private void initializeInventorySession(boolean blindMode) {
@@ -891,8 +839,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         playInventorySound("start");
         startTimer();
 
-        // بدء المحاكاة الحقيقية إذا لم يكن هناك جهاز متصل
-        if (!isHardwareConnected && !localCatalog.isEmpty()) {
+        // بدء المحاكاة الحقيقية من بيانات MySQL إذا لم يكن هناك جهاز متصل
+        if (!isHardwareConnected && !serverCatalog.isEmpty()) {
             startSimulationLoop();
         }
     }
@@ -976,8 +924,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }).start();
     }
 
-    // ... [باقي الدوال تبقى كما هي من الكود السابق]
-
     // ==================== SCREENSHOT & SYNC ====================
 
     private String captureScreenshot() {
@@ -1041,7 +987,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         payload.put("unexpected_count", 0);
         payload.put("total_weight", calculateTotalWeight());
         payload.put("total_value", calculateTotalValue());
-        payload.put("connection_type", isHardwareConnected ? "HARDWARE_RFID" : (isSimulationMode ? "SIMULATION_DATABASE" : "SIMULATOR"));
+        payload.put("connection_type", isHardwareConnected ? "HARDWARE_RFID" : (isSimulationMode ? "SIMULATION_MYSQL" : "SIMULATOR"));
 
         if (getContext() != null) {
             SharedPreferences authPrefs = getContext().getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
@@ -1076,8 +1022,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
         return payload;
     }
-
-    // ... [باقي الدوال تبقى كما هي]
 
     private void saveSnapshotLocally(JSONObject payload) {
         if (offlineCache != null) {
@@ -1159,7 +1103,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }).start();
     }
 
-    // ... [باقي الدوال تبقى كما هي من الكود السابق]
+    // ==================== REPORTS & DIALOGS ====================
 
     private void showSavedReports() {
         Context ctx = getContext();
@@ -1480,14 +1424,116 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         builder.show();
     }
 
-    // ... [باقي الدوال تبقى كما هي من الكود السابق]
-
     private void generateProReport() {
-        // ... [نفس الكود السابق]
+        if (getContext() == null || !isAdded()) return;
+
+        String orgName = orgProfile != null ? orgProfile.getOrgName() : (isArabic ? "مؤسسة المجوهرات" : "Jewelry Enterprise");
+        String orgPhone = orgProfile != null ? orgProfile.getOrgPhone() : "";
+        String orgAddress = orgProfile != null ? orgProfile.getOrgAddress() : (isArabic ? "اليمن" : "Yemen");
+        String activeBranchName = branchesManager != null ? branchesManager.getActiveBranchDisplayName() : "";
+
+        double totalWt = calculateTotalWeight();
+        double totalVal = calculateTotalValue();
+
+        StringBuilder rows = new StringBuilder();
+        int count = 1;
+        synchronized (scannedItems) {
+            for (int i = scannedItems.size() - 1; i >= 0; i--) {
+                InventoryItem item = scannedItems.get(i);
+                String color = "✓".equals(item.status) ? "#22C55E" : "⚠️".equals(item.status) ? "#F59E0B" : "#EF4444";
+                rows.append(String.format(Locale.US,
+                    "<tr><td>%d</td><td style='color:%s;'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%.2fg</td></tr>",
+                    count++, color, item.status, item.serial, item.title, item.karat, item.numericWeight));
+            }
+        }
+
+        double accVal = expectedCount > 0 ? (foundCount * 100.0 / expectedCount) : 100.0;
+        String accColor = accVal >= 98 ? "#22C55E" : accVal >= 90 ? "#F59E0B" : "#EF4444";
+        String dir = isArabic ? "rtl" : "ltr";
+
+        String html = "<!DOCTYPE html><html dir='" + dir + "'><head><meta charset='UTF-8'><style>" +
+            "body{font-family:sans-serif;color:#111827;padding:20px;direction:" + dir + ";background:#fff;font-size:11px}" +
+            ".header{text-align:center;border-bottom:2px solid #D4AF37;padding-bottom:10px;margin-bottom:12px}" +
+            ".header h2{color:#1A237E;margin:0;font-size:18px}" +
+            ".summary{display:flex;justify-content:space-between;margin:12px 0;gap:6px}" +
+            ".card{flex:1;text-align:center;padding:8px;background:#F9FAFB;border-radius:6px}" +
+            ".card .val{font-size:16px;font-weight:700}" +
+            ".card .lbl{font-size:9px;color:#666}" +
+            "table{width:100%;border-collapse:collapse;margin-top:10px;font-size:10px}" +
+            "th{background:#1A237E;color:#fff;padding:6px}td{padding:5px;border-bottom:1px solid #eee;text-align:center}" +
+            ".footer{text-align:center;margin-top:16px;font-size:9px;color:#999}" +
+            "</style></head><body>" +
+            "<div class='header'><h2>" + orgName + " - " + activeBranchName + "</h2><p>" + orgAddress + " | " + orgPhone + "</p></div>" +
+            "<div style='text-align:center;font-weight:bold;margin:8px 0;color:#92400E'>" +
+            (isArabic ? "تقرير تدقيق المخزون" : "Inventory Audit Report") + " | " +
+            new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date()) + "</div>" +
+            "<div class='summary'>" +
+            "<div class='card'><div class='val'>" + expectedCount + "</div><div class='lbl'>" + (isArabic ? "المتوقع" : "Expected") + "</div></div>" +
+            "<div class='card'><div class='val' style='color:#22C55E'>" + foundCount + "</div><div class='lbl'>" + (isArabic ? "تم التحقق" : "Verified") + "</div></div>" +
+            "<div class='card'><div class='val' style='color:" + (varianceCount == 0 ? "#22C55E" : "#EF4444") + "'>" + varianceCount + "</div><div class='lbl'>" + (isArabic ? "العجز" : "Variance") + "</div></div>" +
+            "<div class='card'><div class='val' style='color:" + accColor + "'>" + String.format(Locale.US, "%.1f%%", accVal) + "</div><div class='lbl'>" + (isArabic ? "الدقة" : "Accuracy") + "</div></div>" +
+            "</div>" +
+            "<table><tr><th>#</th><th>" + (isArabic ? "حالة" : "St") + "</th><th>" + (isArabic ? "الرقم" : "Serial") + "</th><th>" + (isArabic ? "القطعة" : "Item") + "</th><th>" + (isArabic ? "عيار" : "K") + "</th><th>" + (isArabic ? "وزن" : "Wt") + "</th></tr>" +
+            rows.toString() + "</table>" +
+            "<div style='display:flex;justify-content:space-between;margin-top:12px;font-weight:bold'>" +
+            "<div>" + (isArabic ? "الوزن الكلي: " : "Total Weight: ") + String.format(Locale.US, "%.2fg", totalWt) + "</div>" +
+            "<div>" + (isArabic ? "القيمة التقديرية: " : "Est. Value: ") +
+            (priceManager != null ? priceManager.formatPriceDefault(totalVal) : String.format(Locale.US, "%,.0f USD", totalVal)) +
+            "</div></div>" +
+            "<div class='footer'>MIRA Inventory Pro | " + orgName + " © 2026</div>" +
+            "</body></html>";
+
+        if (printWebView != null) {
+            if (printWebView.getParent() != null) {
+                ((ViewGroup) printWebView.getParent()).removeView(printWebView);
+            }
+            printWebView.destroy();
+        }
+        
+        printWebView = new WebView(requireContext());
+        printWebView.getSettings().setJavaScriptEnabled(true);
+        printWebView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+        printWebView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                if (getContext() == null || !isAdded()) return;
+                PrintManager pm = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
+                if (pm != null) {
+                    PrintDocumentAdapter pda = view.createPrintDocumentAdapter("MIRA_Inventory_Report_" + activeBranchName);
+                    pm.print("MIRA Inventory Report", pda, new PrintAttributes.Builder().build());
+                }
+            }
+        });
     }
 
     private void showAuditHistoryDialog() {
-        // ... [نفس الكود السابق]
+        Context ctx = getContext();
+        if (ctx == null || apiClient == null) return;
+        Toast.makeText(ctx, isArabic ? "🔄 جاري التحميل..." : "🔄 Loading...", Toast.LENGTH_SHORT).show();
+
+        new Thread(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getInventorySessionsList();
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONArray sessionsArr = response.data.optJSONArray("sessions");
+                    if (sessionsArr == null || sessionsArr.length() == 0) return;
+                    List<String> titleList = new ArrayList<>();
+                    for (int i = 0; i < sessionsArr.length(); i++) {
+                        JSONObject s = sessionsArr.optJSONObject(i);
+                        if (s != null) {
+                            titleList.add((isArabic ? "جلسة #" : "Session #") + s.optInt("id") + " - " + s.optString("created_at"));
+                        }
+                    }
+                    safeRun(() -> new AlertDialog.Builder(requireContext())
+                        .setTitle(isArabic ? "📂 أرشيف الجرد" : "📂 Audit Archive")
+                        .setItems(titleList.toArray(new String[0]), null)
+                        .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                        .show());
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "History error: " + e.getMessage());
+            }
+        }).start();
     }
 
     private void safeRun(Runnable r) {
