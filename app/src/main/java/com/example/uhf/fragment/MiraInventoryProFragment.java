@@ -450,10 +450,11 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     varianceCount = 0;
                     
                     // ✅ إنشاء session_id محلياً إذا لم يكن موجوداً
-                    if (sessionId == 0) {
-                        sessionId = (int) (System.currentTimeMillis() / 1000);
-                        Log.d(TAG, "✅ Created local session ID: " + sessionId);
-                    }
+                     // ✅ إنشاء session_id رقمي
+    if (sessionId == 0) {
+        sessionId = (int) (System.currentTimeMillis() / 1000);
+        Log.d(TAG, "✅ Created session ID: " + sessionId);
+    }
 
                     if (adapter != null) adapter.clearItems();
 
@@ -648,68 +649,70 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 }
 
     private JSONObject createInventoryPayload() throws Exception {
-        JSONObject payload = new JSONObject();
-        
-        payload.put("session_id", sessionId);
-        payload.put("branch_id", branchesManager.getActiveBranchId());
-        payload.put("zone", branchesManager.getActiveBranchDisplayName());
-        payload.put("location", branchesManager.getActiveBranchDisplayName());
-        payload.put("expected_count", expectedCount);
-        payload.put("total_scanned", scannedCount);
-        payload.put("unique_count", foundCount);
-        payload.put("found_count", foundCount);
-        payload.put("missing_count", varianceCount);
-        payload.put("unexpected_count", 0);
-        payload.put("total_weight", calculateTotalWeight());
-        payload.put("total_value", calculateTotalValue());
-        
-        // ✅ إضافة user_id والتوكن من SharedPreferences
-        if (getContext() != null) {
-            SharedPreferences authPrefs = getContext().getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
-            int userId = authPrefs.getInt("user_id", 0);
-            if (userId > 0) {
-                payload.put("user_id", userId);
-                Log.d(TAG, "👤 User ID: " + userId);
-            }
-            
-            String token = authPrefs.getString("auth_token", "");
-            if (token.isEmpty()) {
-                token = authPrefs.getString("session_token", "");
-            }
-            if (!token.isEmpty()) {
-                payload.put("token", token);
-                Log.d(TAG, "🔑 Token: " + token.substring(0, Math.min(10, token.length())) + "...");
-            }
+    JSONObject payload = new JSONObject();
+    
+    // ✅ المشكلة: sessionId كنص "AUDIT-..." بدلاً من رقم
+    // الحل: استخدم رقم فقط
+    payload.put("session_id", sessionId); // تأكد أن sessionId رقم صحيح
+    payload.put("branch_id", branchesManager.getActiveBranchId());
+    payload.put("zone", branchesManager.getActiveBranchDisplayName());
+    payload.put("location", branchesManager.getActiveBranchDisplayName());
+    payload.put("expected_count", expectedCount);
+    payload.put("total_scanned", scannedCount);
+    payload.put("unique_count", foundCount);
+    payload.put("found_count", foundCount);
+    payload.put("missing_count", varianceCount);
+    payload.put("unexpected_count", 0);
+    payload.put("total_weight", calculateTotalWeight());
+    payload.put("total_value", calculateTotalValue());
+    payload.put("connection_type", "SIMULATOR");
+    
+    // ✅ إضافة user_id
+    if (getContext() != null) {
+        SharedPreferences authPrefs = getContext().getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
+        int userId = authPrefs.getInt("user_id", 0);
+        if (userId > 0) {
+            payload.put("user_id", userId);
         }
         
-        // ✅ إضافة العناصر الممسوحة
-        JSONArray itemsJson = new JSONArray();
-        synchronized (scannedItems) {
-            for (InventoryItem item : scannedItems) {
-                JSONObject obj = new JSONObject();
-                obj.put("code", item.serial);
-                obj.put("serial", item.serial);
-                obj.put("title", item.title);
-                obj.put("karat", item.karat);
-                obj.put("weight", item.numericWeight);
-                obj.put("status", item.status);
-                itemsJson.put(obj);
-            }
+        String token = authPrefs.getString("auth_token", "");
+        if (token.isEmpty()) {
+            token = authPrefs.getString("session_token", "");
         }
-        payload.put("items", itemsJson);
-        
-        // ✅ تسجيل البيانات للتصحيح
-        Log.d(TAG, "=== 📋 Inventory Payload ===");
-        Log.d(TAG, "session_id: " + sessionId);
-        Log.d(TAG, "branch_id: " + branchesManager.getActiveBranchId());
-        Log.d(TAG, "expected_count: " + expectedCount);
-        Log.d(TAG, "total_scanned: " + scannedCount);
-        Log.d(TAG, "found_count: " + foundCount);
-        Log.d(TAG, "missing_count: " + varianceCount);
-        Log.d(TAG, "items_count: " + itemsJson.length());
-        
-        return payload;
+        if (!token.isEmpty()) {
+            payload.put("token", token);
+        }
     }
+    
+    // ✅ إضافة items كـ JSONArray وليس scanned_epcs
+    JSONArray itemsJson = new JSONArray();
+    synchronized (scannedItems) {
+        for (InventoryItem item : scannedItems) {
+            JSONObject obj = new JSONObject();
+            obj.put("code", item.serial);
+            obj.put("serial", item.serial);
+            obj.put("title", item.title);
+            obj.put("karat", item.karat);
+            obj.put("weight", item.numericWeight);
+            obj.put("status", item.status);
+            obj.put("rssi", ""); // أضف RSSI إذا كان متوفراً
+            itemsJson.put(obj);
+        }
+    }
+    payload.put("items", itemsJson); // ✅ استخدم "items" وليس "scanned_epcs"
+    
+    // ✅ احتفظ بـ scanned_epcs للتوافق
+    JSONArray epcsArray = new JSONArray();
+    synchronized (scannedItems) {
+        for (InventoryItem item : scannedItems) {
+            epcsArray.put(item.serial);
+        }
+    }
+    payload.put("scanned_epcs", epcsArray);
+    
+    return payload;
+}
+
 
     private void saveSnapshotLocally(JSONObject payload) {
         if (offlineCache != null) {
@@ -1332,4 +1335,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }
         super.onDestroyView();
     }
-                        }
+    }
