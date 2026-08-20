@@ -2,6 +2,8 @@ package com.example.uhf.fragment;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
@@ -9,6 +11,7 @@ import android.os.Looper;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
+import android.util.Base64;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -38,6 +41,7 @@ import com.example.uhf.manager.MiraPriceManager;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -59,6 +63,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private static final int UI_UPDATE_INTERVAL = 250;
     private static final int MAX_DISPLAY_ITEMS = 500;
     private static final long VIBRATION_THROTTLE_MS = 100;
+    private static final int SCREENSHOT_QUALITY = 70; // جودة الصورة 70%
 
     // Views
     private TextView tvInventoryStatus, tvExpectedCount, tvScannedCount, tvVariance;
@@ -523,8 +528,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         AlertDialog.Builder confirmDialog = new AlertDialog.Builder(ctx);
         confirmDialog.setTitle(isArabic ? "⚠️ إيقاف الجرد؟" : "⚠️ Stop Audit?");
         confirmDialog.setMessage(isArabic ?
-            "هل أنت متأكد من إيقاف الجرد؟\nسيتم حفظ التقرير وإرساله." :
-            "Are you sure you want to stop?\nReport will be saved and sent.");
+            "هل أنت متأكد من إيقاف الجرد؟\nسيتم حفظ التقرير وإرساله مع لقطة الشاشة." :
+            "Are you sure you want to stop?\nReport and screenshot will be saved.");
         confirmDialog.setPositiveButton(isArabic ? "نعم، إيقاف" : "Yes, Stop", (d, w) -> {
             d.dismiss();
             finishInventory();
@@ -540,7 +545,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
         final AlertDialog loadingDialog = showProfessionalLoadingDialog(
             isArabic ? "🔄 جاري إيقاف الجرد..." : "🔄 Stopping audit...",
-            isArabic ? "حفظ التقرير وإرساله للسيرفر" : "Saving and sending report"
+            isArabic ? "حفظ التقرير والتقاط لقطة الشاشة" : "Saving report and capturing screenshot"
         );
 
         new Thread(() -> {
@@ -548,7 +553,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                 isScanning = false;
                 varianceCount = Math.max(0, expectedCount - foundCount);
                 
-                boolean synced = syncFullInventorySessionSync();
+                // ✅ التقاط لقطة الشاشة أولاً
+                final String screenshotBase64 = captureScreenshot();
+                Log.d(TAG, "📸 Screenshot captured: " + (screenshotBase64 != null ? screenshotBase64.length() + " chars" : "null"));
+                
+                // ✅ إرسال البيانات مع اللقطة
+                boolean synced = syncFullInventorySessionSync(screenshotBase64);
 
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
@@ -588,22 +598,64 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }).start();
     }
 
-    private boolean syncFullInventorySessionSync() {
+    // ==================== SCREENSHOT CAPTURE ====================
+
+    /**
+     * التقاط لقطة شاشة للشاشة الحالية
+     * @return Base64 encoded image or null if failed
+     */
+    private String captureScreenshot() {
+        try {
+            if (getActivity() == null || getView() == null) {
+                Log.e(TAG, "Cannot capture: activity or view is null");
+                return null;
+            }
+
+            View rootView = getView();
+            Bitmap bitmap = Bitmap.createBitmap(
+                rootView.getWidth(),
+                rootView.getHeight(),
+                Bitmap.Config.ARGB_8888
+            );
+
+            Canvas canvas = new Canvas(bitmap);
+            rootView.draw(canvas);
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            bitmap.compress(Bitmap.CompressFormat.JPEG, SCREENSHOT_QUALITY, baos);
+            byte[] imageBytes = baos.toByteArray();
+            bitmap.recycle();
+
+            String base64 = Base64.encodeToString(imageBytes, Base64.NO_WRAP);
+            
+            Log.d(TAG, "📸 Screenshot captured: " + imageBytes.length + " bytes");
+            
+            return base64;
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Screenshot error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    // ==================== SYNC WITH SCREENSHOT ====================
+
+    private boolean syncFullInventorySessionSync(String screenshotBase64) {
         try {
             JSONObject payload = createInventoryPayload();
             
-            Log.d(TAG, "📤 Sending payload: " + payload.toString());
+            // ✅ إضافة اللقطة إلى payload
+            if (screenshotBase64 != null && !screenshotBase64.isEmpty()) {
+                payload.put("screenshot_base64", screenshotBase64);
+                Log.d(TAG, "📸 Screenshot added to payload");
+            }
+            
+            Log.d(TAG, "📤 Sending payload with screenshot");
             
             MiraApiClient.ApiResponse response = apiClient.closeInventorySession(payload);
             
             if (response != null) {
                 Log.d(TAG, "📥 Server response code: " + response.code);
                 Log.d(TAG, "📥 Server response success: " + response.isSuccess);
-                Log.d(TAG, "📥 Server response data: " + (response.data != null ? response.data.toString() : "null"));
-                
-                if (response.error != null && !response.error.isEmpty()) {
-                    Log.d(TAG, "📥 Server response error: " + response.error);
-                }
                 
                 if (response.isSuccess) {
                     if (response.data != null) {
@@ -613,8 +665,14 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                                 sessionId = serverSessionId;
                                 Log.d(TAG, "✅ Updated session ID from server: " + sessionId);
                             }
+                            
+                            // ✅ التحقق من حفظ اللقطة
+                            String screenshotUrl = response.data.optString("screenshot_url", "");
+                            if (!screenshotUrl.isEmpty()) {
+                                Log.d(TAG, "📸 Screenshot saved at: " + screenshotUrl);
+                            }
                         } catch (Exception e) {
-                            Log.e(TAG, "Parse session_id error: " + e.getMessage());
+                            Log.e(TAG, "Parse response error: " + e.getMessage());
                         }
                     }
                     
@@ -646,15 +704,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private JSONObject createInventoryPayload() throws Exception {
         JSONObject payload = new JSONObject();
         
-        // ✅ session_id رقمي
         payload.put("session_id", sessionId);
-        Log.d(TAG, "📋 Session ID in payload: " + sessionId);
-        
-        // ✅ branch_id
-        int branchId = branchesManager.getActiveBranchId();
-        payload.put("branch_id", branchId);
-        Log.d(TAG, "📋 Branch ID in payload: " + branchId);
-        
+        payload.put("branch_id", branchesManager.getActiveBranchId());
         payload.put("zone", branchesManager.getActiveBranchDisplayName());
         payload.put("location", branchesManager.getActiveBranchDisplayName());
         payload.put("expected_count", expectedCount);
@@ -673,9 +724,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             int userId = authPrefs.getInt("user_id", authPrefs.getInt("userId", 0));
             if (userId > 0) {
                 payload.put("user_id", userId);
-                Log.d(TAG, "📋 User ID: " + userId);
-            } else {
-                Log.e(TAG, "⚠️ User ID is 0 - check login");
             }
             
             String token = authPrefs.getString("auth_token", "");
@@ -702,7 +750,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             }
         }
         payload.put("items", itemsJson);
-        Log.d(TAG, "📋 Items count: " + itemsJson.length());
         
         // ✅ scanned_epcs للتوافق
         JSONArray epcsArray = new JSONArray();
@@ -742,11 +789,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                 .putString("pending_audits", pendingArray.toString())
                 .apply();
             
-            Log.i(TAG, "✅ Audit saved to pending queue: " + pendingArray.length() + " pending");
+            Log.i(TAG, "✅ Audit saved to pending queue");
         } catch (Exception e) {
             Log.e(TAG, "Failed to save pending queue: " + e.getMessage());
         }
     }
+
 
     private void checkPendingQueue() {
         if (pendingQueue == null) return;
@@ -1336,4 +1384,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }
         super.onDestroyView();
     }
-}
+            }
