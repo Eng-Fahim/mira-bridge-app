@@ -46,10 +46,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private Handler mainThreadHandler;
     private boolean isScanning = false;
     
-    // RFID
     private RFIDManager rfidManager;
     
-    // Simulation
     private Handler simulationHandler;
     private Runnable simulationRunnable;
     private int simulationIndex = 0;
@@ -59,7 +57,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         "A000011", "A000012", "A000013", "A000014", "A000015"
     };
     
-    // API
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
 
@@ -83,7 +80,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         apiClient = MiraApiClient.getInstance(requireContext());
         branchesManager = MiraBranchesManager.getInstance(requireContext());
         
-        // ✅ تهيئة RFID
         rfidManager = RFIDManager.getInstance(requireContext());
         rfidManager.setListener(this);
         
@@ -108,18 +104,13 @@ public class MiraInventoryProFragment extends KeyDwonFragment
 
     // ==================== RFID CALLBACKS ====================
     
+    // ✅ هذه هي الدالة المطلوبة في الواجهة
     @Override
-    public void onTagRead(String epc, String rssi) {
+    public void onTagRead(String epc, int rssi) {
         if (!isScanning || epc == null) return;
 
-        int parsedRssi = -60;
-        try {
-            parsedRssi = Integer.parseInt(rssi);
-        } catch (Exception ignored) {}
-
-        final int finalRssi = parsedRssi;
         scannerExecutor.execute(() -> {
-            inventoryEngine.onTagScanned(epc, finalRssi);
+            inventoryEngine.onTagScanned(epc, rssi);
             mainThreadHandler.post(this::updateUI);
         });
     }
@@ -157,8 +148,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     
     private void startScanning() {
         isScanning = true;
-        
-        // ✅ 1. تحميل الكتالوج من السيرفر
         loadCatalogAndStart();
     }
     
@@ -169,15 +158,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             Map<String, InventoryItem> catalog = fetchCatalogFromServer();
             
             mainThreadHandler.post(() -> {
-                // ✅ 2. بدء الجلسة مع الكتالوج
                 inventoryEngine.startSession(catalog);
                 
-                // ✅ 3. تحديث العداد المتوقع
                 if (tvExpectedCount != null) {
                     tvExpectedCount.setText(String.valueOf(catalog != null ? catalog.size() : 0));
                 }
                 
-                // ✅ 4. بدء مصدر القراءة
                 startReadingSource();
             });
         }).start();
@@ -210,14 +196,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                         
                         String title = obj.optString("title", "Gold Item");
                         String karat = obj.optString("karat", "21K");
-                        String status = "✓";
                         
-                        // ✅ InventoryItem بـ 4 معلمات فقط
                         InventoryItem item = new InventoryItem(
                             epc.toUpperCase(),
                             title,
                             karat,
-                            status
+                            "✓"
                         );
                         catalog.put(epc.toUpperCase(), item);
                     }
@@ -231,7 +215,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
     
     private void startReadingSource() {
-        // ✅ محاولة بدء RFID الحقيقي
         boolean hardwareStarted = false;
         
         if (rfidManager != null) {
@@ -249,7 +232,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             }
         }
         
-        // ✅ إذا لم يبدأ الجهاز، ابدأ المحاكاة
         if (!hardwareStarted) {
             startSimulationLoop();
             Toast.makeText(requireContext(), 
@@ -261,7 +243,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 Toast.LENGTH_SHORT).show();
         }
         
-        // ✅ تفعيل/تعطيل الأزرار
         if (btnStartInventory != null) btnStartInventory.setEnabled(false);
         if (btnStopInventory != null) btnStopInventory.setEnabled(true);
     }
@@ -272,7 +253,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         isScanning = false;
         stopSimulationLoop();
         
-        // ✅ إيقاف RFID
         if (rfidManager != null) {
             rfidManager.stopScan();
         }
@@ -304,14 +284,14 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                     String epc = simulationTags[simulationIndex];
                     int rssi = -40 - (int)(Math.random() * 40);
                     
-                    // ✅ استدعاء onTagRead
-                    onTagRead(epc, String.valueOf(rssi));
+                    // ✅ استدعاء onTagRead(int)
+                    onTagRead(epc, rssi);
                     
                     simulationIndex++;
                     long delay = 150 + (long)(Math.random() * 350);
                     simulationHandler.postDelayed(this, delay);
                 } else {
-                    Log.d(TAG, "✅ Simulation completed: " + simulationIndex + " tags");
+                    Log.d(TAG, "✅ Simulation completed");
                 }
             }
         };
