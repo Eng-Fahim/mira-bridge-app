@@ -214,77 +214,78 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
 
     private void initViews(View view) {
-        // Counts
-        tvExpectedCount = view.findViewById(R.id.tvExpectedCount);
-        tvScannedCount = view.findViewById(R.id.tvScannedCount);
-        tvVariance = view.findViewById(R.id.tvVariance);
-        tvAccuracy = view.findViewById(R.id.tvAccuracy);
+    // Counts
+    tvExpectedCount = view.findViewById(R.id.tvExpectedCount);
+    tvScannedCount = view.findViewById(R.id.tvScannedCount);
+    tvVariance = view.findViewById(R.id.tvVariance);
+    tvAccuracy = view.findViewById(R.id.tvAccuracy);
+    
+    // Progress
+    tvProgressPercent = view.findViewById(R.id.tvProgressPercent);
+    progressScanned = view.findViewById(R.id.progressScanned);
+    progressRssi = view.findViewById(R.id.progressRssi);
+    
+    // Status
+    tvInventoryStatus = view.findViewById(R.id.tvInventoryStatus);
+    tvElapsedTime = view.findViewById(R.id.tvElapsedTime);
+    tvRssi = view.findViewById(R.id.tvRssi);
+    tvLastScan = view.findViewById(R.id.tvLastScan);
+    
+    // Info
+    tvTotalWeight = view.findViewById(R.id.tvTotalWeight);
+    tvTotalValue = view.findViewById(R.id.tvTotalValue);
+    tvItemCount = view.findViewById(R.id.tvItemCount);
+    tvEmptyState = view.findViewById(R.id.tvEmptyState);
+    
+    // ✅ RecyclerView - تهيئة واحدة فقط
+    rvInventoryItems = view.findViewById(R.id.rvInventoryItems);
+    if (rvInventoryItems != null) {
+        rvInventoryItems.setLayoutManager(new LinearLayoutManager(requireContext()));
+        scannedItemsAdapter = new ScannedItemsAdapter(scannedItemsDisplayList);
+        rvInventoryItems.setAdapter(scannedItemsAdapter);
         
-        // Progress
-        tvProgressPercent = view.findViewById(R.id.tvProgressPercent);
-        progressScanned = view.findViewById(R.id.progressScanned);
-        progressRssi = view.findViewById(R.id.progressRssi);
-        
-        // Status
-        tvInventoryStatus = view.findViewById(R.id.tvInventoryStatus);
-        tvElapsedTime = view.findViewById(R.id.tvElapsedTime);
-        tvRssi = view.findViewById(R.id.tvRssi);
-        tvLastScan = view.findViewById(R.id.tvLastScan);
-        
-        // Info
-        tvTotalWeight = view.findViewById(R.id.tvTotalWeight);
-        tvTotalValue = view.findViewById(R.id.tvTotalValue);
-        tvItemCount = view.findViewById(R.id.tvItemCount);
-        tvEmptyState = view.findViewById(R.id.tvEmptyState);
-        
-        // RecyclerView
-        rvInventoryItems = view.findViewById(R.id.rvInventoryItems);
-        if (rvInventoryItems != null) {
-            rvInventoryItems.setLayoutManager(new LinearLayoutManager(requireContext()));
-        }
-        
-        if (rvInventoryItems != null) {
-    rvInventoryItems.setLayoutManager(new LinearLayoutManager(requireContext()));
-    scannedItemsAdapter = new ScannedItemsAdapter(scannedItemsDisplayList);
-    rvInventoryItems.setAdapter(scannedItemsAdapter);
-}
-        
-        // Tabs
-        tabInventoryModes = view.findViewById(R.id.tabInventoryModes);
-        if (tabInventoryModes != null) {
-            tabInventoryModes.addTab(tabInventoryModes.newTab().setText("جرد شامل"));
-            tabInventoryModes.addTab(tabInventoryModes.newTab().setText("جرد فئوي"));
-        }
-        
-        // Buttons
-        btnStartInventory = view.findViewById(R.id.btnStartInventory);
-        btnBlindInventory = view.findViewById(R.id.btnBlindInventory);
-        btnStopInventory = view.findViewById(R.id.btnStopInventory);
-        btnGenerateReport = view.findViewById(R.id.btnGenerateReport);
-        btnArchiveReports = view.findViewById(R.id.btnArchiveReports);
-        btnViewSnapshots = view.findViewById(R.id.btnViewSnapshots);
-
-        if (btnStartInventory != null) {
-            btnStartInventory.setOnClickListener(v -> startScanning());
-        }
-        if (btnBlindInventory != null) {
-            btnBlindInventory.setOnClickListener(v -> startBlindInventory());
-        }
-        if (btnStopInventory != null) {
-            btnStopInventory.setOnClickListener(v -> stopScanning());
-            btnStopInventory.setEnabled(false);
-        }
-        if (btnGenerateReport != null) {
-            btnGenerateReport.setOnClickListener(v -> showCommitConfirmationDialog());
-            btnGenerateReport.setEnabled(false);
-        }
-        if (btnArchiveReports != null) {
-            btnArchiveReports.setOnClickListener(v -> showArchiveReports());
-        }
-        if (btnViewSnapshots != null) {
-            btnViewSnapshots.setOnClickListener(v -> showSnapshotsDialog());
-        }
+        // ✅ إضافة تحسين للأداء
+        rvInventoryItems.setHasFixedSize(false); // لأن العناصر تتغير ديناميكياً
+        rvInventoryItems.setItemAnimator(null); // تعطيل الأنيميشن للأداء الأفضل
     }
+    
+    // Tabs
+    tabInventoryModes = view.findViewById(R.id.tabInventoryModes);
+    if (tabInventoryModes != null) {
+        tabInventoryModes.addTab(tabInventoryModes.newTab().setText("جرد شامل"));
+        tabInventoryModes.addTab(tabInventoryModes.newTab().setText("جرد فئوي"));
+    }
+    
+    // Buttons
+    btnStartInventory = view.findViewById(R.id.btnStartInventory);
+    btnBlindInventory = view.findViewById(R.id.btnBlindInventory);
+    btnStopInventory = view.findViewById(R.id.btnStopInventory);
+    btnGenerateReport = view.findViewById(R.id.btnGenerateReport);
+    btnArchiveReports = view.findViewById(R.id.btnArchiveReports);
+    btnViewSnapshots = view.findViewById(R.id.btnViewSnapshots);
+
+    if (btnStartInventory != null) {
+        btnStartInventory.setOnClickListener(v -> startScanning());
+    }
+    if (btnBlindInventory != null) {
+        btnBlindInventory.setOnClickListener(v -> startBlindInventory());
+    }
+    if (btnStopInventory != null) {
+        btnStopInventory.setOnClickListener(v -> stopScanning());
+        btnStopInventory.setEnabled(false);
+    }
+    if (btnGenerateReport != null) {
+        btnGenerateReport.setOnClickListener(v -> showCommitConfirmationDialog());
+        btnGenerateReport.setEnabled(false);
+    }
+    if (btnArchiveReports != null) {
+        btnArchiveReports.setOnClickListener(v -> showArchiveReports());
+    }
+    if (btnViewSnapshots != null) {
+        btnViewSnapshots.setOnClickListener(v -> showSnapshotsDialog());
+    }
+}
+
 
     // ==================== HARDWARE KEY TRIGGER ====================
 
@@ -1490,4 +1491,4 @@ private void displayComparisonResult(JSONObject data) {
             this.status = status;
         }
     }
-                    }
+                        }
