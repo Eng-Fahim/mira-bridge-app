@@ -87,4 +87,6 @@ dependencies {
     implementation "androidx.camera:camera-view:${camerax_version}"
     implementation 'androidx.gridlayout:gridlayout:1.0.0'
     implementation 'androidx.preference:preference:1.2.1'
+      // أضف هذا السطر لمكتبة التشفير
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
 }
