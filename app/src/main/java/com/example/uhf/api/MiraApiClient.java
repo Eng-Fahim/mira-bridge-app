@@ -7,6 +7,8 @@ import android.util.Log;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraServerConfig;
 
+import com.example.uhf.model.ApiProvider;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -18,6 +20,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class MiraApiClient {
 
@@ -56,6 +61,63 @@ public class MiraApiClient {
         this.gateId = serverConfig.getGateId();
         
         Log.d(TAG, "Credentials: URL=" + apiUrl + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "SET") + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId));
+    }
+    
+    // دالة لجلب قائمة المزودين النشطين من السيرفر
+    public List<ApiProvider> getActiveProviders() {
+        List<ApiProvider> providers = new ArrayList<>();
+        
+        try {
+            // افترض أن لديك endpoint يجلب المزودين
+            String response = httpGet(BASE_URL + "/api/providers/active");
+            JSONObject jsonResponse = new JSONObject(response);
+            
+            if (jsonResponse.getBoolean("success")) {
+                JSONArray providersArray = jsonResponse.getJSONArray("data");
+                
+                for (int i = 0; i < providersArray.length(); i++) {
+                    JSONObject providerJson = providersArray.getJSONObject(i);
+                    ApiProvider provider = new ApiProvider();
+                    provider.setId(providerJson.getInt("id"));
+                    provider.setProviderName(providerJson.getString("name"));
+                    provider.setProviderType(providerJson.getString("type"));
+                    provider.setApiKey(providerJson.getString("api_key"));
+                    provider.setBaseUrl(providerJson.getString("base_url"));
+                    provider.setActive(providerJson.getBoolean("is_active"));
+                    
+                    providers.add(provider);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error fetching providers: " + e.getMessage());
+        }
+        
+        return providers;
+    }
+    
+    // دالة لجلب الأسعار تلقائياً باستخدام المزود المحفوظ
+    public ApiResponse fetchGoldPriceWithProvider(int providerId) {
+        ApiResponse response = new ApiResponse();
+        
+        try {
+            // جلب بيانات المزود من السيرفر
+            String providerResponse = httpGet(BASE_URL + "/api/providers/" + providerId);
+            JSONObject providerJson = new JSONObject(providerResponse);
+            
+            if (providerJson.getBoolean("success")) {
+                JSONObject providerData = providerJson.getJSONObject("data");
+                String providerType = providerData.getString("type");
+                String apiKey = providerData.getString("api_key");
+                
+                // استخدام المزود لجلب الأسعار
+                return fetchGoldPrice(providerType, apiKey);
+            }
+        } catch (Exception e) {
+            response.isSuccess = false;
+            response.message = e.getMessage();
+        }
+        
+        return response;
     }
 
     /**
