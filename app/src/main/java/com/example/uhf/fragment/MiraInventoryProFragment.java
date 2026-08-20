@@ -316,41 +316,143 @@ private void handleTabSelection(int position) {
 
 // دالة عرض التقارير المحفوظة
 private void showSavedReports() {
-    try {
-        String lastSnapshot = offlineCache.getString("last_snapshot", null);
-        if (lastSnapshot != null && !lastSnapshot.isEmpty()) {
-            JSONObject snapshot = new JSONObject(lastSnapshot);
+    Context ctx = getContext();
+    if (ctx == null || apiClient == null) return;
+    
+    Log.d(TAG, "📊 Loading reports from server...");
+    
+    // ✅ عرض مؤشر تحميل
+    Toast.makeText(ctx, isArabic ? "🔄 جاري تحميل التقارير..." : "🔄 Loading reports...", Toast.LENGTH_SHORT).show();
+    
+    new Thread(() -> {
+        try {
+            int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
             
-            // ✅ عرض التقرير في Dialog أو تحديث الواجهة
-            AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-            builder.setTitle(isArabic ? "📊 آخر تقرير جرد" : "📊 Last Inventory Report");
+            // ✅ جلب التقارير من السيرفر
+            MiraApiClient.ApiResponse response = apiClient.getInventoryReports(branchId, 1, 50);
             
-            String message = isArabic ?
-                "رقم الجلسة: " + snapshot.optInt("session_id", 0) + "\n" +
-                "المتوقع: " + snapshot.optInt("expected_count", 0) + "\n" +
-                "الممسوح: " + snapshot.optInt("total_scanned", 0) + "\n" +
-                "العجز: " + snapshot.optInt("missing_count", 0) + "\n" +
-                "الوزن: " + snapshot.optDouble("total_weight", 0) + "g\n" :
-                "Session ID: " + snapshot.optInt("session_id", 0) + "\n" +
-                "Expected: " + snapshot.optInt("expected_count", 0) + "\n" +
-                "Scanned: " + snapshot.optInt("total_scanned", 0) + "\n" +
-                "Missing: " + snapshot.optInt("missing_count", 0) + "\n" +
-                "Weight: " + snapshot.optDouble("total_weight", 0) + "g\n";
-            
-            builder.setMessage(message);
-            builder.setPositiveButton(isArabic ? "🖨️ طباعة" : "🖨️ Print", (d, w) -> {
-                d.dismiss();
-                generateProReport();
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONObject data = response.data.optJSONObject("data");
+                if (data != null) {
+                    JSONArray sessionsArr = data.optJSONArray("sessions");
+                    
+                    if (sessionsArr != null && sessionsArr.length() > 0) {
+                        List<String> reportList = new ArrayList<>();
+                        List<JSONObject> sessionObjects = new ArrayList<>();
+                        
+                        for (int i = 0; i < sessionsArr.length(); i++) {
+                            JSONObject session = sessionsArr.optJSONObject(i);
+                            if (session != null) {
+                                sessionObjects.add(session);
+                                
+                                int id = session.optInt("id", 0);
+                                String date = session.optString("closed_at", session.optString("started_at", ""));
+                                int expected = session.optInt("expected_count", 0);
+                                int scanned = session.optInt("scanned_count", 0);
+                                int found = session.optInt("unique_items_found", 0);
+                                double accuracy = session.optDouble("accuracy", 0);
+                                String riskLevel = session.optString("risk_level", "none");
+                                
+                                String riskEmoji = "✅";
+                                switch (riskLevel) {
+                                    case "none": riskEmoji = "✅"; break;
+                                    case "low": riskEmoji = "🟢"; break;
+                                    case "medium": riskEmoji = "🟡"; break;
+                                    case "high": riskEmoji = "🟠"; break;
+                                    case "critical": riskEmoji = "🔴"; break;
+                                }
+                                
+                                String title = String.format(Locale.US,
+                                    "%s جلسة #%d | %s | المتوقع: %d | الممسوح: %d | الدقة: %.1f%%",
+                                    riskEmoji, id, date, expected, scanned, accuracy);
+                                
+                                reportList.add(title);
+                            }
+                        }
+                        
+                        safeRun(() -> {
+                            new AlertDialog.Builder(requireContext())
+                                .setTitle(isArabic ? "📊 تقارير الجرد" : "📊 Inventory Reports")
+                                .setItems(reportList.toArray(new String[0]), (dialog, which) -> {
+                                    // ✅ عند اختيار تقرير
+                                    if (which < sessionObjects.size()) {
+                                        showReportDetail(sessionObjects.get(which));
+                                    }
+                                })
+                                .setPositiveButton(isArabic ? "🖨️ طباعة آخر تقرير" : "🖨️ Print Last Report", (d, w) -> {
+                                    d.dismiss();
+                                    generateProReport();
+                                })
+                                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+                                .show();
+                        });
+                    } else {
+                        safeRun(() -> {
+                            Toast.makeText(getContext(), 
+                                isArabic ? "لا توجد تقارير سابقة" : "No previous reports", 
+                                Toast.LENGTH_SHORT).show();
+                        });
+                    }
+                }
+            } else {
+                safeRun(() -> {
+                    Toast.makeText(getContext(), 
+                        isArabic ? "❌ فشل تحميل التقارير" : "❌ Failed to load reports", 
+                        Toast.LENGTH_SHORT).show();
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Show reports error: " + e.getMessage());
+            safeRun(() -> {
+                Toast.makeText(getContext(), 
+                    isArabic ? "❌ خطأ: " + e.getMessage() : "❌ Error: " + e.getMessage(), 
+                    Toast.LENGTH_LONG).show();
             });
-            builder.setNegativeButton(isArabic ? "إغلاق" : "Close", (d, w) -> d.dismiss());
-            builder.show();
-        } else {
-            Toast.makeText(getContext(), 
-                isArabic ? "لا توجد تقارير سابقة" : "No previous reports", 
-                Toast.LENGTH_SHORT).show();
         }
+    }).start();
+}
+
+// ✅ دالة عرض تفاصيل تقرير محدد
+private void showReportDetail(JSONObject session) {
+    try {
+        int id = session.optInt("id", 0);
+        String date = session.optString("closed_at", session.optString("started_at", ""));
+        String location = session.optString("location", "");
+        int expected = session.optInt("expected_count", 0);
+        int scanned = session.optInt("scanned_count", 0);
+        int found = session.optInt("unique_items_found", 0);
+        int missing = session.optInt("missing_count", 0);
+        double accuracy = session.optDouble("accuracy", 0);
+        String riskLevel = session.optString("risk_level", "none");
+        String screenshotPath = session.optString("screenshot_path", "");
+        
+        String message = isArabic ?
+            "📋 تفاصيل الجلسة #" + id + "\n\n" +
+            "📅 التاريخ: " + date + "\n" +
+            "📍 الموقع: " + location + "\n" +
+            "📦 المتوقع: " + expected + "\n" +
+            "✅ الممسوح: " + scanned + "\n" +
+            "🎯 الموجود: " + found + "\n" +
+            "⚠️ العجز: " + missing + "\n" +
+            "📊 الدقة: " + accuracy + "%\n" +
+            "🚨 مستوى الخطورة: " + riskLevel + "\n" :
+            "📋 Session #" + id + " Details\n\n" +
+            "📅 Date: " + date + "\n" +
+            "📍 Location: " + location + "\n" +
+            "📦 Expected: " + expected + "\n" +
+            "✅ Scanned: " + scanned + "\n" +
+            "🎯 Found: " + found + "\n" +
+            "⚠️ Missing: " + missing + "\n" +
+            "📊 Accuracy: " + accuracy + "%\n" +
+            "🚨 Risk: " + riskLevel + "\n";
+        
+        new AlertDialog.Builder(requireContext())
+            .setTitle(isArabic ? "📋 تفاصيل التقرير" : "📋 Report Details")
+            .setMessage(message)
+            .setPositiveButton(isArabic ? "إغلاق" : "Close", null)
+            .show();
     } catch (Exception e) {
-        Log.e(TAG, "Show reports error: " + e.getMessage());
+        Log.e(TAG, "Show report detail error: " + e.getMessage());
     }
 }
 
@@ -1500,4 +1602,4 @@ private void showSavedReports() {
         }
         super.onDestroyView();
     }
-                }
+                                }
