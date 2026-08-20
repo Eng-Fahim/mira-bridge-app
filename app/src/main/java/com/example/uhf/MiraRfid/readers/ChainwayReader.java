@@ -117,44 +117,12 @@ public class ChainwayReader implements MiraIRFIDReader {
             reader.setPower(powerDbm);
             Log.d(TAG, "Applied power: " + powerDbm + " dBm");
             
-            // وضع الجلسة (S0-S3)
+            // تطبيق Query parameters (الجلسة، Target، و Q-Value) عبر الدالة الرسمية لـ Chainway
             try {
-                reader.setSession(session);
-                Log.d(TAG, "Applied session: S" + session);
+                reader.setQueryTagParam(0, session, target, qValue);
+                Log.d(TAG, "Applied Query Params: Session S" + session + ", Target " + target + ", Q " + qValue);
             } catch (Exception e) {
-                Log.w(TAG, "Session not supported: " + e.getMessage());
-            }
-            
-            // الهدف (A/B)
-            try {
-                reader.setTarget(target);
-                Log.d(TAG, "Applied target: " + (target == 0 ? "A" : "B"));
-            } catch (Exception e) {
-                Log.w(TAG, "Target not supported: " + e.getMessage());
-            }
-            
-            // Q Value
-            try {
-                reader.setQ(qValue);
-                Log.d(TAG, "Applied Q value: " + qValue);
-            } catch (Exception e) {
-                Log.w(TAG, "Q value not supported: " + e.getMessage());
-            }
-            
-            // وضع الصوت
-            try {
-                reader.setBeepMode(beepMode);
-                Log.d(TAG, "Applied beep mode: " + beepMode);
-            } catch (Exception e) {
-                Log.w(TAG, "Beep mode not supported: " + e.getMessage());
-            }
-            
-            // وضع الاهتزاز
-            try {
-                reader.setVibrationMode(vibrationMode);
-                Log.d(TAG, "Applied vibration mode: " + vibrationMode);
-            } catch (Exception e) {
-                Log.w(TAG, "Vibration mode not supported: " + e.getMessage());
+                Log.w(TAG, "Query params not supported: " + e.getMessage());
             }
             
         } catch (Exception e) {
@@ -220,12 +188,7 @@ public class ChainwayReader implements MiraIRFIDReader {
             applyAllSettings();
             
             // بدء الجرد حسب الوضع
-            boolean success;
-            if (continuousMode == 1) {
-                success = reader.startInventoryTag();
-            } else {
-                success = reader.startInventoryTag(); // Single mode يعتمد على SDK
-            }
+            boolean success = reader.startInventoryTag();
             
             if (success) {
                 isScanning = true;
@@ -352,29 +315,14 @@ public class ChainwayReader implements MiraIRFIDReader {
         Log.d(TAG, "Scan interval updated to: " + scanIntervalMs + "ms");
     }
     
-    // إعدادات إضافية
     public void setBeepMode(int mode) {
         this.beepMode = mode;
         saveSettings();
-        try {
-            if (reader != null) {
-                reader.setBeepMode(mode);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Set beep mode error", e);
-        }
     }
     
     public void setVibrationMode(int mode) {
         this.vibrationMode = mode;
         saveSettings();
-        try {
-            if (reader != null) {
-                reader.setVibrationMode(mode);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Set vibration mode error", e);
-        }
     }
     
     public void setContinuousMode(int mode) {
@@ -385,37 +333,19 @@ public class ChainwayReader implements MiraIRFIDReader {
     public void setSession(int session) {
         this.session = session;
         saveSettings();
-        try {
-            if (reader != null) {
-                reader.setSession(session);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Set session error", e);
-        }
+        applyAllSettings();
     }
     
     public void setTarget(int target) {
         this.target = target;
         saveSettings();
-        try {
-            if (reader != null) {
-                reader.setTarget(target);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Set target error", e);
-        }
+        applyAllSettings();
     }
     
     public void setQValue(int qValue) {
         this.qValue = qValue;
         saveSettings();
-        try {
-            if (reader != null) {
-                reader.setQ(qValue);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Set Q value error", e);
-        }
+        applyAllSettings();
     }
     
     // Getters
@@ -446,11 +376,7 @@ public class ChainwayReader implements MiraIRFIDReader {
     
     @Override
     public int getBatteryLevel() {
-        try {
-            if (reader != null) {
-                return reader.getBattery();
-            }
-        } catch (Exception ignored) {}
+        // تم إزالة reader.getBattery() لعدم وجودها في هذا الـ SDK
         return -1;
     }
     
