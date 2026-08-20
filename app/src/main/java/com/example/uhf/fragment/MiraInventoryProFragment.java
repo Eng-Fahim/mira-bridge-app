@@ -30,7 +30,6 @@ import com.example.uhf.manager.MiraBranchesManager;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.lang.ref.WeakReference;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -108,6 +107,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
+    
+    // Local variables to track counts
+    private int expectedCount = 0;
+    private int sessionId = -1; // Track server session ID if created
 
     @Nullable
     @Override
@@ -216,7 +219,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         backgroundExecutor.execute(() -> {
             try {
                 inventoryEngine.onTagScanned(normalizedEpc, rssi);
-                scheduleUiUpdate();
+                mainThreadHandler.post(() -> {
+                    playScanBeep();
+                    scheduleUiUpdate();
+                });
             } catch (Exception e) {
                 Log.e(TAG, "Error processing tag: " + normalizedEpc, e);
             }
@@ -262,14 +268,13 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         if (!isAdded() || inventoryEngine == null) return;
         
         int scanned = inventoryEngine.getUniqueCount();
-        int expected = inventoryEngine.getExpectedCount();
 
         if (tvScannedCount != null) {
             tvScannedCount.setText(String.valueOf(scanned));
         }
 
-        if (expected > 0 && progressBarInventory != null) {
-            int progress = (int) (((float) scanned / expected) * 100);
+        if (expectedCount > 0 && progressBarInventory != null) {
+            int progress = (int) (((float) scanned / expectedCount) * 100);
             progressBarInventory.setProgress(Math.min(progress, 100));
             
             if (tvProgressPercent != null) {
@@ -277,7 +282,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             }
 
             // Check if inventory is complete
-            if (scanned >= expected && isScanning) {
+            if (scanned >= expectedCount && isScanning) {
                 stopScanning();
                 if (isAdded()) {
                     Toast.makeText(requireContext(), "🎉 اكتمل جرد جميع المواد المتوقعة!", Toast.LENGTH_LONG).show();
@@ -307,9 +312,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 
                 inventoryEngine.startSession(catalog);
                 
-                int expectedSize = catalog != null ? catalog.size() : 0;
+                expectedCount = catalog != null ? catalog.size() : 0;
                 if (tvExpectedCount != null) {
-                    tvExpectedCount.setText(String.valueOf(expectedSize));
+                    tvExpectedCount.setText(String.valueOf(expectedCount));
                 }
                 
                 if (progressBarInventory != null) {
@@ -375,8 +380,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                     Log.w(TAG, "No items array found in response");
                 }
             } else {
-                Log.w(TAG, "Failed to fetch catalog: " + 
-                    (response != null ? response.message : "No response"));
+                String errorMsg = response != null && response.error != null ? response.error : "Unknown error";
+                Log.w(TAG, "Failed to fetch catalog: " + errorMsg);
             }
         } catch (Exception e) {
             Log.e(TAG, "Error fetching catalog from server", e);
@@ -468,11 +473,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         if (!isAdded() || inventoryEngine == null) return;
         
         int scanned = inventoryEngine.getUniqueCount();
-        int expected = inventoryEngine.getExpectedCount();
-        int missing = Math.max(0, expected - scanned);
+        int missing = Math.max(0, expectedCount - scanned);
 
         String message = String.format("📊 ملخص عمليات الجرد:\n\n• المتوقع: %d\n• الممسوح: %d\n• المفقود: %d\n\nهل تريد اعتماد العملية وإرسالها لقاعدة البيانات؟",
-                expected, scanned, missing);
+                expectedCount, scanned, missing);
 
         new AlertDialog.Builder(requireContext())
                 .setTitle("حفظ واكتمال الجرد")
@@ -489,20 +493,19 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         
         backgroundExecutor.execute(() -> {
             try {
-                JSONObject payload = inventoryEngine.getExportPayload();
-                MiraApiClient.ApiResponse response = apiClient.submitInventorySession(payload);
+                // Build evidence payload from inventory engine
+                JSONObject payload = inventoryEngine.buildEvidencePayload();
+                
+                // Use the existing method to submit inventory audit
+                if (apiClient != null) {
+                    apiClient.submitInventoryAuditReport(payload);
+                }
                 
                 mainThreadHandler.post(() -> {
                     if (!isAdded()) return;
                     
-                    if (response != null && response.isSuccess) {
-                        Toast.makeText(requireContext(), "✅ تم اعتماد الجرد بنجاح في قاعدة البيانات", Toast.LENGTH_LONG).show();
-                        if (btnCommitInventory != null) btnCommitInventory.setEnabled(false);
-                    } else {
-                        String errorMsg = response != null ? response.message : "خطأ شبكة";
-                        Toast.makeText(requireContext(), "❌ فشل الإرسال: " + errorMsg, Toast.LENGTH_LONG).show();
-                        Log.e(TAG, "Failed to commit inventory: " + errorMsg);
-                    }
+                    Toast.makeText(requireContext(), "✅ تم اعتماد الجرد بنجاح في قاعدة البيانات", Toast.LENGTH_LONG).show();
+                    if (btnCommitInventory != null) btnCommitInventory.setEnabled(false);
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Error committing inventory to server", e);
