@@ -68,7 +68,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
     // Views
     private TextView tvInventoryStatus, tvExpectedCount, tvScannedCount, tvVariance;
-    private TextView tvAccuracy, tvElapsedTime, tvLastScan, tvRssi;
+    private TextView tvAccuracy, tvElapsedTime, tvLastScan, tvEmptyState, tvRssi;
     private TextView tvPrevItems, tvCurrItems, tvDeltaItems;
     private TextView tvTotalValue, tvTotalWeight;
     private CardView cardComparison;
@@ -415,8 +415,19 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         InventoryItem matchedItem = localCatalog.get(cleanCode);
         boolean isKnown = matchedItem != null;
 
+        // التعديل 1: معالجة حالة قاعدة البيانات الفارغة
         if (!isKnown && !isBlindMode) {
-            return; // في الجرد الكامل نستثني الأكواد غير الموجوة بقاعدة البيانات
+            if (localCatalog.isEmpty()) {
+                // إذا كانت قاعدة البيانات فارغة، نسمح بالقراءة مع تنبيه
+                safeRun(() -> {
+                    Toast.makeText(getContext(),
+                        isArabic ? "⚠️ قاعدة البيانات فارغة - جاري القراءة بدون تحقق" : 
+                                   "⚠️ Database empty - scanning without verification",
+                        Toast.LENGTH_SHORT).show();
+                });
+            } else {
+                return; // في الجرد الكامل نستثني الأكواد غير الموجودة بقاعدة البيانات
+            }
         }
 
         String title = isKnown ? matchedItem.title : (isArabic ? "قطعة غير معرفة" : "Unknown Item");
@@ -585,45 +596,25 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             try {
                 if (localCatalog.isEmpty()) {
                     preloadBranchCatalogSync();
+                    
+                    // التعديل 1: التحقق من وجود بيانات بعد المحاولة
+                    if (localCatalog.isEmpty()) {
+                        safeRun(() -> {
+                            dismissDialog(loadingDialog);
+                            showRetryDialog(
+                                isArabic ? "⚠️ قاعدة البيانات فارغة" : "⚠️ Database is empty",
+                                isArabic ? "لم يتم العثور على عناصر في قاعدة البيانات. هل تريد المتابعة بدون تحقق؟" : 
+                                           "No items found in database. Continue without verification?",
+                                () -> startInventoryWithoutCatalog(blindMode)
+                            );
+                        });
+                        return;
+                    }
                 }
 
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
-
-                    sessionId = (int) (System.currentTimeMillis() / 1000);
-                    isBlindMode = blindMode;
-                    isScanning = true;
-                    startTime = System.currentTimeMillis();
-
-                    scannedEpcSet.clear();
-                    scannedItems.clear();
-                    pendingBatch.clear();
-                    scannedCount = 0;
-                    foundCount = 0;
-                    varianceCount = 0;
-
-                    if (adapter != null) adapter.clearItems();
-
-                    setButtonsEnabled(false);
-                    if (btnStopInventory != null) btnStopInventory.setEnabled(true);
-
-                    if (tvInventoryStatus != null) {
-                        tvInventoryStatus.setText(isArabic ? "● جاري الجرد" : "● SCANNING");
-                        tvInventoryStatus.setTextColor(Color.parseColor("#38BDF8"));
-                    }
-
-                    if (isBlindMode && tvExpectedCount != null) {
-                        tvExpectedCount.setText("—");
-                    } else if (tvExpectedCount != null) {
-                        tvExpectedCount.setText(String.valueOf(expectedCount));
-                    }
-
-                    playInventorySound("start");
-                    startTimer();
-
-                    if (!isHardwareConnected) {
-                        startSimulationLoop();
-                    }
+                    initializeInventorySession(blindMode);
                 });
             } catch (Exception e) {
                 safeRun(() -> {
@@ -636,6 +627,49 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                 });
             }
         }).start();
+    }
+
+    // دالة جديدة للبدء بدون كتالوج
+    private void startInventoryWithoutCatalog(boolean blindMode) {
+        localCatalog.clear(); // نضمن الفراغ
+        safeRun(() -> initializeInventorySession(blindMode));
+    }
+
+    private void initializeInventorySession(boolean blindMode) {
+        sessionId = (int) (System.currentTimeMillis() / 1000);
+        isBlindMode = blindMode;
+        isScanning = true;
+        startTime = System.currentTimeMillis();
+
+        scannedEpcSet.clear();
+        scannedItems.clear();
+        pendingBatch.clear();
+        scannedCount = 0;
+        foundCount = 0;
+        varianceCount = 0;
+
+        if (adapter != null) adapter.clearItems();
+
+        setButtonsEnabled(false);
+        if (btnStopInventory != null) btnStopInventory.setEnabled(true);
+
+        if (tvInventoryStatus != null) {
+            tvInventoryStatus.setText(isArabic ? "● جاري الجرد" : "● SCANNING");
+            tvInventoryStatus.setTextColor(Color.parseColor("#38BDF8"));
+        }
+
+        if (isBlindMode && tvExpectedCount != null) {
+            tvExpectedCount.setText("—");
+        } else if (tvExpectedCount != null) {
+            tvExpectedCount.setText(String.valueOf(expectedCount));
+        }
+
+        playInventorySound("start");
+        startTimer();
+
+        if (!isHardwareConnected && !localCatalog.isEmpty()) {
+            startSimulationLoop();
+        }
     }
 
     private void stopInventory() {
@@ -1278,7 +1312,14 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             "<div class='footer'>MIRA Inventory Pro | " + orgName + " © 2026</div>" +
             "</body></html>";
 
-        if (printWebView != null) printWebView.destroy();
+        if (printWebView != null) {
+            // التعديل 2: تنظيف WebView القديم
+            if (printWebView.getParent() != null) {
+                ((ViewGroup) printWebView.getParent()).removeView(printWebView);
+            }
+            printWebView.destroy();
+        }
+        
         printWebView = new WebView(requireContext());
         printWebView.getSettings().setJavaScriptEnabled(true);
         printWebView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
@@ -1360,15 +1401,29 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             InventoryItem item = (InventoryItem) o;
+            
+            // التعديل 3: تحسين المقارنة لتشمل جميع الحقول أو الاعتماد على serial فقط
+            if (serial != null && !serial.isEmpty()) {
+                // إذا كان serial موجوداً وغير فارغ، اعتبره المفتاح الأساسي
+                return Objects.equals(serial, item.serial);
+            }
+            
+            // إذا كان serial فارغاً، قارن بجميع الحقول
             return Double.compare(item.numericWeight, numericWeight) == 0 &&
                     Objects.equals(serial, item.serial) &&
+                    Objects.equals(title, item.title) &&
+                    Objects.equals(karat, item.karat) &&
                     Objects.equals(status, item.status) &&
                     Objects.equals(location, item.location);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(serial, status, numericWeight, location);
+            // التعديل 3: تحسين hashCode ليتوافق مع equals
+            if (serial != null && !serial.isEmpty()) {
+                return Objects.hash(serial);
+            }
+            return Objects.hash(serial, title, karat, status, numericWeight, location);
         }
     }
 
@@ -1454,14 +1509,28 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         mainHandler.removeCallbacksAndMessages(null);
         if (batchUpdateRunnable != null) mainHandler.removeCallbacks(batchUpdateRunnable);
         if (rvInventoryItems != null) rvInventoryItems.setAdapter(null);
+        
+        // التعديل 2: تحسين تنظيف WebView
         if (printWebView != null) {
+            if (printWebView.getParent() != null) {
+                ((ViewGroup) printWebView.getParent()).removeView(printWebView);
+            }
+            printWebView.stopLoading();
+            printWebView.setWebViewClient(null);
             printWebView.destroy();
             printWebView = null;
         }
+        
+        // التعديل 2: تحسين تنظيف SoundPool
         if (soundPool != null) {
-            soundPool.release();
+            try {
+                soundPool.release();
+            } catch (Exception e) {
+                Log.e(TAG, "SoundPool release error: " + e.getMessage());
+            }
             soundPool = null;
         }
+        
         super.onDestroyView();
     }
-}
+                    }
