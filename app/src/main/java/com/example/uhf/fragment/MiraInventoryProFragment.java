@@ -281,59 +281,68 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         return false;
     }
 
-    @Override
-    public void onTagRead(String epc, int rssi) {
-        if (!isScanning || epc == null || epc.isEmpty()) return;
+   @Override
+public void onTagRead(String epc, int rssi) {
+    if (!isScanning || epc == null || epc.isEmpty()) return;
 
-        final String normalizedEpc = epc.trim().toUpperCase();
-        final int finalRssi = rssi;
-        
-        backgroundExecutor.execute(() -> {
-            try {
-                InventoryItem item = inventoryEngine.onTagScanned(normalizedEpc, finalRssi);
-                
-                mainThreadHandler.post(() -> {
-                    playScanBeep();
-                    updateLastScan(normalizedEpc, finalRssi);
-                    addScannedItemToDisplay(normalizedEpc, finalRssi, item);
-                    scheduleUiUpdate();
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Error processing tag: " + normalizedEpc, e);
-            }
-        });
-    }
+    final String normalizedEpc = epc.trim().toUpperCase();
+    final int finalRssi = rssi;
+    
+    backgroundExecutor.execute(() -> {
+        try {
+            inventoryEngine.onTagScanned(normalizedEpc, finalRssi);
+            
+            mainThreadHandler.post(() -> {
+                playScanBeep();
+                updateLastScan(normalizedEpc, finalRssi);
+                addScannedItemToDisplay(normalizedEpc, finalRssi, null);
+                scheduleUiUpdate();
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Error processing tag: " + normalizedEpc, e);
+        }
+    });
+}
 
-    private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
-        if (scannedItemsAdapter == null) return;
-        
-        boolean exists = false;
-        for (ScannedItemDisplay display : scannedItemsDisplayList) {
-            if (display.epc.equals(epc)) {
-                display.count++;
-                display.rssi = rssi;
-                exists = true;
-                break;
-            }
-        }
-        
-        if (!exists) {
-            ScannedItemDisplay display = new ScannedItemDisplay(
-                epc,
-                item != null ? item.getTitle() : "Unknown",
-                item != null ? item.getKarat() : "—",
-                1,
-                rssi
-            );
-            scannedItemsDisplayList.add(0, display);
-        }
-        
-        scannedItemsAdapter.notifyDataSetChanged();
-        
-        if (tvEmptyState != null && !scannedItemsDisplayList.isEmpty()) {
-            tvEmptyState.setVisibility(View.GONE);
+private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
+    if (scannedItemsAdapter == null) return;
+    
+    boolean exists = false;
+    for (ScannedItemDisplay display : scannedItemsDisplayList) {
+        if (display.epc.equals(epc)) {
+            display.count++;
+            display.rssi = rssi;
+            exists = true;
+            break;
         }
     }
+    
+    if (!exists) {
+        String title = "Unknown";
+        String karat = "—";
+        
+        if (item != null) {
+            title = item.getTitle() != null ? item.getTitle() : "Unknown";
+        }
+        
+        ScannedItemDisplay display = new ScannedItemDisplay(
+            epc,
+            title,
+            karat,
+            1,
+            rssi
+        );
+        scannedItemsDisplayList.add(0, display);
+    }
+    
+    scannedItemsAdapter.notifyDataSetChanged();
+    
+    if (tvEmptyState != null && !scannedItemsDisplayList.isEmpty()) {
+        tvEmptyState.setVisibility(View.GONE);
+    }
+}
+
+    
 
     private static class ScannedItemDisplay {
         String epc;
