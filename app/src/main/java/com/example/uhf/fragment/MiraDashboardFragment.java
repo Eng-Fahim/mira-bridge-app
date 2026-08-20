@@ -459,113 +459,157 @@ private CardView createQuickActionCard(MiraQuickAccessSettings.QuickAction actio
     }
 
     private void fetchLiveGoldPrices() {
-        if (apiClient == null) return;
+    if (apiClient == null) return;
 
-        addDebug("🔄 جلب أسعار الذهب العالمية...");
+    addDebug("🔄 جلب أسعار الذهب من المزود النشط...");
 
-        executorService.execute(() -> {
-            try {
-                String provider = "metalprice";
-                String apiKey = "";
-
-                MiraApiClient.ApiResponse response = apiClient.fetchGoldPrice(provider, apiKey);
-
-                mainHandler.post(() -> {
-                    if (!isAdded()) return;
-
-                    if (response != null && response.isSuccess && response.data != null) {
-                        try {
-                            JSONObject data = response.data.optJSONObject("data");
-                            if (data == null) data = response.data;
-
-                            displayGoldPrices(data);
-                            addDebug("✅ تم تحديث أسعار الذهب");
-                        } catch (Exception e) {
-                            Log.e(TAG, "Error parsing gold prices", e);
-                            displayGoldPricesFromCache();
-                        }
-                    } else {
-                        addDebug("⚠️ فشل جلب الأسعار، استخدام الكاش");
-                        displayGoldPricesFromCache();
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Error fetching gold prices", e);
+    executorService.execute(() -> {
+        try {
+            // 1️⃣ جلب المزود النشط من السيرفر
+            List<ApiProvider> providers = apiClient.getActiveProviders();
+            
+            ApiProvider activeProvider = null;
+            
+            // البحث عن المزود النشط
+            for (ApiProvider provider : providers) {
+                if (provider.isActive() && !provider.getApiKey().isEmpty()) {
+                    activeProvider = provider;
+                    break;
+                }
+            }
+            
+            // إذا لم نجد مزود نشط بمفتاح، نستخدم أول مزود
+            if (activeProvider == null && !providers.isEmpty()) {
+                activeProvider = providers.get(0);
+            }
+            
+            if (activeProvider == null) {
                 mainHandler.post(() -> {
                     if (isAdded()) {
+                        addDebug("⚠️ لا يوجد مزود نشط");
                         displayGoldPricesFromCache();
                     }
                 });
+                return;
             }
-        });
-    }
+            
+            addDebug("📡 استخدام المزود: " + activeProvider.getProviderName());
+            
+            // 2️⃣ جلب الأسعار من المزود النشط
+            final ApiProvider finalProvider = activeProvider;
+            MiraApiClient.ApiResponse response = apiClient.fetchGoldPriceWithProvider(activeProvider.getId());
+            
+            mainHandler.post(() -> {
+                if (!isAdded()) return;
+                
+                if (response != null && response.isSuccess && response.data != null) {
+                    try {
+                        JSONObject data = response.data.optJSONObject("data");
+                        if (data == null) data = response.data;
+                        
+                        displayGoldPrices(data);
+                        addDebug("✅ تم تحديث أسعار الذهب من " + finalProvider.getProviderName());
+                        
+                        // حفظ المزود المستخدم في الكاش
+                        if (offlineCache != null) {
+                            offlineCache.edit()
+                                .putString("active_provider", finalProvider.getProviderName())
+                                .putString("active_provider_type", finalProvider.getProviderType())
+                                .apply();
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error parsing gold prices", e);
+                        displayGoldPricesFromCache();
+                    }
+                } else {
+                    addDebug("⚠️ فشل جلب الأسعار من " + finalProvider.getProviderName() + "، استخدام الكاش");
+                    displayGoldPricesFromCache();
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Error fetching gold prices", e);
+            mainHandler.post(() -> {
+                if (isAdded()) {
+                    displayGoldPricesFromCache();
+                }
+            });
+        }
+    });
+}
 
     private void displayGoldPrices(JSONObject data) {
-        try {
-            JSONObject prices = data.optJSONObject("prices");
-            if (prices == null) prices = data;
+    try {
+        JSONObject prices = data.optJSONObject("prices");
+        if (prices == null) prices = data;
 
-            double price24 = prices.optDouble("24k", 0);
-            double price21 = prices.optDouble("21k", 0);
-            double price18 = prices.optDouble("18k", 0);
-            double ouncePrice = data.optDouble("price_per_ounce",
-                    prices.optDouble("ounce_price", price24 * 31.1035));
-            String source = data.optString("source", "server");
+        double price24 = prices.optDouble("24k", 0);
+        double price21 = prices.optDouble("21k", 0);
+        double price18 = prices.optDouble("18k", 0);
+        double ouncePrice = data.optDouble("price_per_ounce",
+                prices.optDouble("ounce_price", price24 * 31.1035));
+        String source = data.optString("source", "server");
 
-            setGoldPrice(tvKarat24, "24K", price24);
-            setGoldPrice(tvKarat21, "21K", price21);
-            setGoldPrice(tvKarat18, "18K", price18);
+        setGoldPrice(tvKarat24, "24K", price24);
+        setGoldPrice(tvKarat21, "21K", price21);
+        setGoldPrice(tvKarat18, "18K", price18);
 
-            if (tvOuncePrice != null && ouncePrice > 0) {
-                tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", ouncePrice));
-            }
-
-            if (tvPriceSource != null) {
-                String sourceText = getSourceDisplayName(source);
-                tvPriceSource.setText("📡 " + sourceText);
-            }
-
-            if (tvLastUpdate != null) {
-                String time = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
-                tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
-            }
-
-            calculateTrend(price24);
-
-        } catch (Exception e) {
-            Log.e(TAG, "displayGoldPrices error", e);
+        if (tvOuncePrice != null && ouncePrice > 0) {
+            tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", ouncePrice));
         }
+
+        if (tvPriceSource != null) {
+            String sourceText = getSourceDisplayName(source);
+            tvPriceSource.setText("📡 " + sourceText);
+        }
+
+        if (tvLastUpdate != null) {
+            String time = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
+            tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
+        }
+
+        calculateTrend(price24);
+
+    } catch (Exception e) {
+        Log.e(TAG, "displayGoldPrices error", e);
     }
-
+}
     private void displayGoldPricesFromCache() {
-        try {
-            if (priceManager == null) return;
+    try {
+        if (priceManager == null) return;
 
-            double price24 = priceManager.getGoldPricePerGram(24);
-            double price21 = priceManager.getGoldPricePerGram(21);
-            double price18 = priceManager.getGoldPricePerGram(18);
+        double price24 = priceManager.getGoldPricePerGram(24);
+        double price21 = priceManager.getGoldPricePerGram(21);
+        double price18 = priceManager.getGoldPricePerGram(18);
 
-            setGoldPrice(tvKarat24, "24K", price24);
-            setGoldPrice(tvKarat21, "21K", price21);
-            setGoldPrice(tvKarat18, "18K", price18);
+        setGoldPrice(tvKarat24, "24K", price24);
+        setGoldPrice(tvKarat21, "21K", price21);
+        setGoldPrice(tvKarat18, "18K", price18);
 
-            if (tvOuncePrice != null && price24 > 0) {
-                double ouncePrice = price24 * 31.1035;
-                tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", ouncePrice));
-            }
+        if (tvOuncePrice != null && price24 > 0) {
+            double ouncePrice = price24 * 31.1035;
+            tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", ouncePrice));
+        }
 
-            if (tvPriceSource != null) {
+        if (tvPriceSource != null) {
+            // عرض المزود المحفوظ من الكاش
+            String cachedProvider = offlineCache != null ? 
+                offlineCache.getString("active_provider", "") : "";
+            
+            if (!cachedProvider.isEmpty()) {
+                tvPriceSource.setText("📡 " + cachedProvider + " (كاش)");
+            } else {
                 tvPriceSource.setText(isArabic ? "📡 كاش محلي" : "📡 Local cache");
             }
-
-            if (tvLastUpdate != null) {
-                tvLastUpdate.setText(isArabic ? "⏰ وضع أوفلاين" : "⏰ Offline mode");
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "displayGoldPricesFromCache error", e);
         }
+
+        if (tvLastUpdate != null) {
+            tvLastUpdate.setText(isArabic ? "⏰ وضع أوفلاين" : "⏰ Offline mode");
+        }
+
+    } catch (Exception e) {
+        Log.e(TAG, "displayGoldPricesFromCache error", e);
     }
+}
 
     private void calculateTrend(double currentPrice) {
         if (tvGoldTrend == null || tvGoldChange == null) return;
