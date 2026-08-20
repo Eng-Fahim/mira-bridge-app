@@ -20,6 +20,7 @@ import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.RFIDManager;
 import com.example.uhf.model.InventoryItem;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.manager.MiraBranchesManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -60,6 +61,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     
     // API
     private MiraApiClient apiClient;
+    private MiraBranchesManager branchesManager;
 
     @Nullable
     @Override
@@ -79,6 +81,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
 
         inventoryEngine = new MiraInventoryEngine(requireContext(), sessionId, deviceId);
         apiClient = MiraApiClient.getInstance(requireContext());
+        branchesManager = MiraBranchesManager.getInstance(requireContext());
         
         // ✅ تهيئة RFID
         rfidManager = RFIDManager.getInstance(requireContext());
@@ -120,11 +123,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             mainThreadHandler.post(this::updateUI);
         });
     }
-    
-    @Override
-    public void onTagRead(String epc, int rssi) {
-        onTagRead(epc, String.valueOf(rssi));
-    }
 
     @Override
     public void onScanStarted() {
@@ -165,7 +163,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
     
     private void loadCatalogAndStart() {
-        // ✅ عرض رسالة تحميل
         Toast.makeText(requireContext(), "🔄 جاري تحميل الكتالوج...", Toast.LENGTH_SHORT).show();
         
         new Thread(() -> {
@@ -190,12 +187,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         Map<String, InventoryItem> catalog = new ConcurrentHashMap<>();
         
         try {
-            if (apiClient == null) return catalog;
+            if (apiClient == null || branchesManager == null) return catalog;
             
-            // ✅ جلب العناصر من الفرع النشط
-            int branchId = com.example.uhf.manager.MiraBranchesManager
-                .getInstance(requireContext()).getActiveBranchId();
-            
+            int branchId = branchesManager.getActiveBranchId();
             MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(branchId);
             
             if (response != null && response.isSuccess && response.data != null) {
@@ -216,10 +210,14 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                         
                         String title = obj.optString("title", "Gold Item");
                         String karat = obj.optString("karat", "21K");
-                        double weight = obj.optDouble("weight", 0.0);
+                        String status = "✓";
                         
+                        // ✅ InventoryItem بـ 4 معلمات فقط
                         InventoryItem item = new InventoryItem(
-                            epc.toUpperCase(), title, karat, weight, "✓", ""
+                            epc.toUpperCase(),
+                            title,
+                            karat,
+                            status
                         );
                         catalog.put(epc.toUpperCase(), item);
                     }
@@ -348,4 +346,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             scannerExecutor.shutdown();
         }
     }
-}
+        }
