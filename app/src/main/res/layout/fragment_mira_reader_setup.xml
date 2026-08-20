@@ -135,6 +135,19 @@
     android:textColor="?attr/colorOnSecondary"
     app:backgroundTint="?attr/colorSecondary"
     app:cornerRadius="8dp" />
+    
+    
+    <!-- بعد زر الإعدادات المتقدمة -->
+<com.google.android.material.button.MaterialButton
+    android:id="@+id/btnApplySettings"
+    android:layout_width="match_parent"
+    android:layout_height="42dp"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginBottom="8dp"
+    android:text="🔄 تطبيق الإعدادات الآن"
+    android:textColor="?attr/colorOnTertiary"
+    app:backgroundTint="?attr/colorTertiary"
+    app:cornerRadius="8dp" />
 
     <TextView
         android:layout_width="match_parent"
