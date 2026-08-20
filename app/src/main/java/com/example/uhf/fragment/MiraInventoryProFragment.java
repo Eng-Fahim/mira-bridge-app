@@ -199,6 +199,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         tvDeltaItems = v.findViewById(R.id.tvDeltaItems);
         tvTotalValue = v.findViewById(R.id.tvTotalValue);
         tvTotalWeight = v.findViewById(R.id.tvTotalWeight);
+        tvEmptyState = v.findViewById(R.id.tvEmptyState);
+
         cardComparison = v.findViewById(R.id.cardComparison);
         btnStartInventory = v.findViewById(R.id.btnStartInventory);
         btnBlindInventory = v.findViewById(R.id.btnBlindInventory);
@@ -208,6 +210,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         rvInventoryItems = v.findViewById(R.id.rvInventoryItems);
         progressScanned = v.findViewById(R.id.progressScanned);
         progressRssi = v.findViewById(R.id.progressRssi);
+        
         applyLanguage();
     }
 
