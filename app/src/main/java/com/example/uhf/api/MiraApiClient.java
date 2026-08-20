@@ -507,7 +507,12 @@ public ApiResponse activateProvider(int providerId) {
     }
 
     public ApiResponse closeInventorySession(JSONObject payload) {
-        return post("/inventory/close-session", payload);
+    return postWithAuth("/inventory/close-session", payload);
+    }
+    public ApiResponse compareInventorySessions(int sessionId1, int sessionId2) {
+    String endpoint = "/inventory/compare-sessions?session_id_1=" + sessionId1 + 
+                      "&session_id_2=" + sessionId2;
+    return getWithAuth(endpoint);
     }
 
     public ApiResponse createInventorySnapshot(JSONObject payload) {
@@ -1108,4 +1113,4 @@ public void submitInventoryAuditReport(JSONObject payload) {
             return null;
         }
     }
-}
+            }
