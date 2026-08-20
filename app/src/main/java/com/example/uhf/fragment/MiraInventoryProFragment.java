@@ -30,17 +30,38 @@ import com.example.uhf.manager.MiraBranchesManager;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.lang.ref.WeakReference;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class MiraInventoryProFragment extends KeyDwonFragment 
         implements MiraIRFIDReader.OnTagReadListener {
 
     private static final String TAG = "MiraInventoryPro";
-
+    
+    // Constants for better readability and maintainability
+    private static final long UI_UPDATE_THROTTLE_MS = 200;
+    private static final long SIMULATION_INITIAL_DELAY_MS = 500;
+    private static final long SIMULATION_MIN_DELAY_MS = 150;
+    private static final long SIMULATION_MAX_ADDITIONAL_DELAY_MS = 350;
+    private static final long BEEP_THROTTLE_MS = 60;
+    private static final int EXECUTOR_SHUTDOWN_TIMEOUT_MS = 500;
+    private static final int MAX_SOUND_STREAMS = 5;
+    private static final float BEEP_VOLUME = 0.7f;
+    private static final float BEEP_RATE = 1.0f;
+    private static final int BEEP_PRIORITY = 0;
+    private static final int BEEP_LOOP = 0;
+    
+    // Hardware key codes for RFID trigger
+    private static final int KEYCODE_RFID_TRIGGER_1 = 139;
+    private static final int KEYCODE_RFID_TRIGGER_2 = 280;
+    private static final int KEYCODE_RFID_TRIGGER_3 = 293;
+    
+    // UI Components
     private TextView tvExpectedCount;
     private TextView tvScannedCount;
     private TextView tvProgressPercent;
@@ -51,8 +72,11 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private Button btnCommitInventory;
 
     private MiraInventoryEngine inventoryEngine;
-    private ExecutorService backgroundExecutor;
-    private Handler mainThreadHandler;
+    
+    // Use single-thread executor for sequential tag processing
+    private final ExecutorService backgroundExecutor = Executors.newSingleThreadExecutor();
+    
+    private final Handler mainThreadHandler = new Handler(Looper.getMainLooper());
     private volatile boolean isScanning = false;
     
     private RFIDManager rfidManager;
@@ -64,13 +88,23 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private long lastBeepTime = 0;
 
     // Simulation Controls
-    private Handler simulationHandler;
+    private final Handler simulationHandler = new Handler(Looper.getMainLooper());
     private Runnable simulationRunnable;
     private int simulationIndex = 0;
     private final String[] simulationTags = {
         "A000001", "A000002", "A000003", "A000004", "A000005",
         "A000006", "A000007", "A000008", "A000009", "A000010"
     };
+    
+    // UI-update throttling
+    private final Runnable uiUpdateRunnable = new Runnable() {
+        @Override
+        public void run() {
+            pendingUiUpdate = false;
+            updateUI();
+        }
+    };
+    private volatile boolean pendingUiUpdate = false;
     
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
@@ -82,10 +116,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         
         initSoundPool();
         initViews(view);
-
-        backgroundExecutor = Executors.newFixedThreadPool(2);
-        mainThreadHandler = new Handler(Looper.getMainLooper());
-        simulationHandler = new Handler(Looper.getMainLooper());
 
         String sessionId = "SESS-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         String deviceId = android.provider.Settings.Secure.getString(
@@ -108,22 +138,30 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build();
+                
         soundPool = new SoundPool.Builder()
-                .setMaxStreams(5)
+                .setMaxStreams(MAX_SOUND_STREAMS)
                 .setAudioAttributes(attributes)
                 .build();
 
-        // تأكد من وجود صوت beep.ogg داخل مجلد res/raw
         beepSoundId = soundPool.load(requireContext(), R.raw.beep, 1);
-        soundPool.setOnLoadCompleteListener((sp, sampleId, status) -> soundLoaded = (status == 0));
+        soundPool.setOnLoadCompleteListener((sp, sampleId, status) -> {
+            soundLoaded = (status == 0);
+            if (!soundLoaded) {
+                Log.w(TAG, "Failed to load beep sound, status: " + status);
+            }
+        });
     }
 
     private void playScanBeep() {
-        // خفض معدل تكرار الصوت لتجنب البطء عند المسح السريع جداً
         long now = System.currentTimeMillis();
-        if (soundLoaded && (now - lastBeepTime > 60)) { 
-            soundPool.play(beepSoundId, 0.7f, 0.7f, 0, 0, 1.0f);
-            lastBeepTime = now;
+        if (soundLoaded && (now - lastBeepTime > BEEP_THROTTLE_MS)) { 
+            try {
+                soundPool.play(beepSoundId, BEEP_VOLUME, BEEP_VOLUME, BEEP_PRIORITY, BEEP_LOOP, BEEP_RATE);
+                lastBeepTime = now;
+            } catch (Exception e) {
+                Log.e(TAG, "Error playing beep sound", e);
+            }
         }
     }
 
@@ -153,7 +191,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     // ==================== HARDWARE KEY TRIGGER ====================
 
     public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
-        if (keyCode == 139 || keyCode == 280 || keyCode == 293) {
+        if (keyCode == KEYCODE_RFID_TRIGGER_1 || keyCode == KEYCODE_RFID_TRIGGER_2 || keyCode == KEYCODE_RFID_TRIGGER_3) {
             if (event.getRepeatCount() == 0) {
                 if (!isScanning) {
                     startScanning();
@@ -170,32 +208,58 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     
     @Override
     public void onTagRead(String epc, int rssi) {
-        if (!isScanning || epc == null) return;
+        if (!isScanning || epc == null || epc.isEmpty()) return;
 
+        // Normalize EPC once before processing
+        final String normalizedEpc = epc.trim().toUpperCase();
+        
         backgroundExecutor.execute(() -> {
-            boolean isNew = inventoryEngine.onTagScanned(epc, rssi);
-            if (isNew) {
-                mainThreadHandler.post(() -> {
-                    playScanBeep();
-                    updateUI();
-                });
+            try {
+                inventoryEngine.onTagScanned(normalizedEpc, rssi);
+                scheduleUiUpdate();
+            } catch (Exception e) {
+                Log.e(TAG, "Error processing tag: " + normalizedEpc, e);
             }
         });
     }
+    
+    private void scheduleUiUpdate() {
+        // Schedule only one pending main-thread update to reduce UI churn
+        if (!pendingUiUpdate) {
+            pendingUiUpdate = true;
+            mainThreadHandler.postDelayed(uiUpdateRunnable, UI_UPDATE_THROTTLE_MS);
+        }
+    }
 
     @Override
-    public void onScanStarted() { Log.d(TAG, "📡 RFID Scan Started"); }
+    public void onScanStarted() { 
+        Log.d(TAG, "RFID Scan Started"); 
+    }
+    
     @Override
-    public void onScanStopped() { Log.d(TAG, "📡 RFID Scan Stopped"); }
+    public void onScanStopped() { 
+        Log.d(TAG, "RFID Scan Stopped"); 
+    }
+    
     @Override
-    public void onError(String errorMessage) { Log.e(TAG, "RFID Error: " + errorMessage); }
+    public void onError(String errorMessage) { 
+        Log.e(TAG, "RFID Error: " + errorMessage); 
+        if (isAdded()) {
+            mainThreadHandler.post(() -> {
+                Toast.makeText(requireContext(), "خطأ في قارئ RFID: " + errorMessage, Toast.LENGTH_SHORT).show();
+            });
+        }
+    }
+    
     @Override
-    public void onConnectionChanged(boolean isConnected) { Log.i(TAG, "RFID Connection: " + isConnected); }
+    public void onConnectionChanged(boolean isConnected) { 
+        Log.i(TAG, "RFID Connection: " + isConnected); 
+    }
 
     // ==================== UI & PROGRESS UPDATE ====================
     
     private void updateUI() {
-        if (!isAdded()) return;
+        if (!isAdded() || inventoryEngine == null) return;
         
         int scanned = inventoryEngine.getUniqueCount();
         int expected = inventoryEngine.getExpectedCount();
@@ -212,10 +276,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 tvProgressPercent.setText(progress + "%");
             }
 
-            // التحقق من اكتمال الجرد بنسبة 100%
+            // Check if inventory is complete
             if (scanned >= expected && isScanning) {
                 stopScanning();
-                Toast.makeText(requireContext(), "🎉 اكتمل جرد جميع المواد المتوقعة!", Toast.LENGTH_LONG).show();
+                if (isAdded()) {
+                    Toast.makeText(requireContext(), "🎉 اكتمل جرد جميع المواد المتوقعة!", Toast.LENGTH_LONG).show();
+                }
             }
         }
     }
@@ -229,6 +295,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
     
     private void loadCatalogAndStart() {
+        if (!isAdded()) return;
+        
         Toast.makeText(requireContext(), "🔄 جاري تحميل البيانات...", Toast.LENGTH_SHORT).show();
         
         backgroundExecutor.execute(() -> {
@@ -236,6 +304,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             
             mainThreadHandler.post(() -> {
                 if (!isAdded()) return;
+                
                 inventoryEngine.startSession(catalog);
                 
                 int expectedSize = catalog != null ? catalog.size() : 0;
@@ -247,6 +316,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                     progressBarInventory.setMax(100);
                     progressBarInventory.setProgress(0);
                 }
+                
+                if (tvProgressPercent != null) {
+                    tvProgressPercent.setText("0%");
+                }
 
                 startReadingSource();
             });
@@ -255,17 +328,24 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     
     private Map<String, InventoryItem> fetchCatalogFromServer() {
         Map<String, InventoryItem> catalog = new ConcurrentHashMap<>();
+        
         try {
-            if (apiClient == null || branchesManager == null) return catalog;
+            if (apiClient == null || branchesManager == null) {
+                Log.w(TAG, "API client or branches manager is null");
+                return catalog;
+            }
             
             int branchId = branchesManager.getActiveBranchId();
             MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(branchId);
             
             if (response != null && response.isSuccess && response.data != null) {
                 JSONArray items = response.data.optJSONArray("items");
+                
                 if (items == null) {
                     JSONObject dataObj = response.data.optJSONObject("data");
-                    if (dataObj != null) items = dataObj.optJSONArray("items");
+                    if (dataObj != null) {
+                        items = dataObj.optJSONArray("items");
+                    }
                 }
                 
                 if (items != null) {
@@ -273,23 +353,36 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                         JSONObject obj = items.getJSONObject(i);
                         String epc = obj.optString("gtin13", 
                             obj.optString("serial_number", 
-                            obj.optString("epc", "")));
+                            obj.optString("epc", ""))).trim();
                         
-                        if (epc.isEmpty()) continue;
+                        if (epc.isEmpty()) {
+                            Log.w(TAG, "Empty EPC found in item at index: " + i);
+                            continue;
+                        }
+                        
+                        String title = obj.optString("title", "Gold Item");
+                        String karat = obj.optString("karat", "21K");
                         
                         InventoryItem item = new InventoryItem(
                             epc.toUpperCase(),
-                            obj.optString("title", "Item"),
-                            obj.optString("karat", "21K"),
+                            title,
+                            karat,
                             "✓"
                         );
                         catalog.put(epc.toUpperCase(), item);
                     }
+                } else {
+                    Log.w(TAG, "No items array found in response");
                 }
+            } else {
+                Log.w(TAG, "Failed to fetch catalog: " + 
+                    (response != null ? response.message : "No response"));
             }
         } catch (Exception e) {
-            Log.e(TAG, "Catalog error: " + e.getMessage());
+            Log.e(TAG, "Error fetching catalog from server", e);
         }
+        
+        Log.d(TAG, "Catalog loaded: " + catalog.size() + " items");
         return catalog;
     }
     
@@ -298,18 +391,29 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         
         if (rfidManager != null) {
             try {
-                MiraIRFIDReader.ReaderType deviceType = rfidManager.getActiveDevice().getType();
-                if (deviceType != MiraIRFIDReader.ReaderType.SIMULATOR) {
-                    hardwareStarted = rfidManager.startScan();
+                if (rfidManager.getActiveDevice() != null) {
+                    MiraIRFIDReader.ReaderType deviceType = rfidManager.getActiveDevice().getType();
+                    
+                    if (deviceType != MiraIRFIDReader.ReaderType.SIMULATOR) {
+                        hardwareStarted = rfidManager.startScan();
+                    }
+                } else {
+                    Log.w(TAG, "Active device is null, falling back to simulation");
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Hardware start error: " + e.getMessage());
+                Log.e(TAG, "Error starting hardware scanner", e);
             }
         }
         
         if (!hardwareStarted) {
             startSimulationLoop();
-            Toast.makeText(requireContext(), "🎯 بدء وضع المحاكاة", Toast.LENGTH_SHORT).show();
+            if (isAdded()) {
+                Toast.makeText(requireContext(), "🎯 بدء وضع المحاكاة", Toast.LENGTH_SHORT).show();
+            }
+        } else {
+            if (isAdded()) {
+                Toast.makeText(requireContext(), "📡 بدء الجرد الفعلي", Toast.LENGTH_SHORT).show();
+            }
         }
         
         if (btnStartInventory != null) btnStartInventory.setEnabled(false);
@@ -324,29 +428,50 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         isScanning = false;
         stopSimulationLoop();
         
-        if (rfidManager != null) rfidManager.stopScan();
+        if (rfidManager != null) {
+            try {
+                rfidManager.stopScan();
+            } catch (Exception e) {
+                Log.e(TAG, "Error stopping RFID scanner", e);
+            }
+        }
         
         backgroundExecutor.execute(() -> {
-            inventoryEngine.processSessionClose();
-            mainThreadHandler.post(() -> {
-                if (!isAdded()) return;
-                Toast.makeText(requireContext(), "🛑 تم إيقاف المسح", Toast.LENGTH_SHORT).show();
-                
-                if (btnStartInventory != null) btnStartInventory.setEnabled(true);
-                if (btnStopInventory != null) btnStopInventory.setEnabled(false);
-                if (btnCommitInventory != null) btnCommitInventory.setEnabled(true);
-            });
+            try {
+                inventoryEngine.processSessionClose();
+                mainThreadHandler.post(() -> {
+                    if (!isAdded()) return;
+                    
+                    Toast.makeText(requireContext(), "🛑 تم إيقاف المسح", Toast.LENGTH_SHORT).show();
+                    
+                    if (btnStartInventory != null) btnStartInventory.setEnabled(true);
+                    if (btnStopInventory != null) btnStopInventory.setEnabled(false);
+                    if (btnCommitInventory != null) btnCommitInventory.setEnabled(true);
+                    
+                    // Update final UI
+                    updateUI();
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error processing session close", e);
+                mainThreadHandler.post(() -> {
+                    if (isAdded()) {
+                        Toast.makeText(requireContext(), "❌ خطأ في إيقاف الجرد", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
         });
     }
 
     // ==================== COMMIT & UPLOAD TO DATABASE ====================
 
     private void showCommitConfirmationDialog() {
+        if (!isAdded() || inventoryEngine == null) return;
+        
         int scanned = inventoryEngine.getUniqueCount();
         int expected = inventoryEngine.getExpectedCount();
         int missing = Math.max(0, expected - scanned);
 
-        String message = String.format("📊 ملخص عمليات الجرد:\n\n• المتوقع: %d\n• المنسوح: %d\n• المفقود: %d\n\nهل تريد اعتماد العملية وإرسالها لقاعدة البيانات؟",
+        String message = String.format("📊 ملخص عمليات الجرد:\n\n• المتوقع: %d\n• الممسوح: %d\n• المفقود: %d\n\nهل تريد اعتماد العملية وإرسالها لقاعدة البيانات؟",
                 expected, scanned, missing);
 
         new AlertDialog.Builder(requireContext())
@@ -358,24 +483,34 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
 
     private void commitInventoryToServer() {
+        if (!isAdded()) return;
+        
         Toast.makeText(requireContext(), "⏳ جاري إرسال البيانات للأنظمة...", Toast.LENGTH_SHORT).show();
         
         backgroundExecutor.execute(() -> {
             try {
-                // إرسال الحزمة للسيرفر عبر ApiClient
                 JSONObject payload = inventoryEngine.getExportPayload();
                 MiraApiClient.ApiResponse response = apiClient.submitInventorySession(payload);
                 
                 mainThreadHandler.post(() -> {
+                    if (!isAdded()) return;
+                    
                     if (response != null && response.isSuccess) {
                         Toast.makeText(requireContext(), "✅ تم اعتماد الجرد بنجاح في قاعدة البيانات", Toast.LENGTH_LONG).show();
                         if (btnCommitInventory != null) btnCommitInventory.setEnabled(false);
                     } else {
-                        Toast.makeText(requireContext(), "❌ فشل الإرسال: " + (response != null ? response.message : "خطأ شبكة"), Toast.LENGTH_LONG).show();
+                        String errorMsg = response != null ? response.message : "خطأ شبكة";
+                        Toast.makeText(requireContext(), "❌ فشل الإرسال: " + errorMsg, Toast.LENGTH_LONG).show();
+                        Log.e(TAG, "Failed to commit inventory: " + errorMsg);
                     }
                 });
             } catch (Exception e) {
-                Log.e(TAG, "Commit error: " + e.getMessage());
+                Log.e(TAG, "Error committing inventory to server", e);
+                mainThreadHandler.post(() -> {
+                    if (isAdded()) {
+                        Toast.makeText(requireContext(), "❌ خطأ في إرسال البيانات", Toast.LENGTH_LONG).show();
+                    }
+                });
             }
         });
     }
@@ -390,22 +525,23 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             public void run() {
                 if (!isScanning) return;
                 
-                if (simulationIndex < simulationTags.length) {
-                    String epc = simulationTags[simulationIndex];
-                    int rssi = -40 - (int)(Math.random() * 40);
-                    
-                    onTagRead(epc, rssi);
-                    
-                    simulationIndex++;
-                    long delay = 250 + (long)(Math.random() * 250);
+                // Use modulo for continuous simulation
+                String epc = simulationTags[simulationIndex % simulationTags.length];
+                int rssi = -40 - (int)(Math.random() * 40);
+                
+                onTagRead(epc, rssi);
+                
+                simulationIndex++;
+                long delay = SIMULATION_MIN_DELAY_MS + 
+                    (long)(Math.random() * SIMULATION_MAX_ADDITIONAL_DELAY_MS);
+                
+                if (isScanning) {
                     simulationHandler.postDelayed(this, delay);
-                } else {
-                    stopScanning();
                 }
             }
         };
         
-        simulationHandler.postDelayed(simulationRunnable, 500);
+        simulationHandler.postDelayed(simulationRunnable, SIMULATION_INITIAL_DELAY_MS);
     }
 
     private void stopSimulationLoop() {
@@ -419,16 +555,25 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        
         isScanning = false;
         stopSimulationLoop();
         
         if (rfidManager != null) {
-            rfidManager.stopScan();
+            try {
+                rfidManager.stopScan();
+            } catch (Exception e) {
+                Log.e(TAG, "Error stopping scanner on destroy", e);
+            }
             rfidManager.setListener(null);
         }
         
         if (soundPool != null) {
-            soundPool.release();
+            try {
+                soundPool.release();
+            } catch (Exception e) {
+                Log.e(TAG, "Error releasing sound pool", e);
+            }
             soundPool = null;
         }
         
@@ -436,8 +581,31 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             simulationHandler.removeCallbacksAndMessages(null);
         }
         
+        if (mainThreadHandler != null) {
+            mainThreadHandler.removeCallbacksAndMessages(null);
+        }
+        
+        // Shutdown background executor gracefully
         if (backgroundExecutor != null && !backgroundExecutor.isShutdown()) {
             backgroundExecutor.shutdown();
+            try {
+                if (!backgroundExecutor.awaitTermination(EXECUTOR_SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                    backgroundExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                Log.w(TAG, "Executor termination interrupted", e);
+                backgroundExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+    
+    @Override
+    public void onPause() {
+        super.onPause();
+        // Optional: Stop scanning when fragment is paused
+        if (isScanning) {
+            stopScanning();
         }
     }
 }
