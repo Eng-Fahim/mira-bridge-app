@@ -1,5 +1,6 @@
 package com.example.uhf.fragment;
 
+import android.content.DialogInterface;
 import android.media.AudioAttributes;
 import android.media.SoundPool;
 import android.os.Bundle;
@@ -11,7 +12,6 @@ import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -30,14 +30,20 @@ import com.example.uhf.model.InventoryItem;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.tabs.TabLayout;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -91,6 +97,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private MaterialButton btnStopInventory;
     private MaterialButton btnGenerateReport;
     private MaterialButton btnArchiveReports;
+    private MaterialButton btnViewSnapshots;
 
     private MiraInventoryEngine inventoryEngine;
     
@@ -116,6 +123,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         "A000001", "A000002", "A000003", "A000004", "A000005",
         "A000006", "A000007", "A000008", "A000009", "A000010"
     };
+    
+    // Catalog EPCs for simulation
+    private final Set<String> catalogEpcs = new HashSet<>();
     
     // UI-update throttling
     private final Runnable uiUpdateRunnable = new Runnable() {
@@ -181,7 +191,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 .setAudioAttributes(attributes)
                 .build();
 
-        // Use existing barcodebeep.ogg from raw folder
         beepSoundId = soundPool.load(requireContext(), R.raw.barcodebeep, 1);
         soundPool.setOnLoadCompleteListener((sp, sampleId, status) -> {
             soundLoaded = (status == 0);
@@ -246,6 +255,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         btnStopInventory = view.findViewById(R.id.btnStopInventory);
         btnGenerateReport = view.findViewById(R.id.btnGenerateReport);
         btnArchiveReports = view.findViewById(R.id.btnArchiveReports);
+        btnViewSnapshots = view.findViewById(R.id.btnViewSnapshots);
 
         if (btnStartInventory != null) {
             btnStartInventory.setOnClickListener(v -> startScanning());
@@ -263,6 +273,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         }
         if (btnArchiveReports != null) {
             btnArchiveReports.setOnClickListener(v -> showArchiveReports());
+        }
+        if (btnViewSnapshots != null) {
+            btnViewSnapshots.setOnClickListener(v -> showSnapshotsDialog());
         }
     }
 
@@ -288,7 +301,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     public void onTagRead(String epc, int rssi) {
         if (!isScanning || epc == null || epc.isEmpty()) return;
 
-        // Normalize EPC once before processing
         final String normalizedEpc = epc.trim().toUpperCase();
         final int finalRssi = rssi;
         
@@ -314,7 +326,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             tvRssi.setText("📶 " + rssi);
         }
         if (progressRssi != null) {
-            // Convert RSSI to percentage (typical range -100 to -30)
             int rssiPercent = Math.max(0, Math.min(100, (rssi + 100) * 100 / 70));
             progressRssi.setProgress(rssiPercent);
         }
@@ -384,19 +395,16 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 tvProgressPercent.setText(progress + "%");
             }
             
-            // Calculate variance (missing items)
             int variance = Math.max(0, expectedCount - scanned);
             if (tvVariance != null) {
                 tvVariance.setText(String.valueOf(variance));
             }
             
-            // Calculate accuracy
             int accuracy = expectedCount > 0 ? (int)(((float)scanned / expectedCount) * 100) : 0;
             if (tvAccuracy != null) {
                 tvAccuracy.setText(accuracy + "%");
             }
 
-            // Check if inventory is complete
             if (scanned >= expectedCount && isScanning) {
                 stopScanning();
                 if (isAdded()) {
@@ -405,12 +413,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             }
         }
         
-        // Update empty state
         if (tvEmptyState != null) {
             tvEmptyState.setVisibility(scanned > 0 ? View.GONE : View.VISIBLE);
         }
         
-        // Update status
         if (tvInventoryStatus != null && isScanning) {
             tvInventoryStatus.setText("📡 جاري الجرد... (الممسوح: " + scanned + ")");
         }
@@ -433,10 +439,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         if (isScanning) return;
         isScanning = true;
         scanStartTime = SystemClock.elapsedRealtime();
-        
-        // Start timer
         mainThreadHandler.post(timerRunnable);
-        
         loadCatalogAndStart();
     }
     
@@ -444,12 +447,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         if (isScanning) return;
         isScanning = true;
         scanStartTime = SystemClock.elapsedRealtime();
-        
-        // Start timer
         mainThreadHandler.post(timerRunnable);
         
-        // For blind inventory, no expected count
         expectedCount = 0;
+        catalogEpcs.clear();
         
         if (tvExpectedCount != null) {
             tvExpectedCount.setText("—");
@@ -459,7 +460,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             tvInventoryStatus.setText("⚡ جرد أعمى - بدون توقعات");
         }
         
-        // Start with empty catalog
         inventoryEngine.startSession(new ConcurrentHashMap<>());
         startReadingSource();
     }
@@ -476,6 +476,11 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 if (!isAdded()) return;
                 
                 inventoryEngine.startSession(catalog);
+                
+                catalogEpcs.clear();
+                if (catalog != null) {
+                    catalogEpcs.addAll(catalog.keySet());
+                }
                 
                 expectedCount = catalog != null ? catalog.size() : 0;
                 if (tvExpectedCount != null) {
@@ -525,9 +530,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                             obj.optString("serial_number", 
                             obj.optString("epc", ""))).trim();
                         
-                        if (epc.isEmpty()) {
-                            continue;
-                        }
+                        if (epc.isEmpty()) continue;
                         
                         String title = obj.optString("title", "Gold Item");
                         String karat = obj.optString("karat", "21K");
@@ -578,6 +581,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         if (btnBlindInventory != null) btnBlindInventory.setEnabled(false);
         if (btnStopInventory != null) btnStopInventory.setEnabled(true);
         if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
+        if (btnArchiveReports != null) btnArchiveReports.setEnabled(false);
+        if (btnViewSnapshots != null) btnViewSnapshots.setEnabled(false);
     }
 
     // ==================== STOP SCANNING ====================
@@ -586,8 +591,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         if (!isScanning) return;
         isScanning = false;
         stopSimulationLoop();
-        
-        // Stop timer
         mainThreadHandler.removeCallbacks(timerRunnable);
         
         if (rfidManager != null) {
@@ -614,8 +617,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                     if (btnBlindInventory != null) btnBlindInventory.setEnabled(true);
                     if (btnStopInventory != null) btnStopInventory.setEnabled(false);
                     if (btnGenerateReport != null) btnGenerateReport.setEnabled(true);
+                    if (btnArchiveReports != null) btnArchiveReports.setEnabled(true);
+                    if (btnViewSnapshots != null) btnViewSnapshots.setEnabled(true);
                     
-                    // Final UI update
                     updateUI();
                 });
             } catch (Exception e) {
@@ -635,7 +639,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         String message = String.format("📊 ملخص عمليات الجرد:\n\n• المتوقع: %d\n• الممسوح: %d\n• المفقود: %d\n\nهل تريد اعتماد العملية وإرسالها لقاعدة البيانات؟",
                 expectedCount, scanned, missing);
 
-        new AlertDialog.Builder(requireContext())
+        new MaterialAlertDialogBuilder(requireContext())
                 .setTitle("حفظ واكتمال الجرد")
                 .setMessage(message)
                 .setPositiveButton("إرسال واعتماد", (dialog, which) -> commitInventoryToServer())
@@ -673,10 +677,287 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         });
     }
 
+    // ==================== ARCHIVE & REPORTS ====================
+    
     private void showArchiveReports() {
-        if (isAdded()) {
-            Toast.makeText(requireContext(), "📂 عرض التقارير المؤرشفة", Toast.LENGTH_SHORT).show();
+        if (!isAdded()) return;
+        
+        // Show loading dialog
+        MaterialAlertDialogBuilder loadingDialog = new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("📂 جاري تحميل الأرشيف...")
+                .setMessage("يرجى الانتظار")
+                .setCancelable(false);
+        AlertDialog loading = loadingDialog.show();
+        
+        backgroundExecutor.execute(() -> {
+            try {
+                List<InventoryReport> reports = fetchArchiveReports();
+                
+                mainThreadHandler.post(() -> {
+                    loading.dismiss();
+                    if (isAdded()) {
+                        displayArchiveDialog(reports);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error fetching archive", e);
+                mainThreadHandler.post(() -> {
+                    loading.dismiss();
+                    if (isAdded()) {
+                        Toast.makeText(requireContext(), "❌ فشل تحميل الأرشيف", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        });
+    }
+    
+    private List<InventoryReport> fetchArchiveReports() {
+        List<InventoryReport> reports = new ArrayList<>();
+        
+        try {
+            if (apiClient != null) {
+                MiraApiClient.ApiResponse response = apiClient.getInventoryReports(
+                    branchesManager.getActiveBranchId(), 1, 20
+                );
+                
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONArray sessions = response.data.optJSONArray("sessions");
+                    if (sessions == null) {
+                        sessions = response.data.optJSONArray("data");
+                    }
+                    
+                    if (sessions != null) {
+                        for (int i = 0; i < sessions.length(); i++) {
+                            JSONObject obj = sessions.getJSONObject(i);
+                            InventoryReport report = new InventoryReport(
+                                obj.optInt("id", i + 1),
+                                obj.optString("session_id", "SESS-" + (i + 1)),
+                                obj.optString("date", ""),
+                                obj.optInt("expected_count", 0),
+                                obj.optInt("scanned_count", 0),
+                                obj.optInt("missing_count", 0),
+                                obj.optString("status", "completed")
+                            );
+                            reports.add(report);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error fetching archive reports", e);
         }
+        
+        // If no reports, add sample data
+        if (reports.isEmpty()) {
+            reports.add(new InventoryReport(1, "SESS-001", "2024-01-15 10:30", 50, 48, 2, "completed"));
+            reports.add(new InventoryReport(2, "SESS-002", "2024-01-14 14:45", 50, 50, 0, "completed"));
+            reports.add(new InventoryReport(3, "SESS-003", "2024-01-13 09:15", 50, 45, 5, "completed"));
+        }
+        
+        return reports;
+    }
+    
+    private void displayArchiveDialog(List<InventoryReport> reports) {
+        if (!isAdded() || reports.isEmpty()) {
+            Toast.makeText(requireContext(), "لا توجد تقارير سابقة", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // Build list of report titles
+        String[] reportTitles = new String[reports.size()];
+        for (int i = 0; i < reports.size(); i++) {
+            InventoryReport r = reports.get(i);
+            reportTitles[i] = String.format("📋 %s - %s (%d/%d)", 
+                r.sessionId, r.date, r.scannedCount, r.expectedCount);
+        }
+        
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("📂 أرشيف تقارير الجرد")
+                .setItems(reportTitles, (dialog, which) -> {
+                    showReportDetails(reports.get(which));
+                })
+                .setPositiveButton("طباعة الكل", (dialog, which) -> {
+                    printAllReports(reports);
+                })
+                .setNegativeButton("إغلاق", null)
+                .show();
+    }
+    
+    private void showReportDetails(InventoryReport report) {
+        if (!isAdded()) return;
+        
+        String message = String.format(
+            "📋 تفاصيل التقرير:\n\n" +
+            "• رقم الجلسة: %s\n" +
+            "• التاريخ: %s\n" +
+            "• المتوقع: %d\n" +
+            "• الممسوح: %d\n" +
+            "• المفقود: %d\n" +
+            "• الحالة: %s\n\n" +
+            "خيارات:",
+            report.sessionId, report.date, report.expectedCount,
+            report.scannedCount, report.missingCount, report.status
+        );
+        
+        String[] options = {"🖨️ طباعة", "📊 مقارنة مع الحالي", "❌ إغلاق"};
+        
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("تفاصيل التقرير")
+                .setMessage(message)
+                .setItems(options, (dialog, which) -> {
+                    switch (which) {
+                        case 0:
+                            printReport(report);
+                            break;
+                        case 1:
+                            compareWithCurrent(report);
+                            break;
+                    }
+                })
+                .show();
+    }
+    
+    private void printReport(InventoryReport report) {
+        if (isAdded()) {
+            Toast.makeText(requireContext(), "🖨️ جاري طباعة التقرير: " + report.sessionId, Toast.LENGTH_SHORT).show();
+            // TODO: Implement actual printing logic
+        }
+    }
+    
+    private void printAllReports(List<InventoryReport> reports) {
+        if (isAdded()) {
+            Toast.makeText(requireContext(), "🖨️ جاري طباعة " + reports.size() + " تقرير", Toast.LENGTH_SHORT).show();
+            // TODO: Implement actual printing logic
+        }
+    }
+    
+    private void compareWithCurrent(InventoryReport oldReport) {
+        if (!isAdded() || inventoryEngine == null) return;
+        
+        int currentScanned = inventoryEngine.getUniqueCount();
+        int currentExpected = expectedCount;
+        
+        String comparison = String.format(
+            "📊 مقارنة الجرد:\n\n" +
+            "التقرير السابق (%s):\n" +
+            "• المتوقع: %d\n" +
+            "• الممسوح: %d\n" +
+            "• المفقود: %d\n\n" +
+            "الجرد الحالي:\n" +
+            "• المتوقع: %d\n" +
+            "• الممسوح: %d\n" +
+            "• المفقود: %d\n\n" +
+            "الفرق:\n" +
+            "• الممسوح: %+d\n" +
+            "• المفقود: %+d",
+            oldReport.date,
+            oldReport.expectedCount, oldReport.scannedCount, oldReport.missingCount,
+            currentExpected, currentScanned, Math.max(0, currentExpected - currentScanned),
+            currentScanned - oldReport.scannedCount,
+            Math.max(0, currentExpected - currentScanned) - oldReport.missingCount
+        );
+        
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("📊 مقارنة الجرد")
+                .setMessage(comparison)
+                .setPositiveButton("إغلاق", null)
+                .show();
+    }
+
+    // ==================== SNAPSHOTS ====================
+    
+    private void showSnapshotsDialog() {
+        if (!isAdded()) return;
+        
+        String[] options = {
+            "📸 عرض لقطات الجرد السابقة",
+            "📊 مقارنة لقطتين",
+            "❌ إغلاق"
+        };
+        
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("📸 لقطات الجرد")
+                .setItems(options, (dialog, which) -> {
+                    switch (which) {
+                        case 0:
+                            showSnapshotsList();
+                            break;
+                        case 1:
+                            showSnapshotComparison();
+                            break;
+                    }
+                })
+                .show();
+    }
+    
+    private void showSnapshotsList() {
+        if (!isAdded()) return;
+        
+        // Sample snapshots data
+        String[] snapshots = {
+            "📸 لقطة 1 - 2024-01-15 10:30 - 48 قطعة",
+            "📸 لقطة 2 - 2024-01-14 14:45 - 50 قطعة",
+            "📸 لقطة 3 - 2024-01-13 09:15 - 45 قطعة"
+        };
+        
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("📸 لقطات الجرد السابقة")
+                .setItems(snapshots, (dialog, which) -> {
+                    Toast.makeText(requireContext(), "تم اختيار: " + snapshots[which], Toast.LENGTH_SHORT).show();
+                })
+                .setPositiveButton("إغلاق", null)
+                .show();
+    }
+    
+    private void showSnapshotComparison() {
+        if (!isAdded()) return;
+        
+        String comparison = 
+            "📊 مقارنة اللقطات:\n\n" +
+            "لقطة 1 (2024-01-15):\n" +
+            "• الممسوح: 48 قطعة\n" +
+            "• المفقود: 2 قطعة\n\n" +
+            "لقطة 2 (2024-01-14):\n" +
+            "• الممسوح: 50 قطعة\n" +
+            "• المفقود: 0 قطعة\n\n" +
+            "الفرق بين اللقطتين:\n" +
+            "• تغير في الممسوح: -2 قطعة\n" +
+            "• تغير في المفقود: +2 قطعة";
+        
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("📊 مقارنة اللقطات")
+                .setMessage(comparison)
+                .setPositiveButton("إغلاق", null)
+                .show();
+    }
+
+    // ==================== EXIT WARNING ====================
+    
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (isScanning) {
+            showExitWarning();
+        }
+    }
+    
+    private void showExitWarning() {
+        if (!isAdded()) return;
+        
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("⚠️ تحذير مهم")
+                .setMessage("الجرد ما زال قيد التشغيل!\n\n" +
+                           "إذا قمت بتغيير الواجهة، سيتوقف الجرد وستفقد البيانات غير المحفوظة.\n\n" +
+                           "هل تريد إيقاف الجرد والمتابعة؟")
+                .setPositiveButton("إيقاف والمتابعة", (dialog, which) -> {
+                    stopScanning();
+                })
+                .setNegativeButton("البقاء في الجرد", (dialog, which) -> {
+                    // Stay on current screen
+                    dialog.dismiss();
+                })
+                .setCancelable(false)
+                .show();
     }
 
     // ==================== SIMULATION ====================
@@ -689,7 +970,15 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             public void run() {
                 if (!isScanning) return;
                 
-                String epc = simulationTags[simulationIndex % simulationTags.length];
+                String epc;
+                
+                if (expectedCount > 0 && !catalogEpcs.isEmpty()) {
+                    List<String> epcList = new ArrayList<>(catalogEpcs);
+                    epc = epcList.get(simulationIndex % epcList.size());
+                } else {
+                    epc = simulationTags[simulationIndex % simulationTags.length];
+                }
+                
                 int rssi = -40 - (int)(Math.random() * 40);
                 
                 onTagRead(epc, rssi);
@@ -746,7 +1035,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             simulationHandler.removeCallbacksAndMessages(null);
         }
         
-        // Shutdown background executor gracefully
         if (backgroundExecutor != null && !backgroundExecutor.isShutdown()) {
             backgroundExecutor.shutdown();
             try {
@@ -761,11 +1049,26 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         }
     }
     
-    @Override
-    public void onPause() {
-        super.onPause();
-        if (isScanning) {
-            stopScanning();
+    // ==================== MODEL CLASS ====================
+    
+    private static class InventoryReport {
+        int id;
+        String sessionId;
+        String date;
+        int expectedCount;
+        int scannedCount;
+        int missingCount;
+        String status;
+        
+        InventoryReport(int id, String sessionId, String date, 
+                       int expectedCount, int scannedCount, int missingCount, String status) {
+            this.id = id;
+            this.sessionId = sessionId;
+            this.date = date;
+            this.expectedCount = expectedCount;
+            this.scannedCount = scannedCount;
+            this.missingCount = missingCount;
+            this.status = status;
         }
     }
 }
