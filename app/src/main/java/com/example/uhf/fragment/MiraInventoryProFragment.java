@@ -88,14 +88,17 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         });
     }
 
-    @Override
     public void onError(String errorMessage) {
         Log.e(TAG, "RFID Read Error: " + errorMessage);
     }
 
-    @Override
     public void onConnectionChanged(boolean isConnected) {
         Log.i(TAG, "RFID Connection status: " + isConnected);
+    }
+
+    @Override
+    public void onScanStopped() {
+        Log.i(TAG, "RFID Hardware scan cycle stopped");
     }
 
     private void updateUI() {
