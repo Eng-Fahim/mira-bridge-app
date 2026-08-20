@@ -67,6 +67,7 @@ public class MiraGoldCurrencyFragment extends Fragment {
     private List<ApiProvider> providersList = new ArrayList<>();
     private ApiProvider selectedProvider;
     private TextView tvSelectedProvider;
+    private TextView tvActiveProviderStatus;
 
     // Gold Views
     private TextView tvGoldPriceStatus, tvLastUpdate, tvOuncePrice, tvOuncePriceConverted;
@@ -146,6 +147,7 @@ public class MiraGoldCurrencyFragment extends Fragment {
         tvOuncePrice = view.findViewById(R.id.tvOuncePrice);
         tvOuncePriceConverted = view.findViewById(R.id.tvOuncePriceConverted);
         tvSelectedProvider = view.findViewById(R.id.tvSelectedProvider);
+        tvActiveProviderStatus = view.findViewById(R.id.tvActiveProviderStatus);
         
         etGoldPrice24k = view.findViewById(R.id.etGoldPrice24k);
         etGoldPrice22k = view.findViewById(R.id.etGoldPrice22k);
@@ -248,9 +250,6 @@ public class MiraGoldCurrencyFragment extends Fragment {
                 if (position < providersList.size()) {
                     selectedProvider = providersList.get(position);
                     
-                    // حفظ اختيار المستخدم
-                    prefs.edit().putInt("selected_provider_id", selectedProvider.getId()).apply();
-                    
                     // عرض اسم المزود
                     if (tvSelectedProvider != null) {
                         tvSelectedProvider.setText(
@@ -258,10 +257,19 @@ public class MiraGoldCurrencyFragment extends Fragment {
                             "المزود المحدد: " + selectedProvider.getProviderName() : 
                             "Selected Provider: " + selectedProvider.getProviderName()
                         );
+                        tvSelectedProvider.setVisibility(View.VISIBLE);
                     }
                     
-                    // جلب الأسعار تلقائياً
-                    fetchGoldPricesAutomatically();
+                    // عرض حالة المزود
+                    if (tvActiveProviderStatus != null) {
+                        if (selectedProvider.isActive()) {
+                            tvActiveProviderStatus.setText(isArabic ? "✅ نشط" : "✅ Active");
+                            tvActiveProviderStatus.setTextColor(0xFF16A34A);
+                        } else {
+                            tvActiveProviderStatus.setText(isArabic ? "⚠️ سيتم تفعيله عند الحفظ" : "⚠️ Will be activated on save");
+                            tvActiveProviderStatus.setTextColor(0xFFF59E0B);
+                        }
+                    }
                 }
             }
             
@@ -340,13 +348,58 @@ public class MiraGoldCurrencyFragment extends Fragment {
                     pbGoldLoading.setVisibility(View.GONE);
                     
                     if (providersList.isEmpty()) {
-                        Toast.makeText(mContext, 
-                            isArabic ? "لا يوجد مزودين نشطين" : "No active providers", 
-                            Toast.LENGTH_SHORT).show();
-                        return;
+                        // إضافة مزودين افتراضيين
+                        addDefaultProviders();
                     }
                     
                     // تحديث Spinner بأسماء المزودين
+                    List<String> providerNames = new ArrayList<>();
+                    for (ApiProvider provider : providersList) {
+                        String name = provider.getProviderName();
+                        if (provider.isActive()) {
+                            name += isArabic ? " ✓" : " ✓";
+                        }
+                        providerNames.add(name);
+                    }
+                    
+                    ArrayAdapter<String> providerAdapter = new ArrayAdapter<>(
+                        mContext, 
+                        android.R.layout.simple_spinner_item, 
+                        providerNames
+                    );
+                    providerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                    spGoldApiProvider.setAdapter(providerAdapter);
+                    spGoldApiProvider.setEnabled(true);
+                    
+                    // استعادة المزود المحفوظ أو النشط
+                    int savedProviderId = prefs.getInt("selected_provider_id", -1);
+                    int activeIndex = 0;
+                    
+                    for (int i = 0; i < providersList.size(); i++) {
+                        if (providersList.get(i).isActive()) {
+                            activeIndex = i;
+                            break;
+                        }
+                    }
+                    
+                    if (savedProviderId != -1) {
+                        for (int i = 0; i < providersList.size(); i++) {
+                            if (providersList.get(i).getId() == savedProviderId) {
+                                spGoldApiProvider.setSelection(i);
+                                return;
+                            }
+                        }
+                    }
+                    
+                    // إذا لم نجد المحفوظ، نختار النشط
+                    spGoldApiProvider.setSelection(activeIndex);
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error loading providers: " + e.getMessage());
+                mainHandler.post(() -> {
+                    pbGoldLoading.setVisibility(View.GONE);
+                    addDefaultProviders();
+                    
                     List<String> providerNames = new ArrayList<>();
                     for (ApiProvider provider : providersList) {
                         providerNames.add(provider.getProviderName());
@@ -360,28 +413,25 @@ public class MiraGoldCurrencyFragment extends Fragment {
                     providerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                     spGoldApiProvider.setAdapter(providerAdapter);
                     spGoldApiProvider.setEnabled(true);
-                    
-                    // استعادة المزود المحفوظ
-                    int savedProviderId = prefs.getInt("selected_provider_id", -1);
-                    if (savedProviderId != -1) {
-                        for (int i = 0; i < providersList.size(); i++) {
-                            if (providersList.get(i).getId() == savedProviderId) {
-                                spGoldApiProvider.setSelection(i);
-                                break;
-                            }
-                        }
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading providers: " + e.getMessage());
-                mainHandler.post(() -> {
-                    pbGoldLoading.setVisibility(View.GONE);
-                    Toast.makeText(mContext, 
-                        isArabic ? "فشل تحميل المزودين" : "Failed to load providers", 
-                        Toast.LENGTH_SHORT).show();
+                    spGoldApiProvider.setSelection(0);
                 });
             }
         });
+    }
+    
+    private void addDefaultProviders() {
+        String[] names = {"Metal Price", "Gold API", "Metals Dev"};
+        String[] types = {"metalprice", "goldapi", "metalsdev"};
+        
+        for (int i = 0; i < names.length; i++) {
+            ApiProvider provider = new ApiProvider();
+            provider.setId(i + 1);
+            provider.setProviderName(names[i]);
+            provider.setProviderType(types[i]);
+            provider.setApiKey("");
+            provider.setActive(i == 0); // الأول نشط افتراضياً
+            providersList.add(provider);
+        }
     }
 
     private void fetchGoldPricesAutomatically() {
@@ -532,11 +582,19 @@ public class MiraGoldCurrencyFragment extends Fragment {
     }
 
     private void saveGoldSettings() {
+        if (selectedProvider == null) {
+            Toast.makeText(mContext, 
+                isArabic ? "يرجى اختيار مزود أولاً" : "Please select a provider first", 
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
         pbGoldLoading.setVisibility(View.VISIBLE);
         btnSaveGoldSettings.setEnabled(false);
         
         executor.execute(() -> {
             try {
+                // 1️⃣ حفظ إعدادات الذهب
                 JSONObject goldData = new JSONObject();
                 goldData.put("gold_price_24k", getDouble(etGoldPrice24k));
                 goldData.put("gold_price_22k", getDouble(etGoldPrice22k));
@@ -555,25 +613,46 @@ public class MiraGoldCurrencyFragment extends Fragment {
                 goldData.put("making_18k", getDouble(etMaking18k));
                 goldData.put("making_14k", getDouble(etMaking14k));
                 goldData.put("making_12k", getDouble(etMaking12k));
-                
-                // حفظ معرف المزود فقط، وليس API Key
-                if (selectedProvider != null) {
-                    goldData.put("provider_id", selectedProvider.getId());
-                }
+                goldData.put("provider_id", selectedProvider.getId());
                 goldData.put("gold_default_currency", spGoldCurrency.getSelectedItem().toString());
                 
+                // حفظ محلي
                 prefs.edit().putString("gold_settings", goldData.toString()).apply();
+                prefs.edit().putInt("selected_provider_id", selectedProvider.getId()).apply();
                 
                 MiraApiClient client = MiraApiClient.getInstance(mContext);
-                MiraApiClient.ApiResponse response = client.saveGoldSettings(goldData);
                 
-                final boolean serverSaved = response != null && response.isSuccess;
+                // 2️⃣ حفظ إعدادات الذهب في السيرفر
+                MiraApiClient.ApiResponse goldResponse = client.saveGoldSettings(goldData);
+                
+                // 3️⃣ تفعيل المزود المختار في السيرفر
+                MiraApiClient.ApiResponse activateResponse = client.activateProvider(selectedProvider.getId());
+                
+                final boolean serverSaved = goldResponse != null && goldResponse.isSuccess;
+                final boolean providerActivated = activateResponse != null && activateResponse.isSuccess;
+                
+                // 4️⃣ تحديث حالة المزودين محلياً
+                for (ApiProvider provider : providersList) {
+                    provider.setActive(provider.getId() == selectedProvider.getId());
+                }
+                
                 mainHandler.post(() -> {
                     pbGoldLoading.setVisibility(View.GONE);
                     btnSaveGoldSettings.setEnabled(true);
-                    Toast.makeText(mContext, 
-                        serverSaved ? (isArabic ? "✅ تم الحفظ" : "✅ Saved") : (isArabic ? "⚠️ تم الحفظ محلياً" : "⚠️ Saved locally"), 
-                        Toast.LENGTH_SHORT).show();
+                    
+                    String message;
+                    if (serverSaved && providerActivated) {
+                        message = isArabic ? "✅ تم الحفظ وتفعيل المزود" : "✅ Saved & provider activated";
+                    } else if (serverSaved) {
+                        message = isArabic ? "⚠️ تم الحفظ ولكن فشل تفعيل المزود" : "⚠️ Saved but provider activation failed";
+                    } else {
+                        message = isArabic ? "⚠️ تم الحفظ محلياً" : "⚠️ Saved locally";
+                    }
+                    
+                    Toast.makeText(mContext, message, Toast.LENGTH_SHORT).show();
+                    
+                    // تحديث واجهة المزودين
+                    updateProvidersUI();
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Error saving gold settings: " + e.getMessage());
@@ -583,6 +662,46 @@ public class MiraGoldCurrencyFragment extends Fragment {
                 });
             }
         });
+    }
+    
+    private void updateProvidersUI() {
+        if (providersList.isEmpty()) return;
+        
+        List<String> providerNames = new ArrayList<>();
+        for (ApiProvider provider : providersList) {
+            String name = provider.getProviderName();
+            if (provider.isActive()) {
+                name += isArabic ? " ✓" : " ✓";
+            }
+            providerNames.add(name);
+        }
+        
+        ArrayAdapter<String> providerAdapter = new ArrayAdapter<>(
+            mContext, 
+            android.R.layout.simple_spinner_item, 
+            providerNames
+        );
+        providerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spGoldApiProvider.setAdapter(providerAdapter);
+        
+        // الحفاظ على اختيار المزود
+        for (int i = 0; i < providersList.size(); i++) {
+            if (providersList.get(i).getId() == selectedProvider.getId()) {
+                spGoldApiProvider.setSelection(i);
+                break;
+            }
+        }
+        
+        // تحديث حالة العرض
+        if (tvActiveProviderStatus != null && selectedProvider != null) {
+            if (selectedProvider.isActive()) {
+                tvActiveProviderStatus.setText(isArabic ? "✅ نشط" : "✅ Active");
+                tvActiveProviderStatus.setTextColor(0xFF16A34A);
+            } else {
+                tvActiveProviderStatus.setText(isArabic ? "⚠️ غير نشط" : "⚠️ Inactive");
+                tvActiveProviderStatus.setTextColor(0xFFF59E0B);
+            }
+        }
     }
 
     private void saveCurrencySettings() {
@@ -683,7 +802,7 @@ public class MiraGoldCurrencyFragment extends Fragment {
         // استعادة آخر سعر تم جلبه إذا كان حديثاً
         long lastUpdateTime = prefs.getLong("last_update_time", 0);
         float lastGoldPrice = prefs.getFloat("last_gold_price_24k", 0);
-        if (lastGoldPrice > 0 && (System.currentTimeMillis() - lastUpdateTime) < 3600000) { // أقل من ساعة
+        if (lastGoldPrice > 0 && (System.currentTimeMillis() - lastUpdateTime) < 3600000) {
             etGoldPrice24k.setText(decimalFormat.format(lastGoldPrice));
             autoFillKaratPrices(lastGoldPrice);
         }
@@ -734,8 +853,6 @@ public class MiraGoldCurrencyFragment extends Fragment {
             if (json.has("making_14k")) etMaking14k.setText(decimalFormat.format(json.optDouble("making_14k")));
             if (json.has("making_12k")) etMaking12k.setText(decimalFormat.format(json.optDouble("making_12k")));
             
-            // لا نقوم بتحميل API Key - يتم جلبه من السيرفر تلقائياً
-            
             if (json.has("gold_default_currency")) {
                 spGoldCurrency.setSelection(getCurrencyPosition(json.optString("gold_default_currency", "USD")));
             }
@@ -744,17 +861,6 @@ public class MiraGoldCurrencyFragment extends Fragment {
             if (json.has("provider_id")) {
                 int providerId = json.optInt("provider_id");
                 prefs.edit().putInt("selected_provider_id", providerId).apply();
-                
-                // تحديث اختيار المزود في الواجهة
-                for (int i = 0; i < providersList.size(); i++) {
-                    if (providersList.get(i).getId() == providerId) {
-                        final int position = i;
-                        mainHandler.post(() -> {
-                            spGoldApiProvider.setSelection(position);
-                        });
-                        break;
-                    }
-                }
             }
         } catch (Exception e) {
             Log.e(TAG, "Error applying gold settings: " + e.getMessage());
@@ -796,4 +902,4 @@ public class MiraGoldCurrencyFragment extends Fragment {
             executor.shutdown();
         }
     }
-}
+                                                }
