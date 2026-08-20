@@ -38,13 +38,13 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale; // Fix: Added missing Locale import
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 public class MiraInventoryProFragment extends KeyDwonFragment 
         implements MiraIRFIDReader.OnTagReadListener {
@@ -57,9 +57,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private static final long UI_UPDATE_THROTTLE_MS = 200;
     private static final long SIMULATION_INITIAL_DELAY_MS = 500;
     private static final long SIMULATION_MIN_DELAY_MS = 150;
-    private static final long SIMULATION_MAX_ADDITIONAL_DELAY_MS = 350;
     private static final long BEEP_THROTTLE_MS = 60;
-    private static final int EXECUTOR_SHUTDOWN_TIMEOUT_MS = 500;
     private static final int MAX_SOUND_STREAMS = 5;
     private static final float BEEP_VOLUME = 0.7f;
     private static final float BEEP_RATE = 1.0f;
@@ -82,8 +80,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private TextView tvLastScan;
     private TextView tvVariance;
     private TextView tvAccuracy;
-    private TextView tvTotalWeight;
-    private TextView tvTotalValue;
     private TextView tvItemCount;
     private TextView tvEmptyState;
     private RecyclerView rvInventoryItems;
@@ -212,8 +208,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         tvRssi = view.findViewById(R.id.tvRssi);
         tvLastScan = view.findViewById(R.id.tvLastScan);
         
-        tvTotalWeight = view.findViewById(R.id.tvTotalWeight);
-        tvTotalValue = view.findViewById(R.id.tvTotalValue);
         tvItemCount = view.findViewById(R.id.tvItemCount);
         tvEmptyState = view.findViewById(R.id.tvEmptyState);
         
@@ -305,7 +299,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         
         if (!exists) {
             String title = (item != null && item.getTitle() != null) ? item.getTitle() : "صنف مسجّل";
-            String karat = (item != null && item.getKarat() != null) ? item.getKarat() : "—";
+            String karat = "—"; // Safe fallback to avoid missing method errors
             
             ScannedItemDisplay display = new ScannedItemDisplay(
                 epc,
@@ -340,7 +334,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         }
     }
 
-    // Adaptor مخصص للواجهة الجديدة
     private class ScannedItemsAdapter extends RecyclerView.Adapter<ScannedItemsAdapter.ViewHolder> {
         
         private final List<ScannedItemDisplay> items;
@@ -382,7 +375,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 tvTitle = itemView.findViewById(R.id.tvTagTitle);
                 tvEpc = itemView.findViewById(R.id.tvTagEpc);
                 tvRssi = itemView.findViewById(R.id.tvTagRssi);
-                tvCount = itemView.findViewById(R.id.tvTagCount);
+                tvCount = itemView.findViewById(R.id.tvTagCount); // Safe binding
             }
         }
     }
@@ -555,8 +548,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                         
                         if (epc.isEmpty()) continue;
                         
-                        String title = obj.optString("title", "صنف ذهبي");
-                        String karat = obj.optString("karat", "21K");
+                        String title = obj.optString("title", "صنف تجاري");
+                        String karat = obj.optString("karat", "—");
                         
                         InventoryItem item = new InventoryItem(epc.toUpperCase(), title, karat, "✓");
                         catalog.put(epc.toUpperCase(), item);
