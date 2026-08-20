@@ -902,4 +902,4 @@ public class MiraGoldCurrencyFragment extends Fragment {
             executor.shutdown();
         }
     }
-                                                }
+            }
