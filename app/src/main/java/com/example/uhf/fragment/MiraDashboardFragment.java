@@ -12,7 +12,7 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-
+import com.example.uhf.model.ApiProvider;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
@@ -101,6 +101,7 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
     super.onViewCreated(view, savedInstanceState);
 
     try {
+    loadCairoFonts();
         // 1️⃣ تهيئة المديرين والخدمات
         apiClient = MiraApiClient.getInstance(requireContext());
         sessionManager = new SessionManager(requireContext());
@@ -445,7 +446,7 @@ private int dpToPx(Context context, float dp) {
     tvEmpty.setText(isArabic ?
             "لا توجد أزرار مفعّلة" :
             "No enabled actions");
-    tvEmpty.setTextSize(12); // ✅ نفس حجم العناوين
+    tvEmpty.setTextSize(12);
     tvEmpty.setGravity(android.view.Gravity.CENTER);
     tvEmpty.setPadding(dpToPx(getContext(), 16), dpToPx(getContext(), 24), dpToPx(getContext(), 16), dpToPx(getContext(), 24));
     
@@ -458,7 +459,12 @@ private int dpToPx(Context context, float dp) {
         tvEmpty.setTextColor(0xFF6B7280);
     }
     
-    tvEmpty.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
+    // ✅ استخدام خط Cairo بدلاً من sans-serif
+    if (cairoRegular != null) {
+        tvEmpty.setTypeface(cairoRegular);
+    } else {
+        tvEmpty.setTypeface(android.graphics.Typeface.DEFAULT);
+    }
 
     containerQuickActions.addView(tvEmpty);
 }
@@ -886,6 +892,7 @@ private int dpToPx(Context context, float dp) {
     @Override
     public void onResume() {
         super.onResume();
+        loadCairoFonts();
         if (branchPrefs != null) {
             branchPrefs.registerOnSharedPreferenceChangeListener(this);
         }
