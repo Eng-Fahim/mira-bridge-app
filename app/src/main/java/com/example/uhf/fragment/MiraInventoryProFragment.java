@@ -92,13 +92,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
 
     @Override
-    public void onError(String errorMessage) {
-        Log.e(TAG, "RFID Scan Error: " + errorMessage);
-        if (mainThreadHandler != null && isAdded()) {
-            mainThreadHandler.post(() -> 
-                Toast.makeText(requireContext(), "خطأ ماسح RFID: " + errorMessage, Toast.LENGTH_SHORT).show()
-            );
-        }
+    public void onConnectionChanged(boolean isConnected) {
+        Log.i(TAG, "RFID Hardware connection state: " + isConnected);
     }
 
     private void updateUI() {
