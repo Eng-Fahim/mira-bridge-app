@@ -72,6 +72,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         }
     }
 
+    // ✅ يجب تطبيق جميع دوال الواجهة
     @Override
     public void onTagRead(String epc, String rssi) {
         if (!isScanning || epc == null) return;
@@ -88,24 +89,26 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         });
     }
 
-    public void onError(String errorMessage) {
-        Log.e(TAG, "RFID Read Error: " + errorMessage);
-    }
-
-    public void onConnectionChanged(boolean isConnected) {
-        Log.i(TAG, "RFID Connection status: " + isConnected);
-    }
-
-    /*public void onScanStopped() {
-        Log.i(TAG, "RFID Hardware scan cycle stopped");
-    }
-
+    // ✅ أضف هذه الدوال - مطلوبة من الواجهة
     @Override
     public void onScanStarted() {
         Log.i(TAG, "RFID Hardware scan cycle started");
     }
-                */
-                
+
+    @Override
+    public void onScanStopped() {
+        Log.i(TAG, "RFID Hardware scan cycle stopped");
+    }
+
+    @Override
+    public void onConnectionChanged(boolean isConnected) {
+        Log.i(TAG, "RFID Connection status: " + isConnected);
+    }
+
+    @Override
+    public void onError(String errorMessage) {
+        Log.e(TAG, "RFID Read Error: " + errorMessage);
+    }
 
     private void updateUI() {
         if (!isAdded()) return;
