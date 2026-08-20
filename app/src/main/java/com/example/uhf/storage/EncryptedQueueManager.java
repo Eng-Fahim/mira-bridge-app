@@ -28,7 +28,9 @@ public class EncryptedQueueManager {
                     context,
                     FILE_NAME,
                     masterKey,
-                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SKEY,
+                    //EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SKEY,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             );
         } catch (Exception e) {
