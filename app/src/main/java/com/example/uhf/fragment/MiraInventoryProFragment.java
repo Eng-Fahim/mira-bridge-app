@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -90,7 +91,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private long lastVibrationTime = 0;
 
     // Simulation Flags & Handlers
-    private boolean isHardwareConnected = false; // يتم ضبطه لـ true عند ربط SDK العتاد
+    private boolean isHardwareConnected = false;
     private Handler simulationHandler;
     private Runnable simulationRunnable;
 
@@ -122,13 +123,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private android.media.SoundPool soundPool;
     private int soundScanId, soundFoundId, soundMissingId;
 
-    // Simulation Fallback Data
-    private final String[] simulationGtins = {
-        "0700000007885", "0700000007886", "0700000007887", "0700000007888", "0700000007889",
-        "0700000007890", "0700000007891", "0700000007892", "0700000007893", "0700000007894",
-        "0700000007895", "0700000007896", "0700000007897", "0700000007898", "0700000007899"
-    };
-
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -146,6 +140,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }
         isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         bindViews(v);
+        setupTabs();
         setupRecyclerView();
         setupClickListeners();
         setInitialState();
@@ -165,8 +160,17 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     @Override
     public void onResume() {
         super.onResume();
+        loadInventorySettings();
         updateBranchHeader();
         syncPendingQueue();
+    }
+
+    private void setupTabs() {
+        if (tabInventoryModes == null) return;
+        tabInventoryModes.removeAllTabs();
+        tabInventoryModes.addTab(tabInventoryModes.newTab().setText(isArabic ? "📋 جرد كامل" : "📋 Full Audit"));
+        tabInventoryModes.addTab(tabInventoryModes.newTab().setText(isArabic ? "⚡ جرد أعمى" : "⚡ Blind Audit"));
+        tabInventoryModes.addTab(tabInventoryModes.newTab().setText(isArabic ? "📊 التقارير" : "📊 Reports"));
     }
 
     private void updateBranchHeader() {
@@ -274,7 +278,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         switch (position) {
             case 0:
                 isBlindMode = false;
-                if (tvExpectedCount != null) tvExpectedCount.setVisibility(View.VISIBLE);
+                if (tvExpectedCount != null) {
+                    tvExpectedCount.setVisibility(View.VISIBLE);
+                    tvExpectedCount.setText(String.valueOf(expectedCount));
+                }
                 if (tvVariance != null) tvVariance.setVisibility(View.VISIBLE);
                 if (btnStartInventory != null) btnStartInventory.setEnabled(!isScanning);
                 if (btnBlindInventory != null) btnBlindInventory.setEnabled(!isScanning);
@@ -303,13 +310,13 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (btnBlindInventory != null) btnBlindInventory.setEnabled(true);
         if (btnStopInventory != null) btnStopInventory.setEnabled(false);
         if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
-        expectedCount = localCatalog.isEmpty() ? simulationGtins.length : localCatalog.size();
+        expectedCount = localCatalog.size();
         if (tvExpectedCount != null) tvExpectedCount.setText(String.valueOf(expectedCount));
         if (cardComparison != null) cardComparison.setVisibility(View.VISIBLE);
         if (progressRssi != null) progressRssi.setMax(100);
     }
 
-    // ==================== OFFLINE CATALOG & PRELOAD ====================
+    // ==================== DATABASE CATALOG PRELOAD ====================
 
     private void preloadBranchCatalog() {
         if (apiClient == null || branchesManager == null) return;
@@ -404,6 +411,11 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
         InventoryItem matchedItem = localCatalog.get(cleanCode);
         boolean isKnown = matchedItem != null;
+
+        if (!isKnown && !isBlindMode) {
+            return; // في الجرد الكامل نستثني الأكواد غير الموجوة بقاعدة البيانات
+        }
+
         String title = isKnown ? matchedItem.title : (isArabic ? "قطعة غير معرفة" : "Unknown Item");
         String karat = isKnown ? matchedItem.karat : "21K";
         double weight = isKnown ? matchedItem.numericWeight : 0.0;
@@ -455,12 +467,25 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
                 updateTotals();
                 updateComparisonCard();
+                checkAutoStopCondition();
             } catch (Exception e) {
                 Log.e(TAG, "Batch update error: " + e.getMessage());
             }
         };
 
         mainHandler.postDelayed(batchUpdateRunnable, UI_UPDATE_INTERVAL);
+    }
+
+    private void checkAutoStopCondition() {
+        if (!isBlindMode && expectedCount > 0 && foundCount >= expectedCount && isScanning) {
+            safeRun(() -> {
+                stopSimulationLoop();
+                Toast.makeText(getContext(),
+                    isArabic ? "✅ اكتمل جرد جميع القطع المتوقعة تلقائياً!" : "✅ All expected items scanned successfully!",
+                    Toast.LENGTH_LONG).show();
+                finishInventory();
+            });
+        }
     }
 
     private void updateRssiDisplay(String rssi) {
@@ -498,7 +523,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         }
     }
 
-    // ==================== SMART SIMULATION ENGINE ====================
+    // ==================== DATABASE-DRIVEN SIMULATION ====================
 
     private void startSimulationLoop() {
         if (simulationHandler == null) {
@@ -507,7 +532,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
         final List<String> availableCodes = new ArrayList<>(localCatalog.keySet());
         if (availableCodes.isEmpty()) {
-            Collections.addAll(availableCodes, simulationGtins);
+            Toast.makeText(getContext(), isArabic ? "⚠️ لا توجد عناصر في قاعدة البيانات للجرد" : "⚠️ Database catalog is empty", Toast.LENGTH_SHORT).show();
+            return;
         }
 
         final int[] index = {0};
@@ -524,15 +550,15 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
                     processScannedTag(epcToScan, randomRssi);
                     index[0]++;
 
-                    long delay = 250 + (long) (Math.random() * 350);
+                    long delay = 200 + (long) (Math.random() * 300);
                     simulationHandler.postDelayed(this, delay);
                 } else {
-                    Log.d(TAG, "🤖 Simulation finished processing available catalog.");
+                    Log.d(TAG, "🤖 Database simulation loop reached end of available items.");
                 }
             }
         };
 
-        simulationHandler.postDelayed(simulationRunnable, 600);
+        simulationHandler.postDelayed(simulationRunnable, 500);
     }
 
     private void stopSimulationLoop() {
@@ -549,7 +575,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
         final AlertDialog loadingDialog = showProfessionalLoadingDialog(
             isArabic ? "🔄 جاري تجهيز الجرد..." : "🔄 Preparing audit...",
-            isArabic ? "يرجى الانتظار - تحميل الكتالوج" : "Please wait - Loading catalog"
+            isArabic ? "يرجى الانتظار - جلب قاعدة البيانات" : "Please wait - Fetching database"
         );
 
         new Thread(() -> {
@@ -585,12 +611,13 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
 
                     if (isBlindMode && tvExpectedCount != null) {
                         tvExpectedCount.setText("—");
+                    } else if (tvExpectedCount != null) {
+                        tvExpectedCount.setText(String.valueOf(expectedCount));
                     }
 
                     playInventorySound("start");
                     startTimer();
 
-                    // إطلاق المحاكي الذكي إذا لم يكن العتاد متصلاً
                     if (!isHardwareConnected) {
                         startSimulationLoop();
                     }
@@ -1027,8 +1054,14 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private void playInventorySound(String type) {
-        if (!soundEnabled || soundPool == null) return;
+        if (!soundEnabled || soundPool == null || getContext() == null) return;
         try {
+            AudioManager audioManager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+            if (audioManager != null) {
+                int currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+                if (currentVolume == 0) return;
+            }
+
             switch (type) {
                 case "scan": soundPool.play(soundScanId, 0.5f, 0.5f, 1, 0, 1f); break;
                 case "found":
@@ -1078,8 +1111,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         Context ctx = getContext();
         if (ctx == null) return;
         SharedPreferences p = ctx.getSharedPreferences("MIRA_BRIDGE_SETTINGS", Context.MODE_PRIVATE);
-        soundEnabled = "true".equals(p.getString("inventory_sound", "true"));
-        vibrateEnabled = "true".equals(p.getString("inventory_vibrate", "true"));
+        soundEnabled = p.getBoolean("inventory_sound", true) || "true".equals(p.getString("inventory_sound", "true"));
+        vibrateEnabled = p.getBoolean("inventory_vibrate", true) || "true".equals(p.getString("inventory_vibrate", "true"));
     }
 
     private AlertDialog showProfessionalLoadingDialog(String title, String message) {
