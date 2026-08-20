@@ -32,7 +32,7 @@ public class EncryptedQueueManager {
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             );
         } catch (Exception e) {
-            Log.e(TAG, "EncryptedSharedPreferences fallback to Standard SharedPreferences", e);
+            Log.e(TAG, "Fallback to standard SharedPreferences", e);
             encryptedPrefs = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE);
         }
     }
@@ -45,7 +45,7 @@ public class EncryptedQueueManager {
             array.put(payload);
 
             encryptedPrefs.edit().putString(KEY_PENDING, array.toString()).apply();
-            Log.i(TAG, "Payload safely persisted in queue.");
+            Log.i(TAG, "Payload stored successfully.");
         } catch (Exception e) {
             Log.e(TAG, "Failed to enqueue payload", e);
         }
