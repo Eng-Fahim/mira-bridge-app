@@ -76,38 +76,73 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         return inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
     }
 
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+@Override
+public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    super.onViewCreated(view, savedInstanceState);
 
-        try {
-            apiClient = MiraApiClient.getInstance(requireContext());
-            sessionManager = new SessionManager(requireContext());
-            branchesManager = MiraBranchesManager.getInstance(requireContext());
-            orgProfile = MiraOrgProfileManager.getInstance(requireContext());
-            priceManager = MiraPriceManager.getInstance(requireContext());
-            quickAccessSettings = MiraQuickAccessSettings.getInstance(requireContext());
-            isArabic = Locale.getDefault().getLanguage().equals("ar");
+    try {
+        // 1️⃣ تهيئة المديرين والخدمات
+        apiClient = MiraApiClient.getInstance(requireContext());
+        sessionManager = new SessionManager(requireContext());
+        branchesManager = MiraBranchesManager.getInstance(requireContext());
+        orgProfile = MiraOrgProfileManager.getInstance(requireContext());
+        priceManager = MiraPriceManager.getInstance(requireContext());
+        quickAccessSettings = MiraQuickAccessSettings.getInstance(requireContext());
+        isArabic = Locale.getDefault().getLanguage().equals("ar");
 
-            branchPrefs = requireContext().getSharedPreferences("mira_branches_prefs", Context.MODE_PRIVATE);
+        branchPrefs = requireContext().getSharedPreferences("mira_branches_prefs", Context.MODE_PRIVATE);
 
-            initViews(view);
-            setupListeners();
-            updateHeader();
-            setupQuickAccessGrid();
+        // 2️⃣ تهيئة الواجهات
+        initViews(view);
+        
+        // 3️⃣ الترحيب والتاريخ أولاً (أعلى أولوية)
+        updateHeader();
+        
+        // 4️⃣ تحديث حالة الاتصال
+        updateLiveStatus();
+        
+        // 5️⃣ تحميل البيانات المحلية فوراً (سريعة)
+        currentBranchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : -1;
+        initBranchCache(currentBranchId);
+        loadOfflineData();
+        
+        // 6️⃣ إعداد أزرار الوصول السريع
+        setupQuickAccessGrid();
+        
+        // 7️⃣ إعداد المستمعين
+        setupListeners();
+        
+        // 8️⃣ عرض shimmer أثناء جلب البيانات
+        showShimmer(true);
+        
+        // 9️⃣ جلب البيانات من السيرفر (خلفية)
+        fetchData();
+        
+        // 🔟 جلب أسعار الذهب (خلفية)
+        fetchLiveGoldPrices();
 
-            currentBranchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : -1;
-            initBranchCache(currentBranchId);
-
-            showShimmer(true);
-            loadOfflineData();
-            fetchData();
-            fetchLiveGoldPrices();
-
-        } catch (Throwable e) {
-            Log.e(TAG, "onViewCreated error", e);
-        }
+    } catch (Throwable e) {
+        Log.e(TAG, "onViewCreated error", e);
     }
+}
+
+/**
+ * ✅ تحديث حالة الاتصال
+ */
+private void updateLiveStatus() {
+    if (tvLiveStatus == null) return;
+    
+    // التحقق من الاتصال
+    boolean isOnline = apiClient != null && apiClient.pingApi();
+    
+    if (isOnline) {
+        tvLiveStatus.setText(isArabic ? "🟢 متصل" : "🟢 Online");
+        tvLiveStatus.setTextColor(0xFF16A34A);
+    } else {
+        tvLiveStatus.setText(isArabic ? "🔴 غير متصل" : "🔴 Offline");
+        tvLiveStatus.setTextColor(0xFFDC2626);
+    }
+}
 
     private void initBranchCache(int branchId) {
         if (getContext() != null) {
@@ -229,52 +264,72 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     private CardView createQuickActionCard(MiraQuickAccessSettings.QuickAction action) {
-        Context context = getContext();
-        if (context == null) return null;
+    Context context = getContext();
+    if (context == null) return null;
 
-        MaterialCardView card = new MaterialCardView(context);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        params.setMargins(6, 6, 6, 6);
-        card.setLayoutParams(params);
-        card.setRadius(12 * context.getResources().getDisplayMetrics().density);
-        card.setCardElevation(2f);
-        card.setStrokeWidth(1);
-        
-        // Dynamic theme stroke color lookup safety
-        try {
-            android.util.TypedValue typedValue = new android.util.TypedValue();
-            context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOutlineVariant, typedValue, true);
-            card.setStrokeColor(typedValue.data);
-        } catch (Exception ignored) {}
+    MaterialCardView card = new MaterialCardView(context);
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+    params.setMargins(6, 6, 6, 6);
+    card.setLayoutParams(params);
+    card.setRadius(12 * context.getResources().getDisplayMetrics().density);
+    card.setCardElevation(2f);
+    card.setStrokeWidth(1);
+    
+    try {
+        android.util.TypedValue typedValue = new android.util.TypedValue();
+        context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOutlineVariant, typedValue, true);
+        card.setStrokeColor(typedValue.data);
+    } catch (Exception ignored) {}
 
-        card.setClickable(true);
-        card.setFocusable(true);
+    card.setClickable(true);
+    card.setFocusable(true);
 
-        LinearLayout layout = new LinearLayout(context);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(8, 14, 8, 14);
-        layout.setGravity(android.view.Gravity.CENTER);
+    LinearLayout layout = new LinearLayout(context);
+    layout.setOrientation(LinearLayout.VERTICAL);
+    layout.setPadding(8, 14, 8, 14);
+    layout.setGravity(android.view.Gravity.CENTER);
 
-        TextView tvIcon = new TextView(context);
-        tvIcon.setText(getActionIcon(action.id));
-        tvIcon.setTextSize(22);
-        tvIcon.setGravity(android.view.Gravity.CENTER);
-        layout.addView(tvIcon);
-
-        TextView tvTitle = new TextView(context);
-        tvTitle.setText(isArabic ? action.titleAr : action.titleEn);
-        tvTitle.setTextSize(11);
-        tvTitle.setGravity(android.view.Gravity.CENTER);
-        tvTitle.setPadding(0, 6, 0, 0);
-        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        layout.addView(tvTitle);
-
-        card.addView(layout);
-        card.setOnClickListener(v -> handleQuickAction(action.id));
-
-        return card;
+    // ✅ تحميل خط Cairo
+    android.graphics.Typeface cairoRegular = null;
+    android.graphics.Typeface cairoBold = null;
+    try {
+        cairoRegular = android.graphics.Typeface.createFromAsset(
+            context.getAssets(), "fonts/cairo_regular.ttf");
+        cairoBold = android.graphics.Typeface.createFromAsset(
+            context.getAssets(), "fonts/cairo_bold.ttf");
+    } catch (Exception e) {
+        Log.e(TAG, "Cairo font load error: " + e.getMessage());
     }
+
+    TextView tvIcon = new TextView(context);
+    tvIcon.setText(getActionIcon(action.id));
+    tvIcon.setTextSize(22);
+    tvIcon.setGravity(android.view.Gravity.CENTER);
+    layout.addView(tvIcon);
+
+    TextView tvTitle = new TextView(context);
+    tvTitle.setText(isArabic ? action.titleAr : action.titleEn);
+    tvTitle.setTextSize(11);
+    tvTitle.setGravity(android.view.Gravity.CENTER);
+    tvTitle.setPadding(0, 6, 0, 0);
+    
+    // ✅ استخدام خط Cairo
+    if (isArabic && cairoBold != null) {
+        tvTitle.setTypeface(cairoBold);
+    } else if (cairoBold != null) {
+        tvTitle.setTypeface(cairoBold);
+    } else {
+        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+    }
+    
+    layout.addView(tvTitle);
+
+    card.addView(layout);
+    card.setOnClickListener(v -> handleQuickAction(action.id));
+
+    return card;
+}
 
     private void handleQuickAction(String actionId) {
         if (getActivity() instanceof UHFMainActivity) {
