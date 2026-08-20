@@ -939,6 +939,167 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         }
     }
     
+    /**
+ * عرض الإعدادات المتقدمة للقارئ النشط
+ */
+private void showAdvancedReaderSettings() {
+    try {
+        MiraIRFIDReader reader = rfidManager.getActiveReader();
+        if (reader == null) {
+            showToast(isArabic ? "لا يوجد قارئ نشط" : "No active reader");
+            return;
+        }
+        
+        if (!(reader instanceof ChainwayReader)) {
+            showToast(isArabic ? "الإعدادات المتقدمة متاحة فقط لأجهزة Chainway" : 
+                "Advanced settings only for Chainway devices");
+            return;
+        }
+        
+        ChainwayReader chainwayReader = (ChainwayReader) reader;
+        
+        LinearLayout layout = new LinearLayout(requireContext());
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(40, 20, 40, 10);
+        
+        // قوة الإرسال
+        TextInputEditText etPower = new TextInputEditText(requireContext());
+        etPower.setHint("قوة الإرسال (dBm) - النطاق: 10-30");
+        etPower.setText(String.valueOf(chainwayReader.getPowerDbm()));
+        etPower.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        layout.addView(etPower);
+        
+        // عتبة RSSI
+        TextInputEditText etRssi = new TextInputEditText(requireContext());
+        etRssi.setHint("عتبة RSSI - النطاق: -100 إلى -30");
+        etRssi.setText(String.valueOf(chainwayReader.getRssiThreshold()));
+        etRssi.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
+        layout.addView(etRssi);
+        
+        // فترة المسح
+        TextInputEditText etInterval = new TextInputEditText(requireContext());
+        etInterval.setHint("فترة المسح (ms) - الحد الأدنى: 50");
+        etInterval.setText(String.valueOf(chainwayReader.getScanIntervalMs()));
+        etInterval.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        layout.addView(etInterval);
+        
+        // Q Value
+        TextInputEditText etQValue = new TextInputEditText(requireContext());
+        etQValue.setHint("Q Value - النطاق: 0-15");
+        etQValue.setText(String.valueOf(chainwayReader.getQValue()));
+        etQValue.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        layout.addView(etQValue);
+        
+        // Session
+        String[] sessions = {"S0", "S1", "S2", "S3"};
+        int currentSession = chainwayReader.getSession();
+        TextView tvSession = new TextView(requireContext());
+        tvSession.setText("Session: " + sessions[currentSession]);
+        tvSession.setTextSize(14);
+        tvSession.setPadding(0, 10, 0, 10);
+        layout.addView(tvSession);
+        
+        // أزرار Session
+        LinearLayout sessionLayout = new LinearLayout(requireContext());
+        sessionLayout.setOrientation(LinearLayout.HORIZONTAL);
+        for (int i = 0; i < sessions.length; i++) {
+            final int session = i;
+            MaterialButton btnSession = new MaterialButton(requireContext());
+            btnSession.setText(sessions[i]);
+            btnSession.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            btnSession.setOnClickListener(v -> {
+                chainwayReader.setSession(session);
+                tvSession.setText("Session: " + sessions[session]);
+                playClickSound();
+            });
+            sessionLayout.addView(btnSession);
+        }
+        layout.addView(sessionLayout);
+        
+        // Target
+        String[] targets = {"A", "B"};
+        int currentTarget = chainwayReader.getTarget();
+        TextView tvTarget = new TextView(requireContext());
+        tvTarget.setText("Target: " + targets[currentTarget]);
+        tvTarget.setTextSize(14);
+        tvTarget.setPadding(0, 10, 0, 10);
+        layout.addView(tvTarget);
+        
+        LinearLayout targetLayout = new LinearLayout(requireContext());
+        targetLayout.setOrientation(LinearLayout.HORIZONTAL);
+        for (int i = 0; i < targets.length; i++) {
+            final int target = i;
+            MaterialButton btnTarget = new MaterialButton(requireContext());
+            btnTarget.setText(targets[i]);
+            btnTarget.setLayoutParams(new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            btnTarget.setOnClickListener(v -> {
+                chainwayReader.setTarget(target);
+                tvTarget.setText("Target: " + targets[target]);
+                playClickSound();
+            });
+            targetLayout.addView(btnTarget);
+        }
+        layout.addView(targetLayout);
+        
+        new AlertDialog.Builder(requireContext())
+            .setTitle("⚙️ الإعدادات المتقدمة للقارئ")
+            .setView(layout)
+            .setPositiveButton("💾 حفظ الكل", (d, w) -> {
+                try {
+                    try { 
+                        String powerText = etPower.getText() != null ? etPower.getText().toString().trim() : "";
+                        if (!powerText.isEmpty()) {
+                            int power = Integer.parseInt(powerText);
+                            power = Math.max(10, Math.min(30, power));
+                            chainwayReader.setPower(power);
+                        }
+                    } catch (Exception ignored) {}
+                    
+                    try { 
+                        String rssiText = etRssi.getText() != null ? etRssi.getText().toString().trim() : "";
+                        if (!rssiText.isEmpty()) {
+                            int rssi = Integer.parseInt(rssiText);
+                            rssi = Math.max(-100, Math.min(-30, rssi));
+                            chainwayReader.setRssiThreshold(rssi);
+                        }
+                    } catch (Exception ignored) {}
+                    
+                    try { 
+                        String intervalText = etInterval.getText() != null ? etInterval.getText().toString().trim() : "";
+                        if (!intervalText.isEmpty()) {
+                            int interval = Integer.parseInt(intervalText);
+                            interval = Math.max(50, Math.min(1000, interval));
+                            chainwayReader.setScanInterval(interval);
+                        }
+                    } catch (Exception ignored) {}
+                    
+                    try { 
+                        String qText = etQValue.getText() != null ? etQValue.getText().toString().trim() : "";
+                        if (!qText.isEmpty()) {
+                            int q = Integer.parseInt(qText);
+                            q = Math.max(0, Math.min(15, q));
+                            chainwayReader.setQValue(q);
+                        }
+                    } catch (Exception ignored) {}
+                    
+                    playSuccessSound();
+                    vibrateSuccess();
+                    showToast("✅ " + (isArabic ? "تم حفظ الإعدادات" : "Settings saved"));
+                } catch (Exception e) {
+                    Log.e(TAG, "Save advanced settings error: " + e.getMessage());
+                }
+            })
+            .setNegativeButton("❌ إلغاء", null)
+            .show();
+            
+    } catch (Exception e) {
+        Log.e(TAG, "Show advanced settings error: " + e.getMessage());
+        showErrorDialog("خطأ في عرض الإعدادات: " + e.getMessage());
+    }
+}
+    
     @Override
     public void onDestroyView() {
         cleanupResources();
