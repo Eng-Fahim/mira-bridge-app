@@ -108,6 +108,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     private Runnable timerRunnable;
     private Runnable batchUpdateRunnable;
     private boolean isBatchScheduled = false;
+    
+    private com.google.android.material.tabs.TabLayout tabInventoryModes;
 
     // Hardware Settings
     private boolean soundEnabled = true;
@@ -177,6 +179,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
     }
 
     private void bindViews(View v) {
+    tabInventoryModes = v.findViewById(R.id.tabInventoryModes);
         tvInventoryStatus = v.findViewById(R.id.tvInventoryStatus);
         tvExpectedCount = v.findViewById(R.id.tvExpectedCount);
         tvScannedCount = v.findViewById(R.id.tvScannedCount);
@@ -252,7 +255,104 @@ public class MiraInventoryProFragment extends KeyDwonFragment {
         if (btnStopInventory != null) btnStopInventory.setOnClickListener(v -> stopInventory());
         if (btnGenerateReport != null) btnGenerateReport.setOnClickListener(v -> generateProReport());
         if (btnArchiveReports != null) btnArchiveReports.setOnClickListener(v -> showAuditHistoryDialog());
+        
+        if (tabInventoryModes != null) {
+    tabInventoryModes.addOnTabSelectedListener(new com.google.android.material.tabs.TabLayout.OnTabSelectedListener() {
+        @Override
+        public void onTabSelected(com.google.android.material.tabs.TabLayout.Tab tab) {
+            handleTabSelection(tab.getPosition());
+        }
+
+        @Override
+        public void onTabUnselected(com.google.android.material.tabs.TabLayout.Tab tab) {
+            // لا شيء
+        }
+
+        @Override
+        public void onTabReselected(com.google.android.material.tabs.TabLayout.Tab tab) {
+            handleTabSelection(tab.getPosition());
+        }
+    });
+}
+
     }
+    
+    // دالة معالجة التبويبات
+private void handleTabSelection(int position) {
+    switch (position) {
+        case 0: // جرد كامل
+            Log.d(TAG, "📋 Full Inventory tab selected");
+            isBlindMode = false;
+            if (tvExpectedCount != null) tvExpectedCount.setVisibility(View.VISIBLE);
+            if (tvVariance != null) tvVariance.setVisibility(View.VISIBLE);
+            if (btnStartInventory != null) btnStartInventory.setEnabled(true);
+            if (btnBlindInventory != null) btnBlindInventory.setEnabled(true);
+            if (rvInventoryItems != null) rvInventoryItems.setVisibility(View.VISIBLE);
+            break;
+            
+        case 1: // جرد أعمى
+            Log.d(TAG, "⚡ Blind Inventory tab selected");
+            isBlindMode = true;
+            if (tvExpectedCount != null) tvExpectedCount.setVisibility(View.GONE);
+            if (tvVariance != null) tvVariance.setVisibility(View.GONE);
+            if (btnStartInventory != null) btnStartInventory.setEnabled(true);
+            if (btnBlindInventory != null) btnBlindInventory.setEnabled(false);
+            if (rvInventoryItems != null) rvInventoryItems.setVisibility(View.VISIBLE);
+            break;
+            
+        case 2: // التقارير
+            Log.d(TAG, "📊 Reports tab selected");
+            // ✅ إظهار التقارير وإخفاء عناصر الجرد
+            if (rvInventoryItems != null) rvInventoryItems.setVisibility(View.GONE);
+            if (btnStartInventory != null) btnStartInventory.setEnabled(false);
+            if (btnBlindInventory != null) btnBlindInventory.setEnabled(false);
+            if (btnStopInventory != null) btnStopInventory.setEnabled(false);
+            
+            // ✅ عرض التقارير المحفوظة
+            showSavedReports();
+            break;
+    }
+}
+
+// دالة عرض التقارير المحفوظة
+private void showSavedReports() {
+    try {
+        String lastSnapshot = offlineCache.getString("last_snapshot", null);
+        if (lastSnapshot != null && !lastSnapshot.isEmpty()) {
+            JSONObject snapshot = new JSONObject(lastSnapshot);
+            
+            // ✅ عرض التقرير في Dialog أو تحديث الواجهة
+            AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+            builder.setTitle(isArabic ? "📊 آخر تقرير جرد" : "📊 Last Inventory Report");
+            
+            String message = isArabic ?
+                "رقم الجلسة: " + snapshot.optInt("session_id", 0) + "\n" +
+                "المتوقع: " + snapshot.optInt("expected_count", 0) + "\n" +
+                "الممسوح: " + snapshot.optInt("total_scanned", 0) + "\n" +
+                "العجز: " + snapshot.optInt("missing_count", 0) + "\n" +
+                "الوزن: " + snapshot.optDouble("total_weight", 0) + "g\n" :
+                "Session ID: " + snapshot.optInt("session_id", 0) + "\n" +
+                "Expected: " + snapshot.optInt("expected_count", 0) + "\n" +
+                "Scanned: " + snapshot.optInt("total_scanned", 0) + "\n" +
+                "Missing: " + snapshot.optInt("missing_count", 0) + "\n" +
+                "Weight: " + snapshot.optDouble("total_weight", 0) + "g\n";
+            
+            builder.setMessage(message);
+            builder.setPositiveButton(isArabic ? "🖨️ طباعة" : "🖨️ Print", (d, w) -> {
+                d.dismiss();
+                generateProReport();
+            });
+            builder.setNegativeButton(isArabic ? "إغلاق" : "Close", (d, w) -> d.dismiss());
+            builder.show();
+        } else {
+            Toast.makeText(getContext(), 
+                isArabic ? "لا توجد تقارير سابقة" : "No previous reports", 
+                Toast.LENGTH_SHORT).show();
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Show reports error: " + e.getMessage());
+    }
+}
 
     private void setInitialState() {
         if (btnStartInventory != null) btnStartInventory.setEnabled(true);
