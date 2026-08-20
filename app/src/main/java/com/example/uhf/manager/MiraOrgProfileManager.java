@@ -14,8 +14,10 @@ public class MiraOrgProfileManager {
     private static final String PREFS_NAME = "MIRA_ORG_PROFILE";
     private static MiraOrgProfileManager instance;
     private final SharedPreferences prefs;
+    private final Context context;
 
     private MiraOrgProfileManager(Context context) {
+        this.context = context.getApplicationContext();
         prefs = context.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
 
@@ -102,6 +104,49 @@ public class MiraOrgProfileManager {
      */
     public String getAppSignature() {
         return getOrgName() + " | " + getOrgSlogan();
+    }
+
+    /**
+     * ✅ الحصول على معرف المستخدم الحالي من SharedPreferences
+     */
+    public int getCurrentUserId() {
+        try {
+            SharedPreferences authPrefs = context.getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
+            return authPrefs.getInt("user_id", 0);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    /**
+     * ✅ الحصول على التوكن الحالي من SharedPreferences
+     */
+    public String getAuthToken() {
+        try {
+            SharedPreferences authPrefs = context.getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
+            String token = authPrefs.getString("auth_token", "");
+            if (token.isEmpty()) {
+                token = authPrefs.getString("session_token", "");
+            }
+            return token;
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /**
+     * ✅ حفظ بيانات المستخدم
+     */
+    public void saveUserAuth(int userId, String token) {
+        try {
+            SharedPreferences authPrefs = context.getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
+            authPrefs.edit()
+                    .putInt("user_id", userId)
+                    .putString("auth_token", token)
+                    .apply();
+        } catch (Exception e) {
+            // تجاهل الأخطاء
+        }
     }
 
     /**
