@@ -22,7 +22,6 @@ public class SessionManager {
     private static final String KEY_LAST_BIOMETRIC_BRANCH_ID = "lastBiometricBranchId";
     private static final String KEY_LAST_BIOMETRIC_BRANCH_NAME = "lastBiometricBranchName";
 
-    // تعريف الصلاحيات في البداية لتسهيل الوصول إليها
     public enum Role {
         SYSTEM_ADMIN,
         ORG_ADMIN,
@@ -69,6 +68,17 @@ public class SessionManager {
         return pref.getString(KEY_USER_ROLE, "INVENTORY_MGR"); 
     }
 
+    // ✅ إضافة getRole
+    public String getRole() { 
+        return getRoleString(); 
+    }
+
+    // ✅ إضافة setRole
+    public void setRole(String role) { 
+        editor.putString(KEY_USER_ROLE, role); 
+        editor.apply(); 
+    }
+
     public boolean isSystemAdmin() { 
         return "SYSTEM_ADMIN".equals(getRoleString()); 
     }
@@ -76,6 +86,11 @@ public class SessionManager {
     public boolean isAnyAdmin() {
         String role = getRoleString();
         return "SYSTEM_ADMIN".equals(role) || "ORG_ADMIN".equals(role) || "ADMIN".equals(role);
+    }
+
+    // ✅ إضافة isAdmin
+    public boolean isAdmin() {
+        return isAnyAdmin();
     }
 
     public boolean isManager() {
@@ -99,8 +114,32 @@ public class SessionManager {
     public String getServerUrl() { return pref.getString(KEY_SERVER_URL, ""); }
     public void setServerUrl(String url) { editor.putString(KEY_SERVER_URL, url); editor.apply(); }
 
+    // ✅ إضافة getPhone و setPhone
+    public String getPhone() { 
+        return pref.getString("phone", ""); 
+    }
+    public void setPhone(String phone) { 
+        editor.putString("phone", phone); 
+        editor.apply(); 
+    }
+
     public void setBiometricEnabled(boolean enabled) { editor.putBoolean(KEY_BIOMETRIC_ENABLED, enabled); editor.apply(); }
     public boolean isBiometricEnabled() { return pref.getBoolean(KEY_BIOMETRIC_ENABLED, false); }
+
+    // ✅ إضافة دوال البيومترية الجديدة
+    public void setBiometricLoginEnabled(boolean enabled) { 
+        setBiometricEnabled(enabled); 
+    }
+    public boolean isBiometricLoginEnabled() { 
+        return isBiometricEnabled(); 
+    }
+    public void setBiometricConfirmEnabled(boolean enabled) { 
+        editor.putBoolean("biometric_confirm_enabled", enabled); 
+        editor.apply(); 
+    }
+    public boolean isBiometricConfirmEnabled() { 
+        return pref.getBoolean("biometric_confirm_enabled", false); 
+    }
 
     public void saveBiometricUser(String username, String role, String displayName, int userId, String token) {
         editor.putString(KEY_LAST_BIOMETRIC_USER, username);
@@ -125,6 +164,11 @@ public class SessionManager {
 
     public int getLastBiometricBranchId() { return pref.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, 1); }
     public String getLastBiometricBranchName() { return pref.getString(KEY_LAST_BIOMETRIC_BRANCH_NAME, ""); }
+
+    // ✅ إضافة refreshProfileData
+    public void refreshProfileData() {
+        // يمكن إضافة منطق إضافي هنا إذا لزم
+    }
 
     public void logoutUser() {
         boolean keepBiometric = pref.getBoolean(KEY_BIOMETRIC_ENABLED, false);
