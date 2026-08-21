@@ -97,9 +97,20 @@ public class MiraAccountingFragment extends Fragment {
         btnCreateManualEntry = view.findViewById(R.id.btnCreateManualEntry);
         tabAccounting = view.findViewById(R.id.tabAccounting);
         
+        
+        
         // ✅ استخدام الموارد المترجمة للتبويبات
         if (tabAccounting != null) {
-            tabAccounting.removeAllTabs();
+            tabAccounting// في initViews أضف:
+            MaterialButton btnFinancialReports = view.findViewById(R.id.btnFinancialReports);
+            if (btnFinancialReports != null) {
+            btnFinancialReports.setOnClickListener(v -> {
+            if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).loadFragment(
+                new MiraFinancialReportsFragment(), "FinancialReports");
+        }
+    });
+    }.removeAllTabs();
             tabAccounting.addTab(tabAccounting.newTab().setText(R.string.tab_journal));
             tabAccounting.addTab(tabAccounting.newTab().setText(R.string.tab_chart_of_accounts));
             tabAccounting.addTab(tabAccounting.newTab().setText(R.string.tab_trial_balance));
