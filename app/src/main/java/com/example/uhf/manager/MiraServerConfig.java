@@ -30,7 +30,7 @@ public class MiraServerConfig {
     }
 
     /**
-     * ✅ الرابط الافتراضي - ضع رابط سيرفرك هنا
+     * ✅ الرابط الافتراضي
      */
     public String getBaseUrl() {
         return prefs.getString(KEY_BASE_URL, "https://sa.mirabarcode.com/wp-json/");
@@ -44,7 +44,7 @@ public class MiraServerConfig {
     }
 
     /**
-     * ✅ مفتاح API - فارغ افتراضياً (يأت من السيرفر عند تسجيل الدخول)
+     * ✅ مفتاح API
      */
     public String getApiKey() {
         return prefs.getString(KEY_API_KEY, "");
@@ -55,7 +55,7 @@ public class MiraServerConfig {
     }
 
     /**
-     * ✅ معرف البوابة - فارغ افتراضياً
+     * ✅ معرف البوابة
      */
     public String getGateId() {
         return prefs.getString(KEY_GATE_ID, "");
@@ -68,15 +68,14 @@ public class MiraServerConfig {
     /**
      * ✅ حفظ بيانات الجلسة بعد تسجيل الدخول
      */
-    
     public void saveSession(String apiKey, String gateId, String authToken) {
-    SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-    prefs.edit()
-        .putString("api_key", apiKey)
-        .putString("gate_id", gateId)
-        .putString("auth_token", authToken)
-        .apply();
-}
+        // ✅ استخدام prefs الموجود في الكلاس مباشرة
+        prefs.edit()
+            .putString(KEY_API_KEY, apiKey != null ? apiKey : "")
+            .putString(KEY_GATE_ID, gateId != null ? gateId : "")
+            .putString(KEY_AUTH_TOKEN, authToken != null ? authToken : "")
+            .apply();
+    }
 
     /**
      * ✅ الحصول على التوكن المحفوظ
