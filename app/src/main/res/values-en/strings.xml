@@ -1669,4 +1669,31 @@
     <string name="title_stop_read_card">Please stop reading tags!</string>
     <string name="tv_fast_inventory">Fast Inventory</string>
 
+
+<!-- Accounting Titles & Header Stats -->
+    <string name="accounting_title">Financial Accounting ERP</string>
+    <string name="main_branch">Main Branch</string>
+    <string name="cash_label">Cash</string>
+    <string name="gold_volume_label">Net Gold (24k)</string>
+    <string name="balance_label">Balance</string>
+
+    <!-- Tabs & Search -->
+    <string name="tab_journal">Journal</string>
+    <string name="tab_chart_of_accounts">Chart of Accounts</string>
+    <string name="tab_trial_balance">Trial Balance</string>
+    <string name="search_hint">Search...</string>
+    <string name="refresh_button">Refresh</string>
+
+    <!-- Table Header Columns -->
+    <string name="header_reference">Ref</string>
+    <string name="header_description">Description</string>
+    <string name="header_gold_24">Net 24 (g)</string>
+    <string name="header_amount">Amount</string>
+
+    <!-- Actions & Status Messages -->
+    <string name="empty_data">No data available</string>
+    <string name="btn_create_compound_entry">+ Create Entry</string>
+    <string name="status_balanced">✓ Balanced</string>
+    <string name="status_unbalanced">⚠️ Unbalanced</string>
+
 </resources>
