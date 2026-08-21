@@ -16,7 +16,6 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ProgressBar;
@@ -31,6 +30,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
+import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.google.android.material.button.MaterialButton;
@@ -61,12 +61,15 @@ public class MiraAccountingFragment extends Fragment {
     private TextView tvTodayRevenue, tvTotalGoldVolume, tvBalanceStatus;
     private TabLayout tabAccounting;
     private MaterialButton btnCreateManualEntry;
+    private MaterialButton btnFinancialReports;
     private ImageButton btnRefresh;
 
-    private String currentTab = "journal"; // journal, chart, trial
+    private String currentTab = "journal";
     private final List<AccountingEntry> entriesList = new ArrayList<>();
     private final List<AccountingEntry> filteredList = new ArrayList<>();
     private AccountingAdapter adapter;
+
+    private boolean isArabic = true;
 
     @Nullable
     @Override
@@ -75,11 +78,11 @@ public class MiraAccountingFragment extends Fragment {
         
         apiClient = MiraApiClient.getInstance(requireContext());
         branchesManager = MiraBranchesManager.getInstance(requireContext());
+        isArabic = Locale.getDefault().getLanguage().equals("ar");
 
         initViews(view);
         setupRecyclerView();
         setupListeners();
-        
         loadData(currentTab);
 
         return view;
@@ -95,25 +98,13 @@ public class MiraAccountingFragment extends Fragment {
         tvTotalGoldVolume = view.findViewById(R.id.tvTotalGoldVolume);
         tvBalanceStatus = view.findViewById(R.id.tvBalanceStatus);
         btnCreateManualEntry = view.findViewById(R.id.btnCreateManualEntry);
+        btnFinancialReports = view.findViewById(R.id.btnFinancialReports);
         tabAccounting = view.findViewById(R.id.tabAccounting);
         
-        
-        
-        // ✅ استخدام الموارد المترجمة للتبويبات
         if (tabAccounting != null) {
-            tabAccounting// في initViews أضف:
-            MaterialButton btnFinancialReports = view.findViewById(R.id.btnFinancialReports);
-            if (btnFinancialReports != null) {
-            btnFinancialReports.setOnClickListener(v -> {
-            if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).loadFragment(
-                new MiraFinancialReportsFragment(), "FinancialReports");
-        }
-    });
-    }.removeAllTabs();
-            tabAccounting.addTab(tabAccounting.newTab().setText(R.string.tab_journal));
-            tabAccounting.addTab(tabAccounting.newTab().setText(R.string.tab_chart_of_accounts));
-            tabAccounting.addTab(tabAccounting.newTab().setText(R.string.tab_trial_balance));
+            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "القيود" : "Journal"));
+            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "دليل الحسابات" : "Chart of Accounts"));
+            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "ميزان المراجعة" : "Trial Balance"));
         }
     }
 
@@ -148,6 +139,15 @@ public class MiraAccountingFragment extends Fragment {
         
         if (btnCreateManualEntry != null) {
             btnCreateManualEntry.setOnClickListener(v -> showCreateEntryDialog());
+        }
+        
+        if (btnFinancialReports != null) {
+            btnFinancialReports.setOnClickListener(v -> {
+                if (getActivity() instanceof UHFMainActivity) {
+                    ((UHFMainActivity) getActivity()).loadFragment(
+                        new MiraFinancialReportsFragment(), "FinancialReports");
+                }
+            });
         }
 
         if (etSearch != null) {
@@ -205,9 +205,6 @@ public class MiraAccountingFragment extends Fragment {
         });
     }
 
-    /**
-     * ✅ قراءة البيانات بمرونة لجميع التبويبات (قيود / دليل حسابات / ميزان مراجعة)
-     */
     private void parseAndDisplay(JSONObject data, String tab) {
         try {
             entriesList.clear();
@@ -227,17 +224,18 @@ public class MiraAccountingFragment extends Fragment {
                         entry.goldDebit = safeDouble(obj.optString("total_gold_debit_grams", "0"));
                         entry.goldCredit = safeDouble(obj.optString("total_gold_credit_grams", "0"));
                     } else if ("chart".equals(tab)) {
-                        entry.code = obj.optString("code", obj.optString("account_code", "—"));
-                        entry.description = obj.optString("name", obj.optString("account_name", "—"));
-                        entry.debit = safeDouble(obj.optString("debit", "0"));
-                        entry.credit = safeDouble(obj.optString("credit", "0"));
-                        entry.goldDebit = safeDouble(obj.optString("gold_balance", "0"));
+                        entry.code = obj.optString("account_code", obj.optString("code", "—"));
+                        entry.description = obj.optString("account_name_ar", obj.optString("account_name", "—"));
+                        entry.debit = safeDouble(obj.optString("opening_balance", "0"));
+                        entry.credit = 0;
+                        entry.goldDebit = safeDouble(obj.optString("opening_gold_grams", "0"));
                     } else if ("trial".equals(tab)) {
-                        entry.code = obj.optString("code", obj.optString("account_code", "—"));
-                        entry.description = obj.optString("account_name", obj.optString("name", "—"));
-                        entry.debit = safeDouble(obj.optString("debit_balance", obj.optString("debit", "0")));
-                        entry.credit = safeDouble(obj.optString("credit_balance", obj.optString("credit", "0")));
-                        entry.goldDebit = safeDouble(obj.optString("gold_debit", "0"));
+                        entry.code = obj.optString("account_code", obj.optString("code", "—"));
+                        entry.description = obj.optString("account_name_ar", obj.optString("account_name", "—"));
+                        entry.debit = safeDouble(obj.optString("total_debit", "0"));
+                        entry.credit = safeDouble(obj.optString("total_credit", "0"));
+                        entry.goldDebit = safeDouble(obj.optString("total_gold_debit", "0"));
+                        entry.goldCredit = safeDouble(obj.optString("total_gold_credit", "0"));
                     }
                     
                     entriesList.add(entry);
@@ -281,10 +279,11 @@ public class MiraAccountingFragment extends Fragment {
             tvTotalGoldVolume.setText(String.format(Locale.US, "%.3f g", totalGold));
         }
         
-        // ✅ استخدام مفاتيح التوازن المترجمة
         if (tvBalanceStatus != null) {
             boolean isBalanced = Math.abs(totalDebit - totalCredit) < 0.01;
-            tvBalanceStatus.setText(isBalanced ? getString(R.string.status_balanced) : getString(R.string.status_unbalanced));
+            tvBalanceStatus.setText(isBalanced ? 
+                (isArabic ? "✓ متوازن" : "✓ Balanced") : 
+                (isArabic ? "⚠️ غير متوازن" : "⚠️ Unbalanced"));
             tvBalanceStatus.setTextColor(isBalanced ? Color.parseColor("#2ECC71") : Color.parseColor("#E74C3C"));
         }
     }
@@ -314,167 +313,132 @@ public class MiraAccountingFragment extends Fragment {
         }
     }
 
-   private void showCreateEntryDialog() {
-    if (getContext() == null) return;
-    
-    Dialog dialog = new Dialog(getContext());
-    dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-    dialog.setContentView(R.layout.dialog_create_journal_entry);
-    
-    if (dialog.getWindow() != null) {
-        dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-        dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT);
-    }
-    
-    EditText etRef = dialog.findViewById(R.id.etDialogRef);
-    EditText etDesc = dialog.findViewById(R.id.etDialogDesc);
-    EditText etGrossWeight = dialog.findViewById(R.id.etDialogGrossWeight);
-    Spinner spKarat = dialog.findViewById(R.id.spDialogKarat);
-    EditText etCashAmount = dialog.findViewById(R.id.etDialogCashAmount);
-    MaterialButton btnCancel = dialog.findViewById(R.id.btnDialogCancel);
-    MaterialButton btnSave = dialog.findViewById(R.id.btnDialogSave);
-    
-    String[] karats = {"24K", "22K", "21K", "18K", "14K"};
-    ArrayAdapter<String> karatAdapter = new ArrayAdapter<>(getContext(), 
-        android.R.layout.simple_spinner_dropdown_item, karats);
-    spKarat.setAdapter(karatAdapter);
-    
-    btnCancel.setOnClickListener(v -> dialog.dismiss());
-    
-    btnSave.setOnClickListener(v -> {
-        String ref = etRef.getText().toString().trim();
-        String desc = etDesc.getText().toString().trim();
-        String grossStr = etGrossWeight.getText().toString().trim();
-        String cashStr = etCashAmount.getText().toString().trim();
+    private void showCreateEntryDialog() {
+        if (getContext() == null) return;
         
-        if (ref.isEmpty() || desc.isEmpty()) {
-            Toast.makeText(getContext(), 
-                isArabic ? "يرجى تعبئة المرجع والبيان" : "Please fill reference and description", 
-                Toast.LENGTH_SHORT).show();
-            return;
+        Dialog dialog = new Dialog(getContext());
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_create_journal_entry);
+        
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT);
         }
         
-        double grossWeight = grossStr.isEmpty() ? 0 : Double.parseDouble(grossStr);
-        double cashAmount = cashStr.isEmpty() ? 0 : Double.parseDouble(cashStr);
-        String karat = spKarat.getSelectedItem().toString();
+        EditText etRef = dialog.findViewById(R.id.etDialogRef);
+        EditText etDesc = dialog.findViewById(R.id.etDialogDesc);
+        EditText etGrossWeight = dialog.findViewById(R.id.etDialogGrossWeight);
+        Spinner spKarat = dialog.findViewById(R.id.spDialogKarat);
+        EditText etCashAmount = dialog.findViewById(R.id.etDialogCashAmount);
+        MaterialButton btnCancel = dialog.findViewById(R.id.btnDialogCancel);
+        MaterialButton btnSave = dialog.findViewById(R.id.btnDialogSave);
         
-        createJournalEntry(ref, desc, grossWeight, karat, cashAmount);
-        dialog.dismiss();
-    });
-    
-    dialog.show();
-}
-
-private void createJournalEntry(String ref, String desc, double grossWeight, String karat, double cashAmount) {
-    executor.execute(() -> {
-        try {
-            JSONObject payload = new JSONObject();
-            payload.put("reference", ref);
-            payload.put("description", desc);
-            payload.put("entry_date", new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new java.util.Date()));
-            payload.put("source_type", "manual");
-            
-            // حساب الوزن الصافي 24K
-            double karatFactor = getKaratFactor(karat);
-            double net24K = grossWeight * karatFactor;
-            
-            JSONArray lines = new JSONArray();
-            
-            // الطرف المدين (الذهب)
-            JSONObject debitLine = new JSONObject();
-            debitLine.put("account_id", 1); // حساب الذهب
-            debitLine.put("description", "شراء " + ref);
-            debitLine.put("debit", cashAmount);
-            debitLine.put("credit", 0);
-            debitLine.put("gold_debit", net24K);
-            debitLine.put("gold_credit", 0);
-            lines.put(debitLine);
-            
-            // الطرف الدائن (النقدية)
-            JSONObject creditLine = new JSONObject();
-            creditLine.put("account_id", 2); // حساب النقدية
-            creditLine.put("description", "دفع " + ref);
-            creditLine.put("debit", 0);
-            creditLine.put("credit", cashAmount);
-            creditLine.put("gold_debit", 0);
-            creditLine.put("gold_credit", 0);
-            lines.put(creditLine);
-            
-            payload.put("lines", lines);
-            payload.put("total_debit", cashAmount);
-            payload.put("total_credit", cashAmount);
-            payload.put("total_gold_debit", net24K);
-            payload.put("total_gold_credit", 0);
-            
-            MiraApiClient.ApiResponse response = apiClient.createJournalEntry(payload);
-            
-            mainHandler.post(() -> {
-                if (response != null && response.isSuccess) {
+        String[] karats = {"24K", "22K", "21K", "18K", "14K"};
+        ArrayAdapter<String> karatAdapter = new ArrayAdapter<>(getContext(), 
+            android.R.layout.simple_spinner_dropdown_item, karats);
+        if (spKarat != null) spKarat.setAdapter(karatAdapter);
+        
+        if (btnCancel != null) btnCancel.setOnClickListener(v -> dialog.dismiss());
+        
+        if (btnSave != null) {
+            btnSave.setOnClickListener(v -> {
+                String ref = etRef != null ? etRef.getText().toString().trim() : "";
+                String desc = etDesc != null ? etDesc.getText().toString().trim() : "";
+                String grossStr = etGrossWeight != null ? etGrossWeight.getText().toString().trim() : "";
+                String cashStr = etCashAmount != null ? etCashAmount.getText().toString().trim() : "";
+                
+                if (ref.isEmpty() || desc.isEmpty()) {
                     Toast.makeText(getContext(), 
-                        isArabic ? "✅ تم إنشاء القيد" : "✅ Entry created", 
+                        isArabic ? "يرجى تعبئة المرجع والبيان" : "Please fill reference and description", 
                         Toast.LENGTH_SHORT).show();
-                    loadData(currentTab);
-                } else {
-                    String error = response != null ? response.error : "Unknown";
-                    Toast.makeText(getContext(), 
-                        isArabic ? "❌ فشل: " + error : "❌ Failed: " + error, 
-                        Toast.LENGTH_LONG).show();
+                    return;
                 }
-            });
-        } catch (Exception e) {
-            e.printStackTrace();
-            mainHandler.post(() -> {
-                Toast.makeText(getContext(), 
-                    isArabic ? "❌ خطأ في الإنشاء" : "❌ Error creating entry", 
-                    Toast.LENGTH_SHORT).show();
+                
+                double grossWeight = grossStr.isEmpty() ? 0 : Double.parseDouble(grossStr);
+                double cashAmount = cashStr.isEmpty() ? 0 : Double.parseDouble(cashStr);
+                String karat = spKarat != null ? spKarat.getSelectedItem().toString() : "21K";
+                
+                createJournalEntry(ref, desc, grossWeight, karat, cashAmount);
+                dialog.dismiss();
             });
         }
-    });
-}
-
-private double getKaratFactor(String karat) {
-    switch (karat.toUpperCase()) {
-        case "24K": return 1.0;
-        case "22K": return 0.9166;
-        case "21K": return 0.875;
-        case "18K": return 0.750;
-        case "14K": return 0.5833;
-        default: return 0.875;
+        
+        dialog.show();
     }
-}
 
-    private void saveJournalEntryToServer(String ref, String desc) {
+    private void createJournalEntry(String ref, String desc, double grossWeight, String karat, double cashAmount) {
         executor.execute(() -> {
             try {
                 JSONObject payload = new JSONObject();
                 payload.put("reference", ref);
                 payload.put("description", desc);
                 payload.put("entry_date", new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new java.util.Date()));
+                payload.put("source_type", "manual");
+                
+                double karatFactor = getKaratFactor(karat);
+                double net24K = grossWeight * karatFactor;
                 
                 JSONArray lines = new JSONArray();
-                JSONObject line = new JSONObject();
-                line.put("account_id", 1);
-                line.put("description", desc);
-                line.put("debit", 0);
-                line.put("credit", 0);
-                lines.put(line);
+                
+                JSONObject debitLine = new JSONObject();
+                debitLine.put("account_id", 1);
+                debitLine.put("description", "شراء " + ref);
+                debitLine.put("debit", cashAmount);
+                debitLine.put("credit", 0);
+                debitLine.put("gold_debit", net24K);
+                debitLine.put("gold_credit", 0);
+                lines.put(debitLine);
+                
+                JSONObject creditLine = new JSONObject();
+                creditLine.put("account_id", 2);
+                creditLine.put("description", "دفع " + ref);
+                creditLine.put("debit", 0);
+                creditLine.put("credit", cashAmount);
+                creditLine.put("gold_debit", 0);
+                creditLine.put("gold_credit", 0);
+                lines.put(creditLine);
                 
                 payload.put("lines", lines);
+                payload.put("total_debit", cashAmount);
+                payload.put("total_credit", cashAmount);
+                payload.put("total_gold_debit", net24K);
+                payload.put("total_gold_credit", 0);
                 
                 MiraApiClient.ApiResponse response = apiClient.createJournalEntry(payload);
                 
                 mainHandler.post(() -> {
                     if (response != null && response.isSuccess) {
-                        Toast.makeText(getContext(), "✅ تم إنشاء القيد", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), 
+                            isArabic ? "✅ تم إنشاء القيد" : "✅ Entry created", 
+                            Toast.LENGTH_SHORT).show();
                         loadData(currentTab);
                     } else {
-                        Toast.makeText(getContext(), "❌ فشل الإنشاء", Toast.LENGTH_SHORT).show();
+                        String error = response != null ? response.error : "Unknown";
+                        Toast.makeText(getContext(), 
+                            isArabic ? "❌ فشل: " + error : "❌ Failed: " + error, 
+                            Toast.LENGTH_LONG).show();
                     }
                 });
             } catch (Exception e) {
-                Log.e(TAG, "Error creating entry: " + e.getMessage());
+                e.printStackTrace();
+                mainHandler.post(() -> {
+                    Toast.makeText(getContext(), 
+                        isArabic ? "❌ خطأ في الإنشاء" : "❌ Error", 
+                        Toast.LENGTH_SHORT).show();
+                });
             }
         });
+    }
+
+    private double getKaratFactor(String karat) {
+        switch (karat.toUpperCase()) {
+            case "24K": return 1.0;
+            case "22K": return 0.9166;
+            case "21K": return 0.875;
+            case "18K": return 0.750;
+            case "14K": return 0.5833;
+            default: return 0.875;
+        }
     }
 
     @Override
@@ -485,8 +449,6 @@ private double getKaratFactor(String karat) {
         }
     }
 
-    // ==================== MODEL ====================
-    
     private static class AccountingEntry {
         int id;
         String code;
@@ -495,11 +457,8 @@ private double getKaratFactor(String karat) {
         double credit;
         double goldDebit;
         double goldCredit;
-        String date;
     }
 
-    // ==================== ADAPTER ====================
-    
     private class AccountingAdapter extends RecyclerView.Adapter<AccountingAdapter.ViewHolder> {
         
         private final List<AccountingEntry> items;
@@ -519,11 +478,9 @@ private double getKaratFactor(String karat) {
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
             AccountingEntry entry = items.get(position);
-            
             holder.tvCode.setText(entry.code != null ? entry.code : "—");
             holder.tvDescription.setText(entry.description != null ? entry.description : "—");
             holder.tvGold.setText(String.format(Locale.US, "%.3f g", entry.goldDebit));
-            
             holder.tvDebit.setText(String.format(Locale.US, "+%,.2f", entry.debit));
             holder.tvCredit.setText(String.format(Locale.US, "-%,.2f", entry.credit));
         }
