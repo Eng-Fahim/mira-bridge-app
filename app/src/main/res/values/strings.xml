@@ -1903,4 +1903,30 @@
 <string name="official_rate">السعر الرسمي</string>
 <string name="market_rate">سعر السوق</string>
 
+
+    <!-- عناوين وإحصائيات المحاسبة -->
+    <string name="accounting_title">نظام ERP المحاسبة المالية</string>
+    <string name="main_branch">الفرع الرئيسي</string>
+    <string name="cash_label">النقدية</string>
+    <string name="gold_volume_label">صافي الذهب (24k)</string>
+    <string name="balance_label">التوازن</string>
+
+    <!-- التبويبات والبحث -->
+    <string name="tab_journal">القيود</string>
+    <string name="tab_chart_of_accounts">دليل الحسابات</string>
+    <string name="tab_trial_balance">ميزان المراجعة</string>
+    <string name="search_hint">بحث...</string>
+    <string name="refresh_button">تحديث</string>
+
+    <!-- ترويسة جدول عرض البيانات -->
+    <string name="header_reference">المرجع</string>
+    <string name="header_description">البيان</string>
+    <string name="header_gold_24">صافي 24 (جم)</string>
+    <string name="header_amount">المبلغ</string>
+
+    <!-- الرسائل والأزرار -->
+    <string name="empty_data">لا توجد بيانات</string>
+    <string name="btn_create_compound_entry">+ إنشاء قيد مركب</string>
+    <string name="status_balanced">✓ متوازن</string>
+    <string name="status_unbalanced">⚠️ غير متوازن</string>
 </resources>
