@@ -2,7 +2,6 @@ package com.example.uhf.fragment;
 
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
@@ -12,6 +11,7 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -22,10 +22,10 @@ import androidx.fragment.app.Fragment;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.android.material.switchmaterial.SwitchMaterial;
 
 import org.json.JSONObject;
 
@@ -35,16 +35,16 @@ import java.util.concurrent.Executors;
 public class MiraProfileFragment extends Fragment {
 
     private static final String TAG = "MiraProfileFragment";
-    private static final String ORG_PREFS = "mira_org_profile";
 
-    private TextView tvProfileName, tvRole, tvAccountNum, tvAltNum;
+    private TextView tvProfileName, tvRole, tvAccountNum;
     private TextView tvOrgNameAr, tvOrgNameEn, tvPhone, tvEmail, tvTaxNum;
     private ImageView imgArrowSecurity, imgArrowTheme;
     private LinearLayout layoutSecurityExpandable, layoutAppThemeExpandable;
-    private SwitchMaterial switchBiometricLogin, switchBiometricConfirm;
+    private Switch switchBiometricLogin, switchBiometricConfirm;
 
     private SessionManager sessionManager;
     private MiraApiClient apiClient;
+    private MiraOrgProfileManager orgProfileManager;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     @Nullable
@@ -54,14 +54,12 @@ public class MiraProfileFragment extends Fragment {
         
         sessionManager = new SessionManager(requireContext());
         apiClient = MiraApiClient.getInstance(requireContext());
+        orgProfileManager = MiraOrgProfileManager.getInstance(requireContext());
 
         initViews(root);
         setupListeners(root);
         
-        // ✅ تحميل البيانات المحلية أولاً
         loadLocalProfileData();
-        
-        // ✅ ثم جلب من السيرفر
         fetchProfileFromServer();
 
         return root;
@@ -71,7 +69,6 @@ public class MiraProfileFragment extends Fragment {
         tvProfileName = root.findViewById(R.id.tvProfileName);
         tvRole = root.findViewById(R.id.tvRole);
         tvAccountNum = root.findViewById(R.id.tvAccountNum);
-        tvAltNum = root.findViewById(R.id.tvAltNum);
 
         tvOrgNameAr = root.findViewById(R.id.tvOrgNameAr);
         tvOrgNameEn = root.findViewById(R.id.tvOrgNameEn);
@@ -90,30 +87,30 @@ public class MiraProfileFragment extends Fragment {
     }
 
     private void setupListeners(View root) {
+        // ✅ زر تعديل المنظمة - للمدير فقط
         MaterialButton btnEditOrgProfile = root.findViewById(R.id.btnEditOrgProfile);
-    if (btnEditOrgProfile != null) {
-        // التحقق من صلاحية المستخدم
-        String role = sessionManager.getRole();
-        boolean isAdmin = role != null && (
-            role.contains("ADMIN") || 
-            role.contains("admin") || 
-            role.contains("مدير") ||
-            role.contains("مسؤول")
-        );
-        
-        if (isAdmin) {
-            btnEditOrgProfile.setVisibility(View.VISIBLE);
-            btnEditOrgProfile.setOnClickListener(v -> showEditOrgDialog());
-        } else {
-            btnEditOrgProfile.setVisibility(View.GONE);
+        if (btnEditOrgProfile != null) {
+            String role = sessionManager.getRole();
+            boolean isAdmin = role != null && (
+                role.contains("ADMIN") || 
+                role.contains("admin") || 
+                role.contains("مدير") ||
+                role.contains("مسؤول")
+            );
+            
+            if (isAdmin) {
+                btnEditOrgProfile.setVisibility(View.VISIBLE);
+                btnEditOrgProfile.setOnClickListener(v -> showEditOrgDialog());
+            } else {
+                btnEditOrgProfile.setVisibility(View.GONE);
+            }
         }
-    }
-    
-    // ✅ زر تعديل الملف الشخصي - متاح للجميع
-    MaterialButton btnEditProfile = root.findViewById(R.id.btnEditProfile);
-    if (btnEditProfile != null) {
-        btnEditProfile.setOnClickListener(v -> showEditUserDialog());
-    }
+        
+        // ✅ زر تعديل الملف الشخصي - للجميع
+        MaterialButton btnEditProfile = root.findViewById(R.id.btnEditProfile);
+        if (btnEditProfile != null) {
+            btnEditProfile.setOnClickListener(v -> showEditUserDialog());
+        }
 
         View headerSecurity = root.findViewById(R.id.headerSecurity);
         if (headerSecurity != null) {
@@ -150,13 +147,11 @@ public class MiraProfileFragment extends Fragment {
     }
 
     /**
-     * ✅ تحميل البيانات المحلية المخزنة
+     * ✅ تحميل البيانات المحلية
      */
     private void loadLocalProfileData() {
         try {
-            // بيانات المستخدم
             String displayName = sessionManager.getDisplayName();
-            String username = sessionManager.getUsername();
             String phone = sessionManager.getPhone();
             
             if (tvProfileName != null && !TextUtils.isEmpty(displayName)) {
@@ -172,37 +167,26 @@ public class MiraProfileFragment extends Fragment {
                 tvAccountNum.setText(phone);
             }
             
-            // بيانات المنظمة
-            SharedPreferences prefs = requireContext()
-                .getSharedPreferences(ORG_PREFS, Context.MODE_PRIVATE);
-            
-            String orgNameAr = prefs.getString("org_name_ar", "");
-            String orgNameEn = prefs.getString("org_name_en", "");
-            String orgPhone = prefs.getString("org_phone", "");
-            String orgEmail = prefs.getString("org_email", "");
-            String taxNumber = prefs.getString("tax_number", "");
-            
-            if (tvOrgNameAr != null && !TextUtils.isEmpty(orgNameAr)) {
-                tvOrgNameAr.setText(orgNameAr);
+            // ✅ استخدام MiraOrgProfileManager
+            if (tvOrgNameAr != null) {
+                tvOrgNameAr.setText(orgProfileManager.getOrgNameAr());
+            }
+            if (tvOrgNameEn != null) {
+                tvOrgNameEn.setText(orgProfileManager.getOrgNameEn());
+            }
+            if (tvPhone != null) {
+                tvPhone.setText(orgProfileManager.getOrgPhone());
+            }
+            if (tvEmail != null) {
+                tvEmail.setText(orgProfileManager.getOrgEmail());
+            }
+            if (tvTaxNum != null) {
+                String tax = orgProfileManager.getTaxNumber();
+                if (!TextUtils.isEmpty(tax)) {
+                    tvTaxNum.setText("الرقم الضريبي: " + tax);
+                }
             }
             
-            if (tvOrgNameEn != null && !TextUtils.isEmpty(orgNameEn)) {
-                tvOrgNameEn.setText(orgNameEn);
-            }
-            
-            if (tvPhone != null && !TextUtils.isEmpty(orgPhone)) {
-                tvPhone.setText(orgPhone);
-            }
-            
-            if (tvEmail != null && !TextUtils.isEmpty(orgEmail)) {
-                tvEmail.setText(orgEmail);
-            }
-            
-            if (tvTaxNum != null && !TextUtils.isEmpty(taxNumber)) {
-                tvTaxNum.setText("الرقم الضريبي: " + taxNumber);
-            }
-            
-            // تفضيلات البيومترية
             if (switchBiometricLogin != null) {
                 switchBiometricLogin.setChecked(sessionManager.isBiometricLoginEnabled());
             }
@@ -217,46 +201,6 @@ public class MiraProfileFragment extends Fragment {
     }
 
     /**
-     * ✅ حفظ البيانات محلياً
-     */
-    private void saveLocalProfileData(JSONObject user, JSONObject org) {
-        try {
-            SharedPreferences prefs = requireContext()
-                .getSharedPreferences(ORG_PREFS, Context.MODE_PRIVATE);
-            SharedPreferences.Editor editor = prefs.edit();
-            
-            if (org != null) {
-                editor.putString("org_name_ar", org.optString("name_ar", ""));
-                editor.putString("org_name_en", org.optString("name_en", ""));
-                editor.putString("org_phone", org.optString("phone", ""));
-                editor.putString("org_email", org.optString("email", ""));
-                editor.putString("tax_number", org.optString("tax_number", ""));
-            }
-            
-            if (user != null) {
-                String displayName = user.optString("display_name", "");
-                String role = user.optString("role", "");
-                String phone = user.optString("phone", "");
-                
-                if (!TextUtils.isEmpty(displayName)) {
-                    sessionManager.setDisplayName(displayName);
-                }
-                if (!TextUtils.isEmpty(role)) {
-                    sessionManager.setRole(role);
-                }
-                if (!TextUtils.isEmpty(phone)) {
-                    sessionManager.setPhone(phone);
-                }
-            }
-            
-            editor.apply();
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Error saving local profile", e);
-        }
-    }
-
-    /**
      * ✅ جلب البروفايل من السيرفر
      */
     private void fetchProfileFromServer() {
@@ -267,20 +211,29 @@ public class MiraProfileFragment extends Fragment {
                 MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
                 
                 if (response != null && response.isSuccess && response.data != null) {
-                    // ✅ السيرفر يرجع user و organization مباشرة في الـ root
                     JSONObject user = response.data.optJSONObject("user");
                     JSONObject org = response.data.optJSONObject("organization");
                     
-                    // ✅ حفظ محلياً
-                    saveLocalProfileData(user, org);
+                    // ✅ حفظ في المدير المركزي
+                    if (org != null) {
+                        orgProfileManager.saveFromServer(org);
+                    }
+                    
+                    if (user != null) {
+                        String displayName = user.optString("display_name", "");
+                        String role = user.optString("role", "");
+                        String phone = user.optString("phone", "");
+                        
+                        if (!TextUtils.isEmpty(displayName)) sessionManager.setDisplayName(displayName);
+                        if (!TextUtils.isEmpty(role)) sessionManager.setRole(role);
+                        if (!TextUtils.isEmpty(phone)) sessionManager.setPhone(phone);
+                    }
                     
                     final JSONObject finalUser = user;
                     final JSONObject finalOrg = org;
                     
                     if (getActivity() != null) {
-                        getActivity().runOnUiThread(() -> {
-                            updateUIWithData(finalUser, finalOrg);
-                        });
+                        getActivity().runOnUiThread(() -> updateUIWithData(finalUser, finalOrg));
                     }
                 }
             } catch (Exception e) {
@@ -332,202 +285,177 @@ public class MiraProfileFragment extends Fragment {
     }
 
     /**
-     * ✅ عرض نافذة التعديل
+     * ✅ نافذة تعديل بيانات المنظمة (للمدير فقط)
      */
-    /**
- * ✅ نافذة تعديل بيانات المنظمة (للمدير فقط)
- */
-private void showEditOrgDialog() {
-    if (getContext() == null) return;
-    
-    View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_edit_mira_profile, null);
-    EditText etNameAr = dialogView.findViewById(R.id.etEditNameAr);
-    EditText etNameEn = dialogView.findViewById(R.id.etEditNameEn);
-    EditText etPhone = dialogView.findViewById(R.id.etEditPhone);
-    EditText etEmail = dialogView.findViewById(R.id.etEditEmail);
-    EditText etTax = dialogView.findViewById(R.id.etEditTax);
-    
-    // تعبئة القيم الحالية
-    if (tvOrgNameAr != null && etNameAr != null) etNameAr.setText(tvOrgNameAr.getText());
-    if (tvOrgNameEn != null && etNameEn != null) etNameEn.setText(tvOrgNameEn.getText());
-    if (tvPhone != null && etPhone != null) etPhone.setText(tvPhone.getText());
-    if (tvEmail != null && etEmail != null) etEmail.setText(tvEmail.getText());
-    
-    if (etTax != null && tvTaxNum != null) {
-        String taxText = tvTaxNum.getText().toString();
-        String tax = taxText.replace("الرقم الضريبي: ", "").trim();
-        etTax.setText(tax);
+    private void showEditOrgDialog() {
+        if (getContext() == null) return;
+        
+        View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_edit_mira_profile, null);
+        EditText etNameAr = dialogView.findViewById(R.id.etEditNameAr);
+        EditText etNameEn = dialogView.findViewById(R.id.etEditNameEn);
+        EditText etPhone = dialogView.findViewById(R.id.etEditPhone);
+        EditText etEmail = dialogView.findViewById(R.id.etEditEmail);
+        EditText etTax = dialogView.findViewById(R.id.etEditTax);
+        
+        if (tvOrgNameAr != null && etNameAr != null) etNameAr.setText(tvOrgNameAr.getText());
+        if (tvOrgNameEn != null && etNameEn != null) etNameEn.setText(tvOrgNameEn.getText());
+        if (tvPhone != null && etPhone != null) etPhone.setText(tvPhone.getText());
+        if (tvEmail != null && etEmail != null) etEmail.setText(tvEmail.getText());
+        
+        if (etTax != null && tvTaxNum != null) {
+            String taxText = tvTaxNum.getText().toString();
+            String tax = taxText.replace("الرقم الضريبي: ", "").trim();
+            etTax.setText(tax);
+        }
+        
+        new MaterialAlertDialogBuilder(getContext())
+                .setTitle("✏️ تعديل بيانات المنظمة")
+                .setView(dialogView)
+                .setPositiveButton("حفظ", (dialog, which) -> {
+                    String nameAr = etNameAr != null ? etNameAr.getText().toString().trim() : "";
+                    String nameEn = etNameEn != null ? etNameEn.getText().toString().trim() : "";
+                    String phone = etPhone != null ? etPhone.getText().toString().trim() : "";
+                    String email = etEmail != null ? etEmail.getText().toString().trim() : "";
+                    String tax = etTax != null ? etTax.getText().toString().trim() : "";
+                    
+                    saveOrgProfileToServer(nameAr, nameEn, phone, email, tax);
+                })
+                .setNegativeButton("إلغاء", null)
+                .show();
     }
-    
-    new MaterialAlertDialogBuilder(getContext())
-            .setTitle("✏️ تعديل بيانات المنظمة")
-            .setView(dialogView)
-            .setPositiveButton("حفظ", (dialog, which) -> {
-                String nameAr = etNameAr != null ? etNameAr.getText().toString().trim() : "";
-                String nameEn = etNameEn != null ? etNameEn.getText().toString().trim() : "";
-                String phone = etPhone != null ? etPhone.getText().toString().trim() : "";
-                String email = etEmail != null ? etEmail.getText().toString().trim() : "";
-                String tax = etTax != null ? etTax.getText().toString().trim() : "";
+
+    /**
+     * ✅ نافذة تعديل بيانات المستخدم
+     */
+    private void showEditUserDialog() {
+        if (getContext() == null) return;
+        
+        View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_edit_user_profile, null);
+        EditText etDisplayName = dialogView.findViewById(R.id.etEditDisplayName);
+        EditText etPhone = dialogView.findViewById(R.id.etEditUserPhone);
+        
+        if (tvProfileName != null && etDisplayName != null) etDisplayName.setText(tvProfileName.getText());
+        if (tvAccountNum != null && etPhone != null) etPhone.setText(tvAccountNum.getText());
+        
+        new MaterialAlertDialogBuilder(getContext())
+                .setTitle("👤 تعديل الملف الشخصي")
+                .setView(dialogView)
+                .setPositiveButton("حفظ", (dialog, which) -> {
+                    String displayName = etDisplayName != null ? etDisplayName.getText().toString().trim() : "";
+                    String phone = etPhone != null ? etPhone.getText().toString().trim() : "";
+                    
+                    saveUserProfileToServer(displayName, phone);
+                })
+                .setNegativeButton("إلغاء", null)
+                .show();
+    }
+
+    /**
+     * ✅ حفظ بيانات المنظمة
+     */
+    private void saveOrgProfileToServer(String nameAr, String nameEn, String phone, String email, String tax) {
+        showLoading(true);
+
+        executor.execute(() -> {
+            try {
+                JSONObject payload = new JSONObject();
+                payload.put("org_name_ar", nameAr);
+                payload.put("org_name_en", nameEn);
+                payload.put("org_phone", phone);
+                payload.put("org_email", email);
+                payload.put("tax_number", tax);
+
+                MiraApiClient.ApiResponse response = apiClient.saveOrgProfile(payload);
                 
-                // ✅ استدعاء دالة الحفظ
-                saveOrgProfileToServer(nameAr, nameEn, phone, email, tax);
-            })
-            .setNegativeButton("إلغاء", null)
-            .show();
-}
-
-/**
- * ✅ نافذة تعديل بيانات المستخدم الشخصي
- */
-private void showEditUserDialog() {
-    if (getContext() == null) return;
-    
-    View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_edit_user_profile, null);
-    EditText etDisplayName = dialogView.findViewById(R.id.etEditDisplayName);
-    EditText etPhone = dialogView.findViewById(R.id.etEditUserPhone);
-    
-    // تعبئة القيم الحالية
-    if (tvProfileName != null && etDisplayName != null) etDisplayName.setText(tvProfileName.getText());
-    if (tvAccountNum != null && etPhone != null) etPhone.setText(tvAccountNum.getText());
-    
-    new MaterialAlertDialogBuilder(getContext())
-            .setTitle("👤 تعديل الملف الشخصي")
-            .setView(dialogView)
-            .setPositiveButton("حفظ", (dialog, which) -> {
-                String displayName = etDisplayName != null ? etDisplayName.getText().toString().trim() : "";
-                String phone = etPhone != null ? etPhone.getText().toString().trim() : "";
+                final boolean success = response != null && response.isSuccess;
                 
-                // ✅ استدعاء دالة حفظ بيانات المستخدم
-                saveUserProfileToServer(displayName, phone);
-            })
-            .setNegativeButton("إلغاء", null)
-            .show();
-}
-
-/**
- * ✅ حفظ بيانات المنظمة في السيرفر
- */
-private void saveOrgProfileToServer(String nameAr, String nameEn, String phone, String email, String tax) {
-    showLoading(true);
-
-    executor.execute(() -> {
-        try {
-            JSONObject payload = new JSONObject();
-            payload.put("org_name_ar", nameAr);
-            payload.put("org_name_en", nameEn);
-            payload.put("org_phone", phone);
-            payload.put("org_email", email);
-            payload.put("tax_number", tax);
-
-            MiraApiClient.ApiResponse response = apiClient.saveOrgProfile(payload);
-            
-            final boolean success = response != null && response.isSuccess;
-            
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    if (success) {
-                        // ✅ تحديث الواجهة
-                        if (tvOrgNameAr != null) tvOrgNameAr.setText(nameAr);
-                        if (tvOrgNameEn != null) tvOrgNameEn.setText(nameEn);
-                        if (tvPhone != null) tvPhone.setText(phone);
-                        if (tvEmail != null) tvEmail.setText(email);
-                        if (tvTaxNum != null) tvTaxNum.setText("الرقم الضريبي: " + tax);
-                        
-                        // ✅ حفظ محلياً
-                        try {
-                            JSONObject org = new JSONObject();
-                            org.put("name_ar", nameAr);
-                            org.put("name_en", nameEn);
-                            org.put("phone", phone);
-                            org.put("email", email);
-                            org.put("tax_number", tax);
-                            saveLocalProfileData(null, org);
-                        } catch (Exception ignored) {}
-                        
-                        Toast.makeText(getContext(), "✅ تم حفظ بيانات المنظمة", Toast.LENGTH_SHORT).show();
-                        notifyProfileUpdated();
-                    } else {
-                        String error = response != null ? response.error : "Unknown error";
-                        Toast.makeText(getContext(), "❌ فشل: " + error, Toast.LENGTH_SHORT).show();
-                    }
-                });
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error saving org profile: ", e);
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    Toast.makeText(getContext(), "❌ خطأ في الحفظ", Toast.LENGTH_SHORT).show();
-                });
-            }
-        } finally {
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> showLoading(false));
-            }
-        }
-    });
-}
-
-/**
- * ✅ حفظ بيانات المستخدم الشخصي في السيرفر
- */
-private void saveUserProfileToServer(String displayName, String phone) {
-    showLoading(true);
-
-    executor.execute(() -> {
-        try {
-            JSONObject payload = new JSONObject();
-            payload.put("display_name", displayName);
-            payload.put("phone", phone);
-
-            // ✅ استخدام updateUser إذا كانت موجودة في MiraApiClient
-            MiraApiClient.ApiResponse response = apiClient.updateUser(payload);
-            
-            final boolean success = response != null && response.isSuccess;
-            
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    if (success) {
-                        // ✅ تحديث الواجهة
-                        if (tvProfileName != null) tvProfileName.setText(displayName);
-                        if (tvAccountNum != null) tvAccountNum.setText(phone);
-                        
-                        // ✅ تحديث SessionManager
-                        if (!TextUtils.isEmpty(displayName)) {
-                            sessionManager.setDisplayName(displayName);
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (success) {
+                            if (tvOrgNameAr != null) tvOrgNameAr.setText(nameAr);
+                            if (tvOrgNameEn != null) tvOrgNameEn.setText(nameEn);
+                            if (tvPhone != null) tvPhone.setText(phone);
+                            if (tvEmail != null) tvEmail.setText(email);
+                            if (tvTaxNum != null) tvTaxNum.setText("الرقم الضريبي: " + tax);
+                            
+                            // ✅ حفظ في المدير المركزي
+                            orgProfileManager.saveFullProfile(nameAr, nameEn, phone, email, tax);
+                            
+                            Toast.makeText(getContext(), "✅ تم حفظ بيانات المنظمة", Toast.LENGTH_SHORT).show();
+                        } else {
+                            String error = response != null ? response.error : "Unknown error";
+                            Toast.makeText(getContext(), "❌ فشل: " + error, Toast.LENGTH_SHORT).show();
                         }
-                        if (!TextUtils.isEmpty(phone)) {
-                            sessionManager.setPhone(phone);
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error saving org profile: ", e);
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "❌ خطأ في الحفظ", Toast.LENGTH_SHORT).show();
+                    });
+                }
+            } finally {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> showLoading(false));
+                }
+            }
+        });
+    }
+
+    /**
+     * ✅ حفظ بيانات المستخدم
+     */
+    private void saveUserProfileToServer(String displayName, String phone) {
+        showLoading(true);
+
+        executor.execute(() -> {
+            try {
+                JSONObject payload = new JSONObject();
+                payload.put("display_name", displayName);
+                payload.put("phone", phone);
+
+                MiraApiClient.ApiResponse response = apiClient.updateUserProfile(payload);
+                
+                final boolean success = response != null && response.isSuccess;
+                
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (success) {
+                            if (tvProfileName != null) tvProfileName.setText(displayName);
+                            if (tvAccountNum != null) tvAccountNum.setText(phone);
+                            
+                            if (!TextUtils.isEmpty(displayName)) sessionManager.setDisplayName(displayName);
+                            if (!TextUtils.isEmpty(phone)) sessionManager.setPhone(phone);
+                            
+                            Toast.makeText(getContext(), "✅ تم تحديث الملف الشخصي", Toast.LENGTH_SHORT).show();
+                        } else {
+                            String error = response != null ? response.error : "Unknown error";
+                            Toast.makeText(getContext(), "❌ فشل: " + error, Toast.LENGTH_SHORT).show();
                         }
-                        
-                        Toast.makeText(getContext(), "✅ تم تحديث الملف الشخصي", Toast.LENGTH_SHORT).show();
-                        notifyProfileUpdated();
-                    } else {
-                        String error = response != null ? response.error : "Unknown error";
-                        Toast.makeText(getContext(), "❌ فشل: " + error, Toast.LENGTH_SHORT).show();
-                    }
-                });
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error saving user profile: ", e);
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        Toast.makeText(getContext(), "❌ خطأ في الحفظ", Toast.LENGTH_SHORT).show();
+                    });
+                }
+            } finally {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> showLoading(false));
+                }
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error saving user profile: ", e);
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    Toast.makeText(getContext(), "❌ خطأ في الحفظ", Toast.LENGTH_SHORT).show();
-                });
-            }
-        } finally {
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> showLoading(false));
-            }
-        }
-    });
-}
+        });
+    }
 
     private void saveBiometricPreference(String key, boolean value) {
         executor.execute(() -> {
             try {
                 JSONObject payload = new JSONObject();
                 payload.put(key, value);
-                MiraApiClient.ApiResponse response = apiClient.saveSettings(payload);
+                apiClient.saveSettings(payload);
             } catch (Exception e) {
                 Log.e(TAG, "Error saving biometric preference", e);
             }
