@@ -36,9 +36,6 @@ import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
-import androidx.lifecycle.MutableLiveData;
-import androidx.lifecycle.ViewModel;
-import androidx.lifecycle.ViewModelProvider;
 
 import com.example.uhf.R;
 import com.example.uhf.fragment.MiraQuickAccessSettingsFragment;
@@ -86,7 +83,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private static final String TAG = "UHFMainActivity";
     private static final int PERMISSION_REQUEST_CODE = 1001;
-    private static final String STATE_CURRENT_FRAGMENT = "current_fragment";
     private static final String PREFS_NAVIGATION = "app_navigation";
     private static final String KEY_CURRENT_FRAGMENT = "current_fragment_tag";
 
@@ -114,7 +110,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private int lastActiveBranchId = -1;
     
     // ✅ متغيرات جديدة لحفظ حالة الـ Fragment
-    private FragmentStateViewModel fragmentStateViewModel;
     private String currentFragmentTag = "Dashboard";
     
     // متغيرات للتعامل مع زر الرجوع
@@ -188,9 +183,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             loadingOverlay = findViewById(R.id.loading_overlay);
             fragmentManager = getSupportFragmentManager();
             
-            // ✅ تهيئة ViewModel لحفظ حالة الـ Fragment
-            fragmentStateViewModel = new ViewModelProvider(this).get(FragmentStateViewModel.class);
-            
             setupOrgProfileListener();
             updateBottomNavLanguage();
 
@@ -213,12 +205,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             setupQuickNav();
 
-            // ✅ استعادة الـ Fragment المحفوظ بدلاً من تحميل الداشبورد دائماً
-            if (savedInstanceState != null) {
-                // استعادة من Bundle أولاً
-                currentFragmentTag = savedInstanceState.getString(STATE_CURRENT_FRAGMENT, "Dashboard");
+            // ✅ استعادة الـ Fragment المحفوظ
+            if (savedInstanceState != null && savedInstanceState.containsKey("current_fragment")) {
+                currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
             } else {
-                // استعادة من SharedPreferences أو ViewModel
                 currentFragmentTag = getSavedFragmentTag();
             }
             
@@ -230,7 +220,14 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         } catch (Exception e) {
             Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
-            Toast.makeText(this, isArabic ? "حدث خطأ أثناء تحميل الواجهة" : "Initialization Error", Toast.LENGTH_LONG).show();
+            // ✅ محاولة تحميل الداشبورد كحل أخير
+            try {
+                if (fragmentManager != null) {
+                    loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+                }
+            } catch (Exception e2) {
+                Log.e(TAG, "Cannot load fallback fragment: " + e2.getMessage(), e2);
+            }
         }
     }
 
@@ -246,13 +243,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    // ✅ حفظ حالة الـ Fragment عند إعادة إنشاء النشاط
+    // ✅ حفظ حالة الـ Fragment
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
-        outState.putString(STATE_CURRENT_FRAGMENT, currentFragmentTag);
-        
-        // ✅ حفظ في SharedPreferences أيضاً
+        outState.putString("current_fragment", currentFragmentTag);
         saveFragmentTagToPrefs(currentFragmentTag);
     }
     
@@ -270,13 +265,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     
     // ✅ استعادة الـ Fragment المحفوظ
     private String getSavedFragmentTag() {
-        // 1. محاولة من ViewModel (أحدث قيمة)
-        String viewModelTag = fragmentStateViewModel.getCurrentFragmentTag().getValue();
-        if (viewModelTag != null && !viewModelTag.isEmpty()) {
-            return viewModelTag;
-        }
-        
-        // 2. محاولة من SharedPreferences
         try {
             SharedPreferences prefs = getSharedPreferences(PREFS_NAVIGATION, Context.MODE_PRIVATE);
             String savedTag = prefs.getString(KEY_CURRENT_FRAGMENT, "Dashboard");
@@ -287,7 +275,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Get saved fragment tag error: " + e.getMessage());
         }
         
-        // 3. الافتراضي
         return "Dashboard";
     }
 
@@ -331,20 +318,24 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     // ✅ تحسين toggleLanguage للحفاظ على الـ Fragment الحالي
     private void toggleLanguage() {
-        String newLang = isArabic ? "en" : "ar";
-        
-        // ✅ حفظ الـ Fragment الحالي قبل تغيير اللغة
-        saveFragmentTagToPrefs(currentFragmentTag);
-        
-        // ✅ تطبيق اللغة الجديدة
-        MiraLanguageHelper.applyLanguage(this, newLang);
-        
-        // ✅ إعادة تشغيل النشاط مع الحفاظ على الـ Fragment
-        Intent intent = new Intent(this, UHFMainActivity.class);
-        intent.putExtra("preserve_fragment", true);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        finish();
+        try {
+            String newLang = isArabic ? "en" : "ar";
+            
+            // ✅ حفظ الـ Fragment الحالي قبل تغيير اللغة
+            saveFragmentTagToPrefs(currentFragmentTag);
+            
+            // ✅ تطبيق اللغة الجديدة
+            MiraLanguageHelper.applyLanguage(this, newLang);
+            
+            // ✅ إعادة تشغيل النشاط مع الحفاظ على الـ Fragment
+            Intent intent = new Intent(this, UHFMainActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            finish();
+        } catch (Exception e) {
+            Log.e(TAG, "Toggle language error: " + e.getMessage(), e);
+            Toast.makeText(this, "Error changing language", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void showGoldRatesDialog() {
@@ -539,7 +530,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             
             // ✅ تحديث الـ Tag الحالي وحفظه
             currentFragmentTag = tag;
-            fragmentStateViewModel.setCurrentFragmentTag(tag);
             saveFragmentTagToPrefs(tag);
             
             FragmentTransaction transaction = fragmentManager.beginTransaction()
@@ -560,12 +550,28 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     
     // ✅ دالة جديدة لتحميل الـ Fragment حسب الـ Tag
     private void loadFragmentByTag(String tag) {
-        Fragment fragment = createFragmentByTag(tag);
-        if (fragment != null) {
-            loadFragment(fragment, tag, false);
-        } else {
-            // إذا فشل الإنشاء، تحميل الداشبورد
-            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+        try {
+            Fragment fragment = createFragmentByTag(tag);
+            if (fragment != null) {
+                currentFragment = fragment;
+                currentFragmentTag = tag;
+                
+                FragmentTransaction transaction = fragmentManager.beginTransaction()
+                        .replace(R.id.fragment_container, fragment, tag);
+                
+                transaction.commitAllowingStateLoss();
+            } else {
+                // إذا فشل الإنشاء، تحميل الداشبورد
+                loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Load fragment by tag error: " + e.getMessage(), e);
+            // تحميل الداشبورد كحل أخير
+            try {
+                loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+            } catch (Exception e2) {
+                Log.e(TAG, "Cannot load dashboard: " + e2.getMessage(), e2);
+            }
         }
     }
     
@@ -783,11 +789,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Fragment topFragment = getTopFragment();
             if (topFragment != null) {
                 currentFragment = topFragment;
-                // ✅ تحديث الـ Tag الحالي
                 String tag = topFragment.getTag();
                 if (tag != null) {
                     currentFragmentTag = tag;
-                    fragmentStateViewModel.setCurrentFragmentTag(tag);
                     saveFragmentTagToPrefs(tag);
                 }
             }
@@ -1046,18 +1050,5 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 notifyAll();
             }
         }
-    }
-}
-
-// ✅ ViewModel لحفظ حالة الـ Fragment
-class FragmentStateViewModel extends ViewModel {
-    private final MutableLiveData<String> currentFragmentTag = new MutableLiveData<>();
-    
-    public MutableLiveData<String> getCurrentFragmentTag() {
-        return currentFragmentTag;
-    }
-    
-    public void setCurrentFragmentTag(String tag) {
-        currentFragmentTag.setValue(tag);
     }
 }
