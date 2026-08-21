@@ -227,7 +227,7 @@ public class MiraAccountingFragment extends Fragment {
     try {
         entriesList.clear();
         
-        // ✅ السيرفر يرجع data مباشرة كمصفوفة
+        // ✅ البيانات مباشرة في "data" كمصفوفة
         JSONArray items = data.optJSONArray("data");
         
         if (items != null && items.length() > 0) {
@@ -235,40 +235,38 @@ public class MiraAccountingFragment extends Fragment {
                 JSONObject obj = items.getJSONObject(i);
                 
                 AccountingEntry entry = new AccountingEntry();
-                entry.id = obj.optInt("id", i + 1);
-                entry.code = obj.optString("entry_number", 
-                    obj.optString("reference", 
-                    obj.optString("account_code", "")));
-                entry.description = obj.optString("description", 
-                    obj.optString("account_name_ar", 
-                    obj.optString("account_name", "")));
-                entry.debit = obj.optDouble("total_debit", obj.optDouble("debit", 0));
-                entry.credit = obj.optDouble("total_credit", obj.optDouble("credit", 0));
-                entry.goldDebit = obj.optDouble("total_gold_debit_grams", 
-                    obj.optDouble("gold_debit_grams", 0));
-                entry.goldCredit = obj.optDouble("total_gold_credit_grams", 
-                    obj.optDouble("gold_credit_grams", 0));
-                entry.date = obj.optString("entry_date", 
-                    obj.optString("created_at", ""));
+                entry.id = i + 1;
+                entry.code = obj.optString("entry_number", obj.optString("reference", "—"));
+                entry.description = obj.optString("description", "—");
+                
+                // ✅ القيم نصية في JSON - تحويل يدوي
+                entry.debit = safeDouble(obj.optString("total_debit", "0"));
+                entry.credit = safeDouble(obj.optString("total_credit", "0"));
+                entry.goldDebit = safeDouble(obj.optString("total_gold_debit_grams", "0"));
+                entry.goldCredit = safeDouble(obj.optString("total_gold_credit_grams", "0"));
+                entry.date = obj.optString("entry_date", obj.optString("created_at", ""));
                 
                 entriesList.add(entry);
             }
         }
         
-        // ✅ تحديث القائمة
         filterData("");
         updateSummary();
         showEmptyState(entriesList.isEmpty());
         
-        // ✅ تسجيل للتصحيح
-        Log.d(TAG, "Parsed entries: " + entriesList.size());
-        
     } catch (Exception e) {
-        Log.e(TAG, "Error parsing data: " + e.getMessage());
+        Log.e(TAG, "Error parsing: " + e.getMessage());
         showEmptyState(true);
     }
 }
 
+private double safeDouble(String value) {
+    try {
+        return Double.parseDouble(value);
+    } catch (Exception e) {
+        return 0.0;
+    }
+}
     private void updateSummary() {
         double totalDebit = 0;
         double totalCredit = 0;
