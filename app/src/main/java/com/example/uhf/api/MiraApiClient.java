@@ -1153,6 +1153,10 @@ public ApiResponse setOpeningBalance(int accountId, double cashBalance, double g
     }
 }
 
+public ApiResponse getAccountingAuditLog() {
+    return getWithAuth("/accounting/audit-log?limit=50");
+}
+
     public ApiResponse calculateGoldPrice(int karat, double weight, String currency) {
         JSONObject payload = new JSONObject();
         try {
