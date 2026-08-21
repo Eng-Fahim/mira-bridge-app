@@ -3,7 +3,9 @@ package com.example.uhf.activity;
 import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.media.AudioManager;
 import android.media.SoundPool;
 import android.net.Uri;
@@ -34,6 +36,9 @@ import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
+import androidx.lifecycle.MutableLiveData;
+import androidx.lifecycle.ViewModel;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.example.uhf.R;
 import com.example.uhf.fragment.MiraQuickAccessSettingsFragment;
@@ -59,6 +64,7 @@ import com.example.uhf.fragment.UHFLocationFragment;
 import com.example.uhf.fragment.UHFSetFragment;
 import com.example.uhf.fragment.MiraProfileFragment;
 import com.example.uhf.fragment.UsersManagementFragment;
+import com.example.uhf.fragment.MiraUHFReadWriteFragment;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.MiraLanguageHelper;
@@ -74,13 +80,15 @@ import com.rscja.deviceapi.entity.UHFTAGInfo;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-
-import com.example.uhf.fragment.MiraUHFReadWriteFragment;
+import java.util.Locale;
 
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private static final String TAG = "UHFMainActivity";
     private static final int PERMISSION_REQUEST_CODE = 1001;
+    private static final String STATE_CURRENT_FRAGMENT = "current_fragment";
+    private static final String PREFS_NAVIGATION = "app_navigation";
+    private static final String KEY_CURRENT_FRAGMENT = "current_fragment_tag";
 
     public TabHost mTabHost = null;
     
@@ -104,6 +112,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public boolean loopFlag = false;
     private boolean isArabic = true;
     private int lastActiveBranchId = -1;
+    
+    // ✅ متغيرات جديدة لحفظ حالة الـ Fragment
+    private FragmentStateViewModel fragmentStateViewModel;
+    private String currentFragmentTag = "Dashboard";
     
     // متغيرات للتعامل مع زر الرجوع
     private long lastBackPressTime = 0;
@@ -176,6 +188,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             loadingOverlay = findViewById(R.id.loading_overlay);
             fragmentManager = getSupportFragmentManager();
             
+            // ✅ تهيئة ViewModel لحفظ حالة الـ Fragment
+            fragmentStateViewModel = new ViewModelProvider(this).get(FragmentStateViewModel.class);
+            
             setupOrgProfileListener();
             updateBottomNavLanguage();
 
@@ -198,8 +213,17 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             setupQuickNav();
 
-            // تحميل الداشبورد بدون Back Stack
-            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+            // ✅ استعادة الـ Fragment المحفوظ بدلاً من تحميل الداشبورد دائماً
+            if (savedInstanceState != null) {
+                // استعادة من Bundle أولاً
+                currentFragmentTag = savedInstanceState.getString(STATE_CURRENT_FRAGMENT, "Dashboard");
+            } else {
+                // استعادة من SharedPreferences أو ViewModel
+                currentFragmentTag = getSavedFragmentTag();
+            }
+            
+            // ✅ تحميل الـ Fragment المناسب
+            loadFragmentByTag(currentFragmentTag);
 
             showLoading();
             mainHandler.postDelayed(this::hideLoading, 300);
@@ -220,6 +244,51 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         } catch (Exception e) {
             Log.w(TAG, "Locale check failed: " + e.getMessage());
         }
+    }
+
+    // ✅ حفظ حالة الـ Fragment عند إعادة إنشاء النشاط
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString(STATE_CURRENT_FRAGMENT, currentFragmentTag);
+        
+        // ✅ حفظ في SharedPreferences أيضاً
+        saveFragmentTagToPrefs(currentFragmentTag);
+    }
+    
+    // ✅ حفظ الـ Fragment الحالي في SharedPreferences
+    private void saveFragmentTagToPrefs(String tag) {
+        try {
+            getSharedPreferences(PREFS_NAVIGATION, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_CURRENT_FRAGMENT, tag)
+                .apply();
+        } catch (Exception e) {
+            Log.e(TAG, "Save fragment tag error: " + e.getMessage());
+        }
+    }
+    
+    // ✅ استعادة الـ Fragment المحفوظ
+    private String getSavedFragmentTag() {
+        // 1. محاولة من ViewModel (أحدث قيمة)
+        String viewModelTag = fragmentStateViewModel.getCurrentFragmentTag().getValue();
+        if (viewModelTag != null && !viewModelTag.isEmpty()) {
+            return viewModelTag;
+        }
+        
+        // 2. محاولة من SharedPreferences
+        try {
+            SharedPreferences prefs = getSharedPreferences(PREFS_NAVIGATION, Context.MODE_PRIVATE);
+            String savedTag = prefs.getString(KEY_CURRENT_FRAGMENT, "Dashboard");
+            if (savedTag != null && !savedTag.isEmpty()) {
+                return savedTag;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Get saved fragment tag error: " + e.getMessage());
+        }
+        
+        // 3. الافتراضي
+        return "Dashboard";
     }
 
     // ==================== TOOLBAR MENU ====================
@@ -260,10 +329,19 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         return super.onOptionsItemSelected(item);
     }
 
+    // ✅ تحسين toggleLanguage للحفاظ على الـ Fragment الحالي
     private void toggleLanguage() {
         String newLang = isArabic ? "en" : "ar";
+        
+        // ✅ حفظ الـ Fragment الحالي قبل تغيير اللغة
+        saveFragmentTagToPrefs(currentFragmentTag);
+        
+        // ✅ تطبيق اللغة الجديدة
         MiraLanguageHelper.applyLanguage(this, newLang);
+        
+        // ✅ إعادة تشغيل النشاط مع الحفاظ على الـ Fragment
         Intent intent = new Intent(this, UHFMainActivity.class);
+        intent.putExtra("preserve_fragment", true);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
@@ -459,6 +537,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             showLoading();
             currentFragment = fragment;
             
+            // ✅ تحديث الـ Tag الحالي وحفظه
+            currentFragmentTag = tag;
+            fragmentStateViewModel.setCurrentFragmentTag(tag);
+            saveFragmentTagToPrefs(tag);
+            
             FragmentTransaction transaction = fragmentManager.beginTransaction()
                     .replace(R.id.fragment_container, fragment, tag);
             
@@ -472,6 +555,65 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         } catch (Exception e) {
             Log.e(TAG, "Error switching fragment: " + e.getMessage());
             hideLoading();
+        }
+    }
+    
+    // ✅ دالة جديدة لتحميل الـ Fragment حسب الـ Tag
+    private void loadFragmentByTag(String tag) {
+        Fragment fragment = createFragmentByTag(tag);
+        if (fragment != null) {
+            loadFragment(fragment, tag, false);
+        } else {
+            // إذا فشل الإنشاء، تحميل الداشبورد
+            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+        }
+    }
+    
+    // ✅ إنشاء الـ Fragment المناسب حسب الـ Tag
+    private Fragment createFragmentByTag(String tag) {
+        if (tag == null) return new MiraDashboardFragment();
+        
+        switch (tag) {
+            case "Dashboard":
+                return new MiraDashboardFragment();
+            case "Scan":
+                return new MiraUHFReadTagFragment();
+            case "POS":
+                return new MiraPosFragment();
+            case "Transfers":
+                return new MiraTransferFragment();
+            case "IdentityStudio":
+                return new MiraIdentityStudioFragment();
+            case "Radar":
+                return new MiraUHFRadarLocationFragment();
+            case "SecureGate":
+                return new MiraSecureGateFragment();
+            case "Reports":
+                return new MiraReportsProFragment();
+            case "Accounting":
+                return new MiraAccountingFragment();
+            case "AdminHub":
+                return new MiraAdminHubFragment();
+            case "SalesHistory":
+                return new MiraSalesHistoryFragment();
+            case "ServerConfig":
+                return new MiraServerConfigFragment();
+            case "GoldRates":
+                return new MiraGoldCurrencyFragment();
+            case "Profile":
+                return new MiraProfileFragment();
+            case "UsersManagement":
+                return new UsersManagementFragment();
+            case "RFIDWrite":
+                return new MiraUHFReadWriteFragment();
+            case "ReaderSetup":
+                return new MiraReaderSetupFragment();
+            case "GateSettings":
+                return new MiraGateSettingsFragment();
+            case "QuickAccessSettings":
+                return new MiraQuickAccessSettingsFragment();
+            default:
+                return new MiraDashboardFragment();
         }
     }
 
@@ -641,6 +783,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Fragment topFragment = getTopFragment();
             if (topFragment != null) {
                 currentFragment = topFragment;
+                // ✅ تحديث الـ Tag الحالي
+                String tag = topFragment.getTag();
+                if (tag != null) {
+                    currentFragmentTag = tag;
+                    fragmentStateViewModel.setCurrentFragmentTag(tag);
+                    saveFragmentTagToPrefs(tag);
+                }
             }
             return;
         }
@@ -897,5 +1046,18 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 notifyAll();
             }
         }
+    }
+}
+
+// ✅ ViewModel لحفظ حالة الـ Fragment
+class FragmentStateViewModel extends ViewModel {
+    private final MutableLiveData<String> currentFragmentTag = new MutableLiveData<>();
+    
+    public MutableLiveData<String> getCurrentFragmentTag() {
+        return currentFragmentTag;
+    }
+    
+    public void setCurrentFragmentTag(String tag) {
+        currentFragmentTag.setValue(tag);
     }
 }
