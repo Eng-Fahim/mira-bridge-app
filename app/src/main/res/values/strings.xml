@@ -1929,4 +1929,53 @@
     <string name="btn_create_compound_entry">+ إنشاء قيد مركب</string>
     <string name="status_balanced">✓ متوازن</string>
     <string name="status_unbalanced">⚠️ غير متوازن</string>
+    
+    
+    <!-- ==================== متغيرات ناقصة يجب إضافتها ==================== -->
+
+<!-- شريط الأدوات -->
+<string name="action_dashboard">الرئيسية</string>
+<string name="action_gold_rates">أسعار الذهب والبورصة</string>
+<string name="action_quick_access_settings">تخصيص الوصول السريع</string>
+<string name="action_toggle_language">تغيير اللغة (English/عربي)</string>
+<string name="action_profile">الملف الشخصي</string>
+<string name="action_logout">تسجيل الخروج</string>
+
+<!-- زر الرجوع -->
+<string name="press_again_to_exit">اضغط مرة أخرى للخروج</string>
+
+<!-- رسائل الجرد -->
+<string name="inventory_scanning">● جاري الجرد</string>
+<string name="inventory_completed">● مكتمل</string>
+<string name="inventory_saved_locally">● محفوظ محلياً</string>
+<string name="inventory_pending_sync">جرد معلق للمزامنة</string>
+<string name="inventory_synced_success">تمت مزامنة الجرد بنجاح</string>
+
+<!-- رسائل التأكيد -->
+<string name="confirm_stop_inventory">هل أنت متأكد من إيقاف الجرد؟</string>
+<string name="yes_stop">نعم، إيقاف</string>
+<string name="continue_scanning">متابعة</string>
+<string name="retry">🔄 إعادة المحاولة</string>
+
+<!-- أزرار الجرد الإضافية -->
+<string name="btn_blind_inventory">⚡ جرد أعمى</string>
+<string name="btn_generate_report">📄 تقرير</string>
+<string name="btn_archive_reports">📂 الأرشيف</string>
+
+<!-- عناوين الداشبورد الإضافية -->
+<string name="gold_prices_global">🥇 أسعار الذهب العالمية</string>
+<string name="ounce_price_label">سعر الأوقية</string>
+<string name="price_source">📡 المصدر</string>
+<string name="last_update">⏰ آخر تحديث</string>
+<string name="quick_access_title">⚡ الوصول السريع</string>
+<string name="customize_quick_access">⚙️ تخصيص</string>
+
+<!-- حالة الجرد -->
+<string name="inventory_in_progress">⚠️ الجرد قيد التشغيل</string>
+<string name="inventory_stop_proceed">إيقاف والانتقال</string>
+
+<!-- رسائل عامة -->
+<string name="unknown">غير معروف</string>
+<string name="no_enabled_actions">لا توجد أزرار مفعّلة</string>
+<string name="devices_connected">الأجهزة متصلة</string>
 </resources>
