@@ -39,6 +39,19 @@ public class SmartScaleConnector {
     public boolean isConnected() {
         return connected;
     }
+    
+        /**
+     * محاولة الاتصال التلقائي بالميزان الذكي المحفوظ مسبقاً
+     */
+    public void connect() {
+        // TODO: يمكنك لاحقاً برمجة هذه الدالة لقراءة الـ MAC Address المحفوظ في إعدادات النظام (SharedPreferences)
+        // ثم تمرير كائن BluetoothDevice إلى الدالة الأساسية بالأسفل.
+        
+        Log.i(TAG, "Auto-connect triggered. Waiting for stored device implementation.");
+        
+        // لتجنب أي أخطاء حالية، الدالة الآن فارغة وتسمح بتجميع (Compile) التطبيق بنجاح.
+    }
+
 
     public void connect(BluetoothDevice device) {
         if (device == null) {
