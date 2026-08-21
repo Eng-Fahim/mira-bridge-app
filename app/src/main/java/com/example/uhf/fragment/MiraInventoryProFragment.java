@@ -784,50 +784,78 @@ public void onTagRead(String epc, int rssi) {
     }
 
     private void commitInventoryToServer() {
-        if (!isAdded()) return;
-        
-        Toast.makeText(requireContext(), "⏳ جاري إرسال البيانات...", Toast.LENGTH_SHORT).show();
-        
-        backgroundExecutor.execute(() -> {
-            try {
-                JSONObject payload = inventoryEngine.buildEvidencePayload();
-                
-                int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-                payload.put("branch_id", branchId);
-                
-                JSONArray itemsArray = new JSONArray();
-                for (ScannedItemDisplay item : scannedItemsDisplayList) {
-                    JSONObject itemObj = new JSONObject();
-                    itemObj.put("code", item.epc);
-                    itemObj.put("serial", item.epc);
-                    itemObj.put("rssi", item.rssi);
-                    itemsArray.put(itemObj);
-                }
-                payload.put("items", itemsArray);
-                
-                MiraApiClient.ApiResponse response = apiClient.closeInventorySession(payload);
-                
-                mainThreadHandler.post(() -> {
-                    if (!isAdded()) return;
-                    
-                    if (response != null && response.isSuccess) {
-                        Toast.makeText(requireContext(), "✅ تم اعتماد الجرد وحفظ التقرير بنجاح", Toast.LENGTH_LONG).show();
-                        if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
-                        showCommitSuccessDialog(response);
-                    } else {
-                        Toast.makeText(requireContext(), "❌ خطأ في إرسال البيانات", Toast.LENGTH_LONG).show();
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Error committing inventory", e);
-                mainThreadHandler.post(() -> {
-                    if (isAdded()) {
-                        Toast.makeText(requireContext(), "❌ خطأ في إرسال البيانات", Toast.LENGTH_LONG).show();
-                    }
-                });
+    if (!isAdded()) return;
+    
+    Toast.makeText(requireContext(), "⏳ جاري إرسال البيانات...", Toast.LENGTH_SHORT).show();
+    
+    backgroundExecutor.execute(() -> {
+        try {
+            // ✅ بناء payload مخصص بدلاً من استخدام buildEvidencePayload مباشرة
+            JSONObject payload = new JSONObject();
+            
+            // 1️⃣ معلومات الجلسة
+            payload.put("session_id", inventoryEngine.getClientSessionId()); // ✅ استخدم getClientSessionId
+            payload.put("client_session_id", inventoryEngine.getClientSessionId());
+            
+            // 2️⃣ معلومات الفرع
+            int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+            payload.put("branch_id", branchId);
+            payload.put("location", "Main Showroom");
+            
+            // 3️⃣ الإحصائيات
+            int scanned = inventoryEngine.getUniqueCount();
+            int totalReads = inventoryEngine.getTotalReads();
+            payload.put("expected_count", expectedCount);
+            payload.put("total_scanned", totalReads);
+            payload.put("unique_count", scanned);
+            payload.put("found_count", scanned);
+            payload.put("missing_count", Math.max(0, expectedCount - scanned));
+            payload.put("unexpected_count", 0);
+            
+            // 4️⃣ قائمة القطع الممسوحة
+            JSONArray itemsArray = new JSONArray();
+            for (ScannedItemDisplay item : scannedItemsDisplayList) {
+                JSONObject itemObj = new JSONObject();
+                itemObj.put("code", item.epc);
+                itemObj.put("serial", item.epc);
+                itemObj.put("rssi", item.rssi);
+                itemsArray.put(itemObj);
             }
-        });
-    }
+            payload.put("items", itemsArray);
+            
+            // 5️⃣ إضافة scanned_epcs كنسخة احتياطية
+            JSONArray epcsArray = new JSONArray();
+            for (ScannedItemDisplay item : scannedItemsDisplayList) {
+                epcsArray.put(item.epc);
+            }
+            payload.put("scanned_epcs", epcsArray);
+            
+            // ✅ إرسال إلى السيرفر
+            MiraApiClient.ApiResponse response = apiClient.closeInventorySession(payload);
+            
+            mainThreadHandler.post(() -> {
+                if (!isAdded()) return;
+                
+                if (response != null && response.isSuccess) {
+                    Toast.makeText(requireContext(), "✅ تم اعتماد الجرد وحفظ التقرير بنجاح", Toast.LENGTH_LONG).show();
+                    if (btnGenerateReport != null) btnGenerateReport.setEnabled(false);
+                    showCommitSuccessDialog(response);
+                } else {
+                    String errorMsg = response != null ? response.error : "Unknown error";
+                    Log.e(TAG, "Commit failed: " + errorMsg);
+                    Toast.makeText(requireContext(), "❌ خطأ: " + errorMsg, Toast.LENGTH_LONG).show();
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Error committing inventory", e);
+            mainThreadHandler.post(() -> {
+                if (isAdded()) {
+                    Toast.makeText(requireContext(), "❌ خطأ في إرسال البيانات: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                }
+            });
+        }
+    });
+}
 
     private void showCommitSuccessDialog(MiraApiClient.ApiResponse response) {
         if (!isAdded() || response.data == null) return;
