@@ -162,9 +162,6 @@ public class LoginActivity extends AppCompatActivity {
 
     // ==================== Profile Listener ====================
 
-    /**
-     * ✅ إعداد المستمع لتغييرات البروفايل
-     */
     private void setupProfileListener() {
         if (orgProfileManager == null) return;
         
@@ -186,14 +183,11 @@ public class LoginActivity extends AppCompatActivity {
                 MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
                 
                 if (response != null && response.isSuccess && response.data != null) {
-                    // ✅ استخراج بيانات المنظمة
                     JSONObject org = response.data.optJSONObject("organization");
                     
                     if (org != null) {
-                        // ✅ حفظ في المدير المركزي
                         orgProfileManager.saveFromServer(org);
                     } else {
-                        // ✅ إذا لم توجد organization، احفظ من root
                         JSONObject rootOrg = new JSONObject();
                         rootOrg.put("name_ar", response.data.optString("org_name", ""));
                         rootOrg.put("name_en", response.data.optString("org_name_en", ""));
@@ -204,7 +198,6 @@ public class LoginActivity extends AppCompatActivity {
                         orgProfileManager.saveFromServer(rootOrg);
                     }
                     
-                    // ✅ تحديث الواجهة
                     mainHandler.post(this::applyOrgProfile);
                 }
             } catch (Exception e) {
@@ -245,7 +238,6 @@ public class LoginActivity extends AppCompatActivity {
             orgProfileManager = MiraOrgProfileManager.getInstance(this);
         }
         
-        // ✅ اسم الجهة - حسب اللغة
         if (tvBrandName != null) {
             if (isArabic) {
                 String nameAr = orgProfileManager.getOrgNameAr();
@@ -256,12 +248,10 @@ public class LoginActivity extends AppCompatActivity {
             }
         }
         
-        // ✅ الوصف
         if (tvBrandSubtitle != null) {
             tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
         }
         
-        // ✅ الشعار التجاري
         if (tvBrandDescription != null) {
             if (isArabic) {
                 tvBrandDescription.setText("منظومة التتبع والمصادقة المعتمدة للمجوهرات");
@@ -270,7 +260,6 @@ public class LoginActivity extends AppCompatActivity {
             }
         }
         
-        // ✅ الشعار
         if (ivAppLogo != null) {
             String logoBase64 = orgProfileManager.getOrgLogo();
             if (logoBase64 != null && !logoBase64.isEmpty()) {
@@ -415,6 +404,21 @@ public class LoginActivity extends AppCompatActivity {
         String branchCode = response.optString("branch_code", "");
         String serverUrl = getText(etServerUrl);
         
+        // ✅ حفظ مفتاح API إذا تم إرساله من السيرفر
+        String apiKey = response.optString("api_key", "");
+        if (!apiKey.isEmpty()) {
+            sessionManager.saveApiKey(apiKey);
+            Log.d("LoginActivity", "✅ API Key saved: " + apiKey.substring(0, Math.min(8, apiKey.length())) + "...");
+        } else {
+            // ✅ إذا لم يتم إرسال api_key (لأنه موجود مسبقاً)
+            // استخدم المفتاح المحفوظ
+            if (sessionManager.hasApiKey()) {
+                Log.d("LoginActivity", "✅ Using existing API Key: " + sessionManager.getApiKeyPrefix());
+            } else {
+                Log.w("LoginActivity", "⚠️ No API Key available!");
+            }
+        }
+        
         if (!serverUrl.isEmpty()) {
             MiraServerConfig.getInstance(this).setBaseUrl(serverUrl);
         }
@@ -550,7 +554,6 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // ✅ تحديث الواجهة عند العودة
         applyOrgProfile();
     }
 
@@ -558,12 +561,10 @@ public class LoginActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         
-        // ✅ إزالة المستمع
         if (orgProfileManager != null && profileListener != null) {
             orgProfileManager.removeListener(profileListener);
         }
         
-        // ✅ إغلاق الـ executor
         if (bgExecutor != null && !bgExecutor.isShutdown()) {
             bgExecutor.shutdown();
         }
