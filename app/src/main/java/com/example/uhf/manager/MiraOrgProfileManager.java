@@ -5,11 +5,11 @@ import android.content.SharedPreferences;
 
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 🏢 MiraOrgProfileManager - مدير بيانات الجهة المركزي
- * 
- * يحفظ بيانات الجهة (الاسم، الشعار، جهات الاتصال، الرقم الضريبي) ويعممها على كامل التطبيق
- * تستخدم في: شاشة تسجيل الدخول، الشاشة الرئيسية، الفواتير، الإيصالات
  */
 public class MiraOrgProfileManager {
 
@@ -17,6 +17,14 @@ public class MiraOrgProfileManager {
     private static MiraOrgProfileManager instance;
     private final SharedPreferences prefs;
     private final Context context;
+    
+    // ✅ قائمة المستمعين للتغييرات
+    private final List<OnProfileChangedListener> listeners = new ArrayList<>();
+
+    // ✅ واجهة المستمع
+    public interface OnProfileChangedListener {
+        void onProfileChanged();
+    }
 
     private MiraOrgProfileManager(Context context) {
         this.context = context.getApplicationContext();
@@ -28,6 +36,27 @@ public class MiraOrgProfileManager {
             instance = new MiraOrgProfileManager(context);
         }
         return instance;
+    }
+
+    // ✅ إضافة مستمع
+    public void addListener(OnProfileChangedListener listener) {
+        if (!listeners.contains(listener)) {
+            listeners.add(listener);
+        }
+    }
+
+    // ✅ إزالة مستمع
+    public void removeListener(OnProfileChangedListener listener) {
+        listeners.remove(listener);
+    }
+
+    // ✅ إشعار جميع المستمعين
+    private void notifyListeners() {
+        for (OnProfileChangedListener listener : listeners) {
+            if (listener != null) {
+                listener.onProfileChanged();
+            }
+        }
     }
 
     // ==================== Getters ====================
@@ -72,7 +101,6 @@ public class MiraOrgProfileManager {
         return prefs.getString("tax_number", "VAT-3100293841");
     }
 
-    // ✅ إضافة getters جديدة
     public String getOrgNameAr() {
         return prefs.getString("org_name_ar", prefs.getString("org_name", "ميرا للتكنولوجيا"));
     }
@@ -81,6 +109,7 @@ public class MiraOrgProfileManager {
 
     public void setTaxNumber(String taxNumber) {
         prefs.edit().putString("tax_number", taxNumber).apply();
+        notifyListeners();
     }
 
     public void saveOrgProfile(String name, String slogan, String phone, String address, String taxNumber) {
@@ -91,6 +120,7 @@ public class MiraOrgProfileManager {
                 .putString("org_address", address)
                 .putString("tax_number", taxNumber)
                 .apply();
+        notifyListeners();
     }
 
     /**
@@ -110,6 +140,7 @@ public class MiraOrgProfileManager {
         editor.putString("org_logo", org.optString("logo_url", getOrgLogo()));
         
         editor.apply();
+        notifyListeners();
     }
 
     /**
@@ -126,13 +157,11 @@ public class MiraOrgProfileManager {
         editor.putString("tax_number", tax);
         
         editor.apply();
+        notifyListeners();
     }
 
     // ==================== دوال مساعدة ====================
 
-    /**
-     * ✅ الحصول على الاسم حسب اللغة الحالية
-     */
     public String getDisplayName() {
         String locale = java.util.Locale.getDefault().getLanguage();
         if (locale.equals("ar")) {
@@ -143,24 +172,15 @@ public class MiraOrgProfileManager {
         return en.isEmpty() ? getOrgNameAr() : en;
     }
 
-    /**
-     * ✅ اسم التطبيق الكامل: "اسم الجهة - MIRA"
-     */
     public String getFullAppTitle() {
         String name = getDisplayName();
         return name.isEmpty() ? "MIRA Jewel" : name + " - MIRA";
     }
 
-    /**
-     * ✅ توقيع الجهة للفواتير والشاشات
-     */
     public String getAppSignature() {
         return getDisplayName() + " | " + getOrgSlogan();
     }
 
-    /**
-     * ✅ معلومات الاتصال كاملة
-     */
     public String getContactInfo() {
         StringBuilder sb = new StringBuilder();
         String phone = getOrgPhone();
@@ -179,9 +199,6 @@ public class MiraOrgProfileManager {
         return sb.toString();
     }
 
-    /**
-     * ✅ التحقق من اكتمال بيانات الجهة
-     */
     public boolean isProfileComplete() {
         return !getOrgName().equals("MIRA Jewelry") 
             && !getOrgName().isEmpty();
