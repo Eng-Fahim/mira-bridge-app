@@ -12,7 +12,7 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-import com.example.uhf.model.ApiProvider;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
@@ -26,6 +26,7 @@ import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.MiraQuickAccessSettings;
+import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.card.MaterialCardView;
 
@@ -40,12 +41,14 @@ import java.util.concurrent.Executors;
 
 public class MiraDashboardFragment extends Fragment implements SharedPreferences.OnSharedPreferenceChangeListener {
 
-private android.graphics.Typeface cairoRegular = null;
-    private android.graphics.Typeface cairoBold = null;
-    private boolean fontsLoaded = false;
-    
     private static final String TAG = "MiraDashboardFragment";
     private static final String OFFLINE_PREFS_BASE = "dashboard_cache_branch_";
+    private static final double OUNCE_TO_GRAM = 31.1035;
+
+    private android.graphics.Typeface cairoRegular = null;
+    private android.graphics.Typeface cairoBold = null;
+    private android.graphics.Typeface cairoMedium = null;
+    private boolean fontsLoaded = false;
 
     private TextView tvGreeting, tvDate, tvLocation, tvLiveStatus;
     private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
@@ -63,6 +66,7 @@ private android.graphics.Typeface cairoRegular = null;
     private SessionManager sessionManager;
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
+    private MiraOrgProfileManager.OnProfileChangedListener profileListener;
     private MiraPriceManager priceManager;
     private MiraQuickAccessSettings quickAccessSettings;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -79,91 +83,133 @@ private android.graphics.Typeface cairoRegular = null;
                              @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
     }
-/**
- * ✅ تحميل خطوط Cairo مرة واحدة
- */
-private void loadCairoFonts() {
-    if (fontsLoaded || getContext() == null) return;
-    
-    try {
-        Context context = getContext();
-        cairoRegular = android.graphics.Typeface.createFromAsset(
-            context.getAssets(), "fonts/cairo_regular.ttf");
-        cairoBold = android.graphics.Typeface.createFromAsset(
-            context.getAssets(), "fonts/cairo_bold.ttf");
-        fontsLoaded = true;
-    } catch (Exception e) {
-        Log.e(TAG, "Cairo font load error: " + e.getMessage());
+
+    private void loadCairoFonts() {
+        if (fontsLoaded || getContext() == null) return;
+        
+        try {
+            Context context = getContext();
+            cairoRegular = android.graphics.Typeface.createFromAsset(
+                context.getAssets(), "fonts/cairo_regular.ttf");
+            cairoBold = android.graphics.Typeface.createFromAsset(
+                context.getAssets(), "fonts/cairo_bold.ttf");
+            cairoMedium = android.graphics.Typeface.createFromAsset(
+                context.getAssets(), "fonts/cairo_medium.ttf");
+            fontsLoaded = true;
+        } catch (Exception e) {
+            Log.e(TAG, "Cairo font load error: " + e.getMessage());
+        }
     }
-}
-@Override
-public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-    super.onViewCreated(view, savedInstanceState);
 
-    try {
-    loadCairoFonts();
-        // 1️⃣ تهيئة المديرين والخدمات
-        apiClient = MiraApiClient.getInstance(requireContext());
-        sessionManager = new SessionManager(requireContext());
-        branchesManager = MiraBranchesManager.getInstance(requireContext());
-        orgProfile = MiraOrgProfileManager.getInstance(requireContext());
-        priceManager = MiraPriceManager.getInstance(requireContext());
-        quickAccessSettings = MiraQuickAccessSettings.getInstance(requireContext());
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
-        branchPrefs = requireContext().getSharedPreferences("mira_branches_prefs", Context.MODE_PRIVATE);
+        try {
+            loadCairoFonts();
+            
+            // 1️⃣ تهيئة المديرين والخدمات
+            apiClient = MiraApiClient.getInstance(requireContext());
+            sessionManager = new SessionManager(requireContext());
+            branchesManager = MiraBranchesManager.getInstance(requireContext());
+            orgProfile = MiraOrgProfileManager.getInstance(requireContext());
+            priceManager = MiraPriceManager.getInstance(requireContext());
+            quickAccessSettings = MiraQuickAccessSettings.getInstance(requireContext());
+            isArabic = Locale.getDefault().getLanguage().equals("ar");
 
-        // 2️⃣ تهيئة الواجهات
-        initViews(view);
-        
-        // 3️⃣ الترحيب والتاريخ أولاً (أعلى أولوية)
-        updateHeader();
-        
-        // 4️⃣ تحديث حالة الاتصال
-        updateLiveStatus();
-        
-        // 5️⃣ تحميل البيانات المحلية فوراً (سريعة)
-        currentBranchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : -1;
-        initBranchCache(currentBranchId);
-        loadOfflineData();
-        
-        // 6️⃣ إعداد أزرار الوصول السريع
-        setupQuickAccessGrid();
-        
-        // 7️⃣ إعداد المستمعين
-        setupListeners();
-        
-        // 8️⃣ عرض shimmer أثناء جلب البيانات
-        showShimmer(true);
-        
-        // 9️⃣ جلب البيانات من السيرفر (خلفية)
-        fetchData();
-        
-        // 🔟 جلب أسعار الذهب (خلفية)
-        fetchLiveGoldPrices();
+            branchPrefs = requireContext().getSharedPreferences("mira_branches_prefs", Context.MODE_PRIVATE);
 
-    } catch (Throwable e) {
-        Log.e(TAG, "onViewCreated error", e);
+            // 2️⃣ تهيئة الواجهات
+            initViews(view);
+            applyFontsToAllViews(view);
+            
+            // 3️⃣ إعداد مستمع البروفايل
+            setupProfileListener();
+            
+            // 4️⃣ الترحيب والتاريخ
+            updateHeader();
+            
+            // 5️⃣ تحديث حالة الاتصال
+            updateLiveStatus();
+            
+            // 6️⃣ تحميل البيانات المحلية
+            currentBranchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : -1;
+            initBranchCache(currentBranchId);
+            loadOfflineData();
+            
+            // 7️⃣ إعداد أزرار الوصول السريع
+            setupQuickAccessGrid();
+            
+            // 8️⃣ إعداد المستمعين
+            setupListeners();
+            
+            // 9️⃣ عرض shimmer
+            showShimmer(true);
+            
+            // 🔟 جلب البيانات
+            fetchData();
+            fetchLiveGoldPrices();
+
+        } catch (Throwable e) {
+            Log.e(TAG, "onViewCreated error", e);
+        }
     }
-}
 
-/**
- * ✅ تحديث حالة الاتصال
- */
-private void updateLiveStatus() {
-    if (tvLiveStatus == null) return;
-    
-    // التحقق من الاتصال
-    boolean isOnline = apiClient != null && apiClient.pingApi();
-    
-    if (isOnline) {
-        tvLiveStatus.setText(isArabic ? "🟢 متصل" : "🟢 Online");
-        tvLiveStatus.setTextColor(0xFF16A34A);
-    } else {
-        tvLiveStatus.setText(isArabic ? "🔴 غير متصل" : "🔴 Offline");
-        tvLiveStatus.setTextColor(0xFFDC2626);
+    /**
+     * ✅ تطبيق خط Cairo على جميع النصوص
+     */
+    private void applyFontsToAllViews(View root) {
+        try {
+            if (root instanceof TextView) {
+                TextView tv = (TextView) root;
+                applyFont(tv);
+            } else if (root instanceof ViewGroup) {
+                ViewGroup group = (ViewGroup) root;
+                for (int i = 0; i < group.getChildCount(); i++) {
+                    applyFontsToAllViews(group.getChildAt(i));
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Apply fonts error: " + e.getMessage());
+        }
     }
-}
+
+    private void applyFont(TextView tv) {
+        if (tv == null || tv.getTypeface() != null && tv.getTypeface().isBold()) {
+            if (tv != null && cairoBold != null) tv.setTypeface(cairoBold);
+            return;
+        }
+        if (cairoRegular != null) {
+            tv.setTypeface(cairoRegular);
+        }
+    }
+
+    private void setupProfileListener() {
+        if (orgProfile == null) return;
+        
+        profileListener = new MiraOrgProfileManager.OnProfileChangedListener() {
+            @Override
+            public void onProfileChanged() {
+                mainHandler.post(() -> updateHeader());
+            }
+        };
+        
+        orgProfile.addListener(profileListener);
+    }
+
+    private void updateLiveStatus() {
+        if (tvLiveStatus == null) return;
+        
+        boolean isOnline = apiClient != null && apiClient.pingApi();
+        
+        if (isOnline) {
+            tvLiveStatus.setText(isArabic ? "🟢 متصل" : "🟢 Online");
+            tvLiveStatus.setTextColor(0xFF16A34A);
+        } else {
+            tvLiveStatus.setText(isArabic ? "🔴 غير متصل" : "🔴 Offline");
+            tvLiveStatus.setTextColor(0xFFDC2626);
+        }
+    }
 
     private void initBranchCache(int branchId) {
         if (getContext() != null) {
@@ -213,15 +259,18 @@ private void updateLiveStatus() {
             }
 
             if (btnRefreshGold != null) {
-                btnRefreshGold.setOnClickListener(v2 -> fetchLiveGoldPrices());
+                btnRefreshGold.setOnClickListener(v2 -> {
+                    // ✅ تفعيل زر التحديث مع تأثير دوران
+                    v2.animate().rotation(360).setDuration(500).start();
+                    fetchLiveGoldPrices();
+                });
             }
 
             if (tvGreeting != null) {
                 tvGreeting.setOnLongClickListener(view -> {
-                    showDebugDialog("🔍 تشخيص الداشبورد");
+                    showDebugDialog(isArabic ? "🔍 تشخيص الداشبورد" : "🔍 Dashboard Debug");
                     return true;
                 });
-                addDebug("✅ تم تجهيز زر التشخيص - اضغط مطولاً على رسالة الترحيب");
             }
 
         } catch (Throwable e) {
@@ -243,155 +292,139 @@ private void updateLiveStatus() {
         });
     }
 
-    // ============================================
-    // ✅ إعداد شبكة الأزرار السريعة الاحترافية
-    // ============================================
     private void setupQuickAccessGrid() {
-    if (containerQuickActions == null) return;
+        if (containerQuickActions == null) return;
 
-    containerQuickActions.removeAllViews();
+        containerQuickActions.removeAllViews();
 
-    List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
+        List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
 
-    if (enabledActions.isEmpty()) {
-        showEmptyQuickAccess();
-        return;
-    }
-
-    LinearLayout currentRow = null;
-    int countInRow = 0;
-
-    for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
-        if (currentRow == null || countInRow == 0) {
-            currentRow = new LinearLayout(getContext());
-            currentRow.setOrientation(LinearLayout.HORIZONTAL);
-            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT);
-            rowParams.setMargins(0, 0, 0, dpToPx(getContext(), 4)); // ✅ مسافة سفلية بين الصفوف
-            currentRow.setLayoutParams(rowParams);
-            currentRow.setPadding(dpToPx(getContext(), 8), 0, dpToPx(getContext(), 8), 0); // ✅ padding أفقي
-            containerQuickActions.addView(currentRow);
+        if (enabledActions.isEmpty()) {
+            showEmptyQuickAccess();
+            return;
         }
 
-        CardView card = createQuickActionCard(action);
-        if (card != null) {
-            currentRow.addView(card);
-            countInRow++;
-        }
+        LinearLayout currentRow = null;
+        int countInRow = 0;
 
-        if (countInRow >= 3) {
-            countInRow = 0;
-            currentRow = null;
+        for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
+            if (currentRow == null || countInRow == 0) {
+                currentRow = new LinearLayout(getContext());
+                currentRow.setOrientation(LinearLayout.HORIZONTAL);
+                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT);
+                rowParams.setMargins(0, 0, 0, dpToPx(getContext(), 4));
+                currentRow.setLayoutParams(rowParams);
+                currentRow.setPadding(dpToPx(getContext(), 8), 0, dpToPx(getContext(), 8), 0);
+                containerQuickActions.addView(currentRow);
+            }
+
+            CardView card = createQuickActionCard(action);
+            if (card != null) {
+                currentRow.addView(card);
+                countInRow++;
+            }
+
+            if (countInRow >= 3) {
+                countInRow = 0;
+                currentRow = null;
+            }
+        }
+        
+        if (currentRow != null && countInRow > 0 && countInRow < 3) {
+            while (countInRow < 3) {
+                View spacer = new View(getContext());
+                LinearLayout.LayoutParams spacerParams = new LinearLayout.LayoutParams(
+                        0, dpToPx(getContext(), 85), 1f);
+                spacerParams.setMargins(4, 4, 4, 4);
+                spacer.setLayoutParams(spacerParams);
+                currentRow.addView(spacer);
+                countInRow++;
+            }
         }
     }
-    
-    // ✅ إضافة بطاقات فارغة لإكمال الصف الأخير
-    if (currentRow != null && countInRow > 0 && countInRow < 3) {
-        while (countInRow < 3) {
-            View spacer = new View(getContext());
-            LinearLayout.LayoutParams spacerParams = new LinearLayout.LayoutParams(
-                    0,
-                    dpToPx(getContext(), 85),
-                    1f);
-            spacerParams.setMargins(4, 4, 4, 4);
-            spacer.setLayoutParams(spacerParams);
-            currentRow.addView(spacer);
-            countInRow++;
+
+    private CardView createQuickActionCard(MiraQuickAccessSettings.QuickAction action) {
+        Context context = getContext();
+        if (context == null) return null;
+
+        MaterialCardView card = new MaterialCardView(context);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                0, dpToPx(context, 85), 1f);
+        params.setMargins(4, 4, 4, 4);
+        card.setLayoutParams(params);
+        card.setRadius(dpToPx(context, 12));
+        card.setCardElevation(dpToPx(context, 1));
+        card.setStrokeWidth(1);
+        
+        try {
+            android.util.TypedValue typedValue = new android.util.TypedValue();
+            context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOutlineVariant, typedValue, true);
+            card.setStrokeColor(typedValue.data);
+        } catch (Exception ignored) {}
+        
+        try {
+            android.util.TypedValue bgTypedValue = new android.util.TypedValue();
+            context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorSurface, bgTypedValue, true);
+            card.setCardBackgroundColor(bgTypedValue.data);
+        } catch (Exception ignored) {}
+
+        card.setClickable(true);
+        card.setFocusable(true);
+        
+        try {
+            android.util.TypedValue rippleColor = new android.util.TypedValue();
+            context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorControlHighlight, rippleColor, true);
+            card.setRippleColor(android.content.res.ColorStateList.valueOf(rippleColor.data));
+        } catch (Exception ignored) {}
+
+        LinearLayout layout = new LinearLayout(context);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setGravity(android.view.Gravity.CENTER);
+        layout.setPadding(dpToPx(context, 6), dpToPx(context, 8), dpToPx(context, 6), dpToPx(context, 8));
+
+        TextView tvIcon = new TextView(context);
+        tvIcon.setText(getActionIcon(action.id));
+        tvIcon.setTextSize(20);
+        tvIcon.setGravity(android.view.Gravity.CENTER);
+        tvIcon.setIncludeFontPadding(false);
+        layout.addView(tvIcon);
+
+        TextView tvTitle = new TextView(context);
+        tvTitle.setText(isArabic ? action.titleAr : action.titleEn);
+        tvTitle.setTextSize(11);
+        tvTitle.setGravity(android.view.Gravity.CENTER);
+        tvTitle.setPadding(0, dpToPx(context, 4), 0, 0);
+        tvTitle.setMaxLines(1);
+        tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        
+        if (cairoBold != null) {
+            tvTitle.setTypeface(cairoBold);
+        } else if (cairoRegular != null) {
+            tvTitle.setTypeface(cairoRegular, android.graphics.Typeface.BOLD);
+        } else {
+            tvTitle.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         }
+        
+        try {
+            android.util.TypedValue textColorTypedValue = new android.util.TypedValue();
+            context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOnSurface, textColorTypedValue, true);
+            tvTitle.setTextColor(textColorTypedValue.data);
+        } catch (Exception ignored) {}
+        
+        layout.addView(tvTitle);
+
+        card.addView(layout);
+        card.setOnClickListener(v -> handleQuickAction(action.id));
+
+        return card;
     }
-}
 
-    // في createQuickActionCard()
-private CardView createQuickActionCard(MiraQuickAccessSettings.QuickAction action) {
-    Context context = getContext();
-    if (context == null) return null;
-
-    MaterialCardView card = new MaterialCardView(context);
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-            0, 
-            dpToPx(context, 85),
-            1f);
-    params.setMargins(4, 4, 4, 4);
-    card.setLayoutParams(params);
-    card.setRadius(dpToPx(context, 12));
-    card.setCardElevation(dpToPx(context, 1));
-    card.setStrokeWidth(1);
-    
-    // ✅ لون الحدود
-    try {
-        android.util.TypedValue typedValue = new android.util.TypedValue();
-        context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOutlineVariant, typedValue, true);
-        card.setStrokeColor(typedValue.data);
-    } catch (Exception ignored) {}
-    
-    // ✅ لون خلفية البطاقة
-    try {
-        android.util.TypedValue bgTypedValue = new android.util.TypedValue();
-        context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorSurface, bgTypedValue, true);
-        card.setCardBackgroundColor(bgTypedValue.data);
-    } catch (Exception ignored) {}
-
-    card.setClickable(true);
-    card.setFocusable(true);
-    
-    // ✅ لون الـ ripple
-    try {
-        android.util.TypedValue rippleColor = new android.util.TypedValue();
-        context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorControlHighlight, rippleColor, true);
-        card.setRippleColor(android.content.res.ColorStateList.valueOf(rippleColor.data));
-    } catch (Exception ignored) {}
-
-    LinearLayout layout = new LinearLayout(context);
-    layout.setOrientation(LinearLayout.VERTICAL);
-    layout.setGravity(android.view.Gravity.CENTER);
-    layout.setPadding(dpToPx(context, 6), dpToPx(context, 8), dpToPx(context, 6), dpToPx(context, 8));
-
-    // ✅ الأيقونة
-    TextView tvIcon = new TextView(context);
-    tvIcon.setText(getActionIcon(action.id));
-    tvIcon.setTextSize(20);
-    tvIcon.setGravity(android.view.Gravity.CENTER);
-    tvIcon.setIncludeFontPadding(false);
-    layout.addView(tvIcon);
-
-    // ✅ العنوان مع خط Cairo (المحمل مسبقاً)
-    TextView tvTitle = new TextView(context);
-    tvTitle.setText(isArabic ? action.titleAr : action.titleEn);
-    tvTitle.setTextSize(11);
-    tvTitle.setGravity(android.view.Gravity.CENTER);
-    tvTitle.setPadding(0, dpToPx(context, 4), 0, 0);
-    tvTitle.setMaxLines(1);
-    tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
-    
-    // ✅ استخدام خط Cairo Bold المحمل
-    if (cairoBold != null) {
-        tvTitle.setTypeface(cairoBold);
-    } else if (cairoRegular != null) {
-        tvTitle.setTypeface(cairoRegular, android.graphics.Typeface.BOLD);
-    } else {
-        tvTitle.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+    private int dpToPx(Context context, float dp) {
+        return (int) (dp * context.getResources().getDisplayMetrics().density);
     }
-    
-    // ✅ لون النص من الثيم
-    try {
-        android.util.TypedValue textColorTypedValue = new android.util.TypedValue();
-        context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOnSurface, textColorTypedValue, true);
-        tvTitle.setTextColor(textColorTypedValue.data);
-    } catch (Exception ignored) {}
-    
-    layout.addView(tvTitle);
 
-    card.addView(layout);
-    card.setOnClickListener(v -> handleQuickAction(action.id));
-
-    return card;
-}
-
-// ✅ دالة مساعدة لتحويل dp إلى px
-private int dpToPx(Context context, float dp) {
-    return (int) (dp * context.getResources().getDisplayMetrics().density);
-}
     private void handleQuickAction(String actionId) {
         if (getActivity() instanceof UHFMainActivity) {
             UHFMainActivity activity = (UHFMainActivity) getActivity();
@@ -440,34 +473,28 @@ private int dpToPx(Context context, float dp) {
     }
 
     private void showEmptyQuickAccess() {
-    if (containerQuickActions == null || getContext() == null) return;
+        if (containerQuickActions == null || getContext() == null) return;
 
-    TextView tvEmpty = new TextView(getContext());
-    tvEmpty.setText(isArabic ?
-            "لا توجد أزرار مفعّلة" :
-            "No enabled actions");
-    tvEmpty.setTextSize(12);
-    tvEmpty.setGravity(android.view.Gravity.CENTER);
-    tvEmpty.setPadding(dpToPx(getContext(), 16), dpToPx(getContext(), 24), dpToPx(getContext(), 16), dpToPx(getContext(), 24));
-    
-    // ✅ استخدام لون النص الثانوي من الثيم
-    try {
-        android.util.TypedValue textColorTypedValue = new android.util.TypedValue();
-        getContext().getTheme().resolveAttribute(com.google.android.material.R.attr.colorOnSurfaceVariant, textColorTypedValue, true);
-        tvEmpty.setTextColor(textColorTypedValue.data);
-    } catch (Exception ignored) {
-        tvEmpty.setTextColor(0xFF6B7280);
-    }
-    
-    // ✅ استخدام خط Cairo بدلاً من sans-serif
-    if (cairoRegular != null) {
-        tvEmpty.setTypeface(cairoRegular);
-    } else {
-        tvEmpty.setTypeface(android.graphics.Typeface.DEFAULT);
-    }
+        TextView tvEmpty = new TextView(getContext());
+        tvEmpty.setText(isArabic ? "لا توجد أزرار مفعّلة" : "No enabled actions");
+        tvEmpty.setTextSize(12);
+        tvEmpty.setGravity(android.view.Gravity.CENTER);
+        tvEmpty.setPadding(dpToPx(getContext(), 16), dpToPx(getContext(), 24), dpToPx(getContext(), 16), dpToPx(getContext(), 24));
+        
+        try {
+            android.util.TypedValue textColorTypedValue = new android.util.TypedValue();
+            getContext().getTheme().resolveAttribute(com.google.android.material.R.attr.colorOnSurfaceVariant, textColorTypedValue, true);
+            tvEmpty.setTextColor(textColorTypedValue.data);
+        } catch (Exception ignored) {
+            tvEmpty.setTextColor(0xFF6B7280);
+        }
+        
+        if (cairoRegular != null) {
+            tvEmpty.setTypeface(cairoRegular);
+        }
 
-    containerQuickActions.addView(tvEmpty);
-}
+        containerQuickActions.addView(tvEmpty);
+    }
 
     private String getActionIcon(String actionId) {
         switch (actionId) {
@@ -507,12 +534,16 @@ private int dpToPx(Context context, float dp) {
                 String pattern = isArabic ? "EEEE، d MMMM yyyy" : "EEEE, MMMM d, yyyy";
                 tvDate.setText(new SimpleDateFormat(pattern, loc).format(new Date()));
             }
+            
             if (tvGreeting != null && sessionManager != null) {
                 String name = sessionManager.getDisplayName();
                 if (name == null || name.isEmpty()) name = sessionManager.getUsername();
                 if (name == null) name = isArabic ? "المستخدم" : "User";
-                tvGreeting.setText(isArabic ? "مرحباً، " + name : "Welcome, " + name);
+                
+                String orgName = orgProfile != null ? orgProfile.getDisplayName() : "MIRA";
+                tvGreeting.setText(isArabic ? orgName + " - مرحباً، " + name : orgName + " - Welcome, " + name);
             }
+            
             if (tvLocation != null && branchesManager != null) {
                 tvLocation.setText("📍 " + branchesManager.getActiveBranchDisplayName());
             }
@@ -522,157 +553,152 @@ private int dpToPx(Context context, float dp) {
     }
 
     private void fetchLiveGoldPrices() {
-    if (apiClient == null) return;
+        if (apiClient == null) return;
 
-    addDebug("🔄 جلب أسعار الذهب من المزود النشط...");
+        addDebug("🔄 جلب أسعار الذهب من المزود النشط...");
 
-    executorService.execute(() -> {
-        try {
-            // 1️⃣ جلب المزود النشط من السيرفر
-            List<ApiProvider> providers = apiClient.getActiveProviders();
-            
-            ApiProvider activeProvider = null;
-            
-            // البحث عن المزود النشط
-            for (ApiProvider provider : providers) {
-                if (provider.isActive() && !provider.getApiKey().isEmpty()) {
-                    activeProvider = provider;
-                    break;
+        executorService.execute(() -> {
+            try {
+                List<ApiProvider> providers = apiClient.getActiveProviders();
+                
+                ApiProvider activeProvider = null;
+                
+                for (ApiProvider provider : providers) {
+                    if (provider.isActive() && !provider.getApiKey().isEmpty()) {
+                        activeProvider = provider;
+                        break;
+                    }
                 }
-            }
-            
-            // إذا لم نجد مزود نشط بمفتاح، نستخدم أول مزود
-            if (activeProvider == null && !providers.isEmpty()) {
-                activeProvider = providers.get(0);
-            }
-            
-            if (activeProvider == null) {
+                
+                if (activeProvider == null && !providers.isEmpty()) {
+                    activeProvider = providers.get(0);
+                }
+                
+                if (activeProvider == null) {
+                    mainHandler.post(() -> {
+                        if (isAdded()) {
+                            addDebug("⚠️ لا يوجد مزود نشط");
+                            displayGoldPricesFromCache();
+                        }
+                    });
+                    return;
+                }
+                
+                addDebug("📡 استخدام المزود: " + activeProvider.getProviderName());
+                
+                final ApiProvider finalProvider = activeProvider;
+                MiraApiClient.ApiResponse response = apiClient.fetchGoldPriceWithProvider(activeProvider.getId());
+                
                 mainHandler.post(() -> {
-                    if (isAdded()) {
-                        addDebug("⚠️ لا يوجد مزود نشط");
+                    if (!isAdded()) return;
+                    
+                    if (response != null && response.isSuccess && response.data != null) {
+                        try {
+                            JSONObject data = response.data.optJSONObject("data");
+                            if (data == null) data = response.data;
+                            
+                            displayGoldPrices(data);
+                            addDebug("✅ تم تحديث أسعار الذهب من " + finalProvider.getProviderName());
+                            
+                            if (offlineCache != null) {
+                                offlineCache.edit()
+                                    .putString("active_provider", finalProvider.getProviderName())
+                                    .putString("active_provider_type", finalProvider.getProviderType())
+                                    .apply();
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error parsing gold prices", e);
+                            displayGoldPricesFromCache();
+                        }
+                    } else {
+                        addDebug("⚠️ فشل جلب الأسعار من " + finalProvider.getProviderName());
                         displayGoldPricesFromCache();
                     }
                 });
-                return;
-            }
-            
-            addDebug("📡 استخدام المزود: " + activeProvider.getProviderName());
-            
-            // 2️⃣ جلب الأسعار من المزود النشط
-            final ApiProvider finalProvider = activeProvider;
-            MiraApiClient.ApiResponse response = apiClient.fetchGoldPriceWithProvider(activeProvider.getId());
-            
-            mainHandler.post(() -> {
-                if (!isAdded()) return;
-                
-                if (response != null && response.isSuccess && response.data != null) {
-                    try {
-                        JSONObject data = response.data.optJSONObject("data");
-                        if (data == null) data = response.data;
-                        
-                        displayGoldPrices(data);
-                        addDebug("✅ تم تحديث أسعار الذهب من " + finalProvider.getProviderName());
-                        
-                        // حفظ المزود المستخدم في الكاش
-                        if (offlineCache != null) {
-                            offlineCache.edit()
-                                .putString("active_provider", finalProvider.getProviderName())
-                                .putString("active_provider_type", finalProvider.getProviderType())
-                                .apply();
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error parsing gold prices", e);
+            } catch (Exception e) {
+                Log.e(TAG, "Error fetching gold prices", e);
+                mainHandler.post(() -> {
+                    if (isAdded()) {
                         displayGoldPricesFromCache();
                     }
-                } else {
-                    addDebug("⚠️ فشل جلب الأسعار من " + finalProvider.getProviderName() + "، استخدام الكاش");
-                    displayGoldPricesFromCache();
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Error fetching gold prices", e);
-            mainHandler.post(() -> {
-                if (isAdded()) {
-                    displayGoldPricesFromCache();
-                }
-            });
-        }
-    });
-}
+                });
+            }
+        });
+    }
 
     private void displayGoldPrices(JSONObject data) {
-    try {
-        JSONObject prices = data.optJSONObject("prices");
-        if (prices == null) prices = data;
+        try {
+            JSONObject prices = data.optJSONObject("prices");
+            if (prices == null) prices = data;
 
-        double price24 = prices.optDouble("24k", 0);
-        double price21 = prices.optDouble("21k", 0);
-        double price18 = prices.optDouble("18k", 0);
-        double ouncePrice = data.optDouble("price_per_ounce",
-                prices.optDouble("ounce_price", price24 * 31.1035));
-        String source = data.optString("source", "server");
+            double price24 = prices.optDouble("24k", 0);
+            double price21 = prices.optDouble("21k", 0);
+            double price18 = prices.optDouble("18k", 0);
+            double ouncePrice = data.optDouble("price_per_ounce",
+                    prices.optDouble("ounce_price", price24 * OUNCE_TO_GRAM));
+            String source = data.optString("source", "server");
 
-        setGoldPrice(tvKarat24, "24K", price24);
-        setGoldPrice(tvKarat21, "21K", price21);
-        setGoldPrice(tvKarat18, "18K", price18);
+            setGoldPrice(tvKarat24, "24K", price24);
+            setGoldPrice(tvKarat21, "21K", price21);
+            setGoldPrice(tvKarat18, "18K", price18);
 
-        if (tvOuncePrice != null && ouncePrice > 0) {
-            tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", ouncePrice));
-        }
-
-        if (tvPriceSource != null) {
-            String sourceText = getSourceDisplayName(source);
-            tvPriceSource.setText("📡 " + sourceText);
-        }
-
-        if (tvLastUpdate != null) {
-            String time = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
-            tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
-        }
-
-        calculateTrend(price24);
-
-    } catch (Exception e) {
-        Log.e(TAG, "displayGoldPrices error", e);
-    }
-}
-    private void displayGoldPricesFromCache() {
-    try {
-        if (priceManager == null) return;
-
-        double price24 = priceManager.getGoldPricePerGram(24);
-        double price21 = priceManager.getGoldPricePerGram(21);
-        double price18 = priceManager.getGoldPricePerGram(18);
-
-        setGoldPrice(tvKarat24, "24K", price24);
-        setGoldPrice(tvKarat21, "21K", price21);
-        setGoldPrice(tvKarat18, "18K", price18);
-
-        if (tvOuncePrice != null && price24 > 0) {
-            double ouncePrice = price24 * 31.1035;
-            tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", ouncePrice));
-        }
-
-        if (tvPriceSource != null) {
-            // عرض المزود المحفوظ من الكاش
-            String cachedProvider = offlineCache != null ? 
-                offlineCache.getString("active_provider", "") : "";
-            
-            if (!cachedProvider.isEmpty()) {
-                tvPriceSource.setText("📡 " + cachedProvider + " (كاش)");
-            } else {
-                tvPriceSource.setText(isArabic ? "📡 كاش محلي" : "📡 Local cache");
+            if (tvOuncePrice != null && ouncePrice > 0) {
+                tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", ouncePrice));
             }
-        }
 
-        if (tvLastUpdate != null) {
-            tvLastUpdate.setText(isArabic ? "⏰ وضع أوفلاين" : "⏰ Offline mode");
-        }
+            if (tvPriceSource != null) {
+                String sourceText = getSourceDisplayName(source);
+                tvPriceSource.setText("📡 " + sourceText);
+            }
 
-    } catch (Exception e) {
-        Log.e(TAG, "displayGoldPricesFromCache error", e);
+            if (tvLastUpdate != null) {
+                String time = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
+                tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
+            }
+
+            calculateTrend(price24);
+
+        } catch (Exception e) {
+            Log.e(TAG, "displayGoldPrices error", e);
+        }
     }
-}
+
+    private void displayGoldPricesFromCache() {
+        try {
+            if (priceManager == null) return;
+
+            double price24 = priceManager.getGoldPricePerGram(24);
+            double price21 = priceManager.getGoldPricePerGram(21);
+            double price18 = priceManager.getGoldPricePerGram(18);
+
+            setGoldPrice(tvKarat24, "24K", price24);
+            setGoldPrice(tvKarat21, "21K", price21);
+            setGoldPrice(tvKarat18, "18K", price18);
+
+            if (tvOuncePrice != null && price24 > 0) {
+                double ouncePrice = price24 * OUNCE_TO_GRAM;
+                tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", ouncePrice));
+            }
+
+            if (tvPriceSource != null) {
+                String cachedProvider = offlineCache != null ? 
+                    offlineCache.getString("active_provider", "") : "";
+                
+                if (!cachedProvider.isEmpty()) {
+                    tvPriceSource.setText("📡 " + cachedProvider + (isArabic ? " (كاش)" : " (Cache)"));
+                } else {
+                    tvPriceSource.setText(isArabic ? "📡 كاش محلي" : "📡 Local cache");
+                }
+            }
+
+            if (tvLastUpdate != null) {
+                tvLastUpdate.setText(isArabic ? "⏰ وضع أوفلاين" : "⏰ Offline mode");
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "displayGoldPricesFromCache error", e);
+        }
+    }
 
     private void calculateTrend(double currentPrice) {
         if (tvGoldTrend == null || tvGoldChange == null) return;
@@ -900,8 +926,8 @@ private int dpToPx(Context context, float dp) {
         if (latestBranchId != currentBranchId) {
             onBranchChanged();
         }
-
         setupQuickAccessGrid();
+        updateHeader();
     }
 
     @Override
@@ -933,8 +959,8 @@ private int dpToPx(Context context, float dp) {
             new android.app.AlertDialog.Builder(requireContext())
                     .setTitle(title)
                     .setMessage(message)
-                    .setPositiveButton("مسح", (dialog, which) -> debugLog.setLength(0))
-                    .setNegativeButton("نسخ", (dialog, which) -> {
+                    .setPositiveButton(isArabic ? "مسح" : "Clear", (dialog, which) -> debugLog.setLength(0))
+                    .setNegativeButton(isArabic ? "نسخ" : "Copy", (dialog, which) -> {
                         if (getContext() != null) {
                             android.content.ClipboardManager clipboard =
                                     (android.content.ClipboardManager) requireContext()
@@ -943,10 +969,10 @@ private int dpToPx(Context context, float dp) {
                                     android.content.ClipData.newPlainText("debug", message);
                             clipboard.setPrimaryClip(clip);
                             Toast.makeText(requireContext(),
-                                    "تم النسخ", Toast.LENGTH_SHORT).show();
+                                    isArabic ? "تم النسخ" : "Copied", Toast.LENGTH_SHORT).show();
                         }
                     })
-                    .setNeutralButton("إغلاق", null)
+                    .setNeutralButton(isArabic ? "إغلاق" : "Close", null)
                     .show();
         } catch (Exception e) {
             Log.e(TAG, "Error showing debug", e);
@@ -956,6 +982,12 @@ private int dpToPx(Context context, float dp) {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        
+        // ✅ إزالة المستمع
+        if (orgProfile != null && profileListener != null) {
+            orgProfile.removeListener(profileListener);
+        }
+        
         mainHandler.removeCallbacksAndMessages(null);
     }
 }
