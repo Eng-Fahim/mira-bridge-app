@@ -80,6 +80,10 @@ public class MiraInventoryEngine {
             }
         });
     }
+    
+    public String getClientSessionId() {
+    return clientSessionId;
+    }
 
     public JSONObject buildEvidencePayload() {
         try {
