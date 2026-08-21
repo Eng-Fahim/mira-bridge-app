@@ -33,6 +33,7 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
 
 import com.example.uhf.R;
 import com.example.uhf.fragment.MiraQuickAccessSettingsFragment;
@@ -83,11 +84,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     public TabHost mTabHost = null;
     
-    
     private MiraOrgProfileManager orgProfileManager;
-private MiraOrgProfileManager.OnProfileChangedListener profileListener;
-private TextView tvAppTitle;
-
+    private MiraOrgProfileManager.OnProfileChangedListener profileListener;
+    private TextView tvAppTitle;
 
     private FrameLayout loadingOverlay;
     private FragmentManager fragmentManager;
@@ -106,9 +105,9 @@ private TextView tvAppTitle;
     private boolean isArabic = true;
     private int lastActiveBranchId = -1;
     
-    // ✅ إضافة متغيرات للتعامل مع زر الرجوع
+    // متغيرات للتعامل مع زر الرجوع
     private long lastBackPressTime = 0;
-    private static final long DOUBLE_BACK_TIMEOUT = 2000; // 2 ثانية
+    private static final long DOUBLE_BACK_TIMEOUT = 2000;
 
     private PlaySoundThread playSoundThread = null;
     private SoundPool soundPool;
@@ -128,30 +127,28 @@ private TextView tvAppTitle;
     }
     
     private void setupOrgProfileListener() {
-    orgProfileManager = MiraOrgProfileManager.getInstance(this);
-    
-    profileListener = new MiraOrgProfileManager.OnProfileChangedListener() {
-        @Override
-        public void onProfileChanged() {
-            updateAppTitle();
-        }
-    };
-    
-    orgProfileManager.addListener(profileListener);
-    updateAppTitle();
-}
-
-private void updateAppTitle() {
-    // ✅ تحديث عنوان الـ Toolbar
-    if (getSupportActionBar() != null) {
-        String orgName = orgProfileManager != null ? 
-            orgProfileManager.getDisplayName() : "MIRA";
-        getSupportActionBar().setTitle(orgName);
+        orgProfileManager = MiraOrgProfileManager.getInstance(this);
+        
+        profileListener = new MiraOrgProfileManager.OnProfileChangedListener() {
+            @Override
+            public void onProfileChanged() {
+                updateAppTitle();
+            }
+        };
+        
+        orgProfileManager.addListener(profileListener);
+        updateAppTitle();
     }
-    
-    // ✅ تحديث updateToolbarTitle أيضاً
-    updateToolbarTitle();
-}
+
+    private void updateAppTitle() {
+        if (getSupportActionBar() != null) {
+            String orgName = orgProfileManager != null ? 
+                orgProfileManager.getDisplayName() : "MIRA";
+            getSupportActionBar().setTitle(orgName);
+        }
+        
+        updateToolbarTitle();
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -183,10 +180,10 @@ private void updateAppTitle() {
             updateBottomNavLanguage();
 
             MaterialToolbar toolbar = findViewById(R.id.toolbar);
-        if (toolbar != null) {
-            setSupportActionBar(toolbar);
-            updateToolbarTitle();
-        }
+            if (toolbar != null) {
+                setSupportActionBar(toolbar);
+                updateToolbarTitle();
+            }
 
             View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
             if (btnHardwareStatus != null) {
@@ -201,8 +198,8 @@ private void updateAppTitle() {
 
             setupQuickNav();
 
-            // العودة للواجهة الرئيسية (Dashboard)
-            loadFragment(new MiraDashboardFragment(), "Dashboard");
+            // تحميل الداشبورد بدون Back Stack
+            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
 
             showLoading();
             mainHandler.postDelayed(this::hideLoading, 300);
@@ -214,16 +211,16 @@ private void updateAppTitle() {
     }
 
     private void initializeLanguageState() {
-    try {
-        isArabic = getResources().getConfiguration().locale.getLanguage().equals("ar");
-        getWindow().getDecorView().setLayoutDirection(
-                isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR
-        );
-        
-    } catch (Exception e) {
-        Log.w(TAG, "Locale check failed: " + e.getMessage());
+        try {
+            isArabic = getResources().getConfiguration().locale.getLanguage().equals("ar");
+            getWindow().getDecorView().setLayoutDirection(
+                    isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR
+            );
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Locale check failed: " + e.getMessage());
+        }
     }
-}
 
     // ==================== TOOLBAR MENU ====================
 
@@ -234,32 +231,34 @@ private void updateAppTitle() {
     }
 
     @Override
-public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-    int id = item.getItemId();
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
 
-    if (id == R.id.action_dashboard) {
-        checkInventoryLockAndExecute(() -> loadFragment(new MiraDashboardFragment(), "Dashboard"));
-        return true;
-    } else if (id == R.id.action_gold_rates) {
-        checkInventoryLockAndExecute(() -> loadFragment(new MiraGoldCurrencyFragment(), "GoldRates"));
-        return true;
-    } else if (id == R.id.action_quick_access_settings) {
-        // ✅ فتح صفحة تخصيص الوصول السريع
-        checkInventoryLockAndExecute(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
-        return true;
-    } else if (id == R.id.action_toggle_language) {
-        toggleLanguage();
-        return true;
-    } else if (id == R.id.action_profile) {
-        checkInventoryLockAndExecute(() -> loadFragment(new MiraProfileFragment(), "Profile"));
-        return true;
-    } else if (id == R.id.action_logout) {
-        confirmLogout();
-        return true;
+        if (id == R.id.action_dashboard) {
+            checkInventoryLockAndExecute(() -> {
+                clearBackStack();
+                loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+            });
+            return true;
+        } else if (id == R.id.action_gold_rates) {
+            checkInventoryLockAndExecute(() -> loadFragment(new MiraGoldCurrencyFragment(), "GoldRates"));
+            return true;
+        } else if (id == R.id.action_quick_access_settings) {
+            checkInventoryLockAndExecute(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
+            return true;
+        } else if (id == R.id.action_toggle_language) {
+            toggleLanguage();
+            return true;
+        } else if (id == R.id.action_profile) {
+            checkInventoryLockAndExecute(() -> loadFragment(new MiraProfileFragment(), "Profile"));
+            return true;
+        } else if (id == R.id.action_logout) {
+            confirmLogout();
+            return true;
+        }
+
+        return super.onOptionsItemSelected(item);
     }
-
-    return super.onOptionsItemSelected(item);
-}
 
     private void toggleLanguage() {
         String newLang = isArabic ? "en" : "ar";
@@ -299,7 +298,7 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
     private void confirmLogout() {
         new AlertDialog.Builder(this)
                 .setTitle(isArabic ? "تسجيل الخروج" : "Logout")
-                .setMessage(isArabic ? "هل أنت تأكد من تسجيل الخروج من المنظومة؟" : "Are you sure you want to log out?")
+                .setMessage(isArabic ? "هل أنت متأكد من تسجيل الخروج من المنظومة؟" : "Are you sure you want to log out?")
                 .setPositiveButton(isArabic ? "تأكيد" : "Logout", (dialog, which) -> {
                     sessionManager.logout();
                     navigateToLogin();
@@ -310,168 +309,185 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
 
     // ==================== NAV SYSTEM & FRAGMENT MANAGEMENT ====================
 
-   private void setupQuickNav() {
-    try {
-        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-        FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
+    private void setupQuickNav() {
+        try {
+            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+            FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
 
-        if (fabActionCenter != null) {
-            fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
-        }
+            if (fabActionCenter != null) {
+                fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
+            }
 
-        if (quickNav != null) {
-            quickNav.setOnItemSelectedListener(item -> {
-                int id = item.getItemId();
+            if (quickNav != null) {
+                quickNav.setOnItemSelectedListener(item -> {
+                    int id = item.getItemId();
 
-                if (id == R.id.nav_home) {
-                    checkInventoryLockAndExecute(() -> loadFragment(new MiraDashboardFragment(), "Dashboard"));
-                    return true;
-                } else if (id == R.id.nav_inventory) {
-                    checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadTagFragment(), "Scan"));
-                    return true;
-                } else if (id == R.id.nav_sales) {
-                    // ✅ البيع الجديد POS
-                    checkInventoryLockAndExecute(() -> loadFragment(new MiraPosFragment(), "POS"));
-                    return true;
-                } else if (id == R.id.nav_transfers) {
-                    // ✅ التحويلات
-                    checkInventoryLockAndExecute(() -> loadFragment(new MiraTransferFragment(), "Transfers"));
-                    return true;
-                } else if (id == R.id.nav_placeholder) {
-                    showQuickActionMenu();
+                    if (id == R.id.nav_home) {
+                        checkInventoryLockAndExecute(() -> {
+                            clearBackStack();
+                            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+                        });
+                        return true;
+                    } else if (id == R.id.nav_inventory) {
+                        checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadTagFragment(), "Scan"));
+                        return true;
+                    } else if (id == R.id.nav_sales) {
+                        checkInventoryLockAndExecute(() -> loadFragment(new MiraPosFragment(), "POS"));
+                        return true;
+                    } else if (id == R.id.nav_transfers) {
+                        checkInventoryLockAndExecute(() -> loadFragment(new MiraTransferFragment(), "Transfers"));
+                        return true;
+                    } else if (id == R.id.nav_placeholder) {
+                        showQuickActionMenu();
+                        return false;
+                    }
                     return false;
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
+        }
+    }
+
+    private void showQuickActionMenu() {
+        try {
+            BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
+            View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
+            dialog.setContentView(view);
+
+            MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(this);
+
+            View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
+            if (btnRfidWrite != null) {
+                btnRfidWrite.setVisibility(View.VISIBLE);
+                btnRfidWrite.setOnClickListener(v -> {
+                    dialog.dismiss();
+                    checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadWriteFragment(), "RFIDWrite"));
+                });
+            }
+
+            if (quickAccess.isActionEnabled("identity")) {
+                bindMenuAction(view, R.id.btnIdentityStudio, dialog, new MiraIdentityStudioFragment(), "IdentityStudio");
+            } else {
+                view.findViewById(R.id.btnIdentityStudio).setVisibility(View.GONE);
+            }
+
+            if (quickAccess.isActionEnabled("radar")) {
+                bindMenuAction(view, R.id.btnRadarLocation, dialog, new MiraUHFRadarLocationFragment(), "Radar");
+            } else {
+                view.findViewById(R.id.btnRadarLocation).setVisibility(View.GONE);
+            }
+
+            if (quickAccess.isActionEnabled("gate")) {
+                bindMenuAction(view, R.id.btnSecureGate, dialog, new MiraSecureGateFragment(), "SecureGate");
+            } else {
+                view.findViewById(R.id.btnSecureGate).setVisibility(View.GONE);
+            }
+
+            if (quickAccess.isActionEnabled("reports")) {
+                bindMenuAction(view, R.id.btnReports, dialog, new MiraReportsProFragment(), "Reports");
+            } else {
+                view.findViewById(R.id.btnReports).setVisibility(View.GONE);
+            }
+
+            if (quickAccess.isActionEnabled("accounting")) {
+                bindMenuAction(view, R.id.btnAccounting, dialog, new MiraAccountingFragment(), "Accounting");
+            } else {
+                view.findViewById(R.id.btnAccounting).setVisibility(View.GONE);
+            }
+
+            if (quickAccess.isActionEnabled("transfers")) {
+                bindMenuAction(view, R.id.btnTransfer, dialog, new MiraTransferFragment(), "Transfers");
+            } else {
+                view.findViewById(R.id.btnTransfer).setVisibility(View.GONE);
+            }
+
+            if (quickAccess.isActionEnabled("sales_history")) {
+                bindMenuAction(view, R.id.btnSalesHistory, dialog, new MiraSalesHistoryFragment(), "SalesHistory");
+            } else {
+                view.findViewById(R.id.btnSalesHistory).setVisibility(View.GONE);
+            }
+
+            if (quickAccess.isActionEnabled("admin_hub")) {
+                View btnAdminHub = view.findViewById(R.id.btnAdminHub);
+                if (btnAdminHub != null) {
+                    btnAdminHub.setVisibility(View.VISIBLE);
+                    btnAdminHub.setOnClickListener(v -> {
+                        dialog.dismiss();
+                        checkInventoryLockAndExecute(() -> loadFragment(new MiraAdminHubFragment(), "AdminHub"));
+                    });
                 }
-                return false;
-            });
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
-    }
-}
-
-  private void showQuickActionMenu() {
-    try {
-        BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
-        View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
-        dialog.setContentView(view);
-
-        // ✅ استخدام إعدادات الوصول السريع
-        MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(this);
-
-        // ✅ إضافة زر برمجة RFID
-        View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
-        if (btnRfidWrite != null) {
-            btnRfidWrite.setVisibility(View.VISIBLE);
-            btnRfidWrite.setOnClickListener(v -> {
-                dialog.dismiss();
-                checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadWriteFragment(), "RFIDWrite"));
-            });
-        } // ✅ القوس هنا
-
-        // 1. استوديو التكويد
-        if (quickAccess.isActionEnabled("identity")) {
-            bindMenuAction(view, R.id.btnIdentityStudio, dialog, new MiraIdentityStudioFragment(), "IdentityStudio");
-        } else {
-            view.findViewById(R.id.btnIdentityStudio).setVisibility(View.GONE);
-        }
-
-        // 2. الرادار
-        if (quickAccess.isActionEnabled("radar")) {
-            bindMenuAction(view, R.id.btnRadarLocation, dialog, new MiraUHFRadarLocationFragment(), "Radar");
-        } else {
-            view.findViewById(R.id.btnRadarLocation).setVisibility(View.GONE);
-        }
-
-        // 3. البوابة الأمنية
-        if (quickAccess.isActionEnabled("gate")) {
-            bindMenuAction(view, R.id.btnSecureGate, dialog, new MiraSecureGateFragment(), "SecureGate");
-        } else {
-            view.findViewById(R.id.btnSecureGate).setVisibility(View.GONE);
-        }
-
-        // 4. التقارير
-        if (quickAccess.isActionEnabled("reports")) {
-            bindMenuAction(view, R.id.btnReports, dialog, new MiraReportsProFragment(), "Reports");
-        } else {
-            view.findViewById(R.id.btnReports).setVisibility(View.GONE);
-        }
-
-        // 5. المحاسبة
-        if (quickAccess.isActionEnabled("accounting")) {
-            bindMenuAction(view, R.id.btnAccounting, dialog, new MiraAccountingFragment(), "Accounting");
-        } else {
-            view.findViewById(R.id.btnAccounting).setVisibility(View.GONE);
-        }
-
-        // 6. التحويلات
-        if (quickAccess.isActionEnabled("transfers")) {
-            bindMenuAction(view, R.id.btnTransfer, dialog, new MiraTransferFragment(), "Transfers");
-        } else {
-            view.findViewById(R.id.btnTransfer).setVisibility(View.GONE);
-        }
-
-        // 7. سجل المبيعات
-        if (quickAccess.isActionEnabled("sales_history")) {
-            bindMenuAction(view, R.id.btnSalesHistory, dialog, new MiraSalesHistoryFragment(), "SalesHistory");
-        } else {
-            view.findViewById(R.id.btnSalesHistory).setVisibility(View.GONE);
-        }
-
-        // 8. الخيارات الإدارية
-        if (quickAccess.isActionEnabled("admin_hub")) {
-            View btnAdminHub = view.findViewById(R.id.btnAdminHub);
-            if (btnAdminHub != null) {
-                btnAdminHub.setVisibility(View.VISIBLE);
-                btnAdminHub.setOnClickListener(v -> {
-                    dialog.dismiss();
-                    checkInventoryLockAndExecute(() -> loadFragment(new MiraAdminHubFragment(), "AdminHub"));
-                });
+            } else {
+                View btnAdminHub = view.findViewById(R.id.btnAdminHub);
+                if (btnAdminHub != null) btnAdminHub.setVisibility(View.GONE);
             }
-        } else {
-            View btnAdminHub = view.findViewById(R.id.btnAdminHub);
-            if (btnAdminHub != null) btnAdminHub.setVisibility(View.GONE);
-        }
 
-        // 9. إعدادات السيرفر
-        if (quickAccess.isActionEnabled("server_config")) {
-            View btnServerConfig = view.findViewById(R.id.btnServerConfig);
-            if (btnServerConfig != null) {
-                btnServerConfig.setVisibility(View.VISIBLE);
-                btnServerConfig.setOnClickListener(v -> {
-                    dialog.dismiss();
-                    loadFragment(new MiraServerConfigFragment(), "ServerConfig");
-                });
+            if (quickAccess.isActionEnabled("server_config")) {
+                View btnServerConfig = view.findViewById(R.id.btnServerConfig);
+                if (btnServerConfig != null) {
+                    btnServerConfig.setVisibility(View.VISIBLE);
+                    btnServerConfig.setOnClickListener(v -> {
+                        dialog.dismiss();
+                        loadFragment(new MiraServerConfigFragment(), "ServerConfig");
+                    });
+                }
+            } else {
+                View btnServerConfig = view.findViewById(R.id.btnServerConfig);
+                if (btnServerConfig != null) btnServerConfig.setVisibility(View.GONE);
             }
-        } else {
-            View btnServerConfig = view.findViewById(R.id.btnServerConfig);
-            if (btnServerConfig != null) btnServerConfig.setVisibility(View.GONE);
-        }
 
-        // زر الإغلاق
-        View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
-        if (fabCloseSheet != null) {
-            fabCloseSheet.setOnClickListener(v -> dialog.dismiss());
-        }
+            View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
+            if (fabCloseSheet != null) {
+                fabCloseSheet.setOnClickListener(v -> dialog.dismiss());
+            }
 
-        dialog.show();
-    } catch (Exception e) {
-        Log.e(TAG, "QuickActionMenu Error: " + e.getMessage(), e);
+            dialog.show();
+        } catch (Exception e) {
+            Log.e(TAG, "QuickActionMenu Error: " + e.getMessage(), e);
+        }
     }
-}
+
+    // ==================== FRAGMENT MANAGEMENT ====================
 
     public void loadFragment(Fragment fragment, String tag) {
+        loadFragment(fragment, tag, true);
+    }
+
+    public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
         try {
             if (fragment == null) return;
             showLoading();
             currentFragment = fragment;
-            fragmentManager.beginTransaction()
-                    .replace(R.id.fragment_container, fragment, tag)
-                    .commitAllowingStateLoss();
+            
+            FragmentTransaction transaction = fragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container, fragment, tag);
+            
+            if (addToBackStack) {
+                transaction.addToBackStack(tag);
+            }
+            
+            transaction.commitAllowingStateLoss();
 
             mainHandler.postDelayed(this::hideLoading, 200);
         } catch (Exception e) {
             Log.e(TAG, "Error switching fragment: " + e.getMessage());
             hideLoading();
+        }
+    }
+
+    private Fragment getTopFragment() {
+        if (fragmentManager.getBackStackEntryCount() > 0) {
+            FragmentManager.BackStackEntry entry = 
+                fragmentManager.getBackStackEntryAt(fragmentManager.getBackStackEntryCount() - 1);
+            return fragmentManager.findFragmentByTag(entry.getName());
+        }
+        return currentFragment;
+    }
+
+    private void clearBackStack() {
+        if (fragmentManager.getBackStackEntryCount() > 0) {
+            FragmentManager.BackStackEntry first = fragmentManager.getBackStackEntryAt(0);
+            fragmentManager.popBackStack(first.getId(), FragmentManager.POP_BACK_STACK_INCLUSIVE);
         }
     }
 
@@ -488,20 +504,20 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
     }
 
     private void showHardwareOptionsDialog() {
-    String[] options = isArabic ? 
-        new String[]{"إعدادات قارئ RFID", "تهيئة البوابات الأمنية", "🌐 إعدادات السيرفر", "اختبار التوصيل"} : 
-        new String[]{"RFID Reader Setup", "Gate Security Setup", "🌐 Server Config", "Connection Test"};
+        String[] options = isArabic ? 
+            new String[]{"إعدادات قارئ RFID", "تهيئة البوابات الأمنية", "🌐 إعدادات السيرفر", "اختبار التوصيل"} : 
+            new String[]{"RFID Reader Setup", "Gate Security Setup", "🌐 Server Config", "Connection Test"};
 
-    new AlertDialog.Builder(this)
-        .setTitle(isArabic ? "📡 أجهزة ومستشعرات المنظومة" : "📡 Hardware & Sensors")
-        .setItems(options, (dialog, which) -> {
-            if (which == 0) loadFragment(new MiraReaderSetupFragment(), "ReaderSetup");
-            else if (which == 1) loadFragment(new MiraGateSettingsFragment(), "GateSettings");
-            else if (which == 2) loadFragment(new MiraServerConfigFragment(), "ServerConfig"); // ✅
-            else Toast.makeText(this, "الأجهزة متصلة", Toast.LENGTH_SHORT).show();
-        })
-        .show();
-}
+        new AlertDialog.Builder(this)
+            .setTitle(isArabic ? "📡 أجهزة ومستشعرات المنظومة" : "📡 Hardware & Sensors")
+            .setItems(options, (dialog, which) -> {
+                if (which == 0) loadFragment(new MiraReaderSetupFragment(), "ReaderSetup");
+                else if (which == 1) loadFragment(new MiraGateSettingsFragment(), "GateSettings");
+                else if (which == 2) loadFragment(new MiraServerConfigFragment(), "ServerConfig");
+                else Toast.makeText(this, isArabic ? "الأجهزة متصلة" : "Devices connected", Toast.LENGTH_SHORT).show();
+            })
+            .show();
+    }
 
     // ==================== LEGACY COMPATIBILITY METHODS ====================
 
@@ -530,7 +546,6 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
     public void openReceiptFragment(String rawJson) {
         try {
             MiraReceiptFragment fragment = MiraReceiptFragment.newInstance(rawJson);
-            // ✅ استخدام show بدلاً من loadFragment للسماح بالعودة الصحيحة
             fragment.show(fragmentManager, "Receipt");
         } catch (Exception e) {
             Log.e(TAG, "openReceiptFragment Error: " + e.getMessage());
@@ -594,11 +609,10 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         }
     }
 
-    // ==================== ✅ BACK BUTTON HANDLING ====================
+    // ==================== BACK BUTTON HANDLING ====================
 
     @Override
     public void onBackPressed() {
-        // 1️⃣ إذا كان الجرد نشط، اطلب التأكيد أولاً
         if (isInventoryActive()) {
             checkInventoryLockAndExecute(() -> handleBackNavigation());
             return;
@@ -607,11 +621,8 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         handleBackNavigation();
     }
 
-    /**
-     * ✅ التعامل مع زر الرجوع بشكل صحيح
-     */
     private void handleBackNavigation() {
-        // 2️⃣ إغلاق أي Dialog مفتوح
+        // 1. إغلاق أي Dialog مفتوح
         for (Fragment fragment : fragmentManager.getFragments()) {
             if (fragment instanceof androidx.fragment.app.DialogFragment) {
                 androidx.fragment.app.DialogFragment dialogFragment = 
@@ -623,44 +634,42 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
             }
         }
         
-        // 3️⃣ إذا كان هناك Back Stack، الرجوع إليه
+        // 2. إذا كان هناك Back Stack، الرجوع إليه
         if (fragmentManager.getBackStackEntryCount() > 0) {
             fragmentManager.popBackStack();
+            
+            Fragment topFragment = getTopFragment();
+            if (topFragment != null) {
+                currentFragment = topFragment;
+            }
             return;
         }
         
-        // 4️⃣ إذا كنا في شاشة غير Dashboard، الرجوع إلى Dashboard
+        // 3. إذا كنا في شاشة غير Dashboard، الرجوع إلى Dashboard
         if (currentFragment != null && !(currentFragment instanceof MiraDashboardFragment)) {
-            loadFragment(new MiraDashboardFragment(), "Dashboard");
+            clearBackStack();
+            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
             return;
         }
         
-        // 5️⃣ في الشاشة الرئيسية - الضغط المزدوج للخروج
+        // 4. في الشاشة الرئيسية - الضغط المزدوج للخروج
         handleDoubleBackToExit();
     }
 
-    /**
-     * ✅ التعامل مع الضغط المزدوج للخروج من التطبيق
-     */
     private void handleDoubleBackToExit() {
         long currentTime = System.currentTimeMillis();
         
         if (currentTime - lastBackPressTime < DOUBLE_BACK_TIMEOUT) {
-            // ضغطة ثانية خلال 2 ثانية - الخروج من التطبيق
             finish();
             return;
         }
         
-        // الضغطة الأولى - عرض رسالة
         lastBackPressTime = currentTime;
         Toast.makeText(this, 
             isArabic ? "اضغط مرة أخرى للخروج" : "Press again to exit", 
             Toast.LENGTH_SHORT).show();
     }
 
-    /**
-     * ✅ معالجة أزرار الأجهزة الفيزيائية
-     */
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
@@ -697,49 +706,45 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
     // ==================== SYSTEM & TOOLBAR HELPERS ====================
 
     private void updateToolbarTitle() {
-    try {
-        if (getSupportActionBar() != null && sessionManager != null) {
-            MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
-            String orgName = (orgProfile != null) ? 
-                orgProfile.getDisplayName() : "MIRA"; // ✅ استخدام getDisplayName بدلاً من getOrgName
-            
-            String displayName = sessionManager.getDisplayName();
-            if (displayName == null || displayName.trim().isEmpty()) {
-                displayName = sessionManager.getUsername();
+        try {
+            if (getSupportActionBar() != null && sessionManager != null) {
+                MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
+                String orgName = (orgProfile != null) ? 
+                    orgProfile.getDisplayName() : "MIRA";
+                
+                getSupportActionBar().setTitle(orgName);
+                
+                if (branchesManager != null && branchesManager.hasActiveBranch()) {
+                    getSupportActionBar().setSubtitle("📍 " + branchesManager.getActiveBranchDisplayName());
+                }
             }
-            
-            getSupportActionBar().setTitle(orgName);
-            
-            if (branchesManager != null && branchesManager.hasActiveBranch()) {
-                getSupportActionBar().setSubtitle("📍 " + branchesManager.getActiveBranchDisplayName());
-            }
+        } catch (Exception e) {
+            Log.e(TAG, "Toolbar Update Error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.e(TAG, "Toolbar Update Error: " + e.getMessage());
     }
-}
+    
     private void updateBottomNavLanguage() {
-    try {
-        BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
-        if (nav != null && nav.getMenu() != null) {
-            Menu menu = nav.getMenu();
-            
-            MenuItem home = menu.findItem(R.id.nav_home);
-            if (home != null) home.setTitle(isArabic ? "الرئيسية" : "Home");
-            
-            MenuItem inventory = menu.findItem(R.id.nav_inventory);
-            if (inventory != null) inventory.setTitle(isArabic ? "الجرد" : "Inventory");
-            
-            MenuItem sales = menu.findItem(R.id.nav_sales);
-            if (sales != null) sales.setTitle(isArabic ? "البيع" : "Sales");
-            
-            MenuItem transfers = menu.findItem(R.id.nav_transfers);
-            if (transfers != null) transfers.setTitle(isArabic ? "التحويلات" : "Transfers");
+        try {
+            BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
+            if (nav != null && nav.getMenu() != null) {
+                Menu menu = nav.getMenu();
+                
+                MenuItem home = menu.findItem(R.id.nav_home);
+                if (home != null) home.setTitle(isArabic ? "الرئيسية" : "Home");
+                
+                MenuItem inventory = menu.findItem(R.id.nav_inventory);
+                if (inventory != null) inventory.setTitle(isArabic ? "الجرد" : "Inventory");
+                
+                MenuItem sales = menu.findItem(R.id.nav_sales);
+                if (sales != null) sales.setTitle(isArabic ? "البيع" : "Sales");
+                
+                MenuItem transfers = menu.findItem(R.id.nav_transfers);
+                if (transfers != null) transfers.setTitle(isArabic ? "التحويلات" : "Transfers");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Update bottom nav language error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.e(TAG, "Update bottom nav language error: " + e.getMessage());
     }
-}
 
     public void showLoading() {
         if (loadingOverlay != null && !isFinishing() && !isDestroyed()) {
@@ -839,24 +844,23 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
     }
 
     @Override
-protected void onDestroy() {
-    try {
-        stopActiveInventory();
-        mainHandler.removeCallbacksAndMessages(null);
-        if (playSoundThread != null) playSoundThread.stopPlay();
-        if (soundPool != null) soundPool.release();
-        if (mReader != null) mReader.free();
-        
-        // ✅ إزالة المستمع
-        if (orgProfileManager != null && profileListener != null) {
-            orgProfileManager.removeListener(profileListener);
+    protected void onDestroy() {
+        try {
+            stopActiveInventory();
+            mainHandler.removeCallbacksAndMessages(null);
+            if (playSoundThread != null) playSoundThread.stopPlay();
+            if (soundPool != null) soundPool.release();
+            if (mReader != null) mReader.free();
+            
+            if (orgProfileManager != null && profileListener != null) {
+                orgProfileManager.removeListener(profileListener);
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
         }
-        
-    } catch (Exception e) {
-        Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
+        super.onDestroy();
     }
-    super.onDestroy(); // ✅ مرة واحدة فقط
-}
 
     private void safeExecute(Runnable runnable, String errorMessage) {
         try {
@@ -894,4 +898,4 @@ protected void onDestroy() {
             }
         }
     }
-                }
+}
