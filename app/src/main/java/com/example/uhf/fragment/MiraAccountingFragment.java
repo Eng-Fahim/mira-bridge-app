@@ -419,50 +419,48 @@ private double safeDouble(String value) {
     // ==================== ADAPTER ====================
     
     private class AccountingAdapter extends RecyclerView.Adapter<AccountingAdapter.ViewHolder> {
+    
+    private final List<AccountingEntry> items;
+    
+    AccountingAdapter(List<AccountingEntry> items) {
+        this.items = items;
+    }
+    
+    @NonNull
+    @Override
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext())
+            .inflate(R.layout.item_accounting_entry, parent, false);
+        return new ViewHolder(view);
+    }
+    
+    @Override
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+        AccountingEntry entry = items.get(position);
         
-        private final List<AccountingEntry> items;
+        holder.tvCode.setText(entry.code != null ? entry.code : "—");
+        holder.tvDescription.setText(entry.description != null ? entry.description : "—");
+        holder.tvGold.setText(String.format(Locale.US, "%.3f g", entry.goldDebit));
         
-        AccountingAdapter(List<AccountingEntry> items) {
-            this.items = items;
-        }
+        holder.tvDebit.setText(String.format(Locale.US, "+%,.2f", entry.debit));
+        holder.tvCredit.setText(String.format(Locale.US, "-%,.2f", entry.credit));
+    }
+    
+    @Override
+    public int getItemCount() {
+        return items.size();
+    }
+    
+    class ViewHolder extends RecyclerView.ViewHolder {
+        TextView tvCode, tvDescription, tvGold, tvDebit, tvCredit;
         
-        @NonNull
-        @Override
-        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext())
-                .inflate(android.R.layout.simple_list_item_2, parent, false);
-            return new ViewHolder(view);
-        }
-        
-        @Override
-        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            AccountingEntry entry = items.get(position);
-            
-            String title = entry.code;
-            if (!entry.description.isEmpty()) {
-                title += " - " + entry.description;
-            }
-            holder.tvTitle.setText(title);
-            
-            holder.tvSubtitle.setText(String.format(Locale.US, 
-                "مدين: %.2f | دائن: %.2f | ذهب: %.3f g", 
-                entry.debit, entry.credit, entry.goldDebit));
-        }
-        
-        @Override
-        public int getItemCount() {
-            return items.size();
-        }
-        
-        class ViewHolder extends RecyclerView.ViewHolder {
-            TextView tvTitle;
-            TextView tvSubtitle;
-            
-            ViewHolder(View itemView) {
-                super(itemView);
-                tvTitle = itemView.findViewById(android.R.id.text1);
-                tvSubtitle = itemView.findViewById(android.R.id.text2);
-            }
+        ViewHolder(View itemView) {
+            super(itemView);
+            tvCode = itemView.findViewById(R.id.tvRowCode);
+            tvDescription = itemView.findViewById(R.id.tvRowDescription);
+            tvGold = itemView.findViewById(R.id.tvRowGold);
+            tvDebit = itemView.findViewById(R.id.tvRowDebit);
+            tvCredit = itemView.findViewById(R.id.tvRowCredit);
         }
     }
 }
