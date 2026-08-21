@@ -82,6 +82,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private static final int PERMISSION_REQUEST_CODE = 1001;
 
     public TabHost mTabHost = null;
+    
+    
+    private MiraOrgProfileManager orgProfileManager;
+private MiraOrgProfileManager.OnProfileChangedListener profileListener;
+private TextView tvAppTitle;
+
 
     private FrameLayout loadingOverlay;
     private FragmentManager fragmentManager;
@@ -120,6 +126,32 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public void setActiveRfidListener(OnRfidScannedListener listener) {
         this.activeRfidListener = listener;
     }
+    
+    private void setupOrgProfileListener() {
+    orgProfileManager = MiraOrgProfileManager.getInstance(this);
+    
+    profileListener = new MiraOrgProfileManager.OnProfileChangedListener() {
+        @Override
+        public void onProfileChanged() {
+            updateAppTitle();
+        }
+    };
+    
+    orgProfileManager.addListener(profileListener);
+    updateAppTitle();
+}
+
+private void updateAppTitle() {
+    // ✅ تحديث عنوان الـ Toolbar
+    if (getSupportActionBar() != null) {
+        String orgName = orgProfileManager != null ? 
+            orgProfileManager.getDisplayName() : "MIRA";
+        getSupportActionBar().setTitle(orgName);
+    }
+    
+    // ✅ تحديث updateToolbarTitle أيضاً
+    updateToolbarTitle();
+}
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -147,13 +179,14 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             loadingOverlay = findViewById(R.id.loading_overlay);
             fragmentManager = getSupportFragmentManager();
             
+            setupOrgProfileListener();
             updateBottomNavLanguage();
 
             MaterialToolbar toolbar = findViewById(R.id.toolbar);
-            if (toolbar != null) {
-                setSupportActionBar(toolbar);
-                updateToolbarTitle();
-            }
+        if (toolbar != null) {
+            setSupportActionBar(toolbar);
+            updateToolbarTitle();
+        }
 
             View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
             if (btnHardwareStatus != null) {
@@ -664,23 +697,27 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
     // ==================== SYSTEM & TOOLBAR HELPERS ====================
 
     private void updateToolbarTitle() {
-        try {
-            if (getSupportActionBar() != null && sessionManager != null) {
-                String displayName = sessionManager.getDisplayName();
-                if (displayName == null || displayName.trim().isEmpty()) displayName = sessionManager.getUsername();
-                MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
-                String orgName = (orgProfile != null) ? orgProfile.getOrgName() : "MIRA";
-
-                getSupportActionBar().setTitle(orgName + " - " + displayName);
-                if (branchesManager != null && branchesManager.hasActiveBranch()) {
-                    getSupportActionBar().setSubtitle("📍 " + branchesManager.getActiveBranchDisplayName());
-                }
+    try {
+        if (getSupportActionBar() != null && sessionManager != null) {
+            MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
+            String orgName = (orgProfile != null) ? 
+                orgProfile.getDisplayName() : "MIRA"; // ✅ استخدام getDisplayName بدلاً من getOrgName
+            
+            String displayName = sessionManager.getDisplayName();
+            if (displayName == null || displayName.trim().isEmpty()) {
+                displayName = sessionManager.getUsername();
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Toolbar Update Error: " + e.getMessage());
+            
+            getSupportActionBar().setTitle(orgName);
+            
+            if (branchesManager != null && branchesManager.hasActiveBranch()) {
+                getSupportActionBar().setSubtitle("📍 " + branchesManager.getActiveBranchDisplayName());
+            }
         }
+    } catch (Exception e) {
+        Log.e(TAG, "Toolbar Update Error: " + e.getMessage());
     }
-    
+}
     private void updateBottomNavLanguage() {
     try {
         BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
@@ -802,18 +839,24 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
     }
 
     @Override
-    protected void onDestroy() {
-        try {
-            stopActiveInventory();
-            mainHandler.removeCallbacksAndMessages(null);
-            if (playSoundThread != null) playSoundThread.stopPlay();
-            if (soundPool != null) soundPool.release();
-            if (mReader != null) mReader.free();
-        } catch (Exception e) {
-            Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
+protected void onDestroy() {
+    try {
+        stopActiveInventory();
+        mainHandler.removeCallbacksAndMessages(null);
+        if (playSoundThread != null) playSoundThread.stopPlay();
+        if (soundPool != null) soundPool.release();
+        if (mReader != null) mReader.free();
+        
+        // ✅ إزالة المستمع
+        if (orgProfileManager != null && profileListener != null) {
+            orgProfileManager.removeListener(profileListener);
         }
-        super.onDestroy();
+        
+    } catch (Exception e) {
+        Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
     }
+    super.onDestroy(); // ✅ مرة واحدة فقط
+}
 
     private void safeExecute(Runnable runnable, String errorMessage) {
         try {
