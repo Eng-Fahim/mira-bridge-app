@@ -179,34 +179,45 @@ public ApiResponse activateProvider(int providerId) {
     // ===================== 🔑 AUTHENTICATION =====================
 
     public ApiResponse login(String username, String password, String deviceId) {
-        JSONObject payload = new JSONObject();
-        try {
-            payload.put("username", username);
-            payload.put("password", password);
-            payload.put("device_id", deviceId != null ? deviceId : "");
-            payload.put("gate_id", getEffectiveGateId());
-            payload.put("app_version", "MIRA-ANDROID-v3.0");
-        } catch (Exception e) {
-            Log.e(TAG, "Error building login payload: " + e.getMessage());
-        }
-        
-        ApiResponse response = post("/auth/login", payload);
-        
-        if (response.isSuccess && response.data != null) {
-            String newApiKey = response.data.optString("api_key", "");
-            String newGateId = response.data.optString("gate_id", "");
-            String authToken = response.data.optString("token", "");
-            
-            if (!newApiKey.isEmpty() || !authToken.isEmpty()) {
-                serverConfig.saveSession(newApiKey, newGateId, authToken);
-                refreshCredentials(); // ✅ تحديث فوري
-                
-                Log.d(TAG, "Login success - credentials updated");
-            }
-        }
-        
-        return response;
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("username", username);
+        payload.put("password", password);
+        payload.put("device_id", deviceId != null ? deviceId : "");
+        payload.put("gate_id", getEffectiveGateId());
+        payload.put("app_version", "MIRA-ANDROID-v3.0");
+    } catch (Exception e) {
+        Log.e(TAG, "Error building login payload: " + e.getMessage());
     }
+    
+    ApiResponse response = post("/auth/login", payload);
+    
+    if (response.isSuccess && response.data != null) {
+        String newApiKey = response.data.optString("api_key", "");
+        String newGateId = response.data.optString("gate_id", "");
+        String authToken = response.data.optString("token", "");
+        
+        // ✅ إذا أرسل السيرفر api_key جديد، احفظه
+        if (!newApiKey.isEmpty()) {
+            serverConfig.saveSession(newApiKey, newGateId, authToken);
+            refreshCredentials();
+            Log.d(TAG, "✅ New API Key saved: " + newApiKey.substring(0, Math.min(8, newApiKey.length())) + "...");
+        } 
+        // ✅ إذا لم يرسل api_key (لأنه موجود)، احتفظ بالمفتاح الحالي
+        else if (!authToken.isEmpty()) {
+            // ✅ احفظ فقط التوكن و gate_id بدون مسح api_key الموجود
+            serverConfig.saveSession(
+                getEffectiveApiKey(),  // ✅ احتفظ بالمفتاح الحالي
+                !newGateId.isEmpty() ? newGateId : getEffectiveGateId(),
+                authToken
+            );
+            refreshCredentials();
+            Log.d(TAG, "✅ Using existing API Key");
+        }
+    }
+    
+    return response;
+}
 
     public ApiResponse getBranchItemsByCategory(int branchId, String category) {
         String endpoint = "/branches/" + branchId + "/inventory/items";
