@@ -1067,6 +1067,38 @@ public void submitInventoryAuditReport(JSONObject payload) {
     public ApiResponse getExchangeRates() {
         return getWithAuth("/currency/rates");
     }
+    
+    
+    // ===================== ACCOUNTING - إضافات =====================
+
+public ApiResponse createAccount(JSONObject payload) {
+    return postWithAuth("/accounting/chart-of-accounts/create", payload);
+}
+
+public ApiResponse getVouchers(String branchId, String voucherType) {
+    String url = "/accounting/vouchers";
+    boolean hasParam = false;
+    if (branchId != null && !branchId.isEmpty()) {
+        url += "?branch_id=" + branchId;
+        hasParam = true;
+    }
+    if (voucherType != null && !voucherType.isEmpty()) {
+        url += (hasParam ? "&" : "?") + "voucher_type=" + voucherType;
+    }
+    return getWithAuth(url);
+}
+
+public ApiResponse createVoucher(JSONObject payload) {
+    return postWithAuth("/accounting/vouchers/create", payload);
+}
+
+public ApiResponse getFiscalYears() {
+    return getWithAuth("/accounting/fiscal-years");
+}
+
+public ApiResponse createFiscalYear(JSONObject payload) {
+    return postWithAuth("/accounting/fiscal-years/create", payload);
+}
 
     public ApiResponse calculateGoldPrice(int karat, double weight, String currency) {
         JSONObject payload = new JSONObject();
