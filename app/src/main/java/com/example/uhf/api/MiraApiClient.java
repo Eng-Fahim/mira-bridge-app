@@ -252,6 +252,10 @@ public ApiResponse activateProvider(int providerId) {
     public ApiResponse getCurrentUser() {
         return getWithAuth("/auth/me");
     }
+    
+    public String getClientSessionId() {
+    return clientSessionId;
+    }
 
     public ApiResponse refreshToken(String oldToken) {
         JSONObject payload = new JSONObject();
