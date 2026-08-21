@@ -1100,6 +1100,37 @@ public ApiResponse createFiscalYear(JSONObject payload) {
     return postWithAuth("/accounting/fiscal-years/create", payload);
 }
 
+// ===================== ACCOUNTING REPORTS =====================
+
+public ApiResponse getBalanceSheet(String branchId, String asOfDate) {
+    String url = "/accounting/balance-sheet";
+    boolean hasParam = false;
+    if (branchId != null && !branchId.isEmpty()) {
+        url += "?branch_id=" + branchId;
+        hasParam = true;
+    }
+    if (asOfDate != null && !asOfDate.isEmpty()) {
+        url += (hasParam ? "&" : "?") + "as_of=" + asOfDate;
+    }
+    return getWithAuth(url);
+}
+
+public ApiResponse getIncomeStatement(String branchId, String fromDate, String toDate) {
+    String url = "/accounting/income-statement?from=" + fromDate + "&to=" + toDate;
+    if (branchId != null && !branchId.isEmpty()) {
+        url += "&branch_id=" + branchId;
+    }
+    return getWithAuth(url);
+}
+
+public ApiResponse getGoldMovementReport(String branchId, String fromDate, String toDate) {
+    String url = "/accounting/gold-movement?from=" + fromDate + "&to=" + toDate;
+    if (branchId != null && !branchId.isEmpty()) {
+        url += "&branch_id=" + branchId;
+    }
+    return getWithAuth(url);
+}
+
     public ApiResponse calculateGoldPrice(int karat, double weight, String currency) {
         JSONObject payload = new JSONObject();
         try {
