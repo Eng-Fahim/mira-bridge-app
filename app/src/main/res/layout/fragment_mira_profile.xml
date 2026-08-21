@@ -12,7 +12,7 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- ==================== 1. قسم المنظمة (للقراءة فقط) ==================== -->
+        <!-- ==================== 1. قسم المنظمة ==================== -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -38,25 +38,18 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <!-- شعار المنظمة -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:layout_marginBottom="16dp">
+                <ImageView
+                    android:id="@+id/imgOrgLogo"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:layout_gravity="center"
+                    android:src="@android:drawable/ic_menu_gallery"
+                    android:contentDescription="شعار المنظمة"
+                    android:background="?attr/colorSurfaceVariant"
+                    android:padding="8dp"
+                    android:layout_marginBottom="16dp"
+                    app:tint="?attr/colorPrimary" />
 
-                    <ImageView
-                        android:id="@+id/imgOrgLogo"
-                        android:layout_width="80dp"
-                        android:layout_height="80dp"
-                        android:src="@drawable/ic_org_placeholder"
-                        android:contentDescription="شعار المنظمة"
-                        android:background="?attr/colorSurfaceVariant"
-                        android:padding="8dp" />
-                </LinearLayout>
-
-                <!-- اسم المنظمة بالعربي -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -83,7 +76,6 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <!-- اسم المنظمة بالإنجليزي -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -110,7 +102,6 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <!-- هاتف المنظمة -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -136,7 +127,6 @@
                         android:textSize="13sp" />
                 </LinearLayout>
 
-                <!-- بريد المنظمة -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -148,7 +138,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="البريد الإلكتروني"
+                        android:text="البريد"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="12sp" />
 
@@ -162,7 +152,6 @@
                         android:textSize="13sp" />
                 </LinearLayout>
 
-                <!-- الرقم الضريبي -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -188,7 +177,6 @@
                         android:textSize="13sp" />
                 </LinearLayout>
 
-                <!-- ✅ زر تعديل - يظهر فقط للمدير -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnEditOrgProfile"
                     android:layout_width="match_parent"
@@ -201,7 +189,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ==================== 2. قسم المستخدم الشخصي ==================== -->
+        <!-- ==================== 2. قسم المستخدم ==================== -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -227,7 +215,6 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <!-- الاسم المعروض -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -254,7 +241,6 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <!-- الدور -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -280,7 +266,6 @@
                         android:textSize="13sp" />
                 </LinearLayout>
 
-                <!-- رقم الحساب -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -306,7 +291,6 @@
                         android:textSize="13sp" />
                 </LinearLayout>
 
-                <!-- زر تعديل الملف الشخصي -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnEditProfile"
                     android:layout_width="match_parent"
@@ -318,7 +302,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ==================== 3. قسم الأمان والإعدادات ==================== -->
+        <!-- ==================== 3. قسم الأمان ==================== -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -342,7 +326,6 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- ✅ البيومترية - قسم قابل للتوسيع -->
                 <LinearLayout
                     android:id="@+id/headerSecurity"
                     android:layout_width="match_parent"
@@ -393,7 +376,7 @@
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="13sp" />
 
-                        <SwitchMaterial
+                        <Switch
                             android:id="@+id/switchBiometricLogin"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content" />
@@ -413,14 +396,13 @@
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="13sp" />
 
-                        <SwitchMaterial
+                        <Switch
                             android:id="@+id/switchBiometricConfirm"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content" />
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- ✅ المظهر - قسم قابل للتوسيع -->
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
@@ -461,7 +443,6 @@
                     android:paddingBottom="16dp"
                     android:visibility="gone">
 
-                    <!-- خيارات المظهر -->
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
