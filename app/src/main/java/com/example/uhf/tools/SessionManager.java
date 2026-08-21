@@ -21,6 +21,12 @@ public class SessionManager {
     private static final String KEY_LAST_BIOMETRIC_TOKEN = "lastBiometricToken";
     private static final String KEY_LAST_BIOMETRIC_BRANCH_ID = "lastBiometricBranchId";
     private static final String KEY_LAST_BIOMETRIC_BRANCH_NAME = "lastBiometricBranchName";
+    
+    // ✅ إضافة متغيرات API Key
+    private static final String KEY_API_KEY = "apiKey";
+    private static final String KEY_API_KEY_ID = "apiKeyId";
+    private static final String KEY_API_KEY_PREFIX = "apiKeyPrefix";
+    private static final String KEY_API_KEY_CREATED_AT = "apiKeyCreatedAt";
 
     public enum Role {
         SYSTEM_ADMIN,
@@ -51,6 +57,69 @@ public class SessionManager {
         editor.apply();
     }
 
+    // ✅ دوال API Key الجديدة
+    
+    /**
+     * حفظ مفتاح API
+     */
+    public void saveApiKey(String apiKey) {
+        if (apiKey != null && !apiKey.isEmpty()) {
+            editor.putString(KEY_API_KEY, apiKey);
+            editor.apply();
+        }
+    }
+    
+    /**
+     * استرجاع مفتاح API المحفوظ
+     */
+    public String getApiKey() {
+        return pref.getString(KEY_API_KEY, "");
+    }
+    
+    /**
+     * التحقق من وجود مفتاح API
+     */
+    public boolean hasApiKey() {
+        String apiKey = getApiKey();
+        return !apiKey.isEmpty();
+    }
+    
+    /**
+     * حفظ معلومات مفتاح API الكاملة
+     */
+    public void saveApiKeyInfo(String apiKey, String keyId, String keyPrefix, String createdAt) {
+        editor.putString(KEY_API_KEY, apiKey);
+        editor.putString(KEY_API_KEY_ID, keyId);
+        editor.putString(KEY_API_KEY_PREFIX, keyPrefix);
+        editor.putString(KEY_API_KEY_CREATED_AT, createdAt);
+        editor.apply();
+    }
+    
+    /**
+     * استرجاع معرف مفتاح API
+     */
+    public String getApiKeyId() {
+        return pref.getString(KEY_API_KEY_ID, "");
+    }
+    
+    /**
+     * استرجاع بادئة مفتاح API
+     */
+    public String getApiKeyPrefix() {
+        return pref.getString(KEY_API_KEY_PREFIX, "");
+    }
+    
+    /**
+     * حذف مفتاح API
+     */
+    public void clearApiKey() {
+        editor.remove(KEY_API_KEY);
+        editor.remove(KEY_API_KEY_ID);
+        editor.remove(KEY_API_KEY_PREFIX);
+        editor.remove(KEY_API_KEY_CREATED_AT);
+        editor.apply();
+    }
+
     public boolean isLoggedIn() { 
         return pref.getBoolean(KEY_IS_LOGGED_IN, false); 
     }
@@ -68,12 +137,10 @@ public class SessionManager {
         return pref.getString(KEY_USER_ROLE, "INVENTORY_MGR"); 
     }
 
-    // ✅ إضافة getRole
     public String getRole() { 
         return getRoleString(); 
     }
 
-    // ✅ إضافة setRole
     public void setRole(String role) { 
         editor.putString(KEY_USER_ROLE, role); 
         editor.apply(); 
@@ -88,7 +155,6 @@ public class SessionManager {
         return "SYSTEM_ADMIN".equals(role) || "ORG_ADMIN".equals(role) || "ADMIN".equals(role);
     }
 
-    // ✅ إضافة isAdmin
     public boolean isAdmin() {
         return isAnyAdmin();
     }
@@ -114,7 +180,6 @@ public class SessionManager {
     public String getServerUrl() { return pref.getString(KEY_SERVER_URL, ""); }
     public void setServerUrl(String url) { editor.putString(KEY_SERVER_URL, url); editor.apply(); }
 
-    // ✅ إضافة getPhone و setPhone
     public String getPhone() { 
         return pref.getString("phone", ""); 
     }
@@ -126,7 +191,6 @@ public class SessionManager {
     public void setBiometricEnabled(boolean enabled) { editor.putBoolean(KEY_BIOMETRIC_ENABLED, enabled); editor.apply(); }
     public boolean isBiometricEnabled() { return pref.getBoolean(KEY_BIOMETRIC_ENABLED, false); }
 
-    // ✅ إضافة دوال البيومترية الجديدة
     public void setBiometricLoginEnabled(boolean enabled) { 
         setBiometricEnabled(enabled); 
     }
@@ -165,7 +229,6 @@ public class SessionManager {
     public int getLastBiometricBranchId() { return pref.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, 1); }
     public String getLastBiometricBranchName() { return pref.getString(KEY_LAST_BIOMETRIC_BRANCH_NAME, ""); }
 
-    // ✅ إضافة refreshProfileData
     public void refreshProfileData() {
         // يمكن إضافة منطق إضافي هنا إذا لزم
     }
@@ -179,6 +242,9 @@ public class SessionManager {
         String lastToken = pref.getString(KEY_LAST_BIOMETRIC_TOKEN, "");
         int lastBranchId = pref.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, 1);
         String lastBranchName = pref.getString(KEY_LAST_BIOMETRIC_BRANCH_NAME, "");
+        
+        // ✅ حفظ مفتاح API قبل المسح (إذا أردت الاحتفاظ به)
+        String apiKey = pref.getString(KEY_API_KEY, "");
 
         editor.clear();
 
@@ -192,6 +258,9 @@ public class SessionManager {
             editor.putInt(KEY_LAST_BIOMETRIC_BRANCH_ID, lastBranchId);
             editor.putString(KEY_LAST_BIOMETRIC_BRANCH_NAME, lastBranchName);
         }
+        
+        // ✅ لا تحذف مفتاح API - سيتم استخدامه في تسجيل الدخول التالي
+        // إذا أردت حذفه، استخدم clearApiKey()
 
         editor.apply();
     }
