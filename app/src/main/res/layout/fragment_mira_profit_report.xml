@@ -229,6 +229,17 @@
                         android:textColor="?attr/colorSecondary"
                         android:textSize="14sp"
                         android:textStyle="bold" />
+                        
+                        <!-- أجور التصنيع - مخفي أو ظاهر حسب الحاجة -->
+<TextView
+    android:id="@+id/tvMakingCharges"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="0.00"
+    android:textColor="?attr/colorOnSurface"
+    android:textSize="14sp"
+    android:textStyle="bold"
+    android:visibility="gone" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
