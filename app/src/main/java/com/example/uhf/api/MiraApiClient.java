@@ -205,14 +205,18 @@ public ApiResponse activateProvider(int providerId) {
         } 
         // ✅ إذا لم يرسل api_key (لأنه موجود)، احتفظ بالمفتاح الحالي
         else if (!authToken.isEmpty()) {
-            // ✅ احفظ فقط التوكن و gate_id بدون مسح api_key الموجود
+            // ✅ احتفظ بالمفتاح الحالي ولا تمسحه
+            String currentApiKey = getEffectiveApiKey();
+            String currentGateId = getEffectiveGateId();
+            
             serverConfig.saveSession(
-                getEffectiveApiKey(),  // ✅ احتفظ بالمفتاح الحالي
-                !newGateId.isEmpty() ? newGateId : getEffectiveGateId(),
+                !currentApiKey.isEmpty() ? currentApiKey : "",  // ✅ احتفظ بالمفتاح الحالي
+                !newGateId.isEmpty() ? newGateId : currentGateId,
                 authToken
             );
             refreshCredentials();
-            Log.d(TAG, "✅ Using existing API Key");
+            Log.d(TAG, "✅ Using existing API Key: " + 
+                (!currentApiKey.isEmpty() ? currentApiKey.substring(0, Math.min(8, currentApiKey.length())) + "..." : "EMPTY"));
         }
     }
     
