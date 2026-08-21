@@ -68,8 +68,6 @@ public class MiraAccountingFragment extends Fragment {
     private final List<AccountingEntry> filteredList = new ArrayList<>();
     private AccountingAdapter adapter;
 
-    private boolean isArabic = true;
-
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -77,13 +75,11 @@ public class MiraAccountingFragment extends Fragment {
         
         apiClient = MiraApiClient.getInstance(requireContext());
         branchesManager = MiraBranchesManager.getInstance(requireContext());
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
 
         initViews(view);
         setupRecyclerView();
         setupListeners();
         
-        // ✅ تحميل البيانات عند الفتح
         loadData(currentTab);
 
         return view;
@@ -101,11 +97,12 @@ public class MiraAccountingFragment extends Fragment {
         btnCreateManualEntry = view.findViewById(R.id.btnCreateManualEntry);
         tabAccounting = view.findViewById(R.id.tabAccounting);
         
-        // ✅ تهيئة التبويبات
+        // ✅ استخدام الموارد المترجمة للتبويبات
         if (tabAccounting != null) {
-            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "القيود" : "Journal"));
-            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "دليل الحسابات" : "Chart of Accounts"));
-            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "ميزان المراجعة" : "Trial Balance"));
+            tabAccounting.removeAllTabs();
+            tabAccounting.addTab(tabAccounting.newTab().setText(R.string.tab_journal));
+            tabAccounting.addTab(tabAccounting.newTab().setText(R.string.tab_chart_of_accounts));
+            tabAccounting.addTab(tabAccounting.newTab().setText(R.string.tab_trial_balance));
         }
     }
 
@@ -153,120 +150,107 @@ public class MiraAccountingFragment extends Fragment {
         }
     }
 
-    /**
-     * ✅ تحميل البيانات من السيرفر
-     */
     private void loadData(String tab) {
-    if (pbLoading != null) pbLoading.setVisibility(View.VISIBLE);
-    if (tvEmptyData != null) tvEmptyData.setVisibility(View.GONE);
-    
-    executor.execute(() -> {
-        try {
-            int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-            String branchIdStr = String.valueOf(branchId);
-            
-            Log.d(TAG, "=== Loading accounting data ===");
-            Log.d(TAG, "Tab: " + tab);
-            Log.d(TAG, "Branch ID: " + branchIdStr);
-            Log.d(TAG, "API URL: " + apiClient.getApiUrl());
-            
-            MiraApiClient.ApiResponse response = null;
-            
-            switch (tab) {
-                case "journal":
-                    response = apiClient.getJournalEntries(branchIdStr);
-                    break;
-                case "chart":
-                    response = apiClient.getChartOfAccounts();
-                    break;
-                case "trial":
-                    response = apiClient.getTrialBalance(branchIdStr);
-                    break;
-            }
-            
-            // ✅ تسجيل مفصل
-            if (response != null) {
-                Log.d(TAG, "Response Success: " + response.isSuccess);
-                Log.d(TAG, "Response Code: " + response.code);
-                Log.d(TAG, "Response Error: " + response.error);
-                if (response.data != null) {
-                    String dataStr = response.data.toString();
-                    Log.d(TAG, "Data: " + dataStr);
-                } else {
-                    Log.d(TAG, "Data is NULL");
-                }
-            } else {
-                Log.d(TAG, "Response is NULL");
-            }
-            
-            final MiraApiClient.ApiResponse finalResponse = response;
-            
-            mainHandler.post(() -> {
-                if (pbLoading != null) pbLoading.setVisibility(View.GONE);
+        if (pbLoading != null) pbLoading.setVisibility(View.VISIBLE);
+        if (tvEmptyData != null) tvEmptyData.setVisibility(View.GONE);
+        
+        executor.execute(() -> {
+            try {
+                int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+                String branchIdStr = String.valueOf(branchId);
                 
-                if (finalResponse != null && finalResponse.isSuccess && finalResponse.data != null) {
-                    parseAndDisplay(finalResponse.data, tab);
-                } else {
-                    showEmptyState(true);
+                MiraApiClient.ApiResponse response = null;
+                
+                switch (tab) {
+                    case "journal":
+                        response = apiClient.getJournalEntries(branchIdStr);
+                        break;
+                    case "chart":
+                        response = apiClient.getChartOfAccounts();
+                        break;
+                    case "trial":
+                        response = apiClient.getTrialBalance(branchIdStr);
+                        break;
                 }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Error: " + e.getMessage(), e);
-            mainHandler.post(() -> {
-                if (pbLoading != null) pbLoading.setVisibility(View.GONE);
-                showEmptyState(true);
-            });
-        }
-    });
-}
+                
+                final MiraApiClient.ApiResponse finalResponse = response;
+                
+                mainHandler.post(() -> {
+                    if (pbLoading != null) pbLoading.setVisibility(View.GONE);
+                    
+                    if (finalResponse != null && finalResponse.isSuccess && finalResponse.data != null) {
+                        parseAndDisplay(finalResponse.data, tab);
+                    } else {
+                        showEmptyState(true);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error: " + e.getMessage(), e);
+                mainHandler.post(() -> {
+                    if (pbLoading != null) pbLoading.setVisibility(View.GONE);
+                    showEmptyState(true);
+                });
+            }
+        });
+    }
 
     /**
-     * ✅ تحليل وعرض البيانات
+     * ✅ قراءة البيانات بمرونة لجميع التبويبات (قيود / دليل حسابات / ميزان مراجعة)
      */
     private void parseAndDisplay(JSONObject data, String tab) {
-    try {
-        entriesList.clear();
-        
-        // ✅ البيانات مباشرة في "data" كمصفوفة
-        JSONArray items = data.optJSONArray("data");
-        
-        if (items != null && items.length() > 0) {
-            for (int i = 0; i < items.length(); i++) {
-                JSONObject obj = items.getJSONObject(i);
-                
-                AccountingEntry entry = new AccountingEntry();
-                entry.id = i + 1;
-                entry.code = obj.optString("entry_number", obj.optString("reference", "—"));
-                entry.description = obj.optString("description", "—");
-                
-                // ✅ القيم نصية في JSON - تحويل يدوي
-                entry.debit = safeDouble(obj.optString("total_debit", "0"));
-                entry.credit = safeDouble(obj.optString("total_credit", "0"));
-                entry.goldDebit = safeDouble(obj.optString("total_gold_debit_grams", "0"));
-                entry.goldCredit = safeDouble(obj.optString("total_gold_credit_grams", "0"));
-                entry.date = obj.optString("entry_date", obj.optString("created_at", ""));
-                
-                entriesList.add(entry);
+        try {
+            entriesList.clear();
+            JSONArray items = data.optJSONArray("data");
+            
+            if (items != null && items.length() > 0) {
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject obj = items.getJSONObject(i);
+                    AccountingEntry entry = new AccountingEntry();
+                    entry.id = i + 1;
+                    
+                    if ("journal".equals(tab)) {
+                        entry.code = obj.optString("entry_number", obj.optString("reference", "—"));
+                        entry.description = obj.optString("description", "—");
+                        entry.debit = safeDouble(obj.optString("total_debit", "0"));
+                        entry.credit = safeDouble(obj.optString("total_credit", "0"));
+                        entry.goldDebit = safeDouble(obj.optString("total_gold_debit_grams", "0"));
+                        entry.goldCredit = safeDouble(obj.optString("total_gold_credit_grams", "0"));
+                    } else if ("chart".equals(tab)) {
+                        entry.code = obj.optString("code", obj.optString("account_code", "—"));
+                        entry.description = obj.optString("name", obj.optString("account_name", "—"));
+                        entry.debit = safeDouble(obj.optString("debit", "0"));
+                        entry.credit = safeDouble(obj.optString("credit", "0"));
+                        entry.goldDebit = safeDouble(obj.optString("gold_balance", "0"));
+                    } else if ("trial".equals(tab)) {
+                        entry.code = obj.optString("code", obj.optString("account_code", "—"));
+                        entry.description = obj.optString("account_name", obj.optString("name", "—"));
+                        entry.debit = safeDouble(obj.optString("debit_balance", obj.optString("debit", "0")));
+                        entry.credit = safeDouble(obj.optString("credit_balance", obj.optString("credit", "0")));
+                        entry.goldDebit = safeDouble(obj.optString("gold_debit", "0"));
+                    }
+                    
+                    entriesList.add(entry);
+                }
             }
+            
+            filterData(etSearch != null ? etSearch.getText().toString() : "");
+            updateSummary();
+            showEmptyState(entriesList.isEmpty());
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing: " + e.getMessage());
+            showEmptyState(true);
         }
-        
-        filterData("");
-        updateSummary();
-        showEmptyState(entriesList.isEmpty());
-        
-    } catch (Exception e) {
-        Log.e(TAG, "Error parsing: " + e.getMessage());
-        showEmptyState(true);
     }
-}
 
-private double safeDouble(String value) {
-    try {
-        return Double.parseDouble(value);
-    } catch (Exception e) {
-        return 0.0;
+    private double safeDouble(String value) {
+        try {
+            return Double.parseDouble(value);
+        } catch (Exception e) {
+            return 0.0;
+        }
     }
-}
+
     private void updateSummary() {
         double totalDebit = 0;
         double totalCredit = 0;
@@ -286,9 +270,10 @@ private double safeDouble(String value) {
             tvTotalGoldVolume.setText(String.format(Locale.US, "%.3f g", totalGold));
         }
         
+        // ✅ استخدام مفاتيح التوازن المترجمة
         if (tvBalanceStatus != null) {
             boolean isBalanced = Math.abs(totalDebit - totalCredit) < 0.01;
-            tvBalanceStatus.setText(isBalanced ? "✓ متوازن" : "⚠️ غير متوازن");
+            tvBalanceStatus.setText(isBalanced ? getString(R.string.status_balanced) : getString(R.string.status_unbalanced));
             tvBalanceStatus.setTextColor(isBalanced ? Color.parseColor("#2ECC71") : Color.parseColor("#E74C3C"));
         }
     }
@@ -298,8 +283,8 @@ private double safeDouble(String value) {
         
         for (AccountingEntry entry : entriesList) {
             if (query == null || query.isEmpty() ||
-                entry.code.toLowerCase().contains(query.toLowerCase()) ||
-                entry.description.toLowerCase().contains(query.toLowerCase())) {
+                (entry.code != null && entry.code.toLowerCase().contains(query.toLowerCase())) ||
+                (entry.description != null && entry.description.toLowerCase().contains(query.toLowerCase()))) {
                 filteredList.add(entry);
             }
         }
@@ -333,9 +318,7 @@ private double safeDouble(String value) {
         
         EditText etRef = dialog.findViewById(R.id.etDialogRef);
         EditText etDesc = dialog.findViewById(R.id.etDialogDesc);
-        EditText etGrossWeight = dialog.findViewById(R.id.etDialogGrossWeight);
         Spinner spKarat = dialog.findViewById(R.id.spDialogKarat);
-        EditText etCashAmount = dialog.findViewById(R.id.etDialogCashAmount);
         Button btnSave = dialog.findViewById(R.id.btnDialogSave);
         
         String[] karats = {"24K", "22K", "21K", "18K"};
@@ -352,7 +335,6 @@ private double safeDouble(String value) {
                     return;
                 }
                 
-                // إرسال إلى السيرفر
                 saveJournalEntryToServer(ref, desc);
                 dialog.dismiss();
             });
@@ -419,48 +401,49 @@ private double safeDouble(String value) {
     // ==================== ADAPTER ====================
     
     private class AccountingAdapter extends RecyclerView.Adapter<AccountingAdapter.ViewHolder> {
-    
-    private final List<AccountingEntry> items;
-    
-    AccountingAdapter(List<AccountingEntry> items) {
-        this.items = items;
-    }
-    
-    @NonNull
-    @Override
-    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext())
-            .inflate(R.layout.item_accounting_entry, parent, false);
-        return new ViewHolder(view);
-    }
-    
-    @Override
-    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        AccountingEntry entry = items.get(position);
         
-        holder.tvCode.setText(entry.code != null ? entry.code : "—");
-        holder.tvDescription.setText(entry.description != null ? entry.description : "—");
-        holder.tvGold.setText(String.format(Locale.US, "%.3f g", entry.goldDebit));
+        private final List<AccountingEntry> items;
         
-        holder.tvDebit.setText(String.format(Locale.US, "+%,.2f", entry.debit));
-        holder.tvCredit.setText(String.format(Locale.US, "-%,.2f", entry.credit));
-    }
-    
-    @Override
-    public int getItemCount() {
-        return items.size();
-    }
-    
-    class ViewHolder extends RecyclerView.ViewHolder {
-        TextView tvCode, tvDescription, tvGold, tvDebit, tvCredit;
+        AccountingAdapter(List<AccountingEntry> items) {
+            this.items = items;
+        }
         
-        ViewHolder(View itemView) {
-            super(itemView);
-            tvCode = itemView.findViewById(R.id.tvRowCode);
-            tvDescription = itemView.findViewById(R.id.tvRowDescription);
-            tvGold = itemView.findViewById(R.id.tvRowGold);
-            tvDebit = itemView.findViewById(R.id.tvRowDebit);
-            tvCredit = itemView.findViewById(R.id.tvRowCredit);
+        @NonNull
+        @Override
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_accounting_entry, parent, false);
+            return new ViewHolder(view);
+        }
+        
+        @Override
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+            AccountingEntry entry = items.get(position);
+            
+            holder.tvCode.setText(entry.code != null ? entry.code : "—");
+            holder.tvDescription.setText(entry.description != null ? entry.description : "—");
+            holder.tvGold.setText(String.format(Locale.US, "%.3f g", entry.goldDebit));
+            
+            holder.tvDebit.setText(String.format(Locale.US, "+%,.2f", entry.debit));
+            holder.tvCredit.setText(String.format(Locale.US, "-%,.2f", entry.credit));
+        }
+        
+        @Override
+        public int getItemCount() {
+            return items.size();
+        }
+        
+        class ViewHolder extends RecyclerView.ViewHolder {
+            TextView tvCode, tvDescription, tvGold, tvDebit, tvCredit;
+            
+            ViewHolder(View itemView) {
+                super(itemView);
+                tvCode = itemView.findViewById(R.id.tvRowCode);
+                tvDescription = itemView.findViewById(R.id.tvRowDescription);
+                tvGold = itemView.findViewById(R.id.tvRowGold);
+                tvDebit = itemView.findViewById(R.id.tvRowDebit);
+                tvCredit = itemView.findViewById(R.id.tvRowCredit);
+            }
         }
     }
 }
