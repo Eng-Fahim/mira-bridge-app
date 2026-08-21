@@ -57,7 +57,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private View shimmerLayout;
     private CardView cardGoldPrices;
     
-    // ✅ 1. استبدال الـ Container بالـ RecyclerView والأدابتر
+    // ✅ RecyclerView للوصول السريع
     private RecyclerView rvQuickActions;
     private QuickActionsAdapter quickAdapter;
 
@@ -69,12 +69,18 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private MiraPriceManager priceManager;
     private MiraQuickAccessSettings quickAccessSettings;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final ExecutorService executorService = Executors.newSingleThreadExecutor();
+    
+    // ✅ استخدام Thread Pool منفصل للعمليات المختلفة
+    private final ExecutorService dataExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService goldPriceExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService pingExecutor = Executors.newSingleThreadExecutor();
+    
     private boolean isArabic;
     private SharedPreferences offlineCache;
     private SharedPreferences branchPrefs;
     private final StringBuilder debugLog = new StringBuilder();
     private int currentBranchId = -1;
+    private boolean isViewInitialized = false;
 
     @Nullable
     @Override
@@ -99,35 +105,38 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
 
             branchPrefs = requireContext().getSharedPreferences("mira_branches_prefs", Context.MODE_PRIVATE);
 
-            // 2️⃣ تهيئة الواجهات
+            // 2️⃣ تهيئة الواجهات (سريعة - على Main Thread)
             initViews(view);
             
             // 3️⃣ إعداد مستمع البروفايل
             setupProfileListener();
             
-            // 4️⃣ الترحيب والتاريخ
+            // 4️⃣ الترحيب والتاريخ (سريع - بيانات محلية)
             updateHeader();
             
-            // 5️⃣ تحديث حالة الاتصال (في الخلفية)
-            updateLiveStatus();
-            
-            // 6️⃣ تحميل البيانات المحلية
+            // 5️⃣ تحميل البيانات المحلية فوراً (بدون شبكة)
             currentBranchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : -1;
             initBranchCache(currentBranchId);
             loadOfflineData();
             
-            // 7️⃣ إعداد أزرار الوصول السريع عبر RecyclerView
+            // 6️⃣ إعداد أزرار الوصول السريع (مرة واحدة فقط)
             setupQuickAccessGrid();
             
-            // 8️⃣ إعداد المستمعين
+            // 7️⃣ إعداد المستمعين
             setupListeners();
             
-            // 9️⃣ عرض shimmer
+            // 8️⃣ عرض shimmer
             showShimmer(true);
             
-            // 🔟 جلب البيانات
-            fetchData();
-            fetchLiveGoldPrices();
+            // 9️⃣ تأخير جلب البيانات من الشبكة للسماح بعرض الواجهة أولاً
+            mainHandler.postDelayed(() -> {
+                if (!isAdded()) return;
+                updateLiveStatus();
+                fetchData();
+                fetchLiveGoldPrices();
+            }, 100); // تأخير 100ms
+            
+            isViewInitialized = true;
 
         } catch (Throwable e) {
             Log.e(TAG, "onViewCreated error", e);
@@ -141,11 +150,11 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         orgProfile.addListener(profileListener);
     }
 
-    // ✅ 2. نقل pingApi() من الـ Main Thread إلى خلفية ExecutorService
+    // ✅ تحسين: pingApi في خلفية منفصلة
     private void updateLiveStatus() {
         if (tvLiveStatus == null) return;
         
-        executorService.execute(() -> {
+        pingExecutor.execute(() -> {
             boolean isOnline = apiClient != null && apiClient.pingApi();
             mainHandler.post(() -> {
                 if (!isAdded()) return;
@@ -199,10 +208,12 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
             cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
             
-            // ✅ تهيئة RecyclerView للوصول السريع
+            // ✅ تهيئة RecyclerView مرة واحدة فقط مع تحسينات الأداء
             rvQuickActions = v.findViewById(R.id.rvQuickActions);
             if (rvQuickActions != null) {
                 rvQuickActions.setLayoutManager(new GridLayoutManager(getContext(), 3));
+                rvQuickActions.setHasFixedSize(true); // ✅ تحسين الأداء
+                rvQuickActions.setItemViewCacheSize(20); // ✅ زيادة الكاش
                 quickAdapter = new QuickActionsAdapter(this::handleQuickAction);
                 rvQuickActions.setAdapter(quickAdapter);
             }
@@ -247,7 +258,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         });
     }
 
-    // ✅ 3. تبسيط ربط البيانات بواسطة RecyclerView Adapter
+    // ✅ تحسين: تحديث البيانات فقط بدون إعادة تهيئة
     private void setupQuickAccessGrid() {
         if (quickAccessSettings == null || quickAdapter == null) return;
         List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
@@ -339,12 +350,18 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
+    // ✅ تحسين: fetchLiveGoldPrices في Executor منفصل
     private void fetchLiveGoldPrices() {
         if (apiClient == null) return;
 
         addDebug("🔄 جلب أسعار الذهب من المزود النشط...");
 
-        executorService.execute(() -> {
+        // ✅ عرض loading state
+        if (cardGoldPrices != null) {
+            cardGoldPrices.setAlpha(0.5f);
+        }
+
+        goldPriceExecutor.execute(() -> {
             try {
                 List<ApiProvider> providers = apiClient.getActiveProviders();
                 ApiProvider activeProvider = null;
@@ -365,6 +382,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                         if (isAdded()) {
                             addDebug("⚠️ لا يوجد مزود نشط");
                             displayGoldPricesFromCache();
+                            restoreCardOpacity();
                         }
                     });
                     return;
@@ -377,6 +395,8 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 
                 mainHandler.post(() -> {
                     if (!isAdded()) return;
+                    
+                    restoreCardOpacity();
                     
                     if (response != null && response.isSuccess && response.data != null) {
                         try {
@@ -406,10 +426,18 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 mainHandler.post(() -> {
                     if (isAdded()) {
                         displayGoldPricesFromCache();
+                        restoreCardOpacity();
                     }
                 });
             }
         });
+    }
+
+    // ✅ دالة مساعدة لإعادة شفافية الكارد
+    private void restoreCardOpacity() {
+        if (cardGoldPrices != null) {
+            cardGoldPrices.animate().alpha(1.0f).setDuration(300).start();
+        }
     }
 
     private void displayGoldPrices(JSONObject data) {
@@ -563,29 +591,33 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
+    // ✅ تحسين: حفظ البيانات في الخلفية
     private void saveOfflineData(JSONObject data) {
         if (offlineCache == null) return;
-        try {
-            JSONObject inv = data.optJSONObject("inventory");
-            JSONObject sales = data.optJSONObject("sales");
+        
+        dataExecutor.execute(() -> {
+            try {
+                JSONObject inv = data.optJSONObject("inventory");
+                JSONObject sales = data.optJSONObject("sales");
 
-            double totalWeightVal = 0.0;
-            if (inv != null) {
-                totalWeightVal = inv.optDouble("total_weight", 0.0);
+                double totalWeightVal = 0.0;
+                if (inv != null) {
+                    totalWeightVal = inv.optDouble("total_weight", 0.0);
+                }
+
+                offlineCache.edit()
+                        .putInt("total_items", inv != null ? inv.optInt("total_items", 0) : 0)
+                        .putFloat("total_weight", (float) totalWeightVal)
+                        .putInt("sold_today", sales != null ? sales.optInt("count_today", 0) : 0)
+                        .putFloat("sales_today", (float) (sales != null ? sales.optDouble("today", 0.0) : 0.0))
+                        .putFloat("sales_month", (float) (sales != null ? sales.optDouble("month", 0.0) : 0.0))
+                        .putFloat("sales_year", (float) (sales != null ? sales.optDouble("year", 0.0) : 0.0))
+                        .putLong("last_update", System.currentTimeMillis())
+                        .apply();
+            } catch (Exception e) {
+                Log.e(TAG, "saveOfflineData error", e);
             }
-
-            offlineCache.edit()
-                    .putInt("total_items", inv != null ? inv.optInt("total_items", 0) : 0)
-                    .putFloat("total_weight", (float) totalWeightVal)
-                    .putInt("sold_today", sales != null ? sales.optInt("count_today", 0) : 0)
-                    .putFloat("sales_today", (float) (sales != null ? sales.optDouble("today", 0.0) : 0.0))
-                    .putFloat("sales_month", (float) (sales != null ? sales.optDouble("month", 0.0) : 0.0))
-                    .putFloat("sales_year", (float) (sales != null ? sales.optDouble("year", 0.0) : 0.0))
-                    .putLong("last_update", System.currentTimeMillis())
-                    .apply();
-        } catch (Exception e) {
-            Log.e(TAG, "saveOfflineData error", e);
-        }
+        });
     }
 
     private void fetchData() {
@@ -599,7 +631,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
 
             final int activeBranchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : -1;
 
-            executorService.execute(() -> {
+            dataExecutor.execute(() -> {
                 MiraApiClient.ApiResponse response = null;
                 try {
                     response = apiClient.getDashboardFull(activeBranchId);
@@ -711,8 +743,10 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         if (latestBranchId != currentBranchId) {
             onBranchChanged();
         }
-        setupQuickAccessGrid();
-        updateHeader();
+        if (isViewInitialized) {
+            setupQuickAccessGrid();
+            updateHeader();
+        }
     }
 
     @Override
@@ -764,7 +798,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    // ✅ 4. إنهاء ExecutorService وتنظيف جميع الموارد لمنع تسريب الذاكرة
+    // ✅ تنظيف جميع الموارد لمنع تسريب الذاكرة
     @Override
     public void onDestroyView() {
         super.onDestroyView();
@@ -773,10 +807,18 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             orgProfile.removeListener(profileListener);
         }
         
-        if (executorService != null && !executorService.isShutdown()) {
-            executorService.shutdown();
-        }
+        // إغلاق جميع Executors
+        shutdownExecutor(dataExecutor);
+        shutdownExecutor(goldPriceExecutor);
+        shutdownExecutor(pingExecutor);
         
         mainHandler.removeCallbacksAndMessages(null);
+        isViewInitialized = false;
+    }
+    
+    private void shutdownExecutor(ExecutorService executor) {
+        if (executor != null && !executor.isShutdown()) {
+            executor.shutdown();
+        }
     }
 }
