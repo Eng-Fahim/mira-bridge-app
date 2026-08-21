@@ -790,21 +790,24 @@ public void onTagRead(String epc, int rssi) {
     
     backgroundExecutor.execute(() -> {
         try {
-            // ✅ بناء payload مخصص بدلاً من استخدام buildEvidencePayload مباشرة
+            // ✅ بناء payload مخصص بالكامل
             JSONObject payload = new JSONObject();
             
             // 1️⃣ معلومات الجلسة
-            payload.put("session_id", inventoryEngine.getClientSessionId()); // ✅ استخدم getClientSessionId
-            payload.put("client_session_id", inventoryEngine.getClientSessionId());
+            String sessionId = inventoryEngine.getClientSessionId();
+            payload.put("session_id", sessionId);
+            payload.put("client_session_id", sessionId);
             
             // 2️⃣ معلومات الفرع
             int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
             payload.put("branch_id", branchId);
             payload.put("location", "Main Showroom");
             
-            // 3️⃣ الإحصائيات
+            // 3️⃣ الإحصائيات - قيم مباشرة
             int scanned = inventoryEngine.getUniqueCount();
             int totalReads = inventoryEngine.getTotalReads();
+            int duplicates = inventoryEngine.getDuplicateCount();
+            
             payload.put("expected_count", expectedCount);
             payload.put("total_scanned", totalReads);
             payload.put("unique_count", scanned);
@@ -812,23 +815,29 @@ public void onTagRead(String epc, int rssi) {
             payload.put("missing_count", Math.max(0, expectedCount - scanned));
             payload.put("unexpected_count", 0);
             
-            // 4️⃣ قائمة القطع الممسوحة
+            // 4️⃣ ✅ قائمة القطع الممسوحة - الأهم
             JSONArray itemsArray = new JSONArray();
+            JSONArray epcsArray = new JSONArray();
+            
             for (ScannedItemDisplay item : scannedItemsDisplayList) {
+                // تنسيق items
                 JSONObject itemObj = new JSONObject();
                 itemObj.put("code", item.epc);
                 itemObj.put("serial", item.epc);
-                itemObj.put("rssi", item.rssi);
+                itemObj.put("rssi", String.valueOf(item.rssi));
                 itemsArray.put(itemObj);
-            }
-            payload.put("items", itemsArray);
-            
-            // 5️⃣ إضافة scanned_epcs كنسخة احتياطية
-            JSONArray epcsArray = new JSONArray();
-            for (ScannedItemDisplay item : scannedItemsDisplayList) {
+                
+                // تنسيق epcs
                 epcsArray.put(item.epc);
             }
+            
+            payload.put("items", itemsArray);
             payload.put("scanned_epcs", epcsArray);
+            
+            // ✅ تسجيل للتصحيح
+            Log.d(TAG, "Payload items count: " + itemsArray.length());
+            Log.d(TAG, "Payload epcs count: " + epcsArray.length());
+            Log.d(TAG, "Scanned display list size: " + scannedItemsDisplayList.size());
             
             // ✅ إرسال إلى السيرفر
             MiraApiClient.ApiResponse response = apiClient.closeInventorySession(payload);
