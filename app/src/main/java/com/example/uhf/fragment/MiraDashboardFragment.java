@@ -9,7 +9,6 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -17,10 +16,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
+import com.example.uhf.adapter.QuickActionsAdapter;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
@@ -28,7 +30,6 @@ import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.SessionManager;
-import com.google.android.material.card.MaterialCardView;
 
 import org.json.JSONObject;
 
@@ -45,11 +46,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private static final String OFFLINE_PREFS_BASE = "dashboard_cache_branch_";
     private static final double OUNCE_TO_GRAM = 31.1035;
 
-    private android.graphics.Typeface cairoRegular = null;
-    private android.graphics.Typeface cairoBold = null;
-    private android.graphics.Typeface cairoMedium = null;
-    private boolean fontsLoaded = false;
-
     private TextView tvGreeting, tvDate, tvLocation, tvLiveStatus;
     private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
     private TextView tvSalesToday, tvSalesMonth, tvSalesYear;
@@ -60,7 +56,10 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private SwipeRefreshLayout swipeRefresh;
     private View shimmerLayout;
     private CardView cardGoldPrices;
-    private LinearLayout containerQuickActions;
+    
+    // ✅ 1. استبدال الـ Container بالـ RecyclerView والأدابتر
+    private RecyclerView rvQuickActions;
+    private QuickActionsAdapter quickAdapter;
 
     private MiraApiClient apiClient;
     private SessionManager sessionManager;
@@ -84,30 +83,11 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         return inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
     }
 
-    private void loadCairoFonts() {
-        if (fontsLoaded || getContext() == null) return;
-        
-        try {
-            Context context = getContext();
-            cairoRegular = android.graphics.Typeface.createFromAsset(
-                context.getAssets(), "fonts/cairo_regular.ttf");
-            cairoBold = android.graphics.Typeface.createFromAsset(
-                context.getAssets(), "fonts/cairo_bold.ttf");
-            cairoMedium = android.graphics.Typeface.createFromAsset(
-                context.getAssets(), "fonts/cairo_medium.ttf");
-            fontsLoaded = true;
-        } catch (Exception e) {
-            Log.e(TAG, "Cairo font load error: " + e.getMessage());
-        }
-    }
-
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
         try {
-            loadCairoFonts();
-            
             // 1️⃣ تهيئة المديرين والخدمات
             apiClient = MiraApiClient.getInstance(requireContext());
             sessionManager = new SessionManager(requireContext());
@@ -121,7 +101,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
 
             // 2️⃣ تهيئة الواجهات
             initViews(view);
-            applyFontsToAllViews(view);
             
             // 3️⃣ إعداد مستمع البروفايل
             setupProfileListener();
@@ -129,7 +108,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             // 4️⃣ الترحيب والتاريخ
             updateHeader();
             
-            // 5️⃣ تحديث حالة الاتصال
+            // 5️⃣ تحديث حالة الاتصال (في الخلفية)
             updateLiveStatus();
             
             // 6️⃣ تحميل البيانات المحلية
@@ -137,7 +116,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             initBranchCache(currentBranchId);
             loadOfflineData();
             
-            // 7️⃣ إعداد أزرار الوصول السريع
+            // 7️⃣ إعداد أزرار الوصول السريع عبر RecyclerView
             setupQuickAccessGrid();
             
             // 8️⃣ إعداد المستمعين
@@ -155,60 +134,30 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    /**
-     * ✅ تطبيق خط Cairo على جميع النصوص
-     */
-    private void applyFontsToAllViews(View root) {
-        try {
-            if (root instanceof TextView) {
-                TextView tv = (TextView) root;
-                applyFont(tv);
-            } else if (root instanceof ViewGroup) {
-                ViewGroup group = (ViewGroup) root;
-                for (int i = 0; i < group.getChildCount(); i++) {
-                    applyFontsToAllViews(group.getChildAt(i));
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Apply fonts error: " + e.getMessage());
-        }
-    }
-
-    private void applyFont(TextView tv) {
-        if (tv == null || tv.getTypeface() != null && tv.getTypeface().isBold()) {
-            if (tv != null && cairoBold != null) tv.setTypeface(cairoBold);
-            return;
-        }
-        if (cairoRegular != null) {
-            tv.setTypeface(cairoRegular);
-        }
-    }
-
     private void setupProfileListener() {
         if (orgProfile == null) return;
         
-        profileListener = new MiraOrgProfileManager.OnProfileChangedListener() {
-            @Override
-            public void onProfileChanged() {
-                mainHandler.post(() -> updateHeader());
-            }
-        };
-        
+        profileListener = () -> mainHandler.post(this::updateHeader);
         orgProfile.addListener(profileListener);
     }
 
+    // ✅ 2. نقل pingApi() من الـ Main Thread إلى خلفية ExecutorService
     private void updateLiveStatus() {
         if (tvLiveStatus == null) return;
         
-        boolean isOnline = apiClient != null && apiClient.pingApi();
-        
-        if (isOnline) {
-            tvLiveStatus.setText(isArabic ? "🟢 متصل" : "🟢 Online");
-            tvLiveStatus.setTextColor(0xFF16A34A);
-        } else {
-            tvLiveStatus.setText(isArabic ? "🔴 غير متصل" : "🔴 Offline");
-            tvLiveStatus.setTextColor(0xFFDC2626);
-        }
+        executorService.execute(() -> {
+            boolean isOnline = apiClient != null && apiClient.pingApi();
+            mainHandler.post(() -> {
+                if (!isAdded()) return;
+                if (isOnline) {
+                    tvLiveStatus.setText(isArabic ? "🟢 متصل" : "🟢 Online");
+                    tvLiveStatus.setTextColor(0xFF16A34A);
+                } else {
+                    tvLiveStatus.setText(isArabic ? "🔴 غير متصل" : "🔴 Offline");
+                    tvLiveStatus.setTextColor(0xFFDC2626);
+                }
+            });
+        });
     }
 
     private void initBranchCache(int branchId) {
@@ -249,7 +198,14 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             tvGoldChange = v.findViewById(R.id.tvGoldChange);
             btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
             cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
-            containerQuickActions = v.findViewById(R.id.containerQuickActions);
+            
+            // ✅ تهيئة RecyclerView للوصول السريع
+            rvQuickActions = v.findViewById(R.id.rvQuickActions);
+            if (rvQuickActions != null) {
+                rvQuickActions.setLayoutManager(new GridLayoutManager(getContext(), 3));
+                quickAdapter = new QuickActionsAdapter(this::handleQuickAction);
+                rvQuickActions.setAdapter(quickAdapter);
+            }
 
             if (swipeRefresh != null) {
                 swipeRefresh.setOnRefreshListener(() -> {
@@ -260,7 +216,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
 
             if (btnRefreshGold != null) {
                 btnRefreshGold.setOnClickListener(v2 -> {
-                    // ✅ تفعيل زر التحديث مع تأثير دوران
                     v2.animate().rotation(360).setDuration(500).start();
                     fetchLiveGoldPrices();
                 });
@@ -292,137 +247,11 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         });
     }
 
+    // ✅ 3. تبسيط ربط البيانات بواسطة RecyclerView Adapter
     private void setupQuickAccessGrid() {
-        if (containerQuickActions == null) return;
-
-        containerQuickActions.removeAllViews();
-
+        if (quickAccessSettings == null || quickAdapter == null) return;
         List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
-
-        if (enabledActions.isEmpty()) {
-            showEmptyQuickAccess();
-            return;
-        }
-
-        LinearLayout currentRow = null;
-        int countInRow = 0;
-
-        for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
-            if (currentRow == null || countInRow == 0) {
-                currentRow = new LinearLayout(getContext());
-                currentRow.setOrientation(LinearLayout.HORIZONTAL);
-                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT);
-                rowParams.setMargins(0, 0, 0, dpToPx(getContext(), 4));
-                currentRow.setLayoutParams(rowParams);
-                currentRow.setPadding(dpToPx(getContext(), 8), 0, dpToPx(getContext(), 8), 0);
-                containerQuickActions.addView(currentRow);
-            }
-
-            CardView card = createQuickActionCard(action);
-            if (card != null) {
-                currentRow.addView(card);
-                countInRow++;
-            }
-
-            if (countInRow >= 3) {
-                countInRow = 0;
-                currentRow = null;
-            }
-        }
-        
-        if (currentRow != null && countInRow > 0 && countInRow < 3) {
-            while (countInRow < 3) {
-                View spacer = new View(getContext());
-                LinearLayout.LayoutParams spacerParams = new LinearLayout.LayoutParams(
-                        0, dpToPx(getContext(), 85), 1f);
-                spacerParams.setMargins(4, 4, 4, 4);
-                spacer.setLayoutParams(spacerParams);
-                currentRow.addView(spacer);
-                countInRow++;
-            }
-        }
-    }
-
-    private CardView createQuickActionCard(MiraQuickAccessSettings.QuickAction action) {
-        Context context = getContext();
-        if (context == null) return null;
-
-        MaterialCardView card = new MaterialCardView(context);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                0, dpToPx(context, 85), 1f);
-        params.setMargins(4, 4, 4, 4);
-        card.setLayoutParams(params);
-        card.setRadius(dpToPx(context, 12));
-        card.setCardElevation(dpToPx(context, 1));
-        card.setStrokeWidth(1);
-        
-        try {
-            android.util.TypedValue typedValue = new android.util.TypedValue();
-            context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOutlineVariant, typedValue, true);
-            card.setStrokeColor(typedValue.data);
-        } catch (Exception ignored) {}
-        
-        try {
-            android.util.TypedValue bgTypedValue = new android.util.TypedValue();
-            context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorSurface, bgTypedValue, true);
-            card.setCardBackgroundColor(bgTypedValue.data);
-        } catch (Exception ignored) {}
-
-        card.setClickable(true);
-        card.setFocusable(true);
-        
-        try {
-            android.util.TypedValue rippleColor = new android.util.TypedValue();
-            context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorControlHighlight, rippleColor, true);
-            card.setRippleColor(android.content.res.ColorStateList.valueOf(rippleColor.data));
-        } catch (Exception ignored) {}
-
-        LinearLayout layout = new LinearLayout(context);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setGravity(android.view.Gravity.CENTER);
-        layout.setPadding(dpToPx(context, 6), dpToPx(context, 8), dpToPx(context, 6), dpToPx(context, 8));
-
-        TextView tvIcon = new TextView(context);
-        tvIcon.setText(getActionIcon(action.id));
-        tvIcon.setTextSize(20);
-        tvIcon.setGravity(android.view.Gravity.CENTER);
-        tvIcon.setIncludeFontPadding(false);
-        layout.addView(tvIcon);
-
-        TextView tvTitle = new TextView(context);
-        tvTitle.setText(isArabic ? action.titleAr : action.titleEn);
-        tvTitle.setTextSize(11);
-        tvTitle.setGravity(android.view.Gravity.CENTER);
-        tvTitle.setPadding(0, dpToPx(context, 4), 0, 0);
-        tvTitle.setMaxLines(1);
-        tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        
-        if (cairoBold != null) {
-            tvTitle.setTypeface(cairoBold);
-        } else if (cairoRegular != null) {
-            tvTitle.setTypeface(cairoRegular, android.graphics.Typeface.BOLD);
-        } else {
-            tvTitle.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        }
-        
-        try {
-            android.util.TypedValue textColorTypedValue = new android.util.TypedValue();
-            context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOnSurface, textColorTypedValue, true);
-            tvTitle.setTextColor(textColorTypedValue.data);
-        } catch (Exception ignored) {}
-        
-        layout.addView(tvTitle);
-
-        card.addView(layout);
-        card.setOnClickListener(v -> handleQuickAction(action.id));
-
-        return card;
-    }
-
-    private int dpToPx(Context context, float dp) {
-        return (int) (dp * context.getResources().getDisplayMetrics().density);
+        quickAdapter.submitList(enabledActions);
     }
 
     private void handleQuickAction(String actionId) {
@@ -472,48 +301,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    private void showEmptyQuickAccess() {
-        if (containerQuickActions == null || getContext() == null) return;
-
-        TextView tvEmpty = new TextView(getContext());
-        tvEmpty.setText(isArabic ? "لا توجد أزرار مفعّلة" : "No enabled actions");
-        tvEmpty.setTextSize(12);
-        tvEmpty.setGravity(android.view.Gravity.CENTER);
-        tvEmpty.setPadding(dpToPx(getContext(), 16), dpToPx(getContext(), 24), dpToPx(getContext(), 16), dpToPx(getContext(), 24));
-        
-        try {
-            android.util.TypedValue textColorTypedValue = new android.util.TypedValue();
-            getContext().getTheme().resolveAttribute(com.google.android.material.R.attr.colorOnSurfaceVariant, textColorTypedValue, true);
-            tvEmpty.setTextColor(textColorTypedValue.data);
-        } catch (Exception ignored) {
-            tvEmpty.setTextColor(0xFF6B7280);
-        }
-        
-        if (cairoRegular != null) {
-            tvEmpty.setTypeface(cairoRegular);
-        }
-
-        containerQuickActions.addView(tvEmpty);
-    }
-
-    private String getActionIcon(String actionId) {
-        switch (actionId) {
-            case "identity": return "🏷️";
-            case "radar": return "📡";
-            case "gate": return "🚪";
-            case "reports": return "📊";
-            case "accounting": return "💰";
-            case "transfers": return "🔄";
-            case "admin_hub": return "⚙️";
-            case "sales_history": return "📋";
-            case "server_config": return "🌐";
-            case "gold_rates": return "🥇";
-            case "users": return "👥";
-            case "branches": return "🏢";
-            default: return "📱";
-        }
-    }
-
     private void showShimmer(boolean show) {
         if (shimmerLayout != null) {
             shimmerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
@@ -560,7 +347,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         executorService.execute(() -> {
             try {
                 List<ApiProvider> providers = apiClient.getActiveProviders();
-                
                 ApiProvider activeProvider = null;
                 
                 for (ApiProvider provider : providers) {
@@ -918,7 +704,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     @Override
     public void onResume() {
         super.onResume();
-        loadCairoFonts();
         if (branchPrefs != null) {
             branchPrefs.registerOnSharedPreferenceChangeListener(this);
         }
@@ -979,13 +764,17 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
+    // ✅ 4. إنهاء ExecutorService وتنظيف جميع الموارد لمنع تسريب الذاكرة
     @Override
     public void onDestroyView() {
         super.onDestroyView();
         
-        // ✅ إزالة المستمع
         if (orgProfile != null && profileListener != null) {
             orgProfile.removeListener(profileListener);
+        }
+        
+        if (executorService != null && !executorService.isShutdown()) {
+            executorService.shutdown();
         }
         
         mainHandler.removeCallbacksAndMessages(null);
