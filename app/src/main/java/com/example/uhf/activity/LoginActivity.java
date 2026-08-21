@@ -38,6 +38,8 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.android.material.textview.MaterialTextView;
 
+import org.json.JSONObject;
+
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
@@ -55,6 +57,8 @@ public class LoginActivity extends AppCompatActivity {
 
     private SessionManager sessionManager;
     private MiraApiClient apiClient;
+    private MiraOrgProfileManager orgProfileManager;
+    private MiraOrgProfileManager.OnProfileChangedListener profileListener;
     private BiometricPrompt biometricPrompt;
     private BiometricPrompt.PromptInfo promptInfo;
 
@@ -75,12 +79,20 @@ public class LoginActivity extends AppCompatActivity {
         }
 
         setContentView(R.layout.activity_login);
+        
+        // ✅ تهيئة مدير المنظمة
+        orgProfileManager = MiraOrgProfileManager.getInstance(this);
+        
         initViews();
         setupBiometric();
         setupServerConfigToggle();
         animateEntrance();
         setupTextWatchers();
         updateUiLanguage(isArabic);
+        
+        // ✅ إعداد المستمع لتغييرات البروفايل
+        setupProfileListener();
+        
         loadOrgProfileFromCloud();
     }
 
@@ -147,33 +159,58 @@ public class LoginActivity extends AppCompatActivity {
         applyOrgProfile();
     }
 
+    // ==================== Profile Listener ====================
+
+    /**
+     * ✅ إعداد المستمع لتغييرات البروفايل
+     */
+    private void setupProfileListener() {
+        if (orgProfileManager == null) return;
+        
+        profileListener = new MiraOrgProfileManager.OnProfileChangedListener() {
+            @Override
+            public void onProfileChanged() {
+                mainHandler.post(() -> applyOrgProfile());
+            }
+        };
+        
+        orgProfileManager.addListener(profileListener);
+    }
+
     // ==================== Cloud Org Profile ====================
 
     private void loadOrgProfileFromCloud() {
-    bgExecutor.execute(() -> {
-        try {
-            MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
-            if (response != null && response.isSuccess && response.data != null) {
-                getSharedPreferences("MIRA_ORG_PROFILE", Context.MODE_PRIVATE)
-                    .edit()
-                    .putString("org_name", response.data.optString("org_name", ""))
-                    .putString("org_name_en", response.data.optString("org_name_en", ""))
-                    .putString("org_slogan", response.data.optString("org_slogan", ""))
-                    .putString("org_slogan_en", response.data.optString("org_slogan_en", ""))
-                    .putString("org_phone", response.data.optString("org_phone", ""))
-                    .putString("org_email", response.data.optString("org_email", ""))
-                    .putString("org_address", response.data.optString("org_address", ""))
-                    .putString("org_address_en", response.data.optString("org_address_en", ""))
-                    .putString("org_website", response.data.optString("org_website", ""))
-                    .putString("org_logo", response.data.optString("org_logo", ""))
-                    .apply();
-                mainHandler.post(this::applyOrgProfile);
+        bgExecutor.execute(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
+                
+                if (response != null && response.isSuccess && response.data != null) {
+                    // ✅ استخراج بيانات المنظمة
+                    JSONObject org = response.data.optJSONObject("organization");
+                    
+                    if (org != null) {
+                        // ✅ حفظ في المدير المركزي
+                        orgProfileManager.saveFromServer(org);
+                    } else {
+                        // ✅ إذا لم توجد organization، احفظ من root
+                        JSONObject rootOrg = new JSONObject();
+                        rootOrg.put("name_ar", response.data.optString("org_name", ""));
+                        rootOrg.put("name_en", response.data.optString("org_name_en", ""));
+                        rootOrg.put("phone", response.data.optString("org_phone", ""));
+                        rootOrg.put("email", response.data.optString("org_email", ""));
+                        rootOrg.put("tax_number", response.data.optString("tax_number", ""));
+                        rootOrg.put("logo_url", response.data.optString("org_logo", ""));
+                        orgProfileManager.saveFromServer(rootOrg);
+                    }
+                    
+                    // ✅ تحديث الواجهة
+                    mainHandler.post(this::applyOrgProfile);
+                }
+            } catch (Exception e) {
+                Log.e("LoginActivity", "Cloud org load error: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.e("LoginActivity", "Cloud org load error: " + e.getMessage());
-        }
-    });
-}
+        });
+    }
 
     // ==================== Language ====================
 
@@ -203,51 +240,51 @@ public class LoginActivity extends AppCompatActivity {
     // ==================== Org Profile ====================
 
     private void applyOrgProfile() {
-    MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
-    
-    // ✅ اسم الجهة - حسب اللغة
-    if (tvBrandName != null) {
-        String nameAr = orgProfile.getOrgName();
-        String nameEn = orgProfile.getOrgNameEn();
-        if (isArabic) {
-            tvBrandName.setText(nameAr != null && !nameAr.isEmpty() ? nameAr : "MIRA Jewelry");
-        } else {
-            tvBrandName.setText(nameEn != null && !nameEn.isEmpty() ? nameEn : "MIRA Jewelry");
+        if (orgProfileManager == null) {
+            orgProfileManager = MiraOrgProfileManager.getInstance(this);
         }
-    }
-    
-    // ✅ الوصف
-    if (tvBrandSubtitle != null) {
-        tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
-    }
-    
-    // ✅ الشعار التجاري - حسب اللغة
-    if (tvBrandDescription != null) {
-        String sloganAr = orgProfile.getOrgSlogan();
-        String sloganEn = orgProfile.getOrgSloganEn();
-        if (isArabic) {
-            tvBrandDescription.setText(sloganAr != null && !sloganAr.isEmpty() ? sloganAr : "منظومة التتبع والمصادقة المعتمدة للمجوهرات");
-        } else {
-            tvBrandDescription.setText(sloganEn != null && !sloganEn.isEmpty() ? sloganEn : "Enterprise Jewelry Traceability & Authentication");
+        
+        // ✅ اسم الجهة - حسب اللغة
+        if (tvBrandName != null) {
+            if (isArabic) {
+                String nameAr = orgProfileManager.getOrgNameAr();
+                tvBrandName.setText(nameAr != null && !nameAr.isEmpty() ? nameAr : "MIRA Jewelry");
+            } else {
+                String nameEn = orgProfileManager.getOrgNameEn();
+                tvBrandName.setText(nameEn != null && !nameEn.isEmpty() ? nameEn : "MIRA Jewelry");
+            }
         }
-    }
-    
-    // ✅ الشعار - من Base64 أو الافتراضي
-    if (ivAppLogo != null) {
-        String logoBase64 = orgProfile.getOrgLogo();
-        if (logoBase64 != null && !logoBase64.isEmpty()) {
-            try {
-                byte[] bytes = android.util.Base64.decode(logoBase64, android.util.Base64.DEFAULT);
-                android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                ivAppLogo.setImageBitmap(bitmap);
-            } catch (Exception e) {
+        
+        // ✅ الوصف
+        if (tvBrandSubtitle != null) {
+            tvBrandSubtitle.setText("MIRA ID™ Smart Jewelry Tag");
+        }
+        
+        // ✅ الشعار التجاري
+        if (tvBrandDescription != null) {
+            if (isArabic) {
+                tvBrandDescription.setText("منظومة التتبع والمصادقة المعتمدة للمجوهرات");
+            } else {
+                tvBrandDescription.setText("Enterprise Jewelry Traceability & Authentication");
+            }
+        }
+        
+        // ✅ الشعار
+        if (ivAppLogo != null) {
+            String logoBase64 = orgProfileManager.getOrgLogo();
+            if (logoBase64 != null && !logoBase64.isEmpty()) {
+                try {
+                    byte[] bytes = android.util.Base64.decode(logoBase64, android.util.Base64.DEFAULT);
+                    android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                    ivAppLogo.setImageBitmap(bitmap);
+                } catch (Exception e) {
+                    ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
+                }
+            } else {
                 ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
             }
-        } else {
-            ivAppLogo.setImageResource(R.drawable.ic_luxury_mira_logo);
         }
     }
-}
 
     // ==================== Server Config ====================
 
@@ -378,8 +415,8 @@ public class LoginActivity extends AppCompatActivity {
         String serverUrl = getText(etServerUrl);
         
         if (!serverUrl.isEmpty()) {
-    MiraServerConfig.getInstance(this).setBaseUrl(serverUrl);
-}
+            MiraServerConfig.getInstance(this).setBaseUrl(serverUrl);
+        }
 
         sessionManager.createLoginSession(username, roleStr, token, serverUrl);
         sessionManager.setDisplayName(displayName);
@@ -507,5 +544,27 @@ public class LoginActivity extends AppCompatActivity {
             .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
         finish();
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // ✅ تحديث الواجهة عند العودة
+        applyOrgProfile();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        
+        // ✅ إزالة المستمع
+        if (orgProfileManager != null && profileListener != null) {
+            orgProfileManager.removeListener(profileListener);
+        }
+        
+        // ✅ إغلاق الـ executor
+        if (bgExecutor != null && !bgExecutor.isShutdown()) {
+            bgExecutor.shutdown();
+        }
     }
 }
