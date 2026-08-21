@@ -99,12 +99,13 @@ public class MiraAccountingFragment extends Fragment {
         tvTotalGoldVolume = view.findViewById(R.id.tvTotalGoldVolume);
         tvBalanceStatus = view.findViewById(R.id.tvBalanceStatus);
         btnCreateManualEntry = view.findViewById(R.id.btnCreateManualEntry);
-        
         tabAccounting = view.findViewById(R.id.tabAccounting);
+        
+        // ✅ تهيئة التبويبات
         if (tabAccounting != null) {
             tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "القيود" : "Journal"));
-            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "دليل الحسابات" : "Chart"));
-            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "ميزان المراجعة" : "Trial"));
+            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "دليل الحسابات" : "Chart of Accounts"));
+            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "ميزان المراجعة" : "Trial Balance"));
         }
     }
 
@@ -156,7 +157,8 @@ public class MiraAccountingFragment extends Fragment {
      * ✅ تحميل البيانات من السيرفر
      */
     private void loadData(String tab) {
-        pbLoading.setVisibility(View.VISIBLE);
+        if (pbLoading != null) pbLoading.setVisibility(View.VISIBLE);
+        if (tvEmptyData != null) tvEmptyData.setVisibility(View.GONE);
         
         executor.execute(() -> {
             try {
@@ -180,21 +182,23 @@ public class MiraAccountingFragment extends Fragment {
                 final MiraApiClient.ApiResponse finalResponse = response;
                 
                 mainHandler.post(() -> {
-                    pbLoading.setVisibility(View.GONE);
+                    if (pbLoading != null) pbLoading.setVisibility(View.GONE);
                     
                     if (finalResponse != null && finalResponse.isSuccess && finalResponse.data != null) {
                         parseAndDisplay(finalResponse.data, tab);
                     } else {
                         showEmptyState(true);
-                        Toast.makeText(getContext(), 
-                            isArabic ? "فشل تحميل البيانات" : "Failed to load data", 
-                            Toast.LENGTH_SHORT).show();
+                        if (getContext() != null) {
+                            Toast.makeText(getContext(), 
+                                isArabic ? "فشل تحميل البيانات" : "Failed to load data", 
+                                Toast.LENGTH_SHORT).show();
+                        }
                     }
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Error loading accounting data: " + e.getMessage());
                 mainHandler.post(() -> {
-                    pbLoading.setVisibility(View.GONE);
+                    if (pbLoading != null) pbLoading.setVisibility(View.GONE);
                     showEmptyState(true);
                 });
             }
@@ -211,17 +215,26 @@ public class MiraAccountingFragment extends Fragment {
             JSONArray items = null;
             
             // استخراج البيانات من التنسيقات المختلفة
-            if (data.has("data")) {
-                JSONObject dataObj = data.optJSONObject("data");
-                if (dataObj != null && dataObj.has("data")) {
-                    items = dataObj.optJSONArray("data");
-                } else {
-                    items = data.optJSONArray("data");
+            JSONObject dataObj = data.optJSONObject("data");
+            if (dataObj != null) {
+                items = dataObj.optJSONArray("data");
+                if (items == null) {
+                    items = dataObj.optJSONArray("items");
+                }
+                if (items == null) {
+                    items = dataObj.optJSONArray("accounts");
+                }
+                if (items == null) {
+                    items = dataObj.optJSONArray("sessions");
                 }
             }
             
             if (items == null) {
                 items = data.optJSONArray("items");
+            }
+            
+            if (items == null) {
+                items = data.optJSONArray("accounts");
             }
             
             if (items != null) {
@@ -230,23 +243,30 @@ public class MiraAccountingFragment extends Fragment {
                     
                     AccountingEntry entry = new AccountingEntry();
                     entry.id = obj.optInt("id", i + 1);
-                    entry.code = obj.optString("entry_number", obj.optString("account_code", ""));
-                    entry.description = obj.optString("description", obj.optString("account_name", obj.optString("account_name_ar", "")));
+                    entry.code = obj.optString("entry_number", 
+                        obj.optString("account_code", 
+                        obj.optString("code", "")));
+                    entry.description = obj.optString("description", 
+                        obj.optString("account_name_ar", 
+                        obj.optString("account_name", 
+                        obj.optString("name", ""))));
                     entry.debit = obj.optDouble("total_debit", obj.optDouble("debit", 0));
                     entry.credit = obj.optDouble("total_credit", obj.optDouble("credit", 0));
-                    entry.goldDebit = obj.optDouble("total_gold_debit_grams", obj.optDouble("gold_debit", 0));
-                    entry.goldCredit = obj.optDouble("total_gold_credit_grams", obj.optDouble("gold_credit", 0));
-                    entry.date = obj.optString("entry_date", obj.optString("created_at", ""));
+                    entry.goldDebit = obj.optDouble("total_gold_debit_grams", 
+                        obj.optDouble("gold_debit_grams", 
+                        obj.optDouble("gold_debit", 0)));
+                    entry.goldCredit = obj.optDouble("total_gold_credit_grams", 
+                        obj.optDouble("gold_credit_grams", 
+                        obj.optDouble("gold_credit", 0)));
+                    entry.date = obj.optString("entry_date", 
+                        obj.optString("created_at", ""));
                     
                     entriesList.add(entry);
                 }
             }
             
             filterData("");
-            
-            // تحديث الملخص
             updateSummary();
-            
             showEmptyState(entriesList.isEmpty());
             
         } catch (Exception e) {
@@ -271,7 +291,7 @@ public class MiraAccountingFragment extends Fragment {
         }
         
         if (tvTotalGoldVolume != null) {
-            tvTotalGoldVolume.setText(String.format(Locale.US, "%.3f g 24K", totalGold));
+            tvTotalGoldVolume.setText(String.format(Locale.US, "%.3f g", totalGold));
         }
         
         if (tvBalanceStatus != null) {
@@ -307,10 +327,80 @@ public class MiraAccountingFragment extends Fragment {
     }
 
     private void showCreateEntryDialog() {
-        // يمكن إضافة نافذة إنشاء قيد هنا
-        Toast.makeText(getContext(), 
-            isArabic ? "سيتم إضافة هذه الميزة قريباً" : "Feature coming soon", 
-            Toast.LENGTH_SHORT).show();
+        if (getContext() == null) return;
+        
+        Context ctx = getContext();
+        Dialog dialog = new Dialog(ctx);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_create_journal_entry);
+        
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT);
+        }
+        
+        EditText etRef = dialog.findViewById(R.id.etDialogRef);
+        EditText etDesc = dialog.findViewById(R.id.etDialogDesc);
+        EditText etGrossWeight = dialog.findViewById(R.id.etDialogGrossWeight);
+        Spinner spKarat = dialog.findViewById(R.id.spDialogKarat);
+        EditText etCashAmount = dialog.findViewById(R.id.etDialogCashAmount);
+        Button btnSave = dialog.findViewById(R.id.btnDialogSave);
+        
+        String[] karats = {"24K", "22K", "21K", "18K"};
+        ArrayAdapter<String> karatAdapter = new ArrayAdapter<>(ctx, android.R.layout.simple_spinner_dropdown_item, karats);
+        if (spKarat != null) spKarat.setAdapter(karatAdapter);
+        
+        if (btnSave != null) {
+            btnSave.setOnClickListener(v -> {
+                String ref = etRef != null ? etRef.getText().toString().trim() : "";
+                String desc = etDesc != null ? etDesc.getText().toString().trim() : "";
+                
+                if (ref.isEmpty() || desc.isEmpty()) {
+                    Toast.makeText(ctx, "يرجى تعبئة المرجع والبيان", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                
+                // إرسال إلى السيرفر
+                saveJournalEntryToServer(ref, desc);
+                dialog.dismiss();
+            });
+        }
+        
+        dialog.show();
+    }
+
+    private void saveJournalEntryToServer(String ref, String desc) {
+        executor.execute(() -> {
+            try {
+                JSONObject payload = new JSONObject();
+                payload.put("reference", ref);
+                payload.put("description", desc);
+                payload.put("entry_date", new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new java.util.Date()));
+                
+                JSONArray lines = new JSONArray();
+                JSONObject line = new JSONObject();
+                line.put("account_id", 1);
+                line.put("description", desc);
+                line.put("debit", 0);
+                line.put("credit", 0);
+                lines.put(line);
+                
+                payload.put("lines", lines);
+                
+                MiraApiClient.ApiResponse response = apiClient.createJournalEntry(payload);
+                
+                mainHandler.post(() -> {
+                    if (response != null && response.isSuccess) {
+                        Toast.makeText(getContext(), "✅ تم إنشاء القيد", Toast.LENGTH_SHORT).show();
+                        loadData(currentTab);
+                    } else {
+                        Toast.makeText(getContext(), "❌ فشل الإنشاء", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error creating entry: " + e.getMessage());
+            }
+        });
     }
 
     @Override
@@ -355,7 +445,13 @@ public class MiraAccountingFragment extends Fragment {
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
             AccountingEntry entry = items.get(position);
-            holder.tvTitle.setText(entry.code + " - " + entry.description);
+            
+            String title = entry.code;
+            if (!entry.description.isEmpty()) {
+                title += " - " + entry.description;
+            }
+            holder.tvTitle.setText(title);
+            
             holder.tvSubtitle.setText(String.format(Locale.US, 
                 "مدين: %.2f | دائن: %.2f | ذهب: %.3f g", 
                 entry.debit, entry.credit, entry.goldDebit));
