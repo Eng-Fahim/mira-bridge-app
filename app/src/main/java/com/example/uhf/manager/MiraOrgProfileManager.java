@@ -3,6 +3,8 @@ package com.example.uhf.manager;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import org.json.JSONObject;
+
 /**
  * 🏢 MiraOrgProfileManager - مدير بيانات الجهة المركزي
  * 
@@ -66,14 +68,16 @@ public class MiraOrgProfileManager {
         return prefs.getString("org_logo", "");
     }
 
-    /**
-     * ✅ إرجاع الرقم الضريبي المعتمد للجهة
-     */
     public String getTaxNumber() {
         return prefs.getString("tax_number", "VAT-3100293841");
     }
 
-    // ==================== Setters (للتحديث) ====================
+    // ✅ إضافة getters جديدة
+    public String getOrgNameAr() {
+        return prefs.getString("org_name_ar", prefs.getString("org_name", "ميرا للتكنولوجيا"));
+    }
+
+    // ==================== Setters ====================
 
     public void setTaxNumber(String taxNumber) {
         prefs.edit().putString("tax_number", taxNumber).apply();
@@ -89,13 +93,61 @@ public class MiraOrgProfileManager {
                 .apply();
     }
 
+    /**
+     * ✅ حفظ بيانات كاملة من JSON (من السيرفر)
+     */
+    public void saveFromServer(JSONObject org) {
+        if (org == null) return;
+        
+        SharedPreferences.Editor editor = prefs.edit();
+        
+        editor.putString("org_name_ar", org.optString("name_ar", getOrgNameAr()));
+        editor.putString("org_name_en", org.optString("name_en", getOrgNameEn()));
+        editor.putString("org_name", org.optString("name_ar", getOrgName()));
+        editor.putString("org_phone", org.optString("phone", getOrgPhone()));
+        editor.putString("org_email", org.optString("email", getOrgEmail()));
+        editor.putString("tax_number", org.optString("tax_number", getTaxNumber()));
+        editor.putString("org_logo", org.optString("logo_url", getOrgLogo()));
+        
+        editor.apply();
+    }
+
+    /**
+     * ✅ حفظ بيانات كاملة يدوياً
+     */
+    public void saveFullProfile(String nameAr, String nameEn, String phone, String email, String tax) {
+        SharedPreferences.Editor editor = prefs.edit();
+        
+        editor.putString("org_name_ar", nameAr);
+        editor.putString("org_name_en", nameEn);
+        editor.putString("org_name", nameAr);
+        editor.putString("org_phone", phone);
+        editor.putString("org_email", email);
+        editor.putString("tax_number", tax);
+        
+        editor.apply();
+    }
+
     // ==================== دوال مساعدة ====================
+
+    /**
+     * ✅ الحصول على الاسم حسب اللغة الحالية
+     */
+    public String getDisplayName() {
+        String locale = java.util.Locale.getDefault().getLanguage();
+        if (locale.equals("ar")) {
+            String ar = getOrgNameAr();
+            return ar.isEmpty() ? getOrgNameEn() : ar;
+        }
+        String en = getOrgNameEn();
+        return en.isEmpty() ? getOrgNameAr() : en;
+    }
 
     /**
      * ✅ اسم التطبيق الكامل: "اسم الجهة - MIRA"
      */
     public String getFullAppTitle() {
-        String name = getOrgName();
+        String name = getDisplayName();
         return name.isEmpty() ? "MIRA Jewel" : name + " - MIRA";
     }
 
@@ -103,50 +155,7 @@ public class MiraOrgProfileManager {
      * ✅ توقيع الجهة للفواتير والشاشات
      */
     public String getAppSignature() {
-        return getOrgName() + " | " + getOrgSlogan();
-    }
-
-    /**
-     * ✅ الحصول على معرف المستخدم الحالي من SharedPreferences
-     */
-    public int getCurrentUserId() {
-        try {
-            SharedPreferences authPrefs = context.getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
-            return authPrefs.getInt("user_id", 0);
-        } catch (Exception e) {
-            return 0;
-        }
-    }
-
-    /**
-     * ✅ الحصول على التوكن الحالي من SharedPreferences
-     */
-    public String getAuthToken() {
-        try {
-            SharedPreferences authPrefs = context.getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
-            String token = authPrefs.getString("auth_token", "");
-            if (token.isEmpty()) {
-                token = authPrefs.getString("session_token", "");
-            }
-            return token;
-        } catch (Exception e) {
-            return "";
-        }
-    }
-
-    /**
-     * ✅ حفظ بيانات المستخدم
-     */
-    public void saveUserAuth(int userId, String token) {
-        try {
-            SharedPreferences authPrefs = context.getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
-            authPrefs.edit()
-                    .putInt("user_id", userId)
-                    .putString("auth_token", token)
-                    .apply();
-        } catch (Exception e) {
-            // تجاهل الأخطاء
-        }
+        return getDisplayName() + " | " + getOrgSlogan();
     }
 
     /**
@@ -176,5 +185,41 @@ public class MiraOrgProfileManager {
     public boolean isProfileComplete() {
         return !getOrgName().equals("MIRA Jewelry") 
             && !getOrgName().isEmpty();
+    }
+
+    // ==================== دوال المستخدم ====================
+
+    public int getCurrentUserId() {
+        try {
+            SharedPreferences authPrefs = context.getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
+            return authPrefs.getInt("user_id", 0);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    public String getAuthToken() {
+        try {
+            SharedPreferences authPrefs = context.getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
+            String token = authPrefs.getString("auth_token", "");
+            if (token.isEmpty()) {
+                token = authPrefs.getString("session_token", "");
+            }
+            return token;
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    public void saveUserAuth(int userId, String token) {
+        try {
+            SharedPreferences authPrefs = context.getSharedPreferences("MIRA_AUTH", Context.MODE_PRIVATE);
+            authPrefs.edit()
+                    .putInt("user_id", userId)
+                    .putString("auth_token", token)
+                    .apply();
+        } catch (Exception e) {
+            // تجاهل الأخطاء
+        }
     }
 }
