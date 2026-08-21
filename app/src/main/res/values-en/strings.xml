@@ -1696,4 +1696,52 @@
     <string name="status_balanced">✓ Balanced</string>
     <string name="status_unbalanced">⚠️ Unbalanced</string>
 
+
+<!-- ==================== Missing Variables ==================== -->
+
+<!-- Toolbar -->
+<string name="action_dashboard">Dashboard</string>
+<string name="action_gold_rates">Gold &amp; Stock Market Prices</string>
+<string name="action_quick_access_settings">Customize Quick Access</string>
+<string name="action_toggle_language">Change Language (English/Arabic)</string>
+<string name="action_profile">Profile</string>
+<string name="action_logout">Log Out</string>
+
+<!-- Back Button -->
+<string name="press_again_to_exit">Press again to exit</string>
+
+<!-- Inventory Messages -->
+<string name="inventory_scanning">● Inventory in Progress</string>
+<string name="inventory_completed">● Completed</string>
+<string name="inventory_saved_locally">● Saved Locally</string>
+<string name="inventory_pending_sync">Inventory Pending Sync</string>
+<string name="inventory_synced_success">Inventory Synced Successfully</string>
+
+<!-- Confirmation Messages -->
+<string name="confirm_stop_inventory">Are you sure you want to stop the inventory?</string>
+<string name="yes_stop">Yes, Stop</string>
+<string name="continue_scanning">Continue</string>
+<string name="retry">🔄 Retry</string>
+
+<!-- Additional Inventory Buttons -->
+<string name="btn_blind_inventory">⚡ Blind Inventory</string>
+<string name="btn_generate_report">📄 Report</string>
+<string name="btn_archive_reports">📂 Archive</string>
+
+<!-- Additional Dashboard Titles -->
+<string name="gold_prices_global">🥇 Global Gold Prices</string>
+<string name="ounce_price_label">Ounce Price</string>
+<string name="price_source">📡 Source</string>
+<string name="last_update">⏰ Last Update</string>
+<string name="quick_access_title">⚡ Quick Access</string>
+<string name="customize_quick_access">⚙️ Customize</string>
+
+<!-- Inventory Status -->
+<string name="inventory_in_progress">⚠️ Inventory in Progress</string>
+<string name="inventory_stop_proceed">Stop &amp; Proceed</string>
+
+<!-- General Messages -->
+<string name="unknown">Unknown</string>
+<string name="no_enabled_actions">No Enabled Actions</string>
+<string name="devices_connected">Devices Connected</string>
 </resources>
