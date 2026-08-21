@@ -42,6 +42,7 @@ import org.json.JSONObject;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 
 public class LoginActivity extends AppCompatActivity {
 
@@ -63,7 +64,7 @@ public class LoginActivity extends AppCompatActivity {
     private BiometricPrompt.PromptInfo promptInfo;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final Executor bgExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService bgExecutor = Executors.newSingleThreadExecutor();
 
     private boolean isArabic = true;
 
