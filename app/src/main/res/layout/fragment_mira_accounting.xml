@@ -4,19 +4,21 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F4F6F9"
-    android:layoutDirection="rtl"
+    android:background="?android:attr/colorBackground"
+    android:layoutDirection="locale"
     android:orientation="vertical"
     android:padding="10dp">
 
-    <!-- 1. شريط العناوين والإحصائيات المزدوجة (ذهب + نقدية) -->
-    <androidx.cardview.widget.CardView
+    <!-- 1. شريط العناوين والإحصائيات -->
+    <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="10dp"
-        app:cardBackgroundColor="#1A2530"
+        app:cardBackgroundColor="?attr/colorSurface"
         app:cardCornerRadius="12dp"
-        app:cardElevation="4dp">
+        app:cardElevation="2dp"
+        app:strokeColor="?attr/colorOutlineVariant"
+        app:strokeWidth="1dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -35,8 +37,8 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="نظام ERP المحاسبة المالية والعيارات"
-                    android:textColor="#FFFFFF"
+                    android:text="نظام ERP المحاسبة المالية"
+                    android:textColor="?attr/colorOnSurface"
                     android:textSize="16sp"
                     android:textStyle="bold" />
 
@@ -44,39 +46,39 @@
                     android:id="@+id/tvActiveBranch"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:background="#2C3E50"
+                    android:background="?attr/colorSurfaceVariant"
                     android:paddingHorizontal="10dp"
                     android:paddingVertical="4dp"
-                    android:text="الفرع الرئيسي - صنعاء"
-                    android:textColor="#ECF0F1"
+                    android:text="الفرع الرئيسي"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="11sp" />
             </LinearLayout>
 
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:layout_marginTop="8dp" 
-                android:background="#2C3E50" />
+                android:layout_marginTop="8dp"
+                android:background="?attr/colorOutlineVariant" />
 
-            <!-- ملخص مالي ثنائي (نقدية + وزن صافي) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:baselineAligned="false"
                 android:orientation="horizontal">
 
-                <!-- 1. المبيعات النقدية -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:gravity="center"
                     android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="النقدية المقبوضة"
-                        android:textColor="#BDC3C7"
+                        android:text="النقدية"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp" />
 
                     <TextView
@@ -84,24 +86,24 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="0.00 YER"
-                        android:textColor="#2ECC71"
-                        android:textSize="13sp"
+                        android:text="0.00"
+                        android:textColor="?attr/colorPrimary"
+                        android:textSize="14sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <!-- 2. حركة صافي الذهب (عيار 24) -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:gravity="center"
                     android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="صافي الحركة (24k)"
-                        android:textColor="#BDC3C7"
+                        android:text="صافي الذهب (24k)"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp" />
 
                     <TextView
@@ -109,24 +111,24 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="0.000 جرام"
-                        android:textColor="#F1C40F"
-                        android:textSize="13sp"
+                        android:text="0.000 g"
+                        android:textColor="?attr/colorSecondary"
+                        android:textSize="14sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <!-- 3. حالة التوازن المزدوج -->
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:gravity="center"
                     android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="توازن الميزان"
-                        android:textColor="#BDC3C7"
+                        android:text="التوازن"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp" />
 
                     <TextView
@@ -134,64 +136,31 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="متوازن ✓"
-                        android:textColor="#2ECC71"
-                        android:textSize="13sp"
+                        android:text="—"
+                        android:textColor="?attr/colorPrimary"
+                        android:textSize="14sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </LinearLayout>
 
         </LinearLayout>
-    </androidx.cardview.widget.CardView>
+    </com.google.android.material.card.MaterialCardView>
 
-    <!-- 2. أزرار التبديل المحاسبية -->
-    <LinearLayout
+    <!-- ✅ 2. TabLayout للتبويبات -->
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tabAccounting"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp"
-        android:orientation="horizontal">
+        android:background="?attr/colorSurface"
+        app:tabGravity="fill"
+        app:tabMode="fixed"
+        app:tabTextColor="?attr/colorOnSurfaceVariant"
+        app:tabSelectedTextColor="?attr/colorPrimary"
+        app:tabIndicatorColor="?attr/colorPrimary"
+        app:tabIndicatorHeight="3dp" />
 
-        <Button
-            android:id="@+id/btnTabJournal"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="0dp"
-            android:layout_height="38dp"
-            android:layout_marginEnd="2dp"
-            android:layout_weight="1"
-            android:background="#2980B9"
-            android:text="القيود اليومية"
-            android:textColor="#FFFFFF"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/btnTabChartOfAccounts"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="0dp"
-            android:layout_height="38dp"
-            android:layout_marginHorizontal="2dp"
-            android:layout_weight="1"
-            android:background="#BDC3C7"
-            android:text="دليل الحسابات"
-            android:textColor="#2C3E50"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/btnTabTrialBalance"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="0dp"
-            android:layout_height="38dp"
-            android:layout_marginStart="2dp"
-            android:layout_weight="1"
-            android:background="#BDC3C7"
-            android:text="ميزان الذهب والنقدية"
-            android:textColor="#2C3E50"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <!-- 3. شريط البحث والتصفية المتقدم -->
+    <!-- 3. البحث -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -205,9 +174,10 @@
             android:layout_height="40dp"
             android:layout_weight="1"
             android:background="@android:drawable/editbox_background"
-            android:hint="بحث بالمرجع، RFID، أو الحساب..."
+            android:hint="بحث..."
             android:paddingHorizontal="10dp"
             android:singleLine="true"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="12sp" />
 
         <ImageButton
@@ -215,79 +185,75 @@
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:layout_marginStart="6dp"
-            android:background="#34495E"
-            android:contentDescription="تحديث البيانات"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="تحديث"
             android:src="@android:drawable/ic_popup_sync"
-            app:tint="#FFFFFF" />
+            app:tint="?attr/colorPrimary" />
     </LinearLayout>
 
-    <!-- 4. ترويسة الجدول الاحترافية (تتضمّن صافي الذهب والنقدية) -->
+    <!-- 4. ترويسة الجدول -->
     <LinearLayout
-        android:id="@+id/headerTable"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#1A2530"
+        android:background="?attr/colorSurfaceVariant"
         android:orientation="horizontal"
         android:paddingVertical="8dp">
 
         <TextView
-            android:id="@+id/thCol1"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="center"
-            android:text="المرجع/الرمز"
-            android:textColor="#FFFFFF"
-            android:textSize="11sp"
+            android:text="المرجع"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="10sp"
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/thCol2"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1.8"
             android:paddingStart="6dp"
-            android:text="البيان/اسم الحساب"
-            android:textColor="#FFFFFF"
-            android:textSize="11sp"
+            android:text="البيان"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="10sp"
             android:textStyle="bold"
             tools:ignore="RtlSymmetry" />
 
         <TextView
-            android:id="@+id/thCol3"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1.2"
             android:gravity="center"
             android:text="صافي 24 (جم)"
-            android:textColor="#F1C40F"
-            android:textSize="11sp"
+            android:textColor="?attr/colorSecondary"
+            android:textSize="10sp"
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/thCol4"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1.3"
             android:gravity="center"
-            android:text="المبلغ النقدي"
-            android:textColor="#2ECC71"
-            android:textSize="11sp"
+            android:text="المبلغ"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="10sp"
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- 5. قائمة عرض البيانات (RecyclerView) -->
+    <!-- 5. قائمة البيانات -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="#FFFFFF">
+        android:background="?attr/colorSurface">
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvAccountingData"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:scrollbars="vertical" />
+            android:scrollbars="vertical"
+            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
         <ProgressBar
             android:id="@+id/pbAccountingLoading"
@@ -301,28 +267,21 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:text="لا توجد قيود أو بيانات محاسبية متوفرة"
-            android:textColor="#7F8C8D"
+            android:text="لا توجد بيانات"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="13sp"
             android:visibility="gone" />
     </FrameLayout>
 
-    <!-- 6. شريط الإجراءات والقيود المركبة -->
-    <LinearLayout
+    <!-- 6. زر إنشاء قيد -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnCreateManualEntry"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="44dp"
         android:layout_marginTop="8dp"
-        android:orientation="horizontal">
-
-        <Button
-            android:id="@+id/btnCreateManualEntry"
-            android:layout_width="match_parent"
-            android:layout_height="42dp"
-            android:background="#27AE60"
-            android:text="+ إنشاء قيد ذهب ونقدية مركب"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-    </LinearLayout>
+        android:text="+ إنشاء قيد مركب"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        app:cornerRadius="10dp" />
 
 </LinearLayout>
