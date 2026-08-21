@@ -208,9 +208,6 @@ public ApiResponse activateProvider(int providerId) {
         return response;
     }
 
-    // ... باقي الدوال تبقى كما هي...
-    
-    
     public ApiResponse getBranchItemsByCategory(int branchId, String category) {
         String endpoint = "/branches/" + branchId + "/inventory/items";
         if (category != null && !category.isEmpty()) {
@@ -251,10 +248,6 @@ public ApiResponse activateProvider(int providerId) {
 
     public ApiResponse getCurrentUser() {
         return getWithAuth("/auth/me");
-    }
-    
-    public String getClientSessionId() {
-    return clientSessionId;
     }
 
     public ApiResponse refreshToken(String oldToken) {
