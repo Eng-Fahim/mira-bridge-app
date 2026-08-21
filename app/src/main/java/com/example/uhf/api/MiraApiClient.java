@@ -1131,6 +1131,28 @@ public ApiResponse getGoldMovementReport(String branchId, String fromDate, Strin
     return getWithAuth(url);
 }
 
+// ===================== ACCOUNTING - ADVANCED =====================
+
+public ApiResponse closeFiscalYear(int yearId) {
+    return postWithAuth("/accounting/fiscal-years/" + yearId + "/close", new JSONObject());
+}
+
+public ApiResponse getOpeningBalances() {
+    return getWithAuth("/accounting/opening-balances");
+}
+
+public ApiResponse setOpeningBalance(int accountId, double cashBalance, double goldBalance) {
+    try {
+        JSONObject payload = new JSONObject();
+        payload.put("account_id", accountId);
+        payload.put("opening_balance", cashBalance);
+        payload.put("opening_gold", goldBalance);
+        return postWithAuth("/accounting/opening-balances/set", payload);
+    } catch (Exception e) {
+        return new ApiResponse(-1, null, e.getMessage());
+    }
+}
+
     public ApiResponse calculateGoldPrice(int karat, double weight, String currency) {
         JSONObject payload = new JSONObject();
         try {
@@ -1179,4 +1201,4 @@ public ApiResponse getGoldMovementReport(String branchId, String fromDate, Strin
             return null;
         }
     }
-    }
+                    }
