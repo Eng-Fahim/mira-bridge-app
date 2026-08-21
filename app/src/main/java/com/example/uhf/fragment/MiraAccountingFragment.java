@@ -5,8 +5,11 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -24,43 +27,65 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
-import com.example.uhf.adapter.MiraAccountingAdapter;
-import com.example.uhf.model.MiraAccountingItem; // <<< السطر المسؤول عن حل مشكلة الـ Build
-import com.example.uhf.viewmodel.MiraAccountingViewModel;
+import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.manager.MiraBranchesManager;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.tabs.TabLayout;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MiraAccountingFragment extends Fragment {
 
-    private MiraAccountingViewModel viewModel;
-    private MiraAccountingAdapter adapter;
+    private static final String TAG = "MiraAccountingFragment";
+
+    private MiraApiClient apiClient;
+    private MiraBranchesManager branchesManager;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     private RecyclerView rvAccountingData;
     private ProgressBar pbLoading;
     private TextView tvEmptyData;
     private EditText etSearch;
-
-    private TextView tvTodayRevenue, tvTotalGoldVolume, tvBalanceStatus, tvActiveBranch;
-    private Button btnTabJournal, btnTabChartOfAccounts, btnTabTrialBalance, btnCreateManualEntry;
+    private TextView tvTodayRevenue, tvTotalGoldVolume, tvBalanceStatus;
+    private TabLayout tabAccounting;
+    private MaterialButton btnCreateManualEntry;
     private ImageButton btnRefresh;
 
-    private MiraAccountingItem.ItemType currentTab = MiraAccountingItem.ItemType.JOURNAL_ENTRY;
-    private final List<MiraAccountingItem> rawDataList = new ArrayList<>();
+    private String currentTab = "journal"; // journal, chart, trial
+    private final List<AccountingEntry> entriesList = new ArrayList<>();
+    private final List<AccountingEntry> filteredList = new ArrayList<>();
+    private AccountingAdapter adapter;
+
+    private boolean isArabic = true;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_mira_accounting, container, false);
+        
+        apiClient = MiraApiClient.getInstance(requireContext());
+        branchesManager = MiraBranchesManager.getInstance(requireContext());
+        isArabic = Locale.getDefault().getLanguage().equals("ar");
+
         initViews(view);
         setupRecyclerView();
         setupListeners();
+        
+        // ✅ تحميل البيانات عند الفتح
+        loadData(currentTab);
+
         return view;
     }
 
@@ -70,236 +95,286 @@ public class MiraAccountingFragment extends Fragment {
         tvEmptyData = view.findViewById(R.id.tvEmptyData);
         etSearch = view.findViewById(R.id.etSearchAccounting);
         btnRefresh = view.findViewById(R.id.btnRefreshAccounting);
-
         tvTodayRevenue = view.findViewById(R.id.tvTodayRevenue);
         tvTotalGoldVolume = view.findViewById(R.id.tvTotalGoldVolume);
         tvBalanceStatus = view.findViewById(R.id.tvBalanceStatus);
-        tvActiveBranch = view.findViewById(R.id.tvActiveBranch);
-
-        btnTabJournal = view.findViewById(R.id.btnTabJournal);
-        btnTabChartOfAccounts = view.findViewById(R.id.btnTabChartOfAccounts);
-        btnTabTrialBalance = view.findViewById(R.id.btnTabTrialBalance);
         btnCreateManualEntry = view.findViewById(R.id.btnCreateManualEntry);
+        
+        tabAccounting = view.findViewById(R.id.tabAccounting);
+        if (tabAccounting != null) {
+            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "القيود" : "Journal"));
+            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "دليل الحسابات" : "Chart"));
+            tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "ميزان المراجعة" : "Trial"));
+        }
     }
 
     private void setupRecyclerView() {
         if (rvAccountingData != null) {
             rvAccountingData.setLayoutManager(new LinearLayoutManager(getContext()));
-            adapter = new MiraAccountingAdapter();
+            adapter = new AccountingAdapter(filteredList);
             rvAccountingData.setAdapter(adapter);
         }
     }
 
     private void setupListeners() {
-        btnTabJournal.setOnClickListener(v -> switchTab(MiraAccountingItem.ItemType.JOURNAL_ENTRY));
-        btnTabChartOfAccounts.setOnClickListener(v -> switchTab(MiraAccountingItem.ItemType.CHART_OF_ACCOUNT));
-        btnTabTrialBalance.setOnClickListener(v -> switchTab(MiraAccountingItem.ItemType.TRIAL_BALANCE));
+        if (tabAccounting != null) {
+            tabAccounting.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+                @Override
+                public void onTabSelected(TabLayout.Tab tab) {
+                    switch (tab.getPosition()) {
+                        case 0: currentTab = "journal"; break;
+                        case 1: currentTab = "chart"; break;
+                        case 2: currentTab = "trial"; break;
+                    }
+                    loadData(currentTab);
+                }
+                @Override public void onTabUnselected(TabLayout.Tab tab) {}
+                @Override public void onTabReselected(TabLayout.Tab tab) {}
+            });
+        }
 
-        btnRefresh.setOnClickListener(v -> loadAccountingData());
-        btnCreateManualEntry.setOnClickListener(v -> showCreateEntryDialog());
+        if (btnRefresh != null) {
+            btnRefresh.setOnClickListener(v -> loadData(currentTab));
+        }
+        
+        if (btnCreateManualEntry != null) {
+            btnCreateManualEntry.setOnClickListener(v -> showCreateEntryDialog());
+        }
 
-        etSearch.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                filterData(s.toString());
+        if (etSearch != null) {
+            etSearch.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    filterData(s.toString());
+                }
+                @Override public void afterTextChanged(Editable s) {}
+            });
+        }
+    }
+
+    /**
+     * ✅ تحميل البيانات من السيرفر
+     */
+    private void loadData(String tab) {
+        pbLoading.setVisibility(View.VISIBLE);
+        
+        executor.execute(() -> {
+            try {
+                int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+                String branchIdStr = String.valueOf(branchId);
+                
+                MiraApiClient.ApiResponse response = null;
+                
+                switch (tab) {
+                    case "journal":
+                        response = apiClient.getJournalEntries(branchIdStr);
+                        break;
+                    case "chart":
+                        response = apiClient.getChartOfAccounts();
+                        break;
+                    case "trial":
+                        response = apiClient.getTrialBalance(branchIdStr);
+                        break;
+                }
+                
+                final MiraApiClient.ApiResponse finalResponse = response;
+                
+                mainHandler.post(() -> {
+                    pbLoading.setVisibility(View.GONE);
+                    
+                    if (finalResponse != null && finalResponse.isSuccess && finalResponse.data != null) {
+                        parseAndDisplay(finalResponse.data, tab);
+                    } else {
+                        showEmptyState(true);
+                        Toast.makeText(getContext(), 
+                            isArabic ? "فشل تحميل البيانات" : "Failed to load data", 
+                            Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error loading accounting data: " + e.getMessage());
+                mainHandler.post(() -> {
+                    pbLoading.setVisibility(View.GONE);
+                    showEmptyState(true);
+                });
             }
-            @Override public void afterTextChanged(Editable s) {}
         });
     }
 
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        setupViewModel();
-    }
-
-    private void setupViewModel() {
+    /**
+     * ✅ تحليل وعرض البيانات
+     */
+    private void parseAndDisplay(JSONObject data, String tab) {
         try {
-            viewModel = new ViewModelProvider(this).get(MiraAccountingViewModel.class);
-            viewModel.getAccountingItemsLiveData().observe(getViewLifecycleOwner(), items -> {
-                pbLoading.setVisibility(View.GONE);
-                if (items != null && !items.isEmpty()) {
-                    rawDataList.clear();
-                    rawDataList.addAll(items);
-                    filterTabAndRender();
-                    updateHeaderSummary(items);
+            entriesList.clear();
+            
+            JSONArray items = null;
+            
+            // استخراج البيانات من التنسيقات المختلفة
+            if (data.has("data")) {
+                JSONObject dataObj = data.optJSONObject("data");
+                if (dataObj != null && dataObj.has("data")) {
+                    items = dataObj.optJSONArray("data");
                 } else {
-                    showEmptyState(true);
+                    items = data.optJSONArray("data");
                 }
-            });
-
-            loadAccountingData();
-        } catch (Exception e) {
-            e.printStackTrace();
-            loadMockEnterpriseData();
-        }
-    }
-
-    private void loadAccountingData() {
-        pbLoading.setVisibility(View.VISIBLE);
-        tvEmptyData.setVisibility(View.GONE);
-        if (viewModel != null) {
-            viewModel.fetchAccountingData(currentTab);
-        } else {
-            loadMockEnterpriseData();
-        }
-    }
-
-    private void switchTab(MiraAccountingItem.ItemType tab) {
-        currentTab = tab;
-        updateTabUI();
-        filterTabAndRender();
-    }
-
-    private void updateTabUI() {
-        int activeColor = Color.parseColor("#2980B9");
-        int inactiveColor = Color.parseColor("#BDC3C7");
-        int activeText = Color.WHITE;
-        int inactiveText = Color.parseColor("#2C3E50");
-
-        btnTabJournal.setBackgroundColor(currentTab == MiraAccountingItem.ItemType.JOURNAL_ENTRY ? activeColor : inactiveColor);
-        btnTabJournal.setTextColor(currentTab == MiraAccountingItem.ItemType.JOURNAL_ENTRY ? activeText : inactiveText);
-
-        btnTabChartOfAccounts.setBackgroundColor(currentTab == MiraAccountingItem.ItemType.CHART_OF_ACCOUNT ? activeColor : inactiveColor);
-        btnTabChartOfAccounts.setTextColor(currentTab == MiraAccountingItem.ItemType.CHART_OF_ACCOUNT ? activeText : inactiveText);
-
-        btnTabTrialBalance.setBackgroundColor(currentTab == MiraAccountingItem.ItemType.TRIAL_BALANCE ? activeColor : inactiveColor);
-        btnTabTrialBalance.setTextColor(currentTab == MiraAccountingItem.ItemType.TRIAL_BALANCE ? activeText : inactiveText);
-    }
-
-    private void filterTabAndRender() {
-        List<MiraAccountingItem> filtered = new ArrayList<>();
-        for (MiraAccountingItem item : rawDataList) {
-            if (item.getItemType() == currentTab) {
-                filtered.add(item);
             }
-        }
-
-        if (filtered.isEmpty()) {
+            
+            if (items == null) {
+                items = data.optJSONArray("items");
+            }
+            
+            if (items != null) {
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject obj = items.getJSONObject(i);
+                    
+                    AccountingEntry entry = new AccountingEntry();
+                    entry.id = obj.optInt("id", i + 1);
+                    entry.code = obj.optString("entry_number", obj.optString("account_code", ""));
+                    entry.description = obj.optString("description", obj.optString("account_name", obj.optString("account_name_ar", "")));
+                    entry.debit = obj.optDouble("total_debit", obj.optDouble("debit", 0));
+                    entry.credit = obj.optDouble("total_credit", obj.optDouble("credit", 0));
+                    entry.goldDebit = obj.optDouble("total_gold_debit_grams", obj.optDouble("gold_debit", 0));
+                    entry.goldCredit = obj.optDouble("total_gold_credit_grams", obj.optDouble("gold_credit", 0));
+                    entry.date = obj.optString("entry_date", obj.optString("created_at", ""));
+                    
+                    entriesList.add(entry);
+                }
+            }
+            
+            filterData("");
+            
+            // تحديث الملخص
+            updateSummary();
+            
+            showEmptyState(entriesList.isEmpty());
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing data: " + e.getMessage());
             showEmptyState(true);
-        } else {
-            showEmptyState(false);
-            if (adapter != null) adapter.setItems(filtered);
+        }
+    }
+
+    private void updateSummary() {
+        double totalDebit = 0;
+        double totalCredit = 0;
+        double totalGold = 0;
+        
+        for (AccountingEntry entry : entriesList) {
+            totalDebit += entry.debit;
+            totalCredit += entry.credit;
+            totalGold += entry.goldDebit;
+        }
+        
+        if (tvTodayRevenue != null) {
+            tvTodayRevenue.setText(String.format(Locale.US, "%,.2f", totalDebit));
+        }
+        
+        if (tvTotalGoldVolume != null) {
+            tvTotalGoldVolume.setText(String.format(Locale.US, "%.3f g 24K", totalGold));
+        }
+        
+        if (tvBalanceStatus != null) {
+            boolean isBalanced = Math.abs(totalDebit - totalCredit) < 0.01;
+            tvBalanceStatus.setText(isBalanced ? "✓ متوازن" : "⚠️ غير متوازن");
+            tvBalanceStatus.setTextColor(isBalanced ? Color.parseColor("#2ECC71") : Color.parseColor("#E74C3C"));
         }
     }
 
     private void filterData(String query) {
-        if (query == null || query.trim().isEmpty()) {
-            filterTabAndRender();
-            return;
-        }
-        String q = query.toLowerCase(Locale.ROOT);
-        List<MiraAccountingItem> filtered = new ArrayList<>();
-        for (MiraAccountingItem item : rawDataList) {
-            if (item.getItemType() == currentTab) {
-                if (item.getCodeOrRef().toLowerCase(Locale.ROOT).contains(q) ||
-                    item.getNameOrDesc().toLowerCase(Locale.ROOT).contains(q) ||
-                    item.getRfidEpc().toLowerCase(Locale.ROOT).contains(q)) {
-                    filtered.add(item);
-                }
+        filteredList.clear();
+        
+        for (AccountingEntry entry : entriesList) {
+            if (query == null || query.isEmpty() ||
+                entry.code.toLowerCase().contains(query.toLowerCase()) ||
+                entry.description.toLowerCase().contains(query.toLowerCase())) {
+                filteredList.add(entry);
             }
         }
-        if (adapter != null) adapter.setItems(filtered);
-    }
-
-    private void updateHeaderSummary(List<MiraAccountingItem> items) {
-        double totalCash = 0;
-        double debitCashSum = 0, creditCashSum = 0;
-
-        for (MiraAccountingItem item : items) {
-            totalCash += item.getDebitCash();
-            debitCashSum += item.getDebitCash();
-            creditCashSum += item.getCreditCash();
+        
+        if (adapter != null) {
+            adapter.notifyDataSetChanged();
         }
-
-        tvTodayRevenue.setText(String.format(Locale.US, "%,.2f YER", totalCash));
-        tvTotalGoldVolume.setText(String.format(Locale.US, "%.3f جرام 24K", totalGoldVolumeCalc(items)));
-
-        boolean isBalanced = Math.abs(debitCashSum - creditCashSum) < 0.01;
-        tvBalanceStatus.setText(isBalanced ? "متوازن ✓" : "غير متوازن ⚠️");
-        tvBalanceStatus.setTextColor(isBalanced ? Color.parseColor("#2ECC71") : Color.parseColor("#E74C3C"));
-    }
-
-    private double totalGoldVolumeCalc(List<MiraAccountingItem> items) {
-        double net = 0;
-        for (MiraAccountingItem i : items) {
-            net += (i.getFineWeight24Debit() - i.getFineWeight24Credit());
-        }
-        return Math.max(net, 0.0);
     }
 
     private void showEmptyState(boolean show) {
-        pbLoading.setVisibility(View.GONE);
-        tvEmptyData.setVisibility(show ? View.VISIBLE : View.GONE);
-        if (rvAccountingData != null) rvAccountingData.setVisibility(show ? View.GONE : View.VISIBLE);
+        if (tvEmptyData != null) {
+            tvEmptyData.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+        if (rvAccountingData != null) {
+            rvAccountingData.setVisibility(show ? View.GONE : View.VISIBLE);
+        }
     }
 
     private void showCreateEntryDialog() {
-        Context ctx = requireContext();
-        Dialog dialog = new Dialog(ctx);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.dialog_create_journal_entry);
-
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT);
-        }
-
-        EditText etRef = dialog.findViewById(R.id.etDialogRef);
-        EditText etDesc = dialog.findViewById(R.id.etDialogDesc);
-        EditText etGrossWeight = dialog.findViewById(R.id.etDialogGrossWeight);
-        Spinner spKarat = dialog.findViewById(R.id.spDialogKarat);
-        EditText etCashAmount = dialog.findViewById(R.id.etDialogCashAmount);
-        Button btnSave = dialog.findViewById(R.id.btnDialogSave);
-
-        String[] karats = {"24K", "22K", "21K", "18K"};
-        ArrayAdapter<String> karatAdapter = new ArrayAdapter<>(ctx, android.R.layout.simple_spinner_dropdown_item, karats);
-        spKarat.setAdapter(karatAdapter);
-
-        btnSave.setOnClickListener(v -> {
-            String ref = etRef.getText().toString().trim();
-            String desc = etDesc.getText().toString().trim();
-            String grossStr = etGrossWeight.getText().toString().trim();
-            String cashStr = etCashAmount.getText().toString().trim();
-
-            if (ref.isEmpty() || desc.isEmpty()) {
-                Toast.makeText(ctx, "يرجى تعبئة المرجع والبيان", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            double gross = grossStr.isEmpty() ? 0 : Double.parseDouble(grossStr);
-            double cash = cashStr.isEmpty() ? 0 : Double.parseDouble(cashStr);
-            int karat = Integer.parseInt(spKarat.getSelectedItem().toString().replace("K", ""));
-
-            double fine24 = MiraAccountingItem.calculateFineWeight24(gross, karat);
-
-            MiraAccountingItem newEntry = new MiraAccountingItem(
-                    MiraAccountingItem.ItemType.JOURNAL_ENTRY,
-                    ref, desc, fine24, 0.0, cash, 0.0, "YER", "2026-08-14"
-            );
-
-            rawDataList.add(0, newEntry);
-            filterTabAndRender();
-            dialog.dismiss();
-            Toast.makeText(ctx, "تم تسجيل القيد المحاسبي المزدوج بنجاح", Toast.LENGTH_SHORT).show();
-        });
-
-        dialog.show();
+        // يمكن إضافة نافذة إنشاء قيد هنا
+        Toast.makeText(getContext(), 
+            isArabic ? "سيتم إضافة هذه الميزة قريباً" : "Feature coming soon", 
+            Toast.LENGTH_SHORT).show();
     }
 
-    private void loadMockEnterpriseData() {
-        rawDataList.clear();
-        rawDataList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.JOURNAL_ENTRY, "JV-2026-001", "شراء طقم ذهب - توريد صندوق", 0.0, 52.410, 0.0, 3500000, "YER", "2026-08-14"));
-        rawDataList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.JOURNAL_ENTRY, "JV-2026-002", "مبيعات ذهب عيار 21 نقداً", 28.500, 0.0, 2100000, 0.0, "YER", "2026-08-14"));
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (executor != null && !executor.isShutdown()) {
+            executor.shutdown();
+        }
+    }
+
+    // ==================== MODEL ====================
+    
+    private static class AccountingEntry {
+        int id;
+        String code;
+        String description;
+        double debit;
+        double credit;
+        double goldDebit;
+        double goldCredit;
+        String date;
+    }
+
+    // ==================== ADAPTER ====================
+    
+    private class AccountingAdapter extends RecyclerView.Adapter<AccountingAdapter.ViewHolder> {
         
-        rawDataList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.CHART_OF_ACCOUNT, "110101", "خزينة الذهب الخام (24K)", 1520.450, 0.0, "YER"));
-        rawDataList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.CHART_OF_ACCOUNT, "110102", "الصندوق النقدي الرئيسي", 0.0, 48500000.0, "YER"));
-        rawDataList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.CHART_OF_ACCOUNT, "110201", "خزينة فروع الذهب الصافي", 840.120, 0.0, "YER"));
-
-        rawDataList.add(new MiraAccountingItem(MiraAccountingItem.ItemType.TRIAL_BALANCE, "TB-24K", "ميزان كاسر الذهب والمسبوكات", 2360.570, 48500000.0, "YER"));
-
-        filterTabAndRender();
-        updateHeaderSummary(rawDataList);
-        pbLoading.setVisibility(View.GONE);
+        private final List<AccountingEntry> items;
+        
+        AccountingAdapter(List<AccountingEntry> items) {
+            this.items = items;
+        }
+        
+        @NonNull
+        @Override
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext())
+                .inflate(android.R.layout.simple_list_item_2, parent, false);
+            return new ViewHolder(view);
+        }
+        
+        @Override
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+            AccountingEntry entry = items.get(position);
+            holder.tvTitle.setText(entry.code + " - " + entry.description);
+            holder.tvSubtitle.setText(String.format(Locale.US, 
+                "مدين: %.2f | دائن: %.2f | ذهب: %.3f g", 
+                entry.debit, entry.credit, entry.goldDebit));
+        }
+        
+        @Override
+        public int getItemCount() {
+            return items.size();
+        }
+        
+        class ViewHolder extends RecyclerView.ViewHolder {
+            TextView tvTitle;
+            TextView tvSubtitle;
+            
+            ViewHolder(View itemView) {
+                super(itemView);
+                tvTitle = itemView.findViewById(android.R.id.text1);
+                tvSubtitle = itemView.findViewById(android.R.id.text2);
+            }
+        }
     }
 }
