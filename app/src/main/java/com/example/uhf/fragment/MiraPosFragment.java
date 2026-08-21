@@ -48,11 +48,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MiraPosFragment extends MiraBaseFragment {
 
     private static final String TAG = "MiraPosFragment";
     private static final String PENDING_SALES_PREFS = "pos_pending_sales";
+    
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     // ==================== MiraPriceManager ====================
     private MiraPriceManager priceManager;
@@ -687,6 +691,7 @@ public class MiraPosFragment extends MiraBaseFragment {
                         double finalAmount = data.finalAmount;
                         String paymentMethod = data.paymentMethod;
                         clearCart();
+                        autoGenerateAccountingEntry(response.data);
                         showSuccessDialog(finalAmount, soldCount, paymentMethod);
                         if (response.data != null) {
                             String json = response.data.toString();
@@ -722,7 +727,23 @@ public class MiraPosFragment extends MiraBaseFragment {
             }
         }).start();
     }
-
+private void autoGenerateAccountingEntry(JSONObject saleData) {
+    if (saleData == null) return;
+    executor.execute(() -> {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("sale_id", saleData.optInt("sale_id", 0));
+            payload.put("sale_number", saleData.optString("sale_number", ""));
+            payload.put("final_amount", saleData.optDouble("final_amount", 0));
+            payload.put("branch_id", getActiveBranchId());
+            
+            MiraApiClient.getInstance(requireContext())
+                .createJournalEntry(payload);
+        } catch (Exception e) {
+            Log.e(TAG, "Auto entry error: " + e.getMessage());
+        }
+    });
+}
     private String getAccountCode(String paymentMethod) {
         if (paymentMethod == null) return "110101";
         switch (paymentMethod.toUpperCase()) {
@@ -1048,4 +1069,4 @@ public class MiraPosFragment extends MiraBaseFragment {
             }
         }
     }
-}
+                                }
