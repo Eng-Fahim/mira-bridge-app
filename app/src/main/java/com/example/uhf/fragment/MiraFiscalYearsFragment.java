@@ -224,20 +224,28 @@ public class MiraFiscalYearsFragment extends Fragment {
             return new ViewHolder(view);
         }
         
-        @Override
-        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            FiscalYearItem item = items.get(position);
-            holder.tvYearName.setText(item.yearName);
-            holder.tvDates.setText(item.startDate + " → " + item.endDate);
-            
-            if (item.isClosed) {
-                holder.tvStatus.setText(isArabic ? "🔒 مغلقة" : "🔒 Closed");
-                holder.tvStatus.setTextColor(Color.parseColor("#E74C3C"));
-            } else {
-                holder.tvStatus.setText(isArabic ? "✅ مفتوحة" : "✅ Open");
-                holder.tvStatus.setTextColor(Color.parseColor("#2ECC71"));
-            }
-        }
+        
+// تعديل Adapter لإضافة الضغط المطول للإغلاق:
+@Override
+public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+    FiscalYearItem item = items.get(position);
+    holder.tvYearName.setText(item.yearName);
+    holder.tvDates.setText(item.startDate + " → " + item.endDate);
+    
+    if (item.isClosed) {
+        holder.tvStatus.setText(isArabic ? "🔒 مغلقة" : "🔒 Closed");
+        holder.tvStatus.setTextColor(Color.parseColor("#E74C3C"));
+    } else {
+        holder.tvStatus.setText(isArabic ? "✅ مفتوحة" : "✅ Open");
+        holder.tvStatus.setTextColor(Color.parseColor("#2ECC71"));
+    }
+    
+    // ✅ الضغط المطول للإغلاق
+    holder.itemView.setOnLongClickListener(v -> {
+        showCloseYearDialog(item);
+        return true;
+    });
+}
         
         @Override
         public int getItemCount() { return items.size(); }
@@ -253,4 +261,40 @@ public class MiraFiscalYearsFragment extends Fragment {
             }
         }
     }
+    
+    // في MiraFiscalYearsFragment.java - أضف دالة الإغلاق:
+
+private void showCloseYearDialog(FiscalYearItem year) {
+    if (getContext() == null || year.isClosed) return;
+    
+    new androidx.appcompat.app.AlertDialog.Builder(getContext())
+        .setTitle(isArabic ? "إغلاق سنة مالية" : "Close Fiscal Year")
+        .setMessage(isArabic ? 
+            "هل أنت متأكد من إغلاق سنة " + year.yearName + "؟\n\nهذا الإجراء لا يمكن التراجع عنه." :
+            "Are you sure you want to close year " + year.yearName + "?\n\nThis action cannot be undone.")
+        .setPositiveButton(isArabic ? "إغلاق" : "Close", (dialog, which) -> {
+            closeFiscalYear(year.id);
+        })
+        .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+        .show();
+}
+
+private void closeFiscalYear(int yearId) {
+    executor.execute(() -> {
+        MiraApiClient.ApiResponse response = apiClient.closeFiscalYear(yearId);
+        
+        mainHandler.post(() -> {
+            if (response != null && response.isSuccess) {
+                Toast.makeText(getContext(), 
+                    isArabic ? "✅ تم إغلاق السنة المالية" : "✅ Year closed", 
+                    Toast.LENGTH_SHORT).show();
+                loadFiscalYears();
+            } else {
+                Toast.makeText(getContext(), 
+                    isArabic ? "❌ فشل الإغلاق" : "❌ Failed", 
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
+    });
+}
 }
