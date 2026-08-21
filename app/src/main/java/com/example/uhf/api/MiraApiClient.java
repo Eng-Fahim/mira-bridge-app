@@ -298,9 +298,15 @@ public ApiResponse activateProvider(int providerId) {
         return postWithAuth("/org-profile/save", payload);
     }
 
-    public ApiResponse getOrgProfile() {
-        return get("/org-profile/get");
-    }
+    // في MiraApiClient.java - عدّل الدوال التالية:
+
+public ApiResponse getOrgProfile() {
+    return get("/profile/get"); 
+}
+
+public ApiResponse saveOrgProfile(JSONObject payload) {
+    return post("/profile/update", payload);
+}
 
     // ===================== 👥 USERS =====================
 
