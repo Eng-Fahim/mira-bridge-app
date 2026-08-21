@@ -157,123 +157,117 @@ public class MiraAccountingFragment extends Fragment {
      * ✅ تحميل البيانات من السيرفر
      */
     private void loadData(String tab) {
-        if (pbLoading != null) pbLoading.setVisibility(View.VISIBLE);
-        if (tvEmptyData != null) tvEmptyData.setVisibility(View.GONE);
-        
-        executor.execute(() -> {
-            try {
-                int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-                String branchIdStr = String.valueOf(branchId);
-                
-                MiraApiClient.ApiResponse response = null;
-                
-                switch (tab) {
-                    case "journal":
-                        response = apiClient.getJournalEntries(branchIdStr);
-                        break;
-                    case "chart":
-                        response = apiClient.getChartOfAccounts();
-                        break;
-                    case "trial":
-                        response = apiClient.getTrialBalance(branchIdStr);
-                        break;
-                }
-                
-                final MiraApiClient.ApiResponse finalResponse = response;
-                
-                mainHandler.post(() -> {
-                    if (pbLoading != null) pbLoading.setVisibility(View.GONE);
-                    
-                    if (finalResponse != null && finalResponse.isSuccess && finalResponse.data != null) {
-                        parseAndDisplay(finalResponse.data, tab);
-                    } else {
-                        showEmptyState(true);
-                        if (getContext() != null) {
-                            Toast.makeText(getContext(), 
-                                isArabic ? "فشل تحميل البيانات" : "Failed to load data", 
-                                Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading accounting data: " + e.getMessage());
-                mainHandler.post(() -> {
-                    if (pbLoading != null) pbLoading.setVisibility(View.GONE);
-                    showEmptyState(true);
-                });
+    if (pbLoading != null) pbLoading.setVisibility(View.VISIBLE);
+    if (tvEmptyData != null) tvEmptyData.setVisibility(View.GONE);
+    
+    executor.execute(() -> {
+        try {
+            int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+            String branchIdStr = String.valueOf(branchId);
+            
+            Log.d(TAG, "=== Loading accounting data ===");
+            Log.d(TAG, "Tab: " + tab);
+            Log.d(TAG, "Branch ID: " + branchIdStr);
+            Log.d(TAG, "API URL: " + apiClient.getApiUrl());
+            
+            MiraApiClient.ApiResponse response = null;
+            
+            switch (tab) {
+                case "journal":
+                    response = apiClient.getJournalEntries(branchIdStr);
+                    break;
+                case "chart":
+                    response = apiClient.getChartOfAccounts();
+                    break;
+                case "trial":
+                    response = apiClient.getTrialBalance(branchIdStr);
+                    break;
             }
-        });
-    }
+            
+            // ✅ تسجيل مفصل
+            if (response != null) {
+                Log.d(TAG, "Response Success: " + response.isSuccess);
+                Log.d(TAG, "Response Code: " + response.code);
+                Log.d(TAG, "Response Error: " + response.error);
+                if (response.data != null) {
+                    String dataStr = response.data.toString();
+                    Log.d(TAG, "Data: " + dataStr);
+                } else {
+                    Log.d(TAG, "Data is NULL");
+                }
+            } else {
+                Log.d(TAG, "Response is NULL");
+            }
+            
+            final MiraApiClient.ApiResponse finalResponse = response;
+            
+            mainHandler.post(() -> {
+                if (pbLoading != null) pbLoading.setVisibility(View.GONE);
+                
+                if (finalResponse != null && finalResponse.isSuccess && finalResponse.data != null) {
+                    parseAndDisplay(finalResponse.data, tab);
+                } else {
+                    showEmptyState(true);
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Error: " + e.getMessage(), e);
+            mainHandler.post(() -> {
+                if (pbLoading != null) pbLoading.setVisibility(View.GONE);
+                showEmptyState(true);
+            });
+        }
+    });
+}
 
     /**
      * ✅ تحليل وعرض البيانات
      */
     private void parseAndDisplay(JSONObject data, String tab) {
-        try {
-            entriesList.clear();
-            
-            JSONArray items = null;
-            
-            // استخراج البيانات من التنسيقات المختلفة
-            JSONObject dataObj = data.optJSONObject("data");
-            if (dataObj != null) {
-                items = dataObj.optJSONArray("data");
-                if (items == null) {
-                    items = dataObj.optJSONArray("items");
-                }
-                if (items == null) {
-                    items = dataObj.optJSONArray("accounts");
-                }
-                if (items == null) {
-                    items = dataObj.optJSONArray("sessions");
-                }
+    try {
+        entriesList.clear();
+        
+        // ✅ السيرفر يرجع data مباشرة كمصفوفة
+        JSONArray items = data.optJSONArray("data");
+        
+        if (items != null && items.length() > 0) {
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject obj = items.getJSONObject(i);
+                
+                AccountingEntry entry = new AccountingEntry();
+                entry.id = obj.optInt("id", i + 1);
+                entry.code = obj.optString("entry_number", 
+                    obj.optString("reference", 
+                    obj.optString("account_code", "")));
+                entry.description = obj.optString("description", 
+                    obj.optString("account_name_ar", 
+                    obj.optString("account_name", "")));
+                entry.debit = obj.optDouble("total_debit", obj.optDouble("debit", 0));
+                entry.credit = obj.optDouble("total_credit", obj.optDouble("credit", 0));
+                entry.goldDebit = obj.optDouble("total_gold_debit_grams", 
+                    obj.optDouble("gold_debit_grams", 0));
+                entry.goldCredit = obj.optDouble("total_gold_credit_grams", 
+                    obj.optDouble("gold_credit_grams", 0));
+                entry.date = obj.optString("entry_date", 
+                    obj.optString("created_at", ""));
+                
+                entriesList.add(entry);
             }
-            
-            if (items == null) {
-                items = data.optJSONArray("items");
-            }
-            
-            if (items == null) {
-                items = data.optJSONArray("accounts");
-            }
-            
-            if (items != null) {
-                for (int i = 0; i < items.length(); i++) {
-                    JSONObject obj = items.getJSONObject(i);
-                    
-                    AccountingEntry entry = new AccountingEntry();
-                    entry.id = obj.optInt("id", i + 1);
-                    entry.code = obj.optString("entry_number", 
-                        obj.optString("account_code", 
-                        obj.optString("code", "")));
-                    entry.description = obj.optString("description", 
-                        obj.optString("account_name_ar", 
-                        obj.optString("account_name", 
-                        obj.optString("name", ""))));
-                    entry.debit = obj.optDouble("total_debit", obj.optDouble("debit", 0));
-                    entry.credit = obj.optDouble("total_credit", obj.optDouble("credit", 0));
-                    entry.goldDebit = obj.optDouble("total_gold_debit_grams", 
-                        obj.optDouble("gold_debit_grams", 
-                        obj.optDouble("gold_debit", 0)));
-                    entry.goldCredit = obj.optDouble("total_gold_credit_grams", 
-                        obj.optDouble("gold_credit_grams", 
-                        obj.optDouble("gold_credit", 0)));
-                    entry.date = obj.optString("entry_date", 
-                        obj.optString("created_at", ""));
-                    
-                    entriesList.add(entry);
-                }
-            }
-            
-            filterData("");
-            updateSummary();
-            showEmptyState(entriesList.isEmpty());
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Error parsing data: " + e.getMessage());
-            showEmptyState(true);
         }
+        
+        // ✅ تحديث القائمة
+        filterData("");
+        updateSummary();
+        showEmptyState(entriesList.isEmpty());
+        
+        // ✅ تسجيل للتصحيح
+        Log.d(TAG, "Parsed entries: " + entriesList.size());
+        
+    } catch (Exception e) {
+        Log.e(TAG, "Error parsing data: " + e.getMessage());
+        showEmptyState(true);
     }
+}
 
     private void updateSummary() {
         double totalDebit = 0;
