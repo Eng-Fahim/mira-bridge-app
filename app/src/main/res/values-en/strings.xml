@@ -5,21 +5,34 @@
     <string name="menu_logout">Sign Out</string>
 
     <!-- Bottom Navigation -->
-    <string name="nav_dashboard">Home</string>
-    <string name="nav_actions">Actions</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_jewelry">Jewelry</string>
     <string name="nav_inventory">Inventory</string>
-    <string name="nav_pos">Sales</string>
+    <string name="nav_pos">POS</string>
     <string name="nav_more">More</string>
+    <string name="nav_identity">Encoding</string>
+    <string name="nav_reports">Reports</string>
+    <string name="nav_transfers">Transfers</string>
     <string name="nav_home">Home</string>
     <string name="nav_profile">Profile</string>
+    <string name="nav_gate">Gates</string>
+    <string name="nav_accounting">Accounting</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_close">Close</string>
+    <string name="nav_actions">Actions</string>
+    <string name="nav_sales">Point of Sale</string>
 
     <string name="menu_action_center">Quick Actions</string>
     <string name="action_rfid_scan">Scan Code</string>
     <string name="action_quick_pos">Quick POS</string>
     <string name="action_transfers">Transfers</string>
     <string name="action_more_tools">More Actions</string>
-    
-    <string name="nav_sales">Point of Sale</string>
+
+    <!-- App -->
+    <string name="app_name">MIRA Jewelry Enterprise™</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_about">About</string>
+    <string name="action_display">Display Settings</string>
 
     <!-- Gates -->
     <string name="mira_gate_title">MIRA Secure Gate™</string>
@@ -56,7 +69,7 @@
     <string name="gate_alarm_title">🚨 SECURITY BREACH 🚨</string>
     <string name="gate_alarm_message">Security Breach - Unauthorized Item!</string>
     <string name="gate_alarm_epc">EPC: -</string>
-    <string name="gate_alarm_stop">🔕 Stop Alarm&amp; Visual Effects</string>
+    <string name="gate_alarm_stop">🔕 Stop Alarm &amp; Visual Effects</string>
 
     <!-- Dashboard -->
     <string name="greeting_default">Welcome...</string>
@@ -79,77 +92,7 @@
     <string name="offline">● OFFLINE</string>
     <string name="pieces">pcs</string>
 
-    <!-- Encoding -->
-    <string name="identity_step_title">Step 1 of 4: Bind &amp; Classify</string>
-    <string name="identity_epc_hint">EPC / GTIN Code</string>
-    <string name="identity_scan_rfid">📡 Auto RFID Scan</string>
-    <string name="identity_category_title">Item Category</string>
-    <string name="identity_ring">💍 Ring</string>
-    <string name="identity_set">💎 Set</string>
-    <string name="identity_bracelet">📿 Bracelet</string>
-    <string name="identity_necklace">📐 Necklace</string>
-    <string name="identity_title_hint">Item Title &amp; Description</string>
-    <string name="identity_metal_specs">Metal Specifications &amp; Weight</string>
-    <string name="identity_metal_type">Metal Type:</string>
-    <string name="identity_yellow_gold">🟡 Yellow Gold</string>
-    <string name="identity_white_gold">⚪ White Gold</string>
-    <string name="identity_rose_gold">🔴 Rose Gold</string>
-    <string name="identity_karat_label">Karat:</string>
-    <string name="identity_weight_label">Gross Weight (g)</string>
-    <string name="identity_weight_hint">0.000</string>
-    <string name="identity_estimated_value">Estimated Gold Value:</string>
-    <string name="identity_stones_title">Stones &amp; Inlay</string>
-    <string name="identity_has_stones">Is the item set with stones?</string>
-    <string name="identity_stone_type_hint">Stone Type (e.g., Diamond, Zircon)</string>
-    <string name="identity_stone_weight_hint">Stone Weight</string>
-    <string name="identity_stone_count_hint">Stone Count</string>
-    <string name="identity_stone_value_hint">Stone Value (YER)</string>
-    <string name="identity_photos_title">Item Photos &amp; Final Approval</string>
-    <string name="identity_add_photos">📷 Capture / Attach Photos</string>
-    <string name="identity_no_photos">No photos attached yet</string>
-    <string name="identity_save_btn">Approve &amp; Export MIRA ID</string>
-    <string name="identity_waiting">WAITING</string>
-    <string name="identity_default_value">0.00 YER</string>
-
-    <!-- App -->
-    <string name="app_name">MIRA Jewelry Enterprise™</string>
-    <string name="action_settings">Settings</string>
-    <string name="action_about">About</string>
-    <string name="action_display">Display Settings</string>
-
-    <!-- Network / Ping -->
-    <string name="title_ip_or_domain">Enter Domain/IP Address</string>
-    <string name="title_ping_count">PING Attempts</string>
-    <string name="title_ping_succ">PING Success</string>
-    <string name="title_ping_fail">PING Failure</string>
-    <string name="title_ping_seconds"> sec</string>
-    <string name="title_ping_background">Background</string>
-    <string name="title_ping_wait">Timeout (sec)</string>
-    <string name="title_ping_restart">Restart</string>
-    <string name="title_ping_pingresult">Ping Result</string>
-    <string name="title_ping_uploadresult">Upload Result</string>
-    <string name="title_ping_downloadresult">Download Result</string>
-    <string name="title_start">Start</string>
-    <string name="title_stop">Stop</string>
-    <string name="title_activity_settings">Settings</string>
-    <string name="action_set">Settings</string>
-
-    <!-- Gold & Currency Extra Titles -->
-    <string name="gold_currency">Gold &amp; Currency</string>
-    <string name="fetch_prices">Fetch Prices</string>
-    <string name="gold_prices_title">Live Gold Prices</string>
-    <string name="profit_margins_title">Profit Margins</string>
-    <string name="making_charges_title">Making Charges (Craftsmanship)</string>
-
-    <!-- Gold Karats Labels -->
-    <string name="karat_24_label">Karat 24</string>
-    <string name="karat_22_label">Karat 22</string>
-    <string name="karat_21_label">Karat 21</string>
-    <string name="karat_18_label">Karat 18</string>
-    <string name="karat_14_label">Karat 14</string>
-    <string name="karat_12_label">Karat 12</string>
-
-    <!-- Identity Studio Strings -->
+    <!-- Encoding / Identity Studio -->
     <string name="step_title">Step 1 of 4: Bind &amp; Classify</string>
     <string name="hint_epc">EPC / GTIN Code...</string>
     <string name="hint_title">Item Title &amp; Description</string>
@@ -198,22 +141,213 @@
     <string name="category_bracelets">Bracelets</string>
     <string name="category_necklaces">Necklaces</string>
 
-    <!-- Network Messages -->
-    <string name="msg_network_none">Network unavailable</string>
-    <string name="msg_network_ok">Network connected</string>
-    <string name="msg_network_unavailable">Network unavailable</string>
-    <string name="msg_domain_ip_bad">Invalid domain/IP address</string>
-    <string name="msg_loding">Loading…</string>
-    <string name="msg_no_data">No data</string>
-    <string name="msg_mac_error">Error</string>
-    <string name="msg_mac_change">Changed</string>
-    <string name="msg_mac_unmatched">Unmatched</string>
+    <!-- Identity Studio (duplicates for compatibility) -->
+    <string name="identity_step_title">Step 1 of 4: Bind &amp; Classify</string>
+    <string name="identity_epc_hint">EPC / GTIN Code</string>
+    <string name="identity_scan_rfid">📡 Auto RFID Scan</string>
+    <string name="identity_category_title">Item Category</string>
+    <string name="identity_ring">💍 Ring</string>
+    <string name="identity_set">💎 Set</string>
+    <string name="identity_bracelet">📿 Bracelet</string>
+    <string name="identity_necklace">📐 Necklace</string>
+    <string name="identity_title_hint">Item Title &amp; Description</string>
+    <string name="identity_metal_specs">Metal Specifications &amp; Weight</string>
+    <string name="identity_metal_type">Metal Type:</string>
+    <string name="identity_yellow_gold">🟡 Yellow Gold</string>
+    <string name="identity_white_gold">⚪ White Gold</string>
+    <string name="identity_rose_gold">🔴 Rose Gold</string>
+    <string name="identity_karat_label">Karat:</string>
+    <string name="identity_weight_label">Gross Weight (g)</string>
+    <string name="identity_weight_hint">0.000</string>
+    <string name="identity_estimated_value">Estimated Gold Value:</string>
+    <string name="identity_stones_title">Stones &amp; Inlay</string>
+    <string name="identity_has_stones">Is the item set with stones?</string>
+    <string name="identity_stone_type_hint">Stone Type (e.g., Diamond, Zircon)</string>
+    <string name="identity_stone_weight_hint">Stone Weight</string>
+    <string name="identity_stone_count_hint">Stone Count</string>
+    <string name="identity_stone_value_hint">Stone Value (YER)</string>
+    <string name="identity_photos_title">Item Photos &amp; Final Approval</string>
+    <string name="identity_add_photos">📷 Capture / Attach Photos</string>
+    <string name="identity_no_photos">No photos attached yet</string>
+    <string name="identity_save_btn">Approve &amp; Export MIRA ID</string>
+    <string name="identity_waiting">WAITING</string>
+    <string name="identity_default_value">0.00 YER</string>
 
-    <!-- App Center -->
-    <string name="app_title">App Center</string>
-    <string name="app_msg_exit_confirm">Press again to exit</string>
-    <string name="upload_title">Upload Tool %s</string>
-    <string name="download_title">Download Tool %s</string>
+    <!-- Network / Ping -->
+    <string name="title_ip_or_domain">Enter Domain/IP Address</string>
+    <string name="title_ping_count">PING Attempts</string>
+    <string name="title_ping_succ">PING Success</string>
+    <string name="title_ping_fail">PING Failure</string>
+    <string name="title_ping_seconds"> sec</string>
+    <string name="title_ping_background">Background</string>
+    <string name="title_ping_wait">Timeout (sec)</string>
+    <string name="title_ping_restart">Restart</string>
+    <string name="title_ping_pingresult">Ping Result</string>
+    <string name="title_ping_uploadresult">Upload Result</string>
+    <string name="title_ping_downloadresult">Download Result</string>
+    <string name="title_start">Start</string>
+    <string name="title_stop">Stop</string>
+    <string name="title_activity_settings">Settings</string>
+    <string name="action_set">Settings</string>
+
+    <!-- Gold & Currency -->
+    <string name="gold_settings_title">💰 Global Gold Prices</string>
+    <string name="ready_to_update">Ready to update</string>
+    <string name="api_provider">API Provider:</string>
+    <string name="api_key_hint">API Key</string>
+    <string name="gold_currency">Gold Currency:</string>
+    <string name="fetch_prices">🔄 Fetch Prices</string>
+    <string name="gold_prices_title">Live Gold Prices</string>
+    <string name="profit_margins_title">Profit Margins</string>
+    <string name="making_charges_title">Making Charges (Craftsmanship)</string>
+    <string name="final_prices_title">Final Prices (with margins &amp; making charges)</string>
+    <string name="currency_settings_title">💱 Exchange Rates &amp; Currencies</string>
+    <string name="default_currency">Default Currency:</string>
+    <string name="chart_currency">Chart Currency:</string>
+    <string name="official_rates_title">Official Exchange Rates</string>
+    <string name="market_rates_title">Market Exchange Rates</string>
+    <string name="save_currency_settings">💾 Save Currency Settings</string>
+    <string name="refresh_rates">🔄 Refresh Live Rates</string>
+    <string name="official_rate">Official Rate</string>
+    <string name="market_rate">Market Rate</string>
+
+    <!-- Gold Karats -->
+    <string name="karat_24_label">Karat 24</string>
+    <string name="karat_22_label">Karat 22</string>
+    <string name="karat_21_label">Karat 21</string>
+    <string name="karat_18_label">Karat 18</string>
+    <string name="karat_14_label">Karat 14</string>
+    <string name="karat_12_label">Karat 12</string>
+
+    <!-- Sales / POS -->
+    <string name="sales_title">Sales History</string>
+    <string name="sales_search_hint">Search by transaction ID or customer...</string>
+    <string name="sales_empty">No sales yet</string>
+    <string name="pos_title">🛒 MIRA POS System</string>
+    <string name="pos_scale_searching">⚖️ Scale: Searching...</string>
+    <string name="pos_scan_gs1">📷 Scan GS1</string>
+    <string name="pos_scan_rfid">📡 Scan RFID</string>
+    <string name="pos_ready_scan">Ready to scan items...</string>
+    <string name="pos_manual_hint">Enter EPC or barcode manually...</string>
+    <string name="pos_add">Add</string>
+    <string name="pos_item_count">Item Count</string>
+    <string name="pos_total_amount">Total Amount</string>
+    <string name="pos_default_amount">0 YER</string>
+    <string name="pos_clear">Clear</string>
+    <string name="pos_checkout">Checkout &amp; Update Stock</string>
+
+    <!-- POS Checkout Dialog -->
+    <string name="checkout_title">💳 Checkout &amp; Payment</string>
+    <string name="item_count_label">Item Count:</string>
+    <string name="total_amount_label">Total Amount:</string>
+    <string name="customer_info_section">👤 Customer Info</string>
+    <string name="customer_name_required">Customer Name * (Required)</string>
+    <string name="customer_phone_optional">Phone (Optional)</string>
+    <string name="customer_email_optional">Email (Optional)</string>
+    <string name="customer_address_optional">Address (Optional)</string>
+    <string name="customer_notes_optional">Notes (Optional)</string>
+    <string name="payment_method_section">🏦 Payment Method</string>
+    <string name="discount_percent_label">Discount %</string>
+    <string name="confirm_sale">Confirm Sale ✓</string>
+
+    <!-- Inventory -->
+    <string name="app_title_inventory">📡 MIRA RFID Inventory</string>
+    <string name="branch_label">📍 Branch</string>
+    <string name="metric_total_scans">Scans</string>
+    <string name="metric_unique_tags">Unique</string>
+    <string name="metric_scan_rate">Rate</string>
+    <string name="metric_time">Time</string>
+    <string name="current_tag_header">CURRENT TAG</string>
+    <string name="awaiting_scan">Awaiting scan...</string>
+    <string name="btn_start_inventory">▶ Start</string>
+    <string name="btn_stop_inventory">⏹ Stop</string>
+    <string name="btn_clear_inventory">🗑️ Clear</string>
+    <string name="btn_export_inventory">📤 Export</string>
+    <string name="inventory_alert_sold">🚨 Alert: Sold item found on shelf!</string>
+    <string name="inventory_branch_default">Main Branch - Sanaa</string>
+    <string name="inventory_reader_connected">Connected (C72)</string>
+    <string name="inventory_zone_label">Inventory Zone:</string>
+    <string name="inventory_total_scanned">Total Scanned</string>
+    <string name="inventory_unique_tags">Unique Tags</string>
+    <string name="inventory_scan_rate">Scan Rate</string>
+    <string name="inventory_elapsed">Elapsed</string>
+    <string name="inventory_expected">Expected</string>
+    <string name="inventory_found">Found</string>
+    <string name="inventory_missing">Missing</string>
+    <string name="inventory_unexpected">Extra</string>
+    <string name="inventory_ready">Ready to start</string>
+    <string name="inventory_last_tag">Last Scanned Item:</string>
+    <string name="inventory_start">▶ Start</string>
+    <string name="inventory_pause">⏸ Pause</string>
+    <string name="inventory_stop">⏹ Stop</string>
+    <string name="inventory_clear">🗑 Clear</string>
+    <string name="inventory_finalize">✅ Save &amp; Approve Cloud Audit</string>
+    <string name="inventory_export_csv">📊 Export CSV</string>
+    <string name="inventory_print">🖨️ Print</string>
+    <string name="inventory_share">📤 Share</string>
+    <string name="inventory_filter_all">All</string>
+    <string name="inventory_filter_found">Found</string>
+    <string name="inventory_filter_missing">Missing</string>
+    <string name="inventory_filter_unexpected">Warnings / Extra</string>
+    <string name="inventory_connection_type">Connection:</string>
+    <string name="inventory_disconnect">Disconnect</string>
+    <string name="simulation_mode_available">Simulation / Camera Available</string>
+    <string name="total">Total</string>
+    <string name="unique">Unique</string>
+    <string name="speed">Speed</string>
+    <string name="time">Time</string>
+    <string name="ready_to_scan">Ready to Scan</string>
+    <string name="start_inventory">Start Inventory</string>
+    <string name="camera_manual">Camera/Manual</string>
+    <string name="simulate_scan">Simulate Scan</string>
+    <string name="instructions">Instructions</string>
+    <string name="print_inventory">Print Inventory</string>
+    <string name="print_missing">Print Missing</string>
+    <string name="screenshot">Screenshot</string>
+    <string name="total_sales">Total Sales</string>
+    <string name="invoices_count">Invoices Count</string>
+    <string name="hardware_connected">Hardware Connected</string>
+    <string name="loading">Loading...</string>
+
+    <!-- MIRA Bridge - About & Branding -->
+    <string name="about_title">About MIRA Bridge</string>
+    <string name="about_version">Version 1.3.0</string>
+    <string name="about_description">MIRA Bridge™ is the official application for the MIRA ID Jewelry Management and Smart Security Gate System.\n\nSupports:\n• UHF RFID Scanning\n• QR/GS1 DataMatrix Camera\n• Radar Positioning\n• MIRA Secure Gate™\n• Integration with MIRA ID Cloud</string>
+    <string name="about_developer">MIRA Technology © 2026</string>
+    <string name="about_website">https://ams.ibreg.org</string>
+
+    <!-- Gate Settings -->
+    <string name="gate_settings_title">🏢 Security Gates Management</string>
+    <string name="add_gate">➕ Add New Gate</string>
+    <string name="sound_settings">🔊 Sound Settings</string>
+    <string name="sound_pass">✅ Pass Sound:</string>
+    <string name="sound_deny">❌ Deny Sound:</string>
+    <string name="sound_alarm">🚨 Alarm Sound:</string>
+    <string name="test_sound">🔊 Test Sound</string>
+    <string name="save_sounds">💾 Save Sounds</string>
+    <string name="additional_settings">⚙️ Additional Settings</string>
+    <string name="vibration_enabled">📳 Vibration on Alarm:</string>
+    <string name="flash_enabled">💡 Screen Flash:</string>
+    <string name="alarm_duration_label">⏱ Alarm Duration (seconds):</string>
+    <string name="rfid_power_label">📡 RFID Power (dBm):</string>
+    <string name="save_all">💾 Save All Settings</string>
+
+    <!-- Sound Names -->
+    <string name="sound_beep_success">🔔 Short Success</string>
+    <string name="sound_beep_soft">🔔 Soft Beep</string>
+    <string name="sound_beep_double">🔔 Double Beep</string>
+    <string name="sound_chime_elegant">🎵 Elegant Chime</string>
+    <string name="sound_silent">🔇 Silent</string>
+    <string name="sound_beep_warning">⚠️ Warning</string>
+    <string name="sound_beep_error">❌ Error</string>
+    <string name="sound_alarm_soft">🚨 Soft Alarm</string>
+    <string name="sound_buzz_double">📳 Double Buzz</string>
+    <string name="sound_alarm_sold_item">🚨 Sold Item Alarm</string>
+    <string name="sound_alarm_breach_security">🚨 Security Breach</string>
+    <string name="sound_alarm_siren_strong">🚨 Strong Siren</string>
+    <string name="sound_alarm_police">🚨 Police Siren</string>
+    <string name="sound_alarm_buzzer_loud">🚨 Loud Buzzer</string>
+    <string name="sound_alarm_klaxon">🚨 Klaxon</string>
 
     <!-- General Actions -->
     <string name="action_back">Back</string>
@@ -241,9 +375,6 @@
     <string name="hello_world">Hello World!</string>
     <string name="title_ping_packet_size">Packet Size</string>
     <string name="ping_title">Ping Tool %s</string>
-    <string name="sales_title">Sales History</string>
-    <string name="sales_search_hint">Search by transaction ID or customer...</string>
-    <string name="sales_empty">No sales yet</string>
 
     <!-- Barcode 1D / 2D -->
     <string name="yid_title">1D Barcode Tool</string>
@@ -275,6 +406,7 @@
     <string name="title_activity_bluetooth_print">Bluetooth Printer</string>
     <string name="send">Send</string>
     <string name="Print">Print</string>
+    <string name="Clear">Clear</string>
     <string name="not_connected">Please connect a Bluetooth printer</string>
     <string name="bt_not_enabled_leaving">Please select a device!!</string>
     <string name="title_connecting">Connecting…</string>
@@ -1536,116 +1668,5 @@
     <string name="msg_max_select_tag_8">Maximum 8 tags can be selected for filtering</string>
     <string name="title_stop_read_card">Please stop reading tags!</string>
     <string name="tv_fast_inventory">Fast Inventory</string>
-    <string name="total_sales">Total Sales</string>
-    <string name="invoices_count">Invoices Count</string>
 
-    <string name="app_title_inventory">📡 MIRA RFID Inventory</string>
-    <string name="branch_label">📍 Branch</string>
-    <string name="metric_total_scans">Scans</string>
-    <string name="metric_unique_tags">Unique</string>
-    <string name="metric_scan_rate">Rate</string>
-    <string name="metric_time">Time</string>
-    <string name="current_tag_header">CURRENT TAG</string>
-    <string name="awaiting_scan">Awaiting scan...</string>
-    <string name="btn_start_inventory">▶ Start</string>
-    <string name="btn_stop_inventory">⏹ Stop</string>
-    <string name="btn_clear_inventory">🗑️ Clear</string>
-    <string name="btn_export_inventory">📤 Export</string>
-
-    <!-- POS -->
-    <string name="pos_title">🛒 MIRA POS System</string>
-    <string name="pos_scale_searching">⚖️ Scale: Searching...</string>
-    <string name="pos_scan_gs1">📷 Scan GS1</string>
-    <string name="pos_scan_rfid">📡 Scan RFID</string>
-    <string name="pos_ready_scan">Ready to scan items...</string>
-    <string name="pos_manual_hint">Enter EPC or barcode manually...</string>
-    <string name="pos_add">Add</string>
-    <string name="pos_item_count">Item Count</string>
-    <string name="pos_total_amount">Total Amount</string>
-    <string name="pos_default_amount">0 YER</string>
-    <string name="pos_clear">Clear</string>
-    <string name="pos_checkout">Checkout &amp; Update Stock</string>
-
-    <!-- Inventory Fragment -->
-    <string name="inventory_alert_sold">🚨 Alert: Sold item found on shelf!</string>
-    <string name="inventory_branch_default">Main Branch - Sanaa</string>
-    <string name="inventory_reader_connected">Connected (C72)</string>
-    <string name="inventory_zone_label">Inventory Zone:</string>
-    <string name="inventory_total_scanned">Total Scanned</string>
-    <string name="inventory_unique_tags">Unique Tags</string>
-    <string name="inventory_scan_rate">Scan Rate</string>
-    <string name="inventory_elapsed">Elapsed</string>
-    <string name="inventory_expected">Expected</string>
-    <string name="inventory_found">Found</string>
-    <string name="inventory_missing">Missing</string>
-    <string name="inventory_unexpected">Extra</string>
-    <string name="inventory_ready">Ready to start</string>
-    <string name="inventory_last_tag">Last Scanned Item:</string>
-    <string name="inventory_start">▶ Start</string>
-    <string name="inventory_pause">⏸ Pause</string>
-    <string name="inventory_stop">⏹ Stop</string>
-    <string name="inventory_clear">🗑 Clear</string>
-    <string name="inventory_finalize">✅ Save &amp; Approve Cloud Audit</string>
-    <string name="inventory_export_csv">📊 Export CSV</string>
-    <string name="inventory_print">🖨️ Print</string>
-    <string name="inventory_share">📤 Share</string>
-    <string name="inventory_filter_all">All</string>
-    <string name="inventory_filter_found">Found</string>
-    <string name="inventory_filter_missing">Missing</string>
-    <string name="inventory_filter_unexpected">Warnings / Extra</string>
-    <string name="inventory_connection_type">Connection:</string>
-    <string name="inventory_disconnect">Disconnect</string>
-    <string name="simulation_mode_available">Simulation / Camera Available</string>
-    <string name="total">Total</string>
-    <string name="unique">Unique</string>
-    <string name="speed">Speed</string>
-    <string name="time">Time</string>
-    <string name="ready_to_scan">Ready to Scan</string>
-    <string name="start_inventory">Start Inventory</string>
-    <string name="camera_manual">Camera/Manual</string>
-    <string name="simulate_scan">Simulate Scan</string>
-    <string name="instructions">Instructions</string>
-    <string name="print_inventory">Print Inventory</string>
-    <string name="print_missing">Print Missing</string>
-    <string name="screenshot">Screenshot</string>
-
-    <!-- MIRA Bridge - About & Branding -->
-    <string name="about_title">About MIRA Bridge</string>
-    <string name="about_version">Version 1.3.0</string>
-    <string name="about_description">MIRA Bridge™ is the official application for the MIRA ID Jewelry Management and Smart Security Gate System.\n\nSupports:\n• UHF RFID Scanning\n• QR/GS1 DataMatrix Camera\n• Radar Positioning\n• MIRA Secure Gate™\n• Integration with MIRA ID Cloud</string>
-    <string name="about_developer">MIRA Technology © 2026</string>
-    <string name="about_website">https://ams.ibreg.org</string>
-
-    <!-- Gate Settings -->
-    <string name="gate_settings_title">🏢 Security Gates Management</string>
-    <string name="add_gate">➕ Add New Gate</string>
-    <string name="sound_settings">🔊 Sound Settings</string>
-    <string name="sound_pass">✅ Pass Sound:</string>
-    <string name="sound_deny">❌ Deny Sound:</string>
-    <string name="sound_alarm">🚨 Alarm Sound:</string>
-    <string name="test_sound">🔊 Test Sound</string>
-    <string name="save_sounds">💾 Save Sounds</string>
-    <string name="additional_settings">⚙️ Additional Settings</string>
-    <string name="vibration_enabled">📳 Vibration on Alarm:</string>
-    <string name="flash_enabled">💡 Screen Flash:</string>
-    <string name="alarm_duration_label">⏱ Alarm Duration (seconds):</string>
-    <string name="rfid_power_label">📡 RFID Power (dBm):</string>
-    <string name="save_all">💾 Save All Settings</string>
-
-    <!-- Sound Names -->
-    <string name="sound_beep_success">🔔 Short Success</string>
-    <string name="sound_beep_soft">🔔 Soft Beep</string>
-    <string name="sound_beep_double">🔔 Double Beep</string>
-    <string name="sound_chime_elegant">🎵 Elegant Chime</string>
-    <string name="sound_silent">🔇 Silent</string>
-    <string name="sound_beep_warning">⚠️ Warning</string>
-    <string name="sound_beep_error">❌ Error</string>
-    <string name="sound_alarm_soft">🚨 Soft Alarm</string>
-    <string name="sound_buzz_double">📳 Double Buzz</string>
-    <string name="sound_alarm_sold_item">🚨 Sold Item Alarm</string>
-    <string name="sound_alarm_breach_security">🚨 Security Breach</string>
-    <string name="sound_alarm_siren_strong">🚨 Strong Siren</string>
-    <string name="sound_alarm_police">🚨 Police Siren</string>
-    <string name="sound_alarm_buzzer_loud">🚨 Loud Buzzer</string>
-    <string name="sound_alarm_klaxon">🚨 Klaxon</string>
 </resources>
