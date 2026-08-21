@@ -68,13 +68,15 @@ public class MiraServerConfig {
     /**
      * ✅ حفظ بيانات الجلسة بعد تسجيل الدخول
      */
+    
     public void saveSession(String apiKey, String gateId, String authToken) {
-        prefs.edit()
-            .putString(KEY_API_KEY, apiKey)
-            .putString(KEY_GATE_ID, gateId)
-            .putString(KEY_AUTH_TOKEN, authToken)
-            .apply();
-    }
+    SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+    prefs.edit()
+        .putString("api_key", apiKey)
+        .putString("gate_id", gateId)
+        .putString("auth_token", authToken)
+        .apply();
+}
 
     /**
      * ✅ الحصول على التوكن المحفوظ
