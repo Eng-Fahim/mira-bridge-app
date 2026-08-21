@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"
-    app:cardBackgroundColor="#1E293B"
-    app:cardCornerRadius="8dp"
-    app:cardElevation="0dp">
+    app:cardBackgroundColor="?attr/colorSurface"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp"
+    app:strokeColor="?attr/colorOutline"
+    app:strokeWidth="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -23,45 +26,49 @@
 
             <TextView
                 android:id="@+id/tvRowItemTitle"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="خاتم ذهب 21K"
-                android:textColor="#FFFFFF"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="14sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                tools:text="خاتم ذهب 21K" />
 
             <TextView
                 android:id="@+id/tvRowItemEpc"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="EPC: 070045537109"
-                android:textColor="#64748B"
-                android:textSize="10sp" />
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp"
+                tools:text="EPC: 070045537109" />
 
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <TextView
                     android:id="@+id/tvRowItemKaratWeight"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="21K | 5.20g"
-                    android:textColor="#94A3B8"
-                    android:textSize="11sp" />
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    tools:text="21K | 5.20g" />
 
                 <TextView
                     android:id="@+id/tvRowItemStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="متاحة"
-                    android:textColor="#4ADE80"
+                    android:layout_marginStart="10dp"
+                    android:textColor="?attr/colorPrimary"
                     android:textSize="11sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    tools:text="✅ متاحة" />
             </LinearLayout>
         </LinearLayout>
 
@@ -70,20 +77,25 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="12dp"
-            android:text="$350.00"
-            android:textColor="#FACE15"
-            android:textSize="15sp"
-            android:textStyle="bold" />
+            android:textColor="?attr/colorPrimary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            tools:text="$350.00" />
 
-        <TextView
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnRowRemove"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:background="@drawable/bg_dark_input"
-            android:gravity="center"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:insetLeft="0dp"
+            android:insetTop="0dp"
+            android:insetRight="0dp"
+            android:insetBottom="0dp"
+            android:padding="0dp"
             android:text="✕"
-            android:textColor="#EF4444"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:textColor="?attr/colorError"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            app:cornerRadius="18dp" />
     </LinearLayout>
-</androidx.cardview.widget.CardView>
+</com.google.android.material.card.MaterialCardView>
