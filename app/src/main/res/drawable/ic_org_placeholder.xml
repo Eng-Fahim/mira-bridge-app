@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="80dp"
+    android:height="80dp"
+    android:viewportWidth="80"
+    android:viewportHeight="80">
+
+    <!-- خلفية دائرية -->
+    <path
+        android:fillColor="?attr/colorPrimary"
+        android:pathData="M40,40m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0" />
+
+    <!-- أيقونة مبنى/منظمة -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,20 L55,28 L55,45 L50,45 L50,40 L45,40 L45,45 L35,45 L35,40 L30,40 L30,45 L25,45 L25,28 Z" />
+
+    <!-- نوافذ -->
+    <path
+        android:fillColor="?attr/colorPrimary"
+        android:pathData="M28,30 L32,30 L32,34 L28,34 Z" />
+    <path
+        android:fillColor="?attr/colorPrimary"
+        android:pathData="M37,30 L41,30 L41,34 L37,34 Z" />
+    <path
+        android:fillColor="?attr/colorPrimary"
+        android:pathData="M46,30 L50,30 L50,34 L46,34 Z" />
+</vector>
