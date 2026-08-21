@@ -30,6 +30,20 @@ public class ArabicNumberToWords {
     private static final String[] MILLIONS = {
         "", "مليون", "مليونان", "ملايين", "ملايين", "ملايين", "ملايين", "ملايين", "ملايين", "ملايين"
     };
+    
+    /**
+     * ✅ الحصول على اسم العملة بالعربية
+     */
+    public static String getCurrencyArabicName(String currency) {
+        switch (currency.toUpperCase()) {
+            case "USD": return "دولار أمريكي";
+            case "YER": return "ريال يمني";
+            case "EGP": return "جنيه مصري";
+            case "SAR": return "ريال سعودي";
+            case "AED": return "درهم إماراتي";
+            default: return currency;
+        }
+    }
 
     /**
      * ✅ تحويل رقم إلى كلمات عربية
