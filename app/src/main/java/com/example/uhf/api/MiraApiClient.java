@@ -293,19 +293,19 @@ public ApiResponse activateProvider(int providerId) {
     }
 
     // ===================== 🏢 ORGANIZATION =====================
-
-    public ApiResponse saveOrgProfile(JSONObject payload) {
-        return postWithAuth("/org-profile/save", payload);
-    }
-
-    // في MiraApiClient.java - عدّل الدوال التالية:
+// ===================== PROFILE =====================
 
 public ApiResponse getOrgProfile() {
-    return get("/profile/get"); 
+    return get("/profile/get");
 }
 
 public ApiResponse saveOrgProfile(JSONObject payload) {
     return post("/profile/update", payload);
+}
+
+// ✅ أضف هذه الدالة
+public ApiResponse updateUserProfile(JSONObject payload) {
+    return post("/profile/update-user", payload);
 }
 
     // ===================== 👥 USERS =====================
@@ -1116,4 +1116,4 @@ public void submitInventoryAuditReport(JSONObject payload) {
             return null;
         }
     }
-            }
+    }
