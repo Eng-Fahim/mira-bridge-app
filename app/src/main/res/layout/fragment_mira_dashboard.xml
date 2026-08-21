@@ -73,8 +73,7 @@
                         android:layout_alignParentStart="true"
                         android:layout_centerVertical="true"
                         android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:layoutDirection="ltr">
+                        android:orientation="horizontal">
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -82,8 +81,7 @@
                             android:text="MIRA"
                             android:textColor="?attr/colorPrimary"
                             android:textSize="18sp"
-                            android:textStyle="bold"
-                            android:layoutDirection="ltr" />
+                            android:textStyle="bold" />
 
                         <Space
                             android:layout_width="4dp"
@@ -95,8 +93,7 @@
                             android:text="JEWELRY ID™"
                             android:textColor="?attr/colorSecondary"
                             android:textSize="12sp"
-                            android:textStyle="bold"
-                            android:layoutDirection="ltr" />
+                            android:textStyle="bold" />
                     </LinearLayout>
 
                     <TextView
@@ -108,13 +105,13 @@
                         android:background="?attr/colorSurfaceVariant"
                         android:paddingHorizontal="10dp"
                         android:paddingVertical="4dp"
-                        android:text="@string/online"
                         android:textColor="?attr/colorPrimary"
                         android:textSize="10sp"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        tools:text="🟢 متصل" />
                 </RelativeLayout>
 
-                <!-- ==================== 2. USER GREETING ==================== -->
+                <!-- ==================== 2. DYNAMIC USER GREETING (FIXED OVERLAP) ==================== -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -125,64 +122,68 @@
                     app:strokeColor="?attr/colorOutlineVariant"
                     app:strokeWidth="1dp">
 
-                    <RelativeLayout
+                    <androidx.constraintlayout.widget.ConstraintLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:padding="14dp">
 
-                        <LinearLayout
+                        <!-- Greeting (Dynamic) -->
+                        <TextView
+                            android:id="@+id/tvGreeting"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="12dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            app:layout_constraintEnd_toStartOf="@id/tcLiveTime"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toTopOf="parent"
+                            tools:text="البوعاني للمجوهرات - مرحباً، سلمان" />
+
+                        <!-- Location / Branch (Dynamic) -->
+                        <TextView
+                            android:id="@+id/tvLocation"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="11sp"
+                            app:layout_constraintEnd_toEndOf="@id/tvGreeting"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toBottomOf="@id/tvGreeting"
+                            tools:text="📍 فرع حده" />
+
+                        <!-- Live Clock -->
+                        <TextClock
+                            android:id="@+id/tcLiveTime"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_alignParentStart="true"
-                            android:gravity="start"
-                            android:orientation="vertical">
+                            android:format12Hour="hh:mm:ss a"
+                            android:format24Hour="HH:mm:ss"
+                            android:textColor="?attr/colorSecondary"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            app:layout_constraintEnd_toEndOf="parent"
+                            app:layout_constraintTop_toTopOf="parent" />
 
-                            <TextView
-                                android:id="@+id/tvGreeting"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/greeting_default"
-                                android:textColor="?attr/colorOnSurface"
-                                android:textSize="16sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/tvLocation"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:text="@string/location_default"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="11sp" />
-                        </LinearLayout>
-
-                        <LinearLayout
+                        <!-- Dynamic Date -->
+                        <TextView
+                            android:id="@+id/tvDate"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_alignParentEnd="true"
-                            android:gravity="end"
-                            android:orientation="vertical">
+                            android:layout_marginTop="4dp"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="10sp"
+                            app:layout_constraintEnd_toEndOf="parent"
+                            app:layout_constraintTop_toBottomOf="@id/tcLiveTime"
+                            tools:text="الجمعة، 21 أغسطس 2026" />
 
-                            <TextClock
-                                android:id="@+id/tcLiveTime"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:format12Hour="hh:mm:ss a"
-                                android:format24Hour="HH:mm:ss"
-                                android:textColor="?attr/colorSecondary"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/tvDate"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:text="--"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="10sp" />
-                        </LinearLayout>
-                    </RelativeLayout>
+                    </androidx.constraintlayout.widget.ConstraintLayout>
                 </com.google.android.material.card.MaterialCardView>
 
                 <!-- ==================== 3. INVENTORY METRICS ==================== -->
@@ -193,7 +194,6 @@
                     android:orientation="horizontal"
                     android:weightSum="3">
 
-                    <!-- Total Items -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="80dp"
@@ -224,14 +224,13 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="4dp"
-                                android:text="0"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="18sp"
-                                android:textStyle="bold" />
+                                android:textStyle="bold"
+                                tools:text="2" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- Total Weight -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="80dp"
@@ -262,14 +261,13 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="4dp"
-                                android:text="0.0 g"
                                 android:textColor="?attr/colorSecondary"
                                 android:textSize="18sp"
-                                android:textStyle="bold" />
+                                android:textStyle="bold"
+                                tools:text="32.3 g" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
-                    <!-- Sold Today -->
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="80dp"
@@ -300,10 +298,10 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="4dp"
-                                android:text="0"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="18sp"
-                                android:textStyle="bold" />
+                                android:textStyle="bold"
+                                tools:text="0" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
@@ -326,7 +324,6 @@
                         android:orientation="vertical"
                         android:padding="14dp">
 
-                        <!-- Header with Refresh Button -->
                         <RelativeLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -354,7 +351,6 @@
                                 app:tint="?attr/colorPrimary" />
                         </RelativeLayout>
 
-                        <!-- Trend -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -374,13 +370,12 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="4dp"
-                                android:text="—"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="10sp"
-                                android:textStyle="bold" />
+                                android:textStyle="bold"
+                                tools:text="-0.00%" />
                         </LinearLayout>
 
-                        <!-- Ounce Price -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -401,13 +396,12 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="💰 $—"
                                 android:textColor="?attr/colorPrimary"
                                 android:textSize="20sp"
-                                android:textStyle="bold" />
+                                android:textStyle="bold"
+                                tools:text="💰 $4,623.83" />
                         </LinearLayout>
 
-                        <!-- Karats -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -421,10 +415,10 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:gravity="center"
-                                android:text="18K | —"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="12sp"
-                                android:textStyle="bold" />
+                                android:textStyle="bold"
+                                tools:text="18K: $111.49/g" />
 
                             <TextView
                                 android:id="@+id/tvGoldPrice21"
@@ -432,10 +426,10 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:gravity="center"
-                                android:text="21K | —"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="12sp"
-                                android:textStyle="bold" />
+                                android:textStyle="bold"
+                                tools:text="21K: $130.08/g" />
 
                             <TextView
                                 android:id="@+id/tvGoldPrice24"
@@ -443,13 +437,12 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:gravity="center"
-                                android:text="24K | —"
                                 android:textColor="?attr/colorPrimary"
                                 android:textSize="12sp"
-                                android:textStyle="bold" />
+                                android:textStyle="bold"
+                                tools:text="24K: $148.66/g" />
                         </LinearLayout>
 
-                        <!-- Footer -->
                         <RelativeLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -460,23 +453,23 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_alignParentStart="true"
-                                android:text="📡 —"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="9sp" />
+                                android:textSize="9sp"
+                                tools:text="📡 GoldAPI" />
 
                             <TextView
                                 android:id="@+id/tvLastUpdate"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_alignParentEnd="true"
-                                android:text="⏰ —"
                                 android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="9sp" />
+                                android:textSize="9sp"
+                                tools:text="⏰ آخر تحديث: 21:54:26" />
                         </RelativeLayout>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- ==================== 5. QUICK ACCESS ==================== -->
+                <!-- ==================== 5. QUICK ACCESS RECYCLERVIEW ==================== -->
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -486,12 +479,14 @@
                     android:textSize="12sp"
                     android:textStyle="bold" />
 
-                <LinearLayout
-                    android:id="@+id/containerQuickActions"
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvQuickActions"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="12dp"
-                    android:orientation="vertical" />
+                    android:nestedScrollingEnabled="false"
+                    app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
+                    app:spanCount="3" />
 
                 <!-- ==================== 6. SALES SUMMARY ==================== -->
                 <com.google.android.material.card.MaterialCardView
@@ -530,10 +525,10 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="3dp"
-                                android:text="--"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="12sp"
-                                android:textStyle="bold" />
+                                android:textStyle="bold"
+                                tools:text="0" />
                         </LinearLayout>
 
                         <View
@@ -560,10 +555,10 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="3dp"
-                                android:text="--"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="12sp"
-                                android:textStyle="bold" />
+                                android:textStyle="bold"
+                                tools:text="0" />
                         </LinearLayout>
 
                         <View
@@ -590,10 +585,10 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="3dp"
-                                android:text="--"
                                 android:textColor="?attr/colorOnSurface"
                                 android:textSize="12sp"
-                                android:textStyle="bold" />
+                                android:textStyle="bold"
+                                tools:text="0" />
                         </LinearLayout>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
