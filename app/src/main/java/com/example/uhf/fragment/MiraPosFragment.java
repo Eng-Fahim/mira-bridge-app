@@ -711,6 +711,10 @@ public void onDestroy() {
             String username = sessionManager.getUsername();
             int branchId = getActiveBranchId();
 
+            // ✅ الحصول على العملة المحلية وسعر الصرف
+            String localCurrency = priceManager.getDefaultCurrency();
+            double exchangeRate = priceManager.getExchangeRate(localCurrency);
+
             JSONObject payload = new JSONObject();
             payload.put("action", "COMPLETE_POS_SALE");
             payload.put("gate_id", client.getGateId());
@@ -735,20 +739,36 @@ public void onDestroy() {
                 obj.put("title", item.name);
                 obj.put("karat", item.karat);
                 obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
-                obj.put("sale_price", item.price);
+                
+                // ✅ السعر بالدولار (الأساسي) والمحلي
+                obj.put("sale_price_usd", item.price);
+                obj.put("sale_price", priceManager.convertFromUSD(item.price, localCurrency));
                 obj.put("item_id", item.itemId > 0 ? item.itemId : 0);
                 itemsArr.put(obj);
             }
             payload.put("items", itemsArr);
 
+            // ✅ حساب المبالغ بالعملتين
+            double subtotalUSD = data.originalTotal;
+            double discountAmountUSD = data.discountAmount;
+            double finalAmountUSD = data.finalAmount;
+            
+            double subtotalLocal = priceManager.convertFromUSD(subtotalUSD, localCurrency);
+            double discountAmountLocal = priceManager.convertFromUSD(discountAmountUSD, localCurrency);
+            double finalAmountLocal = priceManager.convertFromUSD(finalAmountUSD, localCurrency);
+
             JSONObject payment = new JSONObject();
-            // ✅ استخدام القيم الصحيحة من data
-            payment.put("subtotal", data.originalTotal);        // المجموع قبل الخصم
-            payment.put("discount_percent", data.discount);     // نسبة الخصم
-            payment.put("discount_amount", data.discountAmount); // قيمة الخصم
-            payment.put("final_amount", data.finalAmount);      // المبلغ النهائي
-            payment.put("account_code", data.accountCode);      // ✅ استخدام كود الحساب من الديالوج
-            payment.put("currency", "YER");
+            payment.put("subtotal_usd", subtotalUSD);
+            payment.put("subtotal", subtotalLocal);
+            payment.put("discount_percent", data.discount);
+            payment.put("discount_amount_usd", discountAmountUSD);
+            payment.put("discount_amount", discountAmountLocal);
+            payment.put("final_amount_usd", finalAmountUSD);
+            payment.put("final_amount", finalAmountLocal);
+            payment.put("account_code", data.accountCode);
+            payment.put("currency", localCurrency);
+            payment.put("base_currency", "USD");
+            payment.put("exchange_rate", exchangeRate);
             payload.put("payment", payment);
 
             MiraApiClient.ApiResponse response = client.checkout(payload);
@@ -760,11 +780,11 @@ public void onDestroy() {
                 if (response != null && response.isSuccess) {
                     playAlertSound(1);
                     int soldCount = cartList.size();
-                    double finalAmount = data.finalAmount;
+                    double finalAmount = finalAmountLocal;
                     String paymentMethod = data.paymentMethod;
                     clearCart();
                     autoGenerateAccountingEntry(response.data);
-                    showSuccessDialog(finalAmount, soldCount, paymentMethod);
+                    showSuccessDialog(finalAmountUSD, soldCount, paymentMethod);
                     if (response.data != null) {
                         String json = response.data.toString();
                         if (getActivity() instanceof UHFMainActivity)
@@ -800,6 +820,7 @@ public void onDestroy() {
     }).start();
 }
 
+
     private void autoGenerateAccountingEntry(JSONObject saleData) {
         if (saleData == null) return;
         executor.execute(() -> {
@@ -824,6 +845,11 @@ public void onDestroy() {
         SharedPreferences p = getContext().getSharedPreferences(PENDING_SALES_PREFS, Context.MODE_PRIVATE);
         JSONArray arr = new JSONArray(p.getString("pending", "[]"));
         JSONObject sale = new JSONObject();
+        
+        // ✅ حفظ العملة وسعر الصرف
+        String localCurrency = priceManager.getDefaultCurrency();
+        double exchangeRate = priceManager.getExchangeRate(localCurrency);
+        
         sale.put("id", System.currentTimeMillis());
         sale.put("customer_name", data.customerName);
         sale.put("customer_phone", data.customerPhone);
@@ -832,10 +858,16 @@ public void onDestroy() {
         sale.put("customer_notes", data.customerNotes);
         sale.put("payment_method", data.paymentMethod);
         sale.put("account_code", data.accountCode);
-        sale.put("original_total", data.originalTotal);
+        sale.put("currency", localCurrency);
+        sale.put("base_currency", "USD");
+        sale.put("exchange_rate", exchangeRate);
+        sale.put("original_total_usd", data.originalTotal);
+        sale.put("original_total", priceManager.convertFromUSD(data.originalTotal, localCurrency));
         sale.put("discount", data.discount);
-        sale.put("discount_amount", data.discountAmount);
-        sale.put("final_amount", data.finalAmount);
+        sale.put("discount_amount_usd", data.discountAmount);
+        sale.put("discount_amount", priceManager.convertFromUSD(data.discountAmount, localCurrency));
+        sale.put("final_amount_usd", data.finalAmount);
+        sale.put("final_amount", priceManager.convertFromUSD(data.finalAmount, localCurrency));
         sale.put("item_count", cartList.size());
         sale.put("branch_id", getActiveBranchId());
         sale.put("created_at", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()));
@@ -848,7 +880,8 @@ public void onDestroy() {
             obj.put("title", item.name);
             obj.put("karat", item.karat);
             obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
-            obj.put("price", item.price);
+            obj.put("price_usd", item.price);
+            obj.put("price", priceManager.convertFromUSD(item.price, localCurrency));
             if (item.itemId > 0) obj.put("item_id", item.itemId);
             itemsArr.put(obj);
         }
@@ -908,11 +941,17 @@ public void onDestroy() {
                     payload.put("items", sale.optJSONArray("items"));
                     
                     JSONObject payment = new JSONObject();
+                    payment.put("subtotal_usd", sale.optDouble("original_total_usd", 0));
                     payment.put("subtotal", sale.optDouble("original_total", 0));
                     payment.put("discount_percent", sale.optDouble("discount", 0));
+                    payment.put("discount_amount_usd", sale.optDouble("discount_amount_usd", 0));
                     payment.put("discount_amount", sale.optDouble("discount_amount", 0));
+                    payment.put("final_amount_usd", sale.optDouble("final_amount_usd", 0));
                     payment.put("final_amount", sale.optDouble("final_amount", 0));
                     payment.put("account_code", sale.optString("account_code", "110101"));
+                    payment.put("currency", sale.optString("currency", "USD"));
+                    payment.put("base_currency", "USD");
+                    payment.put("exchange_rate", sale.optDouble("exchange_rate", 1.0));
                     payload.put("payment", payment);
                     
                     MiraApiClient.ApiResponse response = client.checkout(payload);
@@ -938,7 +977,6 @@ public void onDestroy() {
         }
     }).start();
 }
-
     private AlertDialog showProfessionalLoadingDialog() {
         Context ctx = getContext();
         if (ctx == null || !isAdded()) return null;
