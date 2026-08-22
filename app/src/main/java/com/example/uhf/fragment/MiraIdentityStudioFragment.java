@@ -39,6 +39,7 @@ import com.example.uhf.databinding.FragmentMiraIdentityStudioBinding;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
+import com.example.uhf.manager.PermissionManager;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
@@ -64,13 +65,14 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     private static final String TAG = "MiraIdentityStudio";
     private static final String OFFLINE_PREFS = "identity_studio_cache";
     private static final long RFID_TIMEOUT_MS = 30000;
-    private static final double CARAT_TO_GRAM_FACTOR = 0.20; // 1 Carat = 0.2 Grams
+    private static final double CARAT_TO_GRAM_FACTOR = 0.20;
 
     private FragmentMiraIdentityStudioBinding binding;
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
     private MiraPriceManager priceManager;
+    private PermissionManager permissionManager;
     private SharedPreferences offlineCache;
 
     private final Map<String, String[]> typeSuggestions = new HashMap<>();
@@ -104,6 +106,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 branchesManager = MiraBranchesManager.getInstance(getContext());
                 orgProfile = MiraOrgProfileManager.getInstance(getContext());
                 priceManager = MiraPriceManager.getInstance(getContext());
+                permissionManager = PermissionManager.getInstance(getContext());
                 offlineCache = getContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
             }
             isArabic = Locale.getDefault().getLanguage().equals("ar");
@@ -113,6 +116,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             setupPhotosRecyclerView();
             applyLanguage();
             setupListeners();
+            applyPermissions();
             populateSuggestions("rings");
             updatePendingSyncBadge();
 
@@ -121,6 +125,28 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             }
         } catch (Exception e) {
             Log.e(TAG, "onViewCreated error: " + e.getMessage());
+        }
+    }
+
+    private void applyPermissions() {
+        boolean canEdit = permissionManager.canEdit("identity") || permissionManager.isManager();
+        
+        if (binding.btnSaveIdentity != null) {
+            binding.btnSaveIdentity.setEnabled(canEdit);
+            binding.btnSaveIdentity.setAlpha(canEdit ? 1.0f : 0.5f);
+        }
+        
+        if (binding.btnScanRfid != null) {
+            binding.btnScanRfid.setEnabled(canEdit);
+        }
+        
+        if (binding.btnAddPhotos != null) {
+            binding.btnAddPhotos.setEnabled(canEdit);
+        }
+        
+        // إذا لا يملك صلاحية التعديل، عرض رسالة
+        if (!canEdit) {
+            showToast(isArabic ? "⛔ وضع القراءة فقط - غير مصرح بالتعديل" : "⛔ Read only mode - Access Denied");
         }
     }
 
@@ -231,8 +257,12 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             }
 
             binding.btnScanRfid.setOnClickListener(v -> {
-                if (isRfidScanning) stopRfidScanningMode();
-                else activateRFIDModeForEncoding();
+                if (permissionManager.canEdit("identity") || permissionManager.isManager()) {
+                    if (isRfidScanning) stopRfidScanningMode();
+                    else activateRFIDModeForEncoding();
+                } else {
+                    showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+                }
             });
 
             binding.switchHasStones.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -263,8 +293,22 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 else if (id == binding.chipNecklace.getId()) populateSuggestions("necklaces");
             });
 
-            binding.btnAddPhotos.setOnClickListener(v -> showImageSourceDialog());
-            binding.btnSaveIdentity.setOnClickListener(v -> finalizeItemIdentity());
+            binding.btnAddPhotos.setOnClickListener(v -> {
+                if (permissionManager.canEdit("identity") || permissionManager.isManager()) {
+                    showImageSourceDialog();
+                } else {
+                    showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+                }
+            });
+            
+            binding.btnSaveIdentity.setOnClickListener(v -> {
+                if (permissionManager.canEdit("identity") || permissionManager.isManager()) {
+                    finalizeItemIdentity();
+                } else {
+                    showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+                }
+            });
+            
             binding.btnViewPending.setOnClickListener(v -> showPendingItemsDialog());
 
         } catch (Exception e) {
@@ -313,7 +357,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 String sValue = binding.etStoneValue.getText() != null ? binding.etStoneValue.getText().toString().trim() : "";
 
                 if (!sWeight.isEmpty()) {
-                    // نفترض إدخال الوزن بالأقراط مع تحويل حتمي إلى جرام
                     stoneWeightGrams = Double.parseDouble(sWeight) * CARAT_TO_GRAM_FACTOR;
                 }
                 if (!sValue.isEmpty()) {
@@ -321,7 +364,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 }
             }
 
-            // صمام أمان حاسوبي للأوزان الصافية
             double netGoldWeight = Math.max(0.0, grossWeight - stoneWeightGrams);
 
             int karat = getSelectedKaratNumber();
@@ -362,6 +404,11 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     private void finalizeItemIdentity() {
+        if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
+            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            return;
+        }
+        
         try {
             if (binding == null) return;
 
@@ -598,6 +645,10 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     private void showImageSourceDialog() {
         if (getContext() == null) return;
+        if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
+            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            return;
+        }
 
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle(isArabic ? "إضافة صورة" : "Add Photo");
@@ -724,6 +775,11 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     private void activateRFIDModeForEncoding() {
+        if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
+            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            return;
+        }
+        
         try {
             if (getActivity() instanceof UHFMainActivity) {
                 UHFMainActivity activity = (UHFMainActivity) getActivity();
@@ -902,21 +958,23 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     private void setFormEnabled(boolean enabled) {
         try {
-            binding.btnSaveIdentity.setEnabled(enabled);
-            binding.btnAddPhotos.setEnabled(enabled);
-            binding.etEpc.setEnabled(enabled);
-            binding.etTitle.setEnabled(enabled);
-            binding.etGrossWeight.setEnabled(enabled);
-            binding.switchHasStones.setEnabled(enabled);
-            binding.etStoneType.setEnabled(enabled);
-            binding.etStoneWeight.setEnabled(enabled);
-            binding.etStoneCount.setEnabled(enabled);
-            binding.etStoneValue.setEnabled(enabled);
-            binding.chipGroupKarat.setEnabled(enabled);
-            binding.chipGroupTypes.setEnabled(enabled);
-            binding.btnScanRfid.setEnabled(enabled);
+            boolean canEdit = permissionManager.canEdit("identity") || permissionManager.isManager();
+            
+            binding.btnSaveIdentity.setEnabled(enabled && canEdit);
+            binding.btnAddPhotos.setEnabled(enabled && canEdit);
+            binding.etEpc.setEnabled(enabled && canEdit);
+            binding.etTitle.setEnabled(enabled && canEdit);
+            binding.etGrossWeight.setEnabled(enabled && canEdit);
+            binding.switchHasStones.setEnabled(enabled && canEdit);
+            binding.etStoneType.setEnabled(enabled && canEdit);
+            binding.etStoneWeight.setEnabled(enabled && canEdit);
+            binding.etStoneCount.setEnabled(enabled && canEdit);
+            binding.etStoneValue.setEnabled(enabled && canEdit);
+            binding.chipGroupKarat.setEnabled(enabled && canEdit);
+            binding.chipGroupTypes.setEnabled(enabled && canEdit);
+            binding.btnScanRfid.setEnabled(enabled && canEdit);
 
-            binding.btnSaveIdentity.setAlpha(enabled ? 1.0f : 0.5f);
+            binding.btnSaveIdentity.setAlpha((enabled && canEdit) ? 1.0f : 0.5f);
         } catch (Exception e) {
             Log.e(TAG, "setFormEnabled error: " + e.getMessage());
         }
@@ -984,7 +1042,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             String json = offlineCache.getString("pending_encodes", "[]");
             JSONArray arr = new JSONArray(json);
             
-            // منع تكرار الـ EPC محليًا
             String targetEpc = payload.optString("epc");
             for (int i = 0; i < arr.length(); i++) {
                 if (arr.getJSONObject(i).optString("epc").equals(targetEpc)) {
@@ -994,7 +1051,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             }
 
             arr.put(payload);
-            while (arr.length() > 200) arr.remove(0); // رفع السعة التخزينية المسموحة
+            while (arr.length() > 200) arr.remove(0);
             offlineCache.edit().putString("pending_encodes", arr.toString()).apply();
         } catch (Exception e) {
             Log.e(TAG, "Save encode offline error: " + e.getMessage());
@@ -1036,6 +1093,8 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     private void syncPendingEncodes() {
         if (apiClient == null || offlineCache == null) return;
+        if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) return;
+        
         final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
 
         new Thread(() -> {
@@ -1200,4 +1259,4 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             }
         }
     }
-}
+    }
