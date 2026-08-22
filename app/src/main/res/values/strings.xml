@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+<string name="quick_action_rfid_write">برمجة RFID</string>
+    <string name="quick_action_identity">استوديو التكويد</string>
+    <string name="quick_action_radar">رادار التتبع</string>
+    <string name="quick_action_gate">مراقبة البوابات</string>
+    <string name="quick_action_reports">التقارير</string>
+    <string name="quick_action_accounting">المحاسبة</string>
+    <string name="quick_action_transfers">التحويلات</string>
+    <string name="quick_action_admin_hub">الخيارات الإدارية</string>
+    <string name="quick_action_sales_history">سجل المبيعات</string>
+    <string name="quick_action_server_config">إعدادات السيرفر</string>
+    
     <!-- ✅ أضف فقط هذه إذا لم تكن موجودة -->
 <string name="menu_profile">ملفي</string>
 <string name="menu_logout">تسجيل الخروج</string>
