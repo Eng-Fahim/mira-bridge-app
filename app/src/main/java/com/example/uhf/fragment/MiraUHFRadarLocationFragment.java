@@ -6,6 +6,7 @@ import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.os.Build;
@@ -40,6 +41,8 @@ import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraSettingsManager;
 import com.example.uhf.manager.PermissionManager;
+import com.example.uhf.MiraRfid.MiraIRFIDReader;
+import com.example.uhf.MiraRfid.RFIDManager;
 import com.example.uhf.tools.UIHelper;
 import com.example.uhf.view.CircleSeekBar;
 import com.example.uhf.view.RadarView;
@@ -62,6 +65,7 @@ import java.util.concurrent.Executors;
 public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
 
     private static final String TAG = "MiraRadarLocation";
+    private static final String SETTINGS_PREFS = "mira_settings";
     private UHFMainActivity mContext;
 
     // ==================== UI Elements ====================
@@ -97,6 +101,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
     private PermissionManager permissionManager;
+    private RFIDManager rfidManager;
     private boolean simulationMode;
     private boolean isArabic;
 
@@ -130,6 +135,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         branchesManager = MiraBranchesManager.getInstance(mContext);
         orgProfile = MiraOrgProfileManager.getInstance(mContext);
         permissionManager = PermissionManager.getInstance(mContext);
+        rfidManager = RFIDManager.getInstance(mContext);
         isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         simulationMode = settingsManager.getBoolean("radar_simulation", true);
 
@@ -139,18 +145,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         setupListeners();
         restoreState();
         updateReaderStatus();
-    }
-
-    // ==================== Helper Methods ====================
-    private boolean isReaderConnected() {
-        if (mContext != null && mContext.mReader != null) {
-            try {
-                return mContext.mReader.isPowerOn();
-            } catch (Exception e) {
-                return true;
-            }
-        }
-        return false;
     }
 
     // ==================== Permissions ====================
@@ -184,7 +178,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         return permissionManager.canEdit("inventory") || permissionManager.isManager();
     }
 
-    // ==================== Views ====================
     private void initViews() {
         View v = getView();
         if (v == null) return;
@@ -223,7 +216,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         updateModeUI();
     }
 
-    // ==================== Language ====================
     private void applyLanguage() {
         if (btStart != null) btStart.setText(isArabic ? "▶ بدء التتبع" : "▶ Start Tracking");
         if (btStop != null) btStop.setText(isArabic ? "⏹ إيقاف" : "⏹ Stop");
@@ -234,7 +226,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         if (btnModeSingle != null) btnModeSingle.setText(isArabic ? "🎯 محدد" : "🎯 Target");
         if (btnModeOpen != null) btnModeOpen.setText(isArabic ? "📡 مفتوح" : "📡 Open");
         if (btnModeGate != null) btnModeGate.setText(isArabic ? "🔍 مفقودات" : "🔍 Missing");
-        if (tvEstimatedDistance != null) tvEstimatedDistance.setText(isArabic ? "المسافة: غير معروفة" : "Distance: Unknown");
+        if (tvEstimatedDistance != null) tvEstimatedDistance.setText(isArabic ? "📏 المسافة: غير معروفة" : "📏 Distance: Unknown");
         
         if (getView() != null) {
             getView().setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
@@ -248,8 +240,15 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         boolean hardwareAvailable = mContext != null && mContext.mReader != null;
         boolean readerConnected = false;
         
-        if (hardwareAvailable) {
-            readerConnected = isReaderConnected();
+        if (hardwareAvailable && rfidManager != null) {
+            try {
+                MiraIRFIDReader reader = rfidManager.getActiveReader();
+                if (reader != null) {
+                    readerConnected = reader.isConnected();
+                }
+            } catch (Exception e) {
+                readerConnected = false;
+            }
         }
         
         if (!hardwareAvailable) {
@@ -264,7 +263,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         }
     }
 
-    // ==================== Estimated Distance ====================
     private String getEstimatedDistance(int rssi) {
         if (rssi > 90) return isArabic ? "أقل من 30 سم" : "< 30 cm";
         if (rssi > 80) return isArabic ? "30-50 سم" : "30-50 cm";
@@ -325,7 +323,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         });
     }
 
-    // ==================== Missing Items ====================
     private void showMissingItemsDialog() {
         if (getContext() == null) return;
 
@@ -406,7 +403,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 .show();
     }
 
-    // ==================== Modes ====================
     private void switchMode(RadarMode mode) {
         currentMode = mode;
         if (inventoryFlag) { stopLocated(); startLocated(); }
@@ -439,7 +435,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         if (btnModeGate != null) btnModeGate.setAlpha(currentMode == RadarMode.MISSING_SEARCH ? 1f : 0.5f);
     }
 
-    // ==================== Start / Stop ====================
     @SuppressLint("LongLogTag")
     private void startLocated() {
         if (inventoryFlag) return;
@@ -457,8 +452,15 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
             boolean hardwareAvailable = mContext != null && mContext.mReader != null;
             boolean readerConnected = false;
             
-            if (hardwareAvailable) {
-                readerConnected = isReaderConnected();
+            if (hardwareAvailable && rfidManager != null) {
+                try {
+                    MiraIRFIDReader reader = rfidManager.getActiveReader();
+                    if (reader != null) {
+                        readerConnected = reader.isConnected();
+                    }
+                } catch (Exception e) {
+                    readerConnected = false;
+                }
             }
             
             if (!hardwareAvailable || !readerConnected) {
@@ -466,7 +468,10 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                     isArabic ? "⚠️ القارئ غير متصل - جاري التبديل للمحاكاة" : "⚠️ Reader disconnected - switching to simulation",
                     Toast.LENGTH_LONG).show();
                 simulationMode = true;
-                settingsManager.setBoolean("radar_simulation", true);
+                if (getContext() != null) {
+                    getContext().getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
+                        .edit().putBoolean("radar_simulation", true).apply();
+                }
             }
         }
 
@@ -566,7 +571,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         updateModeUI();
     }
 
-    // ==================== Simulation ====================
     private void startSimulatedRadar() {
         if (!TextUtils.isEmpty(targetEpc)) queryMiraItem(targetEpc, 85);
 
@@ -604,7 +608,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
             Toast.LENGTH_SHORT).show();
     }
 
-    // ==================== Geiger Feedback ====================
     private void handleGeigerAudioFeedback(int rssi) {
         long now = System.currentTimeMillis();
         long interval = Math.max(100, 1000 - (rssi * 9));
@@ -621,7 +624,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         }
     }
 
-    // ==================== Proximity UI ====================
     private void updateProximityUI(int rssi) {
         this.currentRssi = rssi;
         if (rssiBar != null) rssiBar.setProgress(rssi);
@@ -658,7 +660,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         }
     }
 
-    // ==================== MIRA API ====================
     private void queryMiraItem(String epc, int rssi) {
         if (!settingsManager.getBoolean("auto_query_mira", true)) return;
 
@@ -738,7 +739,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         }
     }
 
-    // ==================== Mark Found ====================
     private void markCurrentItemAsFound() {
         if (!canMarkFound()) {
             Toast.makeText(mContext, 
@@ -777,7 +777,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         });
     }
 
-    // ==================== Counters & Recent ====================
     private void updateCounters() {
         if (tvAuthorizedCount != null) tvAuthorizedCount.setText(String.valueOf(authorizedCount));
         if (tvDeniedCount != null) tvDeniedCount.setText(String.valueOf(deniedCount));
@@ -805,7 +804,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         radarView.setBorderColor(color);
     }
 
-    // ==================== Export ====================
     private void exportScanResults() {
         if (recentScans.isEmpty()) {
             Toast.makeText(mContext, 
@@ -827,7 +825,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
             isArabic ? "تصدير نتائج التتبع" : "Export Tracking Results"));
     }
 
-    // ==================== Lifecycle ====================
     @Override
     public void myOnKeyDwon() {
         if (inventoryFlag) stopLocated();
