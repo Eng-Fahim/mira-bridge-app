@@ -1,4 +1,5 @@
 package com.example.uhf.fragment;
+
 import com.example.uhf.api.MiraApiClient.ApiResponse;
 
 import android.animation.ObjectAnimator;
@@ -38,6 +39,7 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraSettingsManager;
+import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.UIHelper;
 import com.example.uhf.view.CircleSeekBar;
 import com.example.uhf.view.RadarView;
@@ -57,15 +59,11 @@ import java.util.Locale;
 import java.util.Random;
 import java.util.concurrent.Executors;
 
-/**
- * MIRA Proximity & Radar Location Fragment - المكتشف الذكي للقطع المفقودة
- */
 public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
 
     private static final String TAG = "MiraRadarLocation";
     private UHFMainActivity mContext;
 
-    // ==================== UI Elements ====================
     private RadarView radarView;
     private EditText etEPC;
     private Button btStart, btStop, btnExportResults, btnFetchMissing;
@@ -79,7 +77,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
     private TextView tvRecentScans, tvRadarMode;
     private Button btnModeSingle, btnModeOpen, btnModeGate;
 
-    // ==================== State & Tracking ====================
     private boolean inventoryFlag = false;
     private String targetEpc = "";
     private int progress = 5;
@@ -88,22 +85,19 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
     private final List<String> recentScans = new ArrayList<>();
     private final Random random = new Random();
 
-    // ==================== Sound & Geiger Feedback ====================
     private Vibrator vibrator;
     private long lastBeepTime = 0;
 
-    // ==================== Managers ====================
     private MiraSettingsManager settingsManager;
     private MiraBranchesManager branchesManager;
     private MiraOrgProfileManager orgProfile;
+    private PermissionManager permissionManager;
     private boolean simulationMode;
     private boolean isArabic;
 
-    // ==================== Modes ====================
     private enum RadarMode { SINGLE_TARGET, OPEN_SCAN, SECURITY_GATE, MISSING_SEARCH }
     private RadarMode currentMode = RadarMode.SINGLE_TARGET;
 
-    // ==================== Simulation ====================
     private final Handler simulationHandler = new Handler(Looper.getMainLooper());
     private Runnable simulationRunnable;
     private float simulationAngle = 0;
@@ -128,13 +122,32 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         settingsManager = MiraSettingsManager.getInstance(mContext);
         branchesManager = MiraBranchesManager.getInstance(mContext);
         orgProfile = MiraOrgProfileManager.getInstance(mContext);
+        permissionManager = PermissionManager.getInstance(mContext);
         isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         simulationMode = settingsManager.getBoolean("radar_simulation", true);
 
         initViews();
         applyLanguage();
+        applyPermissions();
         setupListeners();
         restoreState();
+    }
+
+    private void applyPermissions() {
+        boolean canUseRadar = permissionManager.canView("radar") || 
+                             permissionManager.isSecurity() || 
+                             permissionManager.isGateSecurity() || 
+                             permissionManager.isManager();
+        
+        if (btStart != null) btStart.setEnabled(canUseRadar);
+        if (btnFetchMissing != null) btnFetchMissing.setEnabled(canUseRadar);
+        if (btnMarkFound != null) btnMarkFound.setEnabled(permissionManager.canEdit("inventory") || permissionManager.isManager());
+        
+        if (!canUseRadar) {
+            if (tvRadarMode != null) {
+                tvRadarMode.setText(isArabic ? "⛔ وضع العرض فقط" : "⛔ View only mode");
+            }
+        }
     }
 
     private void initViews() {
@@ -174,22 +187,47 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
     }
 
     private void applyLanguage() {
-        if (btStart != null) btStart.setText(isArabic ? "▶ بدء التتبع Geiger" : "▶ Start Geiger Track");
+        if (btStart != null) btStart.setText(isArabic ? "▶ بدء التتبع" : "▶ Start Tracking");
         if (btStop != null) btStop.setText(isArabic ? "⏹ إيقاف" : "⏹ Stop");
-        if (etEPC != null) etEPC.setHint(isArabic ? "أدخل EPC أو اختر قطعة مفقودة" : "Enter EPC or select missing");
-        if (btnExportResults != null) btnExportResults.setText(isArabic ? "📤 تصدير" : "📤 Export");
+        if (etEPC != null) etEPC.setHint(isArabic ? "أدخل EPC أو اختر قطعة مفقودة" : "Enter EPC or select missing item");
+        if (btnExportResults != null) btnExportResults.setText(isArabic ? "📤 تصدير النتائج" : "📤 Export Results");
+        if (btnFetchMissing != null) btnFetchMissing.setText(isArabic ? "🔍 المفقودات" : "🔍 Missing");
+        if (btnMarkFound != null) btnMarkFound.setText(isArabic ? "✅ تم العثور" : "✅ Mark Found");
         if (btnModeSingle != null) btnModeSingle.setText(isArabic ? "🎯 محدد" : "🎯 Target");
-        if (btnModeOpen != null) btnModeOpen.setText(isArabic ? "📡 مسح مفتوح" : "📡 Open");
+        if (btnModeOpen != null) btnModeOpen.setText(isArabic ? "📡 مفتوح" : "📡 Open");
         if (btnModeGate != null) btnModeGate.setText(isArabic ? "🔍 مفقودات" : "🔍 Missing");
+        
+        // ✅ اتجاه RTL/LTR
+        if (getView() != null) {
+            getView().setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
+        }
     }
 
     private void setupListeners() {
-        btStart.setOnClickListener(v -> startLocated());
+        btStart.setOnClickListener(v -> {
+            if (permissionManager.canView("radar") || permissionManager.isSecurity() || 
+                permissionManager.isGateSecurity() || permissionManager.isManager()) {
+                startLocated();
+            } else {
+                Toast.makeText(mContext, 
+                    isArabic ? "⛔ غير مصرح" : "⛔ Access Denied", 
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
+        
         btStop.setOnClickListener(v -> stopLocated());
 
         if (btnExportResults != null) btnExportResults.setOnClickListener(v -> exportScanResults());
         if (btnFetchMissing != null) btnFetchMissing.setOnClickListener(v -> showMissingItemsDialog());
-        if (btnMarkFound != null) btnMarkFound.setOnClickListener(v -> markCurrentItemAsFound());
+        if (btnMarkFound != null) btnMarkFound.setOnClickListener(v -> {
+            if (permissionManager.canEdit("inventory") || permissionManager.isManager()) {
+                markCurrentItemAsFound();
+            } else {
+                Toast.makeText(mContext, 
+                    isArabic ? "⛔ غير مصرح" : "⛔ Access Denied", 
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
 
         if (btnModeSingle != null) btnModeSingle.setOnClickListener(v -> switchMode(RadarMode.SINGLE_TARGET));
         if (btnModeOpen != null) btnModeOpen.setOnClickListener(v -> switchMode(RadarMode.OPEN_SCAN));
@@ -215,13 +253,11 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         });
     }
 
-    // ==================== Missing Items Dialog ====================
-
     private void showMissingItemsDialog() {
         if (getContext() == null) return;
 
         AlertDialog loading = new AlertDialog.Builder(requireContext())
-                .setMessage(isArabic ? "جاري جلب القطع المفقودة من السيرفر..." : "Fetching missing items...")
+                .setMessage(isArabic ? "جاري جلب القطع المفقودة..." : "Fetching missing items...")
                 .setCancelable(false)
                 .show();
 
@@ -230,22 +266,21 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 MiraApiClient client = MiraApiClient.getInstance(getContext());
                 ApiResponse apiResponse = client.getReportData("audit", "", "", branchesManager.getActiveBranchId());
 
-                                // استخدام الأسماء الصحيحة للمتغيرات كما هي معرّفة في كلاس ApiResponse
                 JSONObject response = null;
                 if (apiResponse != null && apiResponse.isSuccess) {
-                    response = apiResponse.data; 
-                
- 
+                    response = apiResponse.data;
                 }
 
                 if (getActivity() != null) {
-                    JSONObject finalResponse = response; // لضمان استخدام المتغير داخل Lambda
+                    JSONObject finalResponse = response;
                     getActivity().runOnUiThread(() -> {
                         loading.dismiss();
                         if (finalResponse != null && finalResponse.has("audit_summary")) {
                             parseAndSelectMissingItem(finalResponse);
                         } else {
-                            Toast.makeText(getContext(), isArabic ? "لا توجد قطع مفقودة مسجلة في هذا الفرع" : "No missing items recorded", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getContext(), 
+                                isArabic ? "لا توجد قطع مفقودة مسجلة" : "No missing items recorded", 
+                                Toast.LENGTH_SHORT).show();
                         }
                     });
                 }
@@ -253,13 +288,14 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
                         loading.dismiss();
-                        Toast.makeText(getContext(), isArabic ? "خطأ في الاتصال بالخادم" : "Server Connection Failed", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), 
+                            isArabic ? "خطأ في الاتصال" : "Connection failed", 
+                            Toast.LENGTH_SHORT).show();
                     });
                 }
             }
         });
     }
-
 
     private void parseAndSelectMissingItem(JSONObject data) {
         JSONArray missingArray = data.optJSONArray("missing_details");
@@ -271,22 +307,21 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 JSONObject obj = missingArray.optJSONObject(i);
                 if (obj != null) {
                     String epc = obj.optString("epc", "");
-                    String title = obj.optString("title", "قطعة مفقودة");
+                    String title = obj.optString("title", isArabic ? "قطعة مفقودة" : "Missing item");
                     String weight = obj.optString("weight", "");
                     displayList.add("💎 " + title + " (" + weight + "g)\n🏷️ " + epc);
                     epcList.add(epc);
                 }
             }
         } else {
-            // بيانات افتراضية لأغراض الاختبار والعرض
-            displayList.add("💎 خاتم سوليتير ذهب أبيض (4.2g)\n🏷️ E200001982130124");
+            displayList.add(isArabic ? "💎 خاتم سوليتير (4.2g)\n🏷️ E200001982130124" : "💎 Solitaire Ring (4.2g)\n🏷️ E200001982130124");
             epcList.add("E200001982130124");
-            displayList.add("💎 أسورة عيار 21 ممتازة (12.5g)\n🏷️ E200001982130125");
+            displayList.add(isArabic ? "💎 أسورة عيار 21 (12.5g)\n🏷️ E200001982130125" : "💎 21K Bracelet (12.5g)\n🏷️ E200001982130125");
             epcList.add("E200001982130125");
         }
 
         new AlertDialog.Builder(requireContext())
-                .setTitle(isArabic ? "اختر القطعة المفقودة للبحث عنها" : "Select Missing Item to Search")
+                .setTitle(isArabic ? "اختر القطعة المفقودة" : "Select Missing Item")
                 .setItems(displayList.toArray(new String[0]), (dialog, which) -> {
                     String selectedEpc = epcList.get(which);
                     etEPC.setText(selectedEpc);
@@ -298,8 +333,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 .show();
     }
 
-    // ==================== Modes ====================
-
     private void switchMode(RadarMode mode) {
         currentMode = mode;
         if (inventoryFlag) { stopLocated(); startLocated(); }
@@ -309,9 +342,9 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
 
     private String getModeName(RadarMode mode) {
         switch (mode) {
-            case SINGLE_TARGET: return isArabic ? "🎯 تتبع قطعة محددة" : "🎯 Single Target Geiger";
-            case OPEN_SCAN: return isArabic ? "📡 مسح مفتوح" : "📡 Open Radar Scan";
-            case MISSING_SEARCH: return isArabic ? "🔍 كاشف المفقودات" : "🔍 Missing Items Scanner";
+            case SINGLE_TARGET: return isArabic ? "🎯 تتبع قطعة محددة" : "🎯 Single Target";
+            case OPEN_SCAN: return isArabic ? "📡 مسح مفتوح" : "📡 Open Scan";
+            case MISSING_SEARCH: return isArabic ? "🔍 كاشف المفقودات" : "🔍 Missing Scanner";
             default: return "";
         }
     }
@@ -323,11 +356,17 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         if (btnModeGate != null) btnModeGate.setAlpha(currentMode == RadarMode.MISSING_SEARCH ? 1f : 0.5f);
     }
 
-    // ==================== Start / Stop ====================
-
     @SuppressLint("LongLogTag")
     private void startLocated() {
         if (inventoryFlag) return;
+        
+        if (!(permissionManager.canView("radar") || permissionManager.isSecurity() || 
+              permissionManager.isGateSecurity() || permissionManager.isManager())) {
+            Toast.makeText(mContext, 
+                isArabic ? "⛔ غير مصرح" : "⛔ Access Denied", 
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         radarView.clearPanel();
         targetEpc = etEPC.getText().toString().trim();
@@ -354,7 +393,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                     radarView.bindingData(list, epcToTrack);
                     for (RadarLocationEntity entity : list) {
                         String detectedEpc = entity.getTag();
-                        int val = entity.getValue(); // قيمة القرب والـ RSSI
+                        int val = entity.getValue();
                         
                         if (!TextUtils.isEmpty(detectedEpc)) {
                             handleGeigerAudioFeedback(val);
@@ -373,9 +412,12 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         if (!result) {
             if (!TextUtils.isEmpty(targetEpc)) {
                 queryMiraItem(targetEpc, 70);
-                Toast.makeText(mContext, isArabic ? "⚠️ الرادار غير مدعوم - تم العرض من MIRA API" : "⚠️ Radar unsupported - MIRA fallback", Toast.LENGTH_LONG).show();
+                Toast.makeText(mContext, 
+                    isArabic ? "⚠️ الرادار غير مدعوم" : "⚠️ Radar unsupported", 
+                    Toast.LENGTH_LONG).show();
             } else {
-                UIHelper.ToastMessage(mContext, isArabic ? "فشل البدء - تحقق من الـ EPC" : "Start failed - Check EPC");
+                UIHelper.ToastMessage(mContext, 
+                    isArabic ? "فشل البدء" : "Start failed");
             }
             return;
         }
@@ -420,8 +462,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         resetProximityUI();
     }
 
-    // ==================== Simulation Geiger ====================
-
     private void startSimulatedRadar() {
         if (!TextUtils.isEmpty(targetEpc)) queryMiraItem(targetEpc, 85);
 
@@ -439,7 +479,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 simulationAngle += 10;
                 if (simulationAngle >= 360) simulationAngle = 0;
 
-                // محاكاة اقتراب تدريجي
                 currentRssi = Math.min(100, currentRssi + random.nextInt(15) - 5);
                 if (currentRssi < 20) currentRssi = 30;
 
@@ -454,14 +493,14 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
             }
         };
         simulationHandler.post(simulationRunnable);
-        Toast.makeText(mContext, isArabic ? "⚡ وضع محاكاة الكاشف Geiger" : "⚡ Simulation Geiger Active", Toast.LENGTH_SHORT).show();
+        Toast.makeText(mContext, 
+            isArabic ? "⚡ وضع المحاكاة" : "⚡ Simulation mode", 
+            Toast.LENGTH_SHORT).show();
     }
-
-    // ==================== Geiger Feedback & UI ====================
 
     private void handleGeigerAudioFeedback(int rssi) {
         long now = System.currentTimeMillis();
-        long interval = Math.max(100, 1000 - (rssi * 9)); // كلما زادت الإشارة قل الفارق الزمني
+        long interval = Math.max(100, 1000 - (rssi * 9));
 
         if (now - lastBeepTime > interval) {
             lastBeepTime = now;
@@ -482,14 +521,16 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
 
         if (tvProximityLevel != null) {
             if (rssi > 80) {
-                tvProximityLevel.setText(isArabic ? "🔥 ملاصق جداً للقطعة!" : "🔥 Extremely Close!");
+                tvProximityLevel.setText(isArabic ? "🔥 ملاصق جداً!" : "🔥 Extremely Close!");
                 tvProximityLevel.setTextColor(0xFF22C55E);
-                if (btnMarkFound != null) btnMarkFound.setVisibility(View.VISIBLE);
+                if (btnMarkFound != null && (permissionManager.canEdit("inventory") || permissionManager.isManager())) {
+                    btnMarkFound.setVisibility(View.VISIBLE);
+                }
             } else if (rssi > 50) {
                 tvProximityLevel.setText(isArabic ? "📍 النطاق القريب" : "📍 Near Range");
                 tvProximityLevel.setTextColor(0xFFF59E0B);
             } else {
-                tvProximityLevel.setText(isArabic ? "🌐 إشارة ضعيفة / بعيد" : "🌐 Far / Weak Signal");
+                tvProximityLevel.setText(isArabic ? "🌐 إشارة ضعيفة" : "🌐 Weak Signal");
                 tvProximityLevel.setTextColor(0xFFEF4444);
             }
         }
@@ -500,8 +541,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         if (tvSignalStrength != null) tvSignalStrength.setText("0%");
         if (tvProximityLevel != null) tvProximityLevel.setText(isArabic ? "متوقف" : "Stopped");
     }
-
-    // ==================== MIRA API Query ====================
 
     private void queryMiraItem(String epc, int rssi) {
         if (!settingsManager.getBoolean("auto_query_mira", true)) return;
@@ -560,13 +599,13 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
 
         if (tvRadarItemStatus != null) {
             if (allowed && item != null) {
-                tvRadarItemStatus.setText(isArabic ? "✅ مصرحة بالوجود بالفرع" : "✅ Authorized in Branch");
+                tvRadarItemStatus.setText(isArabic ? "✅ مصرحة بالوجود" : "✅ Authorized");
                 tvRadarItemStatus.setTextColor(0xFF22C55E);
             } else if (!allowed && item != null) {
-                tvRadarItemStatus.setText(isArabic ? "🚨 تنبيه: قطعة غير مخصصة للفرع" : "🚨 Unauthorized Branch Item");
+                tvRadarItemStatus.setText(isArabic ? "🚨 قطعة غير مخصصة للفرع" : "🚨 Unauthorized");
                 tvRadarItemStatus.setTextColor(0xFFEF4444);
             } else {
-                tvRadarItemStatus.setText(isArabic ? "⚠️ قطعة مفقودة / غير مسجلة" : "⚠️ Missing/Unregistered Item");
+                tvRadarItemStatus.setText(isArabic ? "⚠️ مفقودة / غير مسجلة" : "⚠️ Missing/Unregistered");
                 tvRadarItemStatus.setTextColor(0xFFF59E0B);
             }
         }
@@ -582,12 +621,19 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         }
     }
 
-    // ==================== Sync Found Status ====================
-
     private void markCurrentItemAsFound() {
+        if (!(permissionManager.canEdit("inventory") || permissionManager.isManager())) {
+            Toast.makeText(mContext, 
+                isArabic ? "⛔ غير مصرح" : "⛔ Access Denied", 
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
         if (TextUtils.isEmpty(targetEpc)) return;
 
-        Toast.makeText(mContext, isArabic ? "جاري تحديث حالة القطعة إلى (موجودة)..." : "Updating item status to FOUND...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(mContext, 
+            isArabic ? "جاري تحديث الحالة..." : "Updating status...", 
+            Toast.LENGTH_SHORT).show();
 
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
@@ -597,12 +643,13 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
                 params.put("status", "AVAILABLE");
                 params.put("branch_id", branchesManager.getActiveBranchId());
 
-                // إرسال تحديث للسيرفر
                 MiraApiClient.ApiResponse res = client.authorize(targetEpc, "mark_found", params);
 
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
-                        Toast.makeText(mContext, isArabic ? "🎉 تم استعادة وتأكيد موقع القطعة بنجاح!" : "🎉 Item restored successfully!", Toast.LENGTH_LONG).show();
+                        Toast.makeText(mContext, 
+                            isArabic ? "🎉 تم تأكيد موقع القطعة!" : "🎉 Item located!", 
+                            Toast.LENGTH_LONG).show();
                         stopLocated();
                     });
                 }
@@ -611,8 +658,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
             }
         });
     }
-
-    // ==================== UI Controls ====================
 
     private void updateCounters() {
         if (tvAuthorizedCount != null) tvAuthorizedCount.setText(String.valueOf(authorizedCount));
@@ -643,7 +688,9 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
 
     private void exportScanResults() {
         if (recentScans.isEmpty()) {
-            Toast.makeText(mContext, isArabic ? "لا توجد نتائج للتصدير" : "No results to export", Toast.LENGTH_SHORT).show();
+            Toast.makeText(mContext, 
+                isArabic ? "لا توجد نتائج للتصدير" : "No results to export", 
+                Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -654,9 +701,10 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
 
         Intent share = new Intent(Intent.ACTION_SEND);
         share.setType("text/csv");
-        share.putExtra(Intent.EXTRA_SUBJECT, "MIRA Radar Geiger Export - " + branchesManager.getActiveBranchDisplayName());
+        share.putExtra(Intent.EXTRA_SUBJECT, "MIRA Radar Export - " + branchesManager.getActiveBranchDisplayName());
         share.putExtra(Intent.EXTRA_TEXT, csv.toString());
-        startActivity(Intent.createChooser(share, isArabic ? "تصدير نتائج التتبع" : "Export Tracking Results"));
+        startActivity(Intent.createChooser(share, 
+            isArabic ? "تصدير نتائج التتبع" : "Export Tracking Results"));
     }
 
     @Override
@@ -686,8 +734,11 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+        isArabic = newConfig.locale.getLanguage().equals("ar");
+        applyLanguage();
+        applyPermissions();
         FragmentTransaction ft = getFragmentManager().beginTransaction();
         ft.detach(this).attach(this).commit();
         getView().post(this::restoreState);
     }
-            }
+}
