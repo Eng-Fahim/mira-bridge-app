@@ -28,6 +28,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
+import com.example.uhf.manager.PermissionManager;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -55,6 +56,7 @@ public class MiraTransferFragment extends Fragment {
 
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
+    private PermissionManager permissionManager;
     private final List<TransferData> transferList = new ArrayList<>();
     private TransferAdapter adapter;
     private String currentFilter = "";
@@ -82,11 +84,13 @@ public class MiraTransferFragment extends Fragment {
         isArabic = Locale.getDefault().getLanguage().equals("ar");
         apiClient = MiraApiClient.getInstance(requireContext());
         branchesManager = MiraBranchesManager.getInstance(requireContext());
+        permissionManager = PermissionManager.getInstance(requireContext());
         offlineCache = requireContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
 
         initViews(view);
         setupFilterChips();
         setupListeners();
+        applyPermissions();
 
         rvTransfers.setLayoutManager(new LinearLayoutManager(getContext()));
         adapter = new TransferAdapter(transferList, new TransferClickHandler() {
@@ -97,6 +101,55 @@ public class MiraTransferFragment extends Fragment {
 
         loadTransfers();
         loadOfflineTransfers();
+    }
+
+    // ✅ صلاحيات التحويلات حسب المرحلة
+    private void applyPermissions() {
+        boolean canCreate = permissionManager.canEdit("transfers") || 
+                           permissionManager.isManager() || 
+                           permissionManager.isInventoryManager();
+        
+        boolean canApprove = permissionManager.isManager() || 
+                             permissionManager.isBranchManager() || 
+                             permissionManager.canEdit("transfers");
+        
+        boolean canReceive = permissionManager.isManager() || 
+                             permissionManager.isBranchManager() || 
+                             permissionManager.canEdit("transfers");
+
+        // ✅ زر إنشاء تحويل جديد - للمديرين ومديري المخزون
+        if (btnNewTransfer != null) {
+            btnNewTransfer.setEnabled(canCreate);
+            btnNewTransfer.setAlpha(canCreate ? 1.0f : 0.5f);
+        }
+        
+        // ✅ زر المسح - للجميع المصرح لهم بالعرض
+        if (btnScanVerify != null) {
+            btnScanVerify.setEnabled(permissionManager.canView("transfers") || permissionManager.isManager());
+        }
+    }
+
+    private boolean canCreateTransfer() {
+        return permissionManager.canEdit("transfers") || 
+               permissionManager.isManager() || 
+               permissionManager.isInventoryManager();
+    }
+
+    private boolean canApproveTransfer() {
+        return permissionManager.isManager() || 
+               permissionManager.isBranchManager() || 
+               permissionManager.canEdit("transfers");
+    }
+
+    private boolean canReceiveTransfer() {
+        return permissionManager.isManager() || 
+               permissionManager.isBranchManager() || 
+               permissionManager.canEdit("transfers");
+    }
+
+    private boolean canDeleteTransfer() {
+        return permissionManager.isManager() || 
+               permissionManager.canDelete("transfers");
     }
 
     private void initViews(View view) {
@@ -125,7 +178,16 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void setupListeners() {
-        btnNewTransfer.setOnClickListener(v -> showNewTransferDialog());
+        btnNewTransfer.setOnClickListener(v -> {
+            if (canCreateTransfer()) {
+                showNewTransferDialog();
+            } else {
+                Toast.makeText(getContext(), 
+                    ar("⛔ غير مصرح لك بإنشاء تحويلات", "⛔ Access Denied - Cannot create transfers"),
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
+        
         btnScanVerify.setOnClickListener(v -> {
             if (selectedTransfer != null) {
                 showScanItemsDialogForTransfer(selectedTransfer);
@@ -144,8 +206,6 @@ public class MiraTransferFragment extends Fragment {
             tvActiveBranch.setText(ar("الفرع الحالي: ", "Current Branch: ") + branchesManager.getActiveBranchDisplayName());
         }
     }
-
-    // ==================== DATA LOADING ====================
 
     private void loadTransfers() {
         executor.execute(() -> {
@@ -220,29 +280,51 @@ public class MiraTransferFragment extends Fragment {
         loadTransfers();
     }
 
-    // ==================== ACTIONS & DIALOGS ====================
-
     private void handleTransferAction(TransferData t, String action) {
         selectedTransfer = t;
         switch (action) {
-            case "approve": approveTransfer(t); break;
-            case "receive": receiveTransfer(t); break;
-            case "scan": showScanItemsDialogForTransfer(t); break;
+            case "approve": 
+                if (canApproveTransfer()) approveTransfer(t);
+                else showAccessDenied();
+                break;
+            case "receive": 
+                if (canReceiveTransfer()) receiveTransfer(t);
+                else showAccessDenied();
+                break;
+            case "scan": 
+                showScanItemsDialogForTransfer(t); 
+                break;
         }
+    }
+
+    private void showAccessDenied() {
+        Toast.makeText(getContext(), 
+            ar("⛔ غير مصرح لك بهذا الإجراء", "⛔ Access Denied"),
+            Toast.LENGTH_SHORT).show();
     }
 
     private void showTransferActions(TransferData t) {
         selectedTransfer = t;
         List<String> options = new ArrayList<>();
+        
         if ("draft".equals(t.status)) {
-            options.add(ar("📦 إضافة/مسح قطع للتحويل", "📦 Scan & Add Items"));
-            options.add(ar("🗑️ حذف المسودة", "🗑️ Delete Draft"));
+            if (canCreateTransfer()) {
+                options.add(ar("📦 إضافة/مسح قطع للتحويل", "📦 Scan & Add Items"));
+                options.add(ar("🗑️ حذف المسودة", "🗑️ Delete Draft"));
+            }
+            options.add(ar("📋 عرض التفاصيل", "📋 View Details"));
         } else if ("pending".equals(t.status)) {
-            options.add(ar("✅ اعتماد وتجهيز الشحنة", "✅ Approve & Dispatch"));
+            if (canApproveTransfer()) {
+                options.add(ar("✅ اعتماد وتجهيز الشحنة", "✅ Approve & Dispatch"));
+            }
             options.add(ar("🔍 تدقيق القائمة", "🔍 Scan Verification"));
+            options.add(ar("📋 عرض التفاصيل", "📋 View Details"));
         } else if ("approved".equals(t.status) || "in_transit".equals(t.status)) {
-            options.add(ar("📥 استلام مطابقة الشحنة", "📥 Receive Audit"));
+            if (canReceiveTransfer()) {
+                options.add(ar("📥 استلام مطابقة الشحنة", "📥 Receive Audit"));
+            }
             options.add(ar("🔍 تدقيق القطع الميداني", "🔍 Field Scan Audit"));
+            options.add(ar("📋 عرض التفاصيل", "📋 View Details"));
         } else {
             options.add(ar("📋 عرض تفاصيل البيان", "📋 View Full Manifest"));
         }
@@ -252,12 +334,21 @@ public class MiraTransferFragment extends Fragment {
             .setTitle((t.transferNumber != null ? t.transferNumber : "TR-" + t.id) + " (" + t.fromBranch + " ➔ " + t.toBranch + ")")
             .setItems(items, (dialog, which) -> {
                 String sel = items[which];
-                if (sel.contains("إضافة") || sel.contains("Scan")) showScanItemsDialogForTransfer(t);
-                else if (sel.contains("اعتماد") || sel.contains("Approve")) approveTransfer(t);
-                else if (sel.contains("استلام") || sel.contains("Receive")) receiveTransfer(t);
-                else if (sel.contains("تدقيق") || sel.contains("Verification")) showScanItemsDialogForTransfer(t);
-                else if (sel.contains("حذف") || sel.contains("Delete")) deleteTransfer(t);
-                else if (sel.contains("تفاصيل") || sel.contains("Manifest")) showTransferDetails(t);
+                if (sel.contains("إضافة") || sel.contains("Scan & Add")) showScanItemsDialogForTransfer(t);
+                else if (sel.contains("اعتماد") || sel.contains("Approve")) {
+                    if (canApproveTransfer()) approveTransfer(t);
+                    else showAccessDenied();
+                }
+                else if (sel.contains("استلام") || sel.contains("Receive")) {
+                    if (canReceiveTransfer()) receiveTransfer(t);
+                    else showAccessDenied();
+                }
+                else if (sel.contains("تدقيق") || sel.contains("Verification") || sel.contains("Audit")) showScanItemsDialogForTransfer(t);
+                else if (sel.contains("حذف") || sel.contains("Delete")) {
+                    if (canDeleteTransfer()) deleteTransfer(t);
+                    else showAccessDenied();
+                }
+                else if (sel.contains("تفاصيل") || sel.contains("Manifest") || sel.contains("Details")) showTransferDetails(t);
             })
             .setNegativeButton(ar("إغلاق", "Close"), null).show();
     }
@@ -308,6 +399,11 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void approveTransfer(TransferData t) {
+        if (!canApproveTransfer()) {
+            showAccessDenied();
+            return;
+        }
+        
         new MaterialAlertDialogBuilder(requireContext())
             .setTitle(ar("اعتماد وتجهيز الشحنة", "Approve Shipment"))
             .setMessage(ar("هل تأكدت من مراجعة كل القطع المضافة وإقفال البيان للتجهيز؟", "Confirm shipment approval?"))
@@ -329,6 +425,11 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void receiveTransfer(TransferData t) {
+        if (!canReceiveTransfer()) {
+            showAccessDenied();
+            return;
+        }
+        
         new MaterialAlertDialogBuilder(requireContext())
             .setTitle(ar("تأكيد استلام الشحنة", "Receive Shipment"))
             .setMessage(ar("هل استلمت الشحنة مع التدقيق واختبار مطابقة القطع؟", "Confirm receiving and updating branch stock?"))
@@ -350,6 +451,11 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void deleteTransfer(TransferData t) {
+        if (!canDeleteTransfer()) {
+            showAccessDenied();
+            return;
+        }
+        
         new MaterialAlertDialogBuilder(requireContext())
             .setTitle(ar("إلغاء امر التحويل", "Cancel Transfer"))
             .setMessage(ar("هل أنت متأكد من إغلاق وإلغاء هذه المسودة؟", "Are you sure you want to cancel this transfer?"))
@@ -371,6 +477,11 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void showNewTransferDialog() {
+        if (!canCreateTransfer()) {
+            showAccessDenied();
+            return;
+        }
+        
         View dv = LayoutInflater.from(getContext()).inflate(R.layout.dialog_new_transfer, null);
         TextView tvFromBranch = dv.findViewById(R.id.tvFromBranchName);
         Spinner spTo = dv.findViewById(R.id.spToBranch);
@@ -447,8 +558,6 @@ public class MiraTransferFragment extends Fragment {
         });
         dialog.show();
     }
-
-    // ==================== ADVANCED RFID SCANNING ====================
 
     public void onRfidTagScanned(String epc) {
         if (epc == null || epc.trim().isEmpty()) return;
@@ -529,21 +638,24 @@ public class MiraTransferFragment extends Fragment {
                                     if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n✅ " + title + " [" + epc + "]");
                                     if (tvScanCounter != null) tvScanCounter.setText(String.valueOf(activeScanEpcSet.size()));
                                 } else if ("sold".equals(status)) {
-                                    if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n❌ مباعة: " + title);
+                                    if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n❌ " + ar("مباعة", "Sold") + ": " + title);
                                     Toast.makeText(getContext(), ar("❌ هذه القطعة مباعة", "❌ Item is sold"), Toast.LENGTH_SHORT).show();
                                 } else {
-                                    if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n⚠️ غير متاحة للتحويل: " + title);
+                                    if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n⚠️ " + ar("غير متاحة للتحويل", "Not available for transfer") + ": " + title);
                                 }
                             } else {
-                                if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n❓ غير مسجلة: [" + epc + "]");
+                                if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n❓ " + ar("غير مسجلة", "Unregistered") + ": [" + epc + "]");
                             }
                         } else {
-                            if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n⚠️ تعذر التحقق: [" + epc + "]");
+                            if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n⚠️ " + ar("تعذر التحقق", "Verification failed") + ": [" + epc + "]");
                         }
                         etEpc.setText("");
                     });
                 } catch (Exception e) {
-                    mainHandler.post(() -> { Toast.makeText(getContext(), ar("❌ خطأ بالاتصال", "❌ Error"), Toast.LENGTH_SHORT).show(); etEpc.setText(""); });
+                    mainHandler.post(() -> { 
+                        Toast.makeText(getContext(), ar("❌ خطأ بالاتصال", "❌ Error"), Toast.LENGTH_SHORT).show(); 
+                        etEpc.setText(""); 
+                    });
                 }
             });
         });
@@ -590,8 +702,6 @@ public class MiraTransferFragment extends Fragment {
         dialog.show();
     }
 
-    // ==================== HELPERS ====================
-
     private String getStatusText(String status) {
         switch (status) {
             case "draft": return ar("مسودة", "Draft");
@@ -605,8 +715,6 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private String ar(String arabic, String english) { return isArabic ? arabic : english; }
-
-    // ==================== ADAPTER & VIEWHOLDER ====================
 
     static class TransferData {
         int id, itemCount, fromBranchId, toBranchId;
@@ -643,7 +751,6 @@ public class MiraTransferFragment extends Fragment {
             h.tvDetails.setText(t.itemCount + " " + ar("قطعة", "pcs") + " • " + String.format(Locale.US, "%.1f g", t.totalWeight));
             h.tvDate.setText(t.createdAt != null && t.createdAt.length() >= 10 ? t.createdAt.substring(0, 10) : "");
             
-            // Format Status Text & Badge Background Color
             h.tvStatus.setText(getStatusText(t.status));
             int statusBgColor;
             switch (t.status) {
@@ -659,21 +766,20 @@ public class MiraTransferFragment extends Fragment {
 
             h.itemView.setOnClickListener(v -> handler.onClick(t));
 
-            // Setup Quick Action Buttons according to workflow stage
             if ("draft".equals(t.status)) {
-                h.btnAction1.setVisibility(View.VISIBLE);
+                h.btnAction1.setVisibility(canCreateTransfer() ? View.VISIBLE : View.GONE);
                 h.btnAction1.setText(ar("📷 إضافة قطع", "📷 Add Items"));
                 h.btnAction1.setOnClickListener(v -> handler.onAction(t, "scan"));
                 h.btnAction2.setVisibility(View.GONE);
             } else if ("pending".equals(t.status)) {
-                h.btnAction1.setVisibility(View.VISIBLE);
+                h.btnAction1.setVisibility(canApproveTransfer() ? View.VISIBLE : View.GONE);
                 h.btnAction1.setText(ar("✅ اعتماد", "✅ Approve"));
                 h.btnAction1.setOnClickListener(v -> handler.onAction(t, "approve"));
                 h.btnAction2.setVisibility(View.VISIBLE);
                 h.btnAction2.setText(ar("📷 تدقيق", "📷 Scan"));
                 h.btnAction2.setOnClickListener(v -> handler.onAction(t, "scan"));
             } else if ("approved".equals(t.status) || "in_transit".equals(t.status)) {
-                h.btnAction1.setVisibility(View.VISIBLE);
+                h.btnAction1.setVisibility(canReceiveTransfer() ? View.VISIBLE : View.GONE);
                 h.btnAction1.setText(ar("📥 استلام", "📥 Receive"));
                 h.btnAction1.setOnClickListener(v -> handler.onAction(t, "receive"));
                 h.btnAction2.setVisibility(View.VISIBLE);
@@ -704,4 +810,4 @@ public class MiraTransferFragment extends Fragment {
             }
         }
     }
-}
+    }
