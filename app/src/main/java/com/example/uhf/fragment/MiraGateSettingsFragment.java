@@ -25,6 +25,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraGatesSettings;
+import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SoundGenerator;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.switchmaterial.SwitchMaterial;
@@ -40,9 +41,9 @@ public class MiraGateSettingsFragment extends Fragment {
     private static final String TAG = "MiraGateSettingsFragment";
 
     private MiraGatesSettings settings;
+    private PermissionManager permissionManager;
     private SoundPool soundPool;
 
-    // UI
     private RecyclerView rvGates;
     private Spinner spSoundPass, spSoundDeny, spSoundAlarm;
     private SwitchMaterial switchVibration, switchFlash;
@@ -51,7 +52,6 @@ public class MiraGateSettingsFragment extends Fragment {
     private TextView tvRfidPowerValue;
     private MaterialButton btnAddGate, btnTestSound, btnSaveSounds, btnSaveAll;
 
-    // ✅ محول قائمة البوابات
     private GateAdapter gateAdapter;
     private final List<MiraGatesSettings.GateDevice> gatesList = new ArrayList<>();
 
@@ -68,6 +68,7 @@ public class MiraGateSettingsFragment extends Fragment {
 
         Context ctx = requireContext();
         settings = MiraGatesSettings.getInstance(ctx);
+        permissionManager = PermissionManager.getInstance(ctx);
 
         soundPool = new SoundPool.Builder().setMaxStreams(3).build();
 
@@ -75,6 +76,7 @@ public class MiraGateSettingsFragment extends Fragment {
         setupSpinners();
         loadSettings();
         setupListeners();
+        applyPermissions();
         loadGatesFromLocal();
         loadGatesFromServer();
     }
@@ -97,6 +99,25 @@ public class MiraGateSettingsFragment extends Fragment {
         rvGates.setLayoutManager(new LinearLayoutManager(getContext()));
         gateAdapter = new GateAdapter(gatesList, this::removeGate);
         rvGates.setAdapter(gateAdapter);
+    }
+
+    private void applyPermissions() {
+        // ✅ إدارة البوابات - فقط للمديرين
+        boolean canManageGates = permissionManager.isAdmin() || 
+                                  permissionManager.isBranchManager() ||
+                                  permissionManager.canEdit("gates");
+        
+        if (btnAddGate != null) {
+            btnAddGate.setVisibility(canManageGates ? View.VISIBLE : View.GONE);
+        }
+        
+        if (btnSaveSounds != null) {
+            btnSaveSounds.setVisibility(canManageGates ? View.VISIBLE : View.GONE);
+        }
+        
+        if (btnSaveAll != null) {
+            btnSaveAll.setVisibility(canManageGates ? View.VISIBLE : View.GONE);
+        }
     }
 
     private void setupSpinners() {
@@ -169,7 +190,13 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private void setupListeners() {
-        btnAddGate.setOnClickListener(v -> showAddGateDialog());
+        btnAddGate.setOnClickListener(v -> {
+            if (permissionManager.canEdit("gates") || permissionManager.isAdmin() || permissionManager.isBranchManager()) {
+                showAddGateDialog();
+            } else {
+                Toast.makeText(getContext(), "⛔ غير مصرح", Toast.LENGTH_SHORT).show();
+            }
+        });
 
         btnTestSound.setOnClickListener(v -> {
             String selectedSound = MiraGatesSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()];
@@ -180,6 +207,11 @@ public class MiraGateSettingsFragment extends Fragment {
         });
 
         btnSaveSounds.setOnClickListener(v -> {
+            if (!(permissionManager.canEdit("gates") || permissionManager.isAdmin() || permissionManager.isBranchManager())) {
+                Toast.makeText(getContext(), "⛔ غير مصرح", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
             String soundPass = MiraGatesSettings.SoundOptions.PASS_SOUNDS[spSoundPass.getSelectedItemPosition()];
             String soundDeny = MiraGatesSettings.SoundOptions.DENY_SOUNDS[spSoundDeny.getSelectedItemPosition()];
             String soundAlarm = MiraGatesSettings.SoundOptions.ALARM_SOUNDS[spSoundAlarm.getSelectedItemPosition()];
@@ -207,6 +239,11 @@ public class MiraGateSettingsFragment extends Fragment {
         });
 
         btnSaveAll.setOnClickListener(v -> {
+            if (!(permissionManager.canEdit("gates") || permissionManager.isAdmin() || permissionManager.isBranchManager())) {
+                Toast.makeText(getContext(), "⛔ غير مصرح", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
             settings.setVibrationEnabled(switchVibration.isChecked());
             settings.setFlashEnabled(switchFlash.isChecked());
             
@@ -236,6 +273,12 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private void loadGatesFromServer() {
+        if (!permissionManager.canView("gates") && !permissionManager.isAdmin() && 
+            !permissionManager.isBranchManager() && !permissionManager.isSecurity() && 
+            !permissionManager.isGateSecurity()) {
+            return;
+        }
+        
         new Thread(() -> {
             try {
                 MiraApiClient client = MiraApiClient.getInstance(getContext());
@@ -284,6 +327,11 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private void showAddGateDialog() {
+        if (!(permissionManager.canEdit("gates") || permissionManager.isAdmin() || permissionManager.isBranchManager())) {
+            Toast.makeText(getContext(), "⛔ غير مصرح", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle("➕ إضافة بوابة جديدة");
 
@@ -374,6 +422,11 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private void removeGate(int position) {
+        if (!(permissionManager.canDelete("gates") || permissionManager.isAdmin())) {
+            Toast.makeText(getContext(), "⛔ غير مصرح بالحذف", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
         if (position >= 0 && position < gatesList.size()) {
             MiraGatesSettings.GateDevice gate = gatesList.get(position);
             settings.removeGate(gate.gateId);
@@ -394,8 +447,6 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private class GateAdapter extends RecyclerView.Adapter<GateAdapter.GateViewHolder> {
-
-        
 
         private final List<MiraGatesSettings.GateDevice> gates;
         private final OnGateRemoveListener removeListener;
@@ -454,7 +505,8 @@ public class MiraGateSettingsFragment extends Fragment {
             }
         }
     }
+    
     interface OnGateRemoveListener {
-            void onRemove(int position);
-        }
+        void onRemove(int position);
+    }
 }
