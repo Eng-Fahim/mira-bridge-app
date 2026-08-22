@@ -519,34 +519,41 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ==================== FRAGMENT MANAGEMENT ====================
 
     public void loadFragment(Fragment fragment, String tag) {
-        loadFragment(fragment, tag, true);
-    }
+    loadFragment(fragment, tag, true);
+}
 
-    public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-        try {
-            if (fragment == null) return;
-            showLoading();
-            currentFragment = fragment;
-            
-            // ✅ تحديث الـ Tag الحالي وحفظه
-            currentFragmentTag = tag;
-            saveFragmentTagToPrefs(tag);
-            
-            FragmentTransaction transaction = fragmentManager.beginTransaction()
-                    .replace(R.id.fragment_container, fragment, tag);
-            
-            if (addToBackStack) {
-                transaction.addToBackStack(tag);
-            }
-            
-            transaction.commitAllowingStateLoss();
-
-            mainHandler.postDelayed(this::hideLoading, 200);
-        } catch (Exception e) {
-            Log.e(TAG, "Error switching fragment: " + e.getMessage());
-            hideLoading();
+public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
+    try {
+        if (fragment == null) return;
+        
+        // ✅ فحص الصلاحية قبل التحميل
+        PermissionManager pm = PermissionManager.getInstance(this);
+        if (!pm.canAccessFragment(tag)) {
+            Toast.makeText(this, 
+                isArabic ? "⛔ غير مصرح لك بالوصول لهذه الواجهة" : "⛔ Access Denied",
+                Toast.LENGTH_SHORT).show();
+            return;
         }
+        
+        showLoading();
+        currentFragment = fragment;
+        currentFragmentTag = tag;
+        saveFragmentTagToPrefs(tag);
+        
+        FragmentTransaction transaction = fragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, fragment, tag);
+        
+        if (addToBackStack) {
+            transaction.addToBackStack(tag);
+        }
+        
+        transaction.commitAllowingStateLoss();
+        mainHandler.postDelayed(this::hideLoading, 200);
+    } catch (Exception e) {
+        Log.e(TAG, "Error switching fragment: " + e.getMessage());
+        hideLoading();
     }
+}
     
     // ✅ دالة جديدة لتحميل الـ Fragment حسب الـ Tag
     private void loadFragmentByTag(String tag) {
