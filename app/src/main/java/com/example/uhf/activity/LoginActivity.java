@@ -422,6 +422,22 @@ public class LoginActivity extends AppCompatActivity {
         if (!serverUrl.isEmpty()) {
             MiraServerConfig.getInstance(this).setBaseUrl(serverUrl);
         }
+        
+        
+    // ✅ حفظ الصلاحيات
+    String permissionsJson = response.optString("permissions", "");
+    if (permissionsJson.isEmpty()) {
+        // محاولة من permissions_json
+        JSONObject permissionsObj = response.optJSONObject("permissions");
+        if (permissionsObj != null) {
+            permissionsJson = permissionsObj.toString();
+        }
+    }
+    
+    if (!permissionsJson.isEmpty()) {
+        PermissionManager pm = PermissionManager.getInstance(this);
+        pm.savePermissions(permissionsJson);
+    }
 
         sessionManager.createLoginSession(username, roleStr, token, serverUrl);
         sessionManager.setDisplayName(displayName);
