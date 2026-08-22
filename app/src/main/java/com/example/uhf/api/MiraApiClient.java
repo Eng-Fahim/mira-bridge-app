@@ -62,6 +62,23 @@ public class MiraApiClient {
         
         Log.d(TAG, "Credentials: URL=" + apiUrl + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "SET") + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId));
     }
+
+    /**
+ * ✅ إعادة ربط الجهاز بعد مسح البيانات
+ */
+public ApiResponse reconnectDevice(String username, String password, String gateId) {
+    try {
+        JSONObject params = new JSONObject();
+        params.put("username", username);
+        params.put("password", password);
+        params.put("gate_id", gateId);
+        
+        return post("/auth/reconnect", params);
+    } catch (Exception e) {
+        Log.e(TAG, "Reconnect error: " + e.getMessage());
+        return null;
+    }
+}
     
     // دالة لجلب قائمة المزودين النشطين من السيرفر
     public List<ApiProvider> getActiveProviders() {
