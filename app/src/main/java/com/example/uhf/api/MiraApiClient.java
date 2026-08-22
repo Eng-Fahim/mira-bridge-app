@@ -1223,6 +1223,71 @@ public ApiResponse getAccountingAuditLog() {
     public ApiResponse getLivePrices() {
         return getWithAuth("/gold-currency/live-prices");
     }
+
+    // ===================== 👥 USER PERMISSIONS & VALIDATION =====================
+
+/**
+ * ✅ التحقق من توفر اسم المستخدم
+ */
+public ApiResponse checkUsername(String username) {
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("username", username);
+    } catch (Exception e) {
+        Log.e(TAG, "Error building checkUsername payload: " + e.getMessage());
+    }
+    return postWithAuth("/auth/users/check-username", payload);
+}
+
+/**
+ * ✅ تحديث صلاحيات المستخدم المتعددة
+ */
+public ApiResponse updateUserPermissions(JSONObject payload) {
+    return postWithAuth("/auth/users/update-permissions", payload);
+}
+
+/**
+ * ✅ تسجيل نشاط المستخدم
+ */
+public ApiResponse logActivity(JSONObject logEntry) {
+    return postWithAuth("/activity/log", logEntry);
+}
+
+/**
+ * ✅ الحصول على صلاحيات مستخدم محدد
+ */
+public ApiResponse getUserPermissions(int userId) {
+    return getWithAuth("/auth/users/" + userId + "/permissions");
+}
+
+/**
+ * ✅ الحصول على سجل نشاطات المستخدمين
+ */
+public ApiResponse getUserActivityLogs(int userId, int limit) {
+    String endpoint = "/activity/logs?user_id=" + userId + "&limit=" + limit;
+    return getWithAuth(endpoint);
+}
+
+/**
+ * ✅ تحديث حالة المستخدم (نشط/موقوف)
+ */
+public ApiResponse updateUserStatus(int userId, String status) {
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("user_id", userId);
+        payload.put("status", status);
+    } catch (Exception e) {
+        Log.e(TAG, "Error building updateUserStatus payload: " + e.getMessage());
+    }
+    return postWithAuth("/auth/users/update-status", payload);
+}
+
+/**
+ * ✅ الحصول على قوالب الصلاحيات
+ */
+public ApiResponse getPermissionTemplates() {
+    return getWithAuth("/auth/permissions/templates");
+}
     // ===================== ApiResponse =====================
 
     public static class ApiResponse {
