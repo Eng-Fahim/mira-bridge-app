@@ -55,6 +55,13 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Spinner;
+import java.util.ArrayList;
+import java.util.List;
+
 @RequiresApi(api = Build.VERSION_CODES.O)
 public class MiraSecureGateFragment extends Fragment {
 
@@ -167,6 +174,9 @@ public class MiraSecureGateFragment extends Fragment {
         return Locale.getDefault().getLanguage().equals("ar");
     }
 
+    private Spinner spGateSelector;
+    private List<MiraGatesSettings.GateDevice> gatesList = new ArrayList<>();
+    private String currentGateId = "";
     private void initViews(View view) {
         tvGateIcon = view.findViewById(R.id.tvGateIcon);
         tvGateStatus = view.findViewById(R.id.tvGateStatus);
@@ -188,8 +198,63 @@ public class MiraSecureGateFragment extends Fragment {
         tvOverlayTitle = view.findViewById(R.id.tvOverlayTitle);
         tvOverlayDetails = view.findViewById(R.id.tvOverlayDetails);
         btnStopAlarm = view.findViewById(R.id.btnStopAlarm);
+        
+        spGateSelector = view.findViewById(R.id.spGateSelector);
+    
+    // تحميل البوابات
+    loadGatesForSelector();
     }
 
+
+private void loadGatesForSelector() {
+    if (miraGatesSettings == null) return;
+    
+    gatesList = miraGatesSettings.getGates();
+    
+    if (gatesList.isEmpty()) {
+        // إذا لا توجد بوابات، أضف البوابة الحالية
+        MiraGatesSettings.GateDevice currentGate = new MiraGatesSettings.GateDevice();
+        currentGate.gateId = "handheld_c72";
+        currentGate.gateName = isArabic() ? "هذا الجهاز (C72)" : "This Device (C72)";
+        currentGate.location = isArabic() ? "غير محدد" : "Unknown";
+        gatesList.add(currentGate);
+    }
+    
+    // تعبئة الـ Spinner
+    String[] gateNames = new String[gatesList.size()];
+    for (int i = 0; i < gatesList.size(); i++) {
+        gateNames[i] = gatesList.get(i).gateName + " (" + gatesList.get(i).location + ")";
+    }
+    
+    ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+        android.R.layout.simple_spinner_item, gateNames);
+    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    spGateSelector.setAdapter(adapter);
+    
+    // اختيار أول بوابة
+    if (!gatesList.isEmpty()) {
+        currentGateId = gatesList.get(0).gateId;
+    }
+    
+    // مستمع التغيير
+    spGateSelector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        @Override
+        public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+            if (position < gatesList.size()) {
+                currentGateId = gatesList.get(position).gateId;
+                logConsole(isArabic() ? "🚪 تم اختيار: " : "🚪 Selected: " + gatesList.get(position).gateName);
+                
+                // إذا كانت البوابة مفعلة، أعد التشغيل للبوابة الجديدة
+                if (gateActive) {
+                    disarmGate();
+                    armGate();
+                }
+            }
+        }
+        @Override
+        public void onNothingSelected(AdapterView<?> parent) {}
+    });
+}
     private void setupClickListeners() {
         btnArmGate.setOnClickListener(v -> {
             if (permissionManager.canEdit("gates") || permissionManager.isAdmin() || permissionManager.isBranchManager()) {
@@ -270,30 +335,33 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void armGate() {
-        if (isDestroyed) return;
-        
-        if (!(permissionManager.canEdit("gates") || permissionManager.isAdmin() || permissionManager.isBranchManager())) {
-            Toast.makeText(getContext(), 
-                isArabic() ? "⛔ غير مصرح" : "⛔ Access Denied", 
-                Toast.LENGTH_SHORT).show();
-            return;
-        }
-        
-        gateActive = true;
-        updateUI();
-        logConsole(isArabic() ? "🛡️ تم تفعيل البوابة الأمنية." : "🛡️ Gate armed.");
+    if (isDestroyed) return;
+    
+    if (currentGateId.isEmpty()) {
+        Toast.makeText(getContext(), 
+            isArabic() ? "⚠️ اختر بوابة أولاً" : "⚠️ Select a gate first", 
+            Toast.LENGTH_SHORT).show();
+        return;
+    }
+    
+    gateActive = true;
+    updateUI();
+    logConsole(isArabic() ? "🛡️ تم تفعيل البوابة: " : "🛡️ Gate armed: " + getCurrentGateName());
+    
+    syncLocalAllowedCache();
+    startRealtimeDbSync();
+    startContinuousRfidScan();
+    updateGateStatusOnServerForSpecificGate(currentGateId, "armed");
+}
 
-        syncLocalAllowedCache();
-        startRealtimeDbSync();
-        startContinuousRfidScan();
-        updateGateStatusOnServer("armed");
-
-        if (isAdded()) {
-            Toast.makeText(requireContext(), 
-                isArabic() ? "تم تفعيل البوابة" : "Gate armed", 
-                Toast.LENGTH_SHORT).show();
+private String getCurrentGateName() {
+    for (MiraGatesSettings.GateDevice gate : gatesList) {
+        if (gate.gateId.equals(currentGateId)) {
+            return gate.gateName;
         }
     }
+    return "";
+}
 
     private void disarmGate() {
         if (isDestroyed) return;
@@ -575,47 +643,53 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void updateGateStatusOnServer(String status) {
-        if (isDestroyed || gateExecutor == null || gateExecutor.isShutdown()) return;
-        
-        gateExecutor.execute(() -> {
-            try {
-                MiraApiClient client = MiraApiClient.getInstance(mContext);
-                if (client == null) return;
-                
-                client.heartbeat(status, -1);
-                Log.d(TAG, "✅ Gate status updated: " + status);
-            } catch (Exception e) {
-                Log.e(TAG, "Update gate status error: " + e.getMessage());
-            }
-        });
-    }
+    updateGateStatusOnServerForSpecificGate(currentGateId, status);
+}
+
+private void updateGateStatusOnServerForSpecificGate(String gateId, String status) {
+    if (isDestroyed || gateExecutor == null) return;
+    
+    gateExecutor.execute(() -> {
+        try {
+            MiraApiClient client = MiraApiClient.getInstance(mContext);
+            if (client == null) return;
+            
+            JSONObject payload = new JSONObject();
+            payload.put("gate_id", gateId);
+            payload.put("status", status);
+            
+            // استخدم heartbeat مع gate_id محدد
+            client.heartbeat(status, 100);
+            
+            Log.d(TAG, "✅ Gate " + gateId + " status updated: " + status);
+        } catch (Exception e) {
+            Log.e(TAG, "Update gate status error: " + e.getMessage());
+        }
+    });
+}
 
     private void logGateEventToServer(String epc, String decision, String itemTitle) {
-        if (isDestroyed || gateExecutor == null || gateExecutor.isShutdown()) return;
-        
-        gateExecutor.execute(() -> {
-            try {
-                MiraApiClient client = MiraApiClient.getInstance(mContext);
-                if (client == null) return;
-                
-                JSONObject payload = new JSONObject();
-                payload.put("epc", epc);
-                payload.put("decision", decision);
-                payload.put("item_title", itemTitle);
-                payload.put("timestamp", System.currentTimeMillis());
-                
-                MiraApiClient.ApiResponse response = client.postWithAuth("/gate-log", payload);
-                
-                if (response != null && response.isSuccess) {
-                    Log.d(TAG, "✅ Gate event logged: " + decision + " - " + epc);
-                } else {
-                    Log.e(TAG, "❌ Failed to log gate event");
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Log gate event error: " + e.getMessage());
-            }
-        });
-    }
+    if (isDestroyed || gateExecutor == null) return;
+    
+    gateExecutor.execute(() -> {
+        try {
+            MiraApiClient client = MiraApiClient.getInstance(mContext);
+            if (client == null) return;
+            
+            JSONObject payload = new JSONObject();
+            payload.put("gate_id", currentGateId);
+            payload.put("epc", epc);
+            payload.put("decision", decision);
+            payload.put("item_title", itemTitle);
+            payload.put("timestamp", System.currentTimeMillis());
+            
+            client.postWithAuth("/gate-log", payload);
+        } catch (Exception e) {
+            Log.e(TAG, "Log gate event error: " + e.getMessage());
+        }
+    });
+}
+
 
     private void triggerAlarmEffects(String itemTitle, String serial) {
         if (isDestroyed || !isAdded()) return;
