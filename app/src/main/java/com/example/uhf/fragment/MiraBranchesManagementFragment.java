@@ -23,6 +23,7 @@ import androidx.fragment.app.Fragment;
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
+import com.example.uhf.manager.PermissionManager;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 
 import org.json.JSONArray;
@@ -42,6 +43,7 @@ public class MiraBranchesManagementFragment extends Fragment {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private MiraBranchesManager branchesManager;
     private MiraApiClient apiClient;
+    private PermissionManager permissionManager;
     private SharedPreferences offlineCache;
     private final List<BranchData> branchList = new ArrayList<>();
 
@@ -55,6 +57,7 @@ public class MiraBranchesManagementFragment extends Fragment {
         if (ctx != null) {
             branchesManager = MiraBranchesManager.getInstance(ctx);
             apiClient = MiraApiClient.getInstance(ctx);
+            permissionManager = PermissionManager.getInstance(ctx);
             offlineCache = ctx.getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
         }
 
@@ -64,17 +67,46 @@ public class MiraBranchesManagementFragment extends Fragment {
         tvTotalItems = view.findViewById(R.id.tvTotalItems);
         btnAddBranch = view.findViewById(R.id.btnAddBranchSimple);
 
-        btnAddBranch.setOnClickListener(v -> showBranchDialog(null));
+        applyPermissions();
         
-        // ✅ تحميل محلي أولاً
+        btnAddBranch.setOnClickListener(v -> {
+            if (canManageBranches()) {
+                showBranchDialog(null);
+            } else {
+                Toast.makeText(getContext(), 
+                    isArabic() ? "⛔ غير مصرح لك بإضافة فروع" : "⛔ Access Denied",
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
+        
         loadOfflineBranches();
-        // ثم من API
         loadBranchesFromAPI();
 
         return view;
     }
 
-    // ==================== OFFLINE ====================
+    private void applyPermissions() {
+        if (btnAddBranch != null) {
+            if (canManageBranches()) {
+                btnAddBranch.setVisibility(View.VISIBLE);
+            } else {
+                btnAddBranch.setVisibility(View.GONE);
+            }
+        }
+    }
+
+    private boolean canManageBranches() {
+        return permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin();
+    }
+
+    private boolean canViewBranches() {
+        return permissionManager.isAdmin() || permissionManager.isBranchManager() || 
+               permissionManager.isInventoryManager() || permissionManager.isAuditor();
+    }
+
+    private boolean isArabic() {
+        return java.util.Locale.getDefault().getLanguage().equals("ar");
+    }
 
     private void saveBranchesOffline(JSONArray branches) {
         try {
@@ -110,6 +142,11 @@ public class MiraBranchesManagementFragment extends Fragment {
     }
 
     private void loadBranchesFromAPI() {
+        if (!canViewBranches()) {
+            showAccessDenied();
+            return;
+        }
+        
         new Thread(() -> {
             try {
                 if (apiClient == null) return;
@@ -125,6 +162,21 @@ public class MiraBranchesManagementFragment extends Fragment {
                 Log.e(TAG, "API error: " + e.getMessage());
             }
         }).start();
+    }
+
+    private void showAccessDenied() {
+        mainHandler.post(() -> {
+            branchList.clear();
+            displayBranches();
+            if (tvEmptyData() != null) {
+                tvEmptyData().setText(isArabic() ? "⛔ غير مصرح لك بالوصول" : "⛔ Access Denied");
+                tvEmptyData().setVisibility(View.VISIBLE);
+            }
+        });
+    }
+
+    private TextView tvEmptyData() {
+        return null; // يمكن إضافة TextView فارغ في التخطيط إذا لزم
     }
 
     private void parseAndDisplay(JSONArray arr) {
@@ -167,9 +219,23 @@ public class MiraBranchesManagementFragment extends Fragment {
             if (vStatus != null) vStatus.setBackgroundResource(b.isActive ? R.drawable.circle_green : R.drawable.circle_red);
 
             final BranchData fb = b;
-            card.setOnClickListener(v -> showBranchDialog(fb));
+            card.setOnClickListener(v -> {
+                if (canManageBranches()) {
+                    showBranchDialog(fb);
+                } else {
+                    Toast.makeText(getContext(), 
+                        isArabic() ? "⛔ غير مصرح بالتعديل" : "⛔ Access Denied",
+                        Toast.LENGTH_SHORT).show();
+                }
+            });
             card.setOnLongClickListener(v -> {
-                showBranchActions(fb);
+                if (canManageBranches()) {
+                    showBranchActions(fb);
+                } else {
+                    Toast.makeText(getContext(), 
+                        isArabic() ? "⛔ غير مصرح" : "⛔ Access Denied",
+                        Toast.LENGTH_SHORT).show();
+                }
                 return true;
             });
 
@@ -199,10 +265,9 @@ public class MiraBranchesManagementFragment extends Fragment {
         if (tvTotalItems != null) tvTotalItems.setText(String.valueOf(items));
     }
 
-    // ==================== ACTIONS ====================
-
     private void showBranchActions(BranchData b) {
         if (!isAdded() || getContext() == null) return;
+        if (!canManageBranches()) return;
         
         String[] actions = {
             "✅ تعيين كفرع نشط",
@@ -234,9 +299,9 @@ public class MiraBranchesManagementFragment extends Fragment {
             .show();
     }
 
-    // ✅ إدارة مستخدمي الفرع
     private void showBranchUsers(BranchData b) {
         if (!isAdded() || getContext() == null) return;
+        if (!canManageBranches()) return;
         
         new Thread(() -> {
             try {
@@ -274,6 +339,7 @@ public class MiraBranchesManagementFragment extends Fragment {
 
     private void showBranchDialog(@Nullable BranchData existing) {
         if (!isAdded() || getContext() == null) return;
+        if (!canManageBranches()) return;
 
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_branch_edit, null);
@@ -322,6 +388,8 @@ public class MiraBranchesManagementFragment extends Fragment {
     }
 
     private void saveBranch(int id, String name, String code, String phone, String address, String city, boolean active) {
+        if (!canManageBranches()) return;
+        
         new Thread(() -> {
             try {
                 JSONObject payload = new JSONObject();
@@ -353,6 +421,8 @@ public class MiraBranchesManagementFragment extends Fragment {
 
     private void deleteBranch(BranchData b) {
         if (!isAdded() || getContext() == null) return;
+        if (!canManageBranches()) return;
+        
         new AlertDialog.Builder(requireContext())
             .setTitle("حذف فرع")
             .setMessage("هل أنت متأكد من حذف \"" + b.name + "\"؟")
