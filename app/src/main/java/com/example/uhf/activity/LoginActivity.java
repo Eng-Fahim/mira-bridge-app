@@ -37,7 +37,7 @@ import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.android.material.textview.MaterialTextView;
-
+import com.example.uhf.manager.PermissionManager;  // ✅ أضف هذا
 import org.json.JSONObject;
 
 import java.util.concurrent.Executor;
