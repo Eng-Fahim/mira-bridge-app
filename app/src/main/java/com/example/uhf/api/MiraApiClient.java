@@ -237,16 +237,22 @@ public ApiResponse activateProvider(int providerId) {
         
         // ✅ إذا أرسل السيرفر api_key جديد، احفظه
         if (!newApiKey.isEmpty()) {
-            // ✅ استخدام device_id إذا كان gate_id فارغاً
-            String effectiveGateId = !newGateId.isEmpty() ? newGateId : 
-                                     (deviceId != null && !deviceId.isEmpty() ? deviceId : getEffectiveGateId());
-            
-            serverConfig.saveSession(newApiKey, effectiveGateId, authToken);
-            refreshCredentials();
-            Log.d(TAG, "✅ New API Key saved:");
-            Log.d(TAG, "   API Key: " + newApiKey.substring(0, Math.min(8, newApiKey.length())) + "...");
-            Log.d(TAG, "   Gate ID: " + effectiveGateId);
-        } 
+    String effectiveGateId = !newGateId.isEmpty() ? newGateId : 
+                             (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
+    
+    // ✅ حفظ في MiraServerConfig
+    serverConfig.saveSession(newApiKey, effectiveGateId, authToken);
+    
+    // ✅ حفظ في SessionManager أيضاً
+    com.example.uhf.tools.SessionManager sessionManager = 
+        new com.example.uhf.tools.SessionManager(context);
+    sessionManager.saveApiKey(newApiKey);
+    sessionManager.saveGateId(effectiveGateId);
+    
+    refreshCredentials();
+    
+    Log.d(TAG, "✅ API Key saved to BOTH places");
+}
         // ✅ إذا لم يرسل api_key (لأنه موجود)، احتفظ بالمفتاح الحالي
         else if (!authToken.isEmpty()) {
             String currentApiKey = getEffectiveApiKey();
@@ -1349,4 +1355,4 @@ public ApiResponse getPermissionTemplates() {
             return null;
         }
     }
-            }
+                          }
