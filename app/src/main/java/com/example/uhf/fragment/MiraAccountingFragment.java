@@ -33,6 +33,7 @@ import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
+import com.example.uhf.manager.PermissionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.tabs.TabLayout;
 
@@ -51,6 +52,7 @@ public class MiraAccountingFragment extends Fragment {
 
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
+    private PermissionManager permissionManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
@@ -78,11 +80,13 @@ public class MiraAccountingFragment extends Fragment {
         
         apiClient = MiraApiClient.getInstance(requireContext());
         branchesManager = MiraBranchesManager.getInstance(requireContext());
+        permissionManager = PermissionManager.getInstance(requireContext());
         isArabic = Locale.getDefault().getLanguage().equals("ar");
 
         initViews(view);
         setupRecyclerView();
         setupListeners();
+        applyPermissions();
         loadData(currentTab);
 
         return view;
@@ -105,6 +109,24 @@ public class MiraAccountingFragment extends Fragment {
             tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "القيود" : "Journal"));
             tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "دليل الحسابات" : "Chart of Accounts"));
             tabAccounting.addTab(tabAccounting.newTab().setText(isArabic ? "ميزان المراجعة" : "Trial Balance"));
+        }
+    }
+
+    private void applyPermissions() {
+        if (btnCreateManualEntry != null) {
+            if (permissionManager.canEdit("accounting") || permissionManager.isAdmin()) {
+                btnCreateManualEntry.setVisibility(View.VISIBLE);
+            } else {
+                btnCreateManualEntry.setVisibility(View.GONE);
+            }
+        }
+        
+        if (btnFinancialReports != null) {
+            if (permissionManager.canView("accounting") || permissionManager.canView("reports")) {
+                btnFinancialReports.setVisibility(View.VISIBLE);
+            } else {
+                btnFinancialReports.setVisibility(View.GONE);
+            }
         }
     }
 
@@ -138,14 +160,28 @@ public class MiraAccountingFragment extends Fragment {
         }
         
         if (btnCreateManualEntry != null) {
-            btnCreateManualEntry.setOnClickListener(v -> showCreateEntryDialog());
+            btnCreateManualEntry.setOnClickListener(v -> {
+                if (permissionManager.canEdit("accounting") || permissionManager.isAdmin()) {
+                    showCreateEntryDialog();
+                } else {
+                    Toast.makeText(getContext(), 
+                        isArabic ? "⛔ غير مصرح لك بإنشاء قيود" : "⛔ Access Denied",
+                        Toast.LENGTH_SHORT).show();
+                }
+            });
         }
         
         if (btnFinancialReports != null) {
             btnFinancialReports.setOnClickListener(v -> {
-                if (getActivity() instanceof UHFMainActivity) {
-                    ((UHFMainActivity) getActivity()).loadFragment(
-                        new MiraFinancialReportsFragment(), "FinancialReports");
+                if (permissionManager.canAccessFragment("FinancialReports")) {
+                    if (getActivity() instanceof UHFMainActivity) {
+                        ((UHFMainActivity) getActivity()).loadFragment(
+                            new MiraFinancialReportsFragment(), "FinancialReports");
+                    }
+                } else {
+                    Toast.makeText(getContext(), 
+                        isArabic ? "⛔ غير مصرح لك بالوصول للتقارير المالية" : "⛔ Access Denied",
+                        Toast.LENGTH_SHORT).show();
                 }
             });
         }
@@ -162,6 +198,17 @@ public class MiraAccountingFragment extends Fragment {
     }
 
     private void loadData(String tab) {
+        if (!permissionManager.canView("accounting") && !permissionManager.isAdmin() && 
+            !permissionManager.isBranchManager() && 
+            !"AUDITOR".equals(new com.example.uhf.tools.SessionManager(requireContext()).getRoleString())) {
+            showEmptyState(true);
+            if (tvEmptyData != null) {
+                tvEmptyData.setText(isArabic ? "⛔ غير مصرح لك بالوصول" : "⛔ Access Denied");
+            }
+            if (pbLoading != null) pbLoading.setVisibility(View.GONE);
+            return;
+        }
+        
         if (pbLoading != null) pbLoading.setVisibility(View.VISIBLE);
         if (tvEmptyData != null) tvEmptyData.setVisibility(View.GONE);
         
@@ -315,6 +362,13 @@ public class MiraAccountingFragment extends Fragment {
 
     private void showCreateEntryDialog() {
         if (getContext() == null) return;
+        
+        if (!permissionManager.canEdit("accounting") && !permissionManager.isAdmin()) {
+            Toast.makeText(getContext(), 
+                isArabic ? "⛔ غير مصرح" : "⛔ Access Denied",
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
         
         Dialog dialog = new Dialog(getContext());
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
