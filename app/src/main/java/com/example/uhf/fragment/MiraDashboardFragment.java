@@ -260,11 +260,40 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
 
     // ✅ تحسين: تحديث البيانات فقط بدون إعادة تهيئة
     private void setupQuickAccessGrid() {
-        if (quickAccessSettings == null || quickAdapter == null) return;
-        List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
-        quickAdapter.submitList(enabledActions);
+    if (quickAccessSettings == null || quickAdapter == null) return;
+    
+    PermissionManager pm = PermissionManager.getInstance(requireContext());
+    
+    List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
+    
+    // ✅ تصفية الأزرار حسب الصلاحيات
+    List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
+    for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
+        String fragmentTag = getFragmentTagForAction(action.getId());
+        if (pm.canAccessFragment(fragmentTag)) {
+            filteredActions.add(action);
+        }
     }
+    
+    quickAdapter.submitList(filteredActions);
+}
 
+private String getFragmentTagForAction(String actionId) {
+    switch (actionId) {
+        case "identity": return "IdentityStudio";
+        case "radar": return "Radar";
+        case "gate": return "SecureGate";
+        case "reports": return "Reports";
+        case "accounting": return "Accounting";
+        case "transfers": return "Transfers";
+        case "admin_hub": return "AdminHub";
+        case "sales_history": return "SalesHistory";
+        case "server_config": return "ServerConfig";
+        case "gold_rates": return "GoldRates";
+        case "users": return "UsersManagement";
+        default: return actionId;
+    }
+}
     private void handleQuickAction(String actionId) {
         if (getActivity() instanceof UHFMainActivity) {
             UHFMainActivity activity = (UHFMainActivity) getActivity();
