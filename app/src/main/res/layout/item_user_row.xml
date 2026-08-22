@@ -3,138 +3,150 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="16dp"
     android:layout_marginBottom="8dp"
-    app:cardElevation="1dp"
+    app:cardBackgroundColor="?attr/colorSurfaceVariant"
     app:cardCornerRadius="12dp"
-    app:cardBackgroundColor="?attr/colorSurface"
-    app:strokeWidth="1dp"
-    app:strokeColor="?attr/colorOutlineVariant"
-    android:clickable="true"
-    android:focusable="true"
-    android:foreground="?attr/selectableItemBackground">
+    app:cardElevation="2dp"
+    app:strokeWidth="0dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="14dp"
-        android:gravity="center_vertical">
+        android:orientation="vertical"
+        android:padding="16dp">
 
-        <ImageView
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:src="@drawable/ic_person_outline"
-            android:tint="?attr/colorPrimary"
-            android:background="@drawable/circle_primary_bg"
-            android:padding="10dp"
-            android:layout_marginEnd="12dp" />
-
+        <!-- الصف الأول: الاسم والأزرار -->
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-            <LinearLayout
-                android:layout_width="match_parent"
+            <!-- حالة المستخدم -->
+            <View
+                android:id="@+id/vStatusDot"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/circle_green" />
+
+            <!-- اسم المستخدم -->
+            <TextView
+                android:id="@+id/tvRowDisplayName"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:layout_weight="1"
+                android:text="اسم المستخدم"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="16sp"
+                android:textStyle="bold" />
 
-                <TextView
-                    android:id="@+id/tvRowDisplayName"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="محمد أحمد"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
+            <!-- زر الصلاحيات -->
+            <ImageButton
+                android:id="@+id/btnPermissions"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Permissions"
+                android:src="@drawable/ic_permissions"
+                android:tint="?attr/colorPrimary" />
 
-                <View
-                    android:id="@+id/vStatusDot"
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
-                    android:layout_marginStart="6dp"
-                    android:background="@drawable/circle_green" />
+            <!-- زر التعديل -->
+            <ImageButton
+                android:id="@+id/btnRowEdit"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Edit"
+                android:src="@drawable/ic_edit"
+                android:tint="?attr/colorPrimary" />
 
-                <TextView
-                    android:id="@+id/tvRowStatus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="نشط"
-                    android:textColor="#FF22C55E"
-                    android:textSize="11sp"
-                    android:layout_marginStart="4dp" />
-            </LinearLayout>
+            <!-- زر الحذف -->
+            <ImageButton
+                android:id="@+id/btnRowDelete"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Delete"
+                android:src="@drawable/ic_delete"
+                android:tint="#EF4444" />
+        </LinearLayout>
+
+        <!-- الصف الثاني: اسم المستخدم والحالة -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
             <TextView
                 android:id="@+id/tvRowUsername"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@username"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvRowStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@mohammed"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="12sp"
-                android:layout_marginTop="2dp" />
+                android:text="🟢 نشط"
+                android:textColor="#22C55E"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- الصف الثالث: الدور ورقم الموظف -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
 
             <TextView
                 android:id="@+id/tvRowRole"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="مدير المخزون"
+                android:layout_weight="1"
+                android:text="📊 مدير المخزون"
                 android:textColor="?attr/colorPrimary"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:layout_marginTop="2dp" />
+                android:textSize="13sp" />
 
-            <!-- ✅ رقم الموظف -->
             <TextView
                 android:id="@+id/tvRowEmployeeId"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="🪪 MA-001"
+                android:text="🪪 EMP-001"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp"
-                android:layout_marginTop="2dp"
-                android:visibility="gone" />
+                android:textSize="12sp" />
+        </LinearLayout>
 
-            <!-- ✅ الفرع -->
+        <!-- الصف الرابع: الفرع وملخص الصلاحيات -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="vertical">
+
             <TextView
                 android:id="@+id/tvRowBranchName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="🏢 الفرع الرئيسي"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp"
-                android:layout_marginTop="2dp"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvPermissionsSummary"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="👥 📦 📊 ⚙️"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="14sp"
                 android:visibility="gone" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center">
-
-            <ImageButton
-                android:id="@+id/btnRowEdit"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="?attr/colorSurfaceVariant"
-                android:src="@android:drawable/ic_menu_edit"
-                android:contentDescription="تعديل"
-                android:tint="?attr/colorPrimary"
-                android:layout_marginBottom="4dp" />
-
-            <ImageButton
-                android:id="@+id/btnRowDelete"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="?attr/colorSurfaceVariant"
-                android:src="@android:drawable/ic_delete"
-                android:contentDescription="حذف"
-                android:tint="#FFEF4444" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
