@@ -33,6 +33,7 @@ import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraPriceManager;
+import com.example.uhf.manager.PermissionManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -70,6 +71,7 @@ public class MiraSalesHistoryFragment extends Fragment {
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
     private MiraPriceManager priceManager;
+    private PermissionManager permissionManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isArabic;
 
@@ -94,16 +96,29 @@ public class MiraSalesHistoryFragment extends Fragment {
             apiClient = MiraApiClient.getInstance(getContext());
             branchesManager = MiraBranchesManager.getInstance(getContext());
             priceManager = MiraPriceManager.getInstance(getContext());
+            permissionManager = PermissionManager.getInstance(getContext());
             offlineCache = requireContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
         }
 
         initViews(view);
         setupRecyclerView();
         setupListeners();
+        applyPermissions();
 
-        // تحميل فوري أوفلاين ثم استدعاء السيرفر
         loadSalesOffline();
         loadSalesHistory(true);
+    }
+
+    private void applyPermissions() {
+        boolean canView = permissionManager.canView("sales_history") || 
+                         permissionManager.isPosOperator() || 
+                         permissionManager.isManager();
+        
+        if (!canView) {
+            showEmptyState(isArabic ? "⛔ غير مصرح لك بالوصول لسجل المبيعات" : "⛔ Access Denied");
+            if (pbLoading != null) pbLoading.setVisibility(View.GONE);
+            return;
+        }
     }
 
     private void initViews(View view) {
@@ -145,8 +160,6 @@ public class MiraSalesHistoryFragment extends Fragment {
         }
     }
 
-    // ==================== OFFLINE CACHE ====================
-
     private void saveSalesOffline(JSONArray sales) {
         try {
             if (offlineCache == null) return;
@@ -175,10 +188,14 @@ public class MiraSalesHistoryFragment extends Fragment {
         } catch (Exception ignored) {}
     }
 
-    // ==================== DATA LOADING ====================
-
     private void loadSalesHistory(boolean showProgress) {
         if (!isAdded()) return;
+        
+        if (!permissionManager.canView("sales_history") && 
+            !permissionManager.isPosOperator() && 
+            !permissionManager.isManager()) {
+            return;
+        }
 
         if (showProgress) {
             showLoadingState();
@@ -274,8 +291,6 @@ public class MiraSalesHistoryFragment extends Fragment {
         return items;
     }
 
-    // ==================== FILTER & SUMMARY ====================
-
     private void filterSales(String query) {
         List<MiraSaleItem> newFiltered = new ArrayList<>();
         if (query == null || query.trim().isEmpty()) {
@@ -321,8 +336,6 @@ public class MiraSalesHistoryFragment extends Fragment {
         }
     }
 
-    // ==================== UI STATE HELPERS ====================
-
     private void showLoadingState() {
         if (layoutEmptyState != null) layoutEmptyState.setVisibility(View.VISIBLE);
         if (pbLoading != null) pbLoading.setVisibility(View.VISIBLE);
@@ -349,29 +362,23 @@ public class MiraSalesHistoryFragment extends Fragment {
         if (layoutEmptyState != null) layoutEmptyState.setVisibility(View.GONE);
     }
 
-    /**
-     * ✅ الإصلاح: فتح السند بطريقة صحيحة مع الحفاظ على شاشة المبيعات
-     */
     private void openReceipt(MiraSaleItem sale) {
         try {
             if (getActivity() instanceof UHFMainActivity) {
-                // ✅ استخدام الطريقة الموجودة في UHFMainActivity
                 ((UHFMainActivity) getActivity()).openReceiptFragment(sale.rawJson);
             } else if (isAdded()) {
-                // ✅ الحل: استخدام add بدلاً من replace مع إخفاء الـ Fragment الحالي
                 openReceiptWithAdd(sale.rawJson);
             }
         } catch (Exception e) {
             Log.e(TAG, "Error opening receipt", e);
             if (getContext() != null) {
-                Toast.makeText(getContext(), isArabic ? "خطأ في فتح الإيصال" : "Error opening receipt", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), 
+                    isArabic ? "خطأ في فتح الإيصال" : "Error opening receipt", 
+                    Toast.LENGTH_SHORT).show();
             }
         }
     }
 
-    /**
-     * ✅ فتح السند مع الحفاظ على شاشة المبيعات
-     */
     private void openReceiptWithAdd(String receiptJson) {
         try {
             MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(receiptJson);
@@ -379,28 +386,18 @@ public class MiraSalesHistoryFragment extends Fragment {
             FragmentManager fm = getParentFragmentManager();
             FragmentTransaction ft = fm.beginTransaction();
             
-            // ✅ إخفاء الـ Fragment الحالي بدلاً من استبداله
             ft.hide(this);
-            
-            // ✅ إضافة السند فوق شاشة المبيعات
             ft.add(android.R.id.content, receipt, "mira_receipt");
-            
-            // ✅ إضافة إلى Back Stack للعودة الصحيحة
             ft.addToBackStack("mira_receipt");
-            
             ft.commit();
             
-            // ✅ إضافة مستمع للعودة لإظهار شاشة المبيعات مرة أخرى
             fm.addOnBackStackChangedListener(new FragmentManager.OnBackStackChangedListener() {
                 @Override
                 public void onBackStackChanged() {
                     if (fm.getBackStackEntryCount() == 0) {
-                        // ✅ تم العودة من السند، إظهار شاشة المبيعات
                         FragmentTransaction showFt = fm.beginTransaction();
                         showFt.show(MiraSalesHistoryFragment.this);
                         showFt.commit();
-                        
-                        // ✅ إزالة المستمع بعد الاستخدام
                         fm.removeOnBackStackChangedListener(this);
                     }
                 }
@@ -408,7 +405,6 @@ public class MiraSalesHistoryFragment extends Fragment {
             
         } catch (Exception e) {
             Log.e(TAG, "Error in openReceiptWithAdd", e);
-            // ✅ في حالة الفشل، استخدم الطريقة التقليدية
             try {
                 MiraReceiptFragment receipt = MiraReceiptFragment.newInstance(receiptJson);
                 getParentFragmentManager().beginTransaction()
@@ -420,8 +416,6 @@ public class MiraSalesHistoryFragment extends Fragment {
             }
         }
     }
-
-    // ==================== MODEL CLASS ====================
 
     static class MiraSaleItem {
         String saleId, customerName, paymentMethod, date, rawJson;
@@ -446,8 +440,6 @@ public class MiraSalesHistoryFragment extends Fragment {
             return Objects.hash(saleId, customerName, paymentMethod, date, amount, itemCount);
         }
     }
-
-    // ==================== ADAPTER WITH DIFFUTIL ====================
 
     static class MiraSalesAdapter extends RecyclerView.Adapter<MiraSalesAdapter.VH> {
         private final List<MiraSaleItem> items;
