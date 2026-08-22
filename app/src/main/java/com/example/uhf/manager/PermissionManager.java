@@ -8,6 +8,9 @@ import com.example.uhf.tools.SessionManager;
 
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * MIRA Permission Manager
  * إدارة صلاحيات المستخدمين حسب الأدوار
