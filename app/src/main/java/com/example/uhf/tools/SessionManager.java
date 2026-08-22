@@ -27,6 +27,7 @@ public class SessionManager {
     private static final String KEY_API_KEY_ID = "apiKeyId";
     private static final String KEY_API_KEY_PREFIX = "apiKeyPrefix";
     private static final String KEY_API_KEY_CREATED_AT = "apiKeyCreatedAt";
+    private static final String KEY_GATE_ID = "gate_id"; // ✅ ثابت جديد
 
     public enum Role {
         SYSTEM_ADMIN,
@@ -57,7 +58,7 @@ public class SessionManager {
         editor.apply();
     }
 
-    // ✅ دوال API Key الجديدة
+    // ==================== API Key ====================
     
     /**
      * حفظ مفتاح API
@@ -82,6 +83,20 @@ public class SessionManager {
     public boolean hasApiKey() {
         String apiKey = getApiKey();
         return !apiKey.isEmpty();
+    }
+    
+    /**
+     * ✅ حفظ gate_id
+     */
+    public void saveGateId(String gateId) {
+        pref.edit().putString(KEY_GATE_ID, gateId).apply(); // ✅ pref
+    }
+
+    /**
+     * ✅ الحصول على gate_id
+     */
+    public String getGateId() {
+        return pref.getString(KEY_GATE_ID, ""); // ✅ pref
     }
     
     /**
@@ -117,6 +132,7 @@ public class SessionManager {
         editor.remove(KEY_API_KEY_ID);
         editor.remove(KEY_API_KEY_PREFIX);
         editor.remove(KEY_API_KEY_CREATED_AT);
+        editor.remove(KEY_GATE_ID);
         editor.apply();
     }
 
@@ -243,8 +259,9 @@ public class SessionManager {
         int lastBranchId = pref.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, 1);
         String lastBranchName = pref.getString(KEY_LAST_BIOMETRIC_BRANCH_NAME, "");
         
-        // ✅ حفظ مفتاح API قبل المسح (إذا أردت الاحتفاظ به)
+        // ✅ حفظ API Key و Gate ID قبل المسح
         String apiKey = pref.getString(KEY_API_KEY, "");
+        String gateId = pref.getString(KEY_GATE_ID, "");
 
         editor.clear();
 
@@ -259,8 +276,13 @@ public class SessionManager {
             editor.putString(KEY_LAST_BIOMETRIC_BRANCH_NAME, lastBranchName);
         }
         
-        // ✅ لا تحذف مفتاح API - سيتم استخدامه في تسجيل الدخول التالي
-        // إذا أردت حذفه، استخدم clearApiKey()
+        // ✅ الاحتفاظ بـ API Key و Gate ID
+        if (!apiKey.isEmpty()) {
+            editor.putString(KEY_API_KEY, apiKey);
+        }
+        if (!gateId.isEmpty()) {
+            editor.putString(KEY_GATE_ID, gateId);
+        }
 
         editor.apply();
     }
