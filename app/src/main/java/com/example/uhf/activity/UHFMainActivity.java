@@ -38,6 +38,7 @@ import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.example.uhf.R;
+import com.example.uhf.manager.PermissionManager;  
 import com.example.uhf.fragment.MiraQuickAccessSettingsFragment;
 import com.example.uhf.fragment.MiraServerConfigFragment;
 import com.example.uhf.manager.MiraQuickAccessSettings;
