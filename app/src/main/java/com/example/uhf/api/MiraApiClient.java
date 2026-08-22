@@ -235,16 +235,37 @@ public ApiResponse activateProvider(int providerId) {
         String newGateId = response.data.optString("gate_id", "");
         String authToken = response.data.optString("token", "");
         
-        // ✅ حفظ التوكن دائماً
-        if (!authToken.isEmpty()) {
+        // ✅ إذا أرسل السيرفر api_key جديد، احفظه
+        if (!newApiKey.isEmpty()) {
+            // ✅ استخدام device_id إذا كان gate_id فارغاً
+            String effectiveGateId = !newGateId.isEmpty() ? newGateId : 
+                                     (deviceId != null && !deviceId.isEmpty() ? deviceId : getEffectiveGateId());
+            
+            serverConfig.saveSession(newApiKey, effectiveGateId, authToken);
+            refreshCredentials();
+            Log.d(TAG, "✅ New API Key saved:");
+            Log.d(TAG, "   API Key: " + newApiKey.substring(0, Math.min(8, newApiKey.length())) + "...");
+            Log.d(TAG, "   Gate ID: " + effectiveGateId);
+        } 
+        // ✅ إذا لم يرسل api_key (لأنه موجود)، احتفظ بالمفتاح الحالي
+        else if (!authToken.isEmpty()) {
+            String currentApiKey = getEffectiveApiKey();
+            String currentGateId = getEffectiveGateId();
+            
+            // ✅ استخدام device_id إذا كان gate_id الحالي فارغاً
+            String effectiveGateId = !currentGateId.isEmpty() ? currentGateId : 
+                                     (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
+            
             serverConfig.saveSession(
-                !newApiKey.isEmpty() ? newApiKey : getEffectiveApiKey(),
-                !newGateId.isEmpty() ? newGateId : getEffectiveGateId(),
+                !currentApiKey.isEmpty() ? currentApiKey : "",
+                effectiveGateId,
                 authToken
             );
             refreshCredentials();
+            Log.d(TAG, "✅ Using existing API Key with gate_id: " + effectiveGateId);
         }
     }
+    
     return response;
 }
 
