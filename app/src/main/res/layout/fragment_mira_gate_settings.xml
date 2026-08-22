@@ -1,271 +1,113 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="?android:attr/colorBackground"
-    android:fillViewport="true">
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="6dp"
+    app:cardBackgroundColor="?attr/colorSurface"
+    app:cardCornerRadius="10dp"
+    app:cardElevation="1dp"
+    app:strokeColor="?attr/colorOutlineVariant"
+    app:strokeWidth="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="10dp">
 
-        <!-- 🏢 قسم البوابات -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/gate_settings_title"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorPrimary"
-            android:layout_marginBottom="16dp"/>
-
-        <!-- قائمة البوابات -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvGates"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="120dp"
-            android:nestedScrollingEnabled="false"
-            android:layout_marginBottom="8dp"/>
-
-        <!-- زر إضافة بوابة -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnAddGate"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="@string/add_gate"
-            android:textColor="?attr/colorOnPrimary"
-            app:backgroundTint="?attr/colorPrimary"
-            app:cornerRadius="8dp"
-            android:layout_marginBottom="16dp"/>
-
-        <!-- خط فاصل -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="?attr/colorOutline"
-            android:layout_marginBottom="16dp"/>
-
-        <!-- 🔊 قسم الأصوات -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/sound_settings"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorPrimary"
-            android:layout_marginBottom="16dp"/>
-
-        <!-- صوت النجاح -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/sound_pass"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorOnBackground"
-            android:layout_marginBottom="4dp"/>
-
-        <Spinner
-            android:id="@+id/spSoundPass"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginBottom="12dp"/>
-
-        <!-- صوت الرفض -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/sound_deny"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorOnBackground"
-            android:layout_marginBottom="4dp"/>
-
-        <Spinner
-            android:id="@+id/spSoundDeny"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginBottom="12dp"/>
-
-        <!-- صوت الإنذار -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/sound_alarm"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorOnBackground"
-            android:layout_marginBottom="4dp"/>
-
-        <Spinner
-            android:id="@+id/spSoundAlarm"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginBottom="12dp"/>
-
-        <!-- أزرار الصوت -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="16dp">
+            android:gravity="center_vertical">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnTestSound"
-                style="@style/Widget.Material3.Button.OutlinedButton"
+            <LinearLayout
                 android:layout_width="0dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_height="44dp"
-                android:text="@string/test_sound"
-                android:textColor="?attr/colorPrimary"
-                app:strokeColor="?attr/colorPrimary"
-                app:cornerRadius="8dp"
-                android:layout_marginEnd="8dp"/>
+                android:orientation="vertical">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnSaveSounds"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="44dp"
-                android:text="@string/save_sounds"
-                android:textColor="?attr/colorOnPrimary"
-                app:backgroundTint="?attr/colorPrimary"
-                app:cornerRadius="8dp"/>
-        </LinearLayout>
+                <TextView
+                    android:id="@+id/tvGateName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="البوابة الرئيسية"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
 
-        <!-- خط فاصل -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="?attr/colorOutline"
-            android:layout_marginBottom="16dp"/>
-
-        <!-- ⚙️ قسم إعدادات إضافية -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/additional_settings"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorPrimary"
-            android:layout_marginBottom="16dp"/>
-
-        <!-- الاهتزاز -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="8dp">
+                <TextView
+                    android:id="@+id/tvGateLocation"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="📍 المدخل الرئيسي"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="10sp" />
+            </LinearLayout>
 
             <TextView
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="@string/vibration_enabled"
-                android:textSize="14sp"
-                android:textColor="?attr/colorOnBackground"/>
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switchVibration"
+                android:id="@+id/tvGateStatus"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"/>
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="4dp"
+                android:text="⚪ غير متصل"
+                android:textColor="#9E9E9E"
+                android:textSize="11sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- وميض الشاشة -->
+        <!-- ✅ إحصائيات وأحداث -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
             android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="8dp">
+            android:gravity="center_vertical">
 
             <TextView
+                android:id="@+id/tvGateStats"
                 android:layout_width="0dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:text="✅ 0 | ❌ 0"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/tvGateLastEvent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="@string/flash_enabled"
+                android:layout_weight="1.5"
+                android:gravity="end"
+                android:text="لا أحداث"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="9sp" />
+
+            <!-- ✅ زر تحكم -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnToggleGate"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="6dp"
+                android:text="🔓"
                 android:textSize="14sp"
-                android:textColor="?attr/colorOnBackground"/>
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:cornerRadius="18dp" />
 
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switchFlash"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"/>
+            <!-- زر حذف -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRemoveGate"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:text="🗑"
+                android:textSize="14sp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp" />
         </LinearLayout>
-
-        <!-- مدة الإنذار -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/alarm_duration_label"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorOnBackground"
-            android:layout_marginBottom="4dp"/>
-
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etAlarmDuration"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="number"
-                android:hint="10"
-                android:autofillHints=""
-                android:textColor="?attr/colorOnSurface"/>
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- قوة RFID -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/rfid_power_label"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorOnBackground"
-            android:layout_marginBottom="4dp"/>
-
-        <SeekBar
-            android:id="@+id/seekRfidPower"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:max="30"
-            android:progress="28"
-            android:progressTint="?attr/colorPrimary"
-            android:thumbTint="?attr/colorPrimary"
-            android:layout_marginBottom="4dp"/>
-
-        <TextView
-            android:id="@+id/tvRfidPowerValue"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="28 dBm"
-            android:gravity="center"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorPrimary"
-            android:layout_marginBottom="16dp"/>
-
-        <!-- زر حفظ الكل -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnSaveAll"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:text="@string/save_all"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorOnPrimary"
-            app:backgroundTint="?attr/colorPrimary"
-            app:cornerRadius="10dp"/>
-
     </LinearLayout>
-</ScrollView>
+</com.google.android.material.card.MaterialCardView>
