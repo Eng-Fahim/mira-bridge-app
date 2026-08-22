@@ -30,7 +30,7 @@ import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.SessionManager;
-
+import com.example.uhf.manager.PermissionManager;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
@@ -39,8 +39,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.ArrayList;
 
 public class MiraDashboardFragment extends Fragment implements SharedPreferences.OnSharedPreferenceChangeListener {
+
+private PermissionManager permissionManager; 
 
     private static final String TAG = "MiraDashboardFragment";
     private static final String OFFLINE_PREFS_BASE = "dashboard_cache_branch_";
@@ -97,6 +100,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             // 1️⃣ تهيئة المديرين والخدمات
             apiClient = MiraApiClient.getInstance(requireContext());
             sessionManager = new SessionManager(requireContext());
+            permissionManager = PermissionManager.getInstance(requireContext()); 
             branchesManager = MiraBranchesManager.getInstance(requireContext());
             orgProfile = MiraOrgProfileManager.getInstance(requireContext());
             priceManager = MiraPriceManager.getInstance(requireContext());
@@ -207,6 +211,11 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             tvGoldChange = v.findViewById(R.id.tvGoldChange);
             btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
             cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
+    
+    // ✅ إخفاء بطاقة الذهب إذا لا يملك صلاحية
+if (cardGoldPrices != null && !permissionManager.canAccessFragment("GoldRates")) {
+            cardGoldPrices.setVisibility(View.GONE);
+        }
             
             // ✅ تهيئة RecyclerView مرة واحدة فقط مع تحسينات الأداء
             rvQuickActions = v.findViewById(R.id.rvQuickActions);
@@ -242,42 +251,56 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         } catch (Throwable e) {
             Log.e(TAG, "initViews error", e);
         }
+        
+    
     }
 
     private void setupListeners() {
-        if (btnGate != null) btnGate.setOnClickListener(v -> {
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).loadFragment(new MiraSecureGateFragment(), "SecureGate");
+        // ✅ استخدام المتغير بدلاً من إنشاء جديد
+        if (btnGate != null) {
+            if (permissionManager.canAccessFragment("SecureGate")) {
+                btnGate.setVisibility(View.VISIBLE);
+                btnGate.setOnClickListener(v -> {
+                    if (getActivity() instanceof UHFMainActivity) {
+                        ((UHFMainActivity) getActivity()).loadFragment(new MiraSecureGateFragment(), "SecureGate");
+                    }
+                });
+            } else {
+                btnGate.setVisibility(View.GONE);
             }
-        });
-
-        if (btnInventory != null) btnInventory.setOnClickListener(v -> {
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).loadFragment(new MiraInventoryProFragment(), "Scan");
+        }
+        
+        if (btnInventory != null) {
+            if (permissionManager.canAccessFragment("Scan")) {
+                btnInventory.setVisibility(View.VISIBLE);
+                btnInventory.setOnClickListener(v -> {
+                    if (getActivity() instanceof UHFMainActivity) {
+                        ((UHFMainActivity) getActivity()).loadFragment(new MiraInventoryProFragment(), "Scan");
+                    }
+                });
+            } else {
+                btnInventory.setVisibility(View.GONE);
             }
-        });
-    }
-
-    // ✅ تحسين: تحديث البيانات فقط بدون إعادة تهيئة
-    private void setupQuickAccessGrid() {
-    if (quickAccessSettings == null || quickAdapter == null) return;
-    
-    PermissionManager pm = PermissionManager.getInstance(requireContext());
-    
-    List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
-    
-    // ✅ تصفية الأزرار حسب الصلاحيات
-    List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
-    for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
-        String fragmentTag = getFragmentTagForAction(action.getId());
-        if (pm.canAccessFragment(fragmentTag)) {
-            filteredActions.add(action);
         }
     }
     
-    quickAdapter.submitList(filteredActions);
+    private void setupQuickAccessGrid() {
+        if (quickAccessSettings == null || quickAdapter == null) return;
+        
+        List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
+        
+        // ✅ استخدام المتغير
+        List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
+        for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
+            String fragmentTag = getFragmentTagForAction(action.getId());
+            if (permissionManager.canAccessFragment(fragmentTag)) {
+                filteredActions.add(action);
+            }
+        }
+        
+        quickAdapter.submitList(filteredActions);
+    }
 }
-
 private String getFragmentTagForAction(String actionId) {
     switch (actionId) {
         case "identity": return "IdentityStudio";
