@@ -4,8 +4,11 @@ import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
@@ -15,18 +18,23 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatDelegate;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
@@ -36,44 +44,46 @@ import com.example.uhf.tools.SessionManager;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.security.SecureRandom;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Users Management Fragment - النسخة الكاملة
+ * Users Management Fragment - النسخة المحسنة الكاملة
  * 
- * إدارة المستخدمين والصلاحيات مع دعم الفروع المتعدد
+ * إدارة المستخدمين والصلاحيات المتعددة مع دعم الفروع
  * 
- * الصلاحيات:
- * - SYSTEM_ADMIN: يرى ويدير جميع المستخدمين في كل الفروع - جميع الأدوار
- * - ORG_ADMIN: يرى ويدير جميع المستخدمين ما عدا SYSTEM_ADMIN
- * - BRANCH_MANAGER: يرى ويدير مستخدمي فرعه فقط - أدوار محدودة
- * 
- * المميزات:
- * - دعم كامل للغة العربية والإنجليزية
- * - توليد كلمات مرور قوية تلقائياً
- * - اقتراح اسم مستخدم ذكي من الاسم الكامل
- * - مؤشر قوة كلمة المرور التفاعلي مع متطلبات
- * - رقم موظف تلقائي (اختصار الفرع-تسلسل)
- * - اختيار الفرع من قائمة منسدلة
- * - اختيار الصلاحية من قائمة منسدلة (تعرض المسموح فقط)
- * - Loading overlay احترافي أثناء الحفظ
- * - تصفية المستخدمين حسب الفرع النشط
- * - التحقق من الصلاحيات قبل التعديل والحذف
+ * المميزات الجديدة:
+ * - نظام صلاحيات متعدد ومفصل
+ * - قوالب صلاحيات جاهزة
+ * - تصدير البيانات CSV
+ * - فلترة متقدمة
+ * - سجل النشاطات
+ * - تحقق من توفر اسم المستخدم
+ * - واجهة محسنة مع SwipeRefresh
  */
 public class UsersManagementFragment extends Fragment {
 
     // ==================== UI Elements ====================
     private RecyclerView rvUsersList;
     private EditText etSearchUser;
-    private TextView tvTotalUsers, tvActiveUsers, tvOnlineNow;
-    private Button btnAddUser, btnRefreshUsers;
+    private TextView tvTotalUsers, tvActiveUsers, tvOnlineNow, tvSuspendedUsers;
+    private Button btnAddUser, btnRefreshUsers, btnFilter, btnExport;
+    private SwipeRefreshLayout swipeRefreshLayout;
+    private LinearLayout emptyStateLayout;
+    private TextView tvEmptyState;
 
     // ==================== Managers & API ====================
     private MiraApiClient apiClient;
@@ -87,6 +97,7 @@ public class UsersManagementFragment extends Fragment {
     private final List<UserData> filteredList = new ArrayList<>();
     private boolean isArabic;
     private SessionManager.Role currentUserRole;
+    private int currentFilter = 0; // 0 = All, 1 = Active, 2 = Suspended, 3 = Online
 
     // ==================== Constants ====================
     private static final String[] ROLES = {
@@ -107,6 +118,51 @@ public class UsersManagementFragment extends Fragment {
     private static final String[] ROLE_ICONS = {
         "🔧", "🏢", "👤", "📊", "🛒", "🔒", "🚪", "🔍"
     };
+
+    // ==================== Permission Templates ====================
+    private static final Map<String, UserPermissions> PERMISSION_TEMPLATES = new HashMap<>();
+    static {
+        // قالب المدير الكامل
+        UserPermissions adminFull = new UserPermissions();
+        adminFull.setAllPermissions(true);
+        PERMISSION_TEMPLATES.put("ADMIN_FULL", adminFull);
+
+        // قالب المدير
+        UserPermissions manager = new UserPermissions();
+        manager.setCanViewInventory(true);
+        manager.setCanEditInventory(true);
+        manager.setCanViewReports(true);
+        manager.setCanManageUsers(false);
+        manager.setCanViewAuditLogs(true);
+        manager.setCanExportData(true);
+        manager.setCanApproveTransactions(true);
+        manager.setCanAccessSettings(false);
+        PERMISSION_TEMPLATES.put("MANAGER", manager);
+
+        // قالب المشغل
+        UserPermissions operator = new UserPermissions();
+        operator.setCanViewInventory(true);
+        operator.setCanEditInventory(false);
+        operator.setCanViewReports(false);
+        operator.setCanManageUsers(false);
+        operator.setCanViewAuditLogs(false);
+        operator.setCanExportData(false);
+        operator.setCanApproveTransactions(false);
+        operator.setCanAccessSettings(false);
+        PERMISSION_TEMPLATES.put("OPERATOR", operator);
+
+        // قالب المشاهد
+        UserPermissions viewer = new UserPermissions();
+        viewer.setCanViewInventory(true);
+        viewer.setCanEditInventory(false);
+        viewer.setCanViewReports(true);
+        viewer.setCanManageUsers(false);
+        viewer.setCanViewAuditLogs(false);
+        viewer.setCanExportData(false);
+        viewer.setCanApproveTransactions(false);
+        viewer.setCanAccessSettings(false);
+        PERMISSION_TEMPLATES.put("VIEWER", viewer);
+    }
 
     // ==================== Password Generator ====================
     private static final String UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -141,46 +197,22 @@ public class UsersManagementFragment extends Fragment {
         currentUserRole = sessionManager.getUserRole();
 
         // ربط عناصر الواجهة
-        rvUsersList = view.findViewById(R.id.rvUsersList);
-        etSearchUser = view.findViewById(R.id.etSearchUser);
-        tvTotalUsers = view.findViewById(R.id.tvTotalUsers);
-        tvActiveUsers = view.findViewById(R.id.tvActiveUsers);
-        tvOnlineNow = view.findViewById(R.id.tvOnlineNow);
-        btnAddUser = view.findViewById(R.id.btnAddUser);
-        btnRefreshUsers = view.findViewById(R.id.btnRefreshUsers);
-
+        initializeViews(view);
+        
         // تطبيق اللغة
         applyLanguage();
 
-        // تحميل الفروع مسبقاً للاستخدام في الـ Dialog
+        // تحميل الفروع مسبقاً
         loadBranchesCache();
 
         // إعداد RecyclerView
-        rvUsersList.setLayoutManager(new LinearLayoutManager(getContext()));
-        adapter = new UsersAdapter(filteredList, isArabic);
-        rvUsersList.setAdapter(adapter);
+        setupRecyclerView();
 
-        // أزرار
-        btnAddUser.setOnClickListener(v -> {
-            if (canManageUsers()) {
-                showUserDialog(null);
-            } else {
-                Toast.makeText(getContext(),
-                    isArabic ? "❌ ليس لديك صلاحية لإضافة مستخدمين" : "❌ You don't have permission to add users",
-                    Toast.LENGTH_SHORT).show();
-            }
-        });
+        // إعداد الأزرار
+        setupButtons();
 
-        btnRefreshUsers.setOnClickListener(v -> loadUsers());
-
-        // بحث
-        etSearchUser.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override public void afterTextChanged(Editable s) {
-                filterUsers(s.toString());
-            }
-        });
+        // إعداد البحث
+        setupSearch();
 
         // تحميل البيانات
         loadUsers();
@@ -189,8 +221,65 @@ public class UsersManagementFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // إعادة تحميل عند تغيير الفرع
         loadUsers();
+    }
+
+    // ==================== Initialization ====================
+
+    private void initializeViews(View view) {
+        rvUsersList = view.findViewById(R.id.rvUsersList);
+        etSearchUser = view.findViewById(R.id.etSearchUser);
+        tvTotalUsers = view.findViewById(R.id.tvTotalUsers);
+        tvActiveUsers = view.findViewById(R.id.tvActiveUsers);
+        tvOnlineNow = view.findViewById(R.id.tvOnlineNow);
+        tvSuspendedUsers = view.findViewById(R.id.tvSuspendedUsers);
+        btnAddUser = view.findViewById(R.id.btnAddUser);
+        btnRefreshUsers = view.findViewById(R.id.btnRefreshUsers);
+        btnFilter = view.findViewById(R.id.btnFilter);
+        btnExport = view.findViewById(R.id.btnExport);
+        swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout);
+        emptyStateLayout = view.findViewById(R.id.emptyStateLayout);
+        tvEmptyState = view.findViewById(R.id.tvEmptyState);
+    }
+
+    private void setupRecyclerView() {
+        rvUsersList.setLayoutManager(new LinearLayoutManager(getContext()));
+        adapter = new UsersAdapter(filteredList, isArabic);
+        rvUsersList.setAdapter(adapter);
+    }
+
+    private void setupButtons() {
+        btnAddUser.setOnClickListener(v -> {
+            if (canManageUsers()) {
+                showUserDialog(null);
+            } else {
+                showToast(isArabic ? "❌ ليس لديك صلاحية لإضافة مستخدمين" : "❌ You don't have permission to add users");
+            }
+        });
+
+        btnRefreshUsers.setOnClickListener(v -> loadUsers());
+        
+        btnFilter.setOnClickListener(v -> showFilterDialog());
+        
+        btnExport.setOnClickListener(v -> exportUsersData());
+
+        swipeRefreshLayout.setOnRefreshListener(this::loadUsers);
+        swipeRefreshLayout.setColorSchemeResources(
+            android.R.color.holo_blue_bright,
+            android.R.color.holo_green_light,
+            android.R.color.holo_orange_light,
+            android.R.color.holo_red_light
+        );
+    }
+
+    private void setupSearch() {
+        etSearchUser.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                filterUsers(s.toString());
+            }
+        });
     }
 
     // ==================== Language ====================
@@ -199,78 +288,62 @@ public class UsersManagementFragment extends Fragment {
         if (btnAddUser != null) btnAddUser.setText(isArabic ? "+ إضافة مستخدم" : "+ Add User");
         if (etSearchUser != null) etSearchUser.setHint(isArabic ? "بحث عن مستخدم..." : "Search users...");
         if (btnRefreshUsers != null) btnRefreshUsers.setText(isArabic ? "تحديث" : "Refresh");
+        if (btnFilter != null) btnFilter.setText(isArabic ? "تصفية" : "Filter");
+        if (btnExport != null) btnExport.setText(isArabic ? "تصدير" : "Export");
+        
+        if (tvEmptyState != null) {
+            tvEmptyState.setText(isArabic ? "لا يوجد مستخدمين" : "No users found");
+        }
     }
 
     // ==================== Branch & Permission Logic ====================
 
-    /**
-     * الحصول على branch_id للمستخدم الجديد
-     */
     private int getBranchIdForNewUser() {
         return branchesManager.getActiveBranchId();
     }
 
-    /**
-     * التحقق من صلاحية إدارة المستخدمين
-     */
     private boolean canManageUsers() {
         return currentUserRole == SessionManager.Role.SYSTEM_ADMIN
             || currentUserRole == SessionManager.Role.ORG_ADMIN
             || currentUserRole == SessionManager.Role.BRANCH_MANAGER;
     }
 
-    /**
-     * التحقق من صلاحية حذف مستخدم
-     */
     private boolean canDeleteUser(String targetRole) {
-        // SYSTEM_ADMIN يمكنه حذف أي مستخدم
         if (currentUserRole == SessionManager.Role.SYSTEM_ADMIN) return true;
-
-        // ORG_ADMIN يمكنه حذف الجميع ما عدا SYSTEM_ADMIN
         if (currentUserRole == SessionManager.Role.ORG_ADMIN && !"SYSTEM_ADMIN".equals(targetRole))
             return true;
-
-        // BRANCH_MANAGER يمكنه حذف الأدوار المحدودة فقط
         if (currentUserRole == SessionManager.Role.BRANCH_MANAGER) {
             String[] allowed = {"INVENTORY_MGR", "POS_OPERATOR", "SECURITY", "GATE_SECURITY"};
             for (String a : allowed) {
                 if (a.equals(targetRole)) return true;
             }
         }
-
         return false;
     }
 
-    /**
-     * التحقق من صلاحية تعديل مستخدم
-     */
     private boolean canEditUser(String targetRole) {
         return canDeleteUser(targetRole);
     }
 
-    /**
-     * الحصول على الأدوار المسموح بإنشائها حسب صلاحية المستخدم الحالي
-     */
+    private boolean canManagePermissions() {
+        return currentUserRole == SessionManager.Role.SYSTEM_ADMIN
+            || currentUserRole == SessionManager.Role.ORG_ADMIN;
+    }
+
     private String[] getAllowedRoles() {
         if (currentUserRole == SessionManager.Role.SYSTEM_ADMIN) {
             return ROLES;
         }
-
         if (currentUserRole == SessionManager.Role.ORG_ADMIN) {
             return new String[]{"ORG_ADMIN", "BRANCH_MANAGER", "INVENTORY_MGR",
                 "POS_OPERATOR", "SECURITY", "GATE_SECURITY", "AUDITOR"};
         }
-
         if (currentUserRole == SessionManager.Role.BRANCH_MANAGER) {
             return new String[]{"INVENTORY_MGR", "POS_OPERATOR", "SECURITY", "GATE_SECURITY"};
         }
-
         return new String[]{};
     }
 
-    /**
-     * التحقق من أن دوراً معيناً مسموح بإنشائه
-     */
     private boolean isRoleAllowed(String role) {
         String[] allowedRoles = getAllowedRoles();
         for (String allowed : allowedRoles) {
@@ -279,9 +352,6 @@ public class UsersManagementFragment extends Fragment {
         return false;
     }
 
-    /**
-     * الحصول على اسم الدور بالعربية
-     */
     private String getRoleDisplayName(String role, boolean arabic) {
         for (int i = 0; i < ROLES.length; i++) {
             if (ROLES[i].equals(role)) {
@@ -291,9 +361,6 @@ public class UsersManagementFragment extends Fragment {
         return role;
     }
 
-    /**
-     * استخراج كود الدور من النص المعروض
-     */
     private String extractRoleCode(String displayText) {
         for (String role : ROLES) {
             if (displayText.contains(role)) return role;
@@ -325,7 +392,6 @@ public class UsersManagementFragment extends Fragment {
                     }
                 }
             } catch (Exception e) {
-                // استخدام فروع افتراضية عند الفشل
                 if (branchesList.isEmpty()) {
                     branchesList.add(new BranchItem(1, "الفرع الرئيسي", "MAIN", ""));
                     branchesList.add(new BranchItem(2, "فرع عدن", "ADN", ""));
@@ -338,23 +404,30 @@ public class UsersManagementFragment extends Fragment {
     // ==================== Load Users ====================
 
     private void loadUsers() {
+        if (swipeRefreshLayout != null) {
+            swipeRefreshLayout.setRefreshing(true);
+        }
+        
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 MiraApiClient.ApiResponse response = apiClient.getUsers();
                 mainHandler.post(() -> {
+                    if (swipeRefreshLayout != null) {
+                        swipeRefreshLayout.setRefreshing(false);
+                    }
+                    
                     if (response != null && response.isSuccess && response.data != null) {
                         parseUsers(response.data);
                     } else {
-                        Toast.makeText(getContext(),
-                            isArabic ? "فشل تحميل المستخدمين" : "Failed to load users",
-                            Toast.LENGTH_SHORT).show();
+                        showToast(isArabic ? "فشل تحميل المستخدمين" : "Failed to load users");
                     }
                 });
             } catch (Exception e) {
                 mainHandler.post(() -> {
-                    Toast.makeText(getContext(),
-                        isArabic ? "خطأ في الاتصال بالخادم" : "Server connection error",
-                        Toast.LENGTH_SHORT).show();
+                    if (swipeRefreshLayout != null) {
+                        swipeRefreshLayout.setRefreshing(false);
+                    }
+                    showToast(isArabic ? "خطأ في الاتصال بالخادم" : "Server connection error");
                 });
             }
         });
@@ -385,6 +458,20 @@ public class UsersManagementFragment extends Fragment {
             user.isOnline = u.optBoolean("is_online", false);
             user.branchName = u.optString("branch_name", "");
             user.branchId = u.optInt("branch_id", 0);
+            
+            // تحميل الصلاحيات المتعددة
+            user.permissions = new UserPermissions();
+            JSONObject permissionsObj = u.optJSONObject("permissions");
+            if (permissionsObj != null) {
+                user.permissions.setCanViewInventory(permissionsObj.optBoolean("can_view_inventory", false));
+                user.permissions.setCanEditInventory(permissionsObj.optBoolean("can_edit_inventory", false));
+                user.permissions.setCanViewReports(permissionsObj.optBoolean("can_view_reports", false));
+                user.permissions.setCanManageUsers(permissionsObj.optBoolean("can_manage_users", false));
+                user.permissions.setCanViewAuditLogs(permissionsObj.optBoolean("can_view_audit_logs", false));
+                user.permissions.setCanExportData(permissionsObj.optBoolean("can_export_data", false));
+                user.permissions.setCanApproveTransactions(permissionsObj.optBoolean("can_approve_transactions", false));
+                user.permissions.setCanAccessSettings(permissionsObj.optBoolean("can_access_settings", false));
+            }
 
             // استخراج رقم الموظف
             if (!user.employeeId.isEmpty()) {
@@ -398,19 +485,13 @@ public class UsersManagementFragment extends Fragment {
 
             // تصفية حسب الصلاحية
             boolean shouldShow = false;
-
             if (currentUserRole == SessionManager.Role.SYSTEM_ADMIN
                 || currentUserRole == SessionManager.Role.ORG_ADMIN) {
-                // يرى جميع المستخدمين في كل الفروع
                 shouldShow = true;
             } else if (currentUserRole == SessionManager.Role.BRANCH_MANAGER) {
-                // يرى مستخدمي فرعه فقط
                 if (user.branchId == currentBranchId) {
                     shouldShow = true;
                 }
-            } else {
-                // الأدوار الأخرى لا ترى شيئاً
-                shouldShow = false;
             }
 
             if (shouldShow) {
@@ -426,12 +507,14 @@ public class UsersManagementFragment extends Fragment {
         employeeCounter.set(Math.max(maxNum + 1, userList.size() + 1));
 
         // تحديث الواجهة
-        filterUsers(etSearchUser != null ? etSearchUser.getText().toString() : "");
+        applyCurrentFilter();
         updateStats();
+        updateEmptyState();
     }
 
     private void filterUsers(String query) {
         filteredList.clear();
+        
         if (query == null || query.isEmpty()) {
             filteredList.addAll(userList);
         } else {
@@ -446,6 +529,35 @@ public class UsersManagementFragment extends Fragment {
                 }
             }
         }
+        
+        if (adapter != null) adapter.notifyDataSetChanged();
+        updateEmptyState();
+    }
+
+    private void applyCurrentFilter() {
+        filteredList.clear();
+        
+        switch (currentFilter) {
+            case 0: // All
+                filteredList.addAll(userList);
+                break;
+            case 1: // Active
+                for (UserData u : userList) {
+                    if ("active".equals(u.status)) filteredList.add(u);
+                }
+                break;
+            case 2: // Suspended
+                for (UserData u : userList) {
+                    if (!"active".equals(u.status)) filteredList.add(u);
+                }
+                break;
+            case 3: // Online
+                for (UserData u : userList) {
+                    if (u.isOnline) filteredList.add(u);
+                }
+                break;
+        }
+        
         if (adapter != null) adapter.notifyDataSetChanged();
     }
 
@@ -453,13 +565,139 @@ public class UsersManagementFragment extends Fragment {
         int total = userList.size();
         int active = 0;
         int online = 0;
+        int suspended = 0;
+        
         for (UserData u : userList) {
-            if ("active".equals(u.status)) active++;
+            if ("active".equals(u.status)) {
+                active++;
+            } else {
+                suspended++;
+            }
             if (u.isOnline) online++;
         }
+        
         if (tvTotalUsers != null) tvTotalUsers.setText(String.valueOf(total));
         if (tvActiveUsers != null) tvActiveUsers.setText(String.valueOf(active));
         if (tvOnlineNow != null) tvOnlineNow.setText(String.valueOf(online));
+        if (tvSuspendedUsers != null) tvSuspendedUsers.setText(String.valueOf(suspended));
+    }
+
+    private void updateEmptyState() {
+        if (emptyStateLayout != null) {
+            if (filteredList.isEmpty()) {
+                emptyStateLayout.setVisibility(View.VISIBLE);
+                rvUsersList.setVisibility(View.GONE);
+            } else {
+                emptyStateLayout.setVisibility(View.GONE);
+                rvUsersList.setVisibility(View.VISIBLE);
+            }
+        }
+    }
+
+    private void showToast(String message) {
+        if (getContext() != null) {
+            Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // ==================== Filter Dialog ====================
+
+    private void showFilterDialog() {
+        String[] filterOptions = isArabic ? 
+            new String[]{"الكل", "نشط", "موقوف", "متصل الآن"} :
+            new String[]{"All", "Active", "Suspended", "Online Now"};
+        
+        new AlertDialog.Builder(requireContext())
+            .setTitle(isArabic ? "تصفية المستخدمين" : "Filter Users")
+            .setSingleChoiceItems(filterOptions, currentFilter, (dialog, which) -> {
+                currentFilter = which;
+                applyCurrentFilter();
+                dialog.dismiss();
+            })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+            .show();
+    }
+
+    // ==================== Export Data ====================
+
+    private void exportUsersData() {
+        if (userList.isEmpty()) {
+            showToast(isArabic ? "لا يوجد بيانات للتصدير" : "No data to export");
+            return;
+        }
+        
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                StringBuilder csv = new StringBuilder();
+                csv.append("ID,Username,Display Name,Role,Employee ID,Branch,Status,Last Login,Permissions\n");
+                
+                for (UserData u : userList) {
+                    csv.append(u.id).append(",")
+                       .append(escapeCSV(u.username)).append(",")
+                       .append(escapeCSV(u.displayName)).append(",")
+                       .append(u.role).append(",")
+                       .append(escapeCSV(u.employeeId)).append(",")
+                       .append(escapeCSV(u.branchName)).append(",")
+                       .append(u.status).append(",")
+                       .append(escapeCSV(u.lastLogin)).append(",")
+                       .append(getPermissionsSummary(u.permissions)).append("\n");
+                }
+                
+                // حفظ الملف
+                File exportDir = new File(requireContext().getExternalFilesDir(null), "exports");
+                if (!exportDir.exists()) exportDir.mkdirs();
+                
+                String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+                File file = new File(exportDir, "users_" + timestamp + ".csv");
+                
+                FileOutputStream fos = new FileOutputStream(file);
+                fos.write(csv.toString().getBytes("UTF-8"));
+                fos.close();
+                
+                mainHandler.post(() -> {
+                    showToast(isArabic ? "✅ تم تصدير البيانات بنجاح" : "✅ Data exported successfully");
+                    
+                    // فتح الملف للمشاركة
+                    Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                    shareIntent.setType("text/csv");
+                    Uri uri = FileProvider.getUriForFile(requireContext(), 
+                        requireContext().getPackageName() + ".provider", file);
+                    shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(shareIntent, 
+                        isArabic ? "مشاركة البيانات" : "Share Data"));
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    showToast(isArabic ? "❌ فشل تصدير البيانات: " + e.getMessage() : 
+                        "❌ Failed to export data: " + e.getMessage());
+                });
+            }
+        });
+    }
+
+    private String escapeCSV(String value) {
+        if (value == null) return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
+    }
+
+    private String getPermissionsSummary(UserPermissions permissions) {
+        if (permissions == null) return "None";
+        
+        List<String> grantedPermissions = new ArrayList<>();
+        if (permissions.isCanViewInventory()) grantedPermissions.add("ViewInv");
+        if (permissions.isCanEditInventory()) grantedPermissions.add("EditInv");
+        if (permissions.isCanViewReports()) grantedPermissions.add("ViewRep");
+        if (permissions.isCanManageUsers()) grantedPermissions.add("MngUsr");
+        if (permissions.isCanViewAuditLogs()) grantedPermissions.add("ViewAud");
+        if (permissions.isCanExportData()) grantedPermissions.add("Export");
+        if (permissions.isCanApproveTransactions()) grantedPermissions.add("Approve");
+        if (permissions.isCanAccessSettings()) grantedPermissions.add("Settings");
+        
+        return String.join(";", grantedPermissions);
     }
 
     // ==================== Password Generator ====================
@@ -468,18 +706,15 @@ public class UsersManagementFragment extends Fragment {
         if (length < 8) length = 8;
 
         StringBuilder sb = new StringBuilder(length);
-        // ضمان وجود جميع أنواع الأحرف
         sb.append(UPPER.charAt(random.nextInt(UPPER.length())));
         sb.append(LOWER.charAt(random.nextInt(LOWER.length())));
         sb.append(DIGITS.charAt(random.nextInt(DIGITS.length())));
         sb.append(SYMBOLS.charAt(random.nextInt(SYMBOLS.length())));
 
-        // باقي الأحرف عشوائية
         for (int i = 4; i < length; i++) {
             sb.append(ALL.charAt(random.nextInt(ALL.length())));
         }
 
-        // خلط الأحرف
         char[] chars = sb.toString().toCharArray();
         for (int i = chars.length - 1; i > 0; i--) {
             int j = random.nextInt(i + 1);
@@ -505,7 +740,7 @@ public class UsersManagementFragment extends Fragment {
         if (getContext() == null || text.isEmpty()) return;
         ClipboardManager cm = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
         cm.setPrimaryClip(ClipData.newPlainText("password", text));
-        Toast.makeText(getContext(), isArabic ? "📋 تم نسخ كلمة المرور!" : "📋 Password copied!", Toast.LENGTH_SHORT).show();
+        showToast(isArabic ? "📋 تم نسخ كلمة المرور!" : "📋 Password copied!");
     }
 
     private String generateEmployeeId(String branchCode) {
@@ -582,6 +817,50 @@ public class UsersManagementFragment extends Fragment {
         tv.setTextColor(isPasswordStrong(password) ? 0xFF22C55E : 0xFFEF4444);
     }
 
+    // ==================== Username Validation ====================
+
+    private void checkUsernameAvailability(String username, TextView tvResult) {
+        if (username == null || username.length() < 3) {
+            if (tvResult != null) {
+                tvResult.setText(isArabic ? "اسم المستخدم قصير جداً" : "Username too short");
+                tvResult.setTextColor(0xFFEF4444);
+            }
+            return;
+        }
+
+        // فحص محلي أولاً
+        for (UserData user : userList) {
+            if (user.username.equalsIgnoreCase(username)) {
+                if (tvResult != null) {
+                    tvResult.setText(isArabic ? "❌ اسم المستخدم مستخدم بالفعل" : "❌ Username already taken");
+                    tvResult.setTextColor(0xFFEF4444);
+                }
+                return;
+            }
+        }
+
+        // فحص عبر API
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.checkUsername(username);
+                mainHandler.post(() -> {
+                    if (tvResult != null) {
+                        if (response != null && response.isSuccess) {
+                            boolean available = response.data != null && 
+                                response.data.optBoolean("available", false);
+                            tvResult.setText(available ? 
+                                (isArabic ? "✅ اسم المستخدم متاح" : "✅ Username available") : 
+                                (isArabic ? "❌ اسم المستخدم غير متاح" : "❌ Username not available"));
+                            tvResult.setTextColor(available ? 0xFF22C55E : 0xFFEF4444);
+                        }
+                    }
+                });
+            } catch (Exception e) {
+                // تجاهل أخطاء الفحص عبر API
+            }
+        });
+    }
+
     // ==================== User Dialog ====================
 
     private void showUserDialog(@Nullable UserData existingUser) {
@@ -599,11 +878,12 @@ public class UsersManagementFragment extends Fragment {
             dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         }
 
-        // ========== استخراج جميع عناصر الواجهة ==========
+        // استخراج جميع عناصر الواجهة
         TextView tvTitle = dialogView.findViewById(R.id.tvDialogTitle);
         TextView tvSubtitle = dialogView.findViewById(R.id.tvDialogSubtitle);
         EditText etDisplayName = dialogView.findViewById(R.id.etDisplayName);
         EditText etUsername = dialogView.findViewById(R.id.etUsername);
+        TextView tvUsernameStatus = dialogView.findViewById(R.id.tvUsernameStatus);
         EditText etPassword = dialogView.findViewById(R.id.etPassword);
         EditText etEmployeeId = dialogView.findViewById(R.id.etEmployeeId);
         com.google.android.material.textfield.MaterialAutoCompleteTextView etBranch =
@@ -614,6 +894,7 @@ public class UsersManagementFragment extends Fragment {
         Button btnNextStep = dialogView.findViewById(R.id.btnNextStep);
         Button btnPrevStep = dialogView.findViewById(R.id.btnPrevStep);
         Button btnSaveUser = dialogView.findViewById(R.id.btnSaveUser);
+        Button btnManagePermissions = dialogView.findViewById(R.id.btnManagePermissions);
         LinearLayout layoutStep1 = dialogView.findViewById(R.id.layoutStep1);
         LinearLayout layoutStep2 = dialogView.findViewById(R.id.layoutStep2);
         LinearLayout layoutButtons1 = dialogView.findViewById(R.id.layoutButtons1);
@@ -633,7 +914,7 @@ public class UsersManagementFragment extends Fragment {
         LinearLayout loadingOverlay = dialogView.findViewById(R.id.loadingOverlay);
         TextView tvLoadingText = dialogView.findViewById(R.id.tvLoadingText);
 
-        // ========== العناوين ==========
+        // العناوين
         if (tvTitle != null) {
             tvTitle.setText(isEdit
                 ? (isArabic ? "تعديل مستخدم" : "Edit User")
@@ -645,7 +926,7 @@ public class UsersManagementFragment extends Fragment {
                 : (isArabic ? "أدخل بيانات المستخدم الجديد" : "Enter new user data"));
         }
 
-        // ========== إعداد قائمة الفروع ==========
+        // إعداد قائمة الفروع
         List<String> branchNames = new ArrayList<>();
         int activeBranchId = branchesManager.getActiveBranchId();
         int selectedBranchIndex = 0;
@@ -667,53 +948,50 @@ public class UsersManagementFragment extends Fragment {
             etBranch.setOnClickListener(v -> etBranch.showDropDown());
         }
 
-        // ========== إعداد قائمة الصلاحيات (المسموحة فقط) ==========
+        // إعداد قائمة الصلاحيات
         List<String> roleNames = new ArrayList<>();
-String[] allowedRoles = getAllowedRoles();
+        String[] allowedRoles = getAllowedRoles();
 
-for (String roleCode : allowedRoles) {
-    for (int i = 0; i < ROLES.length; i++) {
-        if (ROLES[i].equals(roleCode)) {
-            // ✅ أضف الكود بين قوسين ليتم استخراجه لاحقاً
-            roleNames.add(ROLE_ICONS[i] + " " + (isArabic ? ROLES_AR[i] : ROLES_EN[i]) + " (" + roleCode + ")");
-            break;
+        for (String roleCode : allowedRoles) {
+            for (int i = 0; i < ROLES.length; i++) {
+                if (ROLES[i].equals(roleCode)) {
+                    roleNames.add(ROLE_ICONS[i] + " " + (isArabic ? ROLES_AR[i] : ROLES_EN[i]) + " (" + roleCode + ")");
+                    break;
+                }
+            }
         }
-    }
-}
 
-ArrayAdapter<String> roleAdapter = new ArrayAdapter<>(
-    requireContext(), android.R.layout.simple_dropdown_item_1line, roleNames);
-if (etRole != null) {
-    etRole.setAdapter(roleAdapter);
-    if (!roleNames.isEmpty()) {
-        int defaultIndex = Math.max(0, roleNames.size() - 2);
-        etRole.setText(roleNames.get(defaultIndex), false);
-    }
-    etRole.setOnClickListener(v -> etRole.showDropDown());
-}
+        ArrayAdapter<String> roleAdapter = new ArrayAdapter<>(
+            requireContext(), android.R.layout.simple_dropdown_item_1line, roleNames);
+        if (etRole != null) {
+            etRole.setAdapter(roleAdapter);
+            if (!roleNames.isEmpty()) {
+                int defaultIndex = Math.max(0, roleNames.size() - 2);
+                etRole.setText(roleNames.get(defaultIndex), false);
+            }
+            etRole.setOnClickListener(v -> etRole.showDropDown());
+        }
 
-        // ========== رقم موظف تلقائي ==========
+        // رقم موظف تلقائي
         String branchCode = branchesManager.getActiveBranchCode();
         if (etEmployeeId != null) {
             etEmployeeId.setText(generateEmployeeId(branchCode));
             etEmployeeId.setEnabled(false);
         }
 
-        // ========== متطلبات كلمة المرور الأولية ==========
+        // متطلبات كلمة المرور الأولية
         if (tvPasswordRequirements != null) {
             tvPasswordRequirements.setText(isArabic
                 ? "🔒 يجب أن تحتوي على:\n• 8 أحرف على الأقل\n• حرف كبير (A-Z)\n• رقم (0-9)\n• رمز خاص (!@#$%^&*)"
                 : "🔒 Must contain:\n• Min 8 characters\n• Uppercase (A-Z)\n• Digit (0-9)\n• Special char (!@#$%^&*)");
         }
 
-        // ========== أزرار كلمة المرور ==========
+        // أزرار كلمة المرور
         if (btnGeneratePassword != null) {
             btnGeneratePassword.setOnClickListener(v -> {
                 String pwd = generateStrongPassword(12);
                 if (etPassword != null) etPassword.setText(pwd);
-                Toast.makeText(getContext(),
-                    isArabic ? "🔐 تم توليد كلمة مرور قوية!" : "🔐 Strong password generated!",
-                    Toast.LENGTH_SHORT).show();
+                showToast(isArabic ? "🔐 تم توليد كلمة مرور قوية!" : "🔐 Strong password generated!");
             });
         }
 
@@ -723,9 +1001,7 @@ if (etRole != null) {
                 if (!pwd.isEmpty()) {
                     copyToClipboard(pwd);
                 } else {
-                    Toast.makeText(getContext(),
-                        isArabic ? "لا توجد كلمة مرور لنسخها" : "No password to copy",
-                        Toast.LENGTH_SHORT).show();
+                    showToast(isArabic ? "لا توجد كلمة مرور لنسخها" : "No password to copy");
                 }
             });
         }
@@ -736,14 +1012,25 @@ if (etRole != null) {
                 if (!name.isEmpty()) {
                     etUsername.setText(suggestUsername(name));
                 } else {
-                    Toast.makeText(getContext(),
-                        isArabic ? "أدخل الاسم الظاهر أولاً" : "Enter display name first",
-                        Toast.LENGTH_SHORT).show();
+                    showToast(isArabic ? "أدخل الاسم الظاهر أولاً" : "Enter display name first");
                 }
             });
         }
 
-        // ========== مراقبة قوة كلمة المرور ==========
+        // مراقبة اسم المستخدم
+        if (etUsername != null && tvUsernameStatus != null) {
+            etUsername.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override public void afterTextChanged(Editable s) {
+                    if (!isEdit) {
+                        checkUsernameAvailability(s.toString(), tvUsernameStatus);
+                    }
+                }
+            });
+        }
+
+        // مراقبة قوة كلمة المرور
         if (etPassword != null) {
             etPassword.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -757,12 +1044,13 @@ if (etRole != null) {
             });
         }
 
-        // ========== تعبئة بيانات التعديل ==========
+        // تعبئة بيانات التعديل
         if (isEdit && existingUser != null) {
             if (etDisplayName != null) etDisplayName.setText(existingUser.displayName);
             if (etUsername != null) {
                 etUsername.setText(existingUser.username);
                 etUsername.setEnabled(false);
+                if (tvUsernameStatus != null) tvUsernameStatus.setVisibility(View.GONE);
             }
             if (etPassword != null) {
                 etPassword.setHint(isArabic ? "اتركه فارغاً لعدم التغيير" : "Leave empty to keep unchanged");
@@ -791,7 +1079,7 @@ if (etRole != null) {
                 }
             }
 
-            // وضع التعديل: إظهار كل شيء مباشرة
+            // وضع التعديل
             if (layoutStep1 != null) layoutStep1.setVisibility(View.VISIBLE);
             if (layoutStep2 != null) layoutStep2.setVisibility(View.VISIBLE);
             if (stepsIndicator != null) stepsIndicator.setVisibility(View.GONE);
@@ -800,8 +1088,14 @@ if (etRole != null) {
             if (layoutButtons1 != null) layoutButtons1.setVisibility(View.VISIBLE);
             if (btnCancel != null) btnCancel.setVisibility(View.VISIBLE);
             if (btnSaveUser != null) btnSaveUser.setVisibility(View.VISIBLE);
+            if (btnManagePermissions != null && canManagePermissions()) {
+                btnManagePermissions.setVisibility(View.VISIBLE);
+                btnManagePermissions.setOnClickListener(v -> {
+                    showPermissionsDialog(existingUser);
+                });
+            }
         } else {
-            // وضع الإضافة: خطوة خطوة
+            // وضع الإضافة
             if (layoutStep1 != null) layoutStep1.setVisibility(View.VISIBLE);
             if (layoutStep2 != null) layoutStep2.setVisibility(View.GONE);
             if (stepsIndicator != null) stepsIndicator.setVisibility(View.VISIBLE);
@@ -812,14 +1106,13 @@ if (etRole != null) {
             if (btnCancel != null) btnCancel.setVisibility(View.GONE);
         }
 
-        // ========== زر التالي ==========
+        // زر التالي
         if (btnNextStep != null) {
             btnNextStep.setOnClickListener(v -> {
                 String displayName = etDisplayName != null ? etDisplayName.getText().toString().trim() : "";
                 String username = etUsername != null ? etUsername.getText().toString().trim() : "";
                 String password = etPassword != null ? etPassword.getText().toString().trim() : "";
 
-                // التحقق من الحقول
                 if (displayName.isEmpty()) {
                     if (etDisplayName != null) etDisplayName.setError(isArabic ? "مطلوب" : "Required");
                     return;
@@ -829,20 +1122,16 @@ if (etRole != null) {
                     return;
                 }
                 if (!isEdit && !isPasswordStrong(password)) {
-                    Toast.makeText(getContext(),
-                        isArabic ? "كلمة المرور لا تستوفي المتطلبات الأمنية" : "Password does not meet security requirements",
-                        Toast.LENGTH_SHORT).show();
+                    showToast(isArabic ? "كلمة المرور لا تستوفي المتطلبات الأمنية" : "Password does not meet security requirements");
                     return;
                 }
 
-                // الانتقال للخطوة الثانية
                 if (layoutStep1 != null) layoutStep1.setVisibility(View.GONE);
                 if (layoutStep2 != null) layoutStep2.setVisibility(View.VISIBLE);
                 if (btnNextStep != null) btnNextStep.setVisibility(View.GONE);
                 if (btnSaveUser != null) btnSaveUser.setVisibility(View.VISIBLE);
                 if (btnPrevStep != null) btnPrevStep.setVisibility(View.VISIBLE);
 
-                // تحديث شريط الخطوات
                 if (tvStep1 != null) {
                     tvStep1.setBackgroundResource(R.drawable.circle_outline);
                     tvStep1.setTextColor(0xFF44474E);
@@ -855,7 +1144,7 @@ if (etRole != null) {
             });
         }
 
-        // ========== زر الرجوع ==========
+        // زر الرجوع
         if (btnPrevStep != null) {
             btnPrevStep.setOnClickListener(v -> {
                 if (layoutStep1 != null) layoutStep1.setVisibility(View.VISIBLE);
@@ -875,12 +1164,12 @@ if (etRole != null) {
             });
         }
 
-        // ========== زر الإلغاء ==========
+        // زر الإلغاء
         if (btnCancel != null) {
             btnCancel.setOnClickListener(v -> dialog.dismiss());
         }
 
-        // ========== زر الحفظ ==========
+        // زر الحفظ
         if (btnSaveUser != null) {
             btnSaveUser.setOnClickListener(v -> {
                 String displayName = etDisplayName != null ? etDisplayName.getText().toString().trim() : "";
@@ -890,44 +1179,30 @@ if (etRole != null) {
                 String branchStr = etBranch != null ? etBranch.getText().toString().trim() : "";
                 String roleStr = etRole != null ? etRole.getText().toString().trim() : "";
 
-                // التحقق النهائي
                 if (displayName.isEmpty()) {
-                    Toast.makeText(getContext(),
-                        isArabic ? "الاسم مطلوب" : "Name is required",
-                        Toast.LENGTH_SHORT).show();
+                    showToast(isArabic ? "الاسم مطلوب" : "Name is required");
                     return;
                 }
                 if (username.isEmpty()) {
-                    Toast.makeText(getContext(),
-                        isArabic ? "اسم المستخدم مطلوب" : "Username is required",
-                        Toast.LENGTH_SHORT).show();
+                    showToast(isArabic ? "اسم المستخدم مطلوب" : "Username is required");
                     return;
                 }
                 if (branchStr.isEmpty()) {
-                    Toast.makeText(getContext(),
-                        isArabic ? "الفرع مطلوب" : "Branch is required",
-                        Toast.LENGTH_SHORT).show();
+                    showToast(isArabic ? "الفرع مطلوب" : "Branch is required");
                     return;
                 }
                 if (roleStr.isEmpty()) {
-                    Toast.makeText(getContext(),
-                        isArabic ? "الصلاحية مطلوبة" : "Role is required",
-                        Toast.LENGTH_SHORT).show();
+                    showToast(isArabic ? "الصلاحية مطلوبة" : "Role is required");
                     return;
                 }
 
-                // استخراج كود الصلاحية
                 String role = extractRoleCode(roleStr);
 
-                // التحقق من صلاحية إنشاء هذا الدور
                 if (!isEdit && !isRoleAllowed(role)) {
-                    Toast.makeText(getContext(),
-                        isArabic ? "❌ ليس لديك صلاحية لإنشاء هذا الدور" : "❌ You don't have permission to create this role",
-                        Toast.LENGTH_SHORT).show();
+                    showToast(isArabic ? "❌ ليس لديك صلاحية لإنشاء هذا الدور" : "❌ You don't have permission to create this role");
                     return;
                 }
 
-                // استخراج branchId
                 int branchId = activeBranchId;
                 String branchName = branchStr.split("\\(")[0].trim();
                 for (BranchItem b : branchesList) {
@@ -938,7 +1213,6 @@ if (etRole != null) {
                     }
                 }
 
-                // ✅ إظهار loading overlay
                 if (loadingOverlay != null) loadingOverlay.setVisibility(View.VISIBLE);
                 if (tvLoadingText != null) tvLoadingText.setText(isArabic ? "جاري الحفظ..." : "Saving...");
                 if (btnSaveUser != null) btnSaveUser.setEnabled(false);
@@ -948,7 +1222,6 @@ if (etRole != null) {
                 final int fBranchId = branchId;
                 final String fBranchName = branchName;
 
-                // تنفيذ الحفظ في الخلفية
                 Executors.newSingleThreadExecutor().execute(() -> {
                     try {
                         JSONObject payload = new JSONObject();
@@ -971,23 +1244,27 @@ if (etRole != null) {
                             : apiClient.createUser(payload);
 
                         mainHandler.post(() -> {
-                            // إخفاء loading
                             if (loadingOverlay != null) loadingOverlay.setVisibility(View.GONE);
 
                             if (response != null && response.isSuccess) {
                                 String msg = isEdit
                                     ? (isArabic ? "✅ تم تعديل المستخدم بنجاح" : "✅ User updated successfully")
                                     : (isArabic ? "✅ تمت إضافة المستخدم بنجاح" : "✅ User added successfully");
-                                Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+                                showToast(msg);
+                                
+                                // تسجيل النشاط
+                                logUserActivity(isEdit ? existingUser.id : 0, 
+                                    isEdit ? "UPDATE" : "CREATE", 
+                                    "User: " + username);
+                                
                                 dialog.dismiss();
                                 loadUsers();
                             } else {
                                 String errorMsg = response != null
                                     ? response.optString("message", isArabic ? "فشل العملية" : "Operation failed")
                                     : (isArabic ? "فشل الاتصال بالخادم" : "Server connection failed");
-                                Toast.makeText(getContext(), "❌ " + errorMsg, Toast.LENGTH_LONG).show();
+                                showToast("❌ " + errorMsg);
 
-                                // إعادة تفعيل الأزرار
                                 if (btnSaveUser != null) btnSaveUser.setEnabled(true);
                                 if (btnCancel != null) btnCancel.setEnabled(true);
                                 if (btnPrevStep != null) btnPrevStep.setEnabled(true);
@@ -996,9 +1273,7 @@ if (etRole != null) {
                     } catch (Exception e) {
                         mainHandler.post(() -> {
                             if (loadingOverlay != null) loadingOverlay.setVisibility(View.GONE);
-                            Toast.makeText(getContext(),
-                                (isArabic ? "❌ خطأ: " : "❌ Error: ") + e.getMessage(),
-                                Toast.LENGTH_LONG).show();
+                            showToast((isArabic ? "❌ خطأ: " : "❌ Error: ") + e.getMessage());
                             if (btnSaveUser != null) btnSaveUser.setEnabled(true);
                             if (btnCancel != null) btnCancel.setEnabled(true);
                             if (btnPrevStep != null) btnPrevStep.setEnabled(true);
@@ -1011,15 +1286,174 @@ if (etRole != null) {
         dialog.show();
     }
 
+    // ==================== Permissions Dialog ====================
+
+    private void showPermissionsDialog(UserData user) {
+        if (!canManagePermissions()) {
+            showToast(isArabic ? "❌ ليس لديك صلاحية لإدارة الصلاحيات" : "❌ You don't have permission to manage permissions");
+            return;
+        }
+
+        View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_user_permissions, null);
+
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+            .setView(dialogView)
+            .setTitle(isArabic ? "إدارة الصلاحيات: " + user.displayName : "Manage Permissions: " + user.displayName)
+            .setCancelable(false)
+            .create();
+
+        // عناصر الواجهة
+        CheckBox cbViewInventory = dialogView.findViewById(R.id.cbViewInventory);
+        CheckBox cbEditInventory = dialogView.findViewById(R.id.cbEditInventory);
+        CheckBox cbViewReports = dialogView.findViewById(R.id.cbViewReports);
+        CheckBox cbManageUsers = dialogView.findViewById(R.id.cbManageUsers);
+        CheckBox cbViewAuditLogs = dialogView.findViewById(R.id.cbViewAuditLogs);
+        CheckBox cbExportData = dialogView.findViewById(R.id.cbExportData);
+        CheckBox cbApproveTransactions = dialogView.findViewById(R.id.cbApproveTransactions);
+        CheckBox cbAccessSettings = dialogView.findViewById(R.id.cbAccessSettings);
+        Spinner spinnerTemplates = dialogView.findViewById(R.id.spinnerTemplates);
+        Button btnApplyTemplate = dialogView.findViewById(R.id.btnApplyTemplate);
+        Button btnSavePermissions = dialogView.findViewById(R.id.btnSavePermissions);
+        Button btnCancelPermissions = dialogView.findViewById(R.id.btnCancelPermissions);
+        LinearLayout loadingOverlay = dialogView.findViewById(R.id.loadingOverlay);
+
+        // تعبئة الصلاحيات الحالية
+        if (user.permissions != null) {
+            cbViewInventory.setChecked(user.permissions.isCanViewInventory());
+            cbEditInventory.setChecked(user.permissions.isCanEditInventory());
+            cbViewReports.setChecked(user.permissions.isCanViewReports());
+            cbManageUsers.setChecked(user.permissions.isCanManageUsers());
+            cbViewAuditLogs.setChecked(user.permissions.isCanViewAuditLogs());
+            cbExportData.setChecked(user.permissions.isCanExportData());
+            cbApproveTransactions.setChecked(user.permissions.isCanApproveTransactions());
+            cbAccessSettings.setChecked(user.permissions.isCanAccessSettings());
+        }
+
+        // إعداد قوالب الصلاحيات
+        String[] templateNames = isArabic ? 
+            new String[]{"اختر قالب...", "مدير كامل", "مدير", "مشغل", "مشاهد"} :
+            new String[]{"Select template...", "Full Admin", "Manager", "Operator", "Viewer"};
+        
+        ArrayAdapter<String> templateAdapter = new ArrayAdapter<>(
+            requireContext(), android.R.layout.simple_spinner_item, templateNames);
+        templateAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerTemplates.setAdapter(templateAdapter);
+
+        btnApplyTemplate.setOnClickListener(v -> {
+            int position = spinnerTemplates.getSelectedItemPosition();
+            if (position > 0) {
+                String templateKey = "";
+                switch (position) {
+                    case 1: templateKey = "ADMIN_FULL"; break;
+                    case 2: templateKey = "MANAGER"; break;
+                    case 3: templateKey = "OPERATOR"; break;
+                    case 4: templateKey = "VIEWER"; break;
+                }
+                
+                UserPermissions template = PERMISSION_TEMPLATES.get(templateKey);
+                if (template != null) {
+                    cbViewInventory.setChecked(template.isCanViewInventory());
+                    cbEditInventory.setChecked(template.isCanEditInventory());
+                    cbViewReports.setChecked(template.isCanViewReports());
+                    cbManageUsers.setChecked(template.isCanManageUsers());
+                    cbViewAuditLogs.setChecked(template.isCanViewAuditLogs());
+                    cbExportData.setChecked(template.isCanExportData());
+                    cbApproveTransactions.setChecked(template.isCanApproveTransactions());
+                    cbAccessSettings.setChecked(template.isCanAccessSettings());
+                }
+            }
+        });
+
+        btnSavePermissions.setOnClickListener(v -> {
+            UserPermissions permissions = new UserPermissions();
+            permissions.setCanViewInventory(cbViewInventory.isChecked());
+            permissions.setCanEditInventory(cbEditInventory.isChecked());
+            permissions.setCanViewReports(cbViewReports.isChecked());
+            permissions.setCanManageUsers(cbManageUsers.isChecked());
+            permissions.setCanViewAuditLogs(cbViewAuditLogs.isChecked());
+            permissions.setCanExportData(cbExportData.isChecked());
+            permissions.setCanApproveTransactions(cbApproveTransactions.isChecked());
+            permissions.setCanAccessSettings(cbAccessSettings.isChecked());
+
+            updateUserPermissions(user.id, permissions, loadingOverlay, dialog);
+        });
+
+        btnCancelPermissions.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+    }
+
+    private void updateUserPermissions(int userId, UserPermissions permissions, 
+                                       LinearLayout loadingOverlay, AlertDialog dialog) {
+        if (loadingOverlay != null) loadingOverlay.setVisibility(View.VISIBLE);
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                JSONObject payload = new JSONObject();
+                payload.put("user_id", userId);
+                payload.put("permissions", new JSONObject()
+                    .put("can_view_inventory", permissions.isCanViewInventory())
+                    .put("can_edit_inventory", permissions.isCanEditInventory())
+                    .put("can_view_reports", permissions.isCanViewReports())
+                    .put("can_manage_users", permissions.isCanManageUsers())
+                    .put("can_view_audit_logs", permissions.isCanViewAuditLogs())
+                    .put("can_export_data", permissions.isCanExportData())
+                    .put("can_approve_transactions", permissions.isCanApproveTransactions())
+                    .put("can_access_settings", permissions.isCanAccessSettings())
+                );
+
+                MiraApiClient.ApiResponse response = apiClient.updateUserPermissions(payload);
+
+                mainHandler.post(() -> {
+                    if (loadingOverlay != null) loadingOverlay.setVisibility(View.GONE);
+
+                    if (response != null && response.isSuccess) {
+                        showToast(isArabic ? "✅ تم تحديث الصلاحيات بنجاح" : "✅ Permissions updated successfully");
+                        
+                        // تسجيل النشاط
+                        logUserActivity(userId, "PERMISSION_CHANGE", "Updated permissions");
+                        
+                        dialog.dismiss();
+                        loadUsers();
+                    } else {
+                        showToast(isArabic ? "❌ فشل تحديث الصلاحيات" : "❌ Failed to update permissions");
+                    }
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    if (loadingOverlay != null) loadingOverlay.setVisibility(View.GONE);
+                    showToast((isArabic ? "❌ خطأ: " : "❌ Error: ") + e.getMessage());
+                });
+            }
+        });
+    }
+
+    // ==================== Activity Logging ====================
+
+    private void logUserActivity(int userId, String action, String details) {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                JSONObject logEntry = new JSONObject();
+                logEntry.put("user_id", userId);
+                logEntry.put("action", action);
+                logEntry.put("details", details);
+                logEntry.put("timestamp", System.currentTimeMillis());
+                logEntry.put("performed_by", sessionManager.getUserId());
+                
+                apiClient.logActivity(logEntry);
+            } catch (Exception e) {
+                // Silent fail for logging
+            }
+        });
+    }
+
     // ==================== Delete User ====================
 
     private void deleteUser(int userId, String name, String role) {
         if (!isAdded() || getContext() == null) return;
 
         if (!canDeleteUser(role)) {
-            Toast.makeText(getContext(),
-                isArabic ? "❌ ليس لديك صلاحية لحذف هذا المستخدم" : "❌ You don't have permission to delete this user",
-                Toast.LENGTH_SHORT).show();
+            showToast(isArabic ? "❌ ليس لديك صلاحية لحذف هذا المستخدم" : "❌ You don't have permission to delete this user");
             return;
         }
 
@@ -1031,11 +1465,14 @@ if (etRole != null) {
                 Executors.newSingleThreadExecutor().execute(() -> {
                     MiraApiClient.ApiResponse response = apiClient.deleteUser(userId);
                     mainHandler.post(() -> {
-                        Toast.makeText(getContext(),
-                            response != null && response.isSuccess
-                                ? (isArabic ? "✅ تم حذف المستخدم بنجاح" : "✅ User deleted successfully")
-                                : (isArabic ? "❌ فشل حذف المستخدم" : "❌ Failed to delete user"),
-                            Toast.LENGTH_SHORT).show();
+                        showToast(response != null && response.isSuccess
+                            ? (isArabic ? "✅ تم حذف المستخدم بنجاح" : "✅ User deleted successfully")
+                            : (isArabic ? "❌ فشل حذف المستخدم" : "❌ Failed to delete user"));
+                        
+                        if (response != null && response.isSuccess) {
+                            logUserActivity(userId, "DELETE", "Deleted user: " + name);
+                        }
+                        
                         loadUsers();
                     });
                 });
@@ -1057,6 +1494,54 @@ if (etRole != null) {
         String lastLogin;
         String branchName;
         boolean isOnline;
+        UserPermissions permissions;
+    }
+
+    static class UserPermissions {
+        private boolean canViewInventory;
+        private boolean canEditInventory;
+        private boolean canViewReports;
+        private boolean canManageUsers;
+        private boolean canViewAuditLogs;
+        private boolean canExportData;
+        private boolean canApproveTransactions;
+        private boolean canAccessSettings;
+
+        // Getters and Setters
+        public boolean isCanViewInventory() { return canViewInventory; }
+        public void setCanViewInventory(boolean canViewInventory) { this.canViewInventory = canViewInventory; }
+        
+        public boolean isCanEditInventory() { return canEditInventory; }
+        public void setCanEditInventory(boolean canEditInventory) { this.canEditInventory = canEditInventory; }
+        
+        public boolean isCanViewReports() { return canViewReports; }
+        public void setCanViewReports(boolean canViewReports) { this.canViewReports = canViewReports; }
+        
+        public boolean isCanManageUsers() { return canManageUsers; }
+        public void setCanManageUsers(boolean canManageUsers) { this.canManageUsers = canManageUsers; }
+        
+        public boolean isCanViewAuditLogs() { return canViewAuditLogs; }
+        public void setCanViewAuditLogs(boolean canViewAuditLogs) { this.canViewAuditLogs = canViewAuditLogs; }
+        
+        public boolean isCanExportData() { return canExportData; }
+        public void setCanExportData(boolean canExportData) { this.canExportData = canExportData; }
+        
+        public boolean isCanApproveTransactions() { return canApproveTransactions; }
+        public void setCanApproveTransactions(boolean canApproveTransactions) { this.canApproveTransactions = canApproveTransactions; }
+        
+        public boolean isCanAccessSettings() { return canAccessSettings; }
+        public void setCanAccessSettings(boolean canAccessSettings) { this.canAccessSettings = canAccessSettings; }
+        
+        public void setAllPermissions(boolean value) {
+            this.canViewInventory = value;
+            this.canEditInventory = value;
+            this.canViewReports = value;
+            this.canManageUsers = value;
+            this.canViewAuditLogs = value;
+            this.canExportData = value;
+            this.canApproveTransactions = value;
+            this.canAccessSettings = value;
+        }
     }
 
     static class BranchItem {
@@ -1113,6 +1598,24 @@ if (etRole != null) {
                 h.tvBranchName.setVisibility(View.GONE);
             }
 
+            // عرض ملخص الصلاحيات
+            if (h.tvPermissionsSummary != null && u.permissions != null) {
+                StringBuilder permsSummary = new StringBuilder();
+                if (u.permissions.isCanManageUsers()) permsSummary.append("👥 ");
+                if (u.permissions.isCanEditInventory()) permsSummary.append("✏️📦 ");
+                else if (u.permissions.isCanViewInventory()) permsSummary.append("👁📦 ");
+                if (u.permissions.isCanViewReports()) permsSummary.append("📊 ");
+                if (u.permissions.isCanExportData()) permsSummary.append("📤 ");
+                if (u.permissions.isCanAccessSettings()) permsSummary.append("⚙️ ");
+                
+                if (permsSummary.length() > 0) {
+                    h.tvPermissionsSummary.setText(permsSummary.toString().trim());
+                    h.tvPermissionsSummary.setVisibility(View.VISIBLE);
+                } else {
+                    h.tvPermissionsSummary.setVisibility(View.GONE);
+                }
+            }
+
             // الحالة
             if ("active".equals(u.status)) {
                 if (h.vStatusDot != null) h.vStatusDot.setBackgroundResource(R.drawable.circle_green);
@@ -1130,7 +1633,16 @@ if (etRole != null) {
                 }
             }
 
-            // أزرار التعديل والحذف
+            // أزرار الصلاحيات والتعديل والحذف
+            if (h.btnPermissions != null) {
+                if (canManagePermissions()) {
+                    h.btnPermissions.setVisibility(View.VISIBLE);
+                    h.btnPermissions.setOnClickListener(v -> showPermissionsDialog(u));
+                } else {
+                    h.btnPermissions.setVisibility(View.GONE);
+                }
+            }
+
             if (h.btnEdit != null) {
                 if (canEditUser(u.role)) {
                     h.btnEdit.setVisibility(View.VISIBLE);
@@ -1156,9 +1668,9 @@ if (etRole != null) {
         }
 
         class VH extends RecyclerView.ViewHolder {
-            TextView tvDisplayName, tvUsername, tvRole, tvEmployeeId, tvStatus, tvBranchName;
+            TextView tvDisplayName, tvUsername, tvRole, tvEmployeeId, tvStatus, tvBranchName, tvPermissionsSummary;
             View vStatusDot;
-            ImageButton btnEdit, btnDelete;
+            ImageButton btnEdit, btnDelete, btnPermissions;
 
             VH(View v) {
                 super(v);
@@ -1168,10 +1680,12 @@ if (etRole != null) {
                 tvEmployeeId = v.findViewById(R.id.tvRowEmployeeId);
                 tvStatus = v.findViewById(R.id.tvRowStatus);
                 tvBranchName = v.findViewById(R.id.tvRowBranchName);
+                tvPermissionsSummary = v.findViewById(R.id.tvPermissionsSummary);
                 vStatusDot = v.findViewById(R.id.vStatusDot);
                 btnEdit = v.findViewById(R.id.btnRowEdit);
                 btnDelete = v.findViewById(R.id.btnRowDelete);
+                btnPermissions = v.findViewById(R.id.btnPermissions);
             }
         }
     }
-                    }
+            }
