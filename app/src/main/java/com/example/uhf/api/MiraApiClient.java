@@ -80,17 +80,21 @@ public ApiResponse reconnectDevice(String username, String password, String gate
     }
 }
     // في كل طلب API
+/**
+ * ✅ إضافة مفتاح API للطلبات
+ */
 private void addApiKeyHeader(JSONObject request) {
-    String apiKey = MiraServerConfigManager.getInstance(context).getApiKey();
+    String apiKey = MiraServerConfig.getInstance(context).getApiKey();
     
-    if (apiKey.isEmpty()) {
-        // ✅ استخدام المفتاح الافتراضي
-        apiKey = "mira_gate_test071234567890abcdefghijklmnop";
+    if (apiKey == null || apiKey.isEmpty()) {
+        // ✅ لا نضيف المفتاح - سيرفض السيرفر الطلب
+        // وسيتم إعادة الاتصال تلقائياً
+        Log.w(TAG, "⚠️ No API Key available - request will be rejected");
+        return;
     }
     
     request.put("X-MIRA-API-Key", apiKey);
-}
-    // دالة لجلب قائمة المزودين النشطين من السيرفر
+}    // دالة لجلب قائمة المزودين النشطين من السيرفر
     public List<ApiProvider> getActiveProviders() {
         List<ApiProvider> providers = new ArrayList<>();
         
@@ -1247,4 +1251,4 @@ public ApiResponse getAccountingAuditLog() {
             return null;
         }
     }
-                    }
+            }
