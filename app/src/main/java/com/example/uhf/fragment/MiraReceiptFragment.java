@@ -340,168 +340,163 @@ public class MiraReceiptFragment extends DialogFragment {
 
     // ==================== 📄 HTML RECEIPT ====================
     private void renderHtmlReceipt() {
-    if (webReceipt == null) return;
-    
-    String slogan = orgProfile != null ? orgProfile.getOrgSlogan() : "";
-    String phone = orgProfile != null ? orgProfile.getOrgPhone() : "";
-    String address = orgProfile != null ? orgProfile.getOrgAddress() : "";
-    String taxNumber = orgProfile != null ? orgProfile.getTaxNumber() : "VAT-3100293841";
-    String dir = isArabic ? "rtl" : "ltr";
-
-    StringBuilder h = new StringBuilder();
-    h.append("<!DOCTYPE html><html dir='").append(dir).append("'><head><meta charset='UTF-8'>")
-     .append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
-     .append("<style>")
-     .append("body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 10px; max-width: 380px; margin: auto; background: #fff; color: #1a1a1a; font-size: 11px; }")
-     .append(".header { text-align: center; border-bottom: 2px double #1A237E; padding-bottom: 8px; margin-bottom: 8px; }")
-     .append(".org-name { font-size: 18px; font-weight: bold; color: #1A237E; }")
-     .append(".org-meta { font-size: 9px; color: #555; margin-top: 2px; }")
-     .append(".receipt-title { font-size: 13px; font-weight: bold; text-align: center; background: #f0f2f5; padding: 4px; margin: 6px 0; border-radius: 4px; border: 1px dashed #1A237E; }")
-     .append(".info-grid { width: 100%; font-size: 10px; margin-bottom: 8px; }")
-     .append(".info-grid td { padding: 2px 0; }")
-     .append(".label { color: #666; } .value { font-weight: bold; color: #000; }")
-     .append("table.items { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }")
-     .append("table.items th { background: #1A237E; color: #fff; padding: 4px; text-align: center; border: 1px solid #1A237E; }")
-     .append("table.items td { padding: 4px; border: 1px solid #ddd; text-align: center; }")
-     .append(".rfid-box { font-size: 8px; background: #E8EAF6; padding: 3px; margin-top: 2px; border-radius: 3px; word-break: break-all; }")
-     .append(".datamatrix-container { text-align: center; margin: 4px 0; }")
-     .append(".datamatrix-container img { width: 80px; height: 80px; }")
-     .append(".totals-table { width: 100%; font-size: 10px; margin-top: 6px; }")
-     .append(".totals-table td { padding: 3px 0; }")
-     .append(".grand-total { font-size: 15px; font-weight: bold; color: #1A237E; border-top: 1px solid #1A237E; border-bottom: 2px double #1A237E; padding: 4px 0; }")
-     .append(".tafweet { font-size: 9px; font-style: italic; color: #444; text-align: center; margin-top: 4px; background: #fafafa; padding: 4px; border-radius: 4px; }")
-     .append(".qr-container { text-align: center; margin-top: 10px; padding-top: 6px; border-top: 1px dashed #ccc; }")
-     .append(".qr-container img { width: 110px; height: 110px; }")
-     .append(".footer { text-align: center; margin-top: 10px; font-size: 8px; color: #777; }")
-     .append("</style></head><body>");
-
-    h.append("<div class='header'>")
-     .append("<div class='org-name'>").append(orgName).append("</div>")
-     .append("<div class='org-meta'>").append(slogan).append("</div>")
-     .append("<div class='org-meta'>").append(address).append(" | ").append(phone).append("</div>")
-     .append("<div class='org-meta'><b>الرقم الضريبي: </b>").append(taxNumber).append("</div>")
-     .append("</div>");
-
-    try {
-        JSONObject t = new JSONObject(receiptJsonStr).optJSONObject("transaction");
-        if (t == null) t = new JSONObject(receiptJsonStr);
-
-        String saleId = t.optString("sale_id", "—");
-        String saleNumber = t.optString("sale_number", t.optString("invoice_number", "—"));
-        String dateStr = t.optString("timestamp", new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date()));
-        String customer = t.optString("customer_name", "عميل نقدي");
-        String paymentMethod = t.optString("payment_method", "CASH");
+        if (webReceipt == null) return;
         
-        String currency = t.optString("currency", defaultCurrency);
+        String slogan = orgProfile != null ? orgProfile.getOrgSlogan() : "";
+        String phone = orgProfile != null ? orgProfile.getOrgPhone() : "";
+        String address = orgProfile != null ? orgProfile.getOrgAddress() : "";
+        String taxNumber = orgProfile != null ? orgProfile.getTaxNumber() : "VAT-3100293841";
+        String dir = isArabic ? "rtl" : "ltr";
 
-        h.append("<div class='receipt-title'>سند بيع ضريبي / TAX INVOICE</div>");
+        StringBuilder h = new StringBuilder();
+        h.append("<!DOCTYPE html><html dir='").append(dir).append("'><head><meta charset='UTF-8'>")
+         .append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
+         .append("<style>")
+         .append("body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 10px; max-width: 380px; margin: auto; background: #fff; color: #1a1a1a; font-size: 11px; }")
+         .append(".header { text-align: center; border-bottom: 2px double #1A237E; padding-bottom: 8px; margin-bottom: 8px; }")
+         .append(".org-name { font-size: 18px; font-weight: bold; color: #1A237E; }")
+         .append(".org-meta { font-size: 9px; color: #555; margin-top: 2px; }")
+         .append(".receipt-title { font-size: 13px; font-weight: bold; text-align: center; background: #f0f2f5; padding: 4px; margin: 6px 0; border-radius: 4px; border: 1px dashed #1A237E; }")
+         .append(".info-grid { width: 100%; font-size: 10px; margin-bottom: 8px; }")
+         .append(".info-grid td { padding: 2px 0; }")
+         .append(".label { color: #666; } .value { font-weight: bold; color: #000; }")
+         .append("table.items { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }")
+         .append("table.items th { background: #1A237E; color: #fff; padding: 4px; text-align: center; border: 1px solid #1A237E; }")
+         .append("table.items td { padding: 4px; border: 1px solid #ddd; text-align: center; }")
+         .append(".rfid-box { font-size: 8px; background: #E8EAF6; padding: 3px; margin-top: 2px; border-radius: 3px; word-break: break-all; }")
+         .append(".datamatrix-container { text-align: center; margin: 4px 0; }")
+         .append(".datamatrix-container img { width: 80px; height: 80px; }")
+         .append(".totals-table { width: 100%; font-size: 10px; margin-top: 6px; }")
+         .append(".totals-table td { padding: 3px 0; }")
+         .append(".grand-total { font-size: 15px; font-weight: bold; color: #1A237E; border-top: 1px solid #1A237E; border-bottom: 2px double #1A237E; padding: 4px 0; }")
+         .append(".tafweet { font-size: 9px; font-style: italic; color: #444; text-align: center; margin-top: 4px; background: #fafafa; padding: 4px; border-radius: 4px; }")
+         .append(".qr-container { text-align: center; margin-top: 10px; padding-top: 6px; border-top: 1px dashed #ccc; }")
+         .append(".qr-container img { width: 110px; height: 110px; }")
+         .append(".footer { text-align: center; margin-top: 10px; font-size: 8px; color: #777; }")
+         .append("</style></head><body>");
 
-        h.append("<table class='info-grid'>")
-         .append("<tr><td class='label'>رقم السند:</td><td class='value'>").append(saleNumber).append("</td>")
-         .append("<td class='label'>التاريخ:</td><td class='value'>").append(dateStr).append("</td></tr>")
-         .append("<tr><td class='label'>العميل:</td><td class='value'>").append(customer).append("</td>")
-         .append("<td class='label'>الدفع:</td><td class='value'>").append(paymentMethod).append("</td></tr>")
-         .append("</table>");
-
-        JSONArray items = t.optJSONArray("items");
-        if (items != null && items.length() > 0) {
-            h.append("<table class='items'><thead><tr>")
-             .append("<th>#</th><th>الصنف</th><th>العيار</th><th>الوزن</th><th>المبلغ</th>")
-             .append("</tr></thead><tbody>");
-            
-            for (int i = 0; i < items.length(); i++) {
-                JSONObject it = items.optJSONObject(i);
-                if (it == null) continue;
-                double weight = it.optDouble("weight", 0.0);
-                double itemPrice = it.optDouble("price", it.optDouble("sale_price", 0));
-                
-                // ✅ استخراج RFID EPC
-                String rfidEpc = it.optString("rfid_epc", it.optString("epc", ""));
-                
-                // ✅ استخراج GTIN
-                String gtin = it.optString("gtin", it.optString("gtin13", ""));
-                String serial = it.optString("serial", it.optString("serial_number", ""));
-
-                h.append("<tr>")
-                 .append("<td>").append(i + 1).append("</td>")
-                 .append("<td style='text-align:right;'>")
-                 .append(it.optString("title", "—"))
-                 .append("</td>")
-                 .append("<td>").append(it.optString("karat", "—")).append("</td>")
-                 .append("<td>").append(String.format(Locale.US, "%.2f", weight)).append("</td>")
-                 .append("<td>").append(priceManager.formatPriceDefault(itemPrice)).append("</td>")
-                 .append("</tr>");
-                
-                // ✅ إضافة صف RFID تحت كل قطعة
-                if (!rfidEpc.isEmpty()) {
-                    h.append("<tr><td colspan='5' style='text-align:right; background:#FAFAFA;'>")
-                     .append("<div class='rfid-box'>")
-                     .append("<b>RFID: </b>").append(rfidEpc)
-                     .append("</div>")
-                     .append("</td></tr>");
-                }
-                
-                // ✅ إضافة DataMatrix Barcode
-                if (!gtin.isEmpty()) {
-                    String gs1DataMatrix = buildGS1DataMatrix(gtin, serial);
-                    String barcodeUrl = "https://barcode.tec-it.com/barcode.ashx?data=" + 
-                        Uri.encode(gs1DataMatrix) + "&code=DataMatrix&dpi=96";
-                    
-                    h.append("<tr><td colspan='5' style='text-align:center; background:#FAFAFA;'>")
-                     .append("<div class='datamatrix-container'>")
-                     .append("<img src='").append(barcodeUrl).append("' alt='DataMatrix'/>")
-                     .append("<div style='font-size:7px;color:#888;'>").append(gs1DataMatrix).append("</div>")
-                     .append("</div>")
-                     .append("</td></tr>");
-                }
-            }
-            h.append("</tbody></table>");
-        }
-
-        double subtotal = t.optDouble("subtotal", t.optDouble("total_amount", 0));
-        double discount = t.optDouble("discount_amount", 0);
-        double finalAmt = t.optDouble("final_amount", subtotal - discount);
-
-        h.append("<table class='totals-table'>")
-         .append("<tr><td class='label'>الإجمالي:</td><td class='value' style='text-align:left;'>")
-         .append(priceManager.formatPriceDefault(subtotal)).append("</td></tr>");
-        
-        if (discount > 0) {
-            h.append("<tr><td class='label'>الخصم:</td><td class='value' style='text-align:left; color:red;'>- ")
-             .append(priceManager.formatPriceDefault(discount)).append("</td></tr>");
-        }
-
-        h.append("<tr class='grand-total'><td class='label' style='color:#1A237E;'>الصافي:</td>")
-         .append("<td class='value' style='text-align:left; color:#1A237E;'>")
-         .append(priceManager.formatPriceDefault(finalAmt)).append("</td></tr>")
-         .append("</table>");
-
-        // ✅ التفقيط
-        String tafweetText = ArabicNumberToWords.convert(finalAmt, 
-            ArabicNumberToWords.getCurrencyArabicName(currency));
-        h.append("<div class='tafweet'><b>المبلغ فقط: </b>").append(tafweetText).append("</div>");
-
-        // ✅ QR Code للتحقق
-        String qrData = Uri.encode("Org:" + orgName + "|Receipt:" + saleNumber + "|Total:" + finalAmt + "|Currency:" + currency + "|Tax:" + taxNumber);
-        String qrApiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + qrData;
-
-        h.append("<div class='qr-container'>")
-         .append("<img src='").append(qrApiUrl).append("' alt='QR Verify'/><br>")
-         .append("<span style='font-size:8px;color:#888;'>مسح الرمز للتحقق من صحة السند</span>")
+        h.append("<div class='header'>")
+         .append("<div class='org-name'>").append(orgName).append("</div>")
+         .append("<div class='org-meta'>").append(slogan).append("</div>")
+         .append("<div class='org-meta'>").append(address).append(" | ").append(phone).append("</div>")
+         .append("<div class='org-meta'><b>").append(isArabic ? "الرقم الضريبي: " : "Tax Number: ").append("</b>").append(taxNumber).append("</div>")
          .append("</div>");
 
-    } catch (Exception e) {
-        Log.e(TAG, "Error rendering receipt", e);
-        h.append("<p style='color:red;text-align:center'>خطأ في معالجة بيانات السند</p>");
+        try {
+            JSONObject t = new JSONObject(receiptJsonStr).optJSONObject("transaction");
+            if (t == null) t = new JSONObject(receiptJsonStr);
+
+            String saleId = t.optString("sale_id", "—");
+            String saleNumber = t.optString("sale_number", t.optString("invoice_number", "—"));
+            String dateStr = t.optString("timestamp", new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date()));
+            String customer = t.optString("customer_name", isArabic ? "عميل نقدي" : "Cash Customer");
+            String paymentMethod = t.optString("payment_method", "CASH");
+            
+            String currency = t.optString("currency", defaultCurrency);
+
+            h.append("<div class='receipt-title'>")
+             .append(isArabic ? "سند بيع ضريبي / TAX INVOICE" : "TAX INVOICE")
+             .append("</div>");
+
+            h.append("<table class='info-grid'>")
+             .append("<tr><td class='label'>").append(isArabic ? "رقم السند:" : "Invoice #:").append("</td><td class='value'>").append(saleNumber).append("</td>")
+             .append("<td class='label'>").append(isArabic ? "التاريخ:" : "Date:").append("</td><td class='value'>").append(dateStr).append("</td></tr>")
+             .append("<tr><td class='label'>").append(isArabic ? "العميل:" : "Customer:").append("</td><td class='value'>").append(customer).append("</td>")
+             .append("<td class='label'>").append(isArabic ? "الدفع:" : "Payment:").append("</td><td class='value'>").append(paymentMethod).append("</td></tr>")
+             .append("</table>");
+
+            JSONArray items = t.optJSONArray("items");
+            if (items != null && items.length() > 0) {
+                h.append("<table class='items'><thead><tr>")
+                 .append("<th>#</th><th>").append(isArabic ? "الصنف" : "Item").append("</th><th>").append(isArabic ? "العيار" : "Karat").append("</th><th>").append(isArabic ? "الوزن" : "Weight").append("</th><th>").append(isArabic ? "المبلغ" : "Amount").append("</th>")
+                 .append("</tr></thead><tbody>");
+                
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject it = items.optJSONObject(i);
+                    if (it == null) continue;
+                    double weight = it.optDouble("weight", 0.0);
+                    double itemPrice = it.optDouble("price", it.optDouble("sale_price", 0));
+                    
+                    String rfidEpc = it.optString("rfid_epc", it.optString("epc", ""));
+                    String gtin = it.optString("gtin", it.optString("gtin13", ""));
+                    String serial = it.optString("serial", it.optString("serial_number", ""));
+
+                    h.append("<tr>")
+                     .append("<td>").append(i + 1).append("</td>")
+                     .append("<td style='text-align:right;'>")
+                     .append(it.optString("title", "—"))
+                     .append("</td>")
+                     .append("<td>").append(it.optString("karat", "—")).append("</td>")
+                     .append("<td>").append(String.format(Locale.US, "%.2f", weight)).append("</td>")
+                     .append("<td>").append(priceManager.formatPriceDefault(itemPrice)).append("</td>")
+                     .append("</tr>");
+                    
+                    if (!rfidEpc.isEmpty()) {
+                        h.append("<tr><td colspan='5' style='text-align:right; background:#FAFAFA;'>")
+                         .append("<div class='rfid-box'>")
+                         .append("<b>RFID: </b>").append(rfidEpc)
+                         .append("</div>")
+                         .append("</td></tr>");
+                    }
+                    
+                    if (!gtin.isEmpty()) {
+                        String gs1DataMatrix = buildGS1DataMatrix(gtin, serial);
+                        String barcodeUrl = "https://barcode.tec-it.com/barcode.ashx?data=" + 
+                            Uri.encode(gs1DataMatrix) + "&code=DataMatrix&dpi=96";
+                        
+                        h.append("<tr><td colspan='5' style='text-align:center; background:#FAFAFA;'>")
+                         .append("<div class='datamatrix-container'>")
+                         .append("<img src='").append(barcodeUrl).append("' alt='DataMatrix'/>")
+                         .append("<div style='font-size:7px;color:#888;'>").append(gs1DataMatrix).append("</div>")
+                         .append("</div>")
+                         .append("</td></tr>");
+                    }
+                }
+                h.append("</tbody></table>");
+            }
+
+            double subtotal = t.optDouble("subtotal", t.optDouble("total_amount", 0));
+            double discount = t.optDouble("discount_amount", 0);
+            double finalAmt = t.optDouble("final_amount", subtotal - discount);
+
+            h.append("<table class='totals-table'>")
+             .append("<tr><td class='label'>").append(isArabic ? "الإجمالي:" : "Subtotal:").append("</td><td class='value' style='text-align:left;'>")
+             .append(priceManager.formatPriceDefault(subtotal)).append("</td></tr>");
+            
+            if (discount > 0) {
+                h.append("<tr><td class='label'>").append(isArabic ? "الخصم:" : "Discount:").append("</td><td class='value' style='text-align:left; color:red;'>- ")
+                 .append(priceManager.formatPriceDefault(discount)).append("</td></tr>");
+            }
+
+            h.append("<tr class='grand-total'><td class='label' style='color:#1A237E;'>").append(isArabic ? "الصافي:" : "Net Total:").append("</td>")
+             .append("<td class='value' style='text-align:left; color:#1A237E;'>")
+             .append(priceManager.formatPriceDefault(finalAmt)).append("</td></tr>")
+             .append("</table>");
+
+            String tafweetText = ArabicNumberToWords.convert(finalAmt, 
+                ArabicNumberToWords.getCurrencyArabicName(currency));
+            h.append("<div class='tafweet'><b>").append(isArabic ? "المبلغ فقط: " : "Amount in words: ").append("</b>").append(tafweetText).append("</div>");
+
+            String qrData = Uri.encode("Org:" + orgName + "|Receipt:" + saleNumber + "|Total:" + finalAmt + "|Currency:" + currency + "|Tax:" + taxNumber);
+            String qrApiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + qrData;
+
+            h.append("<div class='qr-container'>")
+             .append("<img src='").append(qrApiUrl).append("' alt='QR Verify'/><br>")
+             .append("<span style='font-size:8px;color:#888;'>").append(isArabic ? "مسح الرمز للتحقق من صحة السند" : "Scan to verify").append("</span>")
+             .append("</div>");
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error rendering receipt", e);
+            h.append("<p style='color:red;text-align:center'>").append(isArabic ? "خطأ في معالجة بيانات السند" : "Error processing receipt").append("</p>");
+        }
+
+        h.append("<div class='footer'>")
+         .append(isArabic ? "شكرًا لتعاملكم معنا | " : "Thank you | ").append(orgName).append("<br>")
+         .append("MIRA Trust Platform © 2026")
+         .append("</div></body></html>");
+
+        webReceipt.loadDataWithBaseURL(null, h.toString(), "text/html", "UTF-8", null);
     }
-
-    h.append("<div class='footer'>")
-     .append("شكرًا لتعاملكم معنا | ").append(orgName).append("<br>")
-     .append("نظام MIRA Trust Platform © 2026")
-     .append("</div></body></html>");
-
-    webReceipt.loadDataWithBaseURL(null, h.toString(), "text/html", "UTF-8", null);
-}
 
     private String getCurrencySymbol(String currency) {
         switch (currency.toUpperCase()) {
