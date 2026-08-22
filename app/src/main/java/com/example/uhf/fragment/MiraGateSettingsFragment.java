@@ -654,28 +654,29 @@ public class MiraGateSettingsFragment extends Fragment {
         }
 
         class GateViewHolder extends RecyclerView.ViewHolder {
-    TextView tvGateName, tvGateLocation, tvGateStatus, tvGateStats, tvGateLastEvent;
-    View btnRemove;
-    MaterialButton btnToggleGate; // ✅ تغيير النوع
+            TextView tvGateName, tvGateLocation, tvGateStatus, tvGateStats, tvGateLastEvent;
+            View btnRemove;
+            MaterialButton btnToggleGate;
 
-    GateViewHolder(@NonNull View itemView) {
-        super(itemView);
-        tvGateName = itemView.findViewById(R.id.tvGateName);
-        tvGateLocation = itemView.findViewById(R.id.tvGateLocation);
-        tvGateStatus = itemView.findViewById(R.id.tvGateStatus);
-        tvGateStats = itemView.findViewById(R.id.tvGateStats);
-        tvGateLastEvent = itemView.findViewById(R.id.tvGateLastEvent);
-        btnRemove = itemView.findViewById(R.id.btnRemoveGate);
-        btnToggleGate = itemView.findViewById(R.id.btnToggleGate); // ✅ سيعمل الآن مع MaterialButton
-    }
-}
-    
-        interface OnGateRemoveListener {
+            GateViewHolder(@NonNull View itemView) {
+                super(itemView);
+                tvGateName = itemView.findViewById(R.id.tvGateName);
+                tvGateLocation = itemView.findViewById(R.id.tvGateLocation);
+                tvGateStatus = itemView.findViewById(R.id.tvGateStatus);
+                tvGateStats = itemView.findViewById(R.id.tvGateStats);
+                tvGateLastEvent = itemView.findViewById(R.id.tvGateLastEvent);
+                btnRemove = itemView.findViewById(R.id.btnRemoveGate);
+                btnToggleGate = itemView.findViewById(R.id.btnToggleGate);
+            }
+        }
+    } // ✅ نهاية GateAdapter
+
+    // ✅ الـ interfaces هنا - داخل MiraGateSettingsFragment وليس داخل GateAdapter
+    interface OnGateRemoveListener {
         void onRemove(int position);
     }
     
     interface OnGateToggleListener {
         void onToggle(int position, boolean open);
     }
-    }
-}
+} // ✅ نهاية MiraGateSettingsFragment
