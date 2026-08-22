@@ -334,51 +334,51 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     private void calculateEstimatedGoldValue() {
-        try {
-            if (binding == null || binding.etGrossWeight == null) return;
+    try {
+        if (binding == null || binding.etGrossWeight == null) return;
 
-            String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
-            if (weightStr.isEmpty()) {
-                resetCalculatedDisplay();
-                return;
-            }
-
-            double grossWeight = Double.parseDouble(weightStr);
-            if (grossWeight <= 0) {
-                resetCalculatedDisplay();
-                return;
-            }
-
-            double stoneWeightGrams = 0.0;
-            double stoneValue = 0.0;
-
-            if (binding.switchHasStones.isChecked()) {
-                String sWeight = binding.etStoneWeight.getText() != null ? binding.etStoneWeight.getText().toString().trim() : "";
-                String sValue = binding.etStoneValue.getText() != null ? binding.etStoneValue.getText().toString().trim() : "";
-
-                if (!sWeight.isEmpty()) {
-                    stoneWeightGrams = Double.parseDouble(sWeight) * CARAT_TO_GRAM_FACTOR;
-                }
-                if (!sValue.isEmpty()) {
-                    stoneValue = Double.parseDouble(sValue);
-                }
-            }
-
-            double netGoldWeight = Math.max(0.0, grossWeight - stoneWeightGrams);
-
-            int karat = getSelectedKaratNumber();
-            double gramPrice = priceManager.getFinalPricePerGram(karat);
-            double goldValue = netGoldWeight * gramPrice;
-            double totalPrice = goldValue + stoneValue;
-
-            String formattedPrice = priceManager.formatPriceDefault(totalPrice);
-            binding.tvEstimatedGoldValue.setText(formattedPrice);
-            binding.tvSummaryPrice.setText(formattedPrice);
-
-        } catch (Exception e) {
-            Log.e(TAG, "calculateEstimatedGoldValue error: " + e.getMessage());
+        String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
+        if (weightStr.isEmpty()) {
+            resetCalculatedDisplay();
+            return;
         }
+
+        double grossWeight = Double.parseDouble(weightStr);
+        if (grossWeight <= 0) {
+            resetCalculatedDisplay();
+            return;
+        }
+
+        double stoneWeightGrams = 0.0;
+        double stoneValue = 0.0;
+
+        if (binding.switchHasStones.isChecked()) {
+            String sWeight = binding.etStoneWeight.getText() != null ? binding.etStoneWeight.getText().toString().trim() : "";
+            String sValue = binding.etStoneValue.getText() != null ? binding.etStoneValue.getText().toString().trim() : "";
+
+            if (!sWeight.isEmpty()) {
+                stoneWeightGrams = Double.parseDouble(sWeight) * CARAT_TO_GRAM_FACTOR;
+            }
+            if (!sValue.isEmpty()) {
+                stoneValue = Double.parseDouble(sValue);
+            }
+        }
+
+        double netGoldWeight = Math.max(0.0, grossWeight - stoneWeightGrams);
+        int karat = getSelectedKaratNumber();
+
+        // ✅ استخدام الدالة الموحدة
+        MiraPriceManager.PricingDetails details = priceManager.calculatePricingDetails(karat, netGoldWeight);
+        double totalPrice = details.finalPrice + stoneValue;
+
+        String formattedPrice = priceManager.formatPriceDefault(totalPrice);
+        binding.tvEstimatedGoldValue.setText(formattedPrice);
+        binding.tvSummaryPrice.setText(formattedPrice);
+
+    } catch (Exception e) {
+        Log.e(TAG, "calculateEstimatedGoldValue error: " + e.getMessage());
     }
+}
 
     private void resetCalculatedDisplay() {
         String zeroText = "0.00 " + priceManager.getCurrencySymbol(priceManager.getDefaultCurrency());
@@ -387,192 +387,215 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     private double[] calculatePricingDetails(double grossWeight, double stoneWeightGrams, double stoneValue) {
-        int karat = getSelectedKaratNumber();
-        double netWeight = Math.max(0.0, grossWeight - stoneWeightGrams);
+    int karat = getSelectedKaratNumber();
+    double netWeight = Math.max(0.0, grossWeight - stoneWeightGrams);
 
-        double basePricePerGram = priceManager.getGoldPricePerGram(karat);
-        double makingPerGram = priceManager.getMakingCharge(karat);
-        double finalPricePerGram = priceManager.getFinalPricePerGram(karat);
-
-        double goldValue = netWeight * basePricePerGram;
-        double makingCost = netWeight * makingPerGram;
-        double totalCost = netWeight * finalPricePerGram;
-        double profitAmount = totalCost - goldValue - makingCost;
-        double finalPrice = totalCost + stoneValue;
-
-        return new double[]{goldValue, makingCost, stoneValue, totalCost, profitAmount, finalPrice, netWeight};
-    }
+    // ✅ استخدام الدالة الموحدة من MiraPriceManager
+    MiraPriceManager.PricingDetails details = priceManager.calculatePricingDetails(karat, netWeight);
+    
+    double finalPrice = details.finalPrice + stoneValue;
+    
+    return new double[]{
+        details.baseGoldCost,      // goldValue
+        details.totalMakingCost,   // makingCost
+        stoneValue,                // stoneValue
+        details.baseGoldCost + details.totalMakingCost, // totalCost (subtotal)
+        details.profitAmount,      // profitAmount
+        finalPrice,                // finalPrice (مع قيمة الأحجار)
+        netWeight                  // netWeight
+    };
+}
 
     private void finalizeItemIdentity() {
-        if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
-            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+    if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
+        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+        return;
+    }
+    
+    try {
+        if (binding == null) return;
+
+        String epc = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
+        String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
+        String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
+
+        if (epc.isEmpty()) {
+            showValidationError(isArabic ? "يرجى مسح RFID أولاً" : "Please scan RFID first");
             return;
         }
-        
-        try {
-            if (binding == null) return;
-
-            String epc = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
-            String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
-            String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
-
-            if (epc.isEmpty()) {
-                showValidationError(isArabic ? "يرجى مسح RFID أولاً" : "Please scan RFID first");
-                return;
-            }
-            if (!isValidEPC(epc)) {
-                showValidationError(isArabic ? "❌ رمز RFID غير صالح!\nيجب أن يكون EPC قياسي أو GTIN-13." : "❌ Invalid RFID code!\nMust be EPC or GTIN-13.");
-                return;
-            }
-            if (title.isEmpty()) {
-                showValidationError(isArabic ? "يرجى كتابة عنوان القطعة" : "Please enter item title");
-                return;
-            }
-            if (weightStr.isEmpty()) {
-                showValidationError(isArabic ? "يرجى تحديد وزن القطعة" : "Please specify item weight");
-                return;
-            }
-
-            double grossWeight = Double.parseDouble(weightStr);
-            if (grossWeight <= 0) {
-                showValidationError(isArabic ? "يجب أن يكون الوزن أكبر من صفر" : "Weight must be greater than zero");
-                return;
-            }
-
-            String stoneType = "";
-            double stoneWeightCarats = 0;
-            int stoneCount = 0;
-            double stoneValue = 0;
-
-            if (binding.switchHasStones.isChecked()) {
-                stoneType = binding.etStoneType.getText() != null ? binding.etStoneType.getText().toString().trim() : "";
-                String stoneWeightStr = binding.etStoneWeight.getText() != null ? binding.etStoneWeight.getText().toString().trim() : "";
-                String stoneCountStr = binding.etStoneCount.getText() != null ? binding.etStoneCount.getText().toString().trim() : "";
-                String stoneValueStr = binding.etStoneValue.getText() != null ? binding.etStoneValue.getText().toString().trim() : "";
-
-                if (!stoneValueStr.isEmpty()) stoneValue = Double.parseDouble(stoneValueStr);
-                if (!stoneWeightStr.isEmpty()) stoneWeightCarats = Double.parseDouble(stoneWeightStr);
-                if (!stoneCountStr.isEmpty()) stoneCount = Integer.parseInt(stoneCountStr);
-            }
-
-            double stoneWeightGrams = stoneWeightCarats * CARAT_TO_GRAM_FACTOR;
-            if (stoneWeightGrams >= grossWeight) {
-                showValidationError(isArabic ? "❌ وزن الأحجار لا يمكن أن يتجاوز أو يساوي الوزن الإجمالي للقطعة!" : "❌ Stone weight cannot exceed gross weight!");
-                return;
-            }
-
-            double[] pricing = calculatePricingDetails(grossWeight, stoneWeightGrams, stoneValue);
-            final double finalGoldValue = pricing[0];
-            final double finalMakingCost = pricing[1];
-            final double finalTotalCost = pricing[3];
-            final double finalProfitAmount = pricing[4];
-            final double finalRetailPrice = pricing[5];
-            final double netGoldWeight = pricing[6];
-
-            final AlertDialog loadingDialog = showProfessionalLoadingDialog(
-                    isArabic ? "🔄 جاري التكويد..." : "🔄 Encoding in progress...",
-                    isArabic ? "يرجى الانتظار - يتم الآن حفظ القطعة" : "Please wait - saving item"
-            );
-
-            setFormEnabled(false);
-
-            final String finalEpc = epc;
-            final String finalTitle = title;
-            final double fGrossWeight = grossWeight;
-            final double fStoneWeightCarats = stoneWeightCarats;
-            final int fStoneCount = stoneCount;
-            final double fStoneValue = stoneValue;
-            final String fStoneType = stoneType;
-            final String selectedKarat = getSelectedKaratCode();
-            final String selectedCategory = getSelectedCategory();
-            final String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
-            final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
-            final List<String> finalPhotoPaths = new ArrayList<>(photoPaths);
-            final int selectedKaratNum = getSelectedKaratNumber();
-            final int currentUserId = getCurrentUserId();
-
-            Executors.newSingleThreadExecutor().execute(() -> {
-                try {
-                    JSONObject payload = new JSONObject();
-                    payload.put("epc", finalEpc);
-                    payload.put("title", finalTitle);
-                    payload.put("purity_code", selectedKarat);
-                    payload.put("gross_weight", fGrossWeight);
-                    payload.put("net_weight", netGoldWeight);
-                    payload.put("stone_weight", fStoneWeightCarats);
-                    payload.put("stone_count", fStoneCount);
-                    payload.put("stone_value", fStoneValue);
-                    payload.put("stone_type", fStoneType);
-                    payload.put("gold_price_per_gram", priceManager.getGoldPricePerGram(selectedKaratNum));
-                    payload.put("gold_value", finalGoldValue);
-                    payload.put("making_per_gram", priceManager.getMakingCharge(selectedKaratNum));
-                    payload.put("making_charge", finalMakingCost);
-                    payload.put("total_cost", finalTotalCost);
-                    payload.put("profit_margin", priceManager.getMargin(selectedKaratNum));
-                    payload.put("profit_amount", finalProfitAmount);
-                    payload.put("retail_price", finalRetailPrice);
-                    payload.put("category", selectedCategory);
-                    payload.put("location", location);
-                    payload.put("branch_id", branchId);
-                    payload.put("user_id", currentUserId);
-
-                    if (!finalPhotoPaths.isEmpty()) {
-                        JSONArray imagesArray = new JSONArray();
-                        for (String path : finalPhotoPaths) imagesArray.put(path);
-                        payload.put("image_paths", imagesArray);
-                    }
-
-                    boolean apiSuccess = false;
-                    int serverItemId = 0;
-
-                    if (apiClient != null) {
-                        try {
-                            MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
-                            apiSuccess = (response != null && response.isSuccess);
-                            if (response != null && response.data != null) {
-                                serverItemId = response.data.optInt("item_id", 0);
-                            }
-                        } catch (Exception ignored) {}
-                    }
-
-                    if (!apiSuccess) {
-                        saveEncodeOffline(payload);
-                    }
-
-                    final boolean success = apiSuccess;
-                    final int finalServerItemId = serverItemId;
-
-                    safeRun(() -> {
-                        dismissDialog(loadingDialog);
-                        setFormEnabled(true);
-
-                        playSuccessSound();
-                        if (success) {
-                            removePendingEncode(finalEpc);
-                            if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
-                                uploadItemImages(finalServerItemId, finalPhotoPaths);
-                            }
-                        } else {
-                            updatePendingSyncBadge();
-                            showToast(isArabic ? "💾 تم الحفظ محلياً (أوفلاين)" : "💾 Saved locally (Offline)");
-                        }
-
-                        showEncodingSuccessDialog(finalTitle, finalEpc, String.format(Locale.US, "%.2f", fGrossWeight), finalRetailPrice);
-                    });
-                } catch (Exception e) {
-                    Log.e(TAG, "Background execution error: " + e.getMessage());
-                    safeRun(() -> {
-                        dismissDialog(loadingDialog);
-                        setFormEnabled(true);
-                        showValidationError(e.getMessage());
-                    });
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "finalizeItemIdentity error: " + e.getMessage());
-            showToast("❌ " + e.getMessage());
+        if (!isValidEPC(epc)) {
+            showValidationError(isArabic ? "❌ رمز RFID غير صالح!\nيجب أن يكون EPC قياسي أو GTIN-13." : "❌ Invalid RFID code!\nMust be EPC or GTIN-13.");
+            return;
         }
+        if (title.isEmpty()) {
+            showValidationError(isArabic ? "يرجى كتابة عنوان القطعة" : "Please enter item title");
+            return;
+        }
+        if (weightStr.isEmpty()) {
+            showValidationError(isArabic ? "يرجى تحديد وزن القطعة" : "Please specify item weight");
+            return;
+        }
+
+        double grossWeight = Double.parseDouble(weightStr);
+        if (grossWeight <= 0) {
+            showValidationError(isArabic ? "يجب أن يكون الوزن أكبر من صفر" : "Weight must be greater than zero");
+            return;
+        }
+
+        String stoneType = "";
+        double stoneWeightCarats = 0;
+        int stoneCount = 0;
+        double stoneValue = 0;
+
+        if (binding.switchHasStones.isChecked()) {
+            stoneType = binding.etStoneType.getText() != null ? binding.etStoneType.getText().toString().trim() : "";
+            String stoneWeightStr = binding.etStoneWeight.getText() != null ? binding.etStoneWeight.getText().toString().trim() : "";
+            String stoneCountStr = binding.etStoneCount.getText() != null ? binding.etStoneCount.getText().toString().trim() : "";
+            String stoneValueStr = binding.etStoneValue.getText() != null ? binding.etStoneValue.getText().toString().trim() : "";
+
+            if (!stoneValueStr.isEmpty()) stoneValue = Double.parseDouble(stoneValueStr);
+            if (!stoneWeightStr.isEmpty()) stoneWeightCarats = Double.parseDouble(stoneWeightStr);
+            if (!stoneCountStr.isEmpty()) stoneCount = Integer.parseInt(stoneCountStr);
+        }
+
+        double stoneWeightGrams = stoneWeightCarats * CARAT_TO_GRAM_FACTOR;
+        if (stoneWeightGrams >= grossWeight) {
+            showValidationError(isArabic ? "❌ وزن الأحجار لا يمكن أن يتجاوز أو يساوي الوزن الإجمالي للقطعة!" : "❌ Stone weight cannot exceed gross weight!");
+            return;
+        }
+
+        double[] pricing = calculatePricingDetails(grossWeight, stoneWeightGrams, stoneValue);
+        final double finalGoldValue = pricing[0];
+        final double finalMakingCost = pricing[1];
+        final double finalTotalCost = pricing[3];
+        final double finalProfitAmount = pricing[4];
+        final double finalRetailPrice = pricing[5];
+        final double netGoldWeight = pricing[6];
+
+        // ✅ تعريف المتغيرات مرة واحدة فقط
+        final int selectedKaratNum = getSelectedKaratNumber();
+        MiraPriceManager.PricingDetails details = priceManager.calculatePricingDetails(selectedKaratNum, netGoldWeight);
+        
+        // ✅ حفظ الأسعار والعملة
+        final String localCurrency = priceManager.getDefaultCurrency();
+        final double finalPriceUSD = details.finalPrice + stoneValue;
+        final double finalPriceLocal = priceManager.convertFromUSD(finalPriceUSD, localCurrency);
+        final double exchangeRate = priceManager.getExchangeRate(localCurrency);
+
+        final AlertDialog loadingDialog = showProfessionalLoadingDialog(
+                isArabic ? "🔄 جاري التكويد..." : "🔄 Encoding in progress...",
+                isArabic ? "يرجى الانتظار - يتم الآن حفظ القطعة" : "Please wait - saving item"
+        );
+
+        setFormEnabled(false);
+
+        final String finalEpc = epc;
+        final String finalTitle = title;
+        final double fGrossWeight = grossWeight;
+        final double fStoneWeightCarats = stoneWeightCarats;
+        final int fStoneCount = stoneCount;
+        final double fStoneValue = stoneValue;
+        final String fStoneType = stoneType;
+        final String selectedKarat = getSelectedKaratCode();
+        final String selectedCategory = getSelectedCategory();
+        final String location = isArabic ? "المعرض الرئيسي" : "Main Showroom";
+        final int branchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : 1;
+        final List<String> finalPhotoPaths = new ArrayList<>(photoPaths);
+        final int currentUserId = getCurrentUserId();
+        
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                JSONObject payload = new JSONObject();
+                payload.put("epc", finalEpc);
+                payload.put("title", finalTitle);
+                payload.put("purity_code", selectedKarat);
+                payload.put("gross_weight", fGrossWeight);
+                payload.put("net_weight", netGoldWeight);
+                payload.put("stone_weight", fStoneWeightCarats);
+                payload.put("stone_count", fStoneCount);
+                payload.put("stone_value", fStoneValue);
+                payload.put("stone_type", fStoneType);
+                
+                // ✅ القيم المالية
+                payload.put("gold_price_per_gram", details.gramPrice);
+                payload.put("gold_value", details.baseGoldCost);
+                payload.put("making_per_gram", priceManager.getMakingCharge(selectedKaratNum));
+                payload.put("making_charge", details.totalMakingCost);
+                payload.put("total_cost", details.baseGoldCost + details.totalMakingCost);
+                payload.put("profit_margin", priceManager.getProfitMargin(selectedKaratNum));
+                payload.put("profit_amount", details.profitAmount);
+                
+                // ✅ الأسعار والعملة
+                payload.put("retail_price_usd", finalPriceUSD);        // السعر الأساسي بالدولار
+                payload.put("retail_price", finalPriceUSD);            // للتوافق مع القديم
+                payload.put("retail_price_local", finalPriceLocal);    // السعر المحلي
+                payload.put("currency", "USD");                         // العملة الأساسية
+                payload.put("local_currency", localCurrency);           // العملة المحلية
+                payload.put("exchange_rate", exchangeRate);             // سعر الصرف
+                payload.put("currency_symbol", priceManager.getCurrencySymbol(localCurrency));
+                
+                payload.put("category", selectedCategory);
+                payload.put("location", location);
+                payload.put("branch_id", branchId);
+                payload.put("user_id", currentUserId);
+
+                if (!finalPhotoPaths.isEmpty()) {
+                    JSONArray imagesArray = new JSONArray();
+                    for (String path : finalPhotoPaths) imagesArray.put(path);
+                    payload.put("image_paths", imagesArray);
+                }
+
+                boolean apiSuccess = false;
+                int serverItemId = 0;
+
+                if (apiClient != null) {
+                    try {
+                        MiraApiClient.ApiResponse response = apiClient.encodeItem(payload);
+                        apiSuccess = (response != null && response.isSuccess);
+                        if (response != null && response.data != null) {
+                            serverItemId = response.data.optInt("item_id", 0);
+                        }
+                    } catch (Exception ignored) {}
+                }
+
+                if (!apiSuccess) {
+                    saveEncodeOffline(payload);
+                }
+
+                final boolean success = apiSuccess;
+                final int finalServerItemId = serverItemId;
+
+                safeRun(() -> {
+                    dismissDialog(loadingDialog);
+                    setFormEnabled(true);
+
+                    playSuccessSound();
+                    if (success) {
+                        removePendingEncode(finalEpc);
+                        if (!finalPhotoPaths.isEmpty() && finalServerItemId > 0) {
+                            uploadItemImages(finalServerItemId, finalPhotoPaths);
+                        }
+                    } else {
+                        updatePendingSyncBadge();
+                        showToast(isArabic ? "💾 تم الحفظ محلياً (أوفلاين)" : "💾 Saved locally (Offline)");
+                    }
+
+                    showEncodingSuccessDialog(finalTitle, finalEpc, String.format(Locale.US, "%.2f", fGrossWeight), finalRetailPrice);
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Background execution error: " + e.getMessage());
+                safeRun(() -> {
+                    dismissDialog(loadingDialog);
+                    setFormEnabled(true);
+                    showValidationError(e.getMessage());
+                });
+            }
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "finalizeItemIdentity error: " + e.getMessage());
+        showToast("❌ " + e.getMessage());
     }
+}
 
     private void showPendingItemsDialog() {
         if (offlineCache == null || !isAdded()) return;
