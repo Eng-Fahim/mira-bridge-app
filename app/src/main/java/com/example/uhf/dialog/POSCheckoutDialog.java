@@ -306,40 +306,42 @@ public class POSCheckoutDialog extends DialogFragment {
         }
 
         if (btnConfirmCheckout != null) {
-            btnConfirmCheckout.setOnClickListener(v -> {
-                if (!validateInputs()) {
-                    return;
-                }
-
-                POSCheckoutData data = new POSCheckoutData();
-
-                if (etCustomerName != null) data.customerName = etCustomerName.getText().toString().trim();
-                if (etCustomerPhone != null) data.customerPhone = etCustomerPhone.getText().toString().trim();
-                if (etCustomerEmail != null) data.customerEmail = etCustomerEmail.getText().toString().trim();
-                if (etCustomerAddress != null) data.customerAddress = etCustomerAddress.getText().toString().trim();
-                if (etCustomerNotes != null) data.customerNotes = etCustomerNotes.getText().toString().trim();
-
-                int paymentPosition = spPaymentMethod != null ? spPaymentMethod.getSelectedItemPosition() : 0;
-                data.paymentMethod = getEnglishPaymentMethod(paymentPosition);
-                data.accountCode = getCurrentAccountCode();
-
-                String discountStr = (etDiscount != null) ? etDiscount.getText().toString().trim() : "0";
-                try {
-                    data.discount = discountStr.isEmpty() ? 0 : Double.parseDouble(discountStr);
-                } catch (Exception e) {
-                    data.discount = 0;
-                }
-
-                data.discountAmount = totalAmount * (data.discount / 100.0);
-                data.finalAmount = totalAmount - data.discountAmount;
-
-                dismissAllowingStateLoss();
-
-                if (listener != null) {
-                    listener.onCheckout(data);
-                }
-            });
+    btnConfirmCheckout.setOnClickListener(v -> {
+        if (!validateInputs()) {
+            return;
         }
+
+        POSCheckoutData data = new POSCheckoutData();
+
+        if (etCustomerName != null) data.customerName = etCustomerName.getText().toString().trim();
+        if (etCustomerPhone != null) data.customerPhone = etCustomerPhone.getText().toString().trim();
+        if (etCustomerEmail != null) data.customerEmail = etCustomerEmail.getText().toString().trim();
+        if (etCustomerAddress != null) data.customerAddress = etCustomerAddress.getText().toString().trim();
+        if (etCustomerNotes != null) data.customerNotes = etCustomerNotes.getText().toString().trim();
+
+        int paymentPosition = spPaymentMethod != null ? spPaymentMethod.getSelectedItemPosition() : 0;
+        data.paymentMethod = getEnglishPaymentMethod(paymentPosition);
+        data.accountCode = getCurrentAccountCode();
+
+        String discountStr = (etDiscount != null) ? etDiscount.getText().toString().trim() : "0";
+        try {
+            data.discount = discountStr.isEmpty() ? 0 : Double.parseDouble(discountStr);
+        } catch (Exception e) {
+            data.discount = 0;
+        }
+
+        // ✅ حفظ جميع القيم المالية بشكل صحيح
+        data.originalTotal = totalAmount;                                    // المجموع الأصلي
+        data.discountAmount = totalAmount * (data.discount / 100.0);       // قيمة الخصم
+        data.finalAmount = totalAmount - data.discountAmount;              // المجموع النهائي
+
+        dismissAllowingStateLoss();
+
+        if (listener != null) {
+            listener.onCheckout(data);
+        }
+    });
+}
     }
 
     /**
