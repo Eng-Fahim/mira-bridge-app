@@ -49,6 +49,20 @@
                 android:textAppearance="?attr/textAppearanceHeadlineSmall"
                 android:textColor="?attr/colorOnBackground"
                 android:textStyle="bold" />
+                
+                <!-- ✅ قبل أزرار Arm/Disarm -->
+<TextView
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="🚪 اختر البوابة:"
+    android:textColor="?attr/colorOnSurfaceVariant"
+    android:textSize="12sp" />
+
+<Spinner
+    android:id="@+id/spGateSelector"
+    android:layout_width="match_parent"
+    android:layout_height="44dp"
+    android:layout_marginBottom="8dp" />
 
             <TextView
                 android:layout_width="wrap_content"
