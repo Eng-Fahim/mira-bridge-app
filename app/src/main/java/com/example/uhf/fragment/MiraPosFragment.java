@@ -60,6 +60,8 @@ public class MiraPosFragment extends MiraBaseFragment {
 
     private static final String TAG = "MiraPosFragment";
     private static final String PENDING_SALES_PREFS = "pos_pending_sales";
+    private boolean isCheckoutDialogShowing = false; 
+    
     
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
@@ -201,36 +203,37 @@ public class MiraPosFragment extends MiraBaseFragment {
     }
 
     @Override
-    public void onPause() {
-        super.onPause();
-        stopRFIDScan();
-        
-        if (scaleConnector != null) {
-            scaleConnector.disconnect();
-        }
-        
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
-        }
+public void onPause() {
+    super.onPause();
+    stopRFIDScan();
+    isCheckoutDialogShowing = false; // ✅ إعادة تعيين عند الخروج من الشاشة
+    
+    if (scaleConnector != null) {
+        scaleConnector.disconnect();
     }
-
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        stopRFIDScan();
-        if (rfidManager != null) {
-            rfidManager.setListener(null);
-        }
+    
+    if (getActivity() instanceof UHFMainActivity) {
+        ((UHFMainActivity) getActivity()).setActivePOSFragment(null);
     }
+}
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        stopRFIDScan();
-        if (scaleConnector != null) scaleConnector.disconnect();
-        if (rfidManager != null) rfidManager.release();
+@Override
+public void onDestroyView() {
+    super.onDestroyView();
+    stopRFIDScan();
+    isCheckoutDialogShowing = false; // ✅ إعادة تعيين المتغير
+    if (rfidManager != null) {
+        rfidManager.setListener(null);
     }
+}
 
+@Override
+public void onDestroy() {
+    super.onDestroy();
+    stopRFIDScan();
+    if (scaleConnector != null) scaleConnector.disconnect();
+    if (rfidManager != null) rfidManager.release();
+}
     private int getActiveBranchId() {
         try {
             return branchesManager != null ? branchesManager.getActiveBranchId() : 1;
@@ -641,35 +644,54 @@ public class MiraPosFragment extends MiraBaseFragment {
         return t;
     }
 
+        
     private void processCheckoutAndStockUpdate() {
-    if (!(permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager())) {
-        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-        return;
-    }
-    if (cartList.isEmpty()) {
-        showToast(isArabic ? "السلة فارغة" : "Cart is empty");
-        return;
-    }
-    if (!isAdded() || getActivity() == null) return;
-    UIHelper.hideKeyboard(getActivity());
-    
-    // منع فتح الديالوج مرتين
-    if (getChildFragmentManager().findFragmentByTag("POSCheckoutDialog") != null) {
-        return; // الديالوج مفتوح بالفعل
-    }
-    
-    try {
-        POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(getCartTotal(), cartList.size());
-        dialog.setCheckoutListener(this::executeCheckout);
-        FragmentManager fm = getChildFragmentManager();
-        if (!fm.isStateSaved()) {
-            dialog.show(fm, "POSCheckoutDialog");
+        if (!(permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager())) {
+            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            return;
         }
-    } catch (Exception e) {
-        showToast(isArabic ? "خطأ" : "Error: " + e.getMessage());
+        if (cartList.isEmpty()) {
+            showToast(isArabic ? "السلة فارغة" : "Cart is empty");
+            return;
+        }
+        
+        // ✅ منع فتح الديالوج مرتين
+        if (isCheckoutDialogShowing) {
+            Log.d(TAG, "Checkout dialog already showing");
+            return;
+        }
+        
+        if (!isAdded() || getActivity() == null) return;
+        UIHelper.hideKeyboard(getActivity());
+        
+        isCheckoutDialogShowing = true;
+        
+        try {
+            POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(getCartTotal(), cartList.size());
+            dialog.setCheckoutListener(data -> {
+                isCheckoutDialogShowing = false; // ✅ إعادة التعيين عند الإغلاق
+                executeCheckout(data);
+            });
+            
+            // ✅ استخدام ParentFragmentManager بدلاً من ChildFragmentManager
+            FragmentManager fm = getParentFragmentManager();
+            
+            // ✅ التحقق من عدم وجود الديالوج مسبقاً
+            if (fm.findFragmentByTag("POSCheckoutDialog") != null) {
+                isCheckoutDialogShowing = false;
+                return;
+            }
+            
+            if (!fm.isStateSaved()) {
+                dialog.show(fm, "POSCheckoutDialog");
+            } else {
+                isCheckoutDialogShowing = false;
+            }
+        } catch (Exception e) {
+            isCheckoutDialogShowing = false;
+            showToast(isArabic ? "خطأ" : "Error: " + e.getMessage());
+        }
     }
-}
-
     private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
     if (!isAdded()) return;
 
@@ -700,6 +722,8 @@ public class MiraPosFragment extends MiraBaseFragment {
             customer.put("name", data.customerName);
             customer.put("phone", data.customerPhone);
             customer.put("email", data.customerEmail != null ? data.customerEmail : "");
+            customer.put("address", data.customerAddress != null ? data.customerAddress : "");
+            customer.put("notes", data.customerNotes != null ? data.customerNotes : "");
             customer.put("payment_method", data.paymentMethod);
             payload.put("customer", customer);
 
@@ -718,12 +742,12 @@ public class MiraPosFragment extends MiraBaseFragment {
             payload.put("items", itemsArr);
 
             JSONObject payment = new JSONObject();
-            // استخدام القيم الصحيحة من data
-            payment.put("subtotal", data.originalTotal); // ✅ استخدم originalTotal من الديالوج
-            payment.put("discount_percent", data.discount);
-            payment.put("discount_amount", data.discountAmount);
-            payment.put("final_amount", data.finalAmount);
-            payment.put("account_code", getAccountCode(data.paymentMethod));
+            // ✅ استخدام القيم الصحيحة من data
+            payment.put("subtotal", data.originalTotal);        // المجموع قبل الخصم
+            payment.put("discount_percent", data.discount);     // نسبة الخصم
+            payment.put("discount_amount", data.discountAmount); // قيمة الخصم
+            payment.put("final_amount", data.finalAmount);      // المبلغ النهائي
+            payment.put("account_code", data.accountCode);      // ✅ استخدام كود الحساب من الديالوج
             payment.put("currency", "YER");
             payload.put("payment", payment);
 
@@ -793,50 +817,48 @@ public class MiraPosFragment extends MiraBaseFragment {
         });
     }
 
-    private String getAccountCode(String paymentMethod) {
-        if (paymentMethod == null) return "110101";
-        switch (paymentMethod.toUpperCase()) {
-            case "CARD": case "NET": case "VISA": case "MASTERCARD": return "110201";
-            case "CREDIT": return "110301";
-            case "BANK_TRANSFER": return "110202";
-            case "CASH": default: return "110101";
-        }
-    }
 
     private void saveFullSaleLocally(POSCheckoutDialog.POSCheckoutData data) {
-        if (getContext() == null) return;
-        try {
-            SharedPreferences p = getContext().getSharedPreferences(PENDING_SALES_PREFS, Context.MODE_PRIVATE);
-            JSONArray arr = new JSONArray(p.getString("pending", "[]"));
-            JSONObject sale = new JSONObject();
-            sale.put("id", System.currentTimeMillis());
-            sale.put("customer_name", data.customerName);
-            sale.put("customer_phone", data.customerPhone);
-            sale.put("payment_method", data.paymentMethod);
-            sale.put("discount", data.discount);
-            sale.put("final_amount", data.finalAmount);
-            sale.put("item_count", cartList.size());
-            sale.put("branch_id", getActiveBranchId());
-            sale.put("created_at", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()));
-            JSONArray itemsArr = new JSONArray();
-            for (CartItem item : cartList) {
-                JSONObject obj = new JSONObject();
-                obj.put("epc", item.epc);
-                obj.put("serial_no", item.serialNo != null ? item.serialNo : item.epc);
-                obj.put("title", item.name);
-                obj.put("karat", item.karat);
-                obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
-                obj.put("price", item.price);
-                if (item.itemId > 0) obj.put("item_id", item.itemId);
-                itemsArr.put(obj);
-            }
-            sale.put("items", itemsArr);
-            arr.put(sale);
-            p.edit().putString("pending", arr.toString()).apply();
-        } catch (Exception e) {
-            Log.e(TAG, "Save local sale error: " + e.getMessage());
+    if (getContext() == null) return;
+    try {
+        SharedPreferences p = getContext().getSharedPreferences(PENDING_SALES_PREFS, Context.MODE_PRIVATE);
+        JSONArray arr = new JSONArray(p.getString("pending", "[]"));
+        JSONObject sale = new JSONObject();
+        sale.put("id", System.currentTimeMillis());
+        sale.put("customer_name", data.customerName);
+        sale.put("customer_phone", data.customerPhone);
+        sale.put("customer_email", data.customerEmail);
+        sale.put("customer_address", data.customerAddress);
+        sale.put("customer_notes", data.customerNotes);
+        sale.put("payment_method", data.paymentMethod);
+        sale.put("account_code", data.accountCode);
+        sale.put("original_total", data.originalTotal);
+        sale.put("discount", data.discount);
+        sale.put("discount_amount", data.discountAmount);
+        sale.put("final_amount", data.finalAmount);
+        sale.put("item_count", cartList.size());
+        sale.put("branch_id", getActiveBranchId());
+        sale.put("created_at", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()));
+        
+        JSONArray itemsArr = new JSONArray();
+        for (CartItem item : cartList) {
+            JSONObject obj = new JSONObject();
+            obj.put("epc", item.epc);
+            obj.put("serial_no", item.serialNo != null ? item.serialNo : item.epc);
+            obj.put("title", item.name);
+            obj.put("karat", item.karat);
+            obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
+            obj.put("price", item.price);
+            if (item.itemId > 0) obj.put("item_id", item.itemId);
+            itemsArr.put(obj);
         }
+        sale.put("items", itemsArr);
+        arr.put(sale);
+        p.edit().putString("pending", arr.toString()).apply();
+    } catch (Exception e) {
+        Log.e(TAG, "Save local sale error: " + e.getMessage());
     }
+}
 
     private void checkPendingSales() {
         if (getContext() == null) return;
@@ -855,57 +877,67 @@ public class MiraPosFragment extends MiraBaseFragment {
     }
 
     private void syncPendingSales() {
-        if (getContext() == null) return;
-        new Thread(() -> {
-            try {
-                SharedPreferences p = getContext().getSharedPreferences(PENDING_SALES_PREFS, Context.MODE_PRIVATE);
-                JSONArray arr = new JSONArray(p.getString("pending", "[]"));
-                if (arr.length() == 0) return;
-                MiraApiClient client = MiraApiClient.getInstance(getContext());
-                JSONArray remainingArr = new JSONArray();
-                int synced = 0;
-                int branchId = getActiveBranchId();
-                for (int i = 0; i < arr.length(); i++) {
-                    try {
-                        JSONObject sale = arr.getJSONObject(i);
-                        JSONObject payload = new JSONObject();
-                        payload.put("action", "COMPLETE_POS_SALE");
-                        payload.put("gate_id", client.getGateId());
-                        payload.put("branch_id", sale.optInt("branch_id", branchId));
-                        JSONObject customer = new JSONObject();
-                        customer.put("name", sale.optString("customer_name", ""));
-                        customer.put("phone", sale.optString("customer_phone", ""));
-                        customer.put("payment_method", sale.optString("payment_method", "CASH"));
-                        payload.put("customer", customer);
-                        payload.put("items", sale.optJSONArray("items"));
-                        JSONObject payment = new JSONObject();
-                        payment.put("subtotal", sale.optDouble("final_amount", 0));
-                        payment.put("discount_percent", sale.optDouble("discount", 0));
-                        payment.put("final_amount", sale.optDouble("final_amount", 0));
-                        payload.put("payment", payment);
-                        MiraApiClient.ApiResponse response = client.checkout(payload);
-                        if (response != null && response.isSuccess) synced++;
-                        else remainingArr.put(sale);
-                    } catch (Exception e) {
-                        remainingArr.put(arr.getJSONObject(i));
-                    }
+    if (getContext() == null) return;
+    new Thread(() -> {
+        try {
+            SharedPreferences p = getContext().getSharedPreferences(PENDING_SALES_PREFS, Context.MODE_PRIVATE);
+            JSONArray arr = new JSONArray(p.getString("pending", "[]"));
+            if (arr.length() == 0) return;
+            MiraApiClient client = MiraApiClient.getInstance(getContext());
+            JSONArray remainingArr = new JSONArray();
+            int synced = 0;
+            int branchId = getActiveBranchId();
+            
+            for (int i = 0; i < arr.length(); i++) {
+                try {
+                    JSONObject sale = arr.getJSONObject(i);
+                    JSONObject payload = new JSONObject();
+                    payload.put("action", "COMPLETE_POS_SALE");
+                    payload.put("gate_id", client.getGateId());
+                    payload.put("branch_id", sale.optInt("branch_id", branchId));
+                    
+                    JSONObject customer = new JSONObject();
+                    customer.put("name", sale.optString("customer_name", ""));
+                    customer.put("phone", sale.optString("customer_phone", ""));
+                    customer.put("email", sale.optString("customer_email", ""));
+                    customer.put("address", sale.optString("customer_address", ""));
+                    customer.put("notes", sale.optString("customer_notes", ""));
+                    customer.put("payment_method", sale.optString("payment_method", "CASH"));
+                    payload.put("customer", customer);
+                    
+                    payload.put("items", sale.optJSONArray("items"));
+                    
+                    JSONObject payment = new JSONObject();
+                    payment.put("subtotal", sale.optDouble("original_total", 0));
+                    payment.put("discount_percent", sale.optDouble("discount", 0));
+                    payment.put("discount_amount", sale.optDouble("discount_amount", 0));
+                    payment.put("final_amount", sale.optDouble("final_amount", 0));
+                    payment.put("account_code", sale.optString("account_code", "110101"));
+                    payload.put("payment", payment);
+                    
+                    MiraApiClient.ApiResponse response = client.checkout(payload);
+                    if (response != null && response.isSuccess) synced++;
+                    else remainingArr.put(sale);
+                } catch (Exception e) {
+                    remainingArr.put(arr.getJSONObject(i));
                 }
-                p.edit().putString("pending", remainingArr.toString()).apply();
-                final int s = synced;
-                final int r = remainingArr.length();
-                safeRun(() -> {
-                    if (s > 0) showToast(isArabic ? "✅ تمت مزامنة " + s + " عملية" : "✅ Synced " + s + " sales");
-                    if (r > 0) {
-                        if (tvCartStatus != null) tvCartStatus.setText("⚠️ " + r + " " + (isArabic ? "معلقة" : "pending"));
-                    } else {
-                        if (tvCartStatus != null) tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Sync pending error: " + e.getMessage());
             }
-        }).start();
-    }
+            p.edit().putString("pending", remainingArr.toString()).apply();
+            final int s = synced;
+            final int r = remainingArr.length();
+            safeRun(() -> {
+                if (s > 0) showToast(isArabic ? "✅ تمت مزامنة " + s + " عملية" : "✅ Synced " + s + " sales");
+                if (r > 0) {
+                    if (tvCartStatus != null) tvCartStatus.setText("⚠️ " + r + " " + (isArabic ? "معلقة" : "pending"));
+                } else {
+                    if (tvCartStatus != null) tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Sync pending error: " + e.getMessage());
+        }
+    }).start();
+}
 
     private AlertDialog showProfessionalLoadingDialog() {
         Context ctx = getContext();
