@@ -47,6 +47,58 @@ public class MiraBranchesManager {
         
         Log.d(TAG, "✅ Active branch saved: ID=" + branchId + ", Name=" + branchName);
     }
+    
+    // في MiraBranchesManager.java - أضف هذه الدالة
+
+/**
+ * ✅ حفظ الفروع من استجابة السيرفر
+ */
+public void saveBranchesFromServer(JSONObject data) {
+    try {
+        JSONArray branches = data.optJSONArray("branches");
+        if (branches == null) {
+            branches = data.optJSONArray("data");
+        }
+        
+        if (branches == null || branches.length() == 0) {
+            Log.w(TAG, "No branches found in server response");
+            return;
+        }
+        
+        SharedPreferences.Editor editor = prefs.edit();
+        
+        // حفظ قائمة الفروع كاملة
+        editor.putString("branches_list", branches.toString());
+        
+        // حفظ كل فرع على حدة
+        for (int i = 0; i < branches.length(); i++) {
+            try {
+                JSONObject branch = branches.getJSONObject(i);
+                int branchId = branch.optInt("id", branch.optInt("branch_id", 0));
+                String branchName = branch.optString("name", branch.optString("branch_name", ""));
+                String branchCode = branch.optString("code", branch.optString("branch_code", ""));
+                String branchAddress = branch.optString("address", "");
+                String branchPhone = branch.optString("phone", "");
+                
+                if (branchId > 0) {
+                    editor.putInt("branch_id_" + branchId, branchId);
+                    editor.putString("branch_name_" + branchId, branchName);
+                    editor.putString("branch_code_" + branchId, branchCode);
+                    editor.putString("branch_address_" + branchId, branchAddress);
+                    editor.putString("branch_phone_" + branchId, branchPhone);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Parse branch error: " + e.getMessage());
+            }
+        }
+        
+        editor.apply();
+        Log.i(TAG, "✅ Branches saved: " + branches.length());
+        
+    } catch (Exception e) {
+        Log.e(TAG, "Save branches error: " + e.getMessage());
+    }
+}
 
     public int getActiveBranchId() {
         try {
