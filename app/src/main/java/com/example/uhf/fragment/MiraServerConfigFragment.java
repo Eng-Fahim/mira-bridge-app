@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -19,6 +20,7 @@ import androidx.fragment.app.Fragment;
 import com.example.uhf.R;
 import com.example.uhf.manager.MiraServerConfig;
 import com.example.uhf.manager.PermissionManager;
+import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
 
 import java.util.Locale;
@@ -27,8 +29,11 @@ import java.util.concurrent.Executors;
 
 public class MiraServerConfigFragment extends Fragment {
 
+    private static final String TAG = "MiraServerConfigFrag";
+    
     private MiraServerConfig serverConfig;
     private PermissionManager permissionManager;
+    private SessionManager sessionManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
@@ -51,12 +56,20 @@ public class MiraServerConfigFragment extends Fragment {
         
         serverConfig = MiraServerConfig.getInstance(requireContext());
         permissionManager = PermissionManager.getInstance(requireContext());
+        sessionManager = new SessionManager(requireContext());
         isArabic = Locale.getDefault().getLanguage().equals("ar");
         
         initViews(view);
         loadCurrentConfig();
         setupListeners();
         applyPermissions();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // ✅ إعادة تحميل الإعدادات
+        loadCurrentConfig();
     }
 
     private void applyPermissions() {
@@ -105,9 +118,22 @@ public class MiraServerConfigFragment extends Fragment {
     }
 
     private void loadCurrentConfig() {
-        etBaseUrl.setText(serverConfig.getBaseUrl());
-        etApiKey.setText(serverConfig.getApiKey());
-        etGateId.setText(serverConfig.getGateId());
+        // ✅ إعادة إنشاء serverConfig للتأكد من القراءة الصحيحة
+        serverConfig = MiraServerConfig.getInstance(requireContext());
+        
+        String baseUrl = serverConfig.getBaseUrl();
+        String apiKey = serverConfig.getApiKey();
+        String gateId = serverConfig.getGateId();
+        
+        // ✅ سجل تشخيصي
+        Log.d(TAG, "=== Loading Config ===");
+        Log.d(TAG, "URL: " + baseUrl);
+        Log.d(TAG, "API Key: " + (apiKey.isEmpty() ? "EMPTY" : apiKey.substring(0, Math.min(8, apiKey.length())) + "..."));
+        Log.d(TAG, "Gate ID: " + (gateId.isEmpty() ? "EMPTY" : gateId));
+        
+        if (etBaseUrl != null) etBaseUrl.setText(baseUrl);
+        if (etApiKey != null) etApiKey.setText(apiKey);
+        if (etGateId != null) etGateId.setText(gateId);
     }
 
     private void setupListeners() {
@@ -185,9 +211,23 @@ public class MiraServerConfigFragment extends Fragment {
             return;
         }
 
+        // ✅ حفظ في MiraServerConfig
         serverConfig.setBaseUrl(baseUrl);
         serverConfig.setApiKey(apiKey);
         serverConfig.setGateId(gateId);
+        
+        // ✅ حفظ في SessionManager أيضاً
+        if (!apiKey.isEmpty()) {
+            sessionManager.saveApiKey(apiKey);
+        }
+        if (!gateId.isEmpty()) {
+            sessionManager.saveGateId(gateId);
+        }
+
+        // ✅ سجل تشخيصي
+        Log.d(TAG, "=== Config Saved ===");
+        Log.d(TAG, "API Key: " + (apiKey.isEmpty() ? "EMPTY" : apiKey.substring(0, Math.min(8, apiKey.length())) + "..."));
+        Log.d(TAG, "Gate ID: " + gateId);
 
         Toast.makeText(getContext(), 
             isArabic ? "✅ تم حفظ الإعدادات" : "✅ Settings saved", 
