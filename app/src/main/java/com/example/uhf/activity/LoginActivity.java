@@ -419,6 +419,7 @@ public class LoginActivity extends AppCompatActivity {
         
         sessionManager.saveApiKey(apiKey);
         sessionManager.saveGateId(effectiveGateId);
+        MiraServerConfig.getInstance(this).saveSession(apiKey, effectiveGateId, token);
         
         Log.d(TAG, "✅ API Key saved with gate_id: " + effectiveGateId);
     } else {
