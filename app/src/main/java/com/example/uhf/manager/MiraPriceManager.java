@@ -1,8 +1,3 @@
-public class MiraPosFragment extends MiraBaseFragment {
-    
-    private boolean isCheckoutDialogShowing = false; // ✅ إضافة هذا المتغير
-    
-    // ... باقي الكود ...
 package com.example.uhf.manager;
 
 import android.content.Context;
@@ -15,10 +10,6 @@ import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * MIRA Price Manager
- * المدير المركزي لأسعار الذهب والعملات
- */
 public class MiraPriceManager {
 
     private static final String TAG = "MiraPriceManager";
@@ -65,7 +56,6 @@ public class MiraPriceManager {
 
     public double getGoldPricePerGram(int karat) {
         String key = "gold_price_" + karat + "k";
-        // ✅ إرجاع 0 إذا لم يتم التحميل بعد - لا قيم افتراضية
         return getDoubleFromPrefs(key, 0);
     }
 
@@ -80,89 +70,87 @@ public class MiraPriceManager {
     }
 
     public double getFinalPricePerGram(int karat) {
-    double basePrice = getGoldPricePerGram(karat);
-    if (basePrice <= 0) return 0;
-    
-    double margin = getMargin(karat);
-    double making = getMakingCharge(karat);
-    
-    // ✅ الحساب الصحيح المطابق لسيرفر PHP
-    double subtotal = basePrice + making;
-    double profitAmount = subtotal * (margin / 100.0);
-    return subtotal + profitAmount;
+        double basePrice = getGoldPricePerGram(karat);
+        if (basePrice <= 0) return 0;
+        
+        double margin = getMargin(karat);
+        double making = getMakingCharge(karat);
+        
+        double subtotal = basePrice + making;
+        double profitAmount = subtotal * (margin / 100.0);
+        return subtotal + profitAmount;
+    }
+
+    public PricingDetails calculatePricingDetails(int karat, double weightGrams) {
+        double basePrice = getGoldPricePerGram(karat);
+        double makingCharge = getMakingCharge(karat);
+        double margin = getMargin(karat);
+        
+        if (basePrice <= 0) {
+            return new PricingDetails(0, 0, 0, 0, 0);
+        }
+        
+        double baseGoldCost = weightGrams * basePrice;
+        double totalMakingCost = weightGrams * makingCharge;
+        double subtotal = baseGoldCost + totalMakingCost;
+        double profitAmount = subtotal * (margin / 100.0);
+        double finalPrice = subtotal + profitAmount;
+        
+        return new PricingDetails(
+            baseGoldCost,
+            totalMakingCost,
+            profitAmount,
+            finalPrice,
+            basePrice
+        );
+    }
+
+    public static class PricingDetails {
+        public final double baseGoldCost;
+        public final double totalMakingCost;
+        public final double profitAmount;
+        public final double finalPrice;
+        public final double gramPrice;
+        
+        public PricingDetails(double baseGoldCost, double totalMakingCost, 
+                              double profitAmount, double finalPrice, double gramPrice) {
+            this.baseGoldCost = baseGoldCost;
+            this.totalMakingCost = totalMakingCost;
+            this.profitAmount = profitAmount;
+            this.finalPrice = finalPrice;
+            this.gramPrice = gramPrice;
+        }
     }
 
     public double calculateGoldPrice(int karat, double weightGrams) {
-    PricingDetails details = calculatePricingDetails(karat, weightGrams);
-    return details.finalPrice;
-}
-public double getProfitMargin(int karat) {
-    return getMargin(karat);
-}
+        PricingDetails details = calculatePricingDetails(karat, weightGrams);
+        return details.finalPrice;
+    }
 
-public double getProfitAmount(int karat, double weightGrams) {
-    PricingDetails details = calculatePricingDetails(karat, weightGrams);
-    return details.profitAmount;
-}
+    public double getProfitMargin(int karat) {
+        return getMargin(karat);
+    }
 
-public double getBaseGoldCost(int karat, double weightGrams) {
-    PricingDetails details = calculatePricingDetails(karat, weightGrams);
-    return details.baseGoldCost;
-}
+    public double getProfitAmount(int karat, double weightGrams) {
+        PricingDetails details = calculatePricingDetails(karat, weightGrams);
+        return details.profitAmount;
+    }
 
-public double getTotalMakingCost(int karat, double weightGrams) {
-    PricingDetails details = calculatePricingDetails(karat, weightGrams);
-    return details.totalMakingCost;
-}
+    public double getBaseGoldCost(int karat, double weightGrams) {
+        PricingDetails details = calculatePricingDetails(karat, weightGrams);
+        return details.baseGoldCost;
+    }
 
+    public double getTotalMakingCost(int karat, double weightGrams) {
+        PricingDetails details = calculatePricingDetails(karat, weightGrams);
+        return details.totalMakingCost;
+    }
 
     public double calculateGoldPriceInCurrency(int karat, double weightGrams, String currency) {
         double priceUSD = calculateGoldPrice(karat, weightGrams);
         if (priceUSD <= 0) return 0;
         return convertFromUSD(priceUSD, currency);
     }
-    
-    public PricingDetails calculatePricingDetails(int karat, double weightGrams) {
-    double basePrice = getGoldPricePerGram(karat);
-    double makingCharge = getMakingCharge(karat);
-    double margin = getMargin(karat);
-    
-    if (basePrice <= 0) {
-        return new PricingDetails(0, 0, 0, 0, 0);
-    }
-    
-    double baseGoldCost = weightGrams * basePrice;
-    double totalMakingCost = weightGrams * makingCharge;
-    double subtotal = baseGoldCost + totalMakingCost;
-    double profitAmount = subtotal * (margin / 100.0);
-    double finalPrice = subtotal + profitAmount;
-    
-    return new PricingDetails(
-        baseGoldCost,
-        totalMakingCost,
-        profitAmount,
-        finalPrice,
-        basePrice
-    );
-}
-
-// ✅ إضافة كلاس داخلي للتفاصيل
-public static class PricingDetails {
-    public final double baseGoldCost;
-    public final double totalMakingCost;
-    public final double profitAmount;
-    public final double finalPrice;
-    public final double gramPrice;
-    
-    public PricingDetails(double baseGoldCost, double totalMakingCost, 
-                          double profitAmount, double finalPrice, double gramPrice) {
-        this.baseGoldCost = baseGoldCost;
-        this.totalMakingCost = totalMakingCost;
-        this.profitAmount = profitAmount;
-        this.finalPrice = finalPrice;
-        this.gramPrice = gramPrice;
-    }
-}
 
     // ============================================
     // 💱 دوال العملات
@@ -281,10 +269,6 @@ public static class PricingDetails {
         }
     }
 
-    // ============================================
-    // 📊 دوال مساعدة
-    // ============================================
-
     public String getGoldItemPriceSummary(int karat, double weightGrams) {
         double priceUSD = calculateGoldPrice(karat, weightGrams);
         if (priceUSD <= 0) return "—";
@@ -316,15 +300,10 @@ public static class PricingDetails {
         return rates;
     }
 
-    // ============================================
-    // حفظ الإعدادات
-    // ============================================
-
     public void saveGoldSettings(JSONObject goldSettings) {
         SharedPreferences.Editor editor = prefs.edit();
         editor.putString("gold_settings", goldSettings.toString());
         
-        // ✅ حفظ القيم مباشرة
         String[] goldKeys = {
             "gold_price_24k", "gold_price_22k", "gold_price_21k",
             "gold_price_18k", "gold_price_14k",
@@ -366,12 +345,6 @@ public static class PricingDetails {
         editor.apply();
     }
 
-    // ============================================
-    // القيم الافتراضية - فقط للهوامش والمصنعية
-    // ============================================
-
-    // ❌ حذف getDefaultGoldPrice - لا نريد سعر افتراضي قديم
-    
     private double getDefaultMargin(int karat) {
         switch (karat) {
             case 24: return 95.0;
@@ -395,10 +368,6 @@ public static class PricingDetails {
             default: return 10.0;
         }
     }
-
-    // ============================================
-    // القراءة من التخزين
-    // ============================================
 
     private double getDoubleFromPrefs(String key, double defaultValue) {
         try {
@@ -427,10 +396,6 @@ public static class PricingDetails {
         }
         return defaultValue;
     }
-
-    // ============================================
-    // التحديث من السيرفر
-    // ============================================
 
     private void loadFromServer() {
         new Thread(() -> {
@@ -501,5 +466,4 @@ public static class PricingDetails {
     public boolean hasValidPrices() {
         return getGoldPricePerGram(KARAT_24) > 0;
     }
-}
 }
