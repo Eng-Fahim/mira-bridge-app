@@ -268,7 +268,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         
         List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
         for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
-            String fragmentTag = getFragmentTagForAction(action.getId());
+            String fragmentTag = getFragmentTagForAction(action.id);
             if (permissionManager.canAccessFragment(fragmentTag)) {
                 filteredActions.add(action);
             }
