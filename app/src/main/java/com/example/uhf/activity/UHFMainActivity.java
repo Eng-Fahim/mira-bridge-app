@@ -282,11 +282,24 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ==================== TOOLBAR MENU ====================
 
     @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.main_menu, menu);
-        return true;
+public boolean onCreateOptionsMenu(Menu menu) {
+    getMenuInflater().inflate(R.menu.main_menu, menu);
+    
+    PermissionManager pm = PermissionManager.getInstance(this);
+    
+    // ✅ إخفاء العناصر حسب الصلاحيات
+    MenuItem actionGoldRates = menu.findItem(R.id.action_gold_rates);
+    if (actionGoldRates != null) {
+        actionGoldRates.setVisible(pm.canAccessFragment("GoldRates"));
     }
-
+    
+    MenuItem actionQuickAccess = menu.findItem(R.id.action_quick_access_settings);
+    if (actionQuickAccess != null) {
+        actionQuickAccess.setVisible(pm.canAccessFragment("QuickAccessSettings"));
+    }
+    
+    return true;
+}
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
@@ -380,45 +393,76 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ==================== NAV SYSTEM & FRAGMENT MANAGEMENT ====================
 
     private void setupQuickNav() {
-        try {
-            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-            FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
+    try {
+        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+        FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
+        
+        PermissionManager pm = PermissionManager.getInstance(this);
 
-            if (fabActionCenter != null) {
-                fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
-            }
-
-            if (quickNav != null) {
-                quickNav.setOnItemSelectedListener(item -> {
-                    int id = item.getItemId();
-
-                    if (id == R.id.nav_home) {
-                        checkInventoryLockAndExecute(() -> {
-                            clearBackStack();
-                            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-                        });
-                        return true;
-                    } else if (id == R.id.nav_inventory) {
-                        checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadTagFragment(), "Scan"));
-                        return true;
-                    } else if (id == R.id.nav_sales) {
-                        checkInventoryLockAndExecute(() -> loadFragment(new MiraPosFragment(), "POS"));
-                        return true;
-                    } else if (id == R.id.nav_transfers) {
-                        checkInventoryLockAndExecute(() -> loadFragment(new MiraTransferFragment(), "Transfers"));
-                        return true;
-                    } else if (id == R.id.nav_placeholder) {
-                        showQuickActionMenu();
-                        return false;
-                    }
-                    return false;
-                });
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
+        if (fabActionCenter != null) {
+            // ✅ إخفاء الزر العائم لغير المصرحين
+            boolean hasAnyQuickAction = pm.isAdmin() || pm.isBranchManager() || 
+                pm.isInventoryManager() || pm.isPosOperator();
+            fabActionCenter.setVisibility(hasAnyQuickAction ? View.VISIBLE : View.GONE);
+            fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
         }
-    }
 
+        if (quickNav != null) {
+            // ✅ إخفاء عناصر القائمة حسب الصلاحيات
+            Menu menu = quickNav.getMenu();
+            
+            MenuItem navHome = menu.findItem(R.id.nav_home);
+            if (navHome != null) navHome.setVisible(true); // ✅ الجميع يرى الرئيسية
+            
+            MenuItem navInventory = menu.findItem(R.id.nav_inventory);
+            if (navInventory != null) {
+                navInventory.setVisible(pm.canAccessFragment("Scan"));
+            }
+            
+            MenuItem navSales = menu.findItem(R.id.nav_sales);
+            if (navSales != null) {
+                navSales.setVisible(pm.canAccessFragment("POS"));
+            }
+            
+            MenuItem navTransfers = menu.findItem(R.id.nav_transfers);
+            if (navTransfers != null) {
+                navTransfers.setVisible(pm.canAccessFragment("Transfers"));
+            }
+            
+            MenuItem navPlaceholder = menu.findItem(R.id.nav_placeholder);
+            if (navPlaceholder != null) {
+                navPlaceholder.setVisible(true); // ✅ دائماً ظاهر
+            }
+
+            quickNav.setOnItemSelectedListener(item -> {
+                int id = item.getItemId();
+
+                if (id == R.id.nav_home) {
+                    checkInventoryLockAndExecute(() -> {
+                        clearBackStack();
+                        loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+                    });
+                    return true;
+                } else if (id == R.id.nav_inventory) {
+                    checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadTagFragment(), "Scan"));
+                    return true;
+                } else if (id == R.id.nav_sales) {
+                    checkInventoryLockAndExecute(() -> loadFragment(new MiraPosFragment(), "POS"));
+                    return true;
+                } else if (id == R.id.nav_transfers) {
+                    checkInventoryLockAndExecute(() -> loadFragment(new MiraTransferFragment(), "Transfers"));
+                    return true;
+                } else if (id == R.id.nav_placeholder) {
+                    showQuickActionMenu();
+                    return false;
+                }
+                return false;
+            });
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
+    }
+}
     private void showQuickActionMenu() {
         try {
             BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
