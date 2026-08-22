@@ -1,3 +1,8 @@
+public class MiraPosFragment extends MiraBaseFragment {
+    
+    private boolean isCheckoutDialogShowing = false; // ✅ إضافة هذا المتغير
+    
+    // ... باقي الكود ...
 package com.example.uhf.manager;
 
 import android.content.Context;
@@ -75,25 +80,89 @@ public class MiraPriceManager {
     }
 
     public double getFinalPricePerGram(int karat) {
-        double basePrice = getGoldPricePerGram(karat);
-        if (basePrice <= 0) return 0;
-        
-        double margin = getMargin(karat);
-        double making = getMakingCharge(karat);
-        return basePrice + (basePrice * margin / 100) + making;
+    double basePrice = getGoldPricePerGram(karat);
+    if (basePrice <= 0) return 0;
+    
+    double margin = getMargin(karat);
+    double making = getMakingCharge(karat);
+    
+    // ✅ الحساب الصحيح المطابق لسيرفر PHP
+    double subtotal = basePrice + making;
+    double profitAmount = subtotal * (margin / 100.0);
+    return subtotal + profitAmount;
     }
 
     public double calculateGoldPrice(int karat, double weightGrams) {
-        double finalPrice = getFinalPricePerGram(karat);
-        if (finalPrice <= 0) return 0;
-        return finalPrice * weightGrams;
-    }
+    PricingDetails details = calculatePricingDetails(karat, weightGrams);
+    return details.finalPrice;
+}
+public double getProfitMargin(int karat) {
+    return getMargin(karat);
+}
+
+public double getProfitAmount(int karat, double weightGrams) {
+    PricingDetails details = calculatePricingDetails(karat, weightGrams);
+    return details.profitAmount;
+}
+
+public double getBaseGoldCost(int karat, double weightGrams) {
+    PricingDetails details = calculatePricingDetails(karat, weightGrams);
+    return details.baseGoldCost;
+}
+
+public double getTotalMakingCost(int karat, double weightGrams) {
+    PricingDetails details = calculatePricingDetails(karat, weightGrams);
+    return details.totalMakingCost;
+}
+
 
     public double calculateGoldPriceInCurrency(int karat, double weightGrams, String currency) {
         double priceUSD = calculateGoldPrice(karat, weightGrams);
         if (priceUSD <= 0) return 0;
         return convertFromUSD(priceUSD, currency);
     }
+    
+    public PricingDetails calculatePricingDetails(int karat, double weightGrams) {
+    double basePrice = getGoldPricePerGram(karat);
+    double makingCharge = getMakingCharge(karat);
+    double margin = getMargin(karat);
+    
+    if (basePrice <= 0) {
+        return new PricingDetails(0, 0, 0, 0, 0);
+    }
+    
+    double baseGoldCost = weightGrams * basePrice;
+    double totalMakingCost = weightGrams * makingCharge;
+    double subtotal = baseGoldCost + totalMakingCost;
+    double profitAmount = subtotal * (margin / 100.0);
+    double finalPrice = subtotal + profitAmount;
+    
+    return new PricingDetails(
+        baseGoldCost,
+        totalMakingCost,
+        profitAmount,
+        finalPrice,
+        basePrice
+    );
+}
+
+// ✅ إضافة كلاس داخلي للتفاصيل
+public static class PricingDetails {
+    public final double baseGoldCost;
+    public final double totalMakingCost;
+    public final double profitAmount;
+    public final double finalPrice;
+    public final double gramPrice;
+    
+    public PricingDetails(double baseGoldCost, double totalMakingCost, 
+                          double profitAmount, double finalPrice, double gramPrice) {
+        this.baseGoldCost = baseGoldCost;
+        this.totalMakingCost = totalMakingCost;
+        this.profitAmount = profitAmount;
+        this.finalPrice = finalPrice;
+        this.gramPrice = gramPrice;
+    }
+}
 
     // ============================================
     // 💱 دوال العملات
@@ -432,4 +501,5 @@ public class MiraPriceManager {
     public boolean hasValidPrices() {
         return getGoldPricePerGram(KARAT_24) > 0;
     }
+}
 }
