@@ -28,22 +28,21 @@ import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.MiraQuickAccessSettings;
+import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.SessionManager;
-import com.example.uhf.manager.PermissionManager;
+
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.ArrayList;
 
 public class MiraDashboardFragment extends Fragment implements SharedPreferences.OnSharedPreferenceChangeListener {
-
-private PermissionManager permissionManager; 
 
     private static final String TAG = "MiraDashboardFragment";
     private static final String OFFLINE_PREFS_BASE = "dashboard_cache_branch_";
@@ -60,7 +59,6 @@ private PermissionManager permissionManager;
     private View shimmerLayout;
     private CardView cardGoldPrices;
     
-    // ✅ RecyclerView للوصول السريع
     private RecyclerView rvQuickActions;
     private QuickActionsAdapter quickAdapter;
 
@@ -71,9 +69,9 @@ private PermissionManager permissionManager;
     private MiraOrgProfileManager.OnProfileChangedListener profileListener;
     private MiraPriceManager priceManager;
     private MiraQuickAccessSettings quickAccessSettings;
+    private PermissionManager permissionManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
-    // ✅ استخدام Thread Pool منفصل للعمليات المختلفة
     private final ExecutorService dataExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService goldPriceExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService pingExecutor = Executors.newSingleThreadExecutor();
@@ -97,48 +95,39 @@ private PermissionManager permissionManager;
         super.onViewCreated(view, savedInstanceState);
 
         try {
-            // 1️⃣ تهيئة المديرين والخدمات
             apiClient = MiraApiClient.getInstance(requireContext());
             sessionManager = new SessionManager(requireContext());
-            permissionManager = PermissionManager.getInstance(requireContext()); 
             branchesManager = MiraBranchesManager.getInstance(requireContext());
             orgProfile = MiraOrgProfileManager.getInstance(requireContext());
             priceManager = MiraPriceManager.getInstance(requireContext());
             quickAccessSettings = MiraQuickAccessSettings.getInstance(requireContext());
+            permissionManager = PermissionManager.getInstance(requireContext());
             isArabic = Locale.getDefault().getLanguage().equals("ar");
 
             branchPrefs = requireContext().getSharedPreferences("mira_branches_prefs", Context.MODE_PRIVATE);
 
-            // 2️⃣ تهيئة الواجهات (سريعة - على Main Thread)
             initViews(view);
-            
-            // 3️⃣ إعداد مستمع البروفايل
             setupProfileListener();
-            
-            // 4️⃣ الترحيب والتاريخ (سريع - بيانات محلية)
             updateHeader();
             
-            // 5️⃣ تحميل البيانات المحلية فوراً (بدون شبكة)
             currentBranchId = (branchesManager != null) ? branchesManager.getActiveBranchId() : -1;
             initBranchCache(currentBranchId);
             loadOfflineData();
             
-            // 6️⃣ إعداد أزرار الوصول السريع (مرة واحدة فقط)
             setupQuickAccessGrid();
-            
-            // 7️⃣ إعداد المستمعين
             setupListeners();
             
-            // 8️⃣ عرض shimmer
             showShimmer(true);
             
-            // 9️⃣ تأخير جلب البيانات من الشبكة للسماح بعرض الواجهة أولاً
             mainHandler.postDelayed(() -> {
                 if (!isAdded()) return;
                 updateLiveStatus();
                 fetchData();
-                fetchLiveGoldPrices();
-            }, 100); // تأخير 100ms
+                
+                if (permissionManager.canAccessFragment("GoldRates")) {
+                    fetchLiveGoldPrices();
+                }
+            }, 100);
             
             isViewInitialized = true;
 
@@ -149,15 +138,12 @@ private PermissionManager permissionManager;
 
     private void setupProfileListener() {
         if (orgProfile == null) return;
-        
         profileListener = () -> mainHandler.post(this::updateHeader);
         orgProfile.addListener(profileListener);
     }
 
-    // ✅ تحسين: pingApi في خلفية منفصلة
     private void updateLiveStatus() {
         if (tvLiveStatus == null) return;
-        
         pingExecutor.execute(() -> {
             boolean isOnline = apiClient != null && apiClient.pingApi();
             mainHandler.post(() -> {
@@ -185,25 +171,19 @@ private PermissionManager permissionManager;
             tvDate = v.findViewById(R.id.tvDate);
             tvLocation = v.findViewById(R.id.tvLocation);
             tvLiveStatus = v.findViewById(R.id.tvLiveStatus);
-
             tvTotalItems = v.findViewById(R.id.tvTotalItems);
             tvTotalWeight = v.findViewById(R.id.tvTotalWeight);
             tvSoldToday = v.findViewById(R.id.tvSoldToday);
-
             tvSalesToday = v.findViewById(R.id.tvSalesToday);
             tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
             tvSalesYear = v.findViewById(R.id.tvSalesYear);
-
             tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
             tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
             tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
-
             btnGate = v.findViewById(R.id.btnGateSecurity);
             btnInventory = v.findViewById(R.id.btnRfidAudit);
-
             shimmerLayout = v.findViewById(R.id.shimmerLayout);
             swipeRefresh = v.findViewById(R.id.swipeRefresh);
-
             tvOuncePrice = v.findViewById(R.id.tvOuncePrice);
             tvPriceSource = v.findViewById(R.id.tvPriceSource);
             tvLastUpdate = v.findViewById(R.id.tvLastUpdate);
@@ -211,18 +191,16 @@ private PermissionManager permissionManager;
             tvGoldChange = v.findViewById(R.id.tvGoldChange);
             btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
             cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
-    
-    // ✅ إخفاء بطاقة الذهب إذا لا يملك صلاحية
-if (cardGoldPrices != null && !permissionManager.canAccessFragment("GoldRates")) {
-            cardGoldPrices.setVisibility(View.GONE);
-        }
             
-            // ✅ تهيئة RecyclerView مرة واحدة فقط مع تحسينات الأداء
+            if (cardGoldPrices != null && !permissionManager.canAccessFragment("GoldRates")) {
+                cardGoldPrices.setVisibility(View.GONE);
+            }
+            
             rvQuickActions = v.findViewById(R.id.rvQuickActions);
             if (rvQuickActions != null) {
                 rvQuickActions.setLayoutManager(new GridLayoutManager(getContext(), 3));
-                rvQuickActions.setHasFixedSize(true); // ✅ تحسين الأداء
-                rvQuickActions.setItemViewCacheSize(20); // ✅ زيادة الكاش
+                rvQuickActions.setHasFixedSize(true);
+                rvQuickActions.setItemViewCacheSize(20);
                 quickAdapter = new QuickActionsAdapter(this::handleQuickAction);
                 rvQuickActions.setAdapter(quickAdapter);
             }
@@ -230,7 +208,9 @@ if (cardGoldPrices != null && !permissionManager.canAccessFragment("GoldRates"))
             if (swipeRefresh != null) {
                 swipeRefresh.setOnRefreshListener(() -> {
                     fetchData();
-                    fetchLiveGoldPrices();
+                    if (permissionManager.canAccessFragment("GoldRates")) {
+                        fetchLiveGoldPrices();
+                    }
                 });
             }
 
@@ -251,12 +231,9 @@ if (cardGoldPrices != null && !permissionManager.canAccessFragment("GoldRates"))
         } catch (Throwable e) {
             Log.e(TAG, "initViews error", e);
         }
-        
-    
     }
 
     private void setupListeners() {
-        // ✅ استخدام المتغير بدلاً من إنشاء جديد
         if (btnGate != null) {
             if (permissionManager.canAccessFragment("SecureGate")) {
                 btnGate.setVisibility(View.VISIBLE);
@@ -269,7 +246,7 @@ if (cardGoldPrices != null && !permissionManager.canAccessFragment("GoldRates"))
                 btnGate.setVisibility(View.GONE);
             }
         }
-        
+
         if (btnInventory != null) {
             if (permissionManager.canAccessFragment("Scan")) {
                 btnInventory.setVisibility(View.VISIBLE);
@@ -283,13 +260,12 @@ if (cardGoldPrices != null && !permissionManager.canAccessFragment("GoldRates"))
             }
         }
     }
-    
+
     private void setupQuickAccessGrid() {
         if (quickAccessSettings == null || quickAdapter == null) return;
         
         List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
         
-        // ✅ استخدام المتغير
         List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
         for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
             String fragmentTag = getFragmentTagForAction(action.getId());
@@ -300,23 +276,24 @@ if (cardGoldPrices != null && !permissionManager.canAccessFragment("GoldRates"))
         
         quickAdapter.submitList(filteredActions);
     }
-}
-private String getFragmentTagForAction(String actionId) {
-    switch (actionId) {
-        case "identity": return "IdentityStudio";
-        case "radar": return "Radar";
-        case "gate": return "SecureGate";
-        case "reports": return "Reports";
-        case "accounting": return "Accounting";
-        case "transfers": return "Transfers";
-        case "admin_hub": return "AdminHub";
-        case "sales_history": return "SalesHistory";
-        case "server_config": return "ServerConfig";
-        case "gold_rates": return "GoldRates";
-        case "users": return "UsersManagement";
-        default: return actionId;
+
+    private String getFragmentTagForAction(String actionId) {
+        switch (actionId) {
+            case "identity": return "IdentityStudio";
+            case "radar": return "Radar";
+            case "gate": return "SecureGate";
+            case "reports": return "Reports";
+            case "accounting": return "Accounting";
+            case "transfers": return "Transfers";
+            case "admin_hub": return "AdminHub";
+            case "sales_history": return "SalesHistory";
+            case "server_config": return "ServerConfig";
+            case "gold_rates": return "GoldRates";
+            case "users": return "UsersManagement";
+            default: return actionId;
+        }
     }
-}
+
     private void handleQuickAction(String actionId) {
         if (getActivity() instanceof UHFMainActivity) {
             UHFMainActivity activity = (UHFMainActivity) getActivity();
@@ -402,13 +379,11 @@ private String getFragmentTagForAction(String actionId) {
         }
     }
 
-    // ✅ تحسين: fetchLiveGoldPrices في Executor منفصل
     private void fetchLiveGoldPrices() {
         if (apiClient == null) return;
 
         addDebug("🔄 جلب أسعار الذهب من المزود النشط...");
 
-        // ✅ عرض loading state
         if (cardGoldPrices != null) {
             cardGoldPrices.setAlpha(0.5f);
         }
@@ -485,7 +460,6 @@ private String getFragmentTagForAction(String actionId) {
         });
     }
 
-    // ✅ دالة مساعدة لإعادة شفافية الكارد
     private void restoreCardOpacity() {
         if (cardGoldPrices != null) {
             cardGoldPrices.animate().alpha(1.0f).setDuration(300).start();
@@ -643,7 +617,6 @@ private String getFragmentTagForAction(String actionId) {
         }
     }
 
-    // ✅ تحسين: حفظ البيانات في الخلفية
     private void saveOfflineData(JSONObject data) {
         if (offlineCache == null) return;
         
@@ -850,7 +823,6 @@ private String getFragmentTagForAction(String actionId) {
         }
     }
 
-    // ✅ تنظيف جميع الموارد لمنع تسريب الذاكرة
     @Override
     public void onDestroyView() {
         super.onDestroyView();
@@ -859,7 +831,6 @@ private String getFragmentTagForAction(String actionId) {
             orgProfile.removeListener(profileListener);
         }
         
-        // إغلاق جميع Executors
         shutdownExecutor(dataExecutor);
         shutdownExecutor(goldPriceExecutor);
         shutdownExecutor(pingExecutor);
@@ -873,4 +844,4 @@ private String getFragmentTagForAction(String actionId) {
             executor.shutdown();
         }
     }
-}
+                    }
