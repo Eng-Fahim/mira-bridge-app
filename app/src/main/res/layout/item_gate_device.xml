@@ -3,64 +3,111 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
+    android:layout_marginBottom="6dp"
     app:cardBackgroundColor="?attr/colorSurface"
     app:cardCornerRadius="10dp"
-    app:cardElevation="2dp"
-    app:strokeWidth="1dp"
-    app:strokeColor="?attr/colorOutlineVariant">
+    app:cardElevation="1dp"
+    app:strokeColor="?attr/colorOutlineVariant"
+    app:strokeWidth="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:padding="12dp">
+        android:orientation="vertical"
+        android:padding="10dp">
 
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_weight="1"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvGateName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="البوابة الرئيسية"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvGateLocation"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="📍 المدخل الرئيسي"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="10sp" />
+            </LinearLayout>
 
             <TextView
-                android:id="@+id/tvGateName"
+                android:id="@+id/tvGateStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="البوابة الرئيسية"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:textColor="?attr/colorOnSurface"/>
-
-            <TextView
-                android:id="@+id/tvGateLocation"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="📍 المدخل الرئيسي"
-                android:textSize="12sp"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:layout_marginTop="4dp"/>
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="4dp"
+                android:text="⚪ غير متصل"
+                android:textColor="#9E9E9E"
+                android:textSize="11sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/tvGateStatus"
-            android:layout_width="wrap_content"
+        <!-- ✅ إحصائيات وأحداث -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="⚪ غير متصل"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:layout_marginEnd="8dp"/>
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-        <ImageButton
-            android:id="@+id/btnRemoveGate"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@android:drawable/ic_menu_delete"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            app:tint="?attr/colorError"
-            android:contentDescription="حذف البوابة"
-            android:focusable="true"
-            android:clickable="true"/>
+            <TextView
+                android:id="@+id/tvGateStats"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="✅ 0 | ❌ 0"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/tvGateLastEvent"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1.5"
+                android:gravity="end"
+                android:text="لا أحداث"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="9sp" />
+
+            <!-- ✅ زر تحكم -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnToggleGate"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="6dp"
+                android:text="🔓"
+                android:textSize="14sp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:cornerRadius="18dp" />
+
+            <!-- زر حذف -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRemoveGate"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:text="🗑"
+                android:textSize="14sp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp" />
+        </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
