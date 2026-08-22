@@ -396,70 +396,79 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
-        playTone(true);
+    playTone(true);
 
-        String token = response.optString("token", "");
-        String roleStr = response.optString("role", "ADMIN");
-        String displayName = response.optString("display_name", username);
-        int userId = response.optInt("user_id", 0);
-        int branchId = response.optInt("branch_id", 1);
-        String branchName = response.optString("branch_name", "");
-        String branchCode = response.optString("branch_code", "");
-        String serverUrl = getText(etServerUrl);
+    String token = response.optString("token", "");
+    String roleStr = response.optString("role", "ADMIN");
+    String displayName = response.optString("display_name", username);
+    int userId = response.optInt("user_id", 0);
+    int branchId = response.optInt("branch_id", 1);
+    String branchName = response.optString("branch_name", "");
+    String branchCode = response.optString("branch_code", "");
+    String serverUrl = getText(etServerUrl); // ✅ تعريف واحد فقط
+    
+    String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+    
+    // ✅ حفظ مفتاح API
+    String apiKey = response.optString("api_key", "");
+    String gateId = response.optString("gate_id", "");
+    
+    if (!apiKey.isEmpty()) {
+        // ✅ استخدام device_id إذا كان gate_id فارغاً
+        String effectiveGateId = !gateId.isEmpty() ? gateId : deviceId;
         
-        // ✅ حفظ مفتاح API إذا تم إرساله من السيرفر
-        String apiKey = response.optString("api_key", "");
-        if (!apiKey.isEmpty()) {
-            sessionManager.saveApiKey(apiKey);
-            Log.d(TAG, "✅ API Key saved: " + apiKey.substring(0, Math.min(8, apiKey.length())) + "...");
+        sessionManager.saveApiKey(apiKey);
+        sessionManager.saveGateId(effectiveGateId);
+        
+        Log.d(TAG, "✅ API Key saved with gate_id: " + effectiveGateId);
+    } else {
+        // ✅ إذا لم يتم إرسال api_key - تحقق من وجوده
+        if (sessionManager.hasApiKey()) {
+            Log.d(TAG, "✅ Using existing API Key");
         } else {
-            // ✅ إذا لم يتم إرسال api_key - تحقق من وجوده
-            if (sessionManager.hasApiKey()) {
-                Log.d(TAG, "✅ Using existing API Key");
-            } else {
-                Log.w(TAG, "⚠️ No API Key available - will reconnect");
-                // ✅ إعادة الاتصال لتوليد مفتاح جديد
-                reconnectAndRestoreData(username, password, serverUrl);
-                return;
-            }
+            Log.w(TAG, "⚠️ No API Key available - will reconnect");
+            // ✅ إعادة الاتصال لتوليد مفتاح جديد
+            reconnectAndRestoreData(username, password, serverUrl);
+            return;
         }
-        
-        if (!serverUrl.isEmpty()) {
-            MiraServerConfig.getInstance(this).setBaseUrl(serverUrl);
-        }
-        
-        // ✅ حفظ الصلاحيات
-        String permissionsJson = response.optString("permissions", "");
-        if (permissionsJson.isEmpty()) {
-            JSONObject permissionsObj = response.optJSONObject("permissions");
-            if (permissionsObj != null) {
-                permissionsJson = permissionsObj.toString();
-            }
-        }
-        
-        if (!permissionsJson.isEmpty()) {
-            PermissionManager pm = PermissionManager.getInstance(this);
-            pm.savePermissions(permissionsJson);
-        }
-
-        sessionManager.createLoginSession(username, roleStr, token, serverUrl);
-        sessionManager.setDisplayName(displayName);
-        sessionManager.setUserId(userId);
-
-        sessionManager.saveBiometricUser(username, roleStr, displayName, userId, token);
-        sessionManager.saveBiometricBranch(branchId, branchName);
-        sessionManager.setBiometricEnabled(true);
-
-        MiraBranchesManager bm = MiraBranchesManager.getInstance(this);
-        bm.setActiveBranch(branchId, branchName, branchCode, "", "");
-        bm.setUserBranchLocked(true);
-
-        // ✅ استعادة جميع البيانات بعد تسجيل الدخول
-        restoreAllDataAfterLogin();
-
-        Toast.makeText(this, (isArabic ? "أهلاً بك " : "Welcome ") + displayName + " ✓", Toast.LENGTH_SHORT).show();
-        mainHandler.postDelayed(this::navigateToMain, 800); // ✅ زيادة التأخير لاستعادة البيانات
     }
+    
+    if (!serverUrl.isEmpty()) {
+        MiraServerConfig.getInstance(this).setBaseUrl(serverUrl);
+    }
+    
+    // ✅ حفظ الصلاحيات
+    String permissionsJson = response.optString("permissions", "");
+    if (permissionsJson.isEmpty()) {
+        JSONObject permissionsObj = response.optJSONObject("permissions");
+        if (permissionsObj != null) {
+            permissionsJson = permissionsObj.toString();
+        }
+    }
+    
+    if (!permissionsJson.isEmpty()) {
+        PermissionManager pm = PermissionManager.getInstance(this);
+        pm.savePermissions(permissionsJson);
+    }
+
+    sessionManager.createLoginSession(username, roleStr, token, serverUrl);
+    sessionManager.setDisplayName(displayName);
+    sessionManager.setUserId(userId);
+
+    sessionManager.saveBiometricUser(username, roleStr, displayName, userId, token);
+    sessionManager.saveBiometricBranch(branchId, branchName);
+    sessionManager.setBiometricEnabled(true);
+
+    MiraBranchesManager bm = MiraBranchesManager.getInstance(this);
+    bm.setActiveBranch(branchId, branchName, branchCode, "", "");
+    bm.setUserBranchLocked(true);
+
+    // ✅ استعادة جميع البيانات بعد تسجيل الدخول
+    restoreAllDataAfterLogin();
+
+    Toast.makeText(this, (isArabic ? "أهلاً بك " : "Welcome ") + displayName + " ✓", Toast.LENGTH_SHORT).show();
+    mainHandler.postDelayed(this::navigateToMain, 800);
+}
 
     /**
      * ✅ إعادة الاتصال وتوليد مفتاح جديد
