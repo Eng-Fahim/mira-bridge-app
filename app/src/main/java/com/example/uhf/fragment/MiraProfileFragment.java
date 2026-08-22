@@ -23,6 +23,7 @@ import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraOrgProfileManager;
+import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SessionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -45,6 +46,7 @@ public class MiraProfileFragment extends Fragment {
     private SessionManager sessionManager;
     private MiraApiClient apiClient;
     private MiraOrgProfileManager orgProfileManager;
+    private PermissionManager permissionManager;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     @Nullable
@@ -55,6 +57,7 @@ public class MiraProfileFragment extends Fragment {
         sessionManager = new SessionManager(requireContext());
         apiClient = MiraApiClient.getInstance(requireContext());
         orgProfileManager = MiraOrgProfileManager.getInstance(requireContext());
+        permissionManager = PermissionManager.getInstance(requireContext());
 
         initViews(root);
         setupListeners(root);
@@ -87,18 +90,12 @@ public class MiraProfileFragment extends Fragment {
     }
 
     private void setupListeners(View root) {
-        // ✅ زر تعديل المنظمة - للمدير فقط
         MaterialButton btnEditOrgProfile = root.findViewById(R.id.btnEditOrgProfile);
         if (btnEditOrgProfile != null) {
-            String role = sessionManager.getRole();
-            boolean isAdmin = role != null && (
-                role.contains("ADMIN") || 
-                role.contains("admin") || 
-                role.contains("مدير") ||
-                role.contains("مسؤول")
-            );
+            // ✅ استخدام PermissionManager بدلاً من فحص النص
+            boolean canEditOrg = permissionManager.isAdmin();
             
-            if (isAdmin) {
+            if (canEditOrg) {
                 btnEditOrgProfile.setVisibility(View.VISIBLE);
                 btnEditOrgProfile.setOnClickListener(v -> showEditOrgDialog());
             } else {
@@ -106,7 +103,6 @@ public class MiraProfileFragment extends Fragment {
             }
         }
         
-        // ✅ زر تعديل الملف الشخصي - للجميع
         MaterialButton btnEditProfile = root.findViewById(R.id.btnEditProfile);
         if (btnEditProfile != null) {
             btnEditProfile.setOnClickListener(v -> showEditUserDialog());
@@ -146,9 +142,6 @@ public class MiraProfileFragment extends Fragment {
         }
     }
 
-    /**
-     * ✅ تحميل البيانات المحلية
-     */
     private void loadLocalProfileData() {
         try {
             String displayName = sessionManager.getDisplayName();
@@ -167,7 +160,6 @@ public class MiraProfileFragment extends Fragment {
                 tvAccountNum.setText(phone);
             }
             
-            // ✅ استخدام MiraOrgProfileManager
             if (tvOrgNameAr != null) {
                 tvOrgNameAr.setText(orgProfileManager.getOrgNameAr());
             }
@@ -200,9 +192,6 @@ public class MiraProfileFragment extends Fragment {
         }
     }
 
-    /**
-     * ✅ جلب البروفايل من السيرفر
-     */
     private void fetchProfileFromServer() {
         showLoading(true);
 
@@ -214,7 +203,6 @@ public class MiraProfileFragment extends Fragment {
                     JSONObject user = response.data.optJSONObject("user");
                     JSONObject org = response.data.optJSONObject("organization");
                     
-                    // ✅ حفظ في المدير المركزي
                     if (org != null) {
                         orgProfileManager.saveFromServer(org);
                     }
@@ -246,9 +234,6 @@ public class MiraProfileFragment extends Fragment {
         });
     }
 
-    /**
-     * ✅ تحديث الواجهة
-     */
     private void updateUIWithData(JSONObject user, JSONObject org) {
         if (user != null) {
             if (tvProfileName != null) {
@@ -284,11 +269,12 @@ public class MiraProfileFragment extends Fragment {
         }
     }
 
-    /**
-     * ✅ نافذة تعديل بيانات المنظمة (للمدير فقط)
-     */
     private void showEditOrgDialog() {
         if (getContext() == null) return;
+        if (!permissionManager.isAdmin()) {
+            Toast.makeText(getContext(), "⛔ غير مصرح", Toast.LENGTH_SHORT).show();
+            return;
+        }
         
         View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_edit_mira_profile, null);
         EditText etNameAr = dialogView.findViewById(R.id.etEditNameAr);
@@ -324,9 +310,6 @@ public class MiraProfileFragment extends Fragment {
                 .show();
     }
 
-    /**
-     * ✅ نافذة تعديل بيانات المستخدم
-     */
     private void showEditUserDialog() {
         if (getContext() == null) return;
         
@@ -350,10 +333,12 @@ public class MiraProfileFragment extends Fragment {
                 .show();
     }
 
-    /**
-     * ✅ حفظ بيانات المنظمة
-     */
     private void saveOrgProfileToServer(String nameAr, String nameEn, String phone, String email, String tax) {
+        if (!permissionManager.isAdmin()) {
+            Toast.makeText(getContext(), "⛔ غير مصرح", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
         showLoading(true);
 
         executor.execute(() -> {
@@ -378,7 +363,6 @@ public class MiraProfileFragment extends Fragment {
                             if (tvEmail != null) tvEmail.setText(email);
                             if (tvTaxNum != null) tvTaxNum.setText("الرقم الضريبي: " + tax);
                             
-                            // ✅ حفظ في المدير المركزي
                             orgProfileManager.saveFullProfile(nameAr, nameEn, phone, email, tax);
                             
                             Toast.makeText(getContext(), "✅ تم حفظ بيانات المنظمة", Toast.LENGTH_SHORT).show();
@@ -403,9 +387,6 @@ public class MiraProfileFragment extends Fragment {
         });
     }
 
-    /**
-     * ✅ حفظ بيانات المستخدم
-     */
     private void saveUserProfileToServer(String displayName, String phone) {
         showLoading(true);
 
