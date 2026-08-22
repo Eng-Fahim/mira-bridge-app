@@ -37,17 +37,18 @@ public class POSCheckoutDialog extends DialogFragment {
     }
 
     public static class POSCheckoutData {
-        public String customerName = "";
-        public String customerPhone = "";
-        public String customerEmail = "";
-        public String customerAddress = "";
-        public String customerNotes = "";
-        public String paymentMethod = "CASH";
-        public String accountCode = "110101";
-        public double discount = 0.0;
-        public double discountAmount = 0.0;
-        public double finalAmount = 0.0;
-    }
+    public String customerName = "";
+    public String customerPhone = "";
+    public String customerEmail = "";
+    public String customerAddress = "";
+    public String customerNotes = "";
+    public String paymentMethod = "CASH";
+    public String accountCode = "110101";
+    public double originalTotal = 0.0;     // ✅ المجموع الأصلي قبل الخصم
+    public double discount = 0.0;           // نسبة الخصم
+    public double discountAmount = 0.0;    // قيمة الخصم
+    public double finalAmount = 0.0;        // المجموع النهائي
+}
 
     private static final String ARG_TOTAL_AMOUNT = "total_amount";
     private static final String ARG_ITEM_COUNT = "item_count";
