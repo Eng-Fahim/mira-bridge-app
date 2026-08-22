@@ -58,69 +58,80 @@ public class MiraGatesSettings {
      * نموذج بوابة أمنية
      */
     public static class GateDevice {
-        public String gateId;
-        public String gateName;
-        public String location;
-        public String deviceType = "chainway_c72";
-        public String ipAddress;
-        public int port = 8080;
-        public String macAddress;
-        public String firmwareVersion;
-        public String status = "offline";
-        public boolean isPrimary;
-        public int rfidPower = 28;
-        public int scanInterval = 500;
-        public boolean autoArm;
-        public String soundPass;
-        public String soundDeny;
-        public String soundAlarm;
+    public String gateId;
+    public String gateName;
+    public String location;
+    public String deviceType = "chainway_c72";
+    public String ipAddress;
+    public int port = 8080;
+    public String macAddress;
+    public String firmwareVersion;
+    public String status = "offline";
+    public boolean isPrimary;
+    public int rfidPower = 28;
+    public int scanInterval = 500;
+    public boolean autoArm;
+    public String soundPass;
+    public String soundDeny;
+    public String soundAlarm;
+    
+    // ✅ الحقول الجديدة
+    public int passCount = 0;
+    public int denyCount = 0;
+    public String lastEvent = "";
 
-        public JSONObject toJson() {
-            JSONObject json = new JSONObject();
-            try {
-                json.put("gate_id", gateId);
-                json.put("gate_name", gateName);
-                json.put("location", location);
-                json.put("device_type", deviceType);
-                json.put("ip_address", ipAddress);
-                json.put("port", port);
-                json.put("mac_address", macAddress);
-                json.put("firmware_version", firmwareVersion);
-                json.put("status", status);
-                json.put("is_primary", isPrimary);
-                json.put("rfid_power", rfidPower);
-                json.put("scan_interval", scanInterval);
-                json.put("auto_arm", autoArm);
-                json.put("sound_pass", soundPass);
-                json.put("sound_deny", soundDeny);
-                json.put("sound_alarm", soundAlarm);
-            } catch (Exception e) {
-                Log.e(TAG, "GateDevice toJson error: " + e.getMessage());
-            }
-            return json;
+    public JSONObject toJson() {
+        JSONObject json = new JSONObject();
+        try {
+            json.put("gate_id", gateId);
+            json.put("gate_name", gateName);
+            json.put("location", location);
+            json.put("device_type", deviceType);
+            json.put("ip_address", ipAddress);
+            json.put("port", port);
+            json.put("mac_address", macAddress);
+            json.put("firmware_version", firmwareVersion);
+            json.put("status", status);
+            json.put("is_primary", isPrimary);
+            json.put("rfid_power", rfidPower);
+            json.put("scan_interval", scanInterval);
+            json.put("auto_arm", autoArm);
+            json.put("sound_pass", soundPass);
+            json.put("sound_deny", soundDeny);
+            json.put("sound_alarm", soundAlarm);
+            json.put("pass_count", passCount);
+            json.put("deny_count", denyCount);
+            json.put("last_event", lastEvent);
+        } catch (Exception e) {
+            Log.e(TAG, "GateDevice toJson error: " + e.getMessage());
         }
-
-        public static GateDevice fromJson(JSONObject json) {
-            GateDevice gate = new GateDevice();
-            gate.gateId = json.optString("gate_id", "");
-            gate.gateName = json.optString("gate_name", "");
-            gate.location = json.optString("location", "");
-            gate.deviceType = json.optString("device_type", "chainway_c72");
-            gate.ipAddress = json.optString("ip_address", "");
-            gate.port = json.optInt("port", 8080);
-            gate.macAddress = json.optString("mac_address", "");
-            gate.firmwareVersion = json.optString("firmware_version", "");
-            gate.status = json.optString("status", "offline");
-            gate.isPrimary = json.optBoolean("is_primary", false);
-            gate.rfidPower = json.optInt("rfid_power", 28);
-            gate.scanInterval = json.optInt("scan_interval", 500);
-            gate.autoArm = json.optBoolean("auto_arm", false);
-            gate.soundPass = json.optString("sound_pass", "beep_success");
-            gate.soundDeny = json.optString("sound_deny", "beep_warning");
-            gate.soundAlarm = json.optString("sound_alarm", "alarm_sold_item");
-            return gate;
-        }
+        return json;
     }
+
+    public static GateDevice fromJson(JSONObject json) {
+        GateDevice gate = new GateDevice();
+        gate.gateId = json.optString("gate_id", "");
+        gate.gateName = json.optString("gate_name", "");
+        gate.location = json.optString("location", "");
+        gate.deviceType = json.optString("device_type", "chainway_c72");
+        gate.ipAddress = json.optString("ip_address", "");
+        gate.port = json.optInt("port", 8080);
+        gate.macAddress = json.optString("mac_address", "");
+        gate.firmwareVersion = json.optString("firmware_version", "");
+        gate.status = json.optString("status", "offline");
+        gate.isPrimary = json.optBoolean("is_primary", false);
+        gate.rfidPower = json.optInt("rfid_power", 28);
+        gate.scanInterval = json.optInt("scan_interval", 500);
+        gate.autoArm = json.optBoolean("auto_arm", false);
+        gate.soundPass = json.optString("sound_pass", "beep_success");
+        gate.soundDeny = json.optString("sound_deny", "beep_warning");
+        gate.soundAlarm = json.optString("sound_alarm", "alarm_sold_item");
+        gate.passCount = json.optInt("pass_count", 0);
+        gate.denyCount = json.optInt("deny_count", 0);
+        gate.lastEvent = json.optString("last_event", "");
+        return gate;
+    }
+}
 
     /**
      * حفظ قائمة البوابات
