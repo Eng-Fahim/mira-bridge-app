@@ -34,6 +34,7 @@ import com.example.uhf.dialog.POSCheckoutDialog;
 import com.example.uhf.engine.SmartScaleConnector;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraPriceManager;
+import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.UIHelper;
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.RFIDManager;
@@ -62,19 +63,16 @@ public class MiraPosFragment extends MiraBaseFragment {
     
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-    // ==================== Price & Data Managers ====================
     private MiraPriceManager priceManager;
     private MiraBranchesManager branchesManager;
+    private PermissionManager permissionManager;
 
-    // RFID Manager & Locks
     private RFIDManager rfidManager;
     private boolean isRFIDScanActive = false;
     private final Set<String> pendingEpcs = new HashSet<>();
     
-    // Debouncing Map
     private final Map<String, Long> lastScannedTimes = new HashMap<>();
 
-    // UI Elements
     private TextView tvScaleStatus, tvItemCount, tvTotalAmount, tvCartStatus;
     private TextInputLayout tilManualEpc;
     private EditText etManualEpc;
@@ -125,6 +123,7 @@ public class MiraPosFragment extends MiraBaseFragment {
         Context ctx = requireContext();
         branchesManager = MiraBranchesManager.getInstance(ctx);
         priceManager = MiraPriceManager.getInstance(ctx);
+        permissionManager = PermissionManager.getInstance(ctx);
         isArabic = Locale.getDefault().getLanguage().equals("ar");
 
         rfidManager = RFIDManager.getInstance(ctx);
@@ -160,9 +159,26 @@ public class MiraPosFragment extends MiraBaseFragment {
         bindViews(view);
         setupRecyclerView();
         setupListeners();
+        applyPermissions();
         initSmartScale();
         checkPendingSales();
         updateCartSummary();
+    }
+
+    private void applyPermissions() {
+        boolean canUsePos = permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager();
+        
+        if (btnCheckout != null) btnCheckout.setEnabled(false);
+        if (btnAddManual != null) btnAddManual.setEnabled(canUsePos);
+        if (btnOpenScanner != null) btnOpenScanner.setEnabled(canUsePos);
+        if (btnPosRFIDMode != null) btnPosRFIDMode.setEnabled(canUsePos);
+        if (etManualEpc != null) etManualEpc.setEnabled(canUsePos);
+        
+        if (!canUsePos) {
+            if (tvCartStatus != null) {
+                tvCartStatus.setText(isArabic ? "⛔ غير مصرح لك باستخدام نقطة البيع" : "⛔ Access Denied");
+            }
+        }
     }
 
     @Override
@@ -215,8 +231,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         if (rfidManager != null) rfidManager.release();
     }
 
-    // ==================== Helpers ====================
-
     private int getActiveBranchId() {
         try {
             return branchesManager != null ? branchesManager.getActiveBranchId() : 1;
@@ -257,8 +271,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    // ==================== View Binds & Language ====================
-
     private void bindViews(View view) {
         tvScaleStatus = view.findViewById(R.id.tvPosScaleStatus);
         tvItemCount = view.findViewById(R.id.tvPosItemCount);
@@ -278,7 +290,6 @@ public class MiraPosFragment extends MiraBaseFragment {
     }
 
     private void applyLanguage() {
-        // ✅ منع تداخل نص التلميح من خلال إلغائه في EditText وتعيينه حتماً في TextInputLayout
         if (etManualEpc != null) etManualEpc.setHint(null);
 
         if (isArabic) {
@@ -318,26 +329,53 @@ public class MiraPosFragment extends MiraBaseFragment {
             });
         }
 
-        if (btnAddManual != null) btnAddManual.setOnClickListener(v -> submitManualEpc());
+        if (btnAddManual != null) btnAddManual.setOnClickListener(v -> {
+            if (permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager()) {
+                submitManualEpc();
+            } else {
+                showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            }
+        });
+        
         if (btnClearCart != null) btnClearCart.setOnClickListener(v -> {
             UIHelper.hideKeyboard(getActivity());
             clearCart();
         });
+        
         if (btnCheckout != null) btnCheckout.setOnClickListener(v -> {
-            UIHelper.hideKeyboard(getActivity());
-            processCheckoutAndStockUpdate();
+            if (permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager()) {
+                UIHelper.hideKeyboard(getActivity());
+                processCheckoutAndStockUpdate();
+            } else {
+                showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            }
         });
+        
         if (btnOpenScanner != null) btnOpenScanner.setOnClickListener(v -> {
-            UIHelper.hideKeyboard(getActivity());
-            openBarcodeScanner();
+            if (permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager()) {
+                UIHelper.hideKeyboard(getActivity());
+                openBarcodeScanner();
+            } else {
+                showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            }
         });
+        
         if (btnPosRFIDMode != null) btnPosRFIDMode.setOnClickListener(v -> {
-            UIHelper.hideKeyboard(getActivity());
-            toggleRFIDMode();
+            if (permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager()) {
+                UIHelper.hideKeyboard(getActivity());
+                toggleRFIDMode();
+            } else {
+                showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            }
         });
     }
 
     private void submitManualEpc() {
+        if (!(permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager())) {
+            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            return;
+        }
+        
         UIHelper.hideKeyboard(getActivity());
         String epc = etManualEpc != null ? etManualEpc.getText().toString().trim() : "";
         if (!epc.isEmpty()) {
@@ -352,8 +390,6 @@ public class MiraPosFragment extends MiraBaseFragment {
             showToast(isArabic ? "أدخل EPC أو باركود" : "Enter EPC or barcode");
         }
     }
-
-    // ==================== الميزان الذكي ====================
 
     private void initSmartScale() {
         scaleConnector = new SmartScaleConnector();
@@ -387,8 +423,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         });
     }
 
-    // ==================== الماسح الضوئي ====================
-
     private void openBarcodeScanner() {
         if (!isAdded()) return;
         MiraBarcodeScannerFragment sf = new MiraBarcodeScannerFragment();
@@ -406,8 +440,6 @@ public class MiraPosFragment extends MiraBaseFragment {
                 .addToBackStack("barcode_scanner")
                 .commit();
     }
-
-    // ==================== RFID ====================
 
     private void toggleRFIDMode() {
         isRFIDModeActive = !isRFIDModeActive;
@@ -431,8 +463,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         isRFIDScanActive = false;
         rfidManager.stopScan();
     }
-
-    // ==================== Scan & Debounce Logic ====================
 
     public void onRingScanned(String epc) {
         long currentTime = System.currentTimeMillis();
@@ -559,8 +589,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         });
     }
 
-    // ==================== إدارة السلة ====================
-
     private void updateCartSummary() {
         int count = cartList.size();
         double sum = 0;
@@ -582,7 +610,7 @@ public class MiraPosFragment extends MiraBaseFragment {
                 else tvCartStatus.setText(isArabic ? "✓ جاهز للبيع" : "✓ Ready for sale");
             }
             if (btnCheckout != null) {
-                btnCheckout.setEnabled(fc > 0 && !fb);
+                btnCheckout.setEnabled(fc > 0 && !fb && (permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager()));
                 btnCheckout.setAlpha(fc > 0 && !fb ? 1f : 0.5f);
             }
         });
@@ -613,9 +641,11 @@ public class MiraPosFragment extends MiraBaseFragment {
         return t;
     }
 
-    // ==================== إتمام عملية البيع ====================
-
     private void processCheckoutAndStockUpdate() {
+        if (!(permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager())) {
+            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            return;
+        }
         if (cartList.isEmpty()) {
             showToast(isArabic ? "السلة فارغة" : "Cart is empty");
             return;
@@ -764,8 +794,6 @@ public class MiraPosFragment extends MiraBaseFragment {
         }
     }
 
-    // ==================== دعم العمل أوفلاين والمزامنة ====================
-
     private void saveFullSaleLocally(POSCheckoutDialog.POSCheckoutData data) {
         if (getContext() == null) return;
         try {
@@ -870,15 +898,12 @@ public class MiraPosFragment extends MiraBaseFragment {
         }).start();
     }
 
-    // ==================== Modern Loading & Dialogs UX ====================
-
     private AlertDialog showProfessionalLoadingDialog() {
         Context ctx = getContext();
         if (ctx == null || !isAdded()) return null;
 
         AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
         
-        // بناء تصميم العرض الحديث برمجياً عبر MaterialCardView
         MaterialCardView cardView = new MaterialCardView(ctx);
         cardView.setRadius(20);
         cardView.setCardElevation(8);
@@ -928,15 +953,16 @@ public class MiraPosFragment extends MiraBaseFragment {
 
     private void setButtonsEnabled(boolean enabled) {
         safeRun(() -> {
+            boolean canUsePos = permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager();
             if (btnCheckout != null) {
-                btnCheckout.setEnabled(enabled && !cartList.isEmpty());
-                btnCheckout.setAlpha(enabled && !cartList.isEmpty() ? 1.0f : 0.5f);
+                btnCheckout.setEnabled(enabled && canUsePos && !cartList.isEmpty());
+                btnCheckout.setAlpha(enabled && canUsePos && !cartList.isEmpty() ? 1.0f : 0.5f);
             }
             if (btnClearCart != null) btnClearCart.setEnabled(enabled);
-            if (btnAddManual != null) btnAddManual.setEnabled(enabled);
-            if (btnOpenScanner != null) btnOpenScanner.setEnabled(enabled);
-            if (btnPosRFIDMode != null) btnPosRFIDMode.setEnabled(enabled);
-            if (etManualEpc != null) etManualEpc.setEnabled(enabled);
+            if (btnAddManual != null) btnAddManual.setEnabled(enabled && canUsePos);
+            if (btnOpenScanner != null) btnOpenScanner.setEnabled(enabled && canUsePos);
+            if (btnPosRFIDMode != null) btnPosRFIDMode.setEnabled(enabled && canUsePos);
+            if (etManualEpc != null) etManualEpc.setEnabled(enabled && canUsePos);
         });
     }
 
@@ -1026,8 +1052,6 @@ public class MiraPosFragment extends MiraBaseFragment {
 
         parent.addView(row);
     }
-
-    // ==================== Adapter ====================
 
     private static class CartAdapter extends RecyclerView.Adapter<CartAdapter.ViewHolder> {
         interface OnRemoveListener {
