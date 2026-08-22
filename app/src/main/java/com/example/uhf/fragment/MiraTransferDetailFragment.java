@@ -22,12 +22,14 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.manager.PermissionManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Executors;
 
 public class MiraTransferDetailFragment extends Fragment {
@@ -43,11 +45,13 @@ public class MiraTransferDetailFragment extends Fragment {
     private RecyclerView rvItems;
 
     private MiraApiClient apiClient;
+    private PermissionManager permissionManager;
     private final List<TransferItemData> itemList = new ArrayList<>();
     private TransferItemAdapter itemAdapter;
     private int totalItems = 0;
     private int scannedItems = 0;
     private String currentStatus;
+    private boolean isArabic;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     public static MiraTransferDetailFragment newInstance(int transferId) {
@@ -74,6 +78,8 @@ public class MiraTransferDetailFragment extends Fragment {
         }
 
         apiClient = MiraApiClient.getInstance(requireContext());
+        permissionManager = PermissionManager.getInstance(requireContext());
+        isArabic = Locale.getDefault().getLanguage().equals("ar");
 
         tvTransferNumber = view.findViewById(R.id.tvDetailTransferNumber);
         tvFromBranch = view.findViewById(R.id.tvDetailFromBranch);
@@ -94,12 +100,64 @@ public class MiraTransferDetailFragment extends Fragment {
         rvItems.setAdapter(itemAdapter);
 
         btnManualScan.setOnClickListener(v -> scanItem());
-        btnApprove.setOnClickListener(v -> approveTransfer());
-        btnReject.setOnClickListener(v -> rejectTransfer());
-        btnReceive.setOnClickListener(v -> receiveTransfer());
+        btnApprove.setOnClickListener(v -> {
+            if (canApprove()) approveTransfer();
+            else showAccessDenied();
+        });
+        btnReject.setOnClickListener(v -> {
+            if (canApprove()) rejectTransfer();
+            else showAccessDenied();
+        });
+        btnReceive.setOnClickListener(v -> {
+            if (canReceive()) receiveTransfer();
+            else showAccessDenied();
+        });
 
+        applyPermissions();
         loadTransferDetail();
     }
+
+    private boolean canApprove() {
+        return permissionManager.isManager() || 
+               permissionManager.isBranchManager() || 
+               permissionManager.canEdit("transfers");
+    }
+
+    private boolean canReceive() {
+        return permissionManager.isManager() || 
+               permissionManager.isBranchManager() || 
+               permissionManager.canEdit("transfers");
+    }
+
+    private boolean canScan() {
+        return permissionManager.canView("transfers") || permissionManager.isManager();
+    }
+
+    private void applyPermissions() {
+        if (btnManualScan != null) {
+            btnManualScan.setEnabled(canScan());
+        }
+        if (etScanEPC != null) {
+            etScanEPC.setEnabled(canScan());
+        }
+        if (btnApprove != null) {
+            btnApprove.setEnabled(canApprove());
+        }
+        if (btnReject != null) {
+            btnReject.setEnabled(canApprove());
+        }
+        if (btnReceive != null) {
+            btnReceive.setEnabled(canReceive());
+        }
+    }
+
+    private void showAccessDenied() {
+        Toast.makeText(getContext(), 
+            ar("⛔ غير مصرح لك بهذا الإجراء", "⛔ Access Denied"),
+            Toast.LENGTH_SHORT).show();
+    }
+
+    private String ar(String arabic, String english) { return isArabic ? arabic : english; }
 
     private void loadTransferDetail() {
         Executors.newSingleThreadExecutor().execute(() -> {
@@ -129,7 +187,7 @@ public class MiraTransferDetailFragment extends Fragment {
 
                             TransferItemData data = new TransferItemData();
                             data.itemId = item.optInt("item_id");
-                            data.title = item.optString("item_title", "قطعة");
+                            data.title = item.optString("item_title", ar("قطعة", "Item"));
                             data.epc = item.optString("rfid_epc", "");
                             data.karat = item.optString("gold_karat", "");
                             data.weight = item.optDouble("gross_weight_grams", 0);
@@ -148,14 +206,23 @@ public class MiraTransferDetailFragment extends Fragment {
     }
 
     private void scanItem() {
+        if (!canScan()) {
+            showAccessDenied();
+            return;
+        }
+        
         String epc = etScanEPC.getText().toString().trim();
         if (epc.isEmpty()) {
-            Toast.makeText(getContext(), "أدخل EPC أو امسح الشريحة", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), 
+                ar("أدخل EPC أو امسح الشريحة", "Enter EPC or scan tag"), 
+                Toast.LENGTH_SHORT).show();
             return;
         }
 
         etScanEPC.setText("");
-        Toast.makeText(getContext(), "🔍 جاري التحقق...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(getContext(), 
+            ar("🔍 جاري التحقق...", "🔍 Verifying..."), 
+            Toast.LENGTH_SHORT).show();
 
         Executors.newSingleThreadExecutor().execute(() -> {
             MiraApiClient.ApiResponse response = apiClient.scanTransferItem(transferId, epc);
@@ -174,9 +241,13 @@ public class MiraTransferDetailFragment extends Fragment {
                         }
                         itemAdapter.notifyDataSetChanged();
                         updateScanProgress();
-                        Toast.makeText(getContext(), "✅ " + response.data.optString("title", "تم المسح"), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), 
+                            "✅ " + response.data.optString("title", ar("تم المسح", "Scanned")), 
+                            Toast.LENGTH_SHORT).show();
                     } else {
-                        Toast.makeText(getContext(), "❌ القطعة ليست ضمن هذا التحويل", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), 
+                            ar("❌ القطعة ليست ضمن هذا التحويل", "❌ Item not in this transfer"), 
+                            Toast.LENGTH_SHORT).show();
                     }
                 }
             });
@@ -192,47 +263,62 @@ public class MiraTransferDetailFragment extends Fragment {
 
     private void updateStatusUI(String status) {
         switch (status) {
-            case "draft": tvStatus.setText("مسودة"); tvStatus.setTextColor(0xFF9CA3AF); break;
-            case "pending": tvStatus.setText("معلق"); tvStatus.setTextColor(0xFFF59E0B); break;
-            case "approved": tvStatus.setText("معتمد"); tvStatus.setTextColor(0xFF3B82F6); break;
-            case "in_transit": tvStatus.setText("بالطريق"); tvStatus.setTextColor(0xFF8B5CF6); break;
-            case "received": tvStatus.setText("مستلم"); tvStatus.setTextColor(0xFF22C55E); break;
-            case "rejected": tvStatus.setText("مرفوض"); tvStatus.setTextColor(0xFFEF4444); break;
+            case "draft": tvStatus.setText(ar("مسودة", "Draft")); tvStatus.setTextColor(0xFF9CA3AF); break;
+            case "pending": tvStatus.setText(ar("معلق", "Pending")); tvStatus.setTextColor(0xFFF59E0B); break;
+            case "approved": tvStatus.setText(ar("معتمد", "Approved")); tvStatus.setTextColor(0xFF3B82F6); break;
+            case "in_transit": tvStatus.setText(ar("بالطريق", "In Transit")); tvStatus.setTextColor(0xFF8B5CF6); break;
+            case "received": tvStatus.setText(ar("مستلم", "Received")); tvStatus.setTextColor(0xFF22C55E); break;
+            case "rejected": tvStatus.setText(ar("مرفوض", "Rejected")); tvStatus.setTextColor(0xFFEF4444); break;
             default: tvStatus.setText(status); tvStatus.setTextColor(0xFF9CA3AF);
         }
 
-        // إظهار/إخفاء الأزرار حسب الحالة
         boolean isPending = "pending".equals(status);
         boolean isApproved = "approved".equals(status) || "in_transit".equals(status);
 
-        btnApprove.setVisibility(isPending ? View.VISIBLE : View.GONE);
-        btnReject.setVisibility(isPending ? View.VISIBLE : View.GONE);
-        btnReceive.setVisibility(isApproved ? View.VISIBLE : View.GONE);
+        btnApprove.setVisibility(isPending && canApprove() ? View.VISIBLE : View.GONE);
+        btnReject.setVisibility(isPending && canApprove() ? View.VISIBLE : View.GONE);
+        btnReceive.setVisibility(isApproved && canReceive() ? View.VISIBLE : View.GONE);
     }
 
     private void approveTransfer() {
+        if (!canApprove()) {
+            showAccessDenied();
+            return;
+        }
+        
         Executors.newSingleThreadExecutor().execute(() -> {
             MiraApiClient.ApiResponse response = apiClient.approveTransfer(transferId);
             mainHandler.post(() -> {
                 if (response != null && response.isSuccess) {
-                    Toast.makeText(getContext(), "✅ تم اعتماد التحويل", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), 
+                        ar("✅ تم اعتماد التحويل", "✅ Approved"), 
+                        Toast.LENGTH_SHORT).show();
                     currentStatus = "approved";
                     updateStatusUI(currentStatus);
                 } else {
-                    Toast.makeText(getContext(), "❌ فشل الاعتماد", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), 
+                        ar("❌ فشل الاعتماد", "❌ Failed"), 
+                        Toast.LENGTH_SHORT).show();
                 }
             });
         });
     }
 
     private void rejectTransfer() {
+        if (!canApprove()) {
+            showAccessDenied();
+            return;
+        }
+        
         Executors.newSingleThreadExecutor().execute(() -> {
             JSONObject payload = new JSONObject();
             try { payload.put("status", "rejected"); } catch (Exception ignored) {}
             MiraApiClient.ApiResponse response = apiClient.updateTransfer(transferId, payload);
             mainHandler.post(() -> {
                 if (response != null && response.isSuccess) {
-                    Toast.makeText(getContext(), "تم رفض التحويل", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), 
+                        ar("تم رفض التحويل", "Transfer rejected"), 
+                        Toast.LENGTH_SHORT).show();
                     currentStatus = "rejected";
                     updateStatusUI(currentStatus);
                 }
@@ -241,29 +327,34 @@ public class MiraTransferDetailFragment extends Fragment {
     }
 
     private void receiveTransfer() {
+        if (!canReceive()) {
+            showAccessDenied();
+            return;
+        }
+        
         Executors.newSingleThreadExecutor().execute(() -> {
             MiraApiClient.ApiResponse response = apiClient.receiveTransfer(transferId);
             mainHandler.post(() -> {
                 if (response != null && response.isSuccess) {
-                    Toast.makeText(getContext(), "✅ تم استلام التحويل بنجاح", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), 
+                        ar("✅ تم استلام التحويل بنجاح", "✅ Received"), 
+                        Toast.LENGTH_SHORT).show();
                     currentStatus = "received";
                     updateStatusUI(currentStatus);
                 } else {
-                    Toast.makeText(getContext(), "❌ فشل الاستلام", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), 
+                        ar("❌ فشل الاستلام", "❌ Failed"), 
+                        Toast.LENGTH_SHORT).show();
                 }
             });
         });
     }
-
-    // ==================== TransferItemData ====================
 
     static class TransferItemData {
         int itemId;
         String title, epc, karat, scanStatus;
         double weight;
     }
-
-    // ==================== Adapter ====================
 
     class TransferItemAdapter extends RecyclerView.Adapter<TransferItemAdapter.VH> {
         final List<TransferItemData> list;
