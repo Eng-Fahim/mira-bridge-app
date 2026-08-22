@@ -642,130 +642,139 @@ public class MiraPosFragment extends MiraBaseFragment {
     }
 
     private void processCheckoutAndStockUpdate() {
-        if (!(permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager())) {
-            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-            return;
-        }
-        if (cartList.isEmpty()) {
-            showToast(isArabic ? "السلة فارغة" : "Cart is empty");
-            return;
-        }
-        if (!isAdded() || getActivity() == null) return;
-        UIHelper.hideKeyboard(getActivity());
-        try {
-            POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(getCartTotal(), cartList.size());
-            dialog.setCheckoutListener(this::executeCheckout);
-            FragmentManager fm = getChildFragmentManager();
-            if (!fm.isStateSaved()) dialog.show(fm, "POSCheckoutDialog");
-        } catch (Exception e) {
-            showToast(isArabic ? "خطأ" : "Error: " + e.getMessage());
-        }
+    if (!(permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager())) {
+        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+        return;
     }
+    if (cartList.isEmpty()) {
+        showToast(isArabic ? "السلة فارغة" : "Cart is empty");
+        return;
+    }
+    if (!isAdded() || getActivity() == null) return;
+    UIHelper.hideKeyboard(getActivity());
+    
+    // منع فتح الديالوج مرتين
+    if (getChildFragmentManager().findFragmentByTag("POSCheckoutDialog") != null) {
+        return; // الديالوج مفتوح بالفعل
+    }
+    
+    try {
+        POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(getCartTotal(), cartList.size());
+        dialog.setCheckoutListener(this::executeCheckout);
+        FragmentManager fm = getChildFragmentManager();
+        if (!fm.isStateSaved()) {
+            dialog.show(fm, "POSCheckoutDialog");
+        }
+    } catch (Exception e) {
+        showToast(isArabic ? "خطأ" : "Error: " + e.getMessage());
+    }
+}
 
     private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
-        if (!isAdded()) return;
+    if (!isAdded()) return;
 
-        final AlertDialog loadingDialog = showProfessionalLoadingDialog();
-        if (loadingDialog == null) return;
+    final AlertDialog loadingDialog = showProfessionalLoadingDialog();
+    if (loadingDialog == null) return;
 
-        setButtonsEnabled(false);
+    setButtonsEnabled(false);
 
-        new Thread(() -> {
-            try {
-                Context ctx = getContext();
-                if (ctx == null) return;
-                MiraApiClient client = MiraApiClient.getInstance(ctx);
+    new Thread(() -> {
+        try {
+            Context ctx = getContext();
+            if (ctx == null) return;
+            MiraApiClient client = MiraApiClient.getInstance(ctx);
 
-                SessionManager sessionManager = new SessionManager(ctx);
-                int userId = sessionManager.getUserId();
-                String username = sessionManager.getUsername();
-                int branchId = getActiveBranchId();
+            SessionManager sessionManager = new SessionManager(ctx);
+            int userId = sessionManager.getUserId();
+            String username = sessionManager.getUsername();
+            int branchId = getActiveBranchId();
 
-                JSONObject payload = new JSONObject();
-                payload.put("action", "COMPLETE_POS_SALE");
-                payload.put("gate_id", client.getGateId());
-                payload.put("branch_id", branchId);
-                payload.put("user_id", userId);
-                payload.put("username", username);
+            JSONObject payload = new JSONObject();
+            payload.put("action", "COMPLETE_POS_SALE");
+            payload.put("gate_id", client.getGateId());
+            payload.put("branch_id", branchId);
+            payload.put("user_id", userId);
+            payload.put("username", username);
 
-                JSONObject customer = new JSONObject();
-                customer.put("name", data.customerName);
-                customer.put("phone", data.customerPhone);
-                customer.put("email", data.customerEmail != null ? data.customerEmail : "");
-                customer.put("payment_method", data.paymentMethod);
-                payload.put("customer", customer);
+            JSONObject customer = new JSONObject();
+            customer.put("name", data.customerName);
+            customer.put("phone", data.customerPhone);
+            customer.put("email", data.customerEmail != null ? data.customerEmail : "");
+            customer.put("payment_method", data.paymentMethod);
+            payload.put("customer", customer);
 
-                JSONArray itemsArr = new JSONArray();
-                for (CartItem item : cartList) {
-                    JSONObject obj = new JSONObject();
-                    obj.put("epc", item.epc);
-                    obj.put("serial_no", item.serialNo != null ? item.serialNo : item.epc);
-                    obj.put("title", item.name);
-                    obj.put("karat", item.karat);
-                    obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
-                    obj.put("sale_price", item.price);
-                    obj.put("item_id", item.itemId > 0 ? item.itemId : 0);
-                    itemsArr.put(obj);
-                }
-                payload.put("items", itemsArr);
-
-                JSONObject payment = new JSONObject();
-                payment.put("subtotal", getCartTotal());
-                payment.put("discount_percent", data.discount);
-                payment.put("discount_amount", data.discountAmount);
-                payment.put("final_amount", data.finalAmount);
-                payment.put("account_code", getAccountCode(data.paymentMethod));
-                payment.put("currency", "YER");
-                payload.put("payment", payment);
-
-                MiraApiClient.ApiResponse response = client.checkout(payload);
-
-                safeRun(() -> {
-                    dismissDialog(loadingDialog);
-                    setButtonsEnabled(true);
-
-                    if (response != null && response.isSuccess) {
-                        playAlertSound(1);
-                        int soldCount = cartList.size();
-                        double finalAmount = data.finalAmount;
-                        String paymentMethod = data.paymentMethod;
-                        clearCart();
-                        autoGenerateAccountingEntry(response.data);
-                        showSuccessDialog(finalAmount, soldCount, paymentMethod);
-                        if (response.data != null) {
-                            String json = response.data.toString();
-                            if (getActivity() instanceof UHFMainActivity)
-                                ((UHFMainActivity) getActivity()).openReceiptFragment(json);
-                        }
-                    } else {
-                        String errorMsg = "";
-                        if (response != null && response.error != null) errorMsg = response.error;
-                        else if (response != null && response.data != null) errorMsg = response.data.optString("message", "");
-                        if (errorMsg.isEmpty()) errorMsg = isArabic ? "فشل الاتصال بالسيرفر" : "Server connection failed";
-                        showRetryDialog(
-                            isArabic ? "❌ فشل إتمام البيع" : "❌ Sale Failed",
-                            errorMsg,
-                            () -> executeCheckout(data)
-                        );
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Checkout Error: " + e.getMessage());
-                safeRun(() -> {
-                    dismissDialog(loadingDialog);
-                    setButtonsEnabled(true);
-                    saveFullSaleLocally(data);
-                    clearCart();
-                    showRetryDialog(
-                        isArabic ? "❌ خطأ في الاتصال" : "❌ Connection Error",
-                        isArabic ? "تم حفظ العملية محلياً.\nسيتم المزامنة تلقائياً عند توفر الاتصال." :
-                                "Sale saved locally.\nWill sync automatically when connection is available.",
-                        null
-                    );
-                });
+            JSONArray itemsArr = new JSONArray();
+            for (CartItem item : cartList) {
+                JSONObject obj = new JSONObject();
+                obj.put("epc", item.epc);
+                obj.put("serial_no", item.serialNo != null ? item.serialNo : item.epc);
+                obj.put("title", item.name);
+                obj.put("karat", item.karat);
+                obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
+                obj.put("sale_price", item.price);
+                obj.put("item_id", item.itemId > 0 ? item.itemId : 0);
+                itemsArr.put(obj);
             }
-        }).start();
-    }
+            payload.put("items", itemsArr);
+
+            JSONObject payment = new JSONObject();
+            // استخدام القيم الصحيحة من data
+            payment.put("subtotal", data.originalTotal); // ✅ استخدم originalTotal من الديالوج
+            payment.put("discount_percent", data.discount);
+            payment.put("discount_amount", data.discountAmount);
+            payment.put("final_amount", data.finalAmount);
+            payment.put("account_code", getAccountCode(data.paymentMethod));
+            payment.put("currency", "YER");
+            payload.put("payment", payment);
+
+            MiraApiClient.ApiResponse response = client.checkout(payload);
+
+            safeRun(() -> {
+                dismissDialog(loadingDialog);
+                setButtonsEnabled(true);
+
+                if (response != null && response.isSuccess) {
+                    playAlertSound(1);
+                    int soldCount = cartList.size();
+                    double finalAmount = data.finalAmount;
+                    String paymentMethod = data.paymentMethod;
+                    clearCart();
+                    autoGenerateAccountingEntry(response.data);
+                    showSuccessDialog(finalAmount, soldCount, paymentMethod);
+                    if (response.data != null) {
+                        String json = response.data.toString();
+                        if (getActivity() instanceof UHFMainActivity)
+                            ((UHFMainActivity) getActivity()).openReceiptFragment(json);
+                    }
+                } else {
+                    String errorMsg = "";
+                    if (response != null && response.error != null) errorMsg = response.error;
+                    else if (response != null && response.data != null) errorMsg = response.data.optString("message", "");
+                    if (errorMsg.isEmpty()) errorMsg = isArabic ? "فشل الاتصال بالسيرفر" : "Server connection failed";
+                    showRetryDialog(
+                        isArabic ? "❌ فشل إتمام البيع" : "❌ Sale Failed",
+                        errorMsg,
+                        () -> executeCheckout(data)
+                    );
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Checkout Error: " + e.getMessage());
+            safeRun(() -> {
+                dismissDialog(loadingDialog);
+                setButtonsEnabled(true);
+                saveFullSaleLocally(data);
+                clearCart();
+                showRetryDialog(
+                    isArabic ? "❌ خطأ في الاتصال" : "❌ Connection Error",
+                    isArabic ? "تم حفظ العملية محلياً.\nسيتم المزامنة تلقائياً عند توفر الاتصال." :
+                            "Sale saved locally.\nWill sync automatically when connection is available.",
+                    null
+                );
+            });
+        }
+    }).start();
+}
 
     private void autoGenerateAccountingEntry(JSONObject saleData) {
         if (saleData == null) return;
@@ -1118,4 +1127,4 @@ public class MiraPosFragment extends MiraBaseFragment {
             }
         }
     }
-}
+                }
