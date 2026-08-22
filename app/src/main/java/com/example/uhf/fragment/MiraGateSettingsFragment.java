@@ -29,6 +29,7 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraGatesSettings;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SoundGenerator;
+import com.example.uhf.manager.GateSecurityManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 
@@ -653,21 +654,21 @@ public class MiraGateSettingsFragment extends Fragment {
         }
 
         class GateViewHolder extends RecyclerView.ViewHolder {
-            TextView tvGateName, tvGateLocation, tvGateStatus, tvGateStats, tvGateLastEvent;
-            View btnRemove, btnToggleGate;
+    TextView tvGateName, tvGateLocation, tvGateStatus, tvGateStats, tvGateLastEvent;
+    View btnRemove;
+    MaterialButton btnToggleGate; // ✅ تغيير النوع
 
-            GateViewHolder(@NonNull View itemView) {
-                super(itemView);
-                tvGateName = itemView.findViewById(R.id.tvGateName);
-                tvGateLocation = itemView.findViewById(R.id.tvGateLocation);
-                tvGateStatus = itemView.findViewById(R.id.tvGateStatus);
-                tvGateStats = itemView.findViewById(R.id.tvGateStats);
-                tvGateLastEvent = itemView.findViewById(R.id.tvGateLastEvent);
-                btnRemove = itemView.findViewById(R.id.btnRemoveGate);
-                btnToggleGate = itemView.findViewById(R.id.btnToggleGate);
-            }
-        }
+    GateViewHolder(@NonNull View itemView) {
+        super(itemView);
+        tvGateName = itemView.findViewById(R.id.tvGateName);
+        tvGateLocation = itemView.findViewById(R.id.tvGateLocation);
+        tvGateStatus = itemView.findViewById(R.id.tvGateStatus);
+        tvGateStats = itemView.findViewById(R.id.tvGateStats);
+        tvGateLastEvent = itemView.findViewById(R.id.tvGateLastEvent);
+        btnRemove = itemView.findViewById(R.id.btnRemoveGate);
+        btnToggleGate = itemView.findViewById(R.id.btnToggleGate); // ✅ سيعمل الآن مع MaterialButton
     }
+}
     
     interface OnGateRemoveListener {
         void onRemove(int position);
@@ -676,4 +677,4 @@ public class MiraGateSettingsFragment extends Fragment {
     interface OnGateToggleListener {
         void onToggle(int position, boolean open);
     }
-                            }
+    }
