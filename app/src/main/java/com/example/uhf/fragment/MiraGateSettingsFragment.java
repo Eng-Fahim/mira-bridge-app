@@ -678,3 +678,4 @@ public class MiraGateSettingsFragment extends Fragment {
         void onToggle(int position, boolean open);
     }
     }
+}
