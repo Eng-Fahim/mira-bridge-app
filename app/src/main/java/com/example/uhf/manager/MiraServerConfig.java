@@ -1,5 +1,4 @@
 package com.example.uhf.manager;
-
 import android.content.Context;
 import android.content.SharedPreferences;
 
