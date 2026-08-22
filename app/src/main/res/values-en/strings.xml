@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="quick_action_rfid_write">RFID Write</string>
+    <string name="quick_action_identity">Identity Studio</string>
+    <string name="quick_action_radar">Radar Tracking</string>
+    <string name="quick_action_gate">Secure Gate</string>
+    <string name="quick_action_reports">Reports</string>
+    <string name="quick_action_accounting">Accounting</string>
+    <string name="quick_action_transfers">Transfers</string>
+    <string name="quick_action_admin_hub">Admin Hub</string>
+    <string name="quick_action_sales_history">Sales History</string>
+    <string name="quick_action_server_config">Server Config</string>
+
     <!-- Menu -->
     <string name="menu_profile">My Profile</string>
     <string name="menu_logout">Sign Out</string>
