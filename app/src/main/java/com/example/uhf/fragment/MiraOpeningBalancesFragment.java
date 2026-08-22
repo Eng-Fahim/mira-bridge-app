@@ -23,6 +23,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.manager.PermissionManager;
 import com.google.android.material.button.MaterialButton;
 
 import org.json.JSONArray;
@@ -39,6 +40,7 @@ public class MiraOpeningBalancesFragment extends Fragment {
     private static final String TAG = "MiraOpeningBalancesFragment";
 
     private MiraApiClient apiClient;
+    private PermissionManager permissionManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
@@ -56,13 +58,28 @@ public class MiraOpeningBalancesFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_mira_opening_balances, container, false);
         
         apiClient = MiraApiClient.getInstance(requireContext());
+        permissionManager = PermissionManager.getInstance(requireContext());
         isArabic = Locale.getDefault().getLanguage().equals("ar");
 
         initViews(view);
         setupListeners();
+        applyPermissions();
         loadAccounts();
 
         return view;
+    }
+
+    private void applyPermissions() {
+        boolean canEdit = permissionManager.canEdit("accounting") || permissionManager.isAdmin();
+        
+        if (btnSaveAll != null) {
+            btnSaveAll.setEnabled(canEdit);
+            btnSaveAll.setAlpha(canEdit ? 1.0f : 0.5f);
+        }
+        
+        if (adapter != null) {
+            adapter.setEditable(canEdit);
+        }
     }
 
     private void initViews(View view) {
@@ -76,10 +93,26 @@ public class MiraOpeningBalancesFragment extends Fragment {
     }
 
     private void setupListeners() {
-        btnSaveAll.setOnClickListener(v -> saveAllBalances());
+        btnSaveAll.setOnClickListener(v -> {
+            if (permissionManager.canEdit("accounting") || permissionManager.isAdmin()) {
+                saveAllBalances();
+            } else {
+                Toast.makeText(getContext(), 
+                    isArabic ? "⛔ غير مصرح لك بالحفظ" : "⛔ Access Denied",
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void loadAccounts() {
+        if (!(permissionManager.canView("accounting") || permissionManager.isAdmin() || 
+              permissionManager.isBranchManager() || permissionManager.isAuditor())) {
+            tvEmptyAccounts.setVisibility(View.VISIBLE);
+            tvEmptyAccounts.setText(isArabic ? "⛔ غير مصرح لك بالوصول" : "⛔ Access Denied");
+            rvAccounts.setVisibility(View.GONE);
+            return;
+        }
+        
         executor.execute(() -> {
             MiraApiClient.ApiResponse response = apiClient.getOpeningBalances();
             
@@ -120,6 +153,13 @@ public class MiraOpeningBalancesFragment extends Fragment {
     }
 
     private void saveAllBalances() {
+        if (!(permissionManager.canEdit("accounting") || permissionManager.isAdmin())) {
+            Toast.makeText(getContext(), 
+                isArabic ? "⛔ غير مصرح" : "⛔ Access Denied",
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
         for (AccountBalance account : accountList) {
             if (account.isModified) {
                 saveBalance(account);
@@ -157,7 +197,6 @@ public class MiraOpeningBalancesFragment extends Fragment {
         }
     }
 
-    // ==================== MODEL ====================
     private static class AccountBalance {
         int id;
         String code;
@@ -167,11 +206,16 @@ public class MiraOpeningBalancesFragment extends Fragment {
         boolean isModified = false;
     }
 
-    // ==================== ADAPTER ====================
     private class AccountBalanceAdapter extends RecyclerView.Adapter<AccountBalanceAdapter.ViewHolder> {
         private List<AccountBalance> items;
+        private boolean editable = true;
         
         AccountBalanceAdapter(List<AccountBalance> items) { this.items = items; }
+        
+        void setEditable(boolean editable) {
+            this.editable = editable;
+            notifyDataSetChanged();
+        }
         
         @NonNull
         @Override
@@ -189,8 +233,11 @@ public class MiraOpeningBalancesFragment extends Fragment {
             holder.etCash.setText(account.cashBalance);
             holder.etGold.setText(account.goldBalance);
             
+            holder.etCash.setEnabled(editable);
+            holder.etGold.setEnabled(editable);
+            
             holder.etCash.setOnFocusChangeListener((v, hasFocus) -> {
-                if (!hasFocus) {
+                if (!hasFocus && editable) {
                     String newValue = holder.etCash.getText().toString().trim();
                     account.cashBalance = newValue;
                     account.isModified = true;
@@ -198,7 +245,7 @@ public class MiraOpeningBalancesFragment extends Fragment {
             });
             
             holder.etGold.setOnFocusChangeListener((v, hasFocus) -> {
-                if (!hasFocus) {
+                if (!hasFocus && editable) {
                     String newValue = holder.etGold.getText().toString().trim();
                     account.goldBalance = newValue;
                     account.isModified = true;
