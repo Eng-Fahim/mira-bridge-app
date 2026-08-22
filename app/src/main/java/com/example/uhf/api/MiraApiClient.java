@@ -79,7 +79,17 @@ public ApiResponse reconnectDevice(String username, String password, String gate
         return null;
     }
 }
+    // في كل طلب API
+private void addApiKeyHeader(JSONObject request) {
+    String apiKey = MiraServerConfigManager.getInstance(context).getApiKey();
     
+    if (apiKey.isEmpty()) {
+        // ✅ استخدام المفتاح الافتراضي
+        apiKey = "mira_gate_test071234567890abcdefghijklmnop";
+    }
+    
+    request.put("X-MIRA-API-Key", apiKey);
+}
     // دالة لجلب قائمة المزودين النشطين من السيرفر
     public List<ApiProvider> getActiveProviders() {
         List<ApiProvider> providers = new ArrayList<>();
