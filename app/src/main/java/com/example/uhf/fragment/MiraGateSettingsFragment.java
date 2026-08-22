@@ -530,20 +530,37 @@ public class MiraGateSettingsFragment extends Fragment {
     /**
      * ✅ فتح/إغلاق البوابة (تحكم مباشر)
      */
+    // في MiraGateSettingsFragment.java - إضافة:
     private void toggleGateStatus(int position, boolean open) {
-        if (!permissionManager.isAdmin() && !permissionManager.isBranchManager()) {
-            Toast.makeText(getContext(), "⛔ غير مصرح", Toast.LENGTH_SHORT).show();
-            return;
-        }
+    if (!permissionManager.isAdmin() && !permissionManager.isBranchManager()) {
+        Toast.makeText(getContext(), "⛔ غير مصرح", Toast.LENGTH_SHORT).show();
+        return;
+    }
+    
+    if (position >= 0 && position < gatesList.size()) {
+        MiraGatesSettings.GateDevice gate = gatesList.get(position);
         
-        if (position >= 0 && position < gatesList.size()) {
-            MiraGatesSettings.GateDevice gate = gatesList.get(position);
+        if (open) {
+            // ✅ تشغيل مراقبة البوابة
+            GateSecurityManager.getInstance(requireContext())
+                .startGateMonitoring(gate.gateId);
+            gate.status = "armed";
             Toast.makeText(getContext(), 
-                (open ? "🔓 فتح: " : "🔒 إغلاق: ") + gate.gateName, 
+                "🚪 تم تشغيل مراقبة: " + gate.gateName, 
+                Toast.LENGTH_SHORT).show();
+        } else {
+            // ✅ إيقاف مراقبة البوابة
+            GateSecurityManager.getInstance(requireContext())
+                .stopGateMonitoring();
+            gate.status = "offline";
+            Toast.makeText(getContext(), 
+                "🔒 تم إيقاف مراقبة: " + gate.gateName, 
                 Toast.LENGTH_SHORT).show();
         }
+        
+        gateAdapter.notifyDataSetChanged();
     }
-
+}
     @Override
     public void onDestroyView() {
         super.onDestroyView();
