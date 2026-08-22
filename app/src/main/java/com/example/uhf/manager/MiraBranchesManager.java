@@ -4,7 +4,15 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
+// ✅ أضف هذه imports
 import org.json.JSONArray;
+import org.json.JSONObject;
+// ✅ نهاية الإضافات
+
+import java.util.ArrayList;
+import java.util.List;
+
+
 
 public class MiraBranchesManager {
 
