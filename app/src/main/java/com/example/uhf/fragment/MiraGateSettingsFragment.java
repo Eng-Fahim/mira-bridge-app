@@ -670,7 +670,7 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 }
     
-    interface OnGateRemoveListener {
+        interface OnGateRemoveListener {
         void onRemove(int position);
     }
     
