@@ -235,29 +235,16 @@ public ApiResponse activateProvider(int providerId) {
         String newGateId = response.data.optString("gate_id", "");
         String authToken = response.data.optString("token", "");
         
-        // ✅ إذا أرسل السيرفر api_key جديد، احفظه
-        if (!newApiKey.isEmpty()) {
-            serverConfig.saveSession(newApiKey, newGateId, authToken);
-            refreshCredentials();
-            Log.d(TAG, "✅ New API Key saved: " + newApiKey.substring(0, Math.min(8, newApiKey.length())) + "...");
-        } 
-        // ✅ إذا لم يرسل api_key (لأنه موجود)، احتفظ بالمفتاح الحالي
-        else if (!authToken.isEmpty()) {
-            // ✅ احتفظ بالمفتاح الحالي ولا تمسحه
-            String currentApiKey = getEffectiveApiKey();
-            String currentGateId = getEffectiveGateId();
-            
+        // ✅ حفظ التوكن دائماً
+        if (!authToken.isEmpty()) {
             serverConfig.saveSession(
-                !currentApiKey.isEmpty() ? currentApiKey : "",  // ✅ احتفظ بالمفتاح الحالي
-                !newGateId.isEmpty() ? newGateId : currentGateId,
+                !newApiKey.isEmpty() ? newApiKey : getEffectiveApiKey(),
+                !newGateId.isEmpty() ? newGateId : getEffectiveGateId(),
                 authToken
             );
             refreshCredentials();
-            Log.d(TAG, "✅ Using existing API Key: " + 
-                (!currentApiKey.isEmpty() ? currentApiKey.substring(0, Math.min(8, currentApiKey.length())) + "..." : "EMPTY"));
         }
     }
-    
     return response;
 }
 
@@ -402,34 +389,42 @@ public ApiResponse updateUserProfile(JSONObject payload) {
 
     // ===================== 📡 PING =====================
 
-    public boolean pingApi(String targetUrl, String targetApiKey) {
-        HttpURLConnection conn = null;
-        try {
-            String baseUrl = (targetUrl != null && !targetUrl.isEmpty()) ? targetUrl : this.apiUrl;
-            if (baseUrl.endsWith("/")) {
-                baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
-            }
-
-            URL url = new URL(baseUrl + "/heartbeat");
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("X-MIRA-API-Key", (targetApiKey != null && !targetApiKey.isEmpty()) ? targetApiKey : getEffectiveApiKey());
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(8000);
-
-            int responseCode = conn.getResponseCode();
-            return (responseCode >= 200 && responseCode < 400);
-        } catch (Exception e) {
-            return false;
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
-    }
-
     public boolean pingApi() {
-        return pingApi(this.apiUrl, getEffectiveApiKey());
+    HttpURLConnection conn = null;
+    try {
+        String baseUrl = this.apiUrl;
+        if (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        }
+        
+        // ✅ استخدم /ping بدلاً من /heartbeat
+        URL url = new URL(baseUrl + "/ping");
+        conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
+        
+        // ✅ إضافة التوكن
+        String token = getAuthToken();
+        if (!token.isEmpty()) {
+            conn.setRequestProperty("X-MIRA-Auth-Token", token);
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+        }
+        
+        conn.setConnectTimeout(8000);
+        conn.setReadTimeout(8000);
+        
+        int responseCode = conn.getResponseCode();
+        return (responseCode >= 200 && responseCode < 400);
+    } catch (Exception e) {
+        Log.e(TAG, "Ping error: " + e.getMessage());
+        return false;
+    } finally {
+        if (conn != null) conn.disconnect();
     }
+}
+
+   
 
     // ===================== 📊 DASHBOARD =====================
 
@@ -878,9 +873,9 @@ public ApiResponse updateUserProfile(JSONObject payload) {
     // ===================== CORE HTTP =====================
 
     private String getAuthToken() {
-        SharedPreferences prefs = context.getSharedPreferences(SESSION_PREFS, Context.MODE_PRIVATE);
-        return prefs.getString("authToken", "");
-    }
+    // ✅ استخدم MiraServerConfig بدلاً من SharedPreferences مباشرة
+    return serverConfig.getAuthToken();
+}
 
     public ApiResponse getWithAuth(String endpoint) {
         // ✅ التحقق من وجود credentials صالحة
@@ -1011,23 +1006,33 @@ public ApiResponse updateUserProfile(JSONObject payload) {
     }
 
     private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
-        int responseCode = conn.getResponseCode();
-        InputStream is = (responseCode >= 200 && responseCode < 300) ?
-                conn.getInputStream() : conn.getErrorStream();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(is, "utf-8"));
-        StringBuilder response = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            response.append(line.trim());
-        }
-        reader.close();
-        String responseBody = response.toString();
-        JSONObject json = null;
-        try {
-            json = new JSONObject(responseBody);
-        } catch (Exception ignored) {}
-        return new ApiResponse(responseCode, json, null);
+    int responseCode = conn.getResponseCode();
+    InputStream is = (responseCode >= 200 && responseCode < 300) ?
+            conn.getInputStream() : conn.getErrorStream();
+    
+    // ✅ معالجة null stream
+    if (is == null) {
+        return new ApiResponse(responseCode, null, "Empty response");
     }
+    
+    BufferedReader reader = new BufferedReader(new InputStreamReader(is, "utf-8"));
+    StringBuilder response = new StringBuilder();
+    String line;
+    while ((line = reader.readLine()) != null) {
+        response.append(line.trim());
+    }
+    reader.close();
+    
+    String responseBody = response.toString();
+    JSONObject json = null;
+    try {
+        if (!responseBody.isEmpty()) {
+            json = new JSONObject(responseBody);
+        }
+    } catch (Exception ignored) {}
+    
+    return new ApiResponse(responseCode, json, null);
+}
 
     public String getGateId() { return getEffectiveGateId(); }
     public String getApiUrl() { return apiUrl; }
