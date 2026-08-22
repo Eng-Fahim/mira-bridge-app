@@ -29,7 +29,6 @@ import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.manager.PermissionManager;
-import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.SessionManager;
 
 import org.json.JSONObject;
@@ -43,16 +42,15 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 public class MiraDashboardFragment extends Fragment implements SharedPreferences.OnSharedPreferenceChangeListener {
 
     private static final String TAG = "MiraDashboardFragment";
     private static final String OFFLINE_PREFS_BASE = "dashboard_cache_branch_";
     private static final double OUNCE_TO_GRAM = 31.1035;
-    private static final int MAX_DEBUG_LINES = 100;
     private static final int MAX_QUICK_ACTIONS = 9;
     private static final long CACHE_VALIDITY_MS = 5 * 60 * 1000; // 5 دقائق
+    private static final long PING_VALIDITY_MS = 30 * 1000; // 30 ثانية
 
     // UI Elements
     private TextView tvGreeting, tvDate, tvLocation, tvLiveStatus;
@@ -69,7 +67,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private RecyclerView rvQuickActions;
     private QuickActionsAdapter quickAdapter;
 
-    // Managers & API
+    // Managers
     private MiraApiClient apiClient;
     private SessionManager sessionManager;
     private MiraBranchesManager branchesManager;
@@ -80,53 +78,54 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private PermissionManager permissionManager;
     
     // Threading
-    private static final ExecutorService sharedExecutor = Executors.newFixedThreadPool(3);
+    private static final ExecutorService sharedExecutor = Executors.newFixedThreadPool(2);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Future<?> dataFuture;
     private Future<?> goldPriceFuture;
     private Future<?> pingFuture;
     
-    // State
+    // State & Cache
     private boolean isArabic;
     private SharedPreferences offlineCache;
     private SharedPreferences branchPrefs;
-    private final List<String> debugLines = new ArrayList<>();
     private int currentBranchId = -1;
     private boolean isViewInitialized = false;
     private boolean isLoading = false;
     private boolean isDataLoaded = false;
     private long lastDataFetchTime = 0;
     private long lastGoldFetchTime = 0;
-    
-    // ThreadLocal formatters for performance
-    private static final ThreadLocal<SimpleDateFormat> dateFormatter = 
-        new ThreadLocal<SimpleDateFormat>() {
-            @Override
-            protected SimpleDateFormat initialValue() {
-                return new SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.US);
-            }
-        };
-    
+    private long lastPingTime = 0;
+
+    // ThreadLocal Formatters (Thread-Safe & Instant Performance)
+    private static final ThreadLocal<SimpleDateFormat> dateFormatsAr = 
+        ThreadLocal.withInitial(() -> new SimpleDateFormat("EEEE، d MMMM yyyy", new Locale("ar")));
+
+    private static final ThreadLocal<SimpleDateFormat> dateFormatsEn = 
+        ThreadLocal.withInitial(() -> new SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.US));
+
     private static final ThreadLocal<SimpleDateFormat> timeFormatter = 
-        new ThreadLocal<SimpleDateFormat>() {
-            @Override
-            protected SimpleDateFormat initialValue() {
-                return new SimpleDateFormat("HH:mm:ss", Locale.US);
-            }
-        };
+        ThreadLocal.withInitial(() -> new SimpleDateFormat("HH:mm:ss", Locale.US));
     
     private static final ThreadLocal<NumberFormat> currencyFormatter = 
-        new ThreadLocal<NumberFormat>() {
-            @Override
-            protected NumberFormat initialValue() {
-                return NumberFormat.getCurrencyInstance(Locale.US);
-            }
-        };
+        ThreadLocal.withInitial(() -> NumberFormat.getCurrencyInstance(Locale.US));
+
+    // DTO لنقل بيانات الذهب بين Threads بدون معالجة JSON على UI Thread
+    private static class GoldPriceData {
+        final double price24, price21, price18, ouncePrice;
+        final String source;
+        
+        GoldPriceData(double price24, double price21, double price18, double ouncePrice, String source) {
+            this.price24 = price24;
+            this.price21 = price21;
+            this.price18 = price18;
+            this.ouncePrice = ouncePrice;
+            this.source = source;
+        }
+    }
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
     }
 
@@ -135,6 +134,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         super.onViewCreated(view, savedInstanceState);
 
         try {
+            // التهيئة الآمنة داخل onViewCreated
             initializeManagers();
             initViews(view);
             setupProfileListener();
@@ -144,102 +144,394 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
             initBranchCache(currentBranchId);
             
-            // تحميل الكاش أولاً للعرض الفوري
             loadOfflineData();
-            
-            // تحديث الهيدر
             updateHeader();
-            
-            // تحميل البيانات بشكل ذكي
             loadDataIfNeeded();
             
             isViewInitialized = true;
-            
         } catch (Throwable e) {
             Log.e(TAG, "onViewCreated error", e);
         }
     }
 
     private void initializeManagers() {
-        apiClient = MiraApiClient.getInstance(requireContext());
-        sessionManager = new SessionManager(requireContext());
-        branchesManager = MiraBranchesManager.getInstance(requireContext());
-        orgProfile = MiraOrgProfileManager.getInstance(requireContext());
-        priceManager = MiraPriceManager.getInstance(requireContext());
-        quickAccessSettings = MiraQuickAccessSettings.getInstance(requireContext());
-        permissionManager = PermissionManager.getInstance(requireContext());
+        if (!isAdded()) return;
+        Context context = requireContext();
+        apiClient = MiraApiClient.getInstance(context);
+        sessionManager = new SessionManager(context);
+        branchesManager = MiraBranchesManager.getInstance(context);
+        orgProfile = MiraOrgProfileManager.getInstance(context);
+        priceManager = MiraPriceManager.getInstance(context);
+        quickAccessSettings = MiraQuickAccessSettings.getInstance(context);
+        permissionManager = PermissionManager.getInstance(context);
         isArabic = Locale.getDefault().getLanguage().equals("ar");
-        branchPrefs = requireContext().getSharedPreferences("mira_branches_prefs", Context.MODE_PRIVATE);
+        branchPrefs = context.getSharedPreferences("mira_branches_prefs", Context.MODE_PRIVATE);
     }
 
     private void initViews(View v) {
+        tvGreeting = v.findViewById(R.id.tvGreeting);
+        tvDate = v.findViewById(R.id.tvDate);
+        tvLocation = v.findViewById(R.id.tvLocation);
+        tvLiveStatus = v.findViewById(R.id.tvLiveStatus);
+        tvTotalItems = v.findViewById(R.id.tvTotalItems);
+        tvTotalWeight = v.findViewById(R.id.tvTotalWeight);
+        tvSoldToday = v.findViewById(R.id.tvSoldToday);
+        tvSalesToday = v.findViewById(R.id.tvSalesToday);
+        tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
+        tvSalesYear = v.findViewById(R.id.tvSalesYear);
+        tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
+        tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
+        tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
+        btnGate = v.findViewById(R.id.btnGateSecurity);
+        btnInventory = v.findViewById(R.id.btnRfidAudit);
+        shimmerLayout = v.findViewById(R.id.shimmerLayout);
+        swipeRefresh = v.findViewById(R.id.swipeRefresh);
+        tvOuncePrice = v.findViewById(R.id.tvOuncePrice);
+        tvPriceSource = v.findViewById(R.id.tvPriceSource);
+        tvLastUpdate = v.findViewById(R.id.tvLastUpdate);
+        tvGoldTrend = v.findViewById(R.id.tvGoldTrend);
+        tvGoldChange = v.findViewById(R.id.tvGoldChange);
+        btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
+        cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
+
+        if (cardGoldPrices != null && permissionManager != null && !permissionManager.canAccessFragment("GoldRates")) {
+            cardGoldPrices.setVisibility(View.GONE);
+        }
+
+        rvQuickActions = v.findViewById(R.id.rvQuickActions);
+        if (rvQuickActions != null) {
+            rvQuickActions.setLayoutManager(new GridLayoutManager(getContext(), 3));
+            rvQuickActions.setHasFixedSize(true);
+            quickAdapter = new QuickActionsAdapter(this::handleQuickAction);
+            rvQuickActions.setAdapter(quickAdapter);
+        }
+
+        if (swipeRefresh != null) {
+            swipeRefresh.setOnRefreshListener(this::refreshAllData);
+        }
+
+        if (btnRefreshGold != null) {
+            btnRefreshGold.setOnClickListener(v2 -> fetchLiveGoldPrices(true));
+        }
+    }
+
+    private void updateHeader() {
+        if (tvDate != null) {
+            SimpleDateFormat formatter = isArabic ? dateFormatsAr.get() : dateFormatsEn.get();
+            if (formatter != null) {
+                tvDate.setText(formatter.format(new Date()));
+            }
+        }
+        
+        if (tvGreeting != null && sessionManager != null) {
+            String name = sessionManager.getDisplayName();
+            if (name == null || name.isEmpty()) name = sessionManager.getUsername();
+            if (name == null) name = isArabic ? "المستخدم" : "User";
+            
+            String orgName = orgProfile != null ? orgProfile.getDisplayName() : "MIRA";
+            tvGreeting.setText(isArabic ? orgName + " - مرحباً، " + name : orgName + " - Welcome, " + name);
+        }
+        
+        if (tvLocation != null && branchesManager != null) {
+            tvLocation.setText("📍 " + branchesManager.getActiveBranchDisplayName());
+        }
+    }
+
+    private void setupQuickAccessGrid() {
+        if (quickAccessSettings == null || quickAdapter == null) return;
+        
+        sharedExecutor.execute(() -> {
+            if (!isAdded()) return;
+            
+            List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
+            List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
+            
+            for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
+                if (filteredActions.size() >= MAX_QUICK_ACTIONS) break;
+                if (permissionManager != null && permissionManager.canAccessFragment(getFragmentTagForAction(action.id))) {
+                    filteredActions.add(action);
+                }
+            }
+            
+            mainHandler.post(() -> {
+                if (isAdded() && quickAdapter != null) {
+                    quickAdapter.submitList(filteredActions);
+                }
+            });
+        });
+    }
+
+    private void loadDataIfNeeded() {
+        long now = System.currentTimeMillis();
+
+        if (!isDataLoaded || (now - lastDataFetchTime) > CACHE_VALIDITY_MS) {
+            fetchData();
+        }
+
+        if (permissionManager != null && permissionManager.canAccessFragment("GoldRates") 
+                && (now - lastGoldFetchTime) > CACHE_VALIDITY_MS) {
+            fetchLiveGoldPrices(false);
+        }
+
+        if ((now - lastPingTime) > PING_VALIDITY_MS) {
+            updateLiveStatus();
+            lastPingTime = now;
+        }
+    }
+
+    private void updateLiveStatus() {
+        if (tvLiveStatus == null || apiClient == null) return;
+
+        cancelFuture(pingFuture);
+        pingFuture = sharedExecutor.submit(() -> {
+            try {
+                boolean isOnline = apiClient.pingApi();
+                mainHandler.post(() -> {
+                    if (!isAdded()) return;
+                    tvLiveStatus.setText(isOnline ? (isArabic ? "🟢 متصل" : "🟢 Online") : (isArabic ? "🔴 غير متصل" : "🔴 Offline"));
+                    tvLiveStatus.setTextColor(isOnline ? 0xFF16A34A : 0xFFDC2626);
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    if (isAdded()) {
+                        tvLiveStatus.setText(isArabic ? "🔴 غير متصل" : "🔴 Offline");
+                        tvLiveStatus.setTextColor(0xFFDC2626);
+                    }
+                });
+            }
+        });
+    }
+
+    private void fetchLiveGoldPrices(boolean forceRefresh) {
+        if (apiClient == null) return;
+
+        long now = System.currentTimeMillis();
+        if (!forceRefresh && (now - lastGoldFetchTime) < CACHE_VALIDITY_MS) return;
+
+        cancelFuture(goldPriceFuture);
+        goldPriceFuture = sharedExecutor.submit(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.fetchActiveGoldPrice();
+                GoldPriceData priceData = parseGoldPriceData(response);
+                
+                mainHandler.post(() -> {
+                    lastGoldFetchTime = System.currentTimeMillis();
+                    if (!isAdded()) return;
+                    
+                    if (priceData != null) {
+                        displayGoldPrices(priceData);
+                    } else {
+                        displayGoldPricesFromCache();
+                    }
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    if (isAdded()) displayGoldPricesFromCache();
+                });
+            }
+        });
+    }
+
+    private GoldPriceData parseGoldPriceData(MiraApiClient.ApiResponse response) {
+        if (response == null || !response.isSuccess || response.data == null) {
+            return null;
+        }
+        
         try {
-            tvGreeting = v.findViewById(R.id.tvGreeting);
-            tvDate = v.findViewById(R.id.tvDate);
-            tvLocation = v.findViewById(R.id.tvLocation);
-            tvLiveStatus = v.findViewById(R.id.tvLiveStatus);
-            tvTotalItems = v.findViewById(R.id.tvTotalItems);
-            tvTotalWeight = v.findViewById(R.id.tvTotalWeight);
-            tvSoldToday = v.findViewById(R.id.tvSoldToday);
-            tvSalesToday = v.findViewById(R.id.tvSalesToday);
-            tvSalesMonth = v.findViewById(R.id.tvSalesMonth);
-            tvSalesYear = v.findViewById(R.id.tvSalesYear);
-            tvKarat24 = v.findViewById(R.id.tvGoldPrice24);
-            tvKarat21 = v.findViewById(R.id.tvGoldPrice21);
-            tvKarat18 = v.findViewById(R.id.tvGoldPrice18);
-            btnGate = v.findViewById(R.id.btnGateSecurity);
-            btnInventory = v.findViewById(R.id.btnRfidAudit);
-            shimmerLayout = v.findViewById(R.id.shimmerLayout);
-            swipeRefresh = v.findViewById(R.id.swipeRefresh);
-            tvOuncePrice = v.findViewById(R.id.tvOuncePrice);
-            tvPriceSource = v.findViewById(R.id.tvPriceSource);
-            tvLastUpdate = v.findViewById(R.id.tvLastUpdate);
-            tvGoldTrend = v.findViewById(R.id.tvGoldTrend);
-            tvGoldChange = v.findViewById(R.id.tvGoldChange);
-            btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
-            cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
+            JSONObject data = response.data.optJSONObject("data");
+            if (data == null) data = response.data;
             
-            if (cardGoldPrices != null && !permissionManager.canAccessFragment("GoldRates")) {
-                cardGoldPrices.setVisibility(View.GONE);
-            }
+            JSONObject prices = data.optJSONObject("prices");
+            if (prices == null) prices = data;
             
-            rvQuickActions = v.findViewById(R.id.rvQuickActions);
-            if (rvQuickActions != null) {
-                rvQuickActions.setLayoutManager(new GridLayoutManager(getContext(), 3));
-                rvQuickActions.setHasFixedSize(true);
-                rvQuickActions.setItemViewCacheSize(20);
-                rvQuickActions.setDrawingCacheEnabled(true);
-                rvQuickActions.setDrawingCacheQuality(View.DRAWING_CACHE_QUALITY_HIGH);
-                quickAdapter = new QuickActionsAdapter(this::handleQuickAction);
-                rvQuickActions.setAdapter(quickAdapter);
-            }
+            double price24 = prices.optDouble("24k", 0);
+            double price21 = prices.optDouble("21k", 0);
+            double price18 = prices.optDouble("18k", 0);
+            double ouncePrice = data.optDouble("price_per_ounce",
+                    prices.optDouble("ounce_price", price24 * OUNCE_TO_GRAM));
+            String source = data.optString("source", "server");
+            
+            return new GoldPriceData(price24, price21, price18, ouncePrice, source);
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
-            if (swipeRefresh != null) {
-                swipeRefresh.setColorSchemeResources(
-                    android.R.color.holo_blue_bright,
-                    android.R.color.holo_green_light,
-                    android.R.color.holo_orange_light,
-                    android.R.color.holo_red_light
-                );
-                swipeRefresh.setOnRefreshListener(this::refreshAllData);
-            }
+    private void displayGoldPrices(GoldPriceData data) {
+        setGoldPrice(tvKarat24, "24K", data.price24);
+        setGoldPrice(tvKarat21, "21K", data.price21);
+        setGoldPrice(tvKarat18, "18K", data.price18);
+        
+        if (tvOuncePrice != null && data.ouncePrice > 0) {
+            tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", data.ouncePrice));
+        }
+        
+        if (tvPriceSource != null) {
+            tvPriceSource.setText("📡 " + getSourceDisplayName(data.source));
+        }
+        
+        if (tvLastUpdate != null) {
+            SimpleDateFormat timeFmt = timeFormatter.get();
+            String time = timeFmt != null ? timeFmt.format(new Date()) : "";
+            tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
+        }
+        
+        calculateTrend(data.price24);
+    }
 
-            if (btnRefreshGold != null) {
-                btnRefreshGold.setOnClickListener(v2 -> {
-                    v2.animate().rotation(360).setDuration(500).start();
-                    fetchLiveGoldPrices(true);
+    private void displayGoldPricesFromCache() {
+        if (priceManager == null) return;
+
+        double price24 = priceManager.getGoldPricePerGram(24);
+        double price21 = priceManager.getGoldPricePerGram(21);
+        double price18 = priceManager.getGoldPricePerGram(18);
+
+        setGoldPrice(tvKarat24, "24K", price24);
+        setGoldPrice(tvKarat21, "21K", price21);
+        setGoldPrice(tvKarat18, "18K", price18);
+
+        if (tvOuncePrice != null && price24 > 0) {
+            tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", price24 * OUNCE_TO_GRAM));
+        }
+
+        if (tvPriceSource != null) {
+            tvPriceSource.setText(isArabic ? "📡 كاش محلي" : "📡 Local cache");
+        }
+
+        if (tvLastUpdate != null) {
+            tvLastUpdate.setText(isArabic ? "⏰ وضع أوفلاين" : "⏰ Offline mode");
+        }
+    }
+
+    private void calculateTrend(double currentPrice) {
+        if (tvGoldTrend == null || tvGoldChange == null || offlineCache == null) return;
+
+        double previousPrice = offlineCache.getFloat("gold_price_24k_prev", 0);
+
+        if (previousPrice > 0 && currentPrice > 0) {
+            double change = currentPrice - previousPrice;
+            double changePercent = (change / previousPrice) * 100;
+
+            if (change > 0) {
+                tvGoldTrend.setText("📈");
+                tvGoldChange.setText(String.format(Locale.US, "+%.2f%%", changePercent));
+                tvGoldChange.setTextColor(0xFF16A34A);
+            } else if (change < 0) {
+                tvGoldTrend.setText("📉");
+                tvGoldChange.setText(String.format(Locale.US, "%.2f%%", changePercent));
+                tvGoldChange.setTextColor(0xFFDC2626);
+            } else {
+                tvGoldTrend.setText("➡️");
+                tvGoldChange.setText("0.00%");
+                tvGoldChange.setTextColor(0xFF6B7280);
+            }
+        }
+
+        if (currentPrice > 0) {
+            offlineCache.edit().putFloat("gold_price_24k_prev", (float) currentPrice).apply();
+        }
+    }
+
+    private void loadOfflineData() {
+        if (offlineCache == null) return;
+        
+        int items = offlineCache.getInt("total_items", 0);
+        double weightVal = offlineCache.getFloat("total_weight", 0.0f);
+        int sold = offlineCache.getInt("sold_today", 0);
+        double sToday = offlineCache.getFloat("sales_today", 0.0f);
+        double sMonth = offlineCache.getFloat("sales_month", 0.0f);
+        double sYear = offlineCache.getFloat("sales_year", 0.0f);
+
+        setText(tvTotalItems, String.valueOf(items));
+        setText(tvTotalWeight, formatWeight(weightVal));
+        setText(tvSoldToday, String.valueOf(sold));
+        setText(tvSalesToday, formatCurrency(sToday));
+        setText(tvSalesMonth, formatCurrency(sMonth));
+        setText(tvSalesYear, formatCurrency(sYear));
+        
+        if (priceManager != null) {
+            displayGoldPricesFromCache();
+        }
+    }
+
+    private void saveOfflineData(JSONObject data) {
+        if (offlineCache == null) return;
+        
+        sharedExecutor.execute(() -> {
+            try {
+                JSONObject inv = data.optJSONObject("inventory");
+                JSONObject sales = data.optJSONObject("sales");
+
+                offlineCache.edit()
+                    .putInt("total_items", inv != null ? inv.optInt("total_items", 0) : 0)
+                    .putFloat("total_weight", (float) (inv != null ? inv.optDouble("total_weight", 0.0) : 0.0))
+                    .putInt("sold_today", sales != null ? sales.optInt("count_today", 0) : 0)
+                    .putFloat("sales_today", (float) (sales != null ? sales.optDouble("today", 0.0) : 0.0))
+                    .putFloat("sales_month", (float) (sales != null ? sales.optDouble("month", 0.0) : 0.0))
+                    .putFloat("sales_year", (float) (sales != null ? sales.optDouble("year", 0.0) : 0.0))
+                    .putLong("last_update", System.currentTimeMillis())
+                    .apply();
+            } catch (Exception e) {
+                Log.e(TAG, "saveOfflineData error", e);
+            }
+        });
+    }
+
+    private void fetchData() {
+        if (isLoading || apiClient == null) return;
+        isLoading = true;
+
+        if (tvLiveStatus != null) {
+            tvLiveStatus.setText(isArabic ? "جاري التحديث..." : "Updating...");
+            tvLiveStatus.setTextColor(0xFFF59E0B);
+        }
+
+        cancelFuture(dataFuture);
+        final int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+
+        dataFuture = sharedExecutor.submit(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getDashboardFull(activeBranchId);
+                mainHandler.post(() -> {
+                    isLoading = false;
+                    lastDataFetchTime = System.currentTimeMillis();
+                    if (!isAdded()) return;
+
+                    if (response != null && response.isSuccess && response.data != null) {
+                        saveOfflineData(response.data);
+                        processData(response.data);
+                        isDataLoaded = true;
+                    } else {
+                        loadOfflineData();
+                    }
+                    showShimmer(false);
+                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    isLoading = false;
+                    if (!isAdded()) return;
+                    loadOfflineData();
+                    showShimmer(false);
+                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                 });
             }
+        });
+    }
 
-            if (tvGreeting != null) {
-                tvGreeting.setOnLongClickListener(view -> {
-                    showDebugDialog(isArabic ? "🔍 تشخيص الداشبورد" : "🔍 Dashboard Debug");
-                    return true;
-                });
-            }
+    private void processData(JSONObject data) {
+        JSONObject inv = data.optJSONObject("inventory");
+        if (inv != null) {
+            setText(tvTotalItems, String.valueOf(inv.optInt("total_items", 0)));
+            setText(tvTotalWeight, formatWeight(inv.optDouble("total_weight", 0.0)));
+        }
 
-        } catch (Throwable e) {
-            Log.e(TAG, "initViews error", e);
+        JSONObject sales = data.optJSONObject("sales");
+        if (sales != null) {
+            setText(tvSoldToday, String.valueOf(sales.optInt("count_today", 0)));
+            setText(tvSalesToday, formatCurrency(sales.optDouble("today", 0.0)));
+            setText(tvSalesMonth, formatCurrency(sales.optDouble("month", 0.0)));
+            setText(tvSalesYear, formatCurrency(sales.optDouble("year", 0.0)));
         }
     }
 
@@ -250,22 +542,43 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     private void setupListeners() {
-        if (btnGate != null) {
-            if (permissionManager.canAccessFragment("SecureGate")) {
-                btnGate.setVisibility(View.VISIBLE);
+        if (btnGate != null && permissionManager != null) {
+            boolean canAccess = permissionManager.canAccessFragment("SecureGate");
+            btnGate.setVisibility(canAccess ? View.VISIBLE : View.GONE);
+            if (canAccess) {
                 btnGate.setOnClickListener(v -> navigateToFragment(new MiraSecureGateFragment(), "SecureGate"));
-            } else {
-                btnGate.setVisibility(View.GONE);
             }
         }
 
-        if (btnInventory != null) {
-            if (permissionManager.canAccessFragment("Scan")) {
-                btnInventory.setVisibility(View.VISIBLE);
+        if (btnInventory != null && permissionManager != null) {
+            boolean canAccess = permissionManager.canAccessFragment("Scan");
+            btnInventory.setVisibility(canAccess ? View.VISIBLE : View.GONE);
+            if (canAccess) {
                 btnInventory.setOnClickListener(v -> navigateToFragment(new MiraInventoryProFragment(), "Scan"));
-            } else {
-                btnInventory.setVisibility(View.GONE);
             }
+        }
+    }
+
+    private void refreshAllData() {
+        showShimmer(true);
+        fetchData();
+        if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
+            fetchLiveGoldPrices(true);
+        }
+    }
+
+    private void showShimmer(boolean show) {
+        if (shimmerLayout != null) {
+            shimmerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+        if (swipeRefresh != null) {
+            swipeRefresh.setVisibility(show ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    private void initBranchCache(int branchId) {
+        if (getContext() != null) {
+            offlineCache = requireContext().getSharedPreferences(OFFLINE_PREFS_BASE + branchId, Context.MODE_PRIVATE);
         }
     }
 
@@ -273,25 +586,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         if (getActivity() instanceof UHFMainActivity) {
             ((UHFMainActivity) getActivity()).loadFragment(fragment, tag);
         }
-    }
-
-    private void setupQuickAccessGrid() {
-        if (quickAccessSettings == null || quickAdapter == null) return;
-        
-        List<MiraQuickAccessSettings.QuickAction> enabledActions = quickAccessSettings.getEnabledActions();
-        
-        // تحديد الإجراءات المسموحة فقط
-        List<MiraQuickAccessSettings.QuickAction> filteredActions = new ArrayList<>();
-        for (MiraQuickAccessSettings.QuickAction action : enabledActions) {
-            if (filteredActions.size() >= MAX_QUICK_ACTIONS) break;
-            
-            String fragmentTag = getFragmentTagForAction(action.id);
-            if (permissionManager.canAccessFragment(fragmentTag)) {
-                filteredActions.add(action);
-            }
-        }
-        
-        quickAdapter.submitList(filteredActions);
     }
 
     private String getFragmentTagForAction(String actionId) {
@@ -318,10 +612,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             Fragment fragment = createFragmentForAction(actionId);
             if (fragment != null) {
                 activity.loadFragment(fragment, getFragmentTagForAction(actionId));
-            } else {
-                Toast.makeText(getContext(),
-                        isArabic ? "غير معروف: " + actionId : "Unknown: " + actionId,
-                        Toast.LENGTH_SHORT).show();
             }
         }
     }
@@ -343,341 +633,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    private void loadDataIfNeeded() {
-        long now = System.currentTimeMillis();
-        
-        // تحميل البيانات إذا لم تُحمل من قبل أو إذا انتهت صلاحية الكاش
-        if (!isDataLoaded || (now - lastDataFetchTime) > CACHE_VALIDITY_MS) {
-            fetchData();
-        }
-        
-        // تحميل أسعار الذهب إذا كانت الصلاحية تسمح
-        if (permissionManager.canAccessFragment("GoldRates") && 
-            (now - lastGoldFetchTime) > CACHE_VALIDITY_MS) {
-            fetchLiveGoldPrices(false);
-        }
-        
-        // تحديث حالة الاتصال
-        updateLiveStatus();
-    }
-
-    private void refreshAllData() {
-        showShimmer(true);
-        fetchData();
-        if (permissionManager.canAccessFragment("GoldRates")) {
-            fetchLiveGoldPrices(true);
-        }
-    }
-
-    private void showShimmer(boolean show) {
-        if (shimmerLayout != null) {
-            shimmerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
-        }
-        if (swipeRefresh != null) {
-            swipeRefresh.setVisibility(show ? View.GONE : View.VISIBLE);
-        }
-    }
-
-    private void updateHeader() {
-        try {
-            if (tvDate != null) {
-                Locale loc = isArabic ? new Locale("ar") : Locale.US;
-                String pattern = isArabic ? "EEEE، d MMMM yyyy" : "EEEE, MMMM d, yyyy";
-                tvDate.setText(new SimpleDateFormat(pattern, loc).format(new Date()));
-            }
-            
-            if (tvGreeting != null && sessionManager != null) {
-                String name = sessionManager.getDisplayName();
-                if (name == null || name.isEmpty()) name = sessionManager.getUsername();
-                if (name == null) name = isArabic ? "المستخدم" : "User";
-                
-                String orgName = orgProfile != null ? orgProfile.getDisplayName() : "MIRA";
-                tvGreeting.setText(isArabic ? orgName + " - مرحباً، " + name : orgName + " - Welcome, " + name);
-            }
-            
-            if (tvLocation != null && branchesManager != null) {
-                tvLocation.setText("📍 " + branchesManager.getActiveBranchDisplayName());
-            }
-        } catch (Throwable e) {
-            Log.e(TAG, "updateHeader error", e);
-        }
-    }
-
-    private void updateLiveStatus() {
-        if (tvLiveStatus == null) return;
-        
-        // إلغاء الطلب السابق
-        if (pingFuture != null && !pingFuture.isDone()) {
-            pingFuture.cancel(true);
-        }
-        
-        pingFuture = sharedExecutor.submit(() -> {
-            try {
-                boolean isOnline = apiClient.pingApi();
-                
-                mainHandler.post(() -> {
-                    if (!isAdded()) return;
-                    
-                    if (isOnline) {
-                        tvLiveStatus.setText(isArabic ? "🟢 متصل" : "🟢 Online");
-                        tvLiveStatus.setTextColor(0xFF16A34A);
-                    } else {
-                        tvLiveStatus.setText(isArabic ? "🔴 غير متصل" : "🔴 Offline");
-                        tvLiveStatus.setTextColor(0xFFDC2626);
-                    }
-                });
-            } catch (Exception e) {
-                mainHandler.post(() -> {
-                    if (isAdded()) {
-                        tvLiveStatus.setText(isArabic ? "🔴 غير متصل" : "🔴 Offline");
-                        tvLiveStatus.setTextColor(0xFFDC2626);
-                    }
-                });
-            }
-        });
-    }
-
-    private void initBranchCache(int branchId) {
-        if (getContext() != null) {
-            offlineCache = requireContext().getSharedPreferences(OFFLINE_PREFS_BASE + branchId, Context.MODE_PRIVATE);
-        }
-    }
-
-    private void fetchData() {
-        if (isLoading) return;
-        isLoading = true;
-        
-        addDebug("🔄 بدء جلب البيانات...");
-        
-        if (tvLiveStatus != null) {
-            tvLiveStatus.setText(isArabic ? "جاري التحديث..." : "Updating...");
-            tvLiveStatus.setTextColor(0xFFF59E0B);
-        }
-        
-        // إلغاء الطلب السابق
-        if (dataFuture != null && !dataFuture.isDone()) {
-            dataFuture.cancel(true);
-        }
-        
-        final int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-        
-        dataFuture = sharedExecutor.submit(() -> {
-            try {
-                MiraApiClient.ApiResponse response = apiClient.getDashboardFull(activeBranchId);
-                
-                mainHandler.post(() -> {
-                    isLoading = false;
-                    lastDataFetchTime = System.currentTimeMillis();
-                    
-                    if (!isAdded()) return;
-                    
-                    if (response != null && response.isSuccess && response.data != null) {
-                        saveOfflineData(response.data);
-                        processData(response.data);
-                        isDataLoaded = true;
-                    } else {
-                        // استخدام الكاش عند الفشل
-                        loadOfflineData();
-                    }
-                    
-                    showShimmer(false);
-                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                });
-            } catch (Exception e) {
-                addDebug("❌ خطأ شبكة/اتصال: " + e.getMessage());
-                
-                mainHandler.post(() -> {
-                    isLoading = false;
-                    if (!isAdded()) return;
-                    
-                    loadOfflineData();
-                    showShimmer(false);
-                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                });
-            }
-        });
-    }
-
-    private void fetchLiveGoldPrices(boolean forceRefresh) {
-        if (apiClient == null) return;
-        
-        long now = System.currentTimeMillis();
-        if (!forceRefresh && (now - lastGoldFetchTime) < CACHE_VALIDITY_MS) {
-            return;
-        }
-        
-        addDebug("🔄 جلب أسعار الذهب...");
-        
-        if (cardGoldPrices != null) {
-            cardGoldPrices.setAlpha(0.5f);
-        }
-        
-        // إلغاء الطلب السابق
-        if (goldPriceFuture != null && !goldPriceFuture.isDone()) {
-            goldPriceFuture.cancel(true);
-        }
-        
-        goldPriceFuture = sharedExecutor.submit(() -> {
-            try {
-                // استخدام طلب موحد
-                MiraApiClient.ApiResponse response = apiClient.fetchActiveGoldPrice();
-                
-                mainHandler.post(() -> {
-                    lastGoldFetchTime = System.currentTimeMillis();
-                    
-                    if (!isAdded()) return;
-                    
-                    restoreCardOpacity();
-                    
-                    if (response != null && response.isSuccess && response.data != null) {
-                        try {
-                            JSONObject data = response.data.optJSONObject("data");
-                            if (data == null) data = response.data;
-                            
-                            displayGoldPrices(data);
-                            addDebug("✅ تم تحديث أسعار الذهب");
-                        } catch (Exception e) {
-                            Log.e(TAG, "Error parsing gold prices", e);
-                            displayGoldPricesFromCache();
-                        }
-                    } else {
-                        addDebug("⚠️ فشل جلب الأسعار");
-                        displayGoldPricesFromCache();
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Error fetching gold prices", e);
-                
-                mainHandler.post(() -> {
-                    if (isAdded()) {
-                        displayGoldPricesFromCache();
-                        restoreCardOpacity();
-                    }
-                });
-            }
-        });
-    }
-
-    private void restoreCardOpacity() {
-        if (cardGoldPrices != null) {
-            cardGoldPrices.animate().alpha(1.0f).setDuration(300).start();
-        }
-    }
-
-    private void displayGoldPrices(JSONObject data) {
-        try {
-            JSONObject prices = data.optJSONObject("prices");
-            if (prices == null) prices = data;
-
-            double price24 = prices.optDouble("24k", 0);
-            double price21 = prices.optDouble("21k", 0);
-            double price18 = prices.optDouble("18k", 0);
-            double ouncePrice = data.optDouble("price_per_ounce",
-                    prices.optDouble("ounce_price", price24 * OUNCE_TO_GRAM));
-            String source = data.optString("source", "server");
-
-            setGoldPrice(tvKarat24, "24K", price24);
-            setGoldPrice(tvKarat21, "21K", price21);
-            setGoldPrice(tvKarat18, "18K", price18);
-
-            if (tvOuncePrice != null && ouncePrice > 0) {
-                tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", ouncePrice));
-            }
-
-            if (tvPriceSource != null) {
-                String sourceText = getSourceDisplayName(source);
-                tvPriceSource.setText("📡 " + sourceText);
-            }
-
-            if (tvLastUpdate != null) {
-                String time = timeFormatter.get().format(new Date());
-                tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
-            }
-
-            calculateTrend(price24);
-
-        } catch (Exception e) {
-            Log.e(TAG, "displayGoldPrices error", e);
-        }
-    }
-
-    private void displayGoldPricesFromCache() {
-        try {
-            if (priceManager == null) return;
-
-            double price24 = priceManager.getGoldPricePerGram(24);
-            double price21 = priceManager.getGoldPricePerGram(21);
-            double price18 = priceManager.getGoldPricePerGram(18);
-
-            setGoldPrice(tvKarat24, "24K", price24);
-            setGoldPrice(tvKarat21, "21K", price21);
-            setGoldPrice(tvKarat18, "18K", price18);
-
-            if (tvOuncePrice != null && price24 > 0) {
-                double ouncePrice = price24 * OUNCE_TO_GRAM;
-                tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", ouncePrice));
-            }
-
-            if (tvPriceSource != null) {
-                String cachedProvider = offlineCache != null ? 
-                    offlineCache.getString("active_provider", "") : "";
-                
-                if (!cachedProvider.isEmpty()) {
-                    tvPriceSource.setText("📡 " + cachedProvider + (isArabic ? " (كاش)" : " (Cache)"));
-                } else {
-                    tvPriceSource.setText(isArabic ? "📡 كاش محلي" : "📡 Local cache");
-                }
-            }
-
-            if (tvLastUpdate != null) {
-                tvLastUpdate.setText(isArabic ? "⏰ وضع أوفلاين" : "⏰ Offline mode");
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "displayGoldPricesFromCache error", e);
-        }
-    }
-
-    private void calculateTrend(double currentPrice) {
-        if (tvGoldTrend == null || tvGoldChange == null) return;
-
-        try {
-            if (offlineCache == null) return;
-
-            double previousPrice = offlineCache.getFloat("gold_price_24k_prev", 0);
-
-            if (previousPrice > 0 && currentPrice > 0) {
-                double change = currentPrice - previousPrice;
-                double changePercent = (change / previousPrice) * 100;
-
-                if (change > 0) {
-                    tvGoldTrend.setText("📈");
-                    tvGoldChange.setText(String.format(Locale.US, "+%.2f%%", changePercent));
-                    tvGoldChange.setTextColor(0xFF16A34A);
-                } else if (change < 0) {
-                    tvGoldTrend.setText("📉");
-                    tvGoldChange.setText(String.format(Locale.US, "%.2f%%", changePercent));
-                    tvGoldChange.setTextColor(0xFFDC2626);
-                } else {
-                    tvGoldTrend.setText("➡️");
-                    tvGoldChange.setText("0.00%");
-                    tvGoldChange.setTextColor(0xFF6B7280);
-                }
-            } else {
-                tvGoldTrend.setText("📊");
-                tvGoldChange.setText("—");
-                tvGoldChange.setTextColor(0xFF6B7280);
-            }
-
-            if (offlineCache != null && currentPrice > 0) {
-                offlineCache.edit().putFloat("gold_price_24k_prev", (float) currentPrice).apply();
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "calculateTrend error", e);
-        }
-    }
-
     private String getSourceDisplayName(String source) {
         if (source == null) return isArabic ? "غير معروف" : "Unknown";
         switch (source.toLowerCase()) {
@@ -689,110 +644,23 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    private void loadOfflineData() {
-        if (offlineCache == null) return;
-        try {
-            int items = offlineCache.getInt("total_items", 0);
-            double weightVal = offlineCache.getFloat("total_weight", 0.0f);
-            int sold = offlineCache.getInt("sold_today", 0);
-            double sToday = offlineCache.getFloat("sales_today", 0.0f);
-            double sMonth = offlineCache.getFloat("sales_month", 0.0f);
-            double sYear = offlineCache.getFloat("sales_year", 0.0f);
-
-            setText(tvTotalItems, String.valueOf(items));
-            setText(tvTotalWeight, formatWeight(weightVal));
-            setText(tvSoldToday, String.valueOf(sold));
-            setText(tvSalesToday, formatCurrency(sToday));
-            setText(tvSalesMonth, formatCurrency(sMonth));
-            setText(tvSalesYear, formatCurrency(sYear));
-            
-            // تحميل أسعار الذهب من الكاش
-            if (priceManager != null) {
-                displayGoldPricesFromCache();
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "loadOfflineData error", e);
-        }
-    }
-
-    private void saveOfflineData(JSONObject data) {
-        if (offlineCache == null) return;
-        
-        sharedExecutor.execute(() -> {
-            try {
-                JSONObject inv = data.optJSONObject("inventory");
-                JSONObject sales = data.optJSONObject("sales");
-
-                double totalWeightVal = 0.0;
-                if (inv != null) {
-                    totalWeightVal = inv.optDouble("total_weight", 0.0);
-                }
-
-                SharedPreferences.Editor editor = offlineCache.edit();
-                editor.putInt("total_items", inv != null ? inv.optInt("total_items", 0) : 0);
-                editor.putFloat("total_weight", (float) totalWeightVal);
-                editor.putInt("sold_today", sales != null ? sales.optInt("count_today", 0) : 0);
-                editor.putFloat("sales_today", (float) (sales != null ? sales.optDouble("today", 0.0) : 0.0));
-                editor.putFloat("sales_month", (float) (sales != null ? sales.optDouble("month", 0.0) : 0.0));
-                editor.putFloat("sales_year", (float) (sales != null ? sales.optDouble("year", 0.0) : 0.0));
-                editor.putLong("last_update", System.currentTimeMillis());
-                editor.apply();
-            } catch (Exception e) {
-                Log.e(TAG, "saveOfflineData error", e);
-            }
-        });
-    }
-
-    private void processData(JSONObject data) {
-        try {
-            JSONObject inv = data.optJSONObject("inventory");
-            if (inv != null) {
-                setText(tvTotalItems, String.valueOf(inv.optInt("total_items", 0)));
-                double weightVal = inv.optDouble("total_weight", 0.0);
-                setText(tvTotalWeight, formatWeight(weightVal));
-            }
-
-            JSONObject sales = data.optJSONObject("sales");
-            if (sales != null) {
-                setText(tvSoldToday, String.valueOf(sales.optInt("count_today", 0)));
-                setText(tvSalesToday, formatCurrency(sales.optDouble("today", 0.0)));
-                setText(tvSalesMonth, formatCurrency(sales.optDouble("month", 0.0)));
-                setText(tvSalesYear, formatCurrency(sales.optDouble("year", 0.0)));
-            }
-
-            if (tvLiveStatus != null) {
-                tvLiveStatus.setText(isArabic ? "متصل" : "Online");
-                tvLiveStatus.setTextColor(0xFF16A34A);
-            }
-        } catch (Throwable e) {
-            Log.e(TAG, "processData error", e);
-        }
-    }
-
     private String formatCurrency(double amount) {
         if (amount <= 0) return "—";
-        if (priceManager != null) {
-            return priceManager.formatPriceDefault(amount);
-        }
-        return currencyFormatter.get().format(amount);
+        if (priceManager != null) return priceManager.formatPriceDefault(amount);
+        NumberFormat fmt = currencyFormatter.get();
+        return fmt != null ? fmt.format(amount) : String.valueOf(amount);
     }
 
     private String formatWeight(double weightInGrams) {
         if (weightInGrams <= 0) return "0.0 g";
-        if (weightInGrams >= 1000) {
-            return String.format(Locale.US, "%.2f kg", weightInGrams / 1000);
-        }
-        return String.format(Locale.US, "%.1f g", weightInGrams);
+        return weightInGrams >= 1000 
+            ? String.format(Locale.US, "%.2f kg", weightInGrams / 1000) 
+            : String.format(Locale.US, "%.1f g", weightInGrams);
     }
 
     private void setGoldPrice(TextView tv, String label, double price) {
         if (tv == null) return;
-        if (price > 0) {
-            tv.setText(String.format(Locale.US, "%s: $%,.2f/g", label, price));
-        } else {
-            tv.setText(label + ": —");
-        }
+        tv.setText(price > 0 ? String.format(Locale.US, "%s: $%,.2f/g", label, price) : label + ": —");
     }
 
     private void setText(TextView tv, String text) {
@@ -801,17 +669,13 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
 
     public void onBranchChanged() {
         if (!isAdded()) return;
-        
+
         int newBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
         if (newBranchId != currentBranchId) {
             currentBranchId = newBranchId;
             initBranchCache(currentBranchId);
             updateHeader();
-            
-            // تحميل الكاش الجديد
             loadOfflineData();
-            
-            // جلب البيانات الجديدة
             showShimmer(true);
             fetchData();
         }
@@ -820,21 +684,16 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     @Override
     public void onResume() {
         super.onResume();
-        
         if (branchPrefs != null) {
             branchPrefs.registerOnSharedPreferenceChangeListener(this);
         }
-        
+
         int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
         if (latestBranchId != currentBranchId) {
             onBranchChanged();
-        }
-        
-        if (isViewInitialized) {
+        } else if (isViewInitialized) {
             setupQuickAccessGrid();
             updateHeader();
-            
-            // تحميل البيانات إذا كانت قديمة
             loadDataIfNeeded();
         }
     }
@@ -842,7 +701,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     @Override
     public void onPause() {
         super.onPause();
-        
         if (branchPrefs != null) {
             branchPrefs.unregisterOnSharedPreferenceChangeListener(this);
         }
@@ -851,74 +709,22 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
         if ("active_branch_id".equals(key) || "active_branch".equals(key)) {
-            mainHandler.post(() -> {
-                int newBranchId = branchesManager.getActiveBranchId();
-                if (newBranchId != currentBranchId) {
-                    onBranchChanged();
-                }
-            });
+            mainHandler.post(this::onBranchChanged);
         }
-    }
-
-    private void addDebug(String message) {
-        Log.d("DASHBOARD_DEBUG", message);
-        
-        debugLines.add(message);
-        if (debugLines.size() > MAX_DEBUG_LINES) {
-            debugLines.remove(0);
-        }
-    }
-
-    private void showDebugDialog(String title) {
-        if (!isAdded()) return;
-        
-        try {
-            String message = getDebugLog();
-            
-            new android.app.AlertDialog.Builder(requireContext())
-                    .setTitle(title)
-                    .setMessage(message)
-                    .setPositiveButton(isArabic ? "مسح" : "Clear", (dialog, which) -> debugLines.clear())
-                    .setNegativeButton(isArabic ? "نسخ" : "Copy", (dialog, which) -> {
-                        if (getContext() != null) {
-                            android.content.ClipboardManager clipboard =
-                                    (android.content.ClipboardManager) requireContext()
-                                            .getSystemService(Context.CLIPBOARD_SERVICE);
-                            android.content.ClipData clip =
-                                    android.content.ClipData.newPlainText("debug", message);
-                            clipboard.setPrimaryClip(clip);
-                            Toast.makeText(requireContext(),
-                                    isArabic ? "تم النسخ" : "Copied", Toast.LENGTH_SHORT).show();
-                        }
-                    })
-                    .setNeutralButton(isArabic ? "إغلاق" : "Close", null)
-                    .show();
-        } catch (Exception e) {
-            Log.e(TAG, "Error showing debug", e);
-        }
-    }
-
-    private String getDebugLog() {
-        StringBuilder sb = new StringBuilder();
-        for (String line : debugLines) {
-            sb.append(line).append("\n");
-        }
-        return sb.length() > 0 ? sb.toString() : (isArabic ? "لا توجد بيانات تشخيص بعد" : "No debug data yet");
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        
+
         if (orgProfile != null && profileListener != null) {
             orgProfile.removeListener(profileListener);
         }
-        
-        // إلغاء جميع الطلبات الجارية
+
         cancelFuture(dataFuture);
         cancelFuture(goldPriceFuture);
         cancelFuture(pingFuture);
-        
+
         mainHandler.removeCallbacksAndMessages(null);
         isViewInitialized = false;
     }
