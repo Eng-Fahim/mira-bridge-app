@@ -39,6 +39,7 @@ import com.example.uhf.MiraRfid.readers.SimulatorReader;
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.RFIDManager;
 import com.example.uhf.MiraRfid.model.RFIDDevice;
+import com.example.uhf.manager.PermissionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.textfield.TextInputEditText;
@@ -53,7 +54,6 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     private static final String PREFS_NAME = "mira_reader_ui_settings";
     private static final int PERMISSION_REQUEST_CODE = 100;
     
-    // ألوان الحالة
     private static final String COLOR_ENABLED = "#16A34A";
     private static final String COLOR_DISABLED = "#EF4444";
     
@@ -70,11 +70,11 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     private TextView tvActiveDeviceStatus;
     
     private RFIDManager rfidManager;
+    private PermissionManager permissionManager;
     private DeviceAdapter deviceAdapter;
     private BluetoothAdapter bluetoothAdapter;
     private final List<BluetoothDevice> discoveredBtDevices = new ArrayList<>();
     
-    // الصوت والاهتزاز
     private ToneGenerator toneGenerator;
     private Vibrator vibrator;
     private boolean isSoundEnabled = true;
@@ -138,6 +138,7 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
     private void initializeFragment(View view) {
         try {
             rfidManager = RFIDManager.getInstance(requireContext());
+            permissionManager = PermissionManager.getInstance(requireContext());
             bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
             uiPrefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             
@@ -149,11 +150,27 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
             bindViews(view);
             setupRecyclerView();
             setupButtons();
+            applyPermissions();
             updateActiveDeviceStatus();
             
         } catch (Exception e) {
             Log.e(TAG, "Initialize error: " + e.getMessage());
             showErrorDialog("خطأ في التهيئة: " + e.getMessage());
+        }
+    }
+    
+    private void applyPermissions() {
+        boolean canManage = permissionManager.isAdmin() || permissionManager.isInventoryManager();
+        
+        if (btnAddDevice != null) btnAddDevice.setEnabled(canManage);
+        if (btnAdvancedSettings != null) btnAdvancedSettings.setEnabled(canManage);
+        if (btnApplySettings != null) btnApplySettings.setEnabled(canManage);
+        if (btnDetectAuto != null) btnDetectAuto.setEnabled(canManage);
+        
+        if (!canManage) {
+            if (tvActiveDeviceStatus != null) {
+                tvActiveDeviceStatus.setText(isArabic ? "⛔ وضع القراءة فقط" : "⛔ Read only mode");
+            }
         }
     }
     
@@ -192,8 +209,6 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         btnVibrationToggle = view.findViewById(R.id.btnVibrationToggle);
         tvActiveDeviceStatus = view.findViewById(R.id.tvActiveDeviceStatus);
         btnApplySettings = view.findViewById(R.id.btnApplySettings);
-
-
     }
     
     private void setupRecyclerView() {
@@ -214,28 +229,39 @@ public class MiraReaderSetupFragment extends MiraBaseFragment {
         try {
             if (btnAddDevice != null) {
                 btnAddDevice.setOnClickListener(v -> {
-                    playClickSound();
-                    vibrateShort();
-                    showAddDeviceDialog();
+                    if (permissionManager.isAdmin() || permissionManager.isInventoryManager()) {
+                        playClickSound();
+                        vibrateShort();
+                        showAddDeviceDialog();
+                    } else {
+                        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+                    }
                 });
             }
             
             if (btnAdvancedSettings != null) {
-            btnAdvancedSettings.setOnClickListener(v -> {
-            playClickSound();
-        vibrateShort();
-        showAdvancedReaderSettings();
-        });
-        }
-        
-        // في setupButtons:
-if (btnApplySettings != null) {
-    btnApplySettings.setOnClickListener(v -> {
-        playClickSound();
-        vibrateShort();
-        applySettingsImmediately();
-    });
-}
+                btnAdvancedSettings.setOnClickListener(v -> {
+                    if (permissionManager.isAdmin() || permissionManager.isInventoryManager()) {
+                        playClickSound();
+                        vibrateShort();
+                        showAdvancedReaderSettings();
+                    } else {
+                        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+                    }
+                });
+            }
+            
+            if (btnApplySettings != null) {
+                btnApplySettings.setOnClickListener(v -> {
+                    if (permissionManager.isAdmin() || permissionManager.isInventoryManager()) {
+                        playClickSound();
+                        vibrateShort();
+                        applySettingsImmediately();
+                    } else {
+                        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+                    }
+                });
+            }
             
             if (btnTestConnection != null) {
                 btnTestConnection.setOnClickListener(v -> {
@@ -247,9 +273,13 @@ if (btnApplySettings != null) {
             
             if (btnDetectAuto != null) {
                 btnDetectAuto.setOnClickListener(v -> {
-                    playClickSound();
-                    vibrateShort();
-                    autoDetectDevice();
+                    if (permissionManager.isAdmin() || permissionManager.isInventoryManager()) {
+                        playClickSound();
+                        vibrateShort();
+                        autoDetectDevice();
+                    } else {
+                        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+                    }
                 });
             }
             
@@ -391,8 +421,6 @@ if (btnApplySettings != null) {
             }
         }
     }
-    
-    // ==================== حالة الجهاز النشط ====================
     
     private void updateActiveDeviceStatus() {
         if (tvActiveDeviceStatus == null) return;
@@ -756,30 +784,39 @@ if (btnApplySettings != null) {
             playClickSound();
             vibrateShort();
             
-            String[] options = {
-                isArabic ? "تعيين كجهاز افتراضي" : "Set as Default",
-                isArabic ? "اختبار الاتصال" : "Test Connection",
-                isArabic ? "تعديل الإعدادات" : "Edit Settings",
-                isArabic ? "عرض المعلومات" : "View Info",
-                isArabic ? "حذف" : "Delete"
-            };
+            boolean canManage = permissionManager.isAdmin() || permissionManager.isInventoryManager();
+            
+            List<String> optionsList = new ArrayList<>();
+            optionsList.add(isArabic ? "اختبار الاتصال" : "Test Connection");
+            optionsList.add(isArabic ? "عرض المعلومات" : "View Info");
+            
+            if (canManage) {
+                optionsList.add(isArabic ? "تعيين كجهاز افتراضي" : "Set as Default");
+                optionsList.add(isArabic ? "تعديل الإعدادات" : "Edit Settings");
+                optionsList.add(isArabic ? "حذف" : "Delete");
+            }
+            
+            String[] options = optionsList.toArray(new String[0]);
             
             new AlertDialog.Builder(requireContext())
                 .setTitle(device.getDisplayName())
                 .setItems(options, (d, which) -> {
                     try {
-                        switch (which) {
-                            case 0: setDefaultDevice(device); break;
-                            case 1: testDevice(device); break;
-                            case 2: showEditDeviceDialog(device); break;
-                            case 3: showDeviceInfo(device); break;
-                            case 4: 
-                                rfidManager.deleteDevice(device); 
-                                playClickSound();
-                                vibrateShort();
-                                refreshDeviceList(); 
-                                updateActiveDeviceStatus(); 
-                                break;
+                        String selected = options[which];
+                        if (selected.equals(isArabic ? "تعيين كجهاز افتراضي" : "Set as Default")) {
+                            setDefaultDevice(device);
+                        } else if (selected.equals(isArabic ? "اختبار الاتصال" : "Test Connection")) {
+                            testDevice(device);
+                        } else if (selected.equals(isArabic ? "تعديل الإعدادات" : "Edit Settings")) {
+                            showEditDeviceDialog(device);
+                        } else if (selected.equals(isArabic ? "عرض المعلومات" : "View Info")) {
+                            showDeviceInfo(device);
+                        } else if (selected.equals(isArabic ? "حذف" : "Delete")) {
+                            rfidManager.deleteDevice(device); 
+                            playClickSound();
+                            vibrateShort();
+                            refreshDeviceList(); 
+                            updateActiveDeviceStatus(); 
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Device option error: " + e.getMessage());
@@ -1126,7 +1163,7 @@ private void showAdvancedReaderSettings() {
     }
 }
     
-    @Override
+   @Override
     public void onDestroyView() {
         cleanupResources();
         super.onDestroyView();
@@ -1293,4 +1330,4 @@ private void applySettingsImmediately() {
             }
         }
     }
-}
+                                                }
