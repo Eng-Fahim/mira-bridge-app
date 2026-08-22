@@ -141,6 +141,18 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         updateReaderStatus();
     }
 
+    // ==================== Helper Methods ====================
+    private boolean isReaderConnected() {
+        if (mContext != null && mContext.mReader != null) {
+            try {
+                return mContext.mReader.isPowerOn();
+            } catch (Exception e) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ==================== Permissions ====================
     private void applyPermissions() {
         boolean canUseRadar = permissionManager.canView("radar") || 
@@ -237,11 +249,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         boolean readerConnected = false;
         
         if (hardwareAvailable) {
-            try {
-                readerConnected = mContext.mReader.isConnected();
-            } catch (Exception e) {
-                readerConnected = false;
-            }
+            readerConnected = isReaderConnected();
         }
         
         if (!hardwareAvailable) {
@@ -415,7 +423,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
             default: modeName = "";
         }
         
-        // ✅ إضافة مؤشر الوضع
         if (inventoryFlag) {
             modeName += simulationMode ? 
                 (isArabic ? " (محاكاة)" : " (Simulation)") : 
@@ -444,7 +451,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
             return;
         }
 
-        // ✅ التحقق من حالة القارئ
         updateReaderStatus();
         
         if (!simulationMode) {
@@ -452,11 +458,7 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
             boolean readerConnected = false;
             
             if (hardwareAvailable) {
-                try {
-                    readerConnected = mContext.mReader.isConnected();
-                } catch (Exception e) {
-                    readerConnected = false;
-                }
+                readerConnected = isReaderConnected();
             }
             
             if (!hardwareAvailable || !readerConnected) {
@@ -625,7 +627,6 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         if (rssiBar != null) rssiBar.setProgress(rssi);
         if (tvSignalStrength != null) tvSignalStrength.setText(rssi + "%");
         
-        // ✅ تحديث المسافة التقديرية
         if (tvEstimatedDistance != null) {
             tvEstimatedDistance.setText(
                 (isArabic ? "📏 المسافة: " : "📏 Distance: ") + getEstimatedDistance(rssi));
@@ -864,4 +865,4 @@ public class MiraUHFRadarLocationFragment extends KeyDwonFragment {
         ft.detach(this).attach(this).commit();
         getView().post(this::restoreState);
     }
-            }
+}
