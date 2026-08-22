@@ -83,18 +83,25 @@ public ApiResponse reconnectDevice(String username, String password, String gate
 /**
  * ✅ إضافة مفتاح API للطلبات
  */
+
+/**
+ * ✅ إضافة مفتاح API للطلبات
+ */
 private void addApiKeyHeader(JSONObject request) {
-    String apiKey = MiraServerConfig.getInstance(context).getApiKey();
-    
-    if (apiKey == null || apiKey.isEmpty()) {
-        // ✅ لا نضيف المفتاح - سيرفض السيرفر الطلب
-        // وسيتم إعادة الاتصال تلقائياً
-        Log.w(TAG, "⚠️ No API Key available - request will be rejected");
-        return;
+    try {
+        String apiKey = MiraServerConfig.getInstance(context).getApiKey();
+        
+        if (apiKey == null || apiKey.isEmpty()) {
+            Log.w(TAG, "⚠️ No API Key available - request will be rejected");
+            return;
+        }
+        
+        request.put("X-MIRA-API-Key", apiKey); // ✅ الآن داخل try-catch
+    } catch (Exception e) {
+        Log.e(TAG, "Add API key error: " + e.getMessage());
     }
-    
-    request.put("X-MIRA-API-Key", apiKey);
-}    // دالة لجلب قائمة المزودين النشطين من السيرفر
+}
+
     public List<ApiProvider> getActiveProviders() {
         List<ApiProvider> providers = new ArrayList<>();
         
