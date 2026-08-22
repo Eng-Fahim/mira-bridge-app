@@ -10,7 +10,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -49,8 +48,8 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private static final String OFFLINE_PREFS_BASE = "dashboard_cache_branch_";
     private static final double OUNCE_TO_GRAM = 31.1035;
     private static final int MAX_QUICK_ACTIONS = 9;
-    private static final long CACHE_VALIDITY_MS = 5 * 60 * 1000; // 5 دقائق
-    private static final long PING_VALIDITY_MS = 30 * 1000; // 30 ثانية
+    private static final long CACHE_VALIDITY_MS = 5 * 60 * 1000;
+    private static final long PING_VALIDITY_MS = 30 * 1000;
 
     // UI Elements
     private TextView tvGreeting, tvDate, tvLocation, tvLiveStatus;
@@ -96,7 +95,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private long lastGoldFetchTime = 0;
     private long lastPingTime = 0;
 
-    // ThreadLocal Formatters (Thread-Safe & Instant Performance)
+    // ThreadLocal Formatters
     private static final ThreadLocal<SimpleDateFormat> dateFormatsAr = 
         ThreadLocal.withInitial(() -> new SimpleDateFormat("EEEE، d MMMM yyyy", new Locale("ar")));
 
@@ -109,7 +108,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private static final ThreadLocal<NumberFormat> currencyFormatter = 
         ThreadLocal.withInitial(() -> NumberFormat.getCurrencyInstance(Locale.US));
 
-    // DTO لنقل بيانات الذهب بين Threads بدون معالجة JSON على UI Thread
     private static class GoldPriceData {
         final double price24, price21, price18, ouncePrice;
         final String source;
@@ -134,7 +132,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         super.onViewCreated(view, savedInstanceState);
 
         try {
-            // التهيئة الآمنة داخل onViewCreated
             initializeManagers();
             initViews(view);
             setupProfileListener();
@@ -309,6 +306,8 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         if (!forceRefresh && (now - lastGoldFetchTime) < CACHE_VALIDITY_MS) return;
 
         cancelFuture(goldPriceFuture);
+        long startTime = System.currentTimeMillis();
+
         goldPriceFuture = sharedExecutor.submit(() -> {
             try {
                 MiraApiClient.ApiResponse response = apiClient.fetchActiveGoldPrice();
@@ -316,6 +315,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 
                 mainHandler.post(() -> {
                     lastGoldFetchTime = System.currentTimeMillis();
+                    logPerformance("fetchLiveGoldPrices", System.currentTimeMillis() - startTime);
                     if (!isAdded()) return;
                     
                     if (priceData != null) {
@@ -488,6 +488,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
 
         cancelFuture(dataFuture);
         final int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+        long startTime = System.currentTimeMillis();
 
         dataFuture = sharedExecutor.submit(() -> {
             try {
@@ -495,6 +496,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 mainHandler.post(() -> {
                     isLoading = false;
                     lastDataFetchTime = System.currentTimeMillis();
+                    logPerformance("fetchData", System.currentTimeMillis() - startTime);
                     if (!isAdded()) return;
 
                     if (response != null && response.isSuccess && response.data != null) {
@@ -667,6 +669,12 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         if (tv != null) tv.setText(text);
     }
 
+    private void logPerformance(String operation, long durationMs) {
+        if (durationMs > 1000) {
+            Log.w(TAG, "Slow operation detected: " + operation + " took " + durationMs + "ms");
+        }
+    }
+
     public void onBranchChanged() {
         if (!isAdded()) return;
 
@@ -710,6 +718,14 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
         if ("active_branch_id".equals(key) || "active_branch".equals(key)) {
             mainHandler.post(this::onBranchChanged);
+        }
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        if (rvQuickActions != null) {
+            rvQuickActions.setItemViewCacheSize(0);
         }
     }
 
