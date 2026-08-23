@@ -889,12 +889,16 @@ public ApiResponse updateUserProfile(JSONObject payload) {
     }
 
     public ApiResponse getReportData(String reportType, String fromDate, String toDate, int branchId) {
-        String endpoint = "/reports/data?type=" + (reportType != null ? reportType : "")
-                + "&from=" + (fromDate != null ? fromDate : "")
-                + "&to=" + (toDate != null ? toDate : "")
-                + "&branch_id=" + branchId;
-        return getWithAuth(endpoint);
-    }
+    // ✅ المسار الجديد
+    String endpoint = "/reports-app?type=" + (reportType != null ? reportType : "dashboard")
+            + "&from=" + (fromDate != null ? fromDate : "")
+            + "&to=" + (toDate != null ? toDate : "")
+            + "&branch_id=" + branchId;
+    
+    Log.d(TAG, "📊 Fetching report: " + endpoint);
+    
+    return getWithAuth(endpoint);
+}
 
 
     // ===================== CORE HTTP =====================
@@ -1355,4 +1359,4 @@ public ApiResponse getPermissionTemplates() {
             return null;
         }
     }
-                          }
+        }
