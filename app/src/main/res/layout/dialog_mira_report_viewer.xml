@@ -77,7 +77,7 @@
             android:textSize="11sp" />
     </LinearLayout>
 
-    <!-- Manual Date Pickers -->
+    <!-- Manual Date Pickers & Item Code -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -103,6 +103,19 @@
             android:layout_weight="1"
             android:textSize="11sp"
             tools:text="إلى: 2026-01-30" />
+
+        <!-- ✅ تم إضافة الحقل المطلوب هنا لإنهاء الخطأ الأول -->
+        <EditText
+            android:id="@+id/etReportItemCode"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_edittext_outlined"
+            android:hint="كود القطعة"
+            android:paddingHorizontal="8dp"
+            android:textSize="11sp"
+            android:visibility="gone" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnReportApplyFilter"
