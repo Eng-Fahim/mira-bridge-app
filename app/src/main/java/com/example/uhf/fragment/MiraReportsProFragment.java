@@ -481,28 +481,29 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void renderReorderHTML(StringBuilder html, JSONObject data) {
-        JSONArray items = data.optJSONArray("reorder_items");
-        html.append("<div class='card'><div class='card-title'>💎 ")
-            .append(isArabic ? "النواقص والطلب" : "Reorder & Demand")
-            .append("</div>");
-        if (items != null && items.length() > 0) {
-            html.append("<table><tr><th>").append(isArabic ? "الصنف" : "Item").append("</th><th>")
-                .append(isArabic ? "العيار" : "Karat").append("</th><th>")
-                .append(isArabic ? "المباع" : "Sold").append("</th></tr>");
-            for (int i = 0; i < items.length(); i++) {
-                JSONObject item = items.optJSONObject(i);
-                if (item != null) {
-                    html.append("<tr><td>").append(item.optString("category", "—")).append("</td>")
-                        .append("<td>").append(item.optString("gold_karat", "—")).append("</td>")
-                        .append("<td>").append(item.optInt("sold_count", 0)).append("</td></tr>");
-                }
+    JSONArray items = data.optJSONArray("reorder_items");
+    html.append("<div class='card'><div class='card-title'>💎 ")
+        .append(isArabic ? "النواقص والطلب" : "Reorder & Demand")
+        .append("</div>");
+    if (items != null && items.length() > 0) {
+        html.append("<table><tr><th>").append(isArabic ? "العيار" : "Karat").append("</th><th>")
+            .append(isArabic ? "المباع" : "Sold").append("</th><th>")
+            .append(isArabic ? "المتبقي" : "Remaining").append("</th></tr>");
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject item = items.optJSONObject(i);
+            if (item != null) {
+                html.append("<tr><td><b>").append(item.optString("gold_karat", "—")).append("</b></td>")
+                    .append("<td>").append(item.optInt("sold_count", 0)).append("</td>")
+                    .append("<td>").append(item.optInt("remaining_stock", 0)).append("</td></tr>");
             }
-            html.append("</table>");
-        } else {
-            html.append("<p style='text-align:center;color:#64748B;'>").append(isArabic ? "المخزون متوازن" : "Inventory balanced").append("</p>");
         }
-        html.append("</div>");
+        html.append("</table>");
+    } else {
+        html.append("<p style='text-align:center;color:#64748B;'>")
+            .append(isArabic ? "المخزون متوازن" : "Inventory balanced").append("</p>");
     }
+    html.append("</div>");
+}
 
     private void renderUsersHTML(StringBuilder html, JSONObject data) {
         JSONArray users = data.optJSONArray("users");
