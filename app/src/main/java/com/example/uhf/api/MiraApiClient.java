@@ -512,7 +512,7 @@ public ApiResponse updateUserProfile(JSONObject payload) {
         HttpURLConnection conn = null;
         try {
             String fullUrl = apiUrl + "/inventory/sessions?branch_id=" + branchId 
-                           + "&page=" + page + "&per_page=" + perPage;
+                   + "&page=" + page + "&per_page=" + perPage;
             
             URL url = new URL(fullUrl);
             conn = (HttpURLConnection) url.openConnection();
@@ -891,15 +891,16 @@ public ApiResponse updateUserProfile(JSONObject payload) {
     public ApiResponse getReportData(String reportType, String fromDate, String toDate, int branchId) {
     String cleanType = reportType != null ? reportType.replace("\"", "").replace("\\", "").replace("'", "").trim() : "dashboard";
     
-    String endpoint = "/reports-app?type=" + cleanType
-            + "&from=" + (fromDate != null ? fromDate : "")
-            + "&to=" + (toDate != null ? toDate : "")
-            + "&branch_id=" + branchId;
+    StringBuilder endpoint = new StringBuilder("/reports-app?type=").append(cleanType);
+    if (fromDate != null && !fromDate.isEmpty()) endpoint.append("&from=").append(fromDate);
+    if (toDate != null && !toDate.isEmpty()) endpoint.append("&to=").append(toDate);
+    if (branchId > 0) endpoint.append("&branch_id=").append(branchId);
     
-    Log.d(TAG, "📊 URL: " + endpoint);
+    Log.d(TAG, "📊 Reports URL: " + endpoint.toString());
     
-    return get(endpoint); // ✅ بدون تحقق
+    return getWithAuth(endpoint.toString()); // ✅ استخدام התוالم المحمية بالتوكن والمفتاح
 }
+
 
 
     // ===================== CORE HTTP =====================
