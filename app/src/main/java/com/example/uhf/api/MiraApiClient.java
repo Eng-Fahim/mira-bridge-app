@@ -73,12 +73,24 @@ public ApiResponse reconnectDevice(String username, String password, String gate
         params.put("password", password);
         params.put("gate_id", gateId);
         
-        return post("/auth/reconnect", params);
+        ApiResponse response = post("/auth/reconnect", params);
+        if (response != null && response.isSuccess && response.data != null) {
+            String newApiKey = response.data.optString("api_key", "");
+            String newGateId = response.data.optString("gate_id", gateId);
+            String authToken = response.data.optString("token", "");
+            
+            if (!newApiKey.isEmpty() || !authToken.isEmpty()) {
+                serverConfig.saveSession(newApiKey, newGateId, authToken);
+                refreshCredentials(); // ✅ تحديث البيانات داخل الكائن فوراً
+            }
+        }
+        return response;
     } catch (Exception e) {
         Log.e(TAG, "Reconnect error: " + e.getMessage());
         return null;
     }
 }
+
     // في كل طلب API
 /**
  * ✅ إضافة مفتاح API للطلبات
@@ -361,19 +373,18 @@ public ApiResponse activateProvider(int providerId) {
 
     // ===================== 🏢 ORGANIZATION =====================
 // ===================== PROFILE =====================
-
 public ApiResponse getOrgProfile() {
-    return get("/profile/get");
+    return getWithAuth("/profile/get"); // تم التعديل إلى WithAuth
 }
 
 public ApiResponse saveOrgProfile(JSONObject payload) {
-    return post("/profile/update", payload);
+    return postWithAuth("/profile/update", payload); // تم التعديل إلى WithAuth
 }
 
-// ✅ أضف هذه الدالة
 public ApiResponse updateUserProfile(JSONObject payload) {
-    return post("/profile/update-user", payload);
+    return postWithAuth("/profile/update-user", payload); // تم التعديل إلى WithAuth
 }
+
 
     // ===================== 👥 USERS =====================
 
@@ -1076,38 +1087,37 @@ public ApiResponse updateUserProfile(JSONObject payload) {
 
     public String getGateId() { return getEffectiveGateId(); }
     public String getApiUrl() { return apiUrl; }
-
-    // ... باقي الكود كما هو ...
 public void submitInventoryAuditReport(JSONObject payload) {
-        HttpURLConnection conn = null;
-        try {
-            String fullUrl = apiUrl + "/inventory/submit-audit";
-            URL url = new URL(fullUrl);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
-            String token = getAuthToken();
-            if (!token.isEmpty()) {
-                conn.setRequestProperty("Authorization", "Bearer " + token);
-            }
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
-            conn.setDoOutput(true);
-            if (payload != null) {
-                String jsonString = payload.toString();
-                try (OutputStream os = conn.getOutputStream()) {
-                    byte[] input = jsonString.getBytes("utf-8");
-                    os.write(input, 0, input.length);
-                }
-            }
-            conn.getResponseCode();
-        } catch (Exception e) {
-            Log.e(TAG, "submitInventoryAuditReport error: " + e.getMessage());
-        } finally {
-            if (conn != null) conn.disconnect();
+    HttpURLConnection conn = null;
+    try {
+        String fullUrl = apiUrl + "/inventory/submit-audit";
+        URL url = new URL(fullUrl);
+        conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
+        String token = getAuthToken();
+        if (!token.isEmpty()) {
+            conn.setRequestProperty("Authorization", "Bearer " + token);
         }
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(15000);
+        conn.setDoOutput(true);
+        if (payload != null) {
+            try (OutputStream os = conn.getOutputStream()) {
+                byte[] input = payload.toString().getBytes("utf-8");
+                os.write(input, 0, input.length);
+            }
+        }
+        // قراءة الاستجابة لإغلاق الـ Stream بشكل صحيح
+        buildResponse(conn); 
+    } catch (Exception e) {
+        Log.e(TAG, "submitInventoryAuditReport error: " + e.getMessage());
+    } finally {
+        if (conn != null) conn.disconnect();
     }
+}
+
 
     // ===================== 💰 GOLD & CURRENCY =====================
 
