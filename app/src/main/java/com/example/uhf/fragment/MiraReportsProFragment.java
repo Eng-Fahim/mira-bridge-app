@@ -68,6 +68,9 @@ public class MiraReportsProFragment extends Fragment {
     private SharedPreferences offlineCache;
     private boolean isArabic;
 
+    private AlertDialog currentReportDialog;
+    private WebView currentWebView;
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -96,11 +99,13 @@ public class MiraReportsProFragment extends Fragment {
 
     @Override
     public void onDestroyView() {
-        super.onDestroyView();
-        // إلغاء الخيوط النشطة لمنع تسريب الذاكرة أو الاستدعاءات الخلفية
+        if (currentReportDialog != null && currentReportDialog.isShowing()) {
+            safeDismissDialog(currentReportDialog, currentWebView);
+        }
         if (executorService != null && !executorService.isShutdown()) {
             executorService.shutdownNow();
         }
+        super.onDestroyView();
     }
 
     private void buildReportsList() {
@@ -165,6 +170,11 @@ public class MiraReportsProFragment extends Fragment {
         webSettings.setBuiltInZoomControls(true);
         webSettings.setDisplayZoomControls(false);
         webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+        
+        webSettings.setAllowFileAccess(true);
+        webSettings.setAllowContentAccess(true);
+        webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        webView.setBackgroundColor(0x00000000); 
 
         final String[] dates = {getDefaultFromDate(), getDefaultToDate()};
         btnFrom.setText((isArabic ? "من: " : "From: ") + dates[0]);
@@ -173,6 +183,10 @@ public class MiraReportsProFragment extends Fragment {
         AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
                 .setView(dialogView)
                 .create();
+
+        // حفظ المراجع بشكل صحيح بعد الإنشاء
+        currentReportDialog = dialog;
+        currentWebView = webView;
 
         btnFrom.setOnClickListener(v -> showDatePicker(date -> {
             dates[0] = date;
@@ -184,7 +198,7 @@ public class MiraReportsProFragment extends Fragment {
             btnTo.setText((isArabic ? "إلى: " : "To: ") + date);
         }));
 
-        btnApply.setOnClickListener(v -> fetchAndRenderReport(item.type, webView, layoutLoading, tvLoadingStatus, dates[0], dates[1]));
+        btnApply.setOnClickListener(v -> fetchAndRenderReport(item.type, webView, layoutLoading, tvLoadingStatus, dates[0], dates[1], dialog));
         btnPrint.setOnClickListener(v -> printReportWebView(webView, item.title));
         btnExport.setOnClickListener(v -> exportReportToCSV(item.type, dates[0], dates[1]));
 
@@ -193,7 +207,7 @@ public class MiraReportsProFragment extends Fragment {
 
         dialog.show();
 
-        webView.post(() -> fetchAndRenderReport(item.type, webView, layoutLoading, tvLoadingStatus, dates[0], dates[1]));
+        webView.post(() -> fetchAndRenderReport(item.type, webView, layoutLoading, tvLoadingStatus, dates[0], dates[1], dialog));
     }
 
     private void safeDismissDialog(AlertDialog dialog, WebView webView) {
@@ -212,9 +226,13 @@ public class MiraReportsProFragment extends Fragment {
         if (dialog != null && dialog.isShowing()) {
             dialog.dismiss();
         }
+        if (dialog == currentReportDialog) {
+            currentReportDialog = null;
+            currentWebView = null;
+        }
     }
 
-    private void fetchAndRenderReport(String reportType, WebView webView, View layoutLoading, TextView tvLoadingStatus, String fromDate, String toDate) {
+    private void fetchAndRenderReport(String reportType, WebView webView, View layoutLoading, TextView tvLoadingStatus, String fromDate, String toDate, AlertDialog parentDialog) {
         if (!isAdded() || getContext() == null) return;
 
         mainHandler.post(() -> {
@@ -260,7 +278,8 @@ public class MiraReportsProFragment extends Fragment {
             final String finalError = errorMessage;
 
             mainHandler.post(() -> {
-                if (!isAdded() || getContext() == null || webView == null) return;
+                // التأكد الكامل أن الـ Fragment والـ Dialog والـ WebView لا يزالون نشطين في الواجهة
+                if (!isAdded() || getContext() == null || webView == null || parentDialog == null || !parentDialog.isShowing()) return;
 
                 if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
 
@@ -274,7 +293,7 @@ public class MiraReportsProFragment extends Fragment {
                             "</body></html>";
                 }
 
-                webView.loadDataWithBaseURL("file:///android_asset/", htmlContent, "text/html", "UTF-8", null);
+                webView.loadDataWithBaseURL(null, htmlContent, "text/html; charset=utf-8", "UTF-8", null);
             });
         });
     }
@@ -285,9 +304,9 @@ public class MiraReportsProFragment extends Fragment {
         String dir = isArabic ? "rtl" : "ltr";
 
         html.append("<!DOCTYPE html><html dir='").append(dir).append("'><head><meta charset='UTF-8'>")
-                .append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
+                .append("<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>")
                 .append("<style>")
-                .append("body{font-family:sans-serif;margin:0;padding:12px;background:#F4F6F9;color:#1F2937;}")
+                .append("html, body { background-color: #F4F6F9 !important; color: #1F2937; margin: 0; padding: 12px; width: 100%; min-height: 100%; box-sizing: border-box; }")
                 .append(".header{background:linear-gradient(135deg,#1E293B,#0F172A);color:#FFF;padding:16px;border-radius:12px;margin-bottom:12px;}")
                 .append(".header h2{margin:0;font-size:18px;color:#F1F5F9;}")
                 .append(".header p{margin:4px 0 0;font-size:11px;color:#94A3B8;}")
@@ -615,12 +634,10 @@ public class MiraReportsProFragment extends Fragment {
                 JSONObject data = new JSONObject(cached);
                 StringBuilder csvContent = new StringBuilder();
                 
-                // إضافة BOM للتعامل السليم مع اللغة العربية في Excel
                 csvContent.append("\uFEFF");
                 csvContent.append("Report Type,").append(type).append("\n");
                 csvContent.append("From,").append(from).append(",To,").append(to).append("\n\n");
 
-                // توليد أعمدة وصفوف CSV حقيقية بحسب نوع التقرير
                 buildFormattedCSV(type, data, csvContent);
 
                 File exportDir = new File(requireContext().getCacheDir(), "exports");
