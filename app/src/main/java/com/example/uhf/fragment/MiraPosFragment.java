@@ -644,54 +644,53 @@ public void onDestroy() {
         return t;
     }
 
-        
-    private void processCheckoutAndStockUpdate() {
-        if (!(permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager())) {
-            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-            return;
-        }
-        if (cartList.isEmpty()) {
-            showToast(isArabic ? "السلة فارغة" : "Cart is empty");
-            return;
-        }
-        
-        // ✅ منع فتح الديالوج مرتين
-        if (isCheckoutDialogShowing) {
-            Log.d(TAG, "Checkout dialog already showing");
-            return;
-        }
-        
-        if (!isAdded() || getActivity() == null) return;
-        UIHelper.hideKeyboard(getActivity());
-        
-        isCheckoutDialogShowing = true;
-        
-        try {
-            POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(getCartTotal(), cartList.size());
-            dialog.setCheckoutListener(data -> {
-                isCheckoutDialogShowing = false; // ✅ إعادة التعيين عند الإغلاق
-                executeCheckout(data);
-            });
-            
-            // ✅ استخدام ParentFragmentManager بدلاً من ChildFragmentManager
-            FragmentManager fm = getParentFragmentManager();
-            
-            // ✅ التحقق من عدم وجود الديالوج مسبقاً
-            if (fm.findFragmentByTag("POSCheckoutDialog") != null) {
-                isCheckoutDialogShowing = false;
-                return;
-            }
-            
-            if (!fm.isStateSaved()) {
-                dialog.show(fm, "POSCheckoutDialog");
-            } else {
-                isCheckoutDialogShowing = false;
-            }
-        } catch (Exception e) {
-            isCheckoutDialogShowing = false;
-            showToast(isArabic ? "خطأ" : "Error: " + e.getMessage());
-        }
+private void processCheckoutAndStockUpdate() {
+    if (!(permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager())) {
+        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+        return;
     }
+    if (cartList.isEmpty()) {
+        showToast(isArabic ? "السلة فارغة" : "Cart is empty");
+        return;
+    }
+    
+    // ✅ منع فتح الديالوج مرتين
+    if (isCheckoutDialogShowing) {
+        Log.d(TAG, "Checkout dialog already showing");
+        return;
+    }
+    
+    if (!isAdded() || getActivity() == null) return;
+    UIHelper.hideKeyboard(getActivity());
+    
+    isCheckoutDialogShowing = true;
+    
+    try {
+        POSCheckoutDialog dialog = POSCheckoutDialog.newInstance(getCartTotal(), cartList.size());
+        
+        dialog.setCheckoutListener(data -> {
+            isCheckoutDialogShowing = false;
+            executeCheckout(data);
+        });
+        
+        // ✅ استخدام OnDialogDismissListener الصحيح
+        dialog.setOnDismissListener(() -> {
+            isCheckoutDialogShowing = false;
+            Log.d(TAG, "Checkout dialog dismissed");
+        });
+        
+        FragmentManager fm = getParentFragmentManager();
+        
+        if (!fm.isStateSaved()) {
+            dialog.show(fm, "POSCheckoutDialog");
+        } else {
+            isCheckoutDialogShowing = false;
+        }
+    } catch (Exception e) {
+        isCheckoutDialogShowing = false;
+        showToast(isArabic ? "خطأ" : "Error: " + e.getMessage());
+    }
+}
     private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
     if (!isAdded()) return;
 
