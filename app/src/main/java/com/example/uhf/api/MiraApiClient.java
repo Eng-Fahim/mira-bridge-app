@@ -405,6 +405,34 @@ public ApiResponse updateUserProfile(JSONObject payload) {
         try { p.put("user_id", userId); } catch (Exception ignored) {}
         return postWithAuth("/auth/users/delete", p);
     }
+    
+    // 1. أضف هذه الواجهة داخل كلاس MiraApiClient
+public interface ApiCallback {
+    void onSuccess(ApiResponse response);
+    void onError(String errorMessage);
+}
+
+// 2. أضف دالة get غيـر المتزامنة داخل MiraApiClient
+public void get(final String endpoint, final ApiCallback callback) {
+    new Thread(new Runnable() {
+        @Override
+        public void run() {
+            final ApiResponse response = getWithAuth(endpoint);
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                @Override
+                public void run() {
+                    if (response != null && response.isSuccess) {
+                        callback.onSuccess(response);
+                    } else {
+                        String err = (response != null && response.error != null) ? response.error : "Unknown error";
+                        callback.onError(err);
+                    }
+                }
+            });
+        }
+    }).start();
+}
+
 
     // ===================== 🔑 AUTHORIZE =====================
 
