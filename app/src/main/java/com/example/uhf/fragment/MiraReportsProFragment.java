@@ -1,6 +1,7 @@
 package com.example.uhf.fragment;
 
 import android.app.DatePickerDialog;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -16,6 +17,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -51,6 +54,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MiraReportsProFragment extends Fragment {
+
+    private int currentBranchId = 1;
 
     private static final String TAG = "MiraReportsPro";
     private static final String CACHE_PREFS = "mira_reports_pro_cache";
@@ -122,6 +127,9 @@ public class MiraReportsProFragment extends Fragment {
             reportList.add(new ReportItem("💎", "النواقص والطلب", "الأكثر مبيعاً", "reorder"));
             reportList.add(new ReportItem("👥", "المستخدمين", "نشاط الموظفين", "users"));
             reportList.add(new ReportItem("💵", "الحركة المالية", "القيود المحاسبية", "financial"));
+            reportList.add(new ReportItem("⏳", "سجل نشاط الموظف", "تايم لاين أفعال الموظف", "user_timeline"));
+            reportList.add(new ReportItem("🏷️", "البصمة الرقمية", "سجل حياة القطعة وتتبعها", "item_passport"));
+            reportList.add(new ReportItem("📉", "أعمار المخزون", "تحليل حركة ودوران القطع", "inventory_aging"));
         } else {
             reportList.add(new ReportItem("📊", "Dashboard", "Comprehensive summary", "dashboard"));
             reportList.add(new ReportItem("💰", "Sales Details", "Invoices + payments + customers", "sales"));
@@ -133,97 +141,122 @@ public class MiraReportsProFragment extends Fragment {
             reportList.add(new ReportItem("💎", "Reorder", "Best sellers", "reorder"));
             reportList.add(new ReportItem("👥", "Users", "Staff activity", "users"));
             reportList.add(new ReportItem("💵", "Financial", "Journal entries", "financial"));
+            reportList.add(new ReportItem("⏳", "User Timeline", "Audit staff activities", "user_timeline"));
+            reportList.add(new ReportItem("🏷️", "Item Passport", "Complete lifecycle tracking", "item_passport"));
+            reportList.add(new ReportItem("📉", "Inventory Aging", "Stock turnover analysis", "inventory_aging"));
         }
     }
 
     private void openReportDialog(ReportItem item) {
-    if (getContext() == null || !isAdded()) return;
+        if (getContext() == null || !isAdded()) return;
 
-    if (permissionManager != null && !permissionManager.canAccessFragment("Reports")) {
-        Toast.makeText(getContext(),
-                isArabic ? "⛔ غير مصرح لك بالوصول للتقارير" : "⛔ Access Denied",
-                Toast.LENGTH_SHORT).show();
-        return;
+        if (permissionManager != null && !permissionManager.canAccessFragment("Reports")) {
+            Toast.makeText(getContext(),
+                    isArabic ? "⛔ غير مصرح لك بالوصول للتقارير" : "⛔ Access Denied",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
+
+        TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
+        WebView webView = dialogView.findViewById(R.id.webReportView);
+        View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
+        TextView tvLoadingStatus = dialogView.findViewById(R.id.tvLoadingStatus);
+
+        MaterialButton btnFrom = dialogView.findViewById(R.id.btnReportDateFrom);
+        MaterialButton btnTo = dialogView.findViewById(R.id.btnReportDateTo);
+        MaterialButton btnApply = dialogView.findViewById(R.id.btnReportApplyFilter);
+        MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
+        MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
+        MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
+
+        View layoutAdvancedFilters = dialogView.findViewById(R.id.layoutAdvancedFilters);
+        Spinner spinnerUsers = dialogView.findViewById(R.id.spinnerReportUsers);
+        EditText etItemCode = dialogView.findViewById(R.id.etReportItemCode);
+
+        tvTitle.setText(item.icon + " " + item.title);
+
+        WebSettings webSettings = webView.getSettings();
+        webSettings.setJavaScriptEnabled(true);
+        webSettings.setDomStorageEnabled(true);
+        webSettings.setLoadWithOverviewMode(true);
+        webSettings.setUseWideViewPort(true);
+        webSettings.setBuiltInZoomControls(true);
+        webSettings.setDisplayZoomControls(false);
+        webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+        webSettings.setAllowFileAccess(true);
+        webSettings.setAllowContentAccess(true);
+        webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        webView.setBackgroundColor(0x00000000);
+
+        if (layoutAdvancedFilters != null) {
+            boolean isUserReport = "user_timeline".equals(item.type);
+            boolean isItemReport = "item_passport".equals(item.type);
+
+            layoutAdvancedFilters.setVisibility((isUserReport || isItemReport) ? View.VISIBLE : View.GONE);
+
+            if (spinnerUsers != null) {
+                spinnerUsers.setVisibility(isUserReport ? View.VISIBLE : View.GONE);
+                if (isUserReport) {
+                    populateUsersSpinner(spinnerUsers);
+                }
+            }
+
+            if (etItemCode != null) {
+                etItemCode.setVisibility(isItemReport ? View.VISIBLE : View.GONE);
+            }
+        }
+
+        final String[] selectedDates = new String[]{getDefaultFromDate(), getDefaultToDate()};
+
+        btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
+        btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
+
+        AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
+                .setView(dialogView)
+                .create();
+
+        currentReportDialog = dialog;
+        currentWebView = webView;
+
+        btnFrom.setOnClickListener(v -> showDatePicker(date -> {
+            selectedDates[0] = date;
+            btnFrom.setText((isArabic ? "من: " : "From: ") + date);
+        }));
+
+        btnTo.setOnClickListener(v -> showDatePicker(date -> {
+            selectedDates[1] = date;
+            btnTo.setText((isArabic ? "إلى: " : "To: ") + date);
+        }));
+
+        btnApply.setOnClickListener(v -> {
+            String fromDate = selectedDates[0];
+            String toDate = selectedDates[1];
+
+            int selectedUserId = 0;
+            if (spinnerUsers != null && spinnerUsers.getVisibility() == View.VISIBLE && spinnerUsers.getSelectedItem() != null) {
+                selectedUserId = ((UserSpinnerItem) spinnerUsers.getSelectedItem()).getId();
+            }
+
+            String itemCode = "";
+            if (etItemCode != null && etItemCode.getVisibility() == View.VISIBLE) {
+                itemCode = etItemCode.getText().toString().trim();
+            }
+
+            fetchAndRenderReportEx(item, webView, layoutLoading, tvLoadingStatus, fromDate, toDate, selectedUserId, itemCode, dialog);
+        });
+
+        btnPrint.setOnClickListener(v -> printReportWebView(webView, item.title));
+        btnExport.setOnClickListener(v -> exportReportToCSV(item.type, selectedDates[0], selectedDates[1]));
+
+        btnClose.setOnClickListener(v -> safeDismissDialog(dialog, webView));
+        dialog.setOnCancelListener(d -> safeDismissDialog(dialog, webView));
+
+        dialog.show();
+
+        webView.post(() -> fetchAndRenderReportEx(item, webView, layoutLoading, tvLoadingStatus, selectedDates[0], selectedDates[1], 0, "", dialog));
     }
-
-    View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
-
-    TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
-    WebView webView = dialogView.findViewById(R.id.webReportView);
-    View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
-    TextView tvLoadingStatus = dialogView.findViewById(R.id.tvLoadingStatus);
-
-    MaterialButton btnFrom = dialogView.findViewById(R.id.btnReportDateFrom);
-    MaterialButton btnTo = dialogView.findViewById(R.id.btnReportDateTo);
-    MaterialButton btnApply = dialogView.findViewById(R.id.btnReportApplyFilter);
-    MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
-    MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
-    MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
-
-    tvTitle.setText(item.icon + " " + item.title);
-
-    WebSettings webSettings = webView.getSettings();
-    webSettings.setJavaScriptEnabled(true);
-    webSettings.setDomStorageEnabled(true);
-    webSettings.setLoadWithOverviewMode(true);
-    webSettings.setUseWideViewPort(true);
-    webSettings.setBuiltInZoomControls(true);
-    webSettings.setDisplayZoomControls(false);
-    webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
-    
-    webSettings.setAllowFileAccess(true);
-    webSettings.setAllowContentAccess(true);
-    webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-    webView.setBackgroundColor(0x00000000); 
-
-    // استخدام مصفوفة لتخزين التواريخ المحدثة ديناميكياً
-    final String[] selectedDates = new String[]{getDefaultFromDate(), getDefaultToDate()};
-    
-    btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
-    btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
-
-    AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
-            .setView(dialogView)
-            .create();
-
-    currentReportDialog = dialog;
-    currentWebView = webView;
-
-    // 1. تحديث تاريخ البداية
-    btnFrom.setOnClickListener(v -> showDatePicker(date -> {
-        selectedDates[0] = date;
-        btnFrom.setText((isArabic ? "من: " : "From: ") + date);
-    }));
-
-    // 2. تحديث تاريخ النهاية
-    btnTo.setOnClickListener(v -> showDatePicker(date -> {
-        selectedDates[1] = date;
-        btnTo.setText((isArabic ? "إلى: " : "To: ") + date);
-    }));
-
-    // 3. عند الضغط على تطبيق: يتم جلب التواريخ المحدثة مباشرة من selectedDates
-    btnApply.setOnClickListener(v -> {
-        String fromDate = selectedDates[0];
-        String toDate = selectedDates[1];
-        
-        // إعادة جلب التقرير بالتواريخ الجديدة
-        fetchAndRenderReport(item.type, webView, layoutLoading, tvLoadingStatus, fromDate, toDate, dialog);
-    });
-
-    btnPrint.setOnClickListener(v -> printReportWebView(webView, item.title));
-    
-    // تصحيح التصدير ليعتمد أيضاً على التواريخ المحددة حالياً
-    btnExport.setOnClickListener(v -> exportReportToCSV(item.type, selectedDates[0], selectedDates[1]));
-
-    btnClose.setOnClickListener(v -> safeDismissDialog(dialog, webView));
-    dialog.setOnCancelListener(d -> safeDismissDialog(dialog, webView));
-
-    dialog.show();
-
-    // التحميل الأول بالتواريخ الافتراضية
-    webView.post(() -> fetchAndRenderReport(item.type, webView, layoutLoading, tvLoadingStatus, selectedDates[0], selectedDates[1], dialog));
-}
-
 
     private void safeDismissDialog(AlertDialog dialog, WebView webView) {
         if (webView != null) {
@@ -247,70 +280,131 @@ public class MiraReportsProFragment extends Fragment {
         }
     }
 
-    private void fetchAndRenderReport(String reportType, WebView webView, View layoutLoading, TextView tvLoadingStatus, String fromDate, String toDate, AlertDialog parentDialog) {
-        if (!isAdded() || getContext() == null) return;
+    private void fetchAndRenderReportEx(ReportItem item, WebView webView, View layoutLoading,
+                                       TextView tvLoadingStatus, String fromDate, String toDate,
+                                       int userId, String itemCode, Dialog dialog) {
+        if (getContext() == null || !isAdded()) return;
 
-        mainHandler.post(() -> {
-            if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
-            if (tvLoadingStatus != null) tvLoadingStatus.setText(
-                    isArabic ? "جاري جلب وتحليل بيانات التقرير..." : "Fetching and analyzing report data...");
-        });
+        if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
+        if (tvLoadingStatus != null) tvLoadingStatus.setText(isArabic ? "جاري جلب وتحليل البيانات..." : "Fetching and analyzing data...");
 
-        executorService.execute(() -> {
-            JSONObject reportData = null;
-            String errorMessage = null;
-            String cacheKey = "cache_pro_" + reportType + "_" + fromDate + "_" + toDate;
+        boolean isAdvanced = "user_timeline".equals(item.type) || "item_passport".equals(item.type) || "inventory_aging".equals(item.type);
+        String endpoint = isAdvanced ? "reports-analytics" : "reports-app";
 
-            try {
-                int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 1;
-                MiraApiClient.ApiResponse response = apiClient != null ? apiClient.getReportData(reportType, fromDate, toDate, activeBranchId) : null;
+        StringBuilder urlBuilder = new StringBuilder();
+        urlBuilder.append("https://sa.mirabarcod.com")
+                  .append("/wp-json/mira-gate/v1/")
+                  .append(endpoint)
+                  .append("?type=").append(item.type)
+                  .append("&from=").append(fromDate)
+                  .append("&to=").append(toDate)
+                  .append("&branch_id=").append(currentBranchId);
 
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject rawData = response.data;
-                    if (rawData.has("data") && rawData.optJSONObject("data") != null) {
-                        reportData = rawData.optJSONObject("data");
-                    } else {
-                        reportData = rawData;
-                    }
-                    if (offlineCache != null && reportData != null) {
-                        offlineCache.edit().putString(cacheKey, reportData.toString()).apply();
-                    }
-                } else {
-                    errorMessage = isArabic ? "فشل الاتصال بالخادم" : "Server connection failed";
-                }
-            } catch (Exception e) {
-                errorMessage = (isArabic ? "خطأ: " : "Error: ") + e.getMessage();
+        if (userId > 0) {
+            urlBuilder.append("&user_id=").append(userId);
+        }
+        if (itemCode != null && !itemCode.trim().isEmpty()) {
+            urlBuilder.append("&item_code=").append(Uri.encode(itemCode.trim()));
+        }
+
+        String requestUrl = urlBuilder.toString();
+
+        apiClient.get(requestUrl, new MiraApiClient.ApiCallback() {
+            @Override
+            public void onSuccess(String jsonResponse) {
+                if (getActivity() == null || !isAdded()) return;
+
+                getActivity().runOnUiThread(() -> {
+                    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+
+                    String htmlContent = "user_timeline".equals(item.type) || "item_passport".equals(item.type)
+                            ? buildReportHtmlTemplate(item, jsonResponse, isArabic)
+                            : generateExecutiveHTML(item.type, parseJsonObject(jsonResponse), fromDate, toDate);
+
+                    webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null);
+                });
             }
 
-            if (reportData == null && offlineCache != null) {
-                String cached = offlineCache.getString(cacheKey, null);
-                if (cached != null) {
-                    try { reportData = new JSONObject(cached); } catch (Exception ignored) {}
+            @Override
+            public void onFailure(String errorMessage) {
+                if (getActivity() == null || !isAdded()) return;
+
+                getActivity().runOnUiThread(() -> {
+                    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+                    Toast.makeText(getContext(),
+                            (isArabic ? "فشل جلب البيانات: " : "Error: ") + errorMessage,
+                            Toast.LENGTH_LONG).show();
+                });
+            }
+        });
+    }
+
+    private JSONObject parseJsonObject(String json) {
+        try {
+            JSONObject obj = new JSONObject(json);
+            return obj.has("data") ? obj.optJSONObject("data") : obj;
+        } catch (Exception e) {
+            return new JSONObject();
+        }
+    }
+
+    private String buildReportHtmlTemplate(ReportItem item, String jsonResponse, boolean isArabic) {
+        StringBuilder html = new StringBuilder();
+        html.append("<!DOCTYPE html><html dir='").append(isArabic ? "rtl" : "ltr").append("'><head>");
+        html.append("<meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+        html.append("<style>");
+        html.append("body { font-family: sans-serif; margin: 15px; background-color: #f8f9fa; color: #333; }");
+        html.append(".card { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }");
+        html.append(".timeline-item { border-right: 3px solid #1a73e8; padding-right: 15px; margin-bottom: 15px; position: relative; }");
+        html.append(".badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: #fff; background: #1a73e8; }");
+        html.append("table { width: 100%; border-collapse: collapse; margin-top: 10px; }");
+        html.append("th, td { border: 1px solid #ddd; padding: 8px; text-align: start; }");
+        html.append("th { background-color: #f1f3f4; }");
+        html.append("</style></head><body>");
+
+        try {
+            JSONObject responseObj = new JSONObject(jsonResponse);
+            JSONObject dataObj = responseObj.optJSONObject("data");
+
+            if (dataObj == null) {
+                html.append("<div class='card'><h3>").append(isArabic ? "لا توجد بيانات متاحة" : "No data available").append("</h3></div>");
+            } else if ("user_timeline".equals(item.type)) {
+                JSONObject userInfo = dataObj.optJSONObject("user_info");
+                JSONArray timeline = dataObj.optJSONArray("timeline");
+
+                html.append("<div class='card'><h2>").append(isArabic ? "سجل نشاط الموظف: " : "User Activity: ")
+                    .append(userInfo != null ? userInfo.optString("display_name") : "").append("</h2></div>");
+
+                if (timeline != null && timeline.length() > 0) {
+                    for (int i = 0; i < timeline.length(); i++) {
+                        JSONObject event = timeline.getJSONObject(i);
+                        html.append("<div class='card timeline-item'>");
+                        html.append("<span class='badge'>").append(event.optString("event_type")).append("</span>");
+                        html.append("<p><strong>").append(isArabic ? "التفاصيل: " : "Details: ").append("</strong>").append(event.optString("details")).append("</p>");
+                        html.append("<small style='color:#777;'>").append(event.optString("created_at")).append("</small>");
+                        html.append("</div>");
+                    }
+                } else {
+                    html.append("<div class='card'><p>").append(isArabic ? "لا توجد أنشطة مسجلة لهذا الموظف في هذه الفترة" : "No activities recorded").append("</p></div>");
                 }
+            } else if ("item_passport".equals(item.type)) {
+                JSONObject itemDetails = dataObj.optJSONObject("item_details");
+                if (itemDetails != null) {
+                    html.append("<div class='card'><h2>").append(isArabic ? "البصمة الرقمية للقطعة" : "Digital Passport").append("</h2>");
+                    html.append("<p><strong>").append(isArabic ? "رمز القطعة: " : "SKU: ").append("</strong>").append(itemDetails.optString("item_code")).append("</p>");
+                    html.append("<p><strong>").append(isArabic ? "العيار / الوزن: " : "Karat / Weight: ").append("</strong>").append(itemDetails.optString("gold_karat")).append(" / ").append(itemDetails.optString("gross_weight_grams")).append("g</p>");
+                    html.append("</div>");
+                }
+            } else {
+                html.append("<div class='card'><pre>").append(dataObj.toString(2)).append("</pre></div>");
             }
 
-            final JSONObject finalData = reportData;
-            final String finalError = errorMessage;
+        } catch (Exception e) {
+            html.append("<div class='card' style='color:red;'><h3>").append(isArabic ? "خطأ في معالجة البيانات" : "Data Parsing Error").append("</h3></div>");
+        }
 
-            mainHandler.post(() -> {
-                // التأكد الكامل أن الـ Fragment والـ Dialog والـ WebView لا يزالون نشطين في الواجهة
-                if (!isAdded() || getContext() == null || webView == null || parentDialog == null || !parentDialog.isShowing()) return;
-
-                if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-
-                String htmlContent;
-                if (finalData != null) {
-                    htmlContent = generateExecutiveHTML(reportType, finalData, fromDate, toDate);
-                } else {
-                    htmlContent = "<html dir='" + (isArabic ? "rtl" : "ltr") + "'><body style='text-align:center;padding:50px;'>" +
-                            "<h2 style='color:#DC2626;'>" + (isArabic ? "❌ لا توجد بيانات" : "❌ No data") + "</h2>" +
-                            "<p>" + (finalError != null ? finalError : "") + "</p>" +
-                            "</body></html>";
-                }
-
-                webView.loadDataWithBaseURL(null, htmlContent, "text/html; charset=utf-8", "UTF-8", null);
-            });
-        });
+        html.append("</body></html>");
+        return html.toString();
     }
 
     private String generateExecutiveHTML(String type, JSONObject data, String from, String to) {
@@ -625,6 +719,56 @@ public class MiraReportsProFragment extends Fragment {
                 "<div class='lbl'>" + lbl + "</div></div>";
     }
 
+    private void populateUsersSpinner(Spinner spinner) {
+        if (getContext() == null || apiClient == null) return;
+
+        String url = "https://sa.mirabarcod.com/wp-json/mira-gate/v1/reports-analytics?type=users_list";
+
+        apiClient.get(url, new MiraApiClient.ApiCallback() {
+            @Override
+            public void onSuccess(String jsonResponse) {
+                if (!isAdded() || getActivity() == null) return;
+                getActivity().runOnUiThread(() -> {
+                    try {
+                        JSONObject responseObj = new JSONObject(jsonResponse);
+                        JSONArray usersArray = responseObj.optJSONArray("data");
+                        List<UserSpinnerItem> userItems = new ArrayList<>();
+
+                        userItems.add(new UserSpinnerItem(0, isArabic ? "-- اختر الموظف --" : "-- Select User --"));
+
+                        if (usersArray != null) {
+                            for (int i = 0; i < usersArray.length(); i++) {
+                                JSONObject u = usersArray.optJSONObject(i);
+                                if (u != null) {
+                                    userItems.add(new UserSpinnerItem(
+                                        u.optInt("ID", u.optInt("id")),
+                                        u.optString("display_name", u.optString("user_login"))
+                                    ));
+                                }
+                            }
+                        }
+
+                        android.widget.ArrayAdapter<UserSpinnerItem> adapter = new android.widget.ArrayAdapter<>(
+                            requireContext(),
+                            android.R.layout.simple_spinner_item,
+                            userItems
+                        );
+                        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                        spinner.setAdapter(adapter);
+
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error parsing users list", e);
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                Log.e(TAG, "Failed to load users for spinner: " + errorMessage);
+            }
+        });
+    }
+
     private void printReportWebView(WebView webView, String jobTitle) {
         if (!isAdded() || getContext() == null || webView == null) return;
         PrintManager pm = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
@@ -648,7 +792,7 @@ public class MiraReportsProFragment extends Fragment {
 
                 JSONObject data = new JSONObject(cached);
                 StringBuilder csvContent = new StringBuilder();
-                
+
                 csvContent.append("\uFEFF");
                 csvContent.append("Report Type,").append(type).append("\n");
                 csvContent.append("From,").append(from).append(",To,").append(to).append("\n\n");
@@ -789,4 +933,21 @@ public class MiraReportsProFragment extends Fragment {
 
     interface OnReportClickListener { void onClick(ReportItem item); }
     interface DatePickerCallback { void onDate(String date); }
+
+    static class UserSpinnerItem {
+        private final int id;
+        private final String name;
+
+        public UserSpinnerItem(int id, String name) {
+            this.id = id;
+            this.name = name;
+        }
+
+        public int getId() { return id; }
+        public String getName() { return name; }
+
+        @NonNull
+        @Override
+        public String toString() { return name; }
+    }
 }
