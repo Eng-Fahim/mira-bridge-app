@@ -183,4 +183,10 @@
 <color name="gate_alarm_bg">#D32F2F</color>
 <color name="gate_alarm_title_yellow">#FFFF00</color>
 
+<!-- ألوان التقارير والمؤشرات -->
+<color name="report_profit_green">#2E7D32</color>
+<color name="report_loss_red">#C62828</color>
+<color name="report_gold_amber">#FF8F00</color>
+<color name="report_neutral_gray">#757575</color>
+
 </resources>
