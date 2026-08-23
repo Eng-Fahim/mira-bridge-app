@@ -20,31 +20,49 @@
             android:layout_centerVertical="true"
             android:text="سند مالي ضريبي"
             android:textColor="?attr/colorPrimary"
-            android:textSize="16sp"
+            android:textSize="18sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/btnMiraCloseReceipt"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:layout_alignParentEnd="true"
+            android:gravity="center"
             android:padding="8dp"
             android:text="✕"
             android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:background="?attr/selectableItemBackgroundBorderless" />
     </RelativeLayout>
 
-    <!-- WebView -->
+    <!-- Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="?attr/colorOutlineVariant"
+        android:layout_marginBottom="12dp" />
+
+    <!-- WebView Container -->
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="420dp"
+        android:layout_height="450dp"
         android:background="?attr/colorSurfaceVariant">
 
         <WebView
             android:id="@+id/webMiraReceipt"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
+
+        <!-- Loading Indicator -->
+        <ProgressBar
+            android:id="@+id/progressReceiptLoading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:indeterminate="true"
+            android:visibility="gone" />
     </FrameLayout>
 
     <!-- Buttons -->
@@ -58,31 +76,48 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnMiraPrintReceipt"
             android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="4dp"
+            android:layout_height="52dp"
+            android:layout_marginEnd="6dp"
             android:layout_weight="1"
             android:text="🖨️ طباعة"
-            android:textSize="13sp"
-            app:cornerRadius="8dp" />
+            android:textSize="14sp"
+            android:textStyle="bold"
+            app:cornerRadius="10dp"
+            app:backgroundTint="?attr/colorPrimary" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnMiraShareReceipt"
             android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="4dp"
+            android:layout_height="52dp"
+            android:layout_marginEnd="6dp"
             android:layout_weight="1"
             android:text="📤 مشاركة"
-            android:textSize="13sp"
-            app:cornerRadius="8dp" />
+            android:textSize="14sp"
+            android:textStyle="bold"
+            app:cornerRadius="10dp"
+            app:backgroundTint="?attr/colorPrimary" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnMiraSaveReceipt"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="52dp"
             android:layout_weight="1"
             android:text="💾 حفظ"
-            android:textSize="13sp"
-            app:cornerRadius="8dp" />
+            android:textSize="14sp"
+            android:textStyle="bold"
+            app:cornerRadius="10dp"
+            app:backgroundTint="?attr/colorPrimary" />
     </LinearLayout>
+
+    <!-- Footer Note -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:text="MIRA Trust Platform"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="10sp"
+        android:alpha="0.6" />
 
 </LinearLayout>
