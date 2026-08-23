@@ -104,14 +104,13 @@
             android:textSize="11sp"
             tools:text="إلى: 2026-01-30" />
 
-        <!-- ✅ تم إضافة الحقل المطلوب هنا لإنهاء الخطأ الأول -->
         <EditText
             android:id="@+id/etReportItemCode"
             android:layout_width="0dp"
             android:layout_height="40dp"
             android:layout_marginStart="4dp"
             android:layout_weight="1"
-            android:background="@drawable/bg_edittext_outlined"
+            android:background="@android:drawable/editbox_background"
             android:hint="كود القطعة"
             android:paddingHorizontal="8dp"
             android:textSize="11sp"
@@ -125,6 +124,21 @@
             android:text="تطبيق"
             android:textSize="11sp"
             app:cornerRadius="6dp" />
+    </LinearLayout>
+
+    <!-- ✅ العناصر المضافة المفقودة (Advanced Filters & Users Spinner) -->
+    <LinearLayout
+        android:id="@+id/layoutAdvancedFilters"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="8dp"
+        android:visibility="gone">
+
+        <Spinner
+            android:id="@+id/spinnerReportUsers"
+            android:layout_width="match_parent"
+            android:layout_height="40dp" />
     </LinearLayout>
 
     <!-- Content Container (WebView + Native Loading View) -->
