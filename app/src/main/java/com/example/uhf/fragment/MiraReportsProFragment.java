@@ -16,7 +16,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -40,12 +39,16 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MiraReportsProFragment extends Fragment {
 
@@ -56,6 +59,7 @@ public class MiraReportsProFragment extends Fragment {
     private ReportsAdapter adapter;
     private final List<ReportItem> reportList = new ArrayList<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final ExecutorService executorService = Executors.newFixedThreadPool(2);
 
     private MiraOrgProfileManager orgProfile;
     private MiraApiClient apiClient;
@@ -77,7 +81,7 @@ public class MiraReportsProFragment extends Fragment {
             permissionManager = PermissionManager.getInstance(getContext());
             offlineCache = getContext().getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE);
         }
-        
+
         isArabic = Locale.getDefault().getLanguage().equals("ar");
 
         rvReports = view.findViewById(R.id.rvReportsList);
@@ -90,9 +94,18 @@ public class MiraReportsProFragment extends Fragment {
         return view;
     }
 
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        // إلغاء الخيوط النشطة لمنع تسريب الذاكرة أو الاستدعاءات الخلفية
+        if (executorService != null && !executorService.isShutdown()) {
+            executorService.shutdownNow();
+        }
+    }
+
     private void buildReportsList() {
         reportList.clear();
-        
+
         if (isArabic) {
             reportList.add(new ReportItem("📊", "لوحة القيادة", "ملخص شامل للعمليات", "dashboard"));
             reportList.add(new ReportItem("💰", "المبيعات التفصيلي", "فواتير + طرق دفع + عملاء", "sales"));
@@ -119,12 +132,12 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void openReportDialog(ReportItem item) {
-        if (getContext() == null) return;
-        
-        if (!permissionManager.canAccessFragment("Reports")) {
-            Toast.makeText(getContext(), 
-                isArabic ? "⛔ غير مصرح لك بالوصول للتقارير" : "⛔ Access Denied",
-                Toast.LENGTH_SHORT).show();
+        if (getContext() == null || !isAdded()) return;
+
+        if (permissionManager != null && !permissionManager.canAccessFragment("Reports")) {
+            Toast.makeText(getContext(),
+                    isArabic ? "⛔ غير مصرح لك بالوصول للتقارير" : "⛔ Access Denied",
+                    Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -174,47 +187,63 @@ public class MiraReportsProFragment extends Fragment {
         btnApply.setOnClickListener(v -> fetchAndRenderReport(item.type, webView, layoutLoading, tvLoadingStatus, dates[0], dates[1]));
         btnPrint.setOnClickListener(v -> printReportWebView(webView, item.title));
         btnExport.setOnClickListener(v -> exportReportToCSV(item.type, dates[0], dates[1]));
-        
-        btnClose.setOnClickListener(v -> {
-            try {
-                webView.stopLoading();
-                webView.destroy();
-            } catch (Exception ignored) {}
-            dialog.dismiss();
-        });
+
+        btnClose.setOnClickListener(v -> safeDismissDialog(dialog, webView));
+        dialog.setOnCancelListener(d -> safeDismissDialog(dialog, webView));
 
         dialog.show();
 
         webView.post(() -> fetchAndRenderReport(item.type, webView, layoutLoading, tvLoadingStatus, dates[0], dates[1]));
     }
 
+    private void safeDismissDialog(AlertDialog dialog, WebView webView) {
+        if (webView != null) {
+            try {
+                webView.stopLoading();
+                ViewGroup parent = (ViewGroup) webView.getParent();
+                if (parent != null) {
+                    parent.removeView(webView);
+                }
+                webView.destroy();
+            } catch (Exception e) {
+                Log.e(TAG, "Error destroying webview", e);
+            }
+        }
+        if (dialog != null && dialog.isShowing()) {
+            dialog.dismiss();
+        }
+    }
+
     private void fetchAndRenderReport(String reportType, WebView webView, View layoutLoading, TextView tvLoadingStatus, String fromDate, String toDate) {
-        if (getContext() == null) return;
+        if (!isAdded() || getContext() == null) return;
 
         mainHandler.post(() -> {
             if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
             if (tvLoadingStatus != null) tvLoadingStatus.setText(
-                isArabic ? "جاري جلب وتحليل بيانات التقرير..." : "Fetching and analyzing report data...");
+                    isArabic ? "جاري جلب وتحليل بيانات التقرير..." : "Fetching and analyzing report data...");
         });
 
-        new Thread(() -> {
+        executorService.execute(() -> {
             JSONObject reportData = null;
             String errorMessage = null;
             String cacheKey = "cache_pro_" + reportType + "_" + fromDate + "_" + toDate;
 
             try {
                 int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 1;
-                MiraApiClient.ApiResponse response = apiClient.getReportData(reportType, fromDate, toDate, activeBranchId);
+                MiraApiClient.ApiResponse response = apiClient != null ? apiClient.getReportData(reportType, fromDate, toDate, activeBranchId) : null;
 
                 if (response != null && response.isSuccess && response.data != null) {
-                    reportData = response.data;
-                    
-                    if (offlineCache != null) {
+                    JSONObject rawData = response.data;
+                    if (rawData.has("data") && rawData.optJSONObject("data") != null) {
+                        reportData = rawData.optJSONObject("data");
+                    } else {
+                        reportData = rawData;
+                    }
+                    if (offlineCache != null && reportData != null) {
                         offlineCache.edit().putString(cacheKey, reportData.toString()).apply();
                     }
                 } else {
-                    errorMessage = isArabic ? 
-                        "فشل الاتصال بالخادم" : "Server connection failed";
+                    errorMessage = isArabic ? "فشل الاتصال بالخادم" : "Server connection failed";
                 }
             } catch (Exception e) {
                 errorMessage = (isArabic ? "خطأ: " : "Error: ") + e.getMessage();
@@ -231,7 +260,7 @@ public class MiraReportsProFragment extends Fragment {
             final String finalError = errorMessage;
 
             mainHandler.post(() -> {
-                if (getContext() == null || webView == null) return;
+                if (!isAdded() || getContext() == null || webView == null) return;
 
                 if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
 
@@ -247,36 +276,36 @@ public class MiraReportsProFragment extends Fragment {
 
                 webView.loadDataWithBaseURL("file:///android_asset/", htmlContent, "text/html", "UTF-8", null);
             });
-        }).start();
+        });
     }
 
     private String generateExecutiveHTML(String type, JSONObject data, String from, String to) {
         StringBuilder html = new StringBuilder();
-        String orgName = orgProfile != null ? orgProfile.getOrgName() : "MIRA JEWELRY SYSTEM";
+        String orgName = orgProfile != null ? orgProfile.getOrgName() : "MIRA SYSTEM";
         String dir = isArabic ? "rtl" : "ltr";
 
         html.append("<!DOCTYPE html><html dir='").append(dir).append("'><head><meta charset='UTF-8'>")
-            .append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
-            .append("<style>")
-            .append("body{font-family:sans-serif;margin:0;padding:12px;background:#F4F6F9;color:#1F2937;}")
-            .append(".header{background:linear-gradient(135deg,#1E293B,#0F172A);color:#FFF;padding:16px;border-radius:12px;margin-bottom:12px;}")
-            .append(".header h2{margin:0;font-size:18px;color:#F1F5F9;}")
-            .append(".header p{margin:4px 0 0;font-size:11px;color:#94A3B8;}")
-            .append(".card{background:#FFF;padding:14px;border-radius:10px;margin-bottom:12px;border:1px solid #E2E8F0;}")
-            .append(".card-title{font-size:14px;font-weight:bold;color:#0F172A;margin-bottom:10px;border-bottom:2px solid #F1F5F9;padding-bottom:6px;}")
-            .append(".grid{display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;margin-bottom:10px;}")
-            .append(".metric{background:#F8FAFC;border:1px solid #E2E8F0;padding:10px;border-radius:8px;text-align:center;}")
-            .append(".metric .val{font-size:15px;font-weight:800;color:#0F172A;}")
-            .append(".metric .lbl{font-size:10px;color:#64748B;}")
-            .append(".gold{color:#D97706;font-weight:bold;}")
-            .append("table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11px;}")
-            .append("th{background:#0F172A;color:#FFF;padding:8px;text-align:center;}")
-            .append("td{padding:8px;border-bottom:1px solid #E2E8F0;text-align:center;}")
-            .append("</style></head><body>");
+                .append("<meta name='viewport' content='width=device-width, initial-scale=1.0'>")
+                .append("<style>")
+                .append("body{font-family:sans-serif;margin:0;padding:12px;background:#F4F6F9;color:#1F2937;}")
+                .append(".header{background:linear-gradient(135deg,#1E293B,#0F172A);color:#FFF;padding:16px;border-radius:12px;margin-bottom:12px;}")
+                .append(".header h2{margin:0;font-size:18px;color:#F1F5F9;}")
+                .append(".header p{margin:4px 0 0;font-size:11px;color:#94A3B8;}")
+                .append(".card{background:#FFF;padding:14px;border-radius:10px;margin-bottom:12px;border:1px solid #E2E8F0;}")
+                .append(".card-title{font-size:14px;font-weight:bold;color:#0F172A;margin-bottom:10px;border-bottom:2px solid #F1F5F9;padding-bottom:6px;}")
+                .append(".grid{display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;margin-bottom:10px;}")
+                .append(".metric{background:#F8FAFC;border:1px solid #E2E8F0;padding:10px;border-radius:8px;text-align:center;}")
+                .append(".metric .val{font-size:15px;font-weight:800;color:#0F172A;}")
+                .append(".metric .lbl{font-size:10px;color:#64748B;}")
+                .append(".gold{color:#D97706;font-weight:bold;}")
+                .append("table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11px;}")
+                .append("th{background:#0F172A;color:#FFF;padding:8px;text-align:center;}")
+                .append("td{padding:8px;border-bottom:1px solid #E2E8F0;text-align:center;}")
+                .append("</style></head><body>");
 
         html.append("<div class='header'><h2>").append(orgName).append("</h2>")
-            .append("<p>").append(isArabic ? "الفترة: " : "Period: ").append(from)
-            .append(isArabic ? " إلى " : " to ").append(to).append("</p></div>");
+                .append("<p>").append(isArabic ? "الفترة: " : "Period: ").append(from)
+                .append(isArabic ? " إلى " : " to ").append(to).append("</p></div>");
 
         switch (type) {
             case "inventory": renderInventoryHTML(html, data); break;
@@ -298,13 +327,13 @@ public class MiraReportsProFragment extends Fragment {
     private void renderDashboardHTML(StringBuilder html, JSONObject data) {
         JSONObject inv = data.optJSONObject("inventory");
         JSONObject sales = data.optJSONObject("sales");
-        
+
         if (inv == null) inv = data;
         if (sales == null) sales = data;
 
         html.append("<div class='card'><div class='card-title'>📊 ")
-            .append(isArabic ? "الملخص التنفيذي" : "Executive Summary")
-            .append("</div><div class='grid'>");
+                .append(isArabic ? "الملخص التنفيذي" : "Executive Summary")
+                .append("</div><div class='grid'>");
         html.append(metricBox("📦", String.valueOf(inv.optInt("total_items", 0)), isArabic ? "القطع" : "Items"));
         html.append(metricBox("⚖️", String.format(Locale.US, "%.1f g", inv.optDouble("total_weight", 0)), isArabic ? "الوزن" : "Weight"));
         html.append(metricBox("💰", String.format(Locale.US, "%,.0f", sales.optDouble("total_revenue", 0)), isArabic ? "الإيرادات" : "Revenue"));
@@ -315,10 +344,10 @@ public class MiraReportsProFragment extends Fragment {
     private void renderInventoryHTML(StringBuilder html, JSONObject data) {
         JSONObject summary = data.optJSONObject("summary");
         if (summary == null) summary = data;
-        
+
         html.append("<div class='card'><div class='card-title'>📦 ")
-            .append(isArabic ? "المخزون التفصيلي" : "Inventory Details")
-            .append("</div><div class='grid'>");
+                .append(isArabic ? "المخزون التفصيلي" : "Inventory Details")
+                .append("</div><div class='grid'>");
         html.append(metricBox("📦", String.valueOf(summary.optInt("total_items", 0)), isArabic ? "إجمالي" : "Total"));
         html.append(metricBox("✅", String.valueOf(summary.optInt("available_count", 0)), isArabic ? "متاح" : "Available"));
         html.append(metricBox("💰", String.valueOf(summary.optInt("sold_count", 0)), isArabic ? "مباع" : "Sold"));
@@ -328,19 +357,19 @@ public class MiraReportsProFragment extends Fragment {
         JSONArray items = data.optJSONArray("items");
         if (items != null && items.length() > 0) {
             html.append("<table><tr><th>#</th><th>").append(isArabic ? "الصنف" : "Item").append("</th><th>")
-                .append(isArabic ? "العيار" : "Karat").append("</th><th>")
-                .append(isArabic ? "الوزن" : "Weight").append("</th><th>")
-                .append(isArabic ? "الحالة" : "Status").append("</th><th>")
-                .append(isArabic ? "الموقع" : "Location").append("</th></tr>");
+                    .append(isArabic ? "العيار" : "Karat").append("</th><th>")
+                    .append(isArabic ? "الوزن" : "Weight").append("</th><th>")
+                    .append(isArabic ? "الحالة" : "Status").append("</th><th>")
+                    .append(isArabic ? "الموقع" : "Location").append("</th></tr>");
             for (int i = 0; i < Math.min(items.length(), 100); i++) {
                 JSONObject item = items.optJSONObject(i);
                 if (item == null) continue;
                 html.append("<tr><td>").append(i + 1).append("</td>")
-                    .append("<td>").append(item.optString("item_title", "—")).append("</td>")
-                    .append("<td>").append(item.optString("gold_karat", "—")).append("</td>")
-                    .append("<td>").append(String.format(Locale.US, "%.2f", item.optDouble("gross_weight_grams", 0))).append("</td>")
-                    .append("<td>").append(item.optString("vault_status", "—")).append("</td>")
-                    .append("<td>").append(item.optString("current_location", "—")).append("</td></tr>");
+                        .append("<td>").append(item.optString("item_title", "—")).append("</td>")
+                        .append("<td>").append(item.optString("gold_karat", "—")).append("</td>")
+                        .append("<td>").append(String.format(Locale.US, "%.2f", item.optDouble("gross_weight_grams", 0))).append("</td>")
+                        .append("<td>").append(item.optString("vault_status", "—")).append("</td>")
+                        .append("<td>").append(item.optString("current_location", "—")).append("</td></tr>");
             }
             html.append("</table>");
         }
@@ -349,68 +378,70 @@ public class MiraReportsProFragment extends Fragment {
     private void renderSalesHTML(StringBuilder html, JSONObject data) {
         JSONObject summary = data.optJSONObject("summary");
         if (summary == null) summary = data;
-        
+
+        int invoicesCount = summary.optInt("invoices_count", summary.optInt("total_invoices", 0));
+        double totalRevenue = summary.optDouble("total_revenue", summary.optDouble("total_sales", 0.0));
+        double avgInvoice = summary.optDouble("avg_invoice", 0.0);
+
         html.append("<div class='card'><div class='card-title'>💰 ")
-            .append(isArabic ? "المبيعات التفصيلي" : "Sales Details")
-            .append("</div><div class='grid'>");
-        html.append(metricBox("💵", String.format(Locale.US, "%,.0f", summary.optDouble("total_revenue", 0)), isArabic ? "الإيرادات" : "Revenue"));
-        html.append(metricBox("🧾", String.valueOf(summary.optInt("invoices_count", 0)), isArabic ? "الفواتير" : "Invoices"));
-        html.append(metricBox("📊", String.format(Locale.US, "%,.0f", summary.optDouble("avg_invoice", 0)), isArabic ? "متوسط الفاتورة" : "Avg Invoice"));
+                .append(isArabic ? "ملخص المبيعات" : "Sales Summary")
+                .append("</div><div class='grid'>");
+        html.append(metricBox("📄", String.valueOf(invoicesCount), isArabic ? "عدد الفواتير" : "Invoices"));
+        html.append(metricBox("💵", String.format(Locale.US, "%.2f", totalRevenue), isArabic ? "الإيرادات" : "Revenue"));
+        html.append(metricBox("📊", String.format(Locale.US, "%.2f", avgInvoice), isArabic ? "متوسط الفاتورة" : "Avg Invoice"));
         html.append("</div></div>");
 
-        JSONArray paymentBreakdown = data.optJSONArray("payment_breakdown");
-        if (paymentBreakdown != null && paymentBreakdown.length() > 0) {
-            html.append("<div class='card'><div class='card-title'>💳 ")
-                .append(isArabic ? "طرق الدفع" : "Payment Methods")
-                .append("</div><table><tr><th>").append(isArabic ? "الطريقة" : "Method").append("</th><th>")
-                .append(isArabic ? "العدد" : "Count").append("</th><th>")
-                .append(isArabic ? "المبلغ" : "Amount").append("</th></tr>");
-            for (int i = 0; i < paymentBreakdown.length(); i++) {
-                JSONObject p = paymentBreakdown.optJSONObject(i);
-                if (p != null) {
-                    html.append("<tr><td>").append(p.optString("payment_method", "—")).append("</td>")
-                        .append("<td>").append(p.optInt("count", 0)).append("</td>")
-                        .append("<td class='gold'>").append(String.format(Locale.US, "%,.0f", p.optDouble("total", 0))).append("</td></tr>");
-                }
-            }
-            html.append("</table></div>");
+        JSONArray salesArray = data.optJSONArray("invoices");
+        if (salesArray == null) {
+            salesArray = data.optJSONArray("sales");
         }
 
-        JSONArray invoices = data.optJSONArray("invoices");
-        if (invoices != null && invoices.length() > 0) {
-            html.append("<table><tr><th>").append(isArabic ? "رقم الفاتورة" : "Invoice").append("</th><th>")
-                .append(isArabic ? "العميل" : "Customer").append("</th><th>")
-                .append(isArabic ? "المبلغ" : "Amount").append("</th><th>")
-                .append(isArabic ? "التاريخ" : "Date").append("</th></tr>");
-            for (int i = 0; i < Math.min(invoices.length(), 50); i++) {
-                JSONObject inv = invoices.optJSONObject(i);
-                if (inv != null) {
-                    html.append("<tr><td>").append(inv.optString("invoice_no", "—")).append("</td>")
-                        .append("<td>").append(inv.optString("customer_name", "—")).append("</td>")
-                        .append("<td class='gold'>").append(String.format(Locale.US, "%,.0f", inv.optDouble("total", 0))).append("</td>")
-                        .append("<td>").append(inv.optString("created_at", "—")).append("</td></tr>");
-                }
+        if (salesArray != null && salesArray.length() > 0) {
+            html.append("<div class='card'><div class='card-title'>🧾 ")
+                    .append(isArabic ? "سجل الفواتير" : "Invoices Log")
+                    .append("</div><table><thead><tr>")
+                    .append("<th>#</th>")
+                    .append("<th>").append(isArabic ? "المبلغ" : "Amount").append("</th>")
+                    .append("<th>").append(isArabic ? "طريقة الدفع" : "Payment").append("</th>")
+                    .append("<th>").append(isArabic ? "البائع" : "Seller").append("</th>")
+                    .append("</tr></thead><tbody>");
+
+            for (int i = 0; i < Math.min(salesArray.length(), 100); i++) {
+                JSONObject s = salesArray.optJSONObject(i);
+                if (s == null) continue;
+
+                String id = s.optString("id", s.optString("invoice_no", "-"));
+                double amount = s.optDouble("final_amount", s.optDouble("subtotal", 0.0));
+                String method = s.optString("payment_method", "CASH");
+                String seller = s.optString("seller_name", "-");
+
+                html.append("<tr>")
+                        .append("<td>").append(id).append("</td>")
+                        .append("<td>").append(String.format(Locale.US, "%.2f", amount)).append("</td>")
+                        .append("<td>").append(method).append("</td>")
+                        .append("<td>").append(seller).append("</td>")
+                        .append("</tr>");
             }
-            html.append("</table>");
+            html.append("</tbody></table></div>");
         }
     }
 
     private void renderMovementHTML(StringBuilder html, JSONObject data) {
         JSONArray movements = data.optJSONArray("movements");
         html.append("<div class='card'><div class='card-title'>🔄 ")
-            .append(isArabic ? "سجل التحويلات" : "Transfer Log")
-            .append("</div>");
+                .append(isArabic ? "سجل التحويلات" : "Transfer Log")
+                .append("</div>");
         if (movements != null && movements.length() > 0) {
             html.append("<table><tr><th>#</th><th>").append(isArabic ? "من" : "From").append("</th><th>")
-                .append(isArabic ? "إلى" : "To").append("</th><th>")
-                .append(isArabic ? "التاريخ" : "Date").append("</th></tr>");
+                    .append(isArabic ? "إلى" : "To").append("</th><th>")
+                    .append(isArabic ? "التاريخ" : "Date").append("</th></tr>");
             for (int i = 0; i < movements.length(); i++) {
                 JSONObject m = movements.optJSONObject(i);
                 if (m != null) {
                     html.append("<tr><td>").append(i + 1).append("</td>")
-                        .append("<td>").append(m.optString("from_branch", "—")).append("</td>")
-                        .append("<td>").append(m.optString("to_branch", "—")).append("</td>")
-                        .append("<td>").append(m.optString("created_at", "—")).append("</td></tr>");
+                            .append("<td>").append(m.optString("from_branch", "—")).append("</td>")
+                            .append("<td>").append(m.optString("to_branch", "—")).append("</td>")
+                            .append("<td>").append(m.optString("created_at", "—")).append("</td></tr>");
                 }
             }
             html.append("</table>");
@@ -423,16 +454,16 @@ public class MiraReportsProFragment extends Fragment {
     private void renderBranchesHTML(StringBuilder html, JSONObject data) {
         JSONArray branches = data.optJSONArray("branches_performance");
         html.append("<div class='card'><div class='card-title'>🏢 ")
-            .append(isArabic ? "أداء الفروع" : "Branch Performance")
-            .append("</div>");
+                .append(isArabic ? "أداء الفروع" : "Branch Performance")
+                .append("</div>");
         if (branches != null && branches.length() > 0) {
             html.append("<table><tr><th>").append(isArabic ? "الفرع" : "Branch").append("</th><th>")
-                .append(isArabic ? "القطع" : "Items").append("</th></tr>");
+                    .append(isArabic ? "القطع" : "Items").append("</th></tr>");
             for (int i = 0; i < branches.length(); i++) {
                 JSONObject b = branches.optJSONObject(i);
                 if (b != null) {
                     html.append("<tr><td>").append(b.optString("branch_name", "—")).append("</td>")
-                        .append("<td>").append(b.optInt("items_count", 0)).append("</td></tr>");
+                            .append("<td>").append(b.optInt("items_count", 0)).append("</td></tr>");
                 }
             }
             html.append("</table>");
@@ -445,18 +476,18 @@ public class MiraReportsProFragment extends Fragment {
     private void renderGatesHTML(StringBuilder html, JSONObject data) {
         JSONArray logs = data.optJSONArray("gate_logs");
         html.append("<div class='card'><div class='card-title'>🚪 ")
-            .append(isArabic ? "سجل البوابات" : "Gate Log")
-            .append("</div>");
+                .append(isArabic ? "سجل البوابات" : "Gate Log")
+                .append("</div>");
         if (logs != null && logs.length() > 0) {
             html.append("<table><tr><th>").append(isArabic ? "البوابة" : "Gate").append("</th><th>")
-                .append(isArabic ? "EPC" : "EPC").append("</th><th>")
-                .append(isArabic ? "التاريخ" : "Date").append("</th></tr>");
+                    .append(isArabic ? "EPC" : "EPC").append("</th><th>")
+                    .append(isArabic ? "التاريخ" : "Date").append("</th></tr>");
             for (int i = 0; i < Math.min(logs.length(), 50); i++) {
                 JSONObject l = logs.optJSONObject(i);
                 if (l != null) {
                     html.append("<tr><td>").append(l.optString("gate_name", "—")).append("</td>")
-                        .append("<td>").append(l.optString("epc", "—")).append("</td>")
-                        .append("<td>").append(l.optString("created_at", "—")).append("</td></tr>");
+                            .append("<td>").append(l.optString("epc", "—")).append("</td>")
+                            .append("<td>").append(l.optString("created_at", "—")).append("</td></tr>");
                 }
             }
             html.append("</table>");
@@ -469,10 +500,10 @@ public class MiraReportsProFragment extends Fragment {
     private void renderAuditHTML(StringBuilder html, JSONObject data) {
         JSONObject audit = data.optJSONObject("audit_summary");
         if (audit == null) audit = data;
-        
+
         html.append("<div class='card'><div class='card-title'>📋 ")
-            .append(isArabic ? "نتائج الجرد" : "Audit Results")
-            .append("</div><div class='grid'>");
+                .append(isArabic ? "نتائج الجرد" : "Audit Results")
+                .append("</div><div class='grid'>");
         html.append(metricBox("🎯", String.format(Locale.US, "%.1f%%", audit.optDouble("accuracy", 0)), isArabic ? "الدقة" : "Accuracy"));
         html.append(metricBox("✅", String.valueOf(audit.optInt("found_items", 0)), isArabic ? "موجود" : "Found"));
         html.append(metricBox("❌", String.valueOf(audit.optInt("missing_items", 0)), isArabic ? "مفقود" : "Missing"));
@@ -481,45 +512,45 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void renderReorderHTML(StringBuilder html, JSONObject data) {
-    JSONArray items = data.optJSONArray("reorder_items");
-    html.append("<div class='card'><div class='card-title'>💎 ")
-        .append(isArabic ? "النواقص والطلب" : "Reorder & Demand")
-        .append("</div>");
-    if (items != null && items.length() > 0) {
-        html.append("<table><tr><th>").append(isArabic ? "العيار" : "Karat").append("</th><th>")
-            .append(isArabic ? "المباع" : "Sold").append("</th><th>")
-            .append(isArabic ? "المتبقي" : "Remaining").append("</th></tr>");
-        for (int i = 0; i < items.length(); i++) {
-            JSONObject item = items.optJSONObject(i);
-            if (item != null) {
-                html.append("<tr><td><b>").append(item.optString("gold_karat", "—")).append("</b></td>")
-                    .append("<td>").append(item.optInt("sold_count", 0)).append("</td>")
-                    .append("<td>").append(item.optInt("remaining_stock", 0)).append("</td></tr>");
+        JSONArray items = data.optJSONArray("reorder_items");
+        html.append("<div class='card'><div class='card-title'>💎 ")
+                .append(isArabic ? "النواقص والطلب" : "Reorder & Demand")
+                .append("</div>");
+        if (items != null && items.length() > 0) {
+            html.append("<table><tr><th>").append(isArabic ? "العيار" : "Karat").append("</th><th>")
+                    .append(isArabic ? "المباع" : "Sold").append("</th><th>")
+                    .append(isArabic ? "المتبقي" : "Remaining").append("</th></tr>");
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject item = items.optJSONObject(i);
+                if (item != null) {
+                    html.append("<tr><td><b>").append(item.optString("gold_karat", "—")).append("</b></td>")
+                            .append("<td>").append(item.optInt("sold_count", 0)).append("</td>")
+                            .append("<td>").append(item.optInt("remaining_stock", 0)).append("</td></tr>");
+                }
             }
+            html.append("</table>");
+        } else {
+            html.append("<p style='text-align:center;color:#64748B;'>")
+                    .append(isArabic ? "المخزون متوازن" : "Inventory balanced").append("</p>");
         }
-        html.append("</table>");
-    } else {
-        html.append("<p style='text-align:center;color:#64748B;'>")
-            .append(isArabic ? "المخزون متوازن" : "Inventory balanced").append("</p>");
+        html.append("</div>");
     }
-    html.append("</div>");
-}
 
     private void renderUsersHTML(StringBuilder html, JSONObject data) {
         JSONArray users = data.optJSONArray("users");
         html.append("<div class='card'><div class='card-title'>👥 ")
-            .append(isArabic ? "المستخدمين" : "Users")
-            .append("</div>");
+                .append(isArabic ? "المستخدمين" : "Users")
+                .append("</div>");
         if (users != null && users.length() > 0) {
             html.append("<table><tr><th>").append(isArabic ? "الاسم" : "Name").append("</th><th>")
-                .append(isArabic ? "الصلاحية" : "Role").append("</th><th>")
-                .append(isArabic ? "الحالة" : "Status").append("</th></tr>");
+                    .append(isArabic ? "الصلاحية" : "Role").append("</th><th>")
+                    .append(isArabic ? "الحالة" : "Status").append("</th></tr>");
             for (int i = 0; i < users.length(); i++) {
                 JSONObject u = users.optJSONObject(i);
                 if (u != null) {
                     html.append("<tr><td>").append(u.optString("display_name", "—")).append("</td>")
-                        .append("<td>").append(u.optString("role_name", "—")).append("</td>")
-                        .append("<td>").append(u.optString("status", "—")).append("</td></tr>");
+                            .append("<td>").append(u.optString("role_name", "—")).append("</td>")
+                            .append("<td>").append(u.optString("status", "—")).append("</td></tr>");
                 }
             }
             html.append("</table>");
@@ -530,17 +561,17 @@ public class MiraReportsProFragment extends Fragment {
     private void renderFinancialHTML(StringBuilder html, JSONObject data) {
         JSONArray entries = data.optJSONArray("journal_entries");
         html.append("<div class='card'><div class='card-title'>💵 ")
-            .append(isArabic ? "الحركة المالية" : "Financial Journal")
-            .append("</div>");
+                .append(isArabic ? "الحركة المالية" : "Financial Journal")
+                .append("</div>");
         if (entries != null && entries.length() > 0) {
             html.append("<table><tr><th>#</th><th>").append(isArabic ? "البيان" : "Description").append("</th><th>")
-                .append(isArabic ? "المبلغ" : "Amount").append("</th></tr>");
+                    .append(isArabic ? "المبلغ" : "Amount").append("</th></tr>");
             for (int i = 0; i < Math.min(entries.length(), 50); i++) {
                 JSONObject e = entries.optJSONObject(i);
                 if (e != null) {
                     html.append("<tr><td>").append(i + 1).append("</td>")
-                        .append("<td>").append(e.optString("description", "—")).append("</td>")
-                        .append("<td class='gold'>").append(String.format(Locale.US, "%,.0f", e.optDouble("amount", 0))).append("</td></tr>");
+                            .append("<td>").append(e.optString("description", "—")).append("</td>")
+                            .append("<td class='gold'>").append(String.format(Locale.US, "%,.0f", e.optDouble("amount", 0))).append("</td></tr>");
                 }
             }
             html.append("</table>");
@@ -561,7 +592,7 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void printReportWebView(WebView webView, String jobTitle) {
-        if (getContext() == null) return;
+        if (!isAdded() || getContext() == null || webView == null) return;
         PrintManager pm = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
         if (pm != null) {
             pm.print(jobTitle, webView.createPrintDocumentAdapter(jobTitle), new PrintAttributes.Builder().build());
@@ -569,42 +600,105 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void exportReportToCSV(String type, String from, String to) {
-        if (getContext() == null) return;
-        try {
-            String cacheKey = "cache_pro_" + type + "_" + from + "_" + to;
-            String cached = offlineCache != null ? offlineCache.getString(cacheKey, null) : null;
+        if (!isAdded() || getContext() == null) return;
 
-            if (cached == null) {
-                Toast.makeText(getContext(), isArabic ? "لا توجد بيانات" : "No data", Toast.LENGTH_SHORT).show();
-                return;
+        executorService.execute(() -> {
+            try {
+                String cacheKey = "cache_pro_" + type + "_" + from + "_" + to;
+                String cached = offlineCache != null ? offlineCache.getString(cacheKey, null) : null;
+
+                if (cached == null) {
+                    mainHandler.post(() -> Toast.makeText(getContext(), isArabic ? "لا توجد بيانات للتصدير" : "No data to export", Toast.LENGTH_SHORT).show());
+                    return;
+                }
+
+                JSONObject data = new JSONObject(cached);
+                StringBuilder csvContent = new StringBuilder();
+                
+                // إضافة BOM للتعامل السليم مع اللغة العربية في Excel
+                csvContent.append("\uFEFF");
+                csvContent.append("Report Type,").append(type).append("\n");
+                csvContent.append("From,").append(from).append(",To,").append(to).append("\n\n");
+
+                // توليد أعمدة وصفوف CSV حقيقية بحسب نوع التقرير
+                buildFormattedCSV(type, data, csvContent);
+
+                File exportDir = new File(requireContext().getCacheDir(), "exports");
+                if (!exportDir.exists()) exportDir.mkdirs();
+
+                File file = new File(exportDir, "MIRA_Report_" + type + "_" + System.currentTimeMillis() + ".csv");
+                FileOutputStream fos = new FileOutputStream(file);
+                OutputStreamWriter writer = new OutputStreamWriter(fos, StandardCharsets.UTF_8);
+
+                writer.write(csvContent.toString());
+                writer.flush();
+                writer.close();
+
+                mainHandler.post(() -> {
+                    if (!isAdded() || getContext() == null) return;
+                    Uri contentUri = FileProvider.getUriForFile(requireContext(), requireContext().getPackageName() + ".fileprovider", file);
+                    Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                    shareIntent.setType("text/csv");
+                    shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(shareIntent, "Share CSV"));
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Export CSV error", e);
+                mainHandler.post(() -> Toast.makeText(getContext(), "Export failed: " + e.getMessage(), Toast.LENGTH_SHORT).show());
             }
+        });
+    }
 
-            File exportDir = new File(requireContext().getCacheDir(), "exports");
-            if (!exportDir.exists()) exportDir.mkdirs();
+    private void buildFormattedCSV(String type, JSONObject data, StringBuilder csv) {
+        switch (type) {
+            case "inventory":
+                JSONArray items = data.optJSONArray("items");
+                csv.append("Index,Item Title,Karat,Weight(g),Status,Location\n");
+                if (items != null) {
+                    for (int i = 0; i < items.length(); i++) {
+                        JSONObject item = items.optJSONObject(i);
+                        if (item == null) continue;
+                        csv.append(i + 1).append(",")
+                           .append(escapeCsv(item.optString("item_title", "-"))).append(",")
+                           .append(escapeCsv(item.optString("gold_karat", "-"))).append(",")
+                           .append(item.optDouble("gross_weight_grams", 0)).append(",")
+                           .append(escapeCsv(item.optString("vault_status", "-"))).append(",")
+                           .append(escapeCsv(item.optString("current_location", "-"))).append("\n");
+                    }
+                }
+                break;
 
-            File file = new File(exportDir, "MIRA_Report_" + type + "_" + System.currentTimeMillis() + ".csv");
-            FileOutputStream fos = new FileOutputStream(file);
-            fos.write(0xEF); fos.write(0xBB); fos.write(0xBF);
+            case "sales":
+                JSONArray sales = data.optJSONArray("invoices");
+                if (sales == null) sales = data.optJSONArray("sales");
+                csv.append("Invoice ID,Amount,Payment Method,Seller\n");
+                if (sales != null) {
+                    for (int i = 0; i < sales.length(); i++) {
+                        JSONObject s = sales.optJSONObject(i);
+                        if (s == null) continue;
+                        csv.append(escapeCsv(s.optString("id", s.optString("invoice_no", "-")))).append(",")
+                           .append(s.optDouble("final_amount", s.optDouble("subtotal", 0.0))).append(",")
+                           .append(escapeCsv(s.optString("payment_method", "CASH"))).append(",")
+                           .append(escapeCsv(s.optString("seller_name", "-"))).append("\n");
+                    }
+                }
+                break;
 
-            StringBuilder csvContent = new StringBuilder();
-            csvContent.append("MIRA Report,").append(type).append("\n");
-            csvContent.append("From,").append(from).append(",To,").append(to).append("\n\n");
-            csvContent.append("Raw Data (JSON)\n");
-            csvContent.append("\"").append(cached.replace("\"", "\"\"")).append("\"\n");
-
-            fos.write(csvContent.toString().getBytes("UTF-8"));
-            fos.close();
-
-            Uri contentUri = FileProvider.getUriForFile(requireContext(), requireContext().getPackageName() + ".fileprovider", file);
-            Intent shareIntent = new Intent(Intent.ACTION_SEND);
-            shareIntent.setType("text/csv");
-            shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
-            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(Intent.createChooser(shareIntent, "Share"));
-
-        } catch (Exception e) {
-            Toast.makeText(getContext(), "Export failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            default:
+                csv.append("Raw Data Summary\n");
+                csv.append(escapeCsv(data.toString())).append("\n");
+                break;
         }
+    }
+
+    private String escapeCsv(String value) {
+        if (value == null) return "\"\"";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 
     private String getDefaultFromDate() { return getCalculatedDate(-30); }
@@ -617,11 +711,11 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void showDatePicker(DatePickerCallback cb) {
-        if (getContext() == null) return;
+        if (!isAdded() || getContext() == null) return;
         Calendar c = Calendar.getInstance();
         new DatePickerDialog(requireContext(),
-            (v, y, m, d) -> cb.onDate(String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d)),
-            c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show();
+                (v, y, m, d) -> cb.onDate(String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d)),
+                c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show();
     }
 
     static class ReportItem {
@@ -663,4 +757,4 @@ public class MiraReportsProFragment extends Fragment {
 
     interface OnReportClickListener { void onClick(ReportItem item); }
     interface DatePickerCallback { void onDate(String date); }
-                        }
+}
