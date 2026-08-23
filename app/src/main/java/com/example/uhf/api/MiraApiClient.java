@@ -889,15 +889,16 @@ public ApiResponse updateUserProfile(JSONObject payload) {
     }
 
     public ApiResponse getReportData(String reportType, String fromDate, String toDate, int branchId) {
-    // ✅ المسار الجديد
-    String endpoint = "/reports-app?type=" + (reportType != null ? reportType : "dashboard")
+    String cleanType = reportType != null ? reportType.replace("\"", "").replace("\\", "").replace("'", "").trim() : "dashboard";
+    
+    String endpoint = "/reports-app?type=" + cleanType
             + "&from=" + (fromDate != null ? fromDate : "")
             + "&to=" + (toDate != null ? toDate : "")
             + "&branch_id=" + branchId;
     
-    Log.d(TAG, "📊 Fetching report: " + endpoint);
+    Log.d(TAG, "📊 URL: " + endpoint);
     
-    return getWithAuth(endpoint);
+    return get(endpoint); // ✅ بدون تحقق
 }
 
 
