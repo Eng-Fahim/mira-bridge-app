@@ -405,14 +405,12 @@ public ApiResponse updateUserProfile(JSONObject payload) {
         try { p.put("user_id", userId); } catch (Exception ignored) {}
         return postWithAuth("/auth/users/delete", p);
     }
-    
-    // 1. أضف هذه الواجهة داخل كلاس MiraApiClient
 public interface ApiCallback {
     void onSuccess(ApiResponse response);
+    void onFailure(String errorMessage);
     void onError(String errorMessage);
 }
 
-// 2. أضف دالة get غيـر المتزامنة داخل MiraApiClient
 public void get(final String endpoint, final ApiCallback callback) {
     new Thread(new Runnable() {
         @Override
@@ -425,6 +423,7 @@ public void get(final String endpoint, final ApiCallback callback) {
                         callback.onSuccess(response);
                     } else {
                         String err = (response != null && response.error != null) ? response.error : "Unknown error";
+                        callback.onFailure(err);
                         callback.onError(err);
                     }
                 }
@@ -432,6 +431,7 @@ public void get(final String endpoint, final ApiCallback callback) {
         }
     }).start();
 }
+
 
 
     // ===================== 🔑 AUTHORIZE =====================
