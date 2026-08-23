@@ -1989,4 +1989,18 @@
 <string name="unknown">غير معروف</string>
 <string name="no_enabled_actions">لا توجد أزرار مفعّلة</string>
 <string name="devices_connected">الأجهزة متصلة</string>
+
+<!-- عناوين التقارير المتقدمة -->
+<string name="report_title_advanced">التقارير المتقدمة</string>
+<string name="report_gold_movement">حركة الذهب والمخزون</string>
+<string name="report_financial_summary">الخلاصة المالية والميزانية</string>
+<string name="report_inventory_audit">تقرير مطابقة الجرد</string>
+
+<!-- حالات تحميل وجلب البيانات -->
+<string name="loading_reports">جاري تحميل البيانات من السيرفر...</string>
+<string name="error_fetching_reports">فشل في جلب بيانات التقرير</string>
+<string name="no_data_available">لا توجد بيانات متاحة للفترة المحددة</string>
+<string name="invalid_date_range">تاريخ النطاق غير صحيح</string>
+
+
 </resources>
