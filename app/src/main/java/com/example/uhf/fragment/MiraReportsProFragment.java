@@ -10,6 +10,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.print.PrintAttributes;
 import android.print.PrintManager;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -228,31 +229,31 @@ public class MiraReportsProFragment extends Fragment {
                 MiraApiClient.ApiResponse response = apiClient.getReportData(reportType, fromDate, toDate, activeBranchId);
 
                 if (response != null && response.isSuccess && response.data != null) {
-                    if (response.data.has("data")) {
-                        Object innerData = response.data.opt("data");
-                        if (innerData instanceof JSONObject) {
-                            reportData = (JSONObject) innerData;
-                        } else if (innerData instanceof JSONArray) {
-                            reportData = new JSONObject();
-                            reportData.put("items_array", innerData);
-                        }
-                    }
-                    if (reportData == null) {
-                        reportData = response.data;
-                    }
-
-                    if (offlineCache != null && reportData != null) {
+                    // ✅ الإصلاح: استخدم response.data مباشرة
+                    reportData = response.data;
+                    
+                    // ✅ سجل تشخيصي
+                    Log.d(TAG, "=== Report Response (" + reportType + ") ===");
+                    Log.d(TAG, "Response keys: " + reportData.keys().toString());
+                    Log.d(TAG, "Full data (first 500 chars): " + 
+                        reportData.toString().substring(0, Math.min(500, reportData.toString().length())));
+                    
+                    // ✅ حفظ في الكاش
+                    if (offlineCache != null) {
                         offlineCache.edit().putString(cacheKey, reportData.toString()).apply();
                     }
                 } else {
                     errorMessage = isArabic ? 
                         "فشل الاتصال بالخادم (رمز الخطأ: " + (response != null ? response.code : "NULL") + ")" :
                         "Server connection failed (Error code: " + (response != null ? response.code : "NULL") + ")";
+                    Log.e(TAG, "❌ Report fetch failed: " + errorMessage);
                 }
             } catch (Exception e) {
                 errorMessage = (isArabic ? "خطأ في المعالجة: " : "Processing error: ") + e.getMessage();
+                Log.e(TAG, "Report fetch exception: " + e.getMessage());
             }
 
+            // ✅ إذا فشل، حاول من الكاش
             if (reportData == null && offlineCache != null) {
                 String cached = offlineCache.getString(cacheKey, null);
                 if (cached != null) {
@@ -345,13 +346,17 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void renderDashboardHTML(StringBuilder html, JSONObject data) {
-        JSONObject inv = data.has("inventory") ? data.optJSONObject("inventory") : data;
-        JSONObject sales = data.has("sales") ? data.optJSONObject("sales") : data;
+        // ✅ الإصلاح: قراءة البنية الصحيحة
+        JSONObject inv = data.optJSONObject("inventory");
+        JSONObject sales = data.optJSONObject("sales");
+        
+        if (inv == null) inv = data;
+        if (sales == null) sales = data;
 
         html.append("<div class='card'><div class='card-title'>")
             .append(isArabic ? "📊 الملخص التنفيذي" : "📊 Executive Summary")
             .append("</div><div class='grid'>");
-        html.append(metricBox("📦", String.valueOf(inv.optInt("total_items", inv.optInt("count", 0))), 
+        html.append(metricBox("📦", String.valueOf(inv.optInt("total_items", 0)), 
             isArabic ? "إجمالي القطع" : "Total Items"));
         html.append(metricBox("⚖️", String.format(Locale.US, "%.1f g", inv.optDouble("total_weight", 0)), 
             isArabic ? "الوزن الإجمالي" : "Total Weight"));
@@ -360,12 +365,12 @@ public class MiraReportsProFragment extends Fragment {
         html.append(metricBox("💰", String.format(Locale.US, "%,.0f", sales.optDouble("total_revenue", 0)), 
             isArabic ? "الإيرادات" : "Revenue"));
         html.append("</div></div>");
-
-        renderInventoryHTML(html, data);
     }
 
     private void renderInventoryHTML(StringBuilder html, JSONObject data) {
-        JSONObject inv = data.has("inventory") ? data.optJSONObject("inventory") : data;
+        // ✅ الإصلاح: قراءة karat_breakdown من inventory
+        JSONObject inv = data.optJSONObject("inventory");
+        if (inv == null) inv = data;
 
         html.append("<div class='card'><div class='card-title'>")
             .append(isArabic ? "📦 تفكيك العيارات والمخزون" : "📦 Karat & Inventory Breakdown")
@@ -376,15 +381,14 @@ public class MiraReportsProFragment extends Fragment {
             .append(isArabic ? "صافي 24K" : "Net 24K").append("</th></tr>");
 
         JSONArray karats = inv.optJSONArray("karat_breakdown");
-        if (karats == null) karats = inv.optJSONArray("items_array");
 
         if (karats != null && karats.length() > 0) {
             for (int i = 0; i < karats.length(); i++) {
                 JSONObject k = karats.optJSONObject(i);
                 if (k == null) continue;
-                html.append("<tr><td><b>").append(k.optString("karat", k.optString("name", "—"))).append("</b></td>")
-                    .append("<td>").append(String.format(Locale.US, "%.2f", k.optDouble("gross_weight", k.optDouble("weight", 0)))).append("</td>")
-                    .append("<td>").append(k.optInt("count", k.optInt("items_count", 0))).append("</td>")
+                html.append("<tr><td><b>").append(k.optString("karat", "—")).append("</b></td>")
+                    .append("<td>").append(String.format(Locale.US, "%.2f", k.optDouble("gross_weight", 0))).append("</td>")
+                    .append("<td>").append(k.optInt("count", 0)).append("</td>")
                     .append("<td class='gold'>").append(String.format(Locale.US, "%.2f", k.optDouble("net_24k", 0))).append("</td></tr>");
             }
         } else {
@@ -394,7 +398,9 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void renderSalesHTML(StringBuilder html, JSONObject data) {
-        JSONObject sales = data.has("sales") ? data.optJSONObject("sales") : data;
+        // ✅ الإصلاح: قراءة من sales مباشرة
+        JSONObject sales = data.optJSONObject("sales");
+        if (sales == null) sales = data;
 
         html.append("<div class='card'><div class='card-title'>")
             .append(isArabic ? "💰 تحليل المبيعات والأرباح" : "💰 Sales & Profit Analysis")
@@ -412,7 +418,6 @@ public class MiraReportsProFragment extends Fragment {
 
     private void renderMovementHTML(StringBuilder html, JSONObject data) {
         JSONArray movements = data.optJSONArray("movements");
-        if (movements == null) movements = data.optJSONArray("items_array");
 
         html.append("<div class='card'><div class='card-title'>")
             .append(isArabic ? "🔄 سجل الحركة والتحويلات" : "🔄 Movement & Transfers Log")
@@ -442,7 +447,6 @@ public class MiraReportsProFragment extends Fragment {
 
     private void renderBranchesHTML(StringBuilder html, JSONObject data) {
         JSONArray branches = data.optJSONArray("branches_performance");
-        if (branches == null) branches = data.optJSONArray("items_array");
 
         html.append("<div class='card'><div class='card-title'>")
             .append(isArabic ? "🏢 أداء الفروع المقارن" : "🏢 Branch Performance Comparison")
@@ -470,7 +474,6 @@ public class MiraReportsProFragment extends Fragment {
 
     private void renderGatesHTML(StringBuilder html, JSONObject data) {
         JSONArray logs = data.optJSONArray("gate_logs");
-        if (logs == null) logs = data.optJSONArray("items_array");
 
         html.append("<div class='card'><div class='card-title'>")
             .append(isArabic ? "🚪 سجل البوابات الأمنية والتمرير" : "🚪 Gate Security & Passage Log")
@@ -485,11 +488,11 @@ public class MiraReportsProFragment extends Fragment {
                 JSONObject l = logs.optJSONObject(i);
                 if (l == null) continue;
 
-                String time = l.optString("event_time", l.optString("timestamp", l.optString("created_at", l.optString("scan_time", "—"))));
+                String time = l.optString("created_at", "—");
                 String gateName = l.optString("gate_name", isArabic ? "البوابة الرئيسية" : "Main Gate");
-                String epc = l.optString("epc", l.optString("epc_code", "—"));
+                String epc = l.optString("epc", "—");
                 
-                boolean isAlarm = l.optBoolean("is_alarm", false) || l.optInt("alarm", 0) == 1 || "ALARM".equalsIgnoreCase(l.optString("status"));
+                boolean isAlarm = "ALARM".equalsIgnoreCase(l.optString("status"));
 
                 html.append("<tr><td>").append(time).append("</td>")
                     .append("<td>").append(gateName).append("</td>")
@@ -509,27 +512,20 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void renderAuditHTML(StringBuilder html, JSONObject data) {
-        JSONObject audit = data.has("audit_summary") ? data.optJSONObject("audit_summary") : data;
+        // ✅ الإصلاح: قراءة من audit_summary مباشرة
+        JSONObject audit = data.optJSONObject("audit_summary");
+        if (audit == null) audit = data;
 
-        int expected = audit.optInt("expected_items", audit.optInt("total_expected", 0));
-        int found = audit.optInt("found_items", audit.optInt("total_found", 0));
-        int missing = audit.optInt("missing_items", audit.optInt("total_missing", 0));
+        int expected = audit.optInt("expected_items", 0);
+        int found = audit.optInt("found_items", 0);
+        int missing = audit.optInt("missing_items", 0);
         int sessions = audit.optInt("total_sessions", 0);
         
-        double accuracy = (expected > 0) ? audit.optDouble("accuracy", 0.0) : 0.0;
-        boolean hasData = audit.optBoolean("has_data", (sessions > 0 || expected > 0));
+        double accuracy = audit.optDouble("accuracy", 0.0);
 
         html.append("<div class='card'><div class='card-title'>")
             .append(isArabic ? "📋 نتائج مطابقة الجرد" : "📋 Inventory Audit Results")
             .append("</div>");
-
-        if (!hasData && expected == 0) {
-            html.append("<div style='text-align:center;padding:15px;color:#64748B;'>")
-                .append(isArabic ? "⚠️ لا توجد جلسات جرد أو بيانات مطابقة خلال الفترة المحددة." : 
-                    "⚠️ No audit sessions or matching data in the selected period.")
-                .append("</div></div>");
-            return;
-        }
 
         html.append("<div class='grid'>")
             .append(metricBox("🎯", String.format(Locale.US, "%.1f%%", accuracy), 
@@ -545,7 +541,6 @@ public class MiraReportsProFragment extends Fragment {
 
     private void renderReorderHTML(StringBuilder html, JSONObject data) {
         JSONArray items = data.optJSONArray("reorder_items");
-        if (items == null) items = data.optJSONArray("items_array");
 
         html.append("<div class='card'><div class='card-title'>")
             .append(isArabic ? "💎 قائمة النواقص وإعادة الطلب" : "💎 Reorder & Demand List")
@@ -692,4 +687,4 @@ public class MiraReportsProFragment extends Fragment {
 
     interface OnReportClickListener { void onClick(ReportItem item); }
     interface DatePickerCallback { void onDate(String date); }
-}
+            }
