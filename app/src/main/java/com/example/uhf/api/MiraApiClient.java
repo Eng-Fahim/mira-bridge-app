@@ -909,34 +909,41 @@ public ApiResponse updateUserProfile(JSONObject payload) {
 }
 
     public ApiResponse getWithAuth(String endpoint) {
-        // ✅ التحقق من وجود credentials صالحة
-        if (!hasValidCredentials()) {
-            Log.e(TAG, "Attempting API call without valid credentials: " + endpoint);
-            return new ApiResponse(401, null, "Unauthorized - Please login first");
+    // ✅ لا ترفض الطلب - فقط سجل تحذير
+    if (!hasValidCredentials()) {
+        Log.w(TAG, "⚠️ No valid credentials for: " + endpoint + " - trying anyway");
+    }
+    
+    HttpURLConnection conn = null;
+    try {
+        String fullUrl = apiUrl + endpoint;
+        URL url = new URL(fullUrl);
+        conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        
+        // ✅ أضف المفتاح فقط إذا كان موجوداً
+        String effectiveKey = getEffectiveApiKey();
+        if (!effectiveKey.isEmpty()) {
+            conn.setRequestProperty("X-MIRA-API-Key", effectiveKey);
         }
         
-        HttpURLConnection conn = null;
-        try {
-            String fullUrl = apiUrl + endpoint;
-            URL url = new URL(fullUrl);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            conn.setRequestProperty("X-MIRA-API-Key", getEffectiveApiKey());
-            String token = getAuthToken();
-            if (!token.isEmpty()) {
-                conn.setRequestProperty("Authorization", "Bearer " + token);
-                conn.setRequestProperty("X-MIRA-Auth-Token", token);
-            }
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
-            return buildResponse(conn);
-        } catch (Exception e) {
-            return new ApiResponse(-1, null, e.getMessage());
-        } finally {
-            if (conn != null) conn.disconnect();
+        // ✅ أضف التوكن فقط إذا كان موجوداً
+        String token = getAuthToken();
+        if (!token.isEmpty()) {
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+            conn.setRequestProperty("X-MIRA-Auth-Token", token);
         }
+        
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(15000);
+        return buildResponse(conn);
+    } catch (Exception e) {
+        return new ApiResponse(-1, null, e.getMessage());
+    } finally {
+        if (conn != null) conn.disconnect();
     }
+}
 
     public ApiResponse postWithAuth(String endpoint, JSONObject payload) {
         // ✅ التحقق من وجود credentials صالحة
