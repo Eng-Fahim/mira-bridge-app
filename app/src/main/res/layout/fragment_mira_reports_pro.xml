@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:attr/colorBackground"
@@ -36,7 +37,7 @@
             android:textColor="?attr/colorPrimary"
             android:textSize="11sp"
             android:textStyle="bold"
-            app:backgroundTint="@android:color/white"
+            app:backgroundTint="?attr/colorSurface"
             app:cornerRadius="8dp" />
     </LinearLayout>
 
@@ -47,6 +48,7 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:clipToPadding="false"
-        android:padding="8dp" />
+        android:padding="8dp"
+        tools:listitem="@android:layout/simple_list_item_2" />
 
 </LinearLayout>
