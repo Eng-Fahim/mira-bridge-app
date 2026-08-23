@@ -1,6 +1,7 @@
 package com.example.uhf.dialog;
 
 import android.app.Dialog;
+import android.content.DialogInterface;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -35,20 +36,26 @@ public class POSCheckoutDialog extends DialogFragment {
     public interface OnCheckoutListener {
         void onCheckout(POSCheckoutData data);
     }
+    
+    // ✅ إضافة واجهة للإغلاق
+    public interface OnDialogDismissListener {
+        void onDialogDismissed();
+    }
 
     public static class POSCheckoutData {
-    public String customerName = "";
-    public String customerPhone = "";
-    public String customerEmail = "";
-    public String customerAddress = "";
-    public String customerNotes = "";
-    public String paymentMethod = "CASH";
-    public String accountCode = "110101";
-    public double originalTotal = 0.0;     // ✅ المجموع الأصلي قبل الخصم
-    public double discount = 0.0;           // نسبة الخصم
-    public double discountAmount = 0.0;    // قيمة الخصم
-    public double finalAmount = 0.0;        // المجموع النهائي
-}
+        public String customerName = "";
+        public String customerPhone = "";
+        public String customerEmail = "";
+        public String customerAddress = "";
+        public String customerNotes = "";
+        public String paymentMethod = "CASH";
+        public String accountCode = "110101";
+        public String currency = "USD";
+        public double originalTotal = 0.0;
+        public double discount = 0.0;
+        public double discountAmount = 0.0;
+        public double finalAmount = 0.0;
+    }
 
     private static final String ARG_TOTAL_AMOUNT = "total_amount";
     private static final String ARG_ITEM_COUNT = "item_count";
@@ -56,9 +63,10 @@ public class POSCheckoutDialog extends DialogFragment {
     private double totalAmount = 0.0;
     private int itemCount = 0;
     private OnCheckoutListener listener;
+    private OnDialogDismissListener dismissListener;
     private boolean isArabic;
     private MiraOrgProfileManager orgProfile;
-    private MiraPriceManager priceManager; // ✅ إضافة مدير الأسعار
+    private MiraPriceManager priceManager;
 
     private TextView tvDialogTitle, tvItemCount, tvSubtotal, tvDiscountAmount, tvFinalTotal, tvAccountNumber;
     private EditText etCustomerName, etCustomerPhone, etCustomerEmail, etCustomerAddress, etCustomerNotes, etDiscount;
@@ -78,6 +86,20 @@ public class POSCheckoutDialog extends DialogFragment {
     public void setCheckoutListener(OnCheckoutListener listener) {
         this.listener = listener;
     }
+    
+    // ✅ إضافة setter للإغلاق
+    public void setOnDismissListener(OnDialogDismissListener listener) {
+        this.dismissListener = listener;
+    }
+    
+    // ✅ استدعاء عند إغلاق الديالوج
+    @Override
+    public void onDismiss(@NonNull DialogInterface dialog) {
+        super.onDismiss(dialog);
+        if (dismissListener != null) {
+            dismissListener.onDialogDismissed();
+        }
+    }
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -89,7 +111,7 @@ public class POSCheckoutDialog extends DialogFragment {
         isArabic = AppCompatDelegate.getApplicationLocales().toLanguageTags().contains("ar");
         if (getContext() != null) {
             orgProfile = MiraOrgProfileManager.getInstance(getContext());
-            priceManager = MiraPriceManager.getInstance(getContext()); // ✅ تهيئة مدير الأسعار
+            priceManager = MiraPriceManager.getInstance(getContext());
         }
     }
 
@@ -107,7 +129,6 @@ public class POSCheckoutDialog extends DialogFragment {
     @Override
     public void onStart() {
         super.onStart();
-        // ضبط عرض الـ Dialog ليكون 90% من عرض الشاشة لمنع الضغط الأفقي
         if (getDialog() != null && getDialog().getWindow() != null) {
             getDialog().getWindow().setLayout(
                     (int) (getResources().getDisplayMetrics().widthPixels * 0.92),
@@ -306,47 +327,48 @@ public class POSCheckoutDialog extends DialogFragment {
         }
 
         if (btnConfirmCheckout != null) {
-    btnConfirmCheckout.setOnClickListener(v -> {
-        if (!validateInputs()) {
-            return;
+            btnConfirmCheckout.setOnClickListener(v -> {
+                if (!validateInputs()) {
+                    return;
+                }
+
+                POSCheckoutData data = new POSCheckoutData();
+
+                if (etCustomerName != null) data.customerName = etCustomerName.getText().toString().trim();
+                if (etCustomerPhone != null) data.customerPhone = etCustomerPhone.getText().toString().trim();
+                if (etCustomerEmail != null) data.customerEmail = etCustomerEmail.getText().toString().trim();
+                if (etCustomerAddress != null) data.customerAddress = etCustomerAddress.getText().toString().trim();
+                if (etCustomerNotes != null) data.customerNotes = etCustomerNotes.getText().toString().trim();
+
+                int paymentPosition = spPaymentMethod != null ? spPaymentMethod.getSelectedItemPosition() : 0;
+                data.paymentMethod = getEnglishPaymentMethod(paymentPosition);
+                data.accountCode = getCurrentAccountCode();
+                
+                // ✅ حفظ العملة
+                if (priceManager != null) {
+                    data.currency = priceManager.getDefaultCurrency();
+                }
+
+                String discountStr = (etDiscount != null) ? etDiscount.getText().toString().trim() : "0";
+                try {
+                    data.discount = discountStr.isEmpty() ? 0 : Double.parseDouble(discountStr);
+                } catch (Exception e) {
+                    data.discount = 0;
+                }
+
+                data.originalTotal = totalAmount;
+                data.discountAmount = totalAmount * (data.discount / 100.0);
+                data.finalAmount = totalAmount - data.discountAmount;
+
+                dismissAllowingStateLoss();
+
+                if (listener != null) {
+                    listener.onCheckout(data);
+                }
+            });
         }
-
-        POSCheckoutData data = new POSCheckoutData();
-
-        if (etCustomerName != null) data.customerName = etCustomerName.getText().toString().trim();
-        if (etCustomerPhone != null) data.customerPhone = etCustomerPhone.getText().toString().trim();
-        if (etCustomerEmail != null) data.customerEmail = etCustomerEmail.getText().toString().trim();
-        if (etCustomerAddress != null) data.customerAddress = etCustomerAddress.getText().toString().trim();
-        if (etCustomerNotes != null) data.customerNotes = etCustomerNotes.getText().toString().trim();
-
-        int paymentPosition = spPaymentMethod != null ? spPaymentMethod.getSelectedItemPosition() : 0;
-        data.paymentMethod = getEnglishPaymentMethod(paymentPosition);
-        data.accountCode = getCurrentAccountCode();
-
-        String discountStr = (etDiscount != null) ? etDiscount.getText().toString().trim() : "0";
-        try {
-            data.discount = discountStr.isEmpty() ? 0 : Double.parseDouble(discountStr);
-        } catch (Exception e) {
-            data.discount = 0;
-        }
-
-        // ✅ حفظ جميع القيم المالية بشكل صحيح
-        data.originalTotal = totalAmount;                                    // المجموع الأصلي
-        data.discountAmount = totalAmount * (data.discount / 100.0);       // قيمة الخصم
-        data.finalAmount = totalAmount - data.discountAmount;              // المجموع النهائي
-
-        dismissAllowingStateLoss();
-
-        if (listener != null) {
-            listener.onCheckout(data);
-        }
-    });
-}
     }
 
-    /**
-     * ✅ تحديث عرض الأسعار بالعملة الصحيحة
-     */
     private void updateFinalAmount() {
         double discountPercent = 0.0;
         if (etDiscount != null) {
@@ -359,7 +381,6 @@ public class POSCheckoutDialog extends DialogFragment {
         double discountAmount = totalAmount * (discountPercent / 100.0);
         double finalAmount = totalAmount - discountAmount;
 
-        // ✅ استخدام MiraPriceManager لتنسيق الأسعار بالعملة الصحيحة
         if (tvSubtotal != null) {
             tvSubtotal.setText(priceManager.formatPriceDefault(totalAmount));
         }
