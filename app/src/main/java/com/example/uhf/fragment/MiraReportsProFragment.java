@@ -137,78 +137,93 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void openReportDialog(ReportItem item) {
-        if (getContext() == null || !isAdded()) return;
+    if (getContext() == null || !isAdded()) return;
 
-        if (permissionManager != null && !permissionManager.canAccessFragment("Reports")) {
-            Toast.makeText(getContext(),
-                    isArabic ? "⛔ غير مصرح لك بالوصول للتقارير" : "⛔ Access Denied",
-                    Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
-
-        TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
-        WebView webView = dialogView.findViewById(R.id.webReportView);
-        View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
-        TextView tvLoadingStatus = dialogView.findViewById(R.id.tvLoadingStatus);
-
-        MaterialButton btnFrom = dialogView.findViewById(R.id.btnReportDateFrom);
-        MaterialButton btnTo = dialogView.findViewById(R.id.btnReportDateTo);
-        MaterialButton btnApply = dialogView.findViewById(R.id.btnReportApplyFilter);
-        MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
-        MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
-        MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
-
-        tvTitle.setText(item.icon + " " + item.title);
-
-        WebSettings webSettings = webView.getSettings();
-        webSettings.setJavaScriptEnabled(true);
-        webSettings.setDomStorageEnabled(true);
-        webSettings.setLoadWithOverviewMode(true);
-        webSettings.setUseWideViewPort(true);
-        webSettings.setBuiltInZoomControls(true);
-        webSettings.setDisplayZoomControls(false);
-        webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
-        
-        webSettings.setAllowFileAccess(true);
-        webSettings.setAllowContentAccess(true);
-        webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        webView.setBackgroundColor(0x00000000); 
-
-        final String[] dates = {getDefaultFromDate(), getDefaultToDate()};
-        btnFrom.setText((isArabic ? "من: " : "From: ") + dates[0]);
-        btnTo.setText((isArabic ? "إلى: " : "To: ") + dates[1]);
-
-        AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
-                .setView(dialogView)
-                .create();
-
-        // حفظ المراجع بشكل صحيح بعد الإنشاء
-        currentReportDialog = dialog;
-        currentWebView = webView;
-
-        btnFrom.setOnClickListener(v -> showDatePicker(date -> {
-            dates[0] = date;
-            btnFrom.setText((isArabic ? "من: " : "From: ") + date);
-        }));
-
-        btnTo.setOnClickListener(v -> showDatePicker(date -> {
-            dates[1] = date;
-            btnTo.setText((isArabic ? "إلى: " : "To: ") + date);
-        }));
-
-        btnApply.setOnClickListener(v -> fetchAndRenderReport(item.type, webView, layoutLoading, tvLoadingStatus, dates[0], dates[1], dialog));
-        btnPrint.setOnClickListener(v -> printReportWebView(webView, item.title));
-        btnExport.setOnClickListener(v -> exportReportToCSV(item.type, dates[0], dates[1]));
-
-        btnClose.setOnClickListener(v -> safeDismissDialog(dialog, webView));
-        dialog.setOnCancelListener(d -> safeDismissDialog(dialog, webView));
-
-        dialog.show();
-
-        webView.post(() -> fetchAndRenderReport(item.type, webView, layoutLoading, tvLoadingStatus, dates[0], dates[1], dialog));
+    if (permissionManager != null && !permissionManager.canAccessFragment("Reports")) {
+        Toast.makeText(getContext(),
+                isArabic ? "⛔ غير مصرح لك بالوصول للتقارير" : "⛔ Access Denied",
+                Toast.LENGTH_SHORT).show();
+        return;
     }
+
+    View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
+
+    TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
+    WebView webView = dialogView.findViewById(R.id.webReportView);
+    View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
+    TextView tvLoadingStatus = dialogView.findViewById(R.id.tvLoadingStatus);
+
+    MaterialButton btnFrom = dialogView.findViewById(R.id.btnReportDateFrom);
+    MaterialButton btnTo = dialogView.findViewById(R.id.btnReportDateTo);
+    MaterialButton btnApply = dialogView.findViewById(R.id.btnReportApplyFilter);
+    MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
+    MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
+    MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
+
+    tvTitle.setText(item.icon + " " + item.title);
+
+    WebSettings webSettings = webView.getSettings();
+    webSettings.setJavaScriptEnabled(true);
+    webSettings.setDomStorageEnabled(true);
+    webSettings.setLoadWithOverviewMode(true);
+    webSettings.setUseWideViewPort(true);
+    webSettings.setBuiltInZoomControls(true);
+    webSettings.setDisplayZoomControls(false);
+    webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+    
+    webSettings.setAllowFileAccess(true);
+    webSettings.setAllowContentAccess(true);
+    webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+    webView.setBackgroundColor(0x00000000); 
+
+    // استخدام مصفوفة لتخزين التواريخ المحدثة ديناميكياً
+    final String[] selectedDates = new String[]{getDefaultFromDate(), getDefaultToDate()};
+    
+    btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
+    btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
+
+    AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
+            .setView(dialogView)
+            .create();
+
+    currentReportDialog = dialog;
+    currentWebView = webView;
+
+    // 1. تحديث تاريخ البداية
+    btnFrom.setOnClickListener(v -> showDatePicker(date -> {
+        selectedDates[0] = date;
+        btnFrom.setText((isArabic ? "من: " : "From: ") + date);
+    }));
+
+    // 2. تحديث تاريخ النهاية
+    btnTo.setOnClickListener(v -> showDatePicker(date -> {
+        selectedDates[1] = date;
+        btnTo.setText((isArabic ? "إلى: " : "To: ") + date);
+    }));
+
+    // 3. عند الضغط على تطبيق: يتم جلب التواريخ المحدثة مباشرة من selectedDates
+    btnApply.setOnClickListener(v -> {
+        String fromDate = selectedDates[0];
+        String toDate = selectedDates[1];
+        
+        // إعادة جلب التقرير بالتواريخ الجديدة
+        fetchAndRenderReport(item.type, webView, layoutLoading, tvLoadingStatus, fromDate, toDate, dialog);
+    });
+
+    btnPrint.setOnClickListener(v -> printReportWebView(webView, item.title));
+    
+    // تصحيح التصدير ليعتمد أيضاً على التواريخ المحددة حالياً
+    btnExport.setOnClickListener(v -> exportReportToCSV(item.type, selectedDates[0], selectedDates[1]));
+
+    btnClose.setOnClickListener(v -> safeDismissDialog(dialog, webView));
+    dialog.setOnCancelListener(d -> safeDismissDialog(dialog, webView));
+
+    dialog.show();
+
+    // التحميل الأول بالتواريخ الافتراضية
+    webView.post(() -> fetchAndRenderReport(item.type, webView, layoutLoading, tvLoadingStatus, selectedDates[0], selectedDates[1], dialog));
+}
+
 
     private void safeDismissDialog(AlertDialog dialog, WebView webView) {
         if (webView != null) {
