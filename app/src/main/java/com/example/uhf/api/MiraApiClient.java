@@ -226,31 +226,35 @@ public class MiraApiClient {
     }
 
     private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
-        int responseCode = conn.getResponseCode();
-        InputStream is = (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream();
+    int responseCode = conn.getResponseCode();
+    InputStream is = (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream();
 
-        if (is == null) {
-            return new ApiResponse(responseCode, null, "Empty response");
-        }
-
-        StringBuilder response = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                response.append(line.trim());
-            }
-        }
-
-        String responseBody = response.toString();
-        JSONObject json = null;
-        try {
-            if (!responseBody.isEmpty()) {
-                json = new JSONObject(responseBody);
-            }
-        } catch (Exception ignored) {}
-
-        return new ApiResponse(responseCode, json, responseCode >= 400 ? responseBody : null);
+    if (is == null) {
+        return new ApiResponse(responseCode, null, "Empty response");
     }
+
+    StringBuilder response = new StringBuilder();
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+        String line;
+        while ((line = reader.readLine()) != null) {
+            response.append(line.trim());
+        }
+    }
+
+    String responseBody = response.toString();
+    JSONObject json = null;
+    try {
+        if (!responseBody.isEmpty()) {
+            json = new JSONObject(responseBody);
+        }
+    } catch (Exception ignored) {}
+
+    // ✅ إنشاء ApiResponse مع تخزين النص الخام
+    ApiResponse apiResponse = new ApiResponse(responseCode, json, responseCode >= 400 ? responseBody : null);
+    apiResponse.setBody(responseBody); // ✅ حفظ النص الخام
+    
+    return apiResponse;
+}
 
     // ===================== 🔑 AUTHENTICATION =====================
 
@@ -1206,17 +1210,35 @@ public class MiraApiClient {
 
     // ===================== ApiResponse =====================
 
+
+    // ===================== ApiResponse =====================
+
     public static class ApiResponse {
         public final int code;
         public final JSONObject data;
         public final String error;
         public final boolean isSuccess;
+        private String rawBody; // ✅ إضافة حقل لتخزين النص الخام
 
         public ApiResponse(int code, JSONObject data, String error) {
             this.code = code;
             this.data = data;
             this.error = error;
             this.isSuccess = code >= 200 && code < 300;
+            this.rawBody = data != null ? data.toString() : ""; // ✅ تخزين النص الخام
+        }
+
+        // ✅ إضافة دالة getBody() المفقودة
+        public String getBody() {
+            if (rawBody != null && !rawBody.isEmpty()) {
+                return rawBody;
+            }
+            return data != null ? data.toString() : "";
+        }
+
+        // ✅ إضافة دالة setBody() للسماح بتعيين النص الخام من buildResponse
+        public void setBody(String body) {
+            this.rawBody = body;
         }
 
         public String optString(String key, String defaultValue) {
@@ -1239,4 +1261,4 @@ public class MiraApiClient {
             return null;
         }
     }
-}
+    }
