@@ -89,4 +89,12 @@ dependencies {
     implementation 'androidx.preference:preference:1.2.1'
       // أضف هذا السطر لمكتبة التشفير
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+    
+    
+        
+    // Room Database
+    implementation "androidx.room:room-runtime:2.6.0"
+    annotationProcessor "androidx.room:room-compiler:2.6.0"
+    // للـ Kotlin إذا كنت تستخدمه:
+    // kapt "androidx.room:room-compiler:2.6.0"
 }
