@@ -1214,25 +1214,21 @@ public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod, 
     }
     
     //المزامنة للجرد
-    public ApiResponse syncOfflineTransactions(JSONArray transactionsArray) {
-    ApiResponse response = new ApiResponse();
-    
+    // ✅ الكود الصحيح
+public ApiResponse syncOfflineTransactions(JSONArray transactionsArray) {
     try {
-        // إرسال المعاملات للخادم
+        // إنشاء payload
         JSONObject payload = new JSONObject();
         payload.put("transactions", transactionsArray);
+        payload.put("gate_id", getEffectiveGateId());
         
-        // استدعاء API المناسب
-        // هذا مثال - عدل حسب API الفعلي الخاص بك
-        response = postRequest("/api/inventory/sync-offline", payload);
+        // استخدام الدوال الموجودة في الكلاس
+        return postWithAuth("/inventory/sync-offline", payload);
         
     } catch (Exception e) {
         Log.e(TAG, "Error syncing offline transactions", e);
-        response.isSuccess = false;
-        response.error = e.getMessage();
+        return new ApiResponse(-1, null, e.getMessage());
     }
-    
-    return response;
 }
     
 
@@ -1356,4 +1352,4 @@ public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod, 
             return null;
         }
     }
-                                         }
+                         }
