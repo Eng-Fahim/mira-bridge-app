@@ -171,12 +171,53 @@ public class MiraReportsProFragment extends Fragment {
         MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
         MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
 
+        final String[] selectedDates = new String[]{getDefaultFromDate(), getDefaultToDate()};
+
+        btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
+        btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
+
+        MaterialButton btnQuickToday = dialogView.findViewById(R.id.btnQuickToday);
+        MaterialButton btnQuickWeek = dialogView.findViewById(R.id.btnQuickWeek);
+        MaterialButton btnQuickMonth = dialogView.findViewById(R.id.btnQuickMonth);
+
+        if (btnQuickToday != null) {
+            btnQuickToday.setOnClickListener(v -> {
+                String today = getDefaultToDate();
+                selectedDates[0] = today;
+                selectedDates[1] = today;
+                btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
+                btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
+                btnApply.performClick();
+            });
+        }
+
+        if (btnQuickWeek != null) {
+            btnQuickWeek.setOnClickListener(v -> {
+                selectedDates[0] = getCalculatedDate(-7);
+                selectedDates[1] = getDefaultToDate();
+                btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
+                btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
+                btnApply.performClick();
+            });
+        }
+
+        if (btnQuickMonth != null) {
+            btnQuickMonth.setOnClickListener(v -> {
+                selectedDates[0] = getCalculatedDate(-30);
+                selectedDates[1] = getDefaultToDate();
+                btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
+                btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
+                btnApply.performClick();
+            });
+        }
+
         View layoutAdvancedFilters = dialogView.findViewById(R.id.layoutAdvancedFilters);
         Spinner spinnerUsers = dialogView.findViewById(R.id.spinnerReportUsers);
         EditText etItemCode = dialogView.findViewById(R.id.etReportItemCode);
 
         tvTitle.setText(item.icon + " " + item.title);
 
+        // إعدادات الـ WebView الآمنة والمستقرة لمنع الصفحة البيضاء
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
         webSettings.setDomStorageEnabled(true);
@@ -191,6 +232,7 @@ public class MiraReportsProFragment extends Fragment {
         webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         
         webView.setBackgroundColor(0xFFFFFFFF);
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 
         if (layoutAdvancedFilters != null) {
             boolean isUserReport = "user_timeline".equals(item.type);
@@ -209,11 +251,6 @@ public class MiraReportsProFragment extends Fragment {
                 etItemCode.setVisibility(isItemReport ? View.VISIBLE : View.GONE);
             }
         }
-
-        final String[] selectedDates = new String[]{getDefaultFromDate(), getDefaultToDate()};
-
-        btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
-        btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
 
         AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
                 .setView(dialogView)
@@ -257,6 +294,7 @@ public class MiraReportsProFragment extends Fragment {
 
         dialog.show();
 
+        // تنفيذ الجلب الأولي للبيانات بعد فتح الواجهة
         webView.post(() -> fetchAndRenderReportEx(item, webView, layoutLoading, tvLoadingStatus, selectedDates[0], selectedDates[1], 0, "", dialog));
     }
 
@@ -316,6 +354,9 @@ public class MiraReportsProFragment extends Fragment {
 
                 getActivity().runOnUiThread(() -> {
                     if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+                    if (webView == null || currentWebView == null) return;
+
+                    webView.setVisibility(View.VISIBLE);
 
                     String jsonResponse = response.getBody() != null ? response.getBody() : "";
                     
@@ -326,6 +367,7 @@ public class MiraReportsProFragment extends Fragment {
                         htmlContent = generateExecutiveHTML(item.type, parseJsonObject(jsonResponse), fromDate, toDate);
                     }
 
+                    // الإصلاح الحاسم: استخدام https://localhost/ يمنع حظر المحتوى وشاشة العرض البيضاء
                     webView.loadDataWithBaseURL("https://localhost/", htmlContent, "text/html", "UTF-8", null);
                 });
             }
@@ -390,8 +432,8 @@ public class MiraReportsProFragment extends Fragment {
         html.append("<!DOCTYPE html><html dir='").append(isArabic ? "rtl" : "ltr").append("'><head>");
         html.append("<meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>");
         html.append("<style>");
-        html.append("body { font-family: sans-serif; margin: 15px; background-color: #fff; color: #333; }");
-        html.append(".card { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }");
+        html.append("html, body { background-color: #ffffff; color: #333333; margin: 0; padding: 15px; font-family: sans-serif; display: block; width: 100%; box-sizing: border-box; }");
+        html.append(".card { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; border: 1px solid #e2e8f0; }");
         html.append(".timeline-item { border-right: 3px solid #1a73e8; padding-right: 15px; margin-bottom: 15px; position: relative; }");
         html.append(".badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: #fff; background: #1a73e8; }");
         html.append("table { width: 100%; border-collapse: collapse; margin-top: 10px; }");
@@ -458,7 +500,7 @@ public class MiraReportsProFragment extends Fragment {
         html.append("<!DOCTYPE html><html dir='").append(dir).append("'><head><meta charset='UTF-8'>")
                 .append("<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>")
                 .append("<style>")
-                .append("html, body { background-color: #F4F6F9 !important; color: #1F2937; margin: 0; padding: 12px; width: 100% !important; height: auto !important; min-height: 100vh; box-sizing: border-box; }")
+                .append("html, body { background-color: #F4F6F9; color: #1F2937; margin: 0; padding: 12px; width: 100%; display: block; box-sizing: border-box; }")
                 .append(".header{background:linear-gradient(135deg,#1E293B,#0F172A);color:#FFF;padding:16px;border-radius:12px;margin-bottom:12px;}")
                 .append(".header h2{margin:0;font-size:18px;color:#F1F5F9;}")
                 .append(".header p{margin:4px 0 0;font-size:11px;color:#94A3B8;}")
