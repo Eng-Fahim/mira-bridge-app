@@ -187,8 +187,10 @@ public class MiraReportsProFragment extends Fragment {
         webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         webSettings.setAllowFileAccess(true);
         webSettings.setAllowContentAccess(true);
+        webSettings.setDatabaseEnabled(true);
         webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        webView.setBackgroundColor(0x00000000);
+        
+        webView.setBackgroundColor(0xFFFFFFFF);
 
         if (layoutAdvancedFilters != null) {
             boolean isUserReport = "user_timeline".equals(item.type);
@@ -281,99 +283,96 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void fetchAndRenderReportEx(ReportItem item, WebView webView, View layoutLoading,
-                                   TextView tvLoadingStatus, String fromDate, String toDate,
-                                   int userId, String itemCode, Dialog dialog) {
-    if (getContext() == null || !isAdded()) return;
+                                        TextView tvLoadingStatus, String fromDate, String toDate,
+                                        int userId, String itemCode, Dialog dialog) {
+        if (getContext() == null || !isAdded()) return;
 
-    if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
-    if (tvLoadingStatus != null) tvLoadingStatus.setText(isArabic ? "جاري جلب وتحليل البيانات..." : "Fetching and analyzing data...");
+        if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
+        if (tvLoadingStatus != null) tvLoadingStatus.setText(isArabic ? "جاري جلب وتحليل البيانات..." : "Fetching and analyzing data...");
 
-    boolean isAdvanced = "user_timeline".equals(item.type) || "item_passport".equals(item.type) || "inventory_aging".equals(item.type);
-    String endpoint = isAdvanced ? "/reports-analytics" : "/reports-app";
+        boolean isAdvanced = "user_timeline".equals(item.type) || "item_passport".equals(item.type) || "inventory_aging".equals(item.type);
+        String endpoint = isAdvanced ? "/reports-analytics" : "/reports-app";
 
-    StringBuilder urlBuilder = new StringBuilder();
-    urlBuilder.append(endpoint)
-              .append("?type=").append(item.type)
-              .append("&from=").append(fromDate)
-              .append("&to=").append(toDate)
-              .append("&branch_id=").append(currentBranchId);
+        StringBuilder urlBuilder = new StringBuilder();
+        urlBuilder.append(endpoint)
+                  .append("?type=").append(item.type)
+                  .append("&from=").append(fromDate)
+                  .append("&to=").append(toDate)
+                  .append("&branch_id=").append(currentBranchId);
 
-    if (userId > 0) {
-        urlBuilder.append("&user_id=").append(userId);
+        if (userId > 0) {
+            urlBuilder.append("&user_id=").append(userId);
+        }
+        if (itemCode != null && !itemCode.trim().isEmpty()) {
+            urlBuilder.append("&item_code=").append(Uri.encode(itemCode.trim()));
+        }
+
+        String requestUrl = urlBuilder.toString();
+
+        apiClient.get(requestUrl, new MiraApiClient.ApiCallback() {
+            @Override
+            public void onSuccess(MiraApiClient.ApiResponse response) {
+                if (getActivity() == null || !isAdded()) return;
+
+                getActivity().runOnUiThread(() -> {
+                    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+
+                    String jsonResponse = response.getBody() != null ? response.getBody() : "";
+                    
+                    String htmlContent;
+                    if ("user_timeline".equals(item.type) || "item_passport".equals(item.type)) {
+                        htmlContent = buildReportHtmlTemplate(item, jsonResponse, isArabic);
+                    } else {
+                        htmlContent = generateExecutiveHTML(item.type, parseJsonObject(jsonResponse), fromDate, toDate);
+                    }
+
+                    webView.loadDataWithBaseURL("https://localhost/", htmlContent, "text/html", "UTF-8", null);
+                });
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                handleReportError(errorMessage, layoutLoading);
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                handleReportError(errorMessage, layoutLoading);
+            }
+        });
     }
-    if (itemCode != null && !itemCode.trim().isEmpty()) {
-        urlBuilder.append("&item_code=").append(Uri.encode(itemCode.trim()));
-    }
 
-    String requestUrl = urlBuilder.toString();
-
-    apiClient.get(requestUrl, new MiraApiClient.ApiCallback() {
-        @Override
-        public void onSuccess(MiraApiClient.ApiResponse response) {
-            if (getActivity() == null || !isAdded()) return;
-
-            getActivity().runOnUiThread(() -> {
-                if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-
-                String jsonResponse = response.getBody() != null ? response.getBody() : "";
-                
-                String htmlContent;
-                if ("user_timeline".equals(item.type) || "item_passport".equals(item.type)) {
-                    htmlContent = buildReportHtmlTemplate(item, jsonResponse, isArabic);
-                } else {
-                    htmlContent = generateExecutiveHTML(item.type, parseJsonObject(jsonResponse), fromDate, toDate);
-                }
-
-                // ✅ إصلاح BaseURL لمنع الشاشة البيضاء
-                webView.loadDataWithBaseURL("https://localhost/", htmlContent, "text/html", "UTF-8", null);
-            });
-        }
-
-        @Override
-        public void onFailure(String errorMessage) {
-            handleReportError(errorMessage, layoutLoading);
-        }
-
-        @Override
-        public void onError(String errorMessage) {
-            handleReportError(errorMessage, layoutLoading);
-        }
-    });
-}
-
-// ✅ إصلاح دالة تحليل الـ JSON لضمان عدم السقوط في Catch عند استقبال Array أو Data مرن
-private JSONObject parseJsonObject(String json) {
-    try {
-        if (json == null || json.trim().isEmpty()) return new JSONObject();
-        
-        json = json.trim();
-        if (json.startsWith("[")) {
-            // إذا كان السيرفر يرجع Array مباشرة
-            JSONArray array = new JSONArray(json);
-            JSONObject wrapper = new JSONObject();
-            wrapper.put("items", array);
-            wrapper.put("invoices", array);
-            return wrapper;
-        }
-
-        JSONObject obj = new JSONObject(json);
-        if (obj.has("data")) {
-            Object dataObj = obj.get("data");
-            if (dataObj instanceof JSONObject) {
-                return (JSONObject) dataObj;
-            } else if (dataObj instanceof JSONArray) {
+    private JSONObject parseJsonObject(String json) {
+        try {
+            if (json == null || json.trim().isEmpty()) return new JSONObject();
+            
+            json = json.trim();
+            if (json.startsWith("[")) {
+                JSONArray array = new JSONArray(json);
                 JSONObject wrapper = new JSONObject();
-                wrapper.put("items", (JSONArray) dataObj);
-                wrapper.put("invoices", (JSONArray) dataObj);
+                wrapper.put("items", array);
+                wrapper.put("invoices", array);
                 return wrapper;
             }
+
+            JSONObject obj = new JSONObject(json);
+            if (obj.has("data")) {
+                Object dataObj = obj.get("data");
+                if (dataObj instanceof JSONObject) {
+                    return (JSONObject) dataObj;
+                } else if (dataObj instanceof JSONArray) {
+                    JSONObject wrapper = new JSONObject();
+                    wrapper.put("items", (JSONArray) dataObj);
+                    wrapper.put("invoices", (JSONArray) dataObj);
+                    return wrapper;
+                }
+            }
+            return obj;
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing JSON report: " + e.getMessage());
+            return new JSONObject();
         }
-        return obj;
-    } catch (Exception e) {
-        Log.e(TAG, "Error parsing JSON report: " + e.getMessage());
-        return new JSONObject();
     }
-}
 
     private void handleReportError(String errorMessage, View layoutLoading) {
         if (getActivity() == null || !isAdded()) return;
@@ -386,72 +385,70 @@ private JSONObject parseJsonObject(String json) {
         });
     }
 
-
     private String buildReportHtmlTemplate(ReportItem item, String jsonResponse, boolean isArabic) {
-    StringBuilder html = new StringBuilder();
-    html.append("<!DOCTYPE html><html dir='").append(isArabic ? "rtl" : "ltr").append("'><head>");
-    html.append("<meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>");
-    html.append("<style>");
-    html.append("body { font-family: sans-serif; margin: 15px; background-color: #fff; color: #333; }");
-    html.append(".card { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }");
-    html.append(".timeline-item { border-right: 3px solid #1a73e8; padding-right: 15px; margin-bottom: 15px; position: relative; }");
-    html.append(".badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: #fff; background: #1a73e8; }");
-    html.append("table { width: 100%; border-collapse: collapse; margin-top: 10px; }");
-    html.append("th, td { border: 1px solid #ddd; padding: 8px; text-align: start; }");
-    html.append("th { background-color: #f1f3f4; }");
-    html.append("</style></head><body>");
+        StringBuilder html = new StringBuilder();
+        html.append("<!DOCTYPE html><html dir='").append(isArabic ? "rtl" : "ltr").append("'><head>");
+        html.append("<meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+        html.append("<style>");
+        html.append("body { font-family: sans-serif; margin: 15px; background-color: #fff; color: #333; }");
+        html.append(".card { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }");
+        html.append(".timeline-item { border-right: 3px solid #1a73e8; padding-right: 15px; margin-bottom: 15px; position: relative; }");
+        html.append(".badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: #fff; background: #1a73e8; }");
+        html.append("table { width: 100%; border-collapse: collapse; margin-top: 10px; }");
+        html.append("th, td { border: 1px solid #ddd; padding: 8px; text-align: start; }");
+        html.append("th { background-color: #f1f3f4; }");
+        html.append("</style></head><body>");
 
-    try {
-        JSONObject responseObj = new JSONObject(jsonResponse);
-        JSONObject dataObj = responseObj.optJSONObject("data");
+        try {
+            JSONObject responseObj = new JSONObject(jsonResponse);
+            JSONObject dataObj = responseObj.optJSONObject("data");
 
-        if (dataObj == null) {
-            // ✅ إذا لم يكن هناك data، استخدم الكائن نفسه
-            dataObj = responseObj;
-        }
+            if (dataObj == null) {
+                dataObj = responseObj;
+            }
 
-        if ("user_timeline".equals(item.type)) {
-            JSONObject userInfo = dataObj.optJSONObject("user_info");
-            JSONArray timeline = dataObj.optJSONArray("timeline");
+            if ("user_timeline".equals(item.type)) {
+                JSONObject userInfo = dataObj.optJSONObject("user_info");
+                JSONArray timeline = dataObj.optJSONArray("timeline");
 
-            html.append("<div class='card'><h2>").append(isArabic ? "سجل نشاط الموظف: " : "User Activity: ")
-                .append(userInfo != null ? userInfo.optString("display_name", userInfo.optString("username", "")) : "").append("</h2></div>");
+                html.append("<div class='card'><h2>").append(isArabic ? "سجل نشاط الموظف: " : "User Activity: ")
+                    .append(userInfo != null ? userInfo.optString("display_name", userInfo.optString("username", "")) : "").append("</h2></div>");
 
-            if (timeline != null && timeline.length() > 0) {
-                for (int i = 0; i < timeline.length(); i++) {
-                    JSONObject event = timeline.getJSONObject(i);
-                    html.append("<div class='card timeline-item'>");
-                    html.append("<span class='badge'>").append(event.optString("event_type", "EVENT")).append("</span>");
-                    html.append("<p><strong>").append(isArabic ? "التفاصيل: " : "Details: ").append("</strong>").append(event.optString("details", "")).append("</p>");
-                    html.append("<small style='color:#777;'>").append(event.optString("created_at", "")).append("</small>");
+                if (timeline != null && timeline.length() > 0) {
+                    for (int i = 0; i < timeline.length(); i++) {
+                        JSONObject event = timeline.getJSONObject(i);
+                        html.append("<div class='card timeline-item'>");
+                        html.append("<span class='badge'>").append(event.optString("event_type", "EVENT")).append("</span>");
+                        html.append("<p><strong>").append(isArabic ? "التفاصيل: " : "Details: ").append("</strong>").append(event.optString("details", "")).append("</p>");
+                        html.append("<small style='color:#777;'>").append(event.optString("created_at", "")).append("</small>");
+                        html.append("</div>");
+                    }
+                } else {
+                    html.append("<div class='card'><p>").append(isArabic ? "لا توجد أنشطة مسجلة لهذا الموظف في هذه الفترة" : "No activities recorded").append("</p></div>");
+                }
+            } else if ("item_passport".equals(item.type)) {
+                JSONObject itemDetails = dataObj.optJSONObject("item_details");
+                if (itemDetails != null) {
+                    html.append("<div class='card'><h2>").append(isArabic ? "البصمة الرقمية للقطعة" : "Digital Passport").append("</h2>");
+                    html.append("<p><strong>").append(isArabic ? "رمز القطعة: " : "SKU: ").append("</strong>").append(itemDetails.optString("item_code", itemDetails.optString("serial_number", ""))).append("</p>");
+                    html.append("<p><strong>").append(isArabic ? "العيار / الوزن: " : "Karat / Weight: ").append("</strong>").append(itemDetails.optString("gold_karat", "")).append(" / ").append(itemDetails.optString("gross_weight_grams", "")).append("g</p>");
                     html.append("</div>");
+                } else {
+                    html.append("<div class='card'><p>").append(isArabic ? "لا توجد بيانات للقطعة" : "No item data").append("</p></div>");
                 }
             } else {
-                html.append("<div class='card'><p>").append(isArabic ? "لا توجد أنشطة مسجلة لهذا الموظف في هذه الفترة" : "No activities recorded").append("</p></div>");
+                html.append("<div class='card'><pre>").append(dataObj.toString(2)).append("</pre></div>");
             }
-        } else if ("item_passport".equals(item.type)) {
-            JSONObject itemDetails = dataObj.optJSONObject("item_details");
-            if (itemDetails != null) {
-                html.append("<div class='card'><h2>").append(isArabic ? "البصمة الرقمية للقطعة" : "Digital Passport").append("</h2>");
-                html.append("<p><strong>").append(isArabic ? "رمز القطعة: " : "SKU: ").append("</strong>").append(itemDetails.optString("item_code", itemDetails.optString("serial_number", ""))).append("</p>");
-                html.append("<p><strong>").append(isArabic ? "العيار / الوزن: " : "Karat / Weight: ").append("</strong>").append(itemDetails.optString("gold_karat", "")).append(" / ").append(itemDetails.optString("gross_weight_grams", "")).append("g</p>");
-                html.append("</div>");
-            } else {
-                html.append("<div class='card'><p>").append(isArabic ? "لا توجد بيانات للقطعة" : "No item data").append("</p></div>");
-            }
-        } else {
-            html.append("<div class='card'><pre>").append(dataObj.toString(2)).append("</pre></div>");
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error building HTML template", e);
+            html.append("<div class='card' style='color:red;'><h3>").append(isArabic ? "خطأ في معالجة البيانات" : "Data Parsing Error").append("</h3>");
+            html.append("<p>").append(e.getMessage()).append("</p></div>");
         }
 
-    } catch (Exception e) {
-        Log.e(TAG, "Error building HTML template", e);
-        html.append("<div class='card' style='color:red;'><h3>").append(isArabic ? "خطأ في معالجة البيانات" : "Data Parsing Error").append("</h3>");
-        html.append("<p>").append(e.getMessage()).append("</p></div>");
+        html.append("</body></html>");
+        return html.toString();
     }
-
-    html.append("</body></html>");
-    return html.toString();
-}
 
     private String generateExecutiveHTML(String type, JSONObject data, String from, String to) {
         StringBuilder html = new StringBuilder();
@@ -461,14 +458,14 @@ private JSONObject parseJsonObject(String json) {
         html.append("<!DOCTYPE html><html dir='").append(dir).append("'><head><meta charset='UTF-8'>")
                 .append("<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>")
                 .append("<style>")
-                .append("html, body { background-color: #F4F6F9 !important; color: #1F2937; margin: 0; padding: 12px; width: 100%; min-height: 100%; box-sizing: border-box; }")
+                .append("html, body { background-color: #F4F6F9 !important; color: #1F2937; margin: 0; padding: 12px; width: 100% !important; height: auto !important; min-height: 100vh; box-sizing: border-box; }")
                 .append(".header{background:linear-gradient(135deg,#1E293B,#0F172A);color:#FFF;padding:16px;border-radius:12px;margin-bottom:12px;}")
                 .append(".header h2{margin:0;font-size:18px;color:#F1F5F9;}")
                 .append(".header p{margin:4px 0 0;font-size:11px;color:#94A3B8;}")
-                .append(".card{background:#FFF;padding:14px;border-radius:10px;margin-bottom:12px;border:1px solid #E2E8F0;}")
+                .append(".card{background:#FFF;padding:14px;border-radius:10px;margin-bottom:12px;border:1px solid #E2E8F0;box-sizing:border-box;}")
                 .append(".card-title{font-size:14px;font-weight:bold;color:#0F172A;margin-bottom:10px;border-bottom:2px solid #F1F5F9;padding-bottom:6px;}")
-                .append(".grid{display:grid;grid-template-columns:repeat(2, 1fr);gap:8px;margin-bottom:10px;}")
-                .append(".metric{background:#F8FAFC;border:1px solid #E2E8F0;padding:10px;border-radius:8px;text-align:center;}")
+                .append(".grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}")
+                .append(".metric{flex:1 1 42%;background:#F8FAFC;border:1px solid #E2E8F0;padding:10px;border-radius:8px;text-align:center;box-sizing:border-box;}")
                 .append(".metric .val{font-size:15px;font-weight:800;color:#0F172A;}")
                 .append(".metric .lbl{font-size:10px;color:#64748B;}")
                 .append(".gold{color:#D97706;font-weight:bold;}")
@@ -766,61 +763,60 @@ private JSONObject parseJsonObject(String json) {
     }
 
     private void populateUsersSpinner(Spinner spinner) {
-    if (getContext() == null || apiClient == null) return;
+        if (getContext() == null || apiClient == null) return;
 
-    // ✅ التعديل: استخدم المسار النسبي فقط بدون الدومين
-    String url = "/reports-analytics?type=users_list";
+        String url = "/reports-analytics?type=users_list";
 
-    apiClient.get(url, new MiraApiClient.ApiCallback() {
-        @Override
-        public void onSuccess(MiraApiClient.ApiResponse response) {
-            if (!isAdded() || getActivity() == null) return;
-            getActivity().runOnUiThread(() -> {
-                try {
-                    String jsonResponse = response.getBody() != null ? response.getBody() : "";
-                    JSONObject responseObj = new JSONObject(jsonResponse);
-                    JSONArray usersArray = responseObj.optJSONArray("data");
-                    List<UserSpinnerItem> userItems = new ArrayList<>();
+        apiClient.get(url, new MiraApiClient.ApiCallback() {
+            @Override
+            public void onSuccess(MiraApiClient.ApiResponse response) {
+                if (!isAdded() || getActivity() == null) return;
+                getActivity().runOnUiThread(() -> {
+                    try {
+                        String jsonResponse = response.getBody() != null ? response.getBody() : "";
+                        JSONObject responseObj = new JSONObject(jsonResponse);
+                        JSONArray usersArray = responseObj.optJSONArray("data");
+                        List<UserSpinnerItem> userItems = new ArrayList<>();
 
-                    userItems.add(new UserSpinnerItem(0, isArabic ? "-- اختر الموظف --" : "-- Select User --"));
+                        userItems.add(new UserSpinnerItem(0, isArabic ? "-- اختر الموظف --" : "-- Select User --"));
 
-                    if (usersArray != null) {
-                        for (int i = 0; i < usersArray.length(); i++) {
-                            JSONObject u = usersArray.optJSONObject(i);
-                            if (u != null) {
-                                userItems.add(new UserSpinnerItem(
-                                    u.optInt("ID", u.optInt("id")),
-                                    u.optString("display_name", u.optString("user_login"))
-                                ));
+                        if (usersArray != null) {
+                            for (int i = 0; i < usersArray.length(); i++) {
+                                JSONObject u = usersArray.optJSONObject(i);
+                                if (u != null) {
+                                    userItems.add(new UserSpinnerItem(
+                                        u.optInt("ID", u.optInt("id")),
+                                        u.optString("display_name", u.optString("user_login"))
+                                    ));
+                                }
                             }
                         }
+
+                        android.widget.ArrayAdapter<UserSpinnerItem> adapter = new android.widget.ArrayAdapter<>(
+                            requireContext(),
+                            android.R.layout.simple_spinner_item,
+                            userItems
+                        );
+                        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                        spinner.setAdapter(adapter);
+
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error parsing users list", e);
                     }
+                });
+            }
 
-                    android.widget.ArrayAdapter<UserSpinnerItem> adapter = new android.widget.ArrayAdapter<>(
-                        requireContext(),
-                        android.R.layout.simple_spinner_item,
-                        userItems
-                    );
-                    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                    spinner.setAdapter(adapter);
+            @Override
+            public void onFailure(String errorMessage) {
+                Log.e(TAG, "Failed to load users for spinner: " + errorMessage);
+            }
 
-                } catch (Exception e) {
-                    Log.e(TAG, "Error parsing users list", e);
-                }
-            });
-        }
-
-        @Override
-        public void onFailure(String errorMessage) {
-            Log.e(TAG, "Failed to load users for spinner: " + errorMessage);
-        }
-
-        @Override
-        public void onError(String errorMessage) {
-            Log.e(TAG, "Failed to load users for spinner: " + errorMessage);
-        }
-    });
-}
+            @Override
+            public void onError(String errorMessage) {
+                Log.e(TAG, "Failed to load users for spinner: " + errorMessage);
+            }
+        });
+    }
 
     private void printReportWebView(WebView webView, String jobTitle) {
         if (!isAdded() || getContext() == null || webView == null) return;
@@ -1003,4 +999,4 @@ private JSONObject parseJsonObject(String json) {
         @Override
         public String toString() { return name; }
     }
-                            }
+}
