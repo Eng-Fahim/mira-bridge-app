@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -71,7 +72,7 @@ public class LoginActivity extends AppCompatActivity {
     private final ExecutorService bgExecutor = Executors.newSingleThreadExecutor();
 
     private boolean isArabic = true;
-    private String lastPassword = ""; // ✅ لحفظ كلمة المرور لإعادة الاتصال
+    private String lastPassword = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -84,11 +85,16 @@ public class LoginActivity extends AppCompatActivity {
             return;
         }
 
+        // 🟢 ضبط لغة التطبيق بناءً على الإعداد الحرفي للنظام أو الجلسة
+        String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
+        isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
+
         setContentView(R.layout.activity_login);
         
         orgProfileManager = MiraOrgProfileManager.getInstance(this);
         
         initViews();
+        disableAutofill(); // 🟢 إلغاء شريط التعبئة التلقائية الكيبورد
         setupBiometric();
         setupServerConfigToggle();
         animateEntrance();
@@ -144,21 +150,32 @@ public class LoginActivity extends AppCompatActivity {
             Toast.makeText(this, isArabic ? "✓ تم حفظ رابط الخادم بنجاح" : "✓ Server URL saved", Toast.LENGTH_SHORT).show();
         });
 
+        // 🟢 التحويل السلس بين اللغات مع إعادة تحميل ملائمة للواجهة
         if (btnToggleLanguage != null) {
             btnToggleLanguage.setOnClickListener(v -> {
                 isArabic = !isArabic;
-                if (isArabic) {
-                    AppCompatDelegate.setApplicationLocales(
-                        androidx.core.os.LocaleListCompat.forLanguageTags("ar"));
-                } else {
-                    AppCompatDelegate.setApplicationLocales(
-                        androidx.core.os.LocaleListCompat.forLanguageTags("en"));
-                }
-                updateUiLanguage(isArabic);
+                String langTag = isArabic ? "ar" : "en";
+                AppCompatDelegate.setApplicationLocales(
+                    androidx.core.os.LocaleListCompat.forLanguageTags(langTag));
+                
+                finish();
+                startActivity(getIntent());
+                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
             });
         }
 
         applyOrgProfile();
+    }
+
+    /**
+     * 🟢 إيقاف التعبئة التلقائية للمحافظة على نظافة الكيبورد ومنع ظهور Enable autofill
+     */
+    private void disableAutofill() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (etUsername != null) etUsername.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+            if (etPassword != null) etPassword.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+            if (etServerUrl != null) etServerUrl.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        }
     }
 
     // ==================== Profile Listener ====================
@@ -210,8 +227,8 @@ public class LoginActivity extends AppCompatActivity {
     // ==================== Language ====================
 
     private void updateUiLanguage(boolean arabic) {
+        getWindow().getDecorView().setLayoutDirection(arabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
         if (arabic) {
-            getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
             if (tvSignInTitle != null) tvSignInTitle.setText("تسجيل الدخول");
             if (tvSignInSubtitle != null) tvSignInSubtitle.setText("أدخل بيانات الاعتماد الخاصة بك للمتابعة");
             if (tilUsername != null) tilUsername.setHint("اسم المستخدم");
@@ -220,7 +237,6 @@ public class LoginActivity extends AppCompatActivity {
             if (tvServerSettings != null) tvServerSettings.setText("🔧 إعدادات الخادم والاتصال (Server Settings)");
             if (btnToggleLanguage != null) btnToggleLanguage.setText("EN / AR");
         } else {
-            getWindow().getDecorView().setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
             if (tvSignInTitle != null) tvSignInTitle.setText("Sign In");
             if (tvSignInSubtitle != null) tvSignInSubtitle.setText("Enter your credentials to continue");
             if (tilUsername != null) tilUsername.setHint("Username");
@@ -353,11 +369,14 @@ public class LoginActivity extends AppCompatActivity {
 
     // ==================== Login ====================
 
+    /**
+     * 🟢 محاولة تسجيل الدخول عبر الشبكة مع التراجع التلقائي للأوفلاين Offline Fallback عند تعذر الشبكة
+     */
     private void attemptApiLogin() {
         String username = getText(etUsername);
         String password = getText(etPassword);
         
-        lastPassword = password; // ✅ حفظ كلمة المرور
+        lastPassword = password;
 
         if (username.isEmpty()) {
             tilUsername.setError(isArabic ? "اسم المستخدم مطلوب" : "Username required");
@@ -379,136 +398,141 @@ public class LoginActivity extends AppCompatActivity {
         bgExecutor.execute(() -> {
             String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
             MiraApiClient.ApiResponse response = apiClient.login(username, password, deviceId);
+            
             mainHandler.post(() -> {
                 showLoading(false);
                 if (response != null && response.isSuccess) {
                     handleLoginSuccess(response, username, password);
                 } else {
-                    playTone(false);
-                    String errorMsg = response != null
-                        ? response.optString("message", isArabic ? "بيانات الاعتماد غير صالحة" : "Invalid credentials")
-                        : (isArabic ? "فشل الاتصال بالخادم" : "Connection failed");
-                    Toast.makeText(LoginActivity.this, errorMsg, Toast.LENGTH_LONG).show();
-                    shakeView(loginCard);
+                    // 🟢 التحقق أوفلاين: هل تم حفظ بيانات هذا المستخدم مسبقاً للبصمة والجلسة؟
+                    String lastBiometricUser = sessionManager.getLastBiometricUser();
+                    if (!lastBiometricUser.isEmpty() && lastBiometricUser.equalsIgnoreCase(username)) {
+                        executeOfflineLogin(username);
+                    } else {
+                        playTone(false);
+                        String errorMsg = response != null
+                            ? response.optString("message", isArabic ? "بيانات الاعتماد غير صالحة" : "Invalid credentials")
+                            : (isArabic ? "فشل الاتصال بالخادم وتطابق أوفلاين غير متوفر" : "Connection failed and offline verification unavailable");
+                        Toast.makeText(LoginActivity.this, errorMsg, Toast.LENGTH_LONG).show();
+                        shakeView(loginCard);
+                    }
                 }
             });
         });
     }
 
-    private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
-    playTone(true);
-
-    String token = response.optString("token", "");
-    String roleStr = response.optString("role", "ADMIN");
-    String displayName = response.optString("display_name", username);
-    int userId = response.optInt("user_id", 0);
-    int branchId = response.optInt("branch_id", 1);
-    String branchName = response.optString("branch_name", "");
-    String branchCode = response.optString("branch_code", "");
-    String serverUrl = getText(etServerUrl); // ✅ تعريف واحد فقط
-    
-    String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-    
-    // ✅ حفظ مفتاح API
-    String apiKey = response.optString("api_key", "");
-    String gateId = response.optString("gate_id", "");
-    
-    if (!apiKey.isEmpty()) {
-        // ✅ استخدام device_id إذا كان gate_id فارغاً
-        String effectiveGateId = !gateId.isEmpty() ? gateId : deviceId;
-        
-        sessionManager.saveApiKey(apiKey);
-        sessionManager.saveGateId(effectiveGateId);
-        MiraServerConfig.getInstance(this).saveSession(apiKey, effectiveGateId, token);
-        
-        Log.d(TAG, "✅ API Key saved with gate_id: " + effectiveGateId);
-    } else {
-        // ✅ إذا لم يتم إرسال api_key - تحقق من وجوده
-        if (sessionManager.hasApiKey()) {
-            Log.d(TAG, "✅ Using existing API Key");
-        } else {
-            Log.w(TAG, "⚠️ No API Key available - will reconnect");
-            // ✅ إعادة الاتصال لتوليد مفتاح جديد
-            reconnectAndRestoreData(username, password, serverUrl);
-            return;
-        }
-    }
-    
-    if (!serverUrl.isEmpty()) {
-        MiraServerConfig.getInstance(this).setBaseUrl(serverUrl);
-    }
-    
-    // ✅ حفظ الصلاحيات
-    String permissionsJson = response.optString("permissions", "");
-    if (permissionsJson.isEmpty()) {
-        JSONObject permissionsObj = response.optJSONObject("permissions");
-        if (permissionsObj != null) {
-            permissionsJson = permissionsObj.toString();
-        }
-    }
-    
-    if (!permissionsJson.isEmpty()) {
-        PermissionManager pm = PermissionManager.getInstance(this);
-        pm.savePermissions(permissionsJson);
-    }
-
-    sessionManager.createLoginSession(username, roleStr, token, serverUrl);
-    sessionManager.setDisplayName(displayName);
-    sessionManager.setUserId(userId);
-
-    sessionManager.saveBiometricUser(username, roleStr, displayName, userId, token);
-    sessionManager.saveBiometricBranch(branchId, branchName);
-    sessionManager.setBiometricEnabled(true);
-
-    MiraBranchesManager bm = MiraBranchesManager.getInstance(this);
-    bm.setActiveBranch(branchId, branchName, branchCode, "", "");
-    bm.setUserBranchLocked(true);
-
-    // ✅ استعادة جميع البيانات بعد تسجيل الدخول
-    restoreAllDataAfterLogin();
-
-    Toast.makeText(this, (isArabic ? "أهلاً بك " : "Welcome ") + displayName + " ✓", Toast.LENGTH_SHORT).show();
-    mainHandler.postDelayed(this::navigateToMain, 800);
-}
-
     /**
-     * ✅ إعادة الاتصال وتوليد مفتاح جديد
+     * 🟢 التكفل بتسجيل الدخول أوفلاين بالاعتماد على بيانات الجلسة السابقة
      */
+    private void executeOfflineLogin(String username) {
+        playTone(true);
+        String lastRole = sessionManager.getLastBiometricRole();
+        String lastDisplayName = sessionManager.getLastBiometricDisplayName();
+        int lastUserId = sessionManager.getLastBiometricUserId();
+        String lastToken = sessionManager.getLastBiometricToken();
+
+        sessionManager.createLoginSession(username, lastRole, 
+            lastToken.isEmpty() ? "OFFLINE_SESSION_TOKEN" : lastToken, 
+            sessionManager.getServerUrl());
+        sessionManager.setDisplayName(lastDisplayName);
+        sessionManager.setUserId(lastUserId);
+
+        int savedBranchId = sessionManager.getLastBiometricBranchId();
+        String savedBranchName = sessionManager.getLastBiometricBranchName();
+        if (savedBranchId > 0) {
+            MiraBranchesManager bm = MiraBranchesManager.getInstance(LoginActivity.this);
+            bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
+            bm.setUserBranchLocked(true);
+        }
+
+        Toast.makeText(this, (isArabic ? "تم تسجيل الدخول (وضع بدون اتصال) 👋 " : "Signed in (Offline Mode) 👋 ") + lastDisplayName, Toast.LENGTH_SHORT).show();
+        mainHandler.postDelayed(this::navigateToMain, 500);
+    }
+
+    private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
+        playTone(true);
+
+        String token = response.optString("token", "");
+        String roleStr = response.optString("role", "ADMIN");
+        String displayName = response.optString("display_name", username);
+        int userId = response.optInt("user_id", 0);
+        int branchId = response.optInt("branch_id", 1);
+        String branchName = response.optString("branch_name", "");
+        String branchCode = response.optString("branch_code", "");
+        String serverUrl = getText(etServerUrl);
+        
+        String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        String apiKey = response.optString("api_key", "");
+        String gateId = response.optString("gate_id", "");
+        
+        if (!apiKey.isEmpty()) {
+            String effectiveGateId = !gateId.isEmpty() ? gateId : deviceId;
+            sessionManager.saveApiKey(apiKey);
+            sessionManager.saveGateId(effectiveGateId);
+            MiraServerConfig.getInstance(this).saveSession(apiKey, effectiveGateId, token);
+        } else {
+            if (!sessionManager.hasApiKey()) {
+                reconnectAndRestoreData(username, password, serverUrl);
+                return;
+            }
+        }
+        
+        if (!serverUrl.isEmpty()) {
+            MiraServerConfig.getInstance(this).setBaseUrl(serverUrl);
+        }
+        
+        String permissionsJson = response.optString("permissions", "");
+        if (permissionsJson.isEmpty()) {
+            JSONObject permissionsObj = response.optJSONObject("permissions");
+            if (permissionsObj != null) {
+                permissionsJson = permissionsObj.toString();
+            }
+        }
+        
+        if (!permissionsJson.isEmpty()) {
+            PermissionManager pm = PermissionManager.getInstance(this);
+            pm.savePermissions(permissionsJson);
+        }
+
+        sessionManager.createLoginSession(username, roleStr, token, serverUrl);
+        sessionManager.setDisplayName(displayName);
+        sessionManager.setUserId(userId);
+
+        sessionManager.saveBiometricUser(username, roleStr, displayName, userId, token);
+        sessionManager.saveBiometricBranch(branchId, branchName);
+        sessionManager.setBiometricEnabled(true);
+
+        MiraBranchesManager bm = MiraBranchesManager.getInstance(this);
+        bm.setActiveBranch(branchId, branchName, branchCode, "", "");
+        bm.setUserBranchLocked(true);
+
+        restoreAllDataAfterLogin();
+
+        Toast.makeText(this, (isArabic ? "أهلاً بك " : "Welcome ") + displayName + " ✓", Toast.LENGTH_SHORT).show();
+        mainHandler.postDelayed(this::navigateToMain, 800);
+    }
+
     private void reconnectAndRestoreData(String username, String password, String serverUrl) {
         showLoading(true);
-        
         bgExecutor.execute(() -> {
             try {
                 String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-                
-                // ✅ استدعاء إعادة الاتصال
                 MiraApiClient.ApiResponse reconnectResponse = apiClient.reconnectDevice(username, password, deviceId);
                 
                 mainHandler.post(() -> {
                     showLoading(false);
-                    
                     if (reconnectResponse != null && reconnectResponse.isSuccess) {
-                        // ✅ حفظ المفتاح الجديد
                         String newApiKey = reconnectResponse.optString("api_key", "");
                         if (!newApiKey.isEmpty()) {
                             sessionManager.saveApiKey(newApiKey);
-                            Log.d(TAG, "✅ New API Key generated: " + newApiKey.substring(0, Math.min(8, newApiKey.length())) + "...");
                         }
-                        
-                        // ✅ حفظ إعدادات السيرفر
                         String newServerUrl = reconnectResponse.optString("server_url", serverUrl);
                         if (!newServerUrl.isEmpty()) {
                             sessionManager.setServerUrl(newServerUrl);
                             MiraServerConfig.getInstance(this).setBaseUrl(newServerUrl);
                         }
-                        
-                        // ✅ استعادة باقي الإعدادات
                         restoreAllDataAfterLogin();
-                        
-                        Toast.makeText(this, 
-                            isArabic ? "✅ تم استعادة الاتصال بنجاح" : "✅ Connection restored successfully", 
-                            Toast.LENGTH_SHORT).show();
-                        
+                        Toast.makeText(this, isArabic ? "✅ تم استعادة الاتصال بنجاح" : "✅ Connection restored successfully", Toast.LENGTH_SHORT).show();
                         mainHandler.postDelayed(this::navigateToMain, 500);
                     } else {
                         String error = reconnectResponse != null ? 
@@ -521,65 +545,41 @@ public class LoginActivity extends AppCompatActivity {
                 Log.e(TAG, "Reconnect error: " + e.getMessage());
                 mainHandler.post(() -> {
                     showLoading(false);
-                    Toast.makeText(this, 
-                        isArabic ? "فشل إعادة الاتصال بالخادم" : "Failed to reconnect to server", 
-                        Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, isArabic ? "فشل إعادة الاتصال بالخادم" : "Failed to reconnect to server", Toast.LENGTH_LONG).show();
                 });
             }
         });
     }
 
-    /**
-     * ✅ استعادة جميع البيانات بعد تسجيل الدخول
-     */
     private void restoreAllDataAfterLogin() {
         bgExecutor.execute(() -> {
             try {
-                // ✅ 1. استعادة أسعار الذهب والعملات
                 MiraApiClient.ApiResponse goldResponse = apiClient.getGoldCurrencySettings();
                 if (goldResponse != null && goldResponse.isSuccess && goldResponse.data != null) {
                     MiraPriceManager priceManager = MiraPriceManager.getInstance(this);
-                    
                     JSONObject data = goldResponse.data.optJSONObject("data");
                     if (data == null) data = goldResponse.data;
-                    
                     JSONObject goldData = data.optJSONObject("gold");
                     JSONObject currencyData = data.optJSONObject("currency");
-                    
-                    if (goldData != null) {
-                        priceManager.saveGoldSettings(goldData);
-                    }
-                    if (currencyData != null) {
-                        priceManager.saveCurrencySettings(currencyData);
-                    }
-                    
-                    Log.d(TAG, "✅ Gold & Currency settings restored");
+                    if (goldData != null) priceManager.saveGoldSettings(goldData);
+                    if (currencyData != null) priceManager.saveCurrencySettings(currencyData);
                 }
                 
-                // ✅ 2. استعادة بيانات الفروع
                 MiraApiClient.ApiResponse branchesResponse = apiClient.getBranches();
                 if (branchesResponse != null && branchesResponse.isSuccess && branchesResponse.data != null) {
                     MiraBranchesManager branchesManager = MiraBranchesManager.getInstance(this);
                     branchesManager.saveBranchesFromServer(branchesResponse.data);
-                    Log.d(TAG, "✅ Branches restored");
                 }
                 
-                // ✅ 3. استعادة الملف الشخصي للمنظمة
                 MiraApiClient.ApiResponse orgResponse = apiClient.getOrgProfile();
                 if (orgResponse != null && orgResponse.isSuccess && orgResponse.data != null) {
                     JSONObject org = orgResponse.data.optJSONObject("organization");
-                    if (org == null) {
-                        org = orgResponse.data.optJSONObject("data");
-                    }
+                    if (org == null) org = orgResponse.data.optJSONObject("data");
                     if (org != null && orgProfileManager != null) {
                         orgProfileManager.saveFromServer(org);
                         mainHandler.post(this::applyOrgProfile);
-                        Log.d(TAG, "✅ Org profile restored");
                     }
                 }
-                
-                Log.d(TAG, "✅ All data restored successfully");
-                
             } catch (Exception e) {
                 Log.e(TAG, "Restore data error: " + e.getMessage());
             }
