@@ -310,31 +310,32 @@ public class MiraReportsProFragment extends Fragment {
         String requestUrl = urlBuilder.toString();
 
         apiClient.get(requestUrl, new MiraApiClient.ApiCallback() {
-            @Override
-            public void onSuccess(String jsonResponse) {
-                if (getActivity() == null || !isAdded()) return;
+    @Override
+    public void onSuccess(MiraApiClient.ApiResponse response) {  // ✅ استخدم MiraApiClient.ApiResponse
+        if (getActivity() == null || !isAdded()) return;
 
-                getActivity().runOnUiThread(() -> {
-                    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+        getActivity().runOnUiThread(() -> {
+            if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
 
-                    String htmlContent = "user_timeline".equals(item.type) || "item_passport".equals(item.type)
-                            ? buildReportHtmlTemplate(item, jsonResponse, isArabic)
-                            : generateExecutiveHTML(item.type, parseJsonObject(jsonResponse), fromDate, toDate);
+            String jsonResponse = response.getBody() != null ? response.getBody() : "";
+            String htmlContent = "user_timeline".equals(item.type) || "item_passport".equals(item.type)
+                    ? buildReportHtmlTemplate(item, jsonResponse, isArabic)
+                    : generateExecutiveHTML(item.type, parseJsonObject(jsonResponse), fromDate, toDate);
 
-                    webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null);
-                });
-            }
-
-            @Override
-            public void onFailure(String errorMessage) {
-                handleReportError(errorMessage, layoutLoading);
-            }
-
-            @Override
-            public void onError(String errorMessage) {
-                handleReportError(errorMessage, layoutLoading);
-            }
+            webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null);
         });
+    }
+
+    @Override
+    public void onFailure(String errorMessage) {
+        handleReportError(errorMessage, layoutLoading);
+    }
+
+    @Override
+    public void onError(String errorMessage) {
+        handleReportError(errorMessage, layoutLoading);
+    }
+});
     }
 
     private void handleReportError(String errorMessage, View layoutLoading) {
@@ -734,12 +735,13 @@ public class MiraReportsProFragment extends Fragment {
         String url = "https://sa.mirabarcod.com/wp-json/mira-gate/v1/reports-analytics?type=users_list";
 
         apiClient.get(url, new MiraApiClient.ApiCallback() {
-            @Override
-            public void onSuccess(String jsonResponse) {
-                if (!isAdded() || getActivity() == null) return;
-                getActivity().runOnUiThread(() -> {
-                    try {
-                        JSONObject responseObj = new JSONObject(jsonResponse);
+    @Override
+    public void onSuccess(MiraApiClient.ApiResponse response) {  // ✅ استخدم MiraApiClient.ApiResponse
+        if (!isAdded() || getActivity() == null) return;
+        getActivity().runOnUiThread(() -> {
+            try {
+                String jsonResponse = response.getBody() != null ? response.getBody() : "";
+                JSONObject responseObj = new JSONObject(jsonResponse);
                         JSONArray usersArray = responseObj.optJSONArray("data");
                         List<UserSpinnerItem> userItems = new ArrayList<>();
 
@@ -771,16 +773,16 @@ public class MiraReportsProFragment extends Fragment {
                 });
             }
 
-            @Override
-            public void onFailure(String errorMessage) {
-                Log.e(TAG, "Failed to load users for spinner: " + errorMessage);
-            }
+                @Override
+    public void onFailure(String errorMessage) {
+        Log.e(TAG, "Failed to load users for spinner: " + errorMessage);
+    }
 
-            @Override
-            public void onError(String errorMessage) {
-                Log.e(TAG, "Failed to load users for spinner: " + errorMessage);
-            }
-        });
+    @Override
+    public void onError(String errorMessage) {
+        Log.e(TAG, "Failed to load users for spinner: " + errorMessage);
+    }
+});
     }
 
     private void printReportWebView(WebView webView, String jobTitle) {
@@ -964,4 +966,4 @@ public class MiraReportsProFragment extends Fragment {
         @Override
         public String toString() { return name; }
     }
-}
+        }
