@@ -217,7 +217,6 @@ public class MiraReportsProFragment extends Fragment {
 
         tvTitle.setText(item.icon + " " + item.title);
 
-        // إعدادات الـ WebView الآمنة والمستقرة لمنع الصفحة البيضاء
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
         webSettings.setDomStorageEnabled(true);
@@ -294,7 +293,6 @@ public class MiraReportsProFragment extends Fragment {
 
         dialog.show();
 
-        // تنفيذ الجلب الأولي للبيانات بعد فتح الواجهة
         webView.post(() -> fetchAndRenderReportEx(item, webView, layoutLoading, tvLoadingStatus, selectedDates[0], selectedDates[1], 0, "", dialog));
     }
 
@@ -353,22 +351,31 @@ public class MiraReportsProFragment extends Fragment {
                 if (getActivity() == null || !isAdded()) return;
 
                 getActivity().runOnUiThread(() -> {
-                    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-                    if (webView == null || currentWebView == null) return;
-
-                    webView.setVisibility(View.VISIBLE);
-
-                    String jsonResponse = response.getBody() != null ? response.getBody() : "";
-                    
-                    String htmlContent;
-                    if ("user_timeline".equals(item.type) || "item_passport".equals(item.type)) {
-                        htmlContent = buildReportHtmlTemplate(item, jsonResponse, isArabic);
-                    } else {
-                        htmlContent = generateExecutiveHTML(item.type, parseJsonObject(jsonResponse), fromDate, toDate);
+                    if (layoutLoading != null) {
+                        layoutLoading.setVisibility(View.GONE);
                     }
 
-                    // الإصلاح الحاسم: استخدام https://localhost/ يمنع حظر المحتوى وشاشة العرض البيضاء
-                    webView.loadDataWithBaseURL("https://localhost/", htmlContent, "text/html", "UTF-8", null);
+                    if (webView != null) {
+                        webView.setVisibility(View.VISIBLE);
+                        webView.bringToFront();
+
+                        String responseBody = response.getBody();
+                        JSONObject parsedData = parseJsonObject(responseBody);
+                        
+                        if (offlineCache != null) {
+                            String cacheKey = "cache_pro_" + item.type + "_" + fromDate + "_" + toDate;
+                            offlineCache.edit().putString(cacheKey, parsedData.toString()).apply();
+                        }
+
+                        String htmlData;
+                        if ("user_timeline".equals(item.type) || "item_passport".equals(item.type)) {
+                            htmlData = buildReportHtmlTemplate(item, responseBody, isArabic);
+                        } else {
+                            htmlData = generateExecutiveHTML(item.type, parsedData, fromDate, toDate);
+                        }
+
+                        webView.loadDataWithBaseURL("https://localhost/", htmlData, "text/html", "UTF-8", null);
+                    }
                 });
             }
 
