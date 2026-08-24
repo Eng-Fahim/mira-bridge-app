@@ -160,6 +160,15 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    
+    // ✅ التحقق من البداية الجديدة
+    boolean freshStart = getIntent().getBooleanExtra("fresh_start", false);
+    
+    if (freshStart) {
+        // ✅ مسح أي حالة قديمة
+        getSupportFragmentManager().popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+    }
         try {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
             String savedLang = MiraLanguageHelper.getSavedLanguage(this);
@@ -231,6 +240,20 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
     }
+    
+    @Override
+    protected void onResume() {
+    super.onResume();
+    
+    try {
+        // ✅ إعادة تحميل الواجهة إذا كانت فارغة
+        if (currentFragment == null || !currentFragment.isAdded()) {
+            loadFragmentByTag(currentFragmentTag);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "onResume error: " + e.getMessage());
+    }
+}
 
     private void initializeLanguageState() {
         try {
@@ -1049,23 +1072,28 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
     }
 
     @Override
-    protected void onDestroy() {
-        try {
-            stopActiveInventory();
-            mainHandler.removeCallbacksAndMessages(null);
-            if (playSoundThread != null) playSoundThread.stopPlay();
-            if (soundPool != null) soundPool.release();
-            if (mReader != null) mReader.free();
-            
-            if (orgProfileManager != null && profileListener != null) {
-                orgProfileManager.removeListener(profileListener);
-            }
-            
-        } catch (Exception e) {
-            Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
+protected void onDestroy() {
+    try {
+        // ✅ مسح Back Stack
+        if (fragmentManager != null) {
+            fragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
         }
-        super.onDestroy();
+        
+        stopActiveInventory();
+        mainHandler.removeCallbacksAndMessages(null);
+        if (playSoundThread != null) playSoundThread.stopPlay();
+        if (soundPool != null) soundPool.release();
+        if (mReader != null) mReader.free();
+        
+        if (orgProfileManager != null && profileListener != null) {
+            orgProfileManager.removeListener(profileListener);
+        }
+        
+    } catch (Exception e) {
+        Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
     }
+    super.onDestroy();
+}
 
     private void safeExecute(Runnable runnable, String errorMessage) {
         try {
