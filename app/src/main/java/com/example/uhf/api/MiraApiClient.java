@@ -1212,6 +1212,29 @@ public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod, 
     public ApiResponse getLivePrices() {
         return getWithAuth("/gold-currency/live-prices");
     }
+    
+    //المزامنة للجرد
+    public ApiResponse syncOfflineTransactions(JSONArray transactionsArray) {
+    ApiResponse response = new ApiResponse();
+    
+    try {
+        // إرسال المعاملات للخادم
+        JSONObject payload = new JSONObject();
+        payload.put("transactions", transactionsArray);
+        
+        // استدعاء API المناسب
+        // هذا مثال - عدل حسب API الفعلي الخاص بك
+        response = postRequest("/api/inventory/sync-offline", payload);
+        
+    } catch (Exception e) {
+        Log.e(TAG, "Error syncing offline transactions", e);
+        response.isSuccess = false;
+        response.error = e.getMessage();
+    }
+    
+    return response;
+}
+    
 
     // ===================== 👥 USER PERMISSIONS & LOGS =====================
 
@@ -1333,4 +1356,4 @@ public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod, 
             return null;
         }
     }
-    }
+                                         }
