@@ -327,15 +327,24 @@ public class MiraReportsProFragment extends Fragment {
 
             @Override
             public void onFailure(String errorMessage) {
-                if (getActivity() == null || !isAdded()) return;
-
-                getActivity().runOnUiThread(() -> {
-                    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-                    Toast.makeText(getContext(),
-                            (isArabic ? "فشل جلب البيانات: " : "Error: ") + errorMessage,
-                            Toast.LENGTH_LONG).show();
-                });
+                handleReportError(errorMessage, layoutLoading);
             }
+
+            @Override
+            public void onError(String errorMessage) {
+                handleReportError(errorMessage, layoutLoading);
+            }
+        });
+    }
+
+    private void handleReportError(String errorMessage, View layoutLoading) {
+        if (getActivity() == null || !isAdded()) return;
+
+        getActivity().runOnUiThread(() -> {
+            if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+            Toast.makeText(getContext(),
+                    (isArabic ? "فشل جلب البيانات: " : "Error: ") + errorMessage,
+                    Toast.LENGTH_LONG).show();
         });
     }
 
@@ -764,6 +773,11 @@ public class MiraReportsProFragment extends Fragment {
 
             @Override
             public void onFailure(String errorMessage) {
+                Log.e(TAG, "Failed to load users for spinner: " + errorMessage);
+            }
+
+            @Override
+            public void onError(String errorMessage) {
                 Log.e(TAG, "Failed to load users for spinner: " + errorMessage);
             }
         });
