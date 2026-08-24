@@ -510,8 +510,80 @@ public class MiraApiClient {
     }
 
     public ApiResponse getSalesHistory() {
-        return getWithAuth("/pos/sales");
+    return getWithAuth("/pos/sales");
+}
+
+// ✅ دالة جديدة للتحميل التدريجي (Pagination)
+public ApiResponse getSalesHistoryPaginated(int page, int pageSize) {
+    String endpoint = "/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize;
+    return getWithAuth(endpoint);
+}
+
+// ✅ دالة للبحث مع التحميل التدريجي
+public ApiResponse searchSalesHistory(String query, int page, int pageSize) {
+    try {
+        String encodedQuery = URLEncoder.encode(query, "UTF-8");
+        String endpoint = "/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize + "&search=" + encodedQuery;
+        return getWithAuth(endpoint);
+    } catch (Exception e) {
+        // في حالة فشل الترميز، نستخدم بدون ترميز
+        String endpoint = "/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize + "&search=" + query;
+        return getWithAuth(endpoint);
     }
+}
+
+// ✅ دالة للفلترة حسب نوع الدفع مع التحميل التدريجي
+public ApiResponse getSalesHistoryByPaymentMethod(String paymentMethod, int page, int pageSize) {
+    String endpoint = "/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize + "&payment_method=" + paymentMethod;
+    return getWithAuth(endpoint);
+}
+
+// ✅ دالة لجلب إحصائيات المبيعات (الإجمالي والعدد)
+public ApiResponse getSalesStats() {
+    return getWithAuth("/pos/sales/stats");
+}
+
+// ✅ دالة لجلب المبيعات حسب نطاق تاريخ
+public ApiResponse getSalesHistoryByDateRange(String fromDate, String toDate, int page, int pageSize) {
+    String endpoint = "/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize;
+    
+    if (fromDate != null && !fromDate.isEmpty()) {
+        endpoint += "&from=" + fromDate;
+    }
+    
+    if (toDate != null && !toDate.isEmpty()) {
+        endpoint += "&to=" + toDate;
+    }
+    
+    return getWithAuth(endpoint);
+}
+
+// ✅ دالة شاملة للفلترة المتقدمة
+public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod, String fromDate, String toDate, int page, int pageSize) {
+    StringBuilder endpoint = new StringBuilder("/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize);
+    
+    try {
+        if (search != null && !search.isEmpty()) {
+            endpoint.append("&search=").append(URLEncoder.encode(search, "UTF-8"));
+        }
+        
+        if (paymentMethod != null && !paymentMethod.isEmpty() && !paymentMethod.equals("ALL")) {
+            endpoint.append("&payment_method=").append(paymentMethod);
+        }
+        
+        if (fromDate != null && !fromDate.isEmpty()) {
+            endpoint.append("&from=").append(fromDate);
+        }
+        
+        if (toDate != null && !toDate.isEmpty()) {
+            endpoint.append("&to=").append(toDate);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Error building advanced search URL", e);
+    }
+    
+    return getWithAuth(endpoint.toString());
+}
 
     // ===================== 🏷️ ITEM =====================
 
