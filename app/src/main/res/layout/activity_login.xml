@@ -215,22 +215,21 @@
                             android:textStyle="bold"
                             app:backgroundTint="?attr/colorPrimary"
                             app:cornerRadius="12dp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnBiometric"
-                            style="@style/Widget.Material3.Button.OutlinedButton"
-                            android:layout_width="56dp"
-                            android:layout_height="56dp"
-                            android:layout_marginStart="12dp"
-                            android:padding="0dp"
-                            app:cornerRadius="12dp"
-                            app:icon="@drawable/ic_fingerprint"
-                            app:iconGravity="center"
-                            app:iconPadding="0dp"
-                            app:iconSize="28dp"
-                            app:iconTint="?attr/colorPrimary"
-                            app:strokeColor="?attr/colorPrimary"
-                            app:strokeWidth="1.5dp" />
+<com.google.android.material.button.MaterialButton
+    android:id="@+id/btnBiometric"
+    style="@style/Widget.Material3.Button.OutlinedButton"
+    android:layout_width="56dp"
+    android:layout_height="56dp"
+    android:layout_marginStart="12dp"
+    android:padding="0dp"
+    app:cornerRadius="12dp"
+    app:icon="@drawable/ic_fingerprint"
+    app:iconPadding="0dp"
+    app:iconSize="28dp"
+    app:iconTint="?attr/colorPrimary"
+    app:strokeColor="?attr/colorPrimary"
+    app:strokeWidth="1.5dp" />
+                        
                     </LinearLayout>
 
                     <!-- المؤشر أثناء جلب البيانات -->
