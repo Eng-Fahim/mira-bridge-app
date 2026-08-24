@@ -54,11 +54,13 @@
                 android:layout_marginTop="2dp" />
         </LinearLayout>
 
+        <!-- العمود الأيمن: الحالة والوقت والإشارة -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:gravity="end">
+            android:gravity="end"
+            android:layout_marginEnd="8dp">
 
             <!-- ID: tvTagStatus -->
             <TextView
@@ -90,6 +92,23 @@
                 android:textSize="10sp"
                 android:layout_marginTop="2dp" />
         </LinearLayout>
+
+        <!-- زر الإجراءات السريعة -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnQuickAction"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:text="⚡"
+            android:textSize="18sp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:cornerRadius="20dp"
+            app:backgroundTint="?attr/colorPrimaryContainer"
+            android:contentDescription="إجراءات سريعة"
+            app:rippleColor="?attr/colorPrimary" />
 
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
