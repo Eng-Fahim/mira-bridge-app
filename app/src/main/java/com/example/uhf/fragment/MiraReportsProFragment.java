@@ -281,63 +281,61 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void fetchAndRenderReportEx(ReportItem item, WebView webView, View layoutLoading,
-                                       TextView tvLoadingStatus, String fromDate, String toDate,
-                                       int userId, String itemCode, Dialog dialog) {
-        if (getContext() == null || !isAdded()) return;
+                                   TextView tvLoadingStatus, String fromDate, String toDate,
+                                   int userId, String itemCode, Dialog dialog) {
+    if (getContext() == null || !isAdded()) return;
 
-        if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
-        if (tvLoadingStatus != null) tvLoadingStatus.setText(isArabic ? "جاري جلب وتحليل البيانات..." : "Fetching and analyzing data...");
+    if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
+    if (tvLoadingStatus != null) tvLoadingStatus.setText(isArabic ? "جاري جلب وتحليل البيانات..." : "Fetching and analyzing data...");
 
-        boolean isAdvanced = "user_timeline".equals(item.type) || "item_passport".equals(item.type) || "inventory_aging".equals(item.type);
-        String endpoint = isAdvanced ? "reports-analytics" : "reports-app";
+    boolean isAdvanced = "user_timeline".equals(item.type) || "item_passport".equals(item.type) || "inventory_aging".equals(item.type);
+    String endpoint = isAdvanced ? "/reports-analytics" : "/reports-app";
 
-        StringBuilder urlBuilder = new StringBuilder();
-        urlBuilder.append("https://sa.mirabarcod.com")
-                  .append("/wp-json/mira-gate/v1/")
-                  .append(endpoint)
-                  .append("?type=").append(item.type)
-                  .append("&from=").append(fromDate)
-                  .append("&to=").append(toDate)
-                  .append("&branch_id=").append(currentBranchId);
+    // ✅ التعديل: استخدم المسار النسبي فقط بدون الدومين
+    StringBuilder urlBuilder = new StringBuilder();
+    urlBuilder.append(endpoint)
+              .append("?type=").append(item.type)
+              .append("&from=").append(fromDate)
+              .append("&to=").append(toDate)
+              .append("&branch_id=").append(currentBranchId);
 
-        if (userId > 0) {
-            urlBuilder.append("&user_id=").append(userId);
+    if (userId > 0) {
+        urlBuilder.append("&user_id=").append(userId);
+    }
+    if (itemCode != null && !itemCode.trim().isEmpty()) {
+        urlBuilder.append("&item_code=").append(Uri.encode(itemCode.trim()));
+    }
+
+    String requestUrl = urlBuilder.toString();
+
+    apiClient.get(requestUrl, new MiraApiClient.ApiCallback() {
+        @Override
+        public void onSuccess(MiraApiClient.ApiResponse response) {
+            if (getActivity() == null || !isAdded()) return;
+
+            getActivity().runOnUiThread(() -> {
+                if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+
+                String jsonResponse = response.getBody() != null ? response.getBody() : "";
+                String htmlContent = "user_timeline".equals(item.type) || "item_passport".equals(item.type)
+                        ? buildReportHtmlTemplate(item, jsonResponse, isArabic)
+                        : generateExecutiveHTML(item.type, parseJsonObject(jsonResponse), fromDate, toDate);
+
+                webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null);
+            });
         }
-        if (itemCode != null && !itemCode.trim().isEmpty()) {
-            urlBuilder.append("&item_code=").append(Uri.encode(itemCode.trim()));
+
+        @Override
+        public void onFailure(String errorMessage) {
+            handleReportError(errorMessage, layoutLoading);
         }
 
-        String requestUrl = urlBuilder.toString();
-
-        apiClient.get(requestUrl, new MiraApiClient.ApiCallback() {
-    @Override
-    public void onSuccess(MiraApiClient.ApiResponse response) {  // ✅ استخدم MiraApiClient.ApiResponse
-        if (getActivity() == null || !isAdded()) return;
-
-        getActivity().runOnUiThread(() -> {
-            if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-
-            String jsonResponse = response.getBody() != null ? response.getBody() : "";
-            String htmlContent = "user_timeline".equals(item.type) || "item_passport".equals(item.type)
-                    ? buildReportHtmlTemplate(item, jsonResponse, isArabic)
-                    : generateExecutiveHTML(item.type, parseJsonObject(jsonResponse), fromDate, toDate);
-
-            webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null);
-        });
-    }
-
-    @Override
-    public void onFailure(String errorMessage) {
-        handleReportError(errorMessage, layoutLoading);
-    }
-
-    @Override
-    public void onError(String errorMessage) {
-        handleReportError(errorMessage, layoutLoading);
-    }
-});
-    }
-
+        @Override
+        public void onError(String errorMessage) {
+            handleReportError(errorMessage, layoutLoading);
+        }
+    });
+}
     private void handleReportError(String errorMessage, View layoutLoading) {
         if (getActivity() == null || !isAdded()) return;
 
@@ -730,60 +728,61 @@ public class MiraReportsProFragment extends Fragment {
     }
 
     private void populateUsersSpinner(Spinner spinner) {
-        if (getContext() == null || apiClient == null) return;
+    if (getContext() == null || apiClient == null) return;
 
-        String url = "https://sa.mirabarcod.com/wp-json/mira-gate/v1/reports-analytics?type=users_list";
+    // ✅ التعديل: استخدم المسار النسبي فقط بدون الدومين
+    String url = "/reports-analytics?type=users_list";
 
-        apiClient.get(url, new MiraApiClient.ApiCallback() {
-    @Override
-    public void onSuccess(MiraApiClient.ApiResponse response) {  // ✅ استخدم MiraApiClient.ApiResponse
-        if (!isAdded() || getActivity() == null) return;
-        getActivity().runOnUiThread(() -> {
-            try {
-                String jsonResponse = response.getBody() != null ? response.getBody() : "";
-                JSONObject responseObj = new JSONObject(jsonResponse);
-                        JSONArray usersArray = responseObj.optJSONArray("data");
-                        List<UserSpinnerItem> userItems = new ArrayList<>();
+    apiClient.get(url, new MiraApiClient.ApiCallback() {
+        @Override
+        public void onSuccess(MiraApiClient.ApiResponse response) {
+            if (!isAdded() || getActivity() == null) return;
+            getActivity().runOnUiThread(() -> {
+                try {
+                    String jsonResponse = response.getBody() != null ? response.getBody() : "";
+                    JSONObject responseObj = new JSONObject(jsonResponse);
+                    JSONArray usersArray = responseObj.optJSONArray("data");
+                    List<UserSpinnerItem> userItems = new ArrayList<>();
 
-                        userItems.add(new UserSpinnerItem(0, isArabic ? "-- اختر الموظف --" : "-- Select User --"));
+                    userItems.add(new UserSpinnerItem(0, isArabic ? "-- اختر الموظف --" : "-- Select User --"));
 
-                        if (usersArray != null) {
-                            for (int i = 0; i < usersArray.length(); i++) {
-                                JSONObject u = usersArray.optJSONObject(i);
-                                if (u != null) {
-                                    userItems.add(new UserSpinnerItem(
-                                        u.optInt("ID", u.optInt("id")),
-                                        u.optString("display_name", u.optString("user_login"))
-                                    ));
-                                }
+                    if (usersArray != null) {
+                        for (int i = 0; i < usersArray.length(); i++) {
+                            JSONObject u = usersArray.optJSONObject(i);
+                            if (u != null) {
+                                userItems.add(new UserSpinnerItem(
+                                    u.optInt("ID", u.optInt("id")),
+                                    u.optString("display_name", u.optString("user_login"))
+                                ));
                             }
                         }
-
-                        android.widget.ArrayAdapter<UserSpinnerItem> adapter = new android.widget.ArrayAdapter<>(
-                            requireContext(),
-                            android.R.layout.simple_spinner_item,
-                            userItems
-                        );
-                        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                        spinner.setAdapter(adapter);
-
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error parsing users list", e);
                     }
-                });
-            }
 
-                @Override
-    public void onFailure(String errorMessage) {
-        Log.e(TAG, "Failed to load users for spinner: " + errorMessage);
-    }
+                    android.widget.ArrayAdapter<UserSpinnerItem> adapter = new android.widget.ArrayAdapter<>(
+                        requireContext(),
+                        android.R.layout.simple_spinner_item,
+                        userItems
+                    );
+                    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                    spinner.setAdapter(adapter);
 
-    @Override
-    public void onError(String errorMessage) {
-        Log.e(TAG, "Failed to load users for spinner: " + errorMessage);
-    }
-});
-    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error parsing users list", e);
+                }
+            });
+        }
+
+        @Override
+        public void onFailure(String errorMessage) {
+            Log.e(TAG, "Failed to load users for spinner: " + errorMessage);
+        }
+
+        @Override
+        public void onError(String errorMessage) {
+            Log.e(TAG, "Failed to load users for spinner: " + errorMessage);
+        }
+    });
+}
 
     private void printReportWebView(WebView webView, String jobTitle) {
         if (!isAdded() || getContext() == null || webView == null) return;
@@ -966,4 +965,4 @@ public class MiraReportsProFragment extends Fragment {
         @Override
         public String toString() { return name; }
     }
-        }
+                            }
