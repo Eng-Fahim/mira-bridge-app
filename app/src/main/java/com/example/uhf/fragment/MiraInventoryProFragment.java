@@ -1,7 +1,6 @@
 package com.example.uhf.fragment;
 
 import android.content.Context;
-import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.media.AudioAttributes;
@@ -30,17 +29,12 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import androidx.room.Dao;
-import androidx.room.Database;
-import androidx.room.Entity;
-import androidx.room.Insert;
-import androidx.room.PrimaryKey;
-import androidx.room.Query;
 import androidx.room.Room;
-import androidx.room.RoomDatabase;
-import androidx.room.ColumnInfo;
 
 import com.example.uhf.R;
+import com.example.uhf.database.InventoryDatabase;
+import com.example.uhf.database.InventoryTransactionDao;
+import com.example.uhf.database.InventoryTransactionEntity;
 import com.example.uhf.engine.MiraInventoryEngine;
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.RFIDManager;
@@ -52,6 +46,7 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.tabs.TabLayout;
 import com.google.zxing.BarcodeFormat;
+import com.google.zxing.WriterException;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 
@@ -150,6 +145,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private final Map<String, String> barcodeToEpcMap = new ConcurrentHashMap<>();
     private final List<AuditEntry> auditLog = new ArrayList<>();
     
+    // Room Database
+    private InventoryDatabase inventoryDatabase;
+    private InventoryTransactionDao transactionDao;
+    
     private final Runnable uiUpdateRunnable = new Runnable() {
         @Override
         public void run() {
@@ -175,10 +174,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private PermissionManager permissionManager;
     private int expectedCount = 0;
     private List<InventoryItem> scannedItemsList = new ArrayList<>();
-    
-    // Room Database
-    private InventoryDatabase inventoryDatabase;
-    private InventoryTransactionDao transactionDao;
 
     @Nullable
     @Override
@@ -489,13 +484,13 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             transaction.synced = false;
             transaction.branchId = branchesManager.getActiveBranchId();
             
-            new Thread(() -> {
+            backgroundExecutor.execute(() -> {
                 try {
                     transactionDao.insertTransaction(transaction);
                 } catch (Exception e) {
                     Log.e(TAG, "Error saving transaction locally", e);
                 }
-            }).start();
+            });
         } catch (Exception e) {
             Log.e(TAG, "Error creating transaction entity", e);
         }
@@ -574,7 +569,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
 
     private String getCurrentUserId() {
-        // يجب استبدال هذا بالمنطق الفعلي للحصول على معرف المستخدم
         return "USER-" + android.provider.Settings.Secure.getString(
             requireContext().getContentResolver(),
             android.provider.Settings.Secure.ANDROID_ID
@@ -710,10 +704,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             return items.size();
         }
         
-        public void highlightItem(String epc, ScanFeedbackType feedbackType) {
-            // يمكن إضافة تأثيرات بصرية هنا
-        }
-        
         class ViewHolder extends RecyclerView.ViewHolder {
             TextView tvTagTitle;
             TextView tvTagEpc;
@@ -805,14 +795,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             }
             
             private void showLocationDialog(ScannedItemDisplay item) {
-                // تنفيذ حوار تحديث الموقع
                 Toast.makeText(itemView.getContext(), 
                     "تحديث الموقع قيد التطوير", 
                     Toast.LENGTH_SHORT).show();
             }
             
             private void showNotesDialog(ScannedItemDisplay item) {
-                // تنفيذ حوار الملاحظات
                 Toast.makeText(itemView.getContext(), 
                     "إضافة ملاحظات قيد التطوير", 
                     Toast.LENGTH_SHORT).show();
@@ -822,12 +810,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
 
     private void updateItemStatus(String epc, String status) {
         logAudit("UPDATE_STATUS", "تحديث حالة " + epc + " إلى " + status);
-        // هنا يتم إرسال التحديث للخادم
     }
 
     private void registerItemDamage(String epc, String damageType) {
         logAudit("REGISTER_DAMAGE", "تسجيل تلف " + epc + " - " + damageType);
-        // هنا يتم إرسال التحديث للخادم
     }
 
     private void updateLastScan(String epc, int rssi) {
@@ -1234,10 +1220,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 payload.put("items", itemsArray);
                 payload.put("scanned_epcs", epcsArray);
                 
-                Log.d(TAG, "Payload items count: " + itemsArray.length());
-                Log.d(TAG, "Payload epcs count: " + epcsArray.length());
-                Log.d(TAG, "Scanned display list size: " + scannedItemsDisplayList.size());
-                
                 MiraApiClient.ApiResponse response = apiClient.closeInventorySession(payload);
                 
                 mainThreadHandler.post(() -> {
@@ -1452,6 +1434,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
 
     private void printReportDirectly(InventoryReport report, List<ScannedItemDisplay> items) {
+        // نفس الكود السابق للطباعة
         try {
             WebView webView = new WebView(requireContext());
             
@@ -1469,8 +1452,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 .append(".items-table th { background-color: #1a237e; color: white; padding: 8px; border: 1px solid #1a237e; font-size: 12px; }")
                 .append(".items-table td { padding: 6px; border: 1px solid #ddd; font-size: 11px; text-align: center; }")
                 .append(".footer { margin-top: 30px; text-align: left; font-size: 10px; color: #888; border-top: 1px solid #ccc; padding-top: 5px; }")
-                .append(".qr-code { text-align: center; margin-top: 20px; }")
-                .append(".qr-code img { width: 150px; height: 150px; }")
                 .append("</style></head><body>");
 
             html.append("<div class='header'>")
@@ -1539,7 +1520,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         if (!isAdded()) return;
         
         try {
-            // إنشاء QR Code
             String qrData = generateReportQRData(report);
             Bitmap qrBitmap = generateQRCode(qrData);
             String qrBase64 = convertBitmapToBase64(qrBitmap);
@@ -1601,7 +1581,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
 
             html.append("</tbody></table>");
             
-            // إضافة QR Code
             if (qrBase64 != null && !qrBase64.isEmpty()) {
                 html.append("<div class='qr-code'>")
                     .append("<img src='data:image/png;base64,").append(qrBase64).append("'/>")
@@ -2166,56 +2145,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             this.status = status;
         }
     }
-}
-
-// Room Database Entities and DAOs
-
-@Entity(tableName = "inventory_transactions")
-class InventoryTransactionEntity {
-    @PrimaryKey(autoGenerate = true)
-    public int id;
-    
-    @ColumnInfo(name = "session_id")
-    public String sessionId;
-    
-    @ColumnInfo(name = "epc_code")
-    public String epcCode;
-    
-    @ColumnInfo(name = "rssi")
-    public int rssi;
-    
-    @ColumnInfo(name = "scan_timestamp")
-    public long timestamp;
-    
-    @ColumnInfo(name = "device_id")
-    public String deviceId;
-    
-    @ColumnInfo(name = "user_id")
-    public String userId;
-    
-    @ColumnInfo(name = "synced")
-    public boolean synced;
-    
-    @ColumnInfo(name = "branch_id")
-    public int branchId;
-}
-
-@Dao
-interface InventoryTransactionDao {
-    @Insert
-    long insertTransaction(InventoryTransactionEntity transaction);
-    
-    @Query("SELECT * FROM inventory_transactions WHERE synced = 0")
-    List<InventoryTransactionEntity> getUnsyncedTransactions();
-    
-    @Query("UPDATE inventory_transactions SET synced = 1 WHERE id IN (:ids)")
-    void markAsSynced(List<Integer> ids);
-    
-    @Query("DELETE FROM inventory_transactions WHERE synced = 1 AND scan_timestamp < :cutoffTime")
-    void cleanupSyncedTransactions(long cutoffTime);
-}
-
-@Database(entities = {InventoryTransactionEntity.class}, version = 1)
-abstract class InventoryDatabase extends RoomDatabase {
-    public abstract InventoryTransactionDao inventoryTransactionDao();
-}
+                    }
