@@ -1,43 +1,44 @@
 package com.example.uhf.fragment;
 
-import android.app.Dialog;
-import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.Window;
-import android.view.WindowManager;
-import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import androidx.core.util.Pair;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
+import com.example.uhf.adapter.MiraFiscalYearAdapter;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.model.MiraFiscalYearItem;
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.datepicker.MaterialDatePicker;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputEditText;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class MiraFiscalYearsFragment extends Fragment {
-
-    private static final String TAG = "MiraFiscalYearsFragment";
+public class MiraFiscalYearsFragment extends Fragment implements MiraFiscalYearAdapter.OnItemClickListener {
 
     private MiraApiClient apiClient;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -46,10 +47,14 @@ public class MiraFiscalYearsFragment extends Fragment {
     private RecyclerView rvFiscalYears;
     private TextView tvEmptyFiscalYears;
     private MaterialButton btnNewFiscalYear;
+    private ProgressBar progressBar;
 
-    private final List<FiscalYearItem> yearList = new ArrayList<>();
-    private FiscalYearAdapter adapter;
+    private final List<MiraFiscalYearItem> yearList = new ArrayList<>();
+    private MiraFiscalYearAdapter adapter;
     private boolean isArabic = true;
+
+    private String selectedStartDate = "";
+    private String selectedEndDate = "";
 
     @Nullable
     @Override
@@ -70,9 +75,10 @@ public class MiraFiscalYearsFragment extends Fragment {
         rvFiscalYears = view.findViewById(R.id.rvFiscalYears);
         tvEmptyFiscalYears = view.findViewById(R.id.tvEmptyFiscalYears);
         btnNewFiscalYear = view.findViewById(R.id.btnNewFiscalYear);
-        
+        progressBar = view.findViewById(R.id.progressBar);
+
         rvFiscalYears.setLayoutManager(new LinearLayoutManager(getContext()));
-        adapter = new FiscalYearAdapter(yearList);
+        adapter = new MiraFiscalYearAdapter(yearList, isArabic, this);
         rvFiscalYears.setAdapter(adapter);
     }
 
@@ -81,15 +87,16 @@ public class MiraFiscalYearsFragment extends Fragment {
     }
 
     private void loadFiscalYears() {
+        showLoading(true);
         executor.execute(() -> {
             MiraApiClient.ApiResponse response = apiClient.getFiscalYears();
             
             mainHandler.post(() -> {
+                showLoading(false);
                 if (response != null && response.isSuccess && response.data != null) {
                     parseFiscalYears(response.data);
                 } else {
-                    tvEmptyFiscalYears.setVisibility(View.VISIBLE);
-                    rvFiscalYears.setVisibility(View.GONE);
+                    showErrorState(isArabic ? "فشل تحميل البيانات" : "Failed to load fiscal years");
                 }
             });
         });
@@ -103,12 +110,15 @@ public class MiraFiscalYearsFragment extends Fragment {
             if (items != null && items.length() > 0) {
                 for (int i = 0; i < items.length(); i++) {
                     JSONObject obj = items.getJSONObject(i);
-                    FiscalYearItem item = new FiscalYearItem();
-                    item.id = obj.optInt("id", i + 1);
-                    item.yearName = obj.optString("year_name", "");
-                    item.startDate = obj.optString("start_date", "");
-                    item.endDate = obj.optString("end_date", "");
-                    item.isClosed = obj.optInt("is_closed", 0) == 1;
+                    MiraFiscalYearItem item = new MiraFiscalYearItem(
+                            obj.optInt("id", i + 1),
+                            obj.optString("year_name", ""),
+                            obj.optString("start_date", ""),
+                            obj.optString("end_date", ""),
+                            obj.optInt("is_closed", 0) == 1,
+                            obj.optDouble("closing_gold_24k", 0.0),
+                            obj.optDouble("closing_cash", 0.0)
+                    );
                     yearList.add(item);
                 }
                 
@@ -116,56 +126,55 @@ public class MiraFiscalYearsFragment extends Fragment {
                 tvEmptyFiscalYears.setVisibility(View.GONE);
                 rvFiscalYears.setVisibility(View.VISIBLE);
             } else {
-                tvEmptyFiscalYears.setVisibility(View.VISIBLE);
-                rvFiscalYears.setVisibility(View.GONE);
+                showErrorState(isArabic ? "لا توجد سنوات مالية مسجلة" : "No fiscal years available");
             }
         } catch (Exception e) {
-            e.printStackTrace();
-            tvEmptyFiscalYears.setVisibility(View.VISIBLE);
-            rvFiscalYears.setVisibility(View.GONE);
+            showErrorState(isArabic ? "خطأ في معالجة البيانات" : "Parsing Error");
         }
     }
 
     private void showCreateFiscalYearDialog() {
         if (getContext() == null) return;
-        
-        Dialog dialog = new Dialog(getContext());
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.dialog_create_fiscal_year);
-        
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT);
-        }
-        
-        EditText etYearName = dialog.findViewById(R.id.etFiscalYearName);
-        EditText etStartDate = dialog.findViewById(R.id.etFiscalStartDate);
-        EditText etEndDate = dialog.findViewById(R.id.etFiscalEndDate);
-        MaterialButton btnCancel = dialog.findViewById(R.id.btnFiscalCancel);
-        MaterialButton btnSave = dialog.findViewById(R.id.btnFiscalSave);
-        
-        btnCancel.setOnClickListener(v -> dialog.dismiss());
-        
-        btnSave.setOnClickListener(v -> {
-            String yearName = etYearName.getText().toString().trim();
-            String startDate = etStartDate.getText().toString().trim();
-            String endDate = etEndDate.getText().toString().trim();
-            
-            if (yearName.isEmpty() || startDate.isEmpty() || endDate.isEmpty()) {
-                Toast.makeText(getContext(), 
-                    isArabic ? "جميع الحقول مطلوبة" : "All fields required", 
-                    Toast.LENGTH_SHORT).show();
-                return;
-            }
-            
-            createFiscalYear(yearName, startDate, endDate);
-            dialog.dismiss();
+
+        View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_create_fiscal_year_m3, null);
+        TextInputEditText etYearName = dialogView.findViewById(R.id.etFiscalYearName);
+        MaterialButton btnSelectDates = dialogView.findViewById(R.id.btnSelectDateRange);
+        TextView tvSelectedDates = dialogView.findViewById(R.id.tvSelectedDates);
+
+        btnSelectDates.setOnClickListener(v -> {
+            MaterialDatePicker<Pair<Long, Long>> picker = MaterialDatePicker.Builder.dateRangePicker()
+                    .setTitleText(isArabic ? "اختر فترة السنة المالية" : "Select Fiscal Year Range")
+                    .build();
+
+            picker.addOnPositiveButtonClickListener(selection -> {
+                if (selection.first != null && selection.second != null) {
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+                    selectedStartDate = sdf.format(new Date(selection.first));
+                    selectedEndDate = sdf.format(new Date(selection.second));
+                    tvSelectedDates.setText(String.format("%s  ➔  %s", selectedStartDate, selectedEndDate));
+                }
+            });
+
+            picker.show(getParentFragmentManager(), "FISCAL_DATE_PICKER");
         });
-        
-        dialog.show();
+
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(isArabic ? "إنشاء سنة مالية جديدة" : "New Fiscal Year")
+                .setView(dialogView)
+                .setPositiveButton(isArabic ? "حفظ وتأسيس" : "Save", (dialog, which) -> {
+                    String yearName = etYearName.getText() != null ? etYearName.getText().toString().trim() : "";
+                    if (yearName.isEmpty() || selectedStartDate.isEmpty() || selectedEndDate.isEmpty()) {
+                        Toast.makeText(getContext(), isArabic ? "يرجى استكمال جميع البيانات" : "All fields required", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    createFiscalYear(yearName, selectedStartDate, selectedEndDate);
+                })
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                .show();
     }
 
     private void createFiscalYear(String name, String start, String end) {
+        showLoading(true);
         executor.execute(() -> {
             try {
                 JSONObject payload = new JSONObject();
@@ -177,20 +186,63 @@ public class MiraFiscalYearsFragment extends Fragment {
                 
                 mainHandler.post(() -> {
                     if (response != null && response.isSuccess) {
-                        Toast.makeText(getContext(), 
-                            isArabic ? "✅ تم إنشاء السنة المالية" : "✅ Fiscal year created", 
-                            Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), isArabic ? "✅ تم إنشاء السنة المالية وترحيل الأرصدة" : "✅ Created", Toast.LENGTH_SHORT).show();
                         loadFiscalYears();
                     } else {
-                        Toast.makeText(getContext(), 
-                            isArabic ? "❌ فشل الإنشاء" : "❌ Failed", 
-                            Toast.LENGTH_SHORT).show();
+                        showLoading(false);
+                        Toast.makeText(getContext(), isArabic ? "❌ فشل الإنشاء" : "❌ Failed", Toast.LENGTH_SHORT).show();
                     }
                 });
             } catch (Exception e) {
-                e.printStackTrace();
+                mainHandler.post(() -> showLoading(false));
             }
         });
+    }
+
+    @Override
+    public void onItemLongClick(MiraFiscalYearItem item) {
+        if (item.isClosed()) return;
+
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(isArabic ? "🔒 إغلاق وتدوير السنة المالية" : "🔒 Close Fiscal Year")
+                .setMessage(isArabic ? 
+                        "هل أنت متأكد من إغلاق سنة (" + item.getYearName() + ")؟\n\nسيتم قفل القيود وتدوير أوزان الذهب والنقدية للسنة الجديدة تلقائياً ولا يمكن التراجع." :
+                        "Are you sure you want to close " + item.getYearName() + "?\nGold weights and balances will be rolled over.")
+                .setPositiveButton(isArabic ? "إغلاق وتدوير" : "Close Year", (dialog, which) -> closeFiscalYear(item.getId()))
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                .show();
+    }
+
+    private void closeFiscalYear(int yearId) {
+        showLoading(true);
+        executor.execute(() -> {
+            MiraApiClient.ApiResponse response = apiClient.closeFiscalYear(yearId);
+            
+            mainHandler.post(() -> {
+                if (response != null && response.isSuccess) {
+                    Toast.makeText(getContext(), isArabic ? "✅ تم إغلاق السنة وتدوير الجرامات بنجاح" : "✅ Closed & Rolled Over", Toast.LENGTH_SHORT).show();
+                    loadFiscalYears();
+                } else {
+                    showLoading(false);
+                    Toast.makeText(getContext(), isArabic ? "❌ فشل الإغلاق" : "❌ Failed", Toast.LENGTH_SHORT).show();
+                }
+            });
+        });
+    }
+
+    private void showLoading(boolean isLoading) {
+        progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+        if (isLoading) {
+            rvFiscalYears.setVisibility(View.GONE);
+            tvEmptyFiscalYears.setVisibility(View.GONE);
+        }
+    }
+
+    private void showErrorState(String message) {
+        showLoading(false);
+        tvEmptyFiscalYears.setVisibility(View.VISIBLE);
+        tvEmptyFiscalYears.setText(message);
+        rvFiscalYears.setVisibility(View.GONE);
     }
 
     @Override
@@ -200,101 +252,4 @@ public class MiraFiscalYearsFragment extends Fragment {
             executor.shutdown();
         }
     }
-
-    // ==================== MODEL ====================
-    private static class FiscalYearItem {
-        int id;
-        String yearName;
-        String startDate;
-        String endDate;
-        boolean isClosed;
-    }
-
-    // ==================== ADAPTER ====================
-    private class FiscalYearAdapter extends RecyclerView.Adapter<FiscalYearAdapter.ViewHolder> {
-        private List<FiscalYearItem> items;
-        
-        FiscalYearAdapter(List<FiscalYearItem> items) { this.items = items; }
-        
-        @NonNull
-        @Override
-        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_fiscal_year, parent, false);
-            return new ViewHolder(view);
-        }
-        
-        
-// تعديل Adapter لإضافة الضغط المطول للإغلاق:
-@Override
-public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-    FiscalYearItem item = items.get(position);
-    holder.tvYearName.setText(item.yearName);
-    holder.tvDates.setText(item.startDate + " → " + item.endDate);
-    
-    if (item.isClosed) {
-        holder.tvStatus.setText(isArabic ? "🔒 مغلقة" : "🔒 Closed");
-        holder.tvStatus.setTextColor(Color.parseColor("#E74C3C"));
-    } else {
-        holder.tvStatus.setText(isArabic ? "✅ مفتوحة" : "✅ Open");
-        holder.tvStatus.setTextColor(Color.parseColor("#2ECC71"));
-    }
-    
-    // ✅ الضغط المطول للإغلاق
-    holder.itemView.setOnLongClickListener(v -> {
-        showCloseYearDialog(item);
-        return true;
-    });
-}
-        
-        @Override
-        public int getItemCount() { return items.size(); }
-        
-        class ViewHolder extends RecyclerView.ViewHolder {
-            TextView tvYearName, tvDates, tvStatus;
-            
-            ViewHolder(View itemView) {
-                super(itemView);
-                tvYearName = itemView.findViewById(R.id.tvFiscalYearName);
-                tvDates = itemView.findViewById(R.id.tvFiscalDates);
-                tvStatus = itemView.findViewById(R.id.tvFiscalStatus);
-            }
-        }
-    }
-    
-    // في MiraFiscalYearsFragment.java - أضف دالة الإغلاق:
-
-private void showCloseYearDialog(FiscalYearItem year) {
-    if (getContext() == null || year.isClosed) return;
-    
-    new androidx.appcompat.app.AlertDialog.Builder(getContext())
-        .setTitle(isArabic ? "إغلاق سنة مالية" : "Close Fiscal Year")
-        .setMessage(isArabic ? 
-            "هل أنت متأكد من إغلاق سنة " + year.yearName + "؟\n\nهذا الإجراء لا يمكن التراجع عنه." :
-            "Are you sure you want to close year " + year.yearName + "?\n\nThis action cannot be undone.")
-        .setPositiveButton(isArabic ? "إغلاق" : "Close", (dialog, which) -> {
-            closeFiscalYear(year.id);
-        })
-        .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-        .show();
-}
-
-private void closeFiscalYear(int yearId) {
-    executor.execute(() -> {
-        MiraApiClient.ApiResponse response = apiClient.closeFiscalYear(yearId);
-        
-        mainHandler.post(() -> {
-            if (response != null && response.isSuccess) {
-                Toast.makeText(getContext(), 
-                    isArabic ? "✅ تم إغلاق السنة المالية" : "✅ Year closed", 
-                    Toast.LENGTH_SHORT).show();
-                loadFiscalYears();
-            } else {
-                Toast.makeText(getContext(), 
-                    isArabic ? "❌ فشل الإغلاق" : "❌ Failed", 
-                    Toast.LENGTH_SHORT).show();
-            }
-        });
-    });
-}
 }
