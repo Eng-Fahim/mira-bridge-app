@@ -126,7 +126,7 @@
             app:cornerRadius="6dp" />
     </LinearLayout>
 
-    <!-- ✅ العناصر المضافة المفقودة (Advanced Filters & Users Spinner) -->
+    <!-- Advanced Filters & Users Spinner -->
     <LinearLayout
         android:id="@+id/layoutAdvancedFilters"
         android:layout_width="match_parent"
@@ -145,13 +145,20 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:background="@android:color/white">
 
+        <!-- ✅ تم إعطاء WebView خلفية بيضاء صريحة ومنع الشفافية -->
         <WebView
             android:id="@+id/webReportView"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="match_parent"
+            android:background="@android:color/white"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:visibility="invisible" />
 
+        <!-- ✅ مؤشر التحميل يظهر افتراضياً لحين اكتمال تجهيز الـ HTML برمجياً -->
         <LinearLayout
             android:id="@+id/layoutLoadingContainer"
             android:layout_width="wrap_content"
@@ -160,7 +167,7 @@
             android:gravity="center"
             android:orientation="vertical"
             android:padding="16dp"
-            android:visibility="gone">
+            android:visibility="visible">
 
             <ProgressBar
                 android:id="@+id/progressReportLoading"
@@ -172,7 +179,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="جاري معالجة البيانات..."
+                android:text="جاري معالجة وتجهيز التقرير..."
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="12sp"
                 android:textStyle="bold" />
