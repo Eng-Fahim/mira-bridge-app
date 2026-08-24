@@ -1,5 +1,6 @@
 package com.example.uhf.fragment;
 
+import android.content.Context;
 import android.content.DialogInterface;
 import android.media.AudioAttributes;
 import android.media.SoundPool;
@@ -7,11 +8,16 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -809,6 +815,18 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 .setTitle("حفظ واكتمال الجرد")
                 .setMessage(message)
                 .setPositiveButton("إرسال واعتماد", (dialog, which) -> commitInventoryToServer())
+                .setNeutralButton("🖨️ طباعة التقرير الحالي", (dialog, which) -> {
+                    InventoryReport currentReport = new InventoryReport(
+                        0,
+                        inventoryEngine.getClientSessionId(),
+                        new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(new Date()),
+                        expectedCount,
+                        scanned,
+                        missing,
+                        "جارية"
+                    );
+                    printReport(currentReport);
+                })
                 .setNegativeButton("إلغاء", null)
                 .show();
     }
@@ -909,7 +927,20 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             new MaterialAlertDialogBuilder(requireContext())
                 .setTitle("🎉 نجاح العملية")
                 .setMessage(message)
-                .setPositiveButton("إغلاق", null)
+                .setPositiveButton("🖨️ طباعة التقرير", (dialog, which) -> {
+                    int scanned = inventoryEngine != null ? inventoryEngine.getUniqueCount() : 0;
+                    InventoryReport committedReport = new InventoryReport(
+                        0,
+                        inventoryEngine != null ? inventoryEngine.getClientSessionId() : "SESS-COMMITTED",
+                        new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(new Date()),
+                        expectedCount,
+                        scanned,
+                        Math.max(0, expectedCount - scanned),
+                        "معتمد"
+                    );
+                    printReport(committedReport);
+                })
+                .setNegativeButton("إغلاق", null)
                 .show();
         } catch (Exception e) {
             Log.e(TAG, "Error showing success dialog", e);
@@ -1030,7 +1061,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             report.scannedCount, report.missingCount, report.status
         );
         
-        String[] options = {"🖨️ طباعة", "📊 مقارنة مع الحالي", "❌ إغلاق"};
+        String[] options = {"🖨️ طباعة التقرير", "📊 مقارنة مع الحالي", "❌ إغلاق"};
         
         new MaterialAlertDialogBuilder(requireContext())
                 .setTitle("تفاصيل التقرير")
@@ -1049,14 +1080,97 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
     
     private void printReport(InventoryReport report) {
-        if (isAdded()) {
-            Toast.makeText(requireContext(), "🖨️ جاري طباعة التقرير: " + report.sessionId, Toast.LENGTH_SHORT).show();
+        if (!isAdded()) return;
+        Toast.makeText(requireContext(), "🖨️ تحضير المستند للطباعة...", Toast.LENGTH_SHORT).show();
+        printReportDirectly(report, scannedItemsDisplayList);
+    }
+
+    private void printAllReports(List<InventoryReport> reports) {
+        if (!isAdded() || reports.isEmpty()) return;
+        for (InventoryReport r : reports) {
+            printReport(r);
         }
     }
-    
-    private void printAllReports(List<InventoryReport> reports) {
-        if (isAdded()) {
-            Toast.makeText(requireContext(), "🖨️ جاري طباعة " + reports.size() + " تقرير", Toast.LENGTH_SHORT).show();
+
+    private void printReportDirectly(InventoryReport report, List<ScannedItemDisplay> items) {
+        try {
+            WebView webView = new WebView(requireContext());
+            
+            StringBuilder html = new StringBuilder();
+            html.append("<!DOCTYPE html><html><head><meta charset='utf-8'>")
+                .append("<style>")
+                .append("body { font-family: sans-serif; direction: rtl; text-align: right; margin: 20px; }")
+                .append(".header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }")
+                .append(".header h1 { margin: 0; color: #1a237e; font-size: 22px; }")
+                .append(".header p { margin: 5px 0 0 0; color: #666; font-size: 13px; }")
+                .append(".summary-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }")
+                .append(".summary-table td { padding: 8px; border: 1px solid #ddd; font-weight: bold; }")
+                .append(".summary-table td.label { background-color: #f5f5f5; width: 25%; }")
+                .append(".items-table { width: 100%; border-collapse: collapse; margin-top: 10px; }")
+                .append(".items-table th { background-color: #1a237e; color: white; padding: 8px; border: 1px solid #1a237e; font-size: 12px; }")
+                .append(".items-table td { padding: 6px; border: 1px solid #ddd; font-size: 11px; text-align: center; }")
+                .append(".footer { margin-top: 30px; text-align: left; font-size: 10px; color: #888; border-top: 1px solid #ccc; padding-top: 5px; }")
+                .append("</style></head><body>");
+
+            html.append("<div class='header'>")
+                .append("<h1>تقرير عمليات الجرد المتقدم - Mira RFID</h1>")
+                .append("<p>رقم الجلسة: ").append(report.sessionId).append(" | التاريخ: ").append(report.date).append("</p>")
+                .append("</div>");
+
+            int accuracy = report.expectedCount > 0 ? (int)(((float)report.scannedCount / report.expectedCount) * 100) : 100;
+
+            html.append("<table class='summary-table'>")
+                .append("<tr><td class='label'>المواد المتوقعة:</td><td>").append(report.expectedCount).append("</td>")
+                .append("<td class='label'>المواد الممسوحة:</td><td>").append(report.scannedCount).append("</td></tr>")
+                .append("<tr><td class='label'>الفارق / المفقود:</td><td>").append(report.missingCount).append("</td>")
+                .append("<td class='label'>نسبة الدقة:</td><td>").append(accuracy).append("%</td></tr>")
+                .append("</table>");
+
+            html.append("<h3>تفاصيل العناصر الممسوحة:</h3>");
+            html.append("<table class='items-table'><thead><tr>")
+                .append("<th>#</th><th>الرمز (EPC)</th><th>وصف القطعة</th><th>العيار</th><th>التكرار</th><th>الإشارة (dBm)</th>")
+                .append("</tr></thead><tbody>");
+
+            if (items != null && !items.isEmpty()) {
+                for (int i = 0; i < items.size(); i++) {
+                    ScannedItemDisplay item = items.get(i);
+                    html.append("<tr>")
+                        .append("<td>").append(i + 1).append("</td>")
+                        .append("<td>").append(item.epc).append("</td>")
+                        .append("<td>").append(item.title).append("</td>")
+                        .append("<td>").append(item.karat).append("</td>")
+                        .append("<td>").append(item.count).append("</td>")
+                        .append("<td>").append(item.rssi).append("</td>")
+                        .append("</tr>");
+                }
+            } else {
+                html.append("<tr><td colspan='6'>لا توجد عناصر ممسوحة مسجلة</td></tr>");
+            }
+
+            html.append("</tbody></table>");
+            html.append("<div class='footer'>تم إنشاء هذا التقرير تلقائياً بواسطة نظام Mira Pro RFID</div>");
+            html.append("</body></html>");
+
+            webView.setWebViewClient(new WebViewClient() {
+                @Override
+                public void onPageFinished(WebView view, String url) {
+                    PrintManager printManager = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
+                    if (printManager != null) {
+                        String jobName = "Mira_Inventory_Report_" + report.sessionId;
+                        PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter(jobName);
+                        PrintAttributes attributes = new PrintAttributes.Builder()
+                                .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+                                .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                                .build();
+                        printManager.print(jobName, printAdapter, attributes);
+                    }
+                }
+            });
+
+            webView.loadDataWithBaseURL(null, html.toString(), "text/html", "UTF-8", null);
+        } catch (Exception e) {
+            Log.e(TAG, "Error executing print task", e);
+            Toast.makeText(requireContext(), "❌ فشلت عملية الطباعة: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
     
@@ -1384,9 +1498,16 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                         .setTitle("📊 نتيجة المقارنة")
                         .setMessage(comparisonText + assessment)
                         .setPositiveButton("🖨️ طباعة", (dialog, which) -> {
-                            Toast.makeText(requireContext(), 
-                                "🖨️ جاري الطباعة...", 
-                                Toast.LENGTH_SHORT).show();
+                            InventoryReport compReport = new InventoryReport(
+                                0,
+                                session2.optString("client_session_id", "COMP-RESULT"),
+                                date2,
+                                expected2,
+                                found2,
+                                missing2,
+                                "مقارنة"
+                            );
+                            printReport(compReport);
                         })
                         .setNegativeButton("إغلاق", null)
                         .show();
@@ -1530,4 +1651,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             this.status = status;
         }
     }
-            }
+}
