@@ -692,11 +692,13 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void navigateToMain() {
-        startActivity(new Intent(this, UHFMainActivity.class)
-            .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
-        finish();
-        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
-    }
+    Intent intent = new Intent(this, UHFMainActivity.class);
+    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+    intent.putExtra("fresh_start", true); // ✅ إشارة بداية جديدة
+    startActivity(intent);
+    finish();
+    overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+}
 
     @Override
     protected void onResume() {
