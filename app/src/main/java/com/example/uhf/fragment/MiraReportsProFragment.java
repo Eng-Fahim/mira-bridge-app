@@ -291,7 +291,6 @@ public class MiraReportsProFragment extends Fragment {
     boolean isAdvanced = "user_timeline".equals(item.type) || "item_passport".equals(item.type) || "inventory_aging".equals(item.type);
     String endpoint = isAdvanced ? "/reports-analytics" : "/reports-app";
 
-    // ✅ التعديل: استخدم المسار النسبي فقط بدون الدومين
     StringBuilder urlBuilder = new StringBuilder();
     urlBuilder.append(endpoint)
               .append("?type=").append(item.type)
@@ -317,11 +316,16 @@ public class MiraReportsProFragment extends Fragment {
                 if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
 
                 String jsonResponse = response.getBody() != null ? response.getBody() : "";
-                String htmlContent = "user_timeline".equals(item.type) || "item_passport".equals(item.type)
-                        ? buildReportHtmlTemplate(item, jsonResponse, isArabic)
-                        : generateExecutiveHTML(item.type, parseJsonObject(jsonResponse), fromDate, toDate);
+                
+                String htmlContent;
+                if ("user_timeline".equals(item.type) || "item_passport".equals(item.type)) {
+                    htmlContent = buildReportHtmlTemplate(item, jsonResponse, isArabic);
+                } else {
+                    htmlContent = generateExecutiveHTML(item.type, parseJsonObject(jsonResponse), fromDate, toDate);
+                }
 
-                webView.loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null);
+                // ✅ إصلاح BaseURL لمنع الشاشة البيضاء
+                webView.loadDataWithBaseURL("https://localhost/", htmlContent, "text/html", "UTF-8", null);
             });
         }
 
@@ -336,6 +340,41 @@ public class MiraReportsProFragment extends Fragment {
         }
     });
 }
+
+// ✅ إصلاح دالة تحليل الـ JSON لضمان عدم السقوط في Catch عند استقبال Array أو Data مرن
+private JSONObject parseJsonObject(String json) {
+    try {
+        if (json == null || json.trim().isEmpty()) return new JSONObject();
+        
+        json = json.trim();
+        if (json.startsWith("[")) {
+            // إذا كان السيرفر يرجع Array مباشرة
+            JSONArray array = new JSONArray(json);
+            JSONObject wrapper = new JSONObject();
+            wrapper.put("items", array);
+            wrapper.put("invoices", array);
+            return wrapper;
+        }
+
+        JSONObject obj = new JSONObject(json);
+        if (obj.has("data")) {
+            Object dataObj = obj.get("data");
+            if (dataObj instanceof JSONObject) {
+                return (JSONObject) dataObj;
+            } else if (dataObj instanceof JSONArray) {
+                JSONObject wrapper = new JSONObject();
+                wrapper.put("items", (JSONArray) dataObj);
+                wrapper.put("invoices", (JSONArray) dataObj);
+                return wrapper;
+            }
+        }
+        return obj;
+    } catch (Exception e) {
+        Log.e(TAG, "Error parsing JSON report: " + e.getMessage());
+        return new JSONObject();
+    }
+}
+
     private void handleReportError(String errorMessage, View layoutLoading) {
         if (getActivity() == null || !isAdded()) return;
 
@@ -347,73 +386,72 @@ public class MiraReportsProFragment extends Fragment {
         });
     }
 
-    private JSONObject parseJsonObject(String json) {
-        try {
-            JSONObject obj = new JSONObject(json);
-            return obj.has("data") ? obj.optJSONObject("data") : obj;
-        } catch (Exception e) {
-            return new JSONObject();
-        }
-    }
 
     private String buildReportHtmlTemplate(ReportItem item, String jsonResponse, boolean isArabic) {
-        StringBuilder html = new StringBuilder();
-        html.append("<!DOCTYPE html><html dir='").append(isArabic ? "rtl" : "ltr").append("'><head>");
-        html.append("<meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>");
-        html.append("<style>");
-        html.append("body { font-family: sans-serif; margin: 15px; background-color: #f8f9fa; color: #333; }");
-        html.append(".card { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }");
-        html.append(".timeline-item { border-right: 3px solid #1a73e8; padding-right: 15px; margin-bottom: 15px; position: relative; }");
-        html.append(".badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: #fff; background: #1a73e8; }");
-        html.append("table { width: 100%; border-collapse: collapse; margin-top: 10px; }");
-        html.append("th, td { border: 1px solid #ddd; padding: 8px; text-align: start; }");
-        html.append("th { background-color: #f1f3f4; }");
-        html.append("</style></head><body>");
+    StringBuilder html = new StringBuilder();
+    html.append("<!DOCTYPE html><html dir='").append(isArabic ? "rtl" : "ltr").append("'><head>");
+    html.append("<meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+    html.append("<style>");
+    html.append("body { font-family: sans-serif; margin: 15px; background-color: #fff; color: #333; }");
+    html.append(".card { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 15px; }");
+    html.append(".timeline-item { border-right: 3px solid #1a73e8; padding-right: 15px; margin-bottom: 15px; position: relative; }");
+    html.append(".badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: #fff; background: #1a73e8; }");
+    html.append("table { width: 100%; border-collapse: collapse; margin-top: 10px; }");
+    html.append("th, td { border: 1px solid #ddd; padding: 8px; text-align: start; }");
+    html.append("th { background-color: #f1f3f4; }");
+    html.append("</style></head><body>");
 
-        try {
-            JSONObject responseObj = new JSONObject(jsonResponse);
-            JSONObject dataObj = responseObj.optJSONObject("data");
+    try {
+        JSONObject responseObj = new JSONObject(jsonResponse);
+        JSONObject dataObj = responseObj.optJSONObject("data");
 
-            if (dataObj == null) {
-                html.append("<div class='card'><h3>").append(isArabic ? "لا توجد بيانات متاحة" : "No data available").append("</h3></div>");
-            } else if ("user_timeline".equals(item.type)) {
-                JSONObject userInfo = dataObj.optJSONObject("user_info");
-                JSONArray timeline = dataObj.optJSONArray("timeline");
+        if (dataObj == null) {
+            // ✅ إذا لم يكن هناك data، استخدم الكائن نفسه
+            dataObj = responseObj;
+        }
 
-                html.append("<div class='card'><h2>").append(isArabic ? "سجل نشاط الموظف: " : "User Activity: ")
-                    .append(userInfo != null ? userInfo.optString("display_name") : "").append("</h2></div>");
+        if ("user_timeline".equals(item.type)) {
+            JSONObject userInfo = dataObj.optJSONObject("user_info");
+            JSONArray timeline = dataObj.optJSONArray("timeline");
 
-                if (timeline != null && timeline.length() > 0) {
-                    for (int i = 0; i < timeline.length(); i++) {
-                        JSONObject event = timeline.getJSONObject(i);
-                        html.append("<div class='card timeline-item'>");
-                        html.append("<span class='badge'>").append(event.optString("event_type")).append("</span>");
-                        html.append("<p><strong>").append(isArabic ? "التفاصيل: " : "Details: ").append("</strong>").append(event.optString("details")).append("</p>");
-                        html.append("<small style='color:#777;'>").append(event.optString("created_at")).append("</small>");
-                        html.append("</div>");
-                    }
-                } else {
-                    html.append("<div class='card'><p>").append(isArabic ? "لا توجد أنشطة مسجلة لهذا الموظف في هذه الفترة" : "No activities recorded").append("</p></div>");
-                }
-            } else if ("item_passport".equals(item.type)) {
-                JSONObject itemDetails = dataObj.optJSONObject("item_details");
-                if (itemDetails != null) {
-                    html.append("<div class='card'><h2>").append(isArabic ? "البصمة الرقمية للقطعة" : "Digital Passport").append("</h2>");
-                    html.append("<p><strong>").append(isArabic ? "رمز القطعة: " : "SKU: ").append("</strong>").append(itemDetails.optString("item_code")).append("</p>");
-                    html.append("<p><strong>").append(isArabic ? "العيار / الوزن: " : "Karat / Weight: ").append("</strong>").append(itemDetails.optString("gold_karat")).append(" / ").append(itemDetails.optString("gross_weight_grams")).append("g</p>");
+            html.append("<div class='card'><h2>").append(isArabic ? "سجل نشاط الموظف: " : "User Activity: ")
+                .append(userInfo != null ? userInfo.optString("display_name", userInfo.optString("username", "")) : "").append("</h2></div>");
+
+            if (timeline != null && timeline.length() > 0) {
+                for (int i = 0; i < timeline.length(); i++) {
+                    JSONObject event = timeline.getJSONObject(i);
+                    html.append("<div class='card timeline-item'>");
+                    html.append("<span class='badge'>").append(event.optString("event_type", "EVENT")).append("</span>");
+                    html.append("<p><strong>").append(isArabic ? "التفاصيل: " : "Details: ").append("</strong>").append(event.optString("details", "")).append("</p>");
+                    html.append("<small style='color:#777;'>").append(event.optString("created_at", "")).append("</small>");
                     html.append("</div>");
                 }
             } else {
-                html.append("<div class='card'><pre>").append(dataObj.toString(2)).append("</pre></div>");
+                html.append("<div class='card'><p>").append(isArabic ? "لا توجد أنشطة مسجلة لهذا الموظف في هذه الفترة" : "No activities recorded").append("</p></div>");
             }
-
-        } catch (Exception e) {
-            html.append("<div class='card' style='color:red;'><h3>").append(isArabic ? "خطأ في معالجة البيانات" : "Data Parsing Error").append("</h3></div>");
+        } else if ("item_passport".equals(item.type)) {
+            JSONObject itemDetails = dataObj.optJSONObject("item_details");
+            if (itemDetails != null) {
+                html.append("<div class='card'><h2>").append(isArabic ? "البصمة الرقمية للقطعة" : "Digital Passport").append("</h2>");
+                html.append("<p><strong>").append(isArabic ? "رمز القطعة: " : "SKU: ").append("</strong>").append(itemDetails.optString("item_code", itemDetails.optString("serial_number", ""))).append("</p>");
+                html.append("<p><strong>").append(isArabic ? "العيار / الوزن: " : "Karat / Weight: ").append("</strong>").append(itemDetails.optString("gold_karat", "")).append(" / ").append(itemDetails.optString("gross_weight_grams", "")).append("g</p>");
+                html.append("</div>");
+            } else {
+                html.append("<div class='card'><p>").append(isArabic ? "لا توجد بيانات للقطعة" : "No item data").append("</p></div>");
+            }
+        } else {
+            html.append("<div class='card'><pre>").append(dataObj.toString(2)).append("</pre></div>");
         }
 
-        html.append("</body></html>");
-        return html.toString();
+    } catch (Exception e) {
+        Log.e(TAG, "Error building HTML template", e);
+        html.append("<div class='card' style='color:red;'><h3>").append(isArabic ? "خطأ في معالجة البيانات" : "Data Parsing Error").append("</h3>");
+        html.append("<p>").append(e.getMessage()).append("</p></div>");
     }
+
+    html.append("</body></html>");
+    return html.toString();
+}
 
     private String generateExecutiveHTML(String type, JSONObject data, String from, String to) {
         StringBuilder html = new StringBuilder();
