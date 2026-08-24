@@ -141,14 +141,14 @@
             android:layout_height="40dp" />
     </LinearLayout>
 
-    <!-- Content Container (WebView + Native Loading View) -->
+       <!-- Content Container (WebView + Native Loading View) -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:background="@android:color/white">
 
-        <!-- ✅ تم إعطاء WebView خلفية بيضاء صريحة ومنع الشفافية -->
+        <!-- اجعل WebView مرئياً (VISIBLE) افتراضياً لتجنب مشاكل عدم العرض -->
         <WebView
             android:id="@+id/webReportView"
             android:layout_width="match_parent"
@@ -156,14 +156,16 @@
             android:background="@android:color/white"
             android:focusable="true"
             android:focusableInTouchMode="true"
-            android:visibility="invisible" />
+            android:visibility="visible" />
 
-        <!-- ✅ مؤشر التحميل يظهر افتراضياً لحين اكتمال تجهيز الـ HTML برمجياً -->
+        <!-- اجعل حاوية التحميل تغطي كامل المساحة بخلفية بيضاء لمنع ظهور تشوه الـ WebView أثناء التحميل -->
         <LinearLayout
             android:id="@+id/layoutLoadingContainer"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/white"
+            android:clickable="true"
+            android:focusable="true"
             android:gravity="center"
             android:orientation="vertical"
             android:padding="16dp"
