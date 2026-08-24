@@ -2,6 +2,8 @@ package com.example.uhf.fragment;
 
 import android.content.Context;
 import android.content.DialogInterface;
+import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.media.AudioAttributes;
 import android.media.SoundPool;
 import android.os.Bundle;
@@ -11,6 +13,7 @@ import android.os.SystemClock;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
+import android.util.Base64;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -27,6 +30,15 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.room.Dao;
+import androidx.room.Database;
+import androidx.room.Entity;
+import androidx.room.Insert;
+import androidx.room.PrimaryKey;
+import androidx.room.Query;
+import androidx.room.Room;
+import androidx.room.RoomDatabase;
+import androidx.room.ColumnInfo;
 
 import com.example.uhf.R;
 import com.example.uhf.engine.MiraInventoryEngine;
@@ -39,14 +51,19 @@ import com.example.uhf.manager.PermissionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.tabs.TabLayout;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -75,6 +92,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private static final float BEEP_RATE = 1.0f;
     private static final int BEEP_PRIORITY = 0;
     private static final int BEEP_LOOP = 0;
+    private static final long TAG_READ_DEBOUNCE_MS = 500;
+    private static final int MAX_AUDIT_ENTRIES = 1000;
+    private static final int EAN13_LENGTH = 13;
+    private static final int UPC12_LENGTH = 12;
     
     private static final int KEYCODE_RFID_TRIGGER_1 = 139;
     private static final int KEYCODE_RFID_TRIGGER_2 = 280;
@@ -125,6 +146,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     };
     
     private final Set<String> catalogEpcs = new HashSet<>();
+    private final Map<String, Long> recentTagReads = new ConcurrentHashMap<>();
+    private final Map<String, String> barcodeToEpcMap = new ConcurrentHashMap<>();
+    private final List<AuditEntry> auditLog = new ArrayList<>();
     
     private final Runnable uiUpdateRunnable = new Runnable() {
         @Override
@@ -151,6 +175,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private PermissionManager permissionManager;
     private int expectedCount = 0;
     private List<InventoryItem> scannedItemsList = new ArrayList<>();
+    
+    // Room Database
+    private InventoryDatabase inventoryDatabase;
+    private InventoryTransactionDao transactionDao;
 
     @Nullable
     @Override
@@ -159,6 +187,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         
         initSoundPool();
         initViews(view);
+        initDatabase();
 
         String sessionId = "SESS-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         String deviceId = android.provider.Settings.Secure.getString(
@@ -177,6 +206,16 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         applyPermissions();
         
         return view;
+    }
+
+    private void initDatabase() {
+        inventoryDatabase = Room.databaseBuilder(
+            requireContext(),
+            InventoryDatabase.class,
+            "inventory_database"
+        ).build();
+        
+        transactionDao = inventoryDatabase.inventoryTransactionDao();
     }
 
     private void applyPermissions() {
@@ -216,15 +255,46 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         });
     }
 
-    private void playScanBeep() {
+    private enum ScanFeedbackType {
+        KNOWN_ITEM,
+        UNKNOWN_ITEM,
+        DUPLICATE_ITEM,
+        MISSING_ITEM
+    }
+
+    private void playScanBeep(ScanFeedbackType feedbackType) {
         long now = System.currentTimeMillis();
-        if (soundLoaded && (now - lastBeepTime > BEEP_THROTTLE_MS)) { 
-            try {
-                soundPool.play(beepSoundId, BEEP_VOLUME, BEEP_VOLUME, BEEP_PRIORITY, BEEP_LOOP, BEEP_RATE);
-                lastBeepTime = now;
-            } catch (Exception e) {
-                Log.e(TAG, "Error playing beep sound", e);
-            }
+        if (!soundLoaded || (now - lastBeepTime <= BEEP_THROTTLE_MS)) {
+            return;
+        }
+        
+        float rate = BEEP_RATE;
+        float volume = BEEP_VOLUME;
+        
+        switch (feedbackType) {
+            case KNOWN_ITEM:
+                rate = 1.0f;
+                volume = 0.7f;
+                break;
+            case UNKNOWN_ITEM:
+                rate = 0.8f;
+                volume = 0.5f;
+                break;
+            case DUPLICATE_ITEM:
+                rate = 1.5f;
+                volume = 0.4f;
+                break;
+            case MISSING_ITEM:
+                rate = 0.6f;
+                volume = 0.9f;
+                break;
+        }
+        
+        try {
+            soundPool.play(beepSoundId, volume, volume, BEEP_PRIORITY, BEEP_LOOP, rate);
+            lastBeepTime = now;
+        } catch (Exception e) {
+            Log.e(TAG, "Error playing beep sound", e);
         }
     }
 
@@ -326,15 +396,30 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     public void onTagRead(String epc, int rssi) {
         if (!isScanning || epc == null || epc.isEmpty()) return;
 
-        final String normalizedEpc = epc.trim().toUpperCase();
+        final String normalizedEpc = normalizeCodeToEpc(epc);
         final int finalRssi = rssi;
+        
+        // De-duplication check
+        long currentTime = System.currentTimeMillis();
+        Long lastReadTime = recentTagReads.get(normalizedEpc);
+        
+        if (lastReadTime != null && (currentTime - lastReadTime) < TAG_READ_DEBOUNCE_MS) {
+            return;
+        }
+        
+        recentTagReads.put(normalizedEpc, currentTime);
+        
+        // تنظيف الخريطة دورياً
+        if (recentTagReads.size() > 1000) {
+            cleanOldTagReads(currentTime);
+        }
         
         backgroundExecutor.execute(() -> {
             try {
                 inventoryEngine.onTagScanned(normalizedEpc, finalRssi);
+                saveTransactionLocally(normalizedEpc, finalRssi);
                 
                 mainThreadHandler.post(() -> {
-                    playScanBeep();
                     updateLastScan(normalizedEpc, finalRssi);
                     addScannedItemToDisplay(normalizedEpc, finalRssi, null);
                     scheduleUiUpdate();
@@ -343,6 +428,157 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 Log.e(TAG, "Error processing tag: " + normalizedEpc, e);
             }
         });
+    }
+
+    private void cleanOldTagReads(long currentTime) {
+        Iterator<Map.Entry<String, Long>> iterator = recentTagReads.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, Long> entry = iterator.next();
+            if (currentTime - entry.getValue() > TAG_READ_DEBOUNCE_MS * 2) {
+                iterator.remove();
+            }
+        }
+    }
+
+    private String normalizeCodeToEpc(String code) {
+        if (code == null || code.isEmpty()) return "";
+        
+        String normalized = code.trim().toUpperCase();
+        
+        if (normalized.startsWith("EPC") || normalized.startsWith("E280")) {
+            return normalized;
+        }
+        
+        if (normalized.length() == EAN13_LENGTH && normalized.matches("\\d{13}")) {
+            return convertEan13ToSgtin96(normalized);
+        }
+        
+        if (normalized.length() == UPC12_LENGTH && normalized.matches("\\d{12}")) {
+            String ean13 = "0" + normalized;
+            return convertEan13ToSgtin96(ean13);
+        }
+        
+        String mappedEpc = barcodeToEpcMap.get(normalized);
+        if (mappedEpc != null) {
+            return mappedEpc;
+        }
+        
+        return normalized;
+    }
+
+    private String convertEan13ToSgtin96(String ean13) {
+        String companyPrefix = ean13.substring(0, 6);
+        String itemReference = ean13.substring(6, 12);
+        String checkDigit = ean13.substring(12);
+        
+        return String.format("E280%s%s%s", companyPrefix, itemReference, checkDigit);
+    }
+
+    private void saveTransactionLocally(String epc, int rssi) {
+        try {
+            InventoryTransactionEntity transaction = new InventoryTransactionEntity();
+            transaction.sessionId = inventoryEngine.getClientSessionId();
+            transaction.epcCode = epc;
+            transaction.rssi = rssi;
+            transaction.timestamp = System.currentTimeMillis();
+            transaction.deviceId = android.provider.Settings.Secure.getString(
+                requireContext().getContentResolver(),
+                android.provider.Settings.Secure.ANDROID_ID
+            );
+            transaction.userId = getCurrentUserId();
+            transaction.synced = false;
+            transaction.branchId = branchesManager.getActiveBranchId();
+            
+            new Thread(() -> {
+                try {
+                    transactionDao.insertTransaction(transaction);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error saving transaction locally", e);
+                }
+            }).start();
+        } catch (Exception e) {
+            Log.e(TAG, "Error creating transaction entity", e);
+        }
+    }
+
+    private void syncOfflineTransactions() {
+        backgroundExecutor.execute(() -> {
+            List<InventoryTransactionEntity> unsynced = transactionDao.getUnsyncedTransactions();
+            
+            if (unsynced.isEmpty()) return;
+            
+            JSONArray transactionsArray = new JSONArray();
+            List<Integer> successfulIds = new ArrayList<>();
+            
+            for (InventoryTransactionEntity transaction : unsynced) {
+                try {
+                    JSONObject transactionJson = new JSONObject();
+                    transactionJson.put("session_id", transaction.sessionId);
+                    transactionJson.put("epc", transaction.epcCode);
+                    transactionJson.put("rssi", transaction.rssi);
+                    transactionJson.put("timestamp", transaction.timestamp);
+                    transactionJson.put("device_id", transaction.deviceId);
+                    transactionJson.put("user_id", transaction.userId);
+                    transactionJson.put("branch_id", transaction.branchId);
+                    
+                    transactionsArray.put(transactionJson);
+                    successfulIds.add(transaction.id);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error preparing transaction for sync", e);
+                }
+            }
+            
+            if (transactionsArray.length() > 0) {
+                MiraApiClient.ApiResponse response = apiClient.syncOfflineTransactions(transactionsArray);
+                
+                if (response != null && response.isSuccess) {
+                    transactionDao.markAsSynced(successfulIds);
+                }
+            }
+        });
+    }
+
+    private static class AuditEntry {
+        String timestamp;
+        String action;
+        String details;
+        String userId;
+        String deviceId;
+        
+        AuditEntry(String action, String details, String userId, String deviceId) {
+            this.timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault())
+                .format(new Date());
+            this.action = action;
+            this.details = details;
+            this.userId = userId;
+            this.deviceId = deviceId;
+        }
+    }
+
+    private void logAudit(String action, String details) {
+        String userId = getCurrentUserId();
+        String deviceId = android.provider.Settings.Secure.getString(
+            requireContext().getContentResolver(),
+            android.provider.Settings.Secure.ANDROID_ID
+        );
+        
+        AuditEntry entry = new AuditEntry(action, details, userId, deviceId);
+        auditLog.add(entry);
+        
+        if (auditLog.size() > MAX_AUDIT_ENTRIES) {
+            auditLog.remove(0);
+        }
+        
+        Log.d(TAG, String.format("AUDIT: [%s] %s - %s (User: %s, Device: %s)", 
+            entry.timestamp, entry.action, entry.details, entry.userId, entry.deviceId));
+    }
+
+    private String getCurrentUserId() {
+        // يجب استبدال هذا بالمنطق الفعلي للحصول على معرف المستخدم
+        return "USER-" + android.provider.Settings.Secure.getString(
+            requireContext().getContentResolver(),
+            android.provider.Settings.Secure.ANDROID_ID
+        ).substring(0, 8);
     }
 
     private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
@@ -363,7 +599,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             }
         }
         
+        ScanFeedbackType feedbackType;
+        boolean isKnown = catalogEpcs.contains(epc);
+        
         if (!exists) {
+            feedbackType = isKnown ? ScanFeedbackType.KNOWN_ITEM : ScanFeedbackType.UNKNOWN_ITEM;
+            
             String title = "قطعة غير معروفة";
             String karat = "—";
             
@@ -390,8 +631,11 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 rvInventoryItems.scrollToPosition(0);
             }
         } else {
+            feedbackType = ScanFeedbackType.DUPLICATE_ITEM;
             scannedItemsAdapter.notifyItemChanged(existingIndex);
         }
+        
+        playScanBeep(feedbackType);
         
         if (tvEmptyState != null && !scannedItemsDisplayList.isEmpty()) {
             tvEmptyState.setVisibility(View.GONE);
@@ -466,6 +710,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             return items.size();
         }
         
+        public void highlightItem(String epc, ScanFeedbackType feedbackType) {
+            // يمكن إضافة تأثيرات بصرية هنا
+        }
+        
         class ViewHolder extends RecyclerView.ViewHolder {
             TextView tvTagTitle;
             TextView tvTagEpc;
@@ -473,6 +721,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             TextView tvTagStatus;
             TextView tvTagTime;
             TextView tvTagRssi;
+            MaterialButton btnQuickAction;
             
             ViewHolder(View itemView) {
                 super(itemView);
@@ -482,8 +731,103 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 tvTagStatus = itemView.findViewById(R.id.tvTagStatus);
                 tvTagTime = itemView.findViewById(R.id.tvTagTime);
                 tvTagRssi = itemView.findViewById(R.id.tvTagRssi);
+                btnQuickAction = itemView.findViewById(R.id.btnQuickAction);
+                
+                if (btnQuickAction != null) {
+                    btnQuickAction.setOnClickListener(v -> {
+                        int position = getAdapterPosition();
+                        if (position != RecyclerView.NO_POSITION) {
+                            ScannedItemDisplay item = items.get(position);
+                            showQuickActionsDialog(item);
+                        }
+                    });
+                }
+            }
+            
+            private void showQuickActionsDialog(ScannedItemDisplay item) {
+                String[] actions = {
+                    "✏️ تعديل الحالة",
+                    "🔧 تسجيل تلف",
+                    "📍 تحديث الموقع",
+                    "📝 ملاحظات",
+                    "❌ إلغاء"
+                };
+                
+                new MaterialAlertDialogBuilder(itemView.getContext())
+                    .setTitle("إجراءات سريعة - " + item.epc)
+                    .setItems(actions, (dialog, which) -> {
+                        switch (which) {
+                            case 0:
+                                showEditStatusDialog(item);
+                                break;
+                            case 1:
+                                showDamageDialog(item);
+                                break;
+                            case 2:
+                                showLocationDialog(item);
+                                break;
+                            case 3:
+                                showNotesDialog(item);
+                                break;
+                        }
+                    })
+                    .show();
+            }
+            
+            private void showEditStatusDialog(ScannedItemDisplay item) {
+                String[] statuses = {"متوفر", "محجوز", "قيد الصيانة", "غير متوفر"};
+                
+                new MaterialAlertDialogBuilder(itemView.getContext())
+                    .setTitle("تعديل حالة - " + item.epc)
+                    .setItems(statuses, (dialog, which) -> {
+                        String newStatus = statuses[which];
+                        updateItemStatus(item.epc, newStatus);
+                        Toast.makeText(itemView.getContext(), 
+                            "تم تحديث الحالة إلى: " + newStatus, 
+                            Toast.LENGTH_SHORT).show();
+                    })
+                    .show();
+            }
+            
+            private void showDamageDialog(ScannedItemDisplay item) {
+                String[] damageTypes = {"خدش بسيط", "كسر", "فقدان جزء", "تلف كامل"};
+                
+                new MaterialAlertDialogBuilder(itemView.getContext())
+                    .setTitle("تسجيل تلف - " + item.epc)
+                    .setItems(damageTypes, (dialog, which) -> {
+                        String damageType = damageTypes[which];
+                        registerItemDamage(item.epc, damageType);
+                        Toast.makeText(itemView.getContext(), 
+                            "تم تسجيل التلف: " + damageType, 
+                            Toast.LENGTH_SHORT).show();
+                    })
+                    .show();
+            }
+            
+            private void showLocationDialog(ScannedItemDisplay item) {
+                // تنفيذ حوار تحديث الموقع
+                Toast.makeText(itemView.getContext(), 
+                    "تحديث الموقع قيد التطوير", 
+                    Toast.LENGTH_SHORT).show();
+            }
+            
+            private void showNotesDialog(ScannedItemDisplay item) {
+                // تنفيذ حوار الملاحظات
+                Toast.makeText(itemView.getContext(), 
+                    "إضافة ملاحظات قيد التطوير", 
+                    Toast.LENGTH_SHORT).show();
             }
         }
+    }
+
+    private void updateItemStatus(String epc, String status) {
+        logAudit("UPDATE_STATUS", "تحديث حالة " + epc + " إلى " + status);
+        // هنا يتم إرسال التحديث للخادم
+    }
+
+    private void registerItemDamage(String epc, String damageType) {
+        logAudit("REGISTER_DAMAGE", "تسجيل تلف " + epc + " - " + damageType);
+        // هنا يتم إرسال التحديث للخادم
     }
 
     private void updateLastScan(String epc, int rssi) {
@@ -608,6 +952,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         isScanning = true;
         scanStartTime = SystemClock.elapsedRealtime();
         mainThreadHandler.post(timerRunnable);
+        
+        logAudit("START_SCAN", "بدء جرد جديد");
+        
         loadCatalogAndStart();
     }
     
@@ -620,6 +967,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         isScanning = true;
         scanStartTime = SystemClock.elapsedRealtime();
         mainThreadHandler.post(timerRunnable);
+        
+        logAudit("START_BLIND_SCAN", "بدء جرد أعمى");
         
         expectedCount = 0;
         catalogEpcs.clear();
@@ -707,13 +1056,15 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                         String title = obj.optString("title", "Gold Item");
                         String karat = obj.optString("karat", "21K");
                         
+                        String normalizedEpc = normalizeCodeToEpc(epc);
+                        
                         InventoryItem item = new InventoryItem(
-                            epc.toUpperCase(),
+                            normalizedEpc,
                             title,
                             karat,
                             "✓"
                         );
-                        catalog.put(epc.toUpperCase(), item);
+                        catalog.put(normalizedEpc, item);
                     }
                 }
             }
@@ -763,6 +1114,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         stopSimulationLoop();
         mainThreadHandler.removeCallbacks(timerRunnable);
         
+        logAudit("STOP_SCAN", "إيقاف الجرد - الممسوح: " + inventoryEngine.getUniqueCount());
+        
         if (rfidManager != null) {
             try {
                 rfidManager.stopScan();
@@ -774,6 +1127,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         backgroundExecutor.execute(() -> {
             try {
                 inventoryEngine.processSessionClose();
+                
                 mainThreadHandler.post(() -> {
                     if (!isAdded()) return;
                     
@@ -791,6 +1145,9 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                     if (btnViewSnapshots != null) btnViewSnapshots.setEnabled(true);
                     
                     updateUI();
+                    
+                    // مزامنة البيانات المحلية
+                    syncOfflineTransactions();
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Error processing session close", e);
@@ -825,7 +1182,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                         missing,
                         "جارية"
                     );
-                    printReport(currentReport);
+                    printReportWithQRCode(currentReport);
                 })
                 .setNegativeButton("إلغاء", null)
                 .show();
@@ -835,6 +1192,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         if (!isAdded()) return;
         
         Toast.makeText(requireContext(), "⏳ جاري إرسال البيانات...", Toast.LENGTH_SHORT).show();
+        
+        logAudit("COMMIT_INVENTORY", "اعتماد الجرد - الجلسة: " + inventoryEngine.getClientSessionId());
         
         backgroundExecutor.execute(() -> {
             try {
@@ -938,7 +1297,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                         Math.max(0, expectedCount - scanned),
                         "معتمد"
                     );
-                    printReport(committedReport);
+                    printReportWithQRCode(committedReport);
                 })
                 .setNegativeButton("إغلاق", null)
                 .show();
@@ -1069,7 +1428,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 .setItems(options, (dialog, which) -> {
                     switch (which) {
                         case 0:
-                            printReport(report);
+                            printReportWithQRCode(report);
                             break;
                         case 1:
                             compareWithCurrent(report);
@@ -1088,7 +1447,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private void printAllReports(List<InventoryReport> reports) {
         if (!isAdded() || reports.isEmpty()) return;
         for (InventoryReport r : reports) {
-            printReport(r);
+            printReportWithQRCode(r);
         }
     }
 
@@ -1110,6 +1469,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 .append(".items-table th { background-color: #1a237e; color: white; padding: 8px; border: 1px solid #1a237e; font-size: 12px; }")
                 .append(".items-table td { padding: 6px; border: 1px solid #ddd; font-size: 11px; text-align: center; }")
                 .append(".footer { margin-top: 30px; text-align: left; font-size: 10px; color: #888; border-top: 1px solid #ccc; padding-top: 5px; }")
+                .append(".qr-code { text-align: center; margin-top: 20px; }")
+                .append(".qr-code img { width: 150px; height: 150px; }")
                 .append("</style></head><body>");
 
             html.append("<div class='header'>")
@@ -1171,6 +1532,156 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         } catch (Exception e) {
             Log.e(TAG, "Error executing print task", e);
             Toast.makeText(requireContext(), "❌ فشلت عملية الطباعة: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    private void printReportWithQRCode(InventoryReport report) {
+        if (!isAdded()) return;
+        
+        try {
+            // إنشاء QR Code
+            String qrData = generateReportQRData(report);
+            Bitmap qrBitmap = generateQRCode(qrData);
+            String qrBase64 = convertBitmapToBase64(qrBitmap);
+            
+            WebView webView = new WebView(requireContext());
+            
+            StringBuilder html = new StringBuilder();
+            html.append("<!DOCTYPE html><html><head><meta charset='utf-8'>")
+                .append("<style>")
+                .append("body { font-family: sans-serif; direction: rtl; text-align: right; margin: 20px; }")
+                .append(".header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }")
+                .append(".header h1 { margin: 0; color: #1a237e; font-size: 22px; }")
+                .append(".header p { margin: 5px 0 0 0; color: #666; font-size: 13px; }")
+                .append(".summary-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }")
+                .append(".summary-table td { padding: 8px; border: 1px solid #ddd; font-weight: bold; }")
+                .append(".summary-table td.label { background-color: #f5f5f5; width: 25%; }")
+                .append(".items-table { width: 100%; border-collapse: collapse; margin-top: 10px; }")
+                .append(".items-table th { background-color: #1a237e; color: white; padding: 8px; border: 1px solid #1a237e; font-size: 12px; }")
+                .append(".items-table td { padding: 6px; border: 1px solid #ddd; font-size: 11px; text-align: center; }")
+                .append(".footer { margin-top: 30px; text-align: left; font-size: 10px; color: #888; border-top: 1px solid #ccc; padding-top: 5px; }")
+                .append(".qr-code { text-align: center; margin-top: 20px; }")
+                .append(".qr-code img { width: 150px; height: 150px; }")
+                .append("</style></head><body>");
+
+            html.append("<div class='header'>")
+                .append("<h1>تقرير عمليات الجرد المتقدم - Mira RFID</h1>")
+                .append("<p>رقم الجلسة: ").append(report.sessionId).append(" | التاريخ: ").append(report.date).append("</p>")
+                .append("</div>");
+
+            int accuracy = report.expectedCount > 0 ? (int)(((float)report.scannedCount / report.expectedCount) * 100) : 100;
+
+            html.append("<table class='summary-table'>")
+                .append("<tr><td class='label'>المواد المتوقعة:</td><td>").append(report.expectedCount).append("</td>")
+                .append("<td class='label'>المواد الممسوحة:</td><td>").append(report.scannedCount).append("</td></tr>")
+                .append("<tr><td class='label'>الفارق / المفقود:</td><td>").append(report.missingCount).append("</td>")
+                .append("<td class='label'>نسبة الدقة:</td><td>").append(accuracy).append("%</td></tr>")
+                .append("</table>");
+
+            html.append("<h3>تفاصيل العناصر الممسوحة:</h3>");
+            html.append("<table class='items-table'><thead><tr>")
+                .append("<th>#</th><th>الرمز (EPC)</th><th>وصف القطعة</th><th>العيار</th><th>التكرار</th><th>الإشارة (dBm)</th>")
+                .append("</tr></thead><tbody>");
+
+            if (scannedItemsDisplayList != null && !scannedItemsDisplayList.isEmpty()) {
+                for (int i = 0; i < scannedItemsDisplayList.size(); i++) {
+                    ScannedItemDisplay item = scannedItemsDisplayList.get(i);
+                    html.append("<tr>")
+                        .append("<td>").append(i + 1).append("</td>")
+                        .append("<td>").append(item.epc).append("</td>")
+                        .append("<td>").append(item.title).append("</td>")
+                        .append("<td>").append(item.karat).append("</td>")
+                        .append("<td>").append(item.count).append("</td>")
+                        .append("<td>").append(item.rssi).append("</td>")
+                        .append("</tr>");
+                }
+            } else {
+                html.append("<tr><td colspan='6'>لا توجد عناصر ممسوحة مسجلة</td></tr>");
+            }
+
+            html.append("</tbody></table>");
+            
+            // إضافة QR Code
+            if (qrBase64 != null && !qrBase64.isEmpty()) {
+                html.append("<div class='qr-code'>")
+                    .append("<img src='data:image/png;base64,").append(qrBase64).append("'/>")
+                    .append("<p>امسح للتحقق من التقرير</p>")
+                    .append("</div>");
+            }
+            
+            html.append("<div class='footer'>تم إنشاء هذا التقرير تلقائياً بواسطة نظام Mira Pro RFID</div>");
+            html.append("</body></html>");
+
+            webView.setWebViewClient(new WebViewClient() {
+                @Override
+                public void onPageFinished(WebView view, String url) {
+                    PrintManager printManager = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
+                    if (printManager != null) {
+                        String jobName = "Mira_Inventory_Report_" + report.sessionId;
+                        PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter(jobName);
+                        PrintAttributes attributes = new PrintAttributes.Builder()
+                                .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+                                .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                                .build();
+                        printManager.print(jobName, printAdapter, attributes);
+                    }
+                }
+            });
+
+            webView.loadDataWithBaseURL(null, html.toString(), "text/html", "UTF-8", null);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error printing report with QR code", e);
+            Toast.makeText(requireContext(), "❌ فشلت عملية الطباعة: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    private Bitmap generateQRCode(String data) {
+        try {
+            QRCodeWriter qrCodeWriter = new QRCodeWriter();
+            BitMatrix bitMatrix = qrCodeWriter.encode(data, BarcodeFormat.QR_CODE, 300, 300);
+            
+            int width = bitMatrix.getWidth();
+            int height = bitMatrix.getHeight();
+            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
+            
+            for (int x = 0; x < width; x++) {
+                for (int y = 0; y < height; y++) {
+                    bitmap.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
+                }
+            }
+            
+            return bitmap;
+        } catch (Exception e) {
+            Log.e(TAG, "Error generating QR code", e);
+            return null;
+        }
+    }
+    
+    private String convertBitmapToBase64(Bitmap bitmap) {
+        if (bitmap == null) return "";
+        
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream);
+        byte[] byteArray = byteArrayOutputStream.toByteArray();
+        
+        return Base64.encodeToString(byteArray, Base64.DEFAULT);
+    }
+    
+    private String generateReportQRData(InventoryReport report) {
+        try {
+            JSONObject qrData = new JSONObject();
+            qrData.put("type", "inventory_report");
+            qrData.put("session_id", report.sessionId);
+            qrData.put("date", report.date);
+            qrData.put("expected_count", report.expectedCount);
+            qrData.put("scanned_count", report.scannedCount);
+            qrData.put("missing_count", report.missingCount);
+            qrData.put("status", report.status);
+            
+            return qrData.toString();
+        } catch (Exception e) {
+            return "{}";
         }
     }
     
@@ -1507,7 +2018,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                                 missing2,
                                 "مقارنة"
                             );
-                            printReport(compReport);
+                            printReportWithQRCode(compReport);
                         })
                         .setNegativeButton("إغلاق", null)
                         .show();
@@ -1629,6 +2140,10 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 Thread.currentThread().interrupt();
             }
         }
+        
+        if (inventoryDatabase != null) {
+            inventoryDatabase.close();
+        }
     }
     
     private static class InventoryReport {
@@ -1651,4 +2166,56 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             this.status = status;
         }
     }
+}
+
+// Room Database Entities and DAOs
+
+@Entity(tableName = "inventory_transactions")
+class InventoryTransactionEntity {
+    @PrimaryKey(autoGenerate = true)
+    public int id;
+    
+    @ColumnInfo(name = "session_id")
+    public String sessionId;
+    
+    @ColumnInfo(name = "epc_code")
+    public String epcCode;
+    
+    @ColumnInfo(name = "rssi")
+    public int rssi;
+    
+    @ColumnInfo(name = "scan_timestamp")
+    public long timestamp;
+    
+    @ColumnInfo(name = "device_id")
+    public String deviceId;
+    
+    @ColumnInfo(name = "user_id")
+    public String userId;
+    
+    @ColumnInfo(name = "synced")
+    public boolean synced;
+    
+    @ColumnInfo(name = "branch_id")
+    public int branchId;
+}
+
+@Dao
+interface InventoryTransactionDao {
+    @Insert
+    long insertTransaction(InventoryTransactionEntity transaction);
+    
+    @Query("SELECT * FROM inventory_transactions WHERE synced = 0")
+    List<InventoryTransactionEntity> getUnsyncedTransactions();
+    
+    @Query("UPDATE inventory_transactions SET synced = 1 WHERE id IN (:ids)")
+    void markAsSynced(List<Integer> ids);
+    
+    @Query("DELETE FROM inventory_transactions WHERE synced = 1 AND scan_timestamp < :cutoffTime")
+    void cleanupSyncedTransactions(long cutoffTime);
+}
+
+@Database(entities = {InventoryTransactionEntity.class}, version = 1)
+abstract class InventoryDatabase extends RoomDatabase {
+    public abstract InventoryTransactionDao inventoryTransactionDao();
 }
