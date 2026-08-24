@@ -404,59 +404,76 @@ public class MiraSalesHistoryFragment extends Fragment {
                                !finalHasMore;
 
                 mainHandler.post(() -> {
-                if (!isAdded()) return;
-                
-                if (isRefresh) {
-                    hideLoadingState();
-                    saleList.clear();
-                    saleList.addAll(items);
+                    if (!isAdded()) return;
                     
-                    if (finalTotalCount > 0) {
-                        totalItems = finalTotalCount;
+                    if (isRefresh) {
+                        hideLoadingState();
+                        saleList.clear();
+                        saleList.addAll(items);
+                        
+                        if (finalTotalCount > 0) {
+                            totalItems = finalTotalCount;
+                        } else {
+                            totalItems = items.size();
+                        }
+                        
+                        currentPage = 0;
+                        hasMoreData = !isLast && items.size() == PAGE_SIZE;
+                        isLastPage = isLast;
+                        
                     } else {
-                        totalItems = items.size();
+                        // إضافة عناصر جديدة
+                        saleList.addAll(items);
+                        
+                        currentPage = page;
+                        hasMoreData = !isLast && items.size() == PAGE_SIZE;
+                        isLastPage = isLast;
                     }
                     
-                    currentPage = 0;
-                    hasMoreData = !isLast && items.size() == PAGE_SIZE;
-                    isLastPage = isLast;
+                    // تحديث الواجهة
+                    String currentQuery = etSearch != null ? etSearch.getText().toString() : "";
+                    filterSales(currentQuery);
                     
-                } else {
-                    // إضافة عناصر جديدة
-                    saleList.addAll(items);
+                    if (saleList.isEmpty()) {
+                        showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
+                    }
                     
-                    currentPage = page;
-                    hasMoreData = !isLast && items.size() == PAGE_SIZE;
-                    isLastPage = isLast;
-                }
-                
-                // تحديث الواجهة
-                String currentQuery = etSearch != null ? etSearch.getText().toString() : "";
-                filterSales(currentQuery);
-                
-                if (saleList.isEmpty()) {
-                    showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
-                }
-                
-                // ✅ إخفاء مؤشر التحميل هنا - المكان الصحيح
-                isLoading = false;
-                if (pbLoadMore != null) {
-                    pbLoadMore.setVisibility(View.GONE);
-                }
-                
-                // ✅ إخفاء حاوية التحميل الإضافي
-                if (loadingMoreContainer != null) {
-                    loadingMoreContainer.setVisibility(View.GONE);
-                }
-                
-                // ✅ إظهار نهاية القائمة إذا كانت آخر صفحة
-                if (isLastPage && tvEndOfList != null) {
-                    tvEndOfList.setVisibility(View.VISIBLE);
-                } else if (tvEndOfList != null) {
-                    tvEndOfList.setVisibility(View.GONE);
-                }
-            });
-            
+                    // إخفاء مؤشر التحميل هنا - المكان الصحيح
+                    isLoading = false;
+                    if (pbLoadMore != null) {
+                        pbLoadMore.setVisibility(View.GONE);
+                    }
+                    
+                    // إخفاء حاوية التحميل الإضافي
+                    if (loadingMoreContainer != null) {
+                        loadingMoreContainer.setVisibility(View.GONE);
+                    }
+                    
+                    // إظهار نهاية القائمة إذا كانت آخر صفحة
+                    if (isLastPage && tvEndOfList != null) {
+                        tvEndOfList.setVisibility(View.VISIBLE);
+                    } else if (tvEndOfList != null) {
+                        tvEndOfList.setVisibility(View.GONE);
+                    }
+                });
+            } else {
+                mainHandler.post(() -> {
+                    if (!isAdded()) return;
+                    hideLoadingState();
+                    isLoading = false;
+                    if (pbLoadMore != null) {
+                        pbLoadMore.setVisibility(View.GONE);
+                    }
+                    
+                    if (loadingMoreContainer != null) {
+                        loadingMoreContainer.setVisibility(View.GONE);
+                    }
+                    
+                    if (saleList.isEmpty()) {
+                        showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
+                    }
+                });
+            }
         } catch (Exception e) {
             Log.e(TAG, "Exception loading sales", e);
             mainHandler.post(() -> {
@@ -467,7 +484,7 @@ public class MiraSalesHistoryFragment extends Fragment {
                     pbLoadMore.setVisibility(View.GONE);
                 }
                 
-                // ✅ إخفاء حاوية التحميل الإضافي في حالة الخطأ
+                // إخفاء حاوية التحميل الإضافي في حالة الخطأ
                 if (loadingMoreContainer != null) {
                     loadingMoreContainer.setVisibility(View.GONE);
                 }
@@ -775,4 +792,4 @@ public class MiraSalesHistoryFragment extends Fragment {
     private interface OnMiraSaleClickListener {
         void onClick(MiraSaleItem sale);
     }
-                        }
+}
