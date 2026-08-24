@@ -2001,6 +2001,8 @@
 <string name="error_fetching_reports">فشل في جلب بيانات التقرير</string>
 <string name="no_data_available">لا توجد بيانات متاحة للفترة المحددة</string>
 <string name="invalid_date_range">تاريخ النطاق غير صحيح</string>
-
+<string name="showing_count">عدد العمليات المعروضة:</string>
+<string name="loading_more">جاري تحميل المزيد...</string>
+<string name="end_of_list">— نهاية القائمة —</string>
 
 </resources>
