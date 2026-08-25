@@ -108,6 +108,30 @@ public void saveBranchesFromServer(JSONObject data) {
     }
 }
 
+public List<BranchItem> getAllBranches() {
+    List<BranchItem> branches = new ArrayList<>();
+    try {
+        MiraApiClient.ApiResponse response = apiClient.getBranches();
+        if (response != null && response.isSuccess && response.data != null) {
+            JSONArray arr = response.data.optJSONArray("branches");
+            if (arr != null) {
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject b = arr.optJSONObject(i);
+                    if (b != null) {
+                        BranchItem item = new BranchItem();
+                        item.id = b.optInt("id");
+                        item.name = b.optString("branch_name_ar", b.optString("branch_name", ""));
+                        branches.add(item);
+                    }
+                }
+            }
+        }
+    } catch (Exception e) {
+        Log.e("BranchesManager", "Error loading branches: " + e.getMessage());
+    }
+    return branches;
+}
+
     public int getActiveBranchId() {
         try {
             int branchId = prefs.getInt(KEY_ACTIVE_BRANCH_ID, 1); // ✅ افتراضي 1
