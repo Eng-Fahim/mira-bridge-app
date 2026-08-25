@@ -12,6 +12,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -85,9 +86,7 @@ public class MiraReportsProFragment extends Fragment {
         currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 1;
 
         rvReports = view.findViewById(R.id.rvReportsList);
-       // rvReports.setLayoutManager(new LinearLayoutManager(getContext()));
-       rvReports.setLayoutManager(new androidx.recyclerview.widget.GridLayoutManager(getContext(), 2));
-
+        rvReports.setLayoutManager(new androidx.recyclerview.widget.GridLayoutManager(getContext(), 2));
 
         buildReportsList();
         adapter = new ReportsAdapter(reportList, this::openReportDialog);
@@ -110,6 +109,13 @@ public class MiraReportsProFragment extends Fragment {
             reportList.add(new ReportItem("💎", "النواقص والطلب", "الأكثر مبيعاً", "reorder"));
             reportList.add(new ReportItem("👥", "المستخدمين", "الموظفين", "users"));
             reportList.add(new ReportItem("💵", "الحركة المالية", "القيود المحاسبية", "financial"));
+            
+            // ✅ التقارير المتقدمة الجديدة
+            reportList.add(new ReportItem("⏱️", "تايم لاين المستخدم", "سجل نشاطات الموظف", "user_timeline"));
+            reportList.add(new ReportItem("💠", "بصمة القطعة", "سجل حياة القطعة الكامل", "item_passport"));
+            reportList.add(new ReportItem("🛡️", "مؤشر أمن البوابات", "تحليل المرور والإنذارات", "gate_security_index"));
+            reportList.add(new ReportItem("📅", "أعمار المخزون", "تحليل الركود والتقادم", "inventory_aging"));
+            reportList.add(new ReportItem("⚠️", "تفاصيل الفروقات", "فروقات الجرد التفصيلية", "audit_discrepancy_detail"));
         } else {
             reportList.add(new ReportItem("📊", "Dashboard", "Summary", "dashboard"));
             reportList.add(new ReportItem("💰", "Sales", "Invoices + customers", "sales"));
@@ -121,6 +127,13 @@ public class MiraReportsProFragment extends Fragment {
             reportList.add(new ReportItem("💎", "Reorder", "Best sellers", "reorder"));
             reportList.add(new ReportItem("👥", "Users", "Staff", "users"));
             reportList.add(new ReportItem("💵", "Financial", "Journal", "financial"));
+            
+            // ✅ Advanced Reports
+            reportList.add(new ReportItem("⏱️", "User Timeline", "Staff activity log", "user_timeline"));
+            reportList.add(new ReportItem("💠", "Item Passport", "Complete item lifecycle", "item_passport"));
+            reportList.add(new ReportItem("🛡️", "Gate Security Index", "Traffic & alerts analysis", "gate_security_index"));
+            reportList.add(new ReportItem("📅", "Inventory Aging", "Stagnation analysis", "inventory_aging"));
+            reportList.add(new ReportItem("⚠️", "Discrepancy Detail", "Detailed audit discrepancies", "audit_discrepancy_detail"));
         }
     }
 
@@ -129,6 +142,17 @@ public class MiraReportsProFragment extends Fragment {
 
         if (permissionManager != null && !permissionManager.canAccessFragment("Reports")) {
             Toast.makeText(getContext(), isArabic ? "⛔ غير مصرح" : "⛔ Access Denied", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // ✅ معالجة خاصة للتقارير التي تحتاج مدخلات إضافية
+        if (item.type.equals("user_timeline")) {
+            showUserTimelineDialog(item);
+            return;
+        }
+        
+        if (item.type.equals("item_passport")) {
+            showItemPassportDialog(item);
             return;
         }
 
@@ -217,67 +241,429 @@ public class MiraReportsProFragment extends Fragment {
         fetchAndDisplay(item.type, rvData, layoutLoading, tvLoadingStatus, selectedDates[0], selectedDates[1]);
     }
 
-    private void printRecyclerView(RecyclerView rvData, String title) {
-        if (getContext() == null || rvData == null) return;
-
-        try {
-            int width = rvData.getWidth();
-            int height = rvData.getHeight();
-
-            if (width <= 0 || height <= 0) {
-                width = 1080;
-                height = 1920;
+    // ✅ دالة خاصة بتايم لاين المستخدم
+    private void showUserTimelineDialog(ReportItem item) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle(isArabic ? "⏱️ تايم لاين المستخدم" : "⏱️ User Timeline");
+        
+        View inputView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_input_user_id, null);
+        EditText etUserId = inputView.findViewById(R.id.etUserId);
+        
+        builder.setView(inputView);
+        builder.setPositiveButton(isArabic ? "عرض" : "Show", (dialog, which) -> {
+            String userIdStr = etUserId.getText().toString().trim();
+            if (!userIdStr.isEmpty()) {
+                int userId = Integer.parseInt(userIdStr);
+                fetchAdvancedReport(item.type, userId, "", "", 0, getDefaultFromDate(), getDefaultToDate());
+            } else {
+                Toast.makeText(getContext(), isArabic ? "أدخل معرف المستخدم" : "Enter user ID", Toast.LENGTH_SHORT).show();
             }
+        });
+        builder.setNegativeButton(isArabic ? "إلغاء" : "Cancel", null);
+        builder.show();
+    }
 
-            android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888);
-            android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
-            canvas.drawColor(android.graphics.Color.WHITE);
-            rvData.draw(canvas);
+    // ✅ دالة خاصة ببصمة القطعة
+    private void showItemPassportDialog(ReportItem item) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle(isArabic ? "💠 بصمة القطعة" : "💠 Item Passport");
+        
+        View inputView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_input_serial, null);
+        EditText etSerial = inputView.findViewById(R.id.etSerialNumber);
+        
+        builder.setView(inputView);
+        builder.setPositiveButton(isArabic ? "بحث" : "Search", (dialog, which) -> {
+            String serial = etSerial.getText().toString().trim();
+            if (!serial.isEmpty()) {
+                fetchAdvancedReport(item.type, 0, serial, "", 0, "", "");
+            } else {
+                Toast.makeText(getContext(), isArabic ? "أدخل الرقم التسلسلي" : "Enter serial number", Toast.LENGTH_SHORT).show();
+            }
+        });
+        builder.setNegativeButton(isArabic ? "إلغاء" : "Cancel", null);
+        builder.show();
+    }
 
-            android.print.PrintManager printManager = (android.print.PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
-            android.print.PrintAttributes attributes = new android.print.PrintAttributes.Builder()
-                    .setMediaSize(android.print.PrintAttributes.MediaSize.ISO_A4)
-                    .setResolution(new android.print.PrintAttributes.Resolution("pdf", "pdf", 600, 600))
-                    .setMinMargins(android.print.PrintAttributes.Margins.NO_MARGINS)
-                    .build();
+    // ✅ دالة جديدة لجلب التقارير المتقدمة
+    private void fetchAdvancedReport(String type, int userId, String serialNumber, 
+                                     String gtin13, int gateId, String fromDate, String toDate) {
+        executorService.execute(() -> {
+            try {
+                // بناء الـ endpoint مع المعاملات الإضافية
+                StringBuilder endpoint = new StringBuilder("/reports-analytics?type=").append(type);
+                
+                if (userId > 0) endpoint.append("&user_id=").append(userId);
+                if (!serialNumber.isEmpty()) endpoint.append("&serial_number=").append(serialNumber);
+                if (!gtin13.isEmpty()) endpoint.append("&gtin13=").append(gtin13);
+                if (gateId > 0) endpoint.append("&gate_id=").append(gateId);
+                if (!fromDate.isEmpty()) endpoint.append("&from=").append(fromDate);
+                if (!toDate.isEmpty()) endpoint.append("&to=").append(toDate);
+                if (currentBranchId > 0) endpoint.append("&branch_id=").append(currentBranchId);
 
-            printManager.print(title, new android.print.PrintDocumentAdapter() {
-                @Override
-                public void onLayout(android.print.PrintAttributes oldAttributes, android.print.PrintAttributes newAttributes,
-                                   android.os.CancellationSignal cancellationSignal,
-                                   LayoutResultCallback callback, android.os.Bundle extras) {
-                    callback.onLayoutFinished(new android.print.PrintDocumentInfo.Builder("report.pdf")
-                            .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
-                            .build(), true);
+                Log.d(TAG, "Advanced Report URL: " + endpoint.toString());
+                
+                MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint.toString());
+
+                mainHandler.post(() -> {
+                    if (response == null || !response.isSuccess) {
+                        Toast.makeText(getContext(), 
+                            isArabic ? "فشل التحميل" : "Failed to load", 
+                            Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    JSONObject data = response.data;
+                    if (data == null) {
+                        Toast.makeText(getContext(), isArabic ? "لا توجد بيانات" : "No data available", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    Log.d(TAG, "Advanced Report Data: " + data.toString());
+
+                    // عرض البيانات في Dialog
+                    showAdvancedReportDialog(type, data);
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Advanced report error: " + e.getMessage());
+                mainHandler.post(() -> {
+                    Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
+    }
+
+    // ✅ دالة لعرض التقارير المتقدمة في Dialog
+    private void showAdvancedReportDialog(String type, JSONObject data) {
+        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
+        
+        TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
+        RecyclerView rvData = dialogView.findViewById(R.id.rvReportData);
+        View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
+        TextView tvLoadingStatus = dialogView.findViewById(R.id.tvLoadingStatus);
+        
+        if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+        
+        tvTitle.setText(getReportTitle(type));
+        rvData.setLayoutManager(new LinearLayoutManager(getContext()));
+        
+        // استخدام المحول المناسب
+        RecyclerView.Adapter<?> adapter = createAdvancedAdapter(type, data);
+        rvData.setAdapter(adapter);
+        
+        AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
+                .setView(dialogView)
+                .create();
+        
+        MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
+        if (btnClose != null) {
+            btnClose.setOnClickListener(v -> dialog.dismiss());
+        }
+        
+        dialog.show();
+    }
+
+    private String getReportTitle(String type) {
+        if (isArabic) {
+            switch (type) {
+                case "user_timeline": return "⏱️ تايم لاين المستخدم";
+                case "item_passport": return "💠 بصمة القطعة";
+                case "gate_security_index": return "🛡️ مؤشر أمن البوابات";
+                case "inventory_aging": return "📅 أعمار المخزون";
+                case "audit_discrepancy_detail": return "⚠️ تفاصيل الفروقات";
+                default: return "📊 تقرير متقدم";
+            }
+        } else {
+            switch (type) {
+                case "user_timeline": return "⏱️ User Timeline";
+                case "item_passport": return "💠 Item Passport";
+                case "gate_security_index": return "🛡️ Gate Security Index";
+                case "inventory_aging": return "📅 Inventory Aging";
+                case "audit_discrepancy_detail": return "⚠️ Discrepancy Detail";
+                default: return "📊 Advanced Report";
+            }
+        }
+    }
+
+    private RecyclerView.Adapter<?> createAdvancedAdapter(String type, JSONObject data) {
+        JSONObject dataObj = data.optJSONObject("data");
+        if (dataObj == null) dataObj = data;
+        
+        switch (type) {
+            case "user_timeline":
+                return new GenericAdapter(parseUserTimeline(dataObj));
+            case "item_passport":
+                return new GenericAdapter(parseItemPassport(dataObj));
+            case "gate_security_index":
+                return new GenericAdapter(parseGateSecurity(dataObj));
+            case "inventory_aging":
+                return new GenericAdapter(parseInventoryAging(dataObj));
+            case "audit_discrepancy_detail":
+                return new GenericAdapter(parseAuditDiscrepancy(dataObj));
+            default:
+                return new GenericAdapter(parseGeneric(dataObj));
+        }
+    }
+
+    // ==================== Advanced Parsing Functions ====================
+
+    private List<GenericItem> parseUserTimeline(JSONObject data) {
+        List<GenericItem> items = new ArrayList<>();
+        if (data == null) return items;
+        
+        JSONObject userInfo = data.optJSONObject("user_info");
+        if (userInfo != null) {
+            items.add(new GenericItem(
+                isArabic ? "👤 المستخدم" : "👤 User",
+                userInfo.optString("display_name", userInfo.optString("username", "-"))
+            ));
+        }
+        
+        items.add(new GenericItem(
+            isArabic ? "📊 إجمالي الأحداث" : "📊 Total Events",
+            String.valueOf(data.optInt("total_events", 0))
+        ));
+        
+        JSONArray timeline = data.optJSONArray("timeline");
+        if (timeline != null) {
+            for (int i = 0; i < timeline.length(); i++) {
+                JSONObject event = timeline.optJSONObject(i);
+                if (event != null) {
+                    String eventType = event.optString("event_type", "-");
+                    String details = event.optString("details", "-");
+                    String date = event.optString("created_at", "-");
+                    
+                    // ترجمة نوع الحدث
+                    String translatedType = eventType;
+                    if (isArabic) {
+                        switch (eventType) {
+                            case "SALE": translatedType = "💰 عملية بيع"; break;
+                            case "INVENTORY_AUDIT": translatedType = "📋 جرد مخزون"; break;
+                            case "TRANSFER": translatedType = "🔄 تحويل"; break;
+                        }
+                    }
+                    
+                    items.add(new GenericItem(translatedType, details + "\n" + date));
                 }
+            }
+        }
+        return items;
+    }
 
-                @Override
-                public void onWrite(android.print.PageRange[] pages, android.os.ParcelFileDescriptor destination,
-                                  android.os.CancellationSignal cancellationSignal, WriteResultCallback callback) {
-                    try {
-                        android.graphics.pdf.PdfDocument pdfDocument = new android.graphics.pdf.PdfDocument();
+    private List<GenericItem> parseItemPassport(JSONObject data) {
+        List<GenericItem> items = new ArrayList<>();
+        if (data == null) return items;
+        
+        JSONObject itemDetails = data.optJSONObject("item_details");
+        if (itemDetails != null) {
+            items.add(new GenericItem(
+                isArabic ? "📦 عنوان القطعة" : "📦 Item Title",
+                itemDetails.optString("item_title", "-")
+            ));
+            items.add(new GenericItem(
+                isArabic ? "🔢 الرقم التسلسلي" : "🔢 Serial Number",
+                itemDetails.optString("serial_number", "-")
+            ));
+            items.add(new GenericItem(
+                isArabic ? "🏷️ العيار" : "🏷️ Karat",
+                itemDetails.optString("gold_karat", "-")
+            ));
+            items.add(new GenericItem(
+                isArabic ? "⚖️ الوزن" : "⚖️ Weight",
+                itemDetails.optString("gross_weight_grams", "-") + " g"
+            ));
+            items.add(new GenericItem(
+                isArabic ? "📍 الحالة" : "📍 Status",
+                itemDetails.optString("vault_status", "-")
+            ));
+            items.add(new GenericItem(
+                isArabic ? "🏢 الموقع" : "🏢 Location",
+                itemDetails.optString("current_location", "-")
+            ));
+        }
+        
+        JSONArray gateHistory = data.optJSONArray("gate_history");
+        if (gateHistory != null && gateHistory.length() > 0) {
+            items.add(new GenericItem(
+                isArabic ? "🚪 سجل البوابات" : "🚪 Gate History",
+                String.valueOf(gateHistory.length())
+            ));
+            for (int i = 0; i < gateHistory.length(); i++) {
+                JSONObject gate = gateHistory.optJSONObject(i);
+                if (gate != null) {
+                    items.add(new GenericItem(
+                        "بوابة: " + gate.optString("gate_name", "-"),
+                        "التاريخ: " + gate.optString("created_at", "-")
+                    ));
+                }
+            }
+        }
+        
+        JSONArray movements = data.optJSONArray("movements");
+        if (movements != null && movements.length() > 0) {
+            items.add(new GenericItem(
+                isArabic ? "🔄 سجل التحويلات" : "🔄 Transfer History",
+                String.valueOf(movements.length())
+            ));
+            for (int i = 0; i < movements.length(); i++) {
+                JSONObject movement = movements.optJSONObject(i);
+                if (movement != null) {
+                    items.add(new GenericItem(
+                        "من: " + movement.optString("from_b", "-") + " → إلى: " + movement.optString("to_b", "-"),
+                        "التاريخ: " + movement.optString("created_at", "-")
+                    ));
+                }
+            }
+        }
+        
+        return items;
+    }
 
-                        android.graphics.pdf.PdfDocument.PageInfo pageInfo = new android.graphics.pdf.PdfDocument.PageInfo.Builder(
-                                bitmap.getWidth(), bitmap.getHeight(), 1).create();
-
-                        android.graphics.pdf.PdfDocument.Page page = pdfDocument.startPage(pageInfo);
-                        page.getCanvas().drawBitmap(bitmap, 0, 0, null);
-                        pdfDocument.finishPage(page);
-
-                        pdfDocument.writeTo(new FileOutputStream(destination.getFileDescriptor()));
-                        pdfDocument.close();
-
-                        callback.onWriteFinished(new android.print.PageRange[]{android.print.PageRange.ALL_PAGES});
-                    } catch (Exception e) {
-                        callback.onWriteFailed(e.getMessage());
+    private List<GenericItem> parseGateSecurity(JSONObject data) {
+        List<GenericItem> items = new ArrayList<>();
+        if (data == null) return items;
+        
+        // البحث عن مصفوفة بيانات البوابات
+        JSONArray gatesArr = null;
+        Iterator<String> keys = data.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            Object value = data.opt(key);
+            if (value instanceof JSONArray) {
+                JSONArray arr = (JSONArray) value;
+                if (arr.length() > 0) {
+                    JSONObject first = arr.optJSONObject(0);
+                    if (first != null && first.has("total_events")) {
+                        gatesArr = arr;
+                        break;
                     }
                 }
-            }, attributes);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Print error: " + e.getMessage());
-            Toast.makeText(getContext(), "Print error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
         }
+        
+        if (gatesArr != null) {
+            for (int i = 0; i < gatesArr.length(); i++) {
+                JSONObject gate = gatesArr.optJSONObject(i);
+                if (gate != null) {
+                    String gateId = gate.optString("gate_id", "-");
+                    int totalEvents = gate.optInt("total_events", 0);
+                    int alerts = gate.optInt("alerts", 0);
+                    int passed = gate.optInt("passed", 0);
+                    
+                    items.add(new GenericItem(
+                        (isArabic ? "🚪 بوابة " : "🚪 Gate ") + gateId,
+                        String.format(Locale.US, 
+                            "%s: %d\n%s: %d\n%s: %d",
+                            isArabic ? "إجمالي الأحداث" : "Total Events", totalEvents,
+                            isArabic ? "إنذارات" : "Alerts", alerts,
+                            isArabic ? "مسموح" : "Passed", passed)
+                    ));
+                }
+            }
+        }
+        
+        return items;
+    }
+
+    private List<GenericItem> parseInventoryAging(JSONObject data) {
+        List<GenericItem> items = new ArrayList<>();
+        if (data == null) return items;
+        
+        // البحث عن مصفوفة بيانات الأعمار
+        JSONArray agingArr = null;
+        Iterator<String> keys = data.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            Object value = data.opt(key);
+            if (value instanceof JSONArray) {
+                JSONArray arr = (JSONArray) value;
+                if (arr.length() > 0) {
+                    JSONObject first = arr.optJSONObject(0);
+                    if (first != null && first.has("age_bracket")) {
+                        agingArr = arr;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (agingArr != null) {
+            for (int i = 0; i < agingArr.length(); i++) {
+                JSONObject aging = agingArr.optJSONObject(i);
+                if (aging != null) {
+                    String bracket = aging.optString("age_bracket", "-");
+                    int itemsCount = aging.optInt("items_count", 0);
+                    double totalWeight = aging.optDouble("total_weight", 0);
+                    
+                    // ترجمة الفئات العمرية
+                    String translatedBracket = bracket;
+                    if (isArabic) {
+                        switch (bracket) {
+                            case "0-30 Days": translatedBracket = "٠-٣٠ يوم"; break;
+                            case "31-60 Days": translatedBracket = "٣١-٦٠ يوم"; break;
+                            case "61-90 Days": translatedBracket = "٦١-٩٠ يوم"; break;
+                            case "+90 Days (Stagnant)": translatedBracket = "+٩٠ يوم (راكد)"; break;
+                        }
+                    }
+                    
+                    items.add(new GenericItem(
+                        translatedBracket,
+                        String.format(Locale.US, 
+                            "%s: %d\n%s: %.2f g",
+                            isArabic ? "القطع" : "Items", itemsCount,
+                            isArabic ? "الوزن" : "Weight", totalWeight)
+                    ));
+                }
+            }
+        }
+        
+        return items;
+    }
+
+    private List<GenericItem> parseAuditDiscrepancy(JSONObject data) {
+        List<GenericItem> items = new ArrayList<>();
+        if (data == null) return items;
+        
+        // البحث عن مصفوفة بيانات الفروقات
+        JSONArray discArr = null;
+        Iterator<String> keys = data.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            Object value = data.opt(key);
+            if (value instanceof JSONArray) {
+                JSONArray arr = (JSONArray) value;
+                if (arr.length() > 0) {
+                    JSONObject first = arr.optJSONObject(0);
+                    if (first != null && first.has("discrepancy")) {
+                        discArr = arr;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (discArr != null) {
+            for (int i = 0; i < discArr.length(); i++) {
+                JSONObject disc = discArr.optJSONObject(i);
+                if (disc != null) {
+                    String sessionId = disc.optString("session_id", "-");
+                    int branchId = disc.optInt("branch_id", 0);
+                    int expectedItems = disc.optInt("expected_items", 0);
+                    int foundItems = disc.optInt("found_items", 0);
+                    int discrepancy = disc.optInt("discrepancy", 0);
+                    
+                    items.add(new GenericItem(
+                        (isArabic ? "📋 جلسة " : "📋 Session ") + sessionId,
+                        String.format(Locale.US,
+                            "%s: %d\n%s: %d\n%s: %d",
+                            isArabic ? "المتوقع" : "Expected", expectedItems,
+                            isArabic ? "الموجود" : "Found", foundItems,
+                            isArabic ? "الفرق" : "Difference", discrepancy)
+                    ));
+                }
+            }
+        }
+        
+        return items;
     }
 
     private void fetchAndDisplay(String type, RecyclerView rvData, View layoutLoading, 
@@ -323,18 +709,12 @@ public class MiraReportsProFragment extends Fragment {
 
                     Log.d(TAG, "=== Report: " + type + " ===");
                     Log.d(TAG, "Data keys: " + data.keys().toString());
-                    if (data.toString().length() > 500) {
-                        Log.d(TAG, "Data preview: " + data.toString().substring(0, 500));
-                    } else {
-                        Log.d(TAG, "Data: " + data.toString());
-                    }
 
                     String cacheKey = "cache_pro_" + type + "_" + fromDate + "_" + toDate;
                     if (offlineCache != null) {
                         offlineCache.edit().putString(cacheKey, data.toString()).apply();
                     }
 
-                    // استخدام المحول المناسب
                     RecyclerView.Adapter<?> reportAdapter = createAdapterForType(type, data);
                     rvData.setAdapter(reportAdapter);
                 });
@@ -391,18 +771,16 @@ public class MiraReportsProFragment extends Fragment {
         }
     }
 
-    // ==================== Parsing Functions (محسنة) ====================
+    // ==================== Parsing Functions ====================
 
     private JSONArray findArrayInData(JSONObject data, String[] possibleKeys, String[] identifyingKeys) {
         if (data == null) return null;
         
-        // 1. البحث المباشر في الجذر
         for (String key : possibleKeys) {
             JSONArray arr = data.optJSONArray(key);
             if (arr != null && arr.length() > 0) return arr;
         }
         
-        // 2. البحث في الكائنات المتداخلة
         Iterator<String> keys = data.keys();
         while (keys.hasNext()) {
             String key = keys.next();
@@ -688,31 +1066,6 @@ public class MiraReportsProFragment extends Fragment {
             ));
         }
 
-        JSONObject audit = data.optJSONObject("audit");
-        if (audit != null) {
-            JSONObject auditSummary = audit.optJSONObject("audit_summary");
-            if (auditSummary != null) {
-                items.add(new DashboardItem(
-                    isArabic ? "🎯 دقة الجرد" : "🎯 Audit Accuracy",
-                    String.format(Locale.US, "%.1f%%", auditSummary.optDouble("accuracy", 0))
-                ));
-            }
-        }
-
-        JSONArray karatBreakdown = data.optJSONArray("karat_breakdown");
-        if (karatBreakdown != null) {
-            for (int i = 0; i < karatBreakdown.length(); i++) {
-                JSONObject karat = karatBreakdown.optJSONObject(i);
-                if (karat != null) {
-                    items.add(new DashboardItem(
-                        isArabic ? "🏷️ عيار " + karat.optString("gold_karat", "") : 
-                                   "🏷️ Karat " + karat.optString("gold_karat", ""),
-                        karat.optInt("count", 0) + " " + (isArabic ? "قطعة" : "items")
-                    ));
-                }
-            }
-        }
-
         return items;
     }
 
@@ -989,6 +1342,69 @@ public class MiraReportsProFragment extends Fragment {
 
     // ==================== Export CSV & Helpers ====================
 
+    private void printRecyclerView(RecyclerView rvData, String title) {
+        if (getContext() == null || rvData == null) return;
+
+        try {
+            int width = rvData.getWidth();
+            int height = rvData.getHeight();
+
+            if (width <= 0 || height <= 0) {
+                width = 1080;
+                height = 1920;
+            }
+
+            android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
+            canvas.drawColor(android.graphics.Color.WHITE);
+            rvData.draw(canvas);
+
+            android.print.PrintManager printManager = (android.print.PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
+            android.print.PrintAttributes attributes = new android.print.PrintAttributes.Builder()
+                    .setMediaSize(android.print.PrintAttributes.MediaSize.ISO_A4)
+                    .setResolution(new android.print.PrintAttributes.Resolution("pdf", "pdf", 600, 600))
+                    .setMinMargins(android.print.PrintAttributes.Margins.NO_MARGINS)
+                    .build();
+
+            printManager.print(title, new android.print.PrintDocumentAdapter() {
+                @Override
+                public void onLayout(android.print.PrintAttributes oldAttributes, android.print.PrintAttributes newAttributes,
+                                   android.os.CancellationSignal cancellationSignal,
+                                   LayoutResultCallback callback, android.os.Bundle extras) {
+                    callback.onLayoutFinished(new android.print.PrintDocumentInfo.Builder("report.pdf")
+                            .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
+                            .build(), true);
+                }
+
+                @Override
+                public void onWrite(android.print.PageRange[] pages, android.os.ParcelFileDescriptor destination,
+                                  android.os.CancellationSignal cancellationSignal, WriteResultCallback callback) {
+                    try {
+                        android.graphics.pdf.PdfDocument pdfDocument = new android.graphics.pdf.PdfDocument();
+
+                        android.graphics.pdf.PdfDocument.PageInfo pageInfo = new android.graphics.pdf.PdfDocument.PageInfo.Builder(
+                                bitmap.getWidth(), bitmap.getHeight(), 1).create();
+
+                        android.graphics.pdf.PdfDocument.Page page = pdfDocument.startPage(pageInfo);
+                        page.getCanvas().drawBitmap(bitmap, 0, 0, null);
+                        pdfDocument.finishPage(page);
+
+                        pdfDocument.writeTo(new FileOutputStream(destination.getFileDescriptor()));
+                        pdfDocument.close();
+
+                        callback.onWriteFinished(new android.print.PageRange[]{android.print.PageRange.ALL_PAGES});
+                    } catch (Exception e) {
+                        callback.onWriteFailed(e.getMessage());
+                    }
+                }
+            }, attributes);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Print error: " + e.getMessage());
+            Toast.makeText(getContext(), "Print error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void exportReportToCSV(String type, String from, String to) {
         if (!isAdded() || getContext() == null) return;
         try {
@@ -1058,4 +1474,4 @@ public class MiraReportsProFragment extends Fragment {
         if (executorService != null && !executorService.isShutdown()) executorService.shutdownNow();
         super.onDestroyView();
     }
-            }
+}
