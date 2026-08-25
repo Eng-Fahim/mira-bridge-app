@@ -1,0 +1,5 @@
+<LinearLayout ...>
+    <TextView android:id="@+id/tvName" />
+    <TextView android:id="@+id/tvRole" />
+    <TextView android:id="@+id/tvStatus" />
+</LinearLayout>
