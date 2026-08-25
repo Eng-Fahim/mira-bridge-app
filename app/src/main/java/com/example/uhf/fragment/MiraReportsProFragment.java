@@ -380,14 +380,18 @@ public class MiraReportsProFragment extends Fragment {
 
     // ==================== Parsing Functions ====================
 
+        // ==================== Parsing Functions ====================
+
     private List<SalesItem> parseSales(JSONObject data) {
         List<SalesItem> items = new ArrayList<>();
-        JSONObject salesObj = data.optJSONObject("sales");
-        if (salesObj == null) salesObj = data;
+        if (data == null) return items;
 
-        JSONArray invoices = salesObj.optJSONArray("invoices");
-        if (invoices == null) invoices = salesObj.optJSONArray("sales");
-        if (invoices == null) invoices = data.optJSONArray("invoices");
+        JSONArray invoices = data.optJSONArray("invoices");
+        if (invoices == null && data.has("sales")) {
+            Object obj = data.opt("sales");
+            if (obj instanceof JSONArray) invoices = (JSONArray) obj;
+            else if (obj instanceof JSONObject) invoices = ((JSONObject) obj).optJSONArray("invoices");
+        }
         if (invoices == null) invoices = data.optJSONArray("items_list");
 
         if (invoices != null) {
@@ -395,7 +399,7 @@ public class MiraReportsProFragment extends Fragment {
                 JSONObject inv = invoices.optJSONObject(i);
                 if (inv != null) {
                     items.add(new SalesItem(
-                        inv.optString("invoice_no", inv.optString("sale_number", inv.optString("id", "-"))),
+                        inv.optString("sale_number", inv.optString("invoice_no", inv.optString("id", "-"))),
                         inv.optString("customer_name", inv.optString("customer", "-")),
                         inv.optDouble("final_amount", inv.optDouble("total", inv.optDouble("subtotal", 0))),
                         inv.optString("payment_method", inv.optString("payment", "-")),
@@ -409,12 +413,16 @@ public class MiraReportsProFragment extends Fragment {
 
     private List<InventoryItem> parseInventory(JSONObject data) {
         List<InventoryItem> items = new ArrayList<>();
-        JSONObject invObj = data.optJSONObject("inventory");
-        if (invObj == null) invObj = data;
+        if (data == null) return items;
 
-        JSONArray arr = invObj.optJSONArray("items");
-        if (arr == null) arr = data.optJSONArray("items");
+        JSONArray arr = data.optJSONArray("items");
+        if (arr == null && data.has("inventory")) {
+            Object obj = data.opt("inventory");
+            if (obj instanceof JSONArray) arr = (JSONArray) obj;
+            else if (obj instanceof JSONObject) arr = ((JSONObject) obj).optJSONArray("items");
+        }
         if (arr == null) arr = data.optJSONArray("items_list");
+        if (arr == null) arr = data.optJSONArray("data");
 
         if (arr != null) {
             for (int i = 0; i < arr.length(); i++) {
@@ -435,13 +443,13 @@ public class MiraReportsProFragment extends Fragment {
 
     private List<AuditItem> parseAudit(JSONObject data) {
         List<AuditItem> items = new ArrayList<>();
-        JSONObject auditContainer = data.optJSONObject("audit");
-        if (auditContainer == null) auditContainer = data;
+        if (data == null) return items;
 
-        JSONObject audit = auditContainer.optJSONObject("audit_summary");
-        if (audit == null) audit = auditContainer;
+        JSONObject audit = data.optJSONObject("audit_summary");
+        if (audit == null) audit = data.optJSONObject("audit");
+        if (audit == null) audit = data;
 
-        if (audit != null) {
+        if (audit.has("accuracy") || audit.has("found") || audit.has("found_items")) {
             items.add(new AuditItem(
                 audit.optDouble("accuracy", 0),
                 audit.optInt("found_items", audit.optInt("found", 0)),
@@ -454,10 +462,13 @@ public class MiraReportsProFragment extends Fragment {
 
     private List<ReorderItem> parseReorder(JSONObject data) {
         List<ReorderItem> items = new ArrayList<>();
+        if (data == null) return items;
+
         JSONArray arr = data.optJSONArray("reorder_items");
         if (arr == null) arr = data.optJSONArray("karat_breakdown");
         if (arr == null) arr = data.optJSONArray("items");
         if (arr == null) arr = data.optJSONArray("items_list");
+        if (arr == null) arr = data.optJSONArray("data");
 
         if (arr != null) {
             for (int i = 0; i < arr.length(); i++) {
@@ -476,6 +487,8 @@ public class MiraReportsProFragment extends Fragment {
 
     private List<UsersItem> parseUsers(JSONObject data) {
         List<UsersItem> items = new ArrayList<>();
+        if (data == null) return items;
+
         JSONArray arr = data.optJSONArray("users");
         if (arr == null) arr = data.optJSONArray("data");
         if (arr == null) arr = data.optJSONArray("items_list");
@@ -497,6 +510,8 @@ public class MiraReportsProFragment extends Fragment {
 
     private List<GatesItem> parseGates(JSONObject data) {
         List<GatesItem> items = new ArrayList<>();
+        if (data == null) return items;
+
         JSONArray arr = data.optJSONArray("gate_logs");
         if (arr == null) arr = data.optJSONArray("logs");
         if (arr == null) arr = data.optJSONArray("data");
@@ -519,6 +534,8 @@ public class MiraReportsProFragment extends Fragment {
 
     private List<MovementItem> parseMovement(JSONObject data) {
         List<MovementItem> items = new ArrayList<>();
+        if (data == null) return items;
+
         JSONArray arr = data.optJSONArray("movements");
         if (arr == null) arr = data.optJSONArray("transfers");
         if (arr == null) arr = data.optJSONArray("data");
@@ -541,6 +558,8 @@ public class MiraReportsProFragment extends Fragment {
 
     private List<BranchesItem> parseBranches(JSONObject data) {
         List<BranchesItem> items = new ArrayList<>();
+        if (data == null) return items;
+
         JSONArray arr = data.optJSONArray("branches_performance");
         if (arr == null) arr = data.optJSONArray("branches");
         if (arr == null) arr = data.optJSONArray("data");
@@ -562,6 +581,8 @@ public class MiraReportsProFragment extends Fragment {
 
     private List<FinancialItem> parseFinancial(JSONObject data) {
         List<FinancialItem> items = new ArrayList<>();
+        if (data == null) return items;
+
         JSONArray arr = data.optJSONArray("journal_entries");
         if (arr == null) arr = data.optJSONArray("entries");
         if (arr == null) arr = data.optJSONArray("financial");
@@ -602,6 +623,7 @@ public class MiraReportsProFragment extends Fragment {
 
     private List<DashboardItem> parseDashboard(JSONObject data) {
         List<DashboardItem> items = new ArrayList<>();
+        if (data == null) return items;
 
         JSONObject inv = data.optJSONObject("inventory");
         if (inv != null) {
