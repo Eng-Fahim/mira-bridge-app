@@ -50,7 +50,7 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Dynamic Summary Cards (ملخص الإحصائيات) -->
+    <!-- Dynamic Summary Cards -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -134,7 +134,7 @@
 
     </LinearLayout>
 
-    <!-- ✅ شريط معلومات إضافي - عدد العمليات المعروضة -->
+    <!-- ✅ شريط معلومات إضافي -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -159,6 +159,42 @@
             android:textColor="?attr/colorPrimary"
             android:textSize="12sp"
             android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- ✅ أزرار الفلاتر الجديدة -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="4dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnFilterPayment"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:text="💰 الكل"
+            android:textSize="11sp"
+            app:cornerRadius="8dp"
+            app:icon="@android:drawable/ic_menu_sort_by_size"
+            app:iconPadding="4dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnFilterBranch"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:text="🏢 جميع الفروع"
+            android:textSize="11sp"
+            android:visibility="gone"
+            app:cornerRadius="8dp"
+            app:icon="@android:drawable/ic_menu_compass"
+            app:iconPadding="4dp" />
     </LinearLayout>
 
     <!-- Search Bar -->
@@ -208,7 +244,7 @@
                 android:paddingBottom="16dp"
                 tools:listitem="@layout/item_mira_sale" />
 
-            <!-- ✅ مؤشر تحميل المزيد في أسفل القائمة -->
+            <!-- مؤشر تحميل المزيد -->
             <LinearLayout
                 android:id="@+id/loadingMoreContainer"
                 android:layout_width="match_parent"
@@ -234,7 +270,7 @@
                     android:textSize="12sp" />
             </LinearLayout>
 
-            <!-- Empty / Loading State Layout -->
+            <!-- Empty / Loading State -->
             <LinearLayout
                 android:id="@+id/layoutEmptyState"
                 android:layout_width="wrap_content"
@@ -262,7 +298,7 @@
                     android:textSize="14sp" />
             </LinearLayout>
 
-            <!-- ✅ رسالة نهاية القائمة -->
+            <!-- رسالة نهاية القائمة -->
             <TextView
                 android:id="@+id/tvEndOfList"
                 android:layout_width="wrap_content"
