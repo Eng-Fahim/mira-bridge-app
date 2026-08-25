@@ -1,373 +1,382 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:fillViewport="true">
+    android:layout_height="wrap_content">
 
-    <LinearLayout
+    <ScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp">
+        android:fillViewport="true">
 
-        <!-- العنوان -->
-        <TextView
-            android:id="@+id/tvDialogTitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="إضافة مستخدم جديد"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tvDialogSubtitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="أدخل بيانات المستخدم الجديد"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="14sp" />
-
-        <!-- مؤشر الخطوات -->
         <LinearLayout
-            android:id="@+id/stepsIndicator"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:gravity="center"
-            android:orientation="horizontal">
+            android:orientation="vertical"
+            android:padding="24dp">
 
+            <!-- العنوان -->
             <TextView
-                android:id="@+id/tvStep1"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:background="@drawable/circle_primary"
-                android:gravity="center"
-                android:text="1"
-                android:textColor="@android:color/white"
+                android:id="@+id/tvDialogTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="إضافة مستخدم جديد"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="20sp"
                 android:textStyle="bold" />
 
-            <View
-                android:id="@+id/vStepLine1"
-                android:layout_width="40dp"
-                android:layout_height="2dp"
-                android:background="?attr/colorPrimary" />
-
             <TextView
-                android:id="@+id/tvStep2"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:background="@drawable/circle_outline"
-                android:gravity="center"
-                android:text="2"
-                android:textColor="#44474E"
-                android:textStyle="bold" />
-        </LinearLayout>
+                android:id="@+id/tvDialogSubtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="أدخل بيانات المستخدم الجديد"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="14sp" />
 
-        <!-- الخطوة 1: المعلومات الأساسية -->
-        <LinearLayout
-            android:id="@+id/layoutStep1"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <!-- الاسم الظاهر -->
-            <com.google.android.material.textfield.TextInputLayout
+            <!-- مؤشر الخطوات -->
+            <LinearLayout
+                android:id="@+id/stepsIndicator"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:hint="الاسم الظاهر">
+                android:gravity="center"
+                android:orientation="horizontal">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etDisplayName"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="textPersonName" />
-            </com.google.android.material.textfield.TextInputLayout>
+                <TextView
+                    android:id="@+id/tvStep1"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="@drawable/circle_primary"
+                    android:gravity="center"
+                    android:text="1"
+                    android:textColor="@android:color/white"
+                    android:textStyle="bold" />
 
-            <!-- اسم المستخدم مع زر الاقتراح -->
+                <View
+                    android:id="@+id/vStepLine1"
+                    android:layout_width="40dp"
+                    android:layout_height="2dp"
+                    android:background="?attr/colorPrimary" />
+
+                <TextView
+                    android:id="@+id/tvStep2"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="@drawable/circle_outline"
+                    android:gravity="center"
+                    android:text="2"
+                    android:textColor="#44474E"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- الخطوة 1: المعلومات الأساسية -->
             <LinearLayout
+                android:id="@+id/layoutStep1"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal"
-                android:gravity="end">
+                android:orientation="vertical">
 
+                <!-- الاسم الظاهر -->
                 <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:hint="اسم المستخدم">
+                    android:layout_marginTop="16dp"
+                    android:hint="الاسم الظاهر">
 
                     <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etUsername"
+                        android:id="@+id/etDisplayName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPersonName" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- اسم المستخدم مع زر الاقتراح -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="end"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="اسم المستخدم">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etUsername"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="text" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <ImageButton
+                        android:id="@+id/btnSuggestUsername"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_marginStart="4dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Suggest username"
+                        android:src="@android:drawable/ic_menu_edit"
+                        app:tint="?attr/colorPrimary" />
+                </LinearLayout>
+
+                <!-- حالة اسم المستخدم -->
+                <TextView
+                    android:id="@+id/tvUsernameStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textSize="12sp" />
+
+                <!-- كلمة المرور -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:hint="كلمة المرور"
+                    app:endIconMode="password_toggle">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etPassword"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPassword" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- أزرار كلمة المرور -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <ImageButton
+                        android:id="@+id/btnGeneratePassword"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Generate password"
+                        android:src="@android:drawable/ic_menu_rotate"
+                        app:tint="?attr/colorPrimary" />
+
+                    <ImageButton
+                        android:id="@+id/btnCopyPassword"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:layout_marginStart="16dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Copy password"
+                        android:src="@android:drawable/ic_menu_save"
+                        app:tint="?attr/colorPrimary" />
+                </LinearLayout>
+
+                <!-- مؤشر قوة كلمة المرور -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <View
+                        android:id="@+id/vStrength1"
+                        android:layout_width="0dp"
+                        android:layout_height="4dp"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:background="#CBD5E1" />
+
+                    <View
+                        android:id="@+id/vStrength2"
+                        android:layout_width="0dp"
+                        android:layout_height="4dp"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:background="#CBD5E1" />
+
+                    <View
+                        android:id="@+id/vStrength3"
+                        android:layout_width="0dp"
+                        android:layout_height="4dp"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:background="#CBD5E1" />
+
+                    <View
+                        android:id="@+id/vStrength4"
+                        android:layout_width="0dp"
+                        android:layout_height="4dp"
+                        android:layout_weight="1"
+                        android:background="#CBD5E1" />
+
+                    <TextView
+                        android:id="@+id/tvStrengthLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- متطلبات كلمة المرور -->
+                <TextView
+                    android:id="@+id/tvPasswordRequirements"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- الخطوة 2: معلومات إضافية -->
+            <LinearLayout
+                android:id="@+id/layoutStep2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <!-- رقم الموظف -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:hint="رقم الموظف">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etEmployeeId"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="text" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <ImageButton
-                    android:id="@+id/btnSuggestUsername"
-                    android:layout_width="48dp"
+                <!-- الفرع -->
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="الفرع">
+
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                        android:id="@+id/etBranch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="none" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- الصلاحية -->
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="الصلاحية">
+
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                        android:id="@+id/etRole"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="none" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- زر إدارة الصلاحيات المتعددة -->
+                <Button
+                    android:id="@+id/btnManagePermissions"
+                    android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:layout_marginStart="4dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@android:drawable/ic_menu_edit"
-                    android:contentDescription="Suggest username"
-                    app:tint="?attr/colorPrimary" />
+                    android:layout_marginTop="16dp"
+                    android:backgroundTint="?attr/colorPrimaryContainer"
+                    android:text="⚙️ إدارة الصلاحيات المتعددة"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    android:visibility="gone" />
             </LinearLayout>
 
-            <!-- حالة اسم المستخدم -->
-            <TextView
-                android:id="@+id/tvUsernameStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textSize="12sp" />
-
-            <!-- كلمة المرور -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:hint="كلمة المرور"
-                app:endIconMode="password_toggle">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etPassword"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="textPassword" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- أزرار كلمة المرور -->
+            <!-- أزرار التنقل -->
             <LinearLayout
+                android:id="@+id/layoutButtons1"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal"
-                android:gravity="center">
+                android:layout_marginTop="24dp"
+                android:orientation="horizontal">
 
-                <ImageButton
-                    android:id="@+id/btnGeneratePassword"
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@android:drawable/ic_menu_rotate"
-                    android:contentDescription="Generate password"
-                    app:tint="?attr/colorPrimary" />
+                <Button
+                    android:id="@+id/btnCancelUser"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="?attr/colorSurfaceVariant"
+                    android:text="إلغاء"
+                    android:textColor="?attr/colorOnSurface" />
 
-                <ImageButton
-                    android:id="@+id/btnCopyPassword"
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
-                    android:layout_marginStart="16dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:src="@android:drawable/ic_menu_save"
-                    android:contentDescription="Copy password"
-                    app:tint="?attr/colorPrimary" />
+                <Button
+                    android:id="@+id/btnNextStep"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="?attr/colorPrimary"
+                    android:text="التالي ←"
+                    android:textColor="?attr/colorOnPrimary" />
+
+                <Button
+                    android:id="@+id/btnPrevStep"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="?attr/colorSurfaceVariant"
+                    android:text="→ السابق"
+                    android:textColor="?attr/colorOnSurface"
+                    android:visibility="gone" />
+
+                <Button
+                    android:id="@+id/btnSaveUser"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#22C55E"
+                    android:text="💾 حفظ"
+                    android:textColor="@android:color/white"
+                    android:visibility="gone" />
             </LinearLayout>
 
-            <!-- مؤشر قوة كلمة المرور -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <View
-                    android:id="@+id/vStrength1"
-                    android:layout_width="0dp"
-                    android:layout_height="4dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="4dp"
-                    android:background="#CBD5E1" />
-
-                <View
-                    android:id="@+id/vStrength2"
-                    android:layout_width="0dp"
-                    android:layout_height="4dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="4dp"
-                    android:background="#CBD5E1" />
-
-                <View
-                    android:id="@+id/vStrength3"
-                    android:layout_width="0dp"
-                    android:layout_height="4dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="4dp"
-                    android:background="#CBD5E1" />
-
-                <View
-                    android:id="@+id/vStrength4"
-                    android:layout_width="0dp"
-                    android:layout_height="4dp"
-                    android:layout_weight="1"
-                    android:background="#CBD5E1" />
-
-                <TextView
-                    android:id="@+id/tvStrengthLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <!-- متطلبات كلمة المرور -->
-            <TextView
-                android:id="@+id/tvPasswordRequirements"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:textSize="12sp" />
         </LinearLayout>
+    </ScrollView>
 
-        <!-- الخطوة 2: معلومات إضافية -->
+    <!-- Loading Overlay كعنصر مجاور علوي للـ Dialog -->
+    <FrameLayout
+        android:id="@+id/loadingOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#80000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
         <LinearLayout
-            android:id="@+id/layoutStep2"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="?attr/colorSurface"
+                android:elevation="8dp"
             android:orientation="vertical"
-            android:visibility="gone">
+            android:padding="24dp">
 
-            <!-- رقم الموظف -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:hint="رقم الموظف">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etEmployeeId"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="text" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- الفرع -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:hint="الفرع">
-
-                <com.google.android.material.textfield.MaterialAutoCompleteTextView
-                    android:id="@+id/etBranch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="none" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- الصلاحية -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:hint="الصلاحية">
-
-                <com.google.android.material.textfield.MaterialAutoCompleteTextView
-                    android:id="@+id/etRole"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="none" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- زر إدارة الصلاحيات المتعددة -->
-            <Button
-                android:id="@+id/btnManagePermissions"
-                android:layout_width="match_parent"
+            <ProgressBar
+                android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:layout_marginTop="16dp"
-                android:backgroundTint="?attr/colorPrimaryContainer"
-                android:text="⚙️ إدارة الصلاحيات المتعددة"
-                android:textColor="?attr/colorOnPrimaryContainer"
-                android:visibility="gone" />
-        </LinearLayout>
+                android:layout_gravity="center" />
 
-        <!-- أزرار التنقل -->
-        <LinearLayout
-            android:id="@+id/layoutButtons1"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/btnCancelUser"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dp"
-                android:backgroundTint="?attr/colorSurfaceVariant"
-                android:text="إلغاء"
-                android:textColor="?attr/colorOnSurface" />
-
-            <Button
-                android:id="@+id/btnNextStep"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:backgroundTint="?attr/colorPrimary"
-                android:text="التالي ←"
-                android:textColor="?attr/colorOnPrimary" />
-
-            <Button
-                android:id="@+id/btnPrevStep"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dp"
-                android:backgroundTint="?attr/colorSurfaceVariant"
-                android:text="→ السابق"
-                android:textColor="?attr/colorOnSurface"
-                android:visibility="gone" />
-
-            <Button
-                android:id="@+id/btnSaveUser"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:backgroundTint="#22C55E"
-                android:text="💾 حفظ"
-                android:textColor="@android:color/white"
-                android:visibility="gone" />
-        </LinearLayout>
-
-        <!-- Loading Overlay -->
-        <FrameLayout
-            android:id="@+id/loadingOverlay"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="#80000000"
-            android:clickable="true"
-            android:focusable="true"
-            android:visibility="gone">
-
-            <LinearLayout
+            <TextView
+                android:id="@+id/tvLoadingText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:background="?attr/colorSurface"
-                android:orientation="vertical"
-                android:padding="24dp">
-
-                <ProgressBar
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_gravity="center" />
-
-                <TextView
-                    android:id="@+id/tvLoadingText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="جاري الحفظ..."
-                    android:textColor="?attr/colorOnSurface" />
-            </LinearLayout>
-        </FrameLayout>
-    </LinearLayout>
-</ScrollView>
+                android:layout_marginTop="12dp"
+                android:text="جاري الحفظ..."
+                android:textColor="?attr/colorOnSurface" />
+        </LinearLayout>
+    </FrameLayout>
+</FrameLayout>
