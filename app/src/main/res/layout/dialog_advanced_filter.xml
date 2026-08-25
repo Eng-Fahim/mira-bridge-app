@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <EditText
+        android:id="@+id/etFilterSearch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="بحث عام"
+        android:inputType="text"
+        android:padding="12dp" />
+
+    <TextView
+        android:id="@+id/tvFilter1Label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="فلتر 1"
+        android:textStyle="bold" />
+
+    <EditText
+        android:id="@+id/etFilter1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="قيمة الفلتر"
+        android:inputType="text"
+        android:padding="12dp" />
+
+    <TextView
+        android:id="@+id/tvFilter2Label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="فلتر 2"
+        android:textStyle="bold" />
+
+    <EditText
+        android:id="@+id/etFilter2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="قيمة الفلتر"
+        android:inputType="text"
+        android:padding="12dp" />
+</LinearLayout>
