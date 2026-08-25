@@ -1,3 +1,4 @@
+
 package com.example.uhf.fragment;
 
 import android.content.Context;
@@ -388,42 +389,44 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
 
     @Override
-    public void onTagRead(String epc, int rssi) {
-        if (!isScanning || epc == null || epc.isEmpty()) return;
+public void onTagRead(String epc, int rssi) {
+    if (!isScanning || epc == null || epc.isEmpty()) return;
 
-        final String normalizedEpc = normalizeCodeToEpc(epc);
-        final int finalRssi = rssi;
-        
-        // De-duplication check
-        long currentTime = System.currentTimeMillis();
-        Long lastReadTime = recentTagReads.get(normalizedEpc);
-        
-        if (lastReadTime != null && (currentTime - lastReadTime) < TAG_READ_DEBOUNCE_MS) {
-            return;
-        }
-        
-        recentTagReads.put(normalizedEpc, currentTime);
-        
-        // تنظيف الخريطة دورياً
-        if (recentTagReads.size() > 1000) {
-            cleanOldTagReads(currentTime);
-        }
-        
-        backgroundExecutor.execute(() -> {
-            try {
-                inventoryEngine.onTagScanned(normalizedEpc, finalRssi);
-                saveTransactionLocally(normalizedEpc, finalRssi);
-                
-                mainThreadHandler.post(() -> {
-                    updateLastScan(normalizedEpc, finalRssi);
-                    addScannedItemToDisplay(normalizedEpc, finalRssi, null);
-                    scheduleUiUpdate();
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Error processing tag: " + normalizedEpc, e);
-            }
-        });
+    final String normalizedEpc = normalizeCodeToEpc(epc);
+    final int finalRssi = rssi;
+
+    long currentTime = System.currentTimeMillis();
+    Long lastReadTime = recentTagReads.get(normalizedEpc);
+
+    if (lastReadTime != null && (currentTime - lastReadTime) < TAG_READ_DEBOUNCE_MS) {
+        return;
     }
+
+    recentTagReads.put(normalizedEpc, currentTime);
+
+    if (recentTagReads.size() > 1000) {
+        cleanOldTagReads(currentTime);
+    }
+
+    // المعالجة في الخلفية لقواعد البيانات والمحرك فقط
+    backgroundExecutor.execute(() -> {
+        try {
+            inventoryEngine.onTagScanned(normalizedEpc, finalRssi);
+            saveTransactionLocally(normalizedEpc, finalRssi);
+
+            // إرسال التحديث للواجهة فقط عبر الميثود الآمنة
+            addScannedItemToDisplay(normalizedEpc, finalRssi, null);
+
+            mainThreadHandler.post(() -> {
+                updateLastScan(normalizedEpc, finalRssi);
+                scheduleUiUpdate();
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Error processing tag: " + normalizedEpc, e);
+        }
+    });
+}
+
 
     private void cleanOldTagReads(long currentTime) {
         Iterator<Map.Entry<String, Long>> iterator = recentTagReads.entrySet().iterator();
@@ -576,14 +579,20 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
 
     private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
-        if (scannedItemsAdapter == null) return;
-        
+    // 1. ضمان تحويل كافة التعديلات على الـ UI إلى الـ Main Thread
+    mainThreadHandler.post(() -> {
+        // 2. التحقق من سلامة حالة الـ Fragment والـ Adapter قبل التعديل
+        if (!isAdded() || getContext() == null || scannedItemsAdapter == null) {
+            return;
+        }
+
         boolean exists = false;
         int existingIndex = -1;
 
+        // البحث عن العنصر في القائمة
         for (int i = 0; i < scannedItemsDisplayList.size(); i++) {
             ScannedItemDisplay display = scannedItemsDisplayList.get(i);
-            if (display.epc.equals(epc)) {
+            if (display != null && epc.equals(display.epc)) {
                 display.count++;
                 display.rssi = rssi;
                 display.time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
@@ -592,25 +601,25 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 break;
             }
         }
-        
+
         ScanFeedbackType feedbackType;
         boolean isKnown = catalogEpcs.contains(epc);
-        
+
         if (!exists) {
             feedbackType = isKnown ? ScanFeedbackType.KNOWN_ITEM : ScanFeedbackType.UNKNOWN_ITEM;
-            
+
             String title = "قطعة غير معروفة";
             String karat = "—";
-            
+
             if (item != null) {
                 title = item.getTitle() != null ? item.getTitle() : "قطعة ذهبية";
                 karat = item.getKarat() != null ? item.getKarat() : "—";
-            } else if (catalogEpcs.contains(epc)) {
+            } else if (isKnown) {
                 title = "مادة مسجلة بالكتالوج";
             }
-            
+
             String currentTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
-            
+
             ScannedItemDisplay display = new ScannedItemDisplay(
                 epc,
                 title,
@@ -619,8 +628,11 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 rssi,
                 currentTime
             );
+
+            // إضافة العنصر في بداية القائمة وتحديث الـ Adapter أصولاً
             scannedItemsDisplayList.add(0, display);
             scannedItemsAdapter.notifyItemInserted(0);
+
             if (rvInventoryItems != null) {
                 rvInventoryItems.scrollToPosition(0);
             }
@@ -628,13 +640,16 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             feedbackType = ScanFeedbackType.DUPLICATE_ITEM;
             scannedItemsAdapter.notifyItemChanged(existingIndex);
         }
-        
+
+        // تشغيل الصوت الآمن
         playScanBeep(feedbackType);
-        
+
+        // تحديث حالة الشاشة الفارغة
         if (tvEmptyState != null && !scannedItemsDisplayList.isEmpty()) {
             tvEmptyState.setVisibility(View.GONE);
         }
-    }
+    });
+}
 
     private static class ScannedItemDisplay {
         String epc;
