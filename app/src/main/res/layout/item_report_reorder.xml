@@ -1,0 +1,5 @@
+<LinearLayout ...>
+    <TextView android:id="@+id/tvKarat" />
+    <TextView android:id="@+id/tvSold" />
+    <TextView android:id="@+id/tvRemaining" />
+</LinearLayout>
