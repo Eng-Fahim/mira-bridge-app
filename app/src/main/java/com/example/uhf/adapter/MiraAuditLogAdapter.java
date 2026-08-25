@@ -73,7 +73,8 @@ public class MiraAuditLogAdapter extends RecyclerView.Adapter<MiraAuditLogAdapte
         chip.setText(label);
         chip.setChipBackgroundColorResource(android.R.color.transparent);
         chip.setTextColor(color);
-        chip.setStrokeColorResource(android.R.color.transparent);
+        chip.setStrokeColor(android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT));
+
     }
 
     @Override
