@@ -40,6 +40,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
@@ -319,54 +320,21 @@ public class MiraReportsProFragment extends Fragment {
                     }
 
                     Log.d(TAG, "=== Report: " + type + " ===");
-                    Log.d(TAG, "Data: " + data.toString().substring(0, Math.min(500, data.toString().length())));
+                    Log.d(TAG, "Data keys: " + data.keys().toString());
+                    if (data.toString().length() > 500) {
+                        Log.d(TAG, "Data preview: " + data.toString().substring(0, 500));
+                    } else {
+                        Log.d(TAG, "Data: " + data.toString());
+                    }
 
                     String cacheKey = "cache_pro_" + type + "_" + fromDate + "_" + toDate;
                     if (offlineCache != null) {
                         offlineCache.edit().putString(cacheKey, data.toString()).apply();
                     }
 
-                    switch (type) {
-                        case "sales":
-                            List<SalesItem> sales = parseSales(data);
-                            rvData.setAdapter(sales.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new SalesAdapter(sales));
-                            break;
-                        case "inventory":
-                            List<InventoryItem> inv = parseInventory(data);
-                            rvData.setAdapter(inv.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new InventoryAdapter(inv));
-                            break;
-                        case "audit":
-                            List<AuditItem> audit = parseAudit(data);
-                            rvData.setAdapter(audit.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new AuditAdapter(audit));
-                            break;
-                        case "reorder":
-                            List<ReorderItem> reorder = parseReorder(data);
-                            rvData.setAdapter(reorder.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new ReorderAdapter(reorder));
-                            break;
-                        case "users":
-                            List<UsersItem> users = parseUsers(data);
-                            rvData.setAdapter(users.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new UsersAdapter(users));
-                            break;
-                        case "gates":
-                            List<GatesItem> gates = parseGates(data);
-                            rvData.setAdapter(gates.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new GatesAdapter(gates));
-                            break;
-                        case "movement":
-                            List<MovementItem> movement = parseMovement(data);
-                            rvData.setAdapter(movement.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new MovementAdapter(movement));
-                            break;
-                        case "branches":
-                            List<BranchesItem> branches = parseBranches(data);
-                            rvData.setAdapter(branches.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new BranchesAdapter(branches));
-                            break;
-                        case "financial":
-                            List<FinancialItem> financial = parseFinancial(data);
-                            rvData.setAdapter(financial.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new FinancialAdapter(financial));
-                            break;
-                        default:
-                            rvData.setAdapter(new DashboardAdapter(parseDashboard(data)));
-                            break;
-                    }
+                    // استخدام المحول المناسب
+                    RecyclerView.Adapter<?> reportAdapter = createAdapterForType(type, data);
+                    rvData.setAdapter(reportAdapter);
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Fetch error: " + e.getMessage());
@@ -378,21 +346,92 @@ public class MiraReportsProFragment extends Fragment {
         });
     }
 
-    // ==================== Parsing Functions ====================
+    private RecyclerView.Adapter<?> createAdapterForType(String type, JSONObject data) {
+        switch (type) {
+            case "sales": {
+                List<SalesItem> sales = parseSales(data);
+                return sales.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new SalesAdapter(sales);
+            }
+            case "inventory": {
+                List<InventoryItem> inv = parseInventory(data);
+                return inv.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new InventoryAdapter(inv);
+            }
+            case "audit": {
+                List<AuditItem> audit = parseAudit(data);
+                return audit.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new AuditAdapter(audit);
+            }
+            case "reorder": {
+                List<ReorderItem> reorder = parseReorder(data);
+                return reorder.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new ReorderAdapter(reorder);
+            }
+            case "users": {
+                List<UsersItem> users = parseUsers(data);
+                return users.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new UsersAdapter(users);
+            }
+            case "gates": {
+                List<GatesItem> gates = parseGates(data);
+                return gates.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new GatesAdapter(gates);
+            }
+            case "movement": {
+                List<MovementItem> movement = parseMovement(data);
+                return movement.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new MovementAdapter(movement);
+            }
+            case "branches": {
+                List<BranchesItem> branches = parseBranches(data);
+                return branches.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new BranchesAdapter(branches);
+            }
+            case "financial": {
+                List<FinancialItem> financial = parseFinancial(data);
+                return financial.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new FinancialAdapter(financial);
+            }
+            default:
+                return new DashboardAdapter(parseDashboard(data));
+        }
+    }
 
-        // ==================== Parsing Functions ====================
+    // ==================== Parsing Functions (محسنة) ====================
+
+    private JSONArray findArrayInData(JSONObject data, String[] possibleKeys, String[] identifyingKeys) {
+        if (data == null) return null;
+        
+        // 1. البحث المباشر في الجذر
+        for (String key : possibleKeys) {
+            JSONArray arr = data.optJSONArray(key);
+            if (arr != null && arr.length() > 0) return arr;
+        }
+        
+        // 2. البحث في الكائنات المتداخلة
+        Iterator<String> keys = data.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            Object value = data.opt(key);
+            
+            if (value instanceof JSONObject) {
+                JSONArray nestedArr = findArrayInData((JSONObject) value, possibleKeys, identifyingKeys);
+                if (nestedArr != null) return nestedArr;
+            } else if (value instanceof JSONArray) {
+                JSONArray arr = (JSONArray) value;
+                if (arr.length() > 0 && identifyingKeys != null) {
+                    JSONObject firstItem = arr.optJSONObject(0);
+                    if (firstItem != null) {
+                        for (String idKey : identifyingKeys) {
+                            if (firstItem.has(idKey)) return arr;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return null;
+    }
 
     private List<SalesItem> parseSales(JSONObject data) {
         List<SalesItem> items = new ArrayList<>();
         if (data == null) return items;
 
-        JSONArray invoices = data.optJSONArray("invoices");
-        if (invoices == null && data.has("sales")) {
-            Object obj = data.opt("sales");
-            if (obj instanceof JSONArray) invoices = (JSONArray) obj;
-            else if (obj instanceof JSONObject) invoices = ((JSONObject) obj).optJSONArray("invoices");
-        }
-        if (invoices == null) invoices = data.optJSONArray("items_list");
+        JSONArray invoices = findArrayInData(data, 
+            new String[]{"invoices", "sales", "items_list", "data"}, 
+            new String[]{"sale_number", "invoice_no", "final_amount", "customer_name"});
 
         if (invoices != null) {
             for (int i = 0; i < invoices.length(); i++) {
@@ -415,14 +454,9 @@ public class MiraReportsProFragment extends Fragment {
         List<InventoryItem> items = new ArrayList<>();
         if (data == null) return items;
 
-        JSONArray arr = data.optJSONArray("items");
-        if (arr == null && data.has("inventory")) {
-            Object obj = data.opt("inventory");
-            if (obj instanceof JSONArray) arr = (JSONArray) obj;
-            else if (obj instanceof JSONObject) arr = ((JSONObject) obj).optJSONArray("items");
-        }
-        if (arr == null) arr = data.optJSONArray("items_list");
-        if (arr == null) arr = data.optJSONArray("data");
+        JSONArray arr = findArrayInData(data, 
+            new String[]{"items", "inventory", "items_list", "data"}, 
+            new String[]{"item_title", "serial_number", "gross_weight_grams", "gold_karat"});
 
         if (arr != null) {
             for (int i = 0; i < arr.length(); i++) {
@@ -464,11 +498,9 @@ public class MiraReportsProFragment extends Fragment {
         List<ReorderItem> items = new ArrayList<>();
         if (data == null) return items;
 
-        JSONArray arr = data.optJSONArray("reorder_items");
-        if (arr == null) arr = data.optJSONArray("karat_breakdown");
-        if (arr == null) arr = data.optJSONArray("items");
-        if (arr == null) arr = data.optJSONArray("items_list");
-        if (arr == null) arr = data.optJSONArray("data");
+        JSONArray arr = findArrayInData(data, 
+            new String[]{"reorder_items", "karat_breakdown", "items", "items_list", "data"}, 
+            new String[]{"gold_karat", "sold_count", "remaining_stock"});
 
         if (arr != null) {
             for (int i = 0; i < arr.length(); i++) {
@@ -489,9 +521,9 @@ public class MiraReportsProFragment extends Fragment {
         List<UsersItem> items = new ArrayList<>();
         if (data == null) return items;
 
-        JSONArray arr = data.optJSONArray("users");
-        if (arr == null) arr = data.optJSONArray("data");
-        if (arr == null) arr = data.optJSONArray("items_list");
+        JSONArray arr = findArrayInData(data, 
+            new String[]{"users", "data", "items_list"}, 
+            new String[]{"display_name", "username", "role_name"});
 
         if (arr != null) {
             for (int i = 0; i < arr.length(); i++) {
@@ -512,10 +544,9 @@ public class MiraReportsProFragment extends Fragment {
         List<GatesItem> items = new ArrayList<>();
         if (data == null) return items;
 
-        JSONArray arr = data.optJSONArray("gate_logs");
-        if (arr == null) arr = data.optJSONArray("logs");
-        if (arr == null) arr = data.optJSONArray("data");
-        if (arr == null) arr = data.optJSONArray("items_list");
+        JSONArray arr = findArrayInData(data, 
+            new String[]{"gate_logs", "logs", "data", "items_list"}, 
+            new String[]{"gate_name", "epc", "tag_epc"});
 
         if (arr != null) {
             for (int i = 0; i < arr.length(); i++) {
@@ -536,10 +567,9 @@ public class MiraReportsProFragment extends Fragment {
         List<MovementItem> items = new ArrayList<>();
         if (data == null) return items;
 
-        JSONArray arr = data.optJSONArray("movements");
-        if (arr == null) arr = data.optJSONArray("transfers");
-        if (arr == null) arr = data.optJSONArray("data");
-        if (arr == null) arr = data.optJSONArray("items_list");
+        JSONArray arr = findArrayInData(data, 
+            new String[]{"movements", "transfers", "data", "items_list"}, 
+            new String[]{"transfer_number", "from_branch", "to_branch"});
 
         if (arr != null) {
             for (int i = 0; i < arr.length(); i++) {
@@ -548,7 +578,7 @@ public class MiraReportsProFragment extends Fragment {
                     items.add(new MovementItem(
                         obj.optString("from_branch", obj.optString("from", obj.optString("source", "-"))),
                         obj.optString("to_branch", obj.optString("to", obj.optString("destination", "-"))),
-                        obj.optString("created_at", obj.optString("date", obj.optString("transfer_date", "-")))
+                        obj.optString("created_at", obj.optString("date", obj.optString("requested_at", "-")))
                     ));
                 }
             }
@@ -560,10 +590,9 @@ public class MiraReportsProFragment extends Fragment {
         List<BranchesItem> items = new ArrayList<>();
         if (data == null) return items;
 
-        JSONArray arr = data.optJSONArray("branches_performance");
-        if (arr == null) arr = data.optJSONArray("branches");
-        if (arr == null) arr = data.optJSONArray("data");
-        if (arr == null) arr = data.optJSONArray("items_list");
+        JSONArray arr = findArrayInData(data, 
+            new String[]{"branches_performance", "branches", "data", "items_list"}, 
+            new String[]{"branch_name", "items_count"});
 
         if (arr != null) {
             for (int i = 0; i < arr.length(); i++) {
@@ -583,11 +612,9 @@ public class MiraReportsProFragment extends Fragment {
         List<FinancialItem> items = new ArrayList<>();
         if (data == null) return items;
 
-        JSONArray arr = data.optJSONArray("journal_entries");
-        if (arr == null) arr = data.optJSONArray("entries");
-        if (arr == null) arr = data.optJSONArray("financial");
-        if (arr == null) arr = data.optJSONArray("data");
-        if (arr == null) arr = data.optJSONArray("items_list");
+        JSONArray arr = findArrayInData(data, 
+            new String[]{"journal_entries", "entries", "financial", "data", "items_list"}, 
+            new String[]{"description", "amount", "credit"});
 
         if (arr != null) {
             for (int i = 0; i < arr.length(); i++) {
@@ -610,7 +637,7 @@ public class MiraReportsProFragment extends Fragment {
         JSONObject innerData = data.optJSONObject("data");
         if (innerData != null) data = innerData;
 
-        java.util.Iterator<String> keys = data.keys();
+        Iterator<String> keys = data.keys();
         while (keys.hasNext()) {
             String key = keys.next();
             Object value = data.opt(key);
@@ -626,6 +653,8 @@ public class MiraReportsProFragment extends Fragment {
         if (data == null) return items;
 
         JSONObject inv = data.optJSONObject("inventory");
+        if (inv == null) inv = data.optJSONObject("summary");
+        
         if (inv != null) {
             items.add(new DashboardItem(
                 isArabic ? "📦 إجمالي القطع" : "📦 Total Items",
