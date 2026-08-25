@@ -1794,7 +1794,6 @@
     <string name="employee_id">Employee ID</string>
     <string name="branch">Branch</string>
     <string name="role">Role</string>
-    <string name="cancel">Cancel</string>
     <string name="next_step">Next →</string>
     <string name="prev_step">← Previous</string>
     <string name="save_user">💾 Save</string>
