@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:attr/colorBackground"
@@ -43,7 +42,7 @@
         android:layout_height="wrap_content"
         android:background="?attr/colorSurfaceVariant"
         android:orientation="horizontal"
-        android:paddingHorizontal="4dp"
+        android:paddingHorizontal="8dp"
         android:paddingVertical="4dp">
 
         <com.google.android.material.button.MaterialButton
@@ -52,7 +51,6 @@
             android:layout_width="0dp"
             android:layout_height="36dp"
             android:layout_weight="1"
-            android:padding="0dp"
             android:text="اليوم"
             android:textSize="11sp" />
 
@@ -62,7 +60,6 @@
             android:layout_width="0dp"
             android:layout_height="36dp"
             android:layout_weight="1"
-            android:padding="0dp"
             android:text="آخر 7 أيام"
             android:textSize="11sp" />
 
@@ -72,12 +69,11 @@
             android:layout_width="0dp"
             android:layout_height="36dp"
             android:layout_weight="1"
-            android:padding="0dp"
             android:text="آخر 30 يوم"
             android:textSize="11sp" />
     </LinearLayout>
 
-    <!-- Manual Date Pickers & Item Code -->
+    <!-- Manual Date Pickers -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -91,8 +87,8 @@
             android:layout_width="0dp"
             android:layout_height="40dp"
             android:layout_weight="1"
-            android:textSize="11sp"
-            tools:text="من: 2026-01-01" />
+            android:text="من: 2026-01-01"
+            android:textSize="10sp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnReportDateTo"
@@ -101,20 +97,8 @@
             android:layout_height="40dp"
             android:layout_marginStart="4dp"
             android:layout_weight="1"
-            android:textSize="11sp"
-            tools:text="إلى: 2026-01-30" />
-
-        <EditText
-            android:id="@+id/etReportItemCode"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="4dp"
-            android:layout_weight="1"
-            android:background="@android:drawable/editbox_background"
-            android:hint="كود القطعة"
-            android:paddingHorizontal="8dp"
-            android:textSize="11sp"
-            android:visibility="gone" />
+            android:text="إلى: 2026-01-30"
+            android:textSize="10sp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnReportApplyFilter"
@@ -126,61 +110,42 @@
             app:cornerRadius="6dp" />
     </LinearLayout>
 
-    <!-- Advanced Filters & Users Spinner -->
-    <LinearLayout
-        android:id="@+id/layoutAdvancedFilters"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingHorizontal="8dp"
-        android:visibility="gone">
-
-        <Spinner
-            android:id="@+id/spinnerReportUsers"
-            android:layout_width="match_parent"
-            android:layout_height="40dp" />
-    </LinearLayout>
-
-    <!-- Content Container (WebView + Native Loading View) -->
+    <!-- ✅ المحتوى: RecyclerView بدلاً من WebView -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:background="@android:color/white">
+        android:layout_weight="1">
 
-        <WebView
-            android:id="@+id/webReportView"
+        <!-- RecyclerView للبيانات -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvReportData"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@android:color/white"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:visibility="gone" />
+            android:clipToPadding="false"
+            android:padding="8dp" />
 
-        <!-- Loading Container -->
+        <!-- Loading Overlay -->
         <LinearLayout
             android:id="@+id/layoutLoadingContainer"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="#FFFFFF"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
             android:gravity="center"
             android:orientation="vertical"
             android:padding="16dp"
-            android:visibility="gone"
-            android:alpha="1.0">
-            
+            android:visibility="gone">
+
             <ProgressBar
                 android:id="@+id/progressReportLoading"
                 android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:indeterminateTint="?attr/colorPrimary" />
-            
+                android:layout_height="48dp" />
+
             <TextView
                 android:id="@+id/tvLoadingStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="جاري معالجة وتجهيز التقرير..."
+                android:text="جاري المعالجة..."
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -198,23 +163,23 @@
         android:padding="8dp">
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnReportPrint"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:id="@+id/btnReportExport"
             android:layout_width="0dp"
             android:layout_height="44dp"
             android:layout_marginEnd="4dp"
             android:layout_weight="1"
-            android:text="🖨️ طباعة التقرير"
+            android:text="📤 تصدير CSV"
             android:textSize="12sp"
             app:cornerRadius="8dp" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnReportExport"
+            android:id="@+id/btnReportPrint"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="0dp"
             android:layout_height="44dp"
             android:layout_marginStart="4dp"
             android:layout_weight="1"
-            android:text="📤 تصدير CSV"
+            android:text="🖨️ طباعة"
             android:textSize="12sp"
             app:cornerRadius="8dp" />
     </LinearLayout>
