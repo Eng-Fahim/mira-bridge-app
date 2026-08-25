@@ -2057,4 +2057,9 @@
     <string name="new_transfer">+ تحويل جديد</string>
     <string name="scan_verify">🔍 فتح كاشف المطابقة المسحية (RFID Live Scan)</string>
     <string name="no_transfers">لا توجد بيانات تحويل مطابقة للفلتر المحدد</string>
+
+    <string name="invoice_title">فاتورة بيع</string>
+    <string name="print_btn">🖨️ طباعة</string>
+    <string name="share_btn">📤 مشاركة</string>
+    <string name="save_pdf_btn">💾 حفظ PDF</string>
 </resources>
