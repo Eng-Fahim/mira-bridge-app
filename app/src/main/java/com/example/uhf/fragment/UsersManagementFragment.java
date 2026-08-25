@@ -493,343 +493,358 @@ public class UsersManagementFragment extends Fragment {
     // ==================== User Dialog ====================
 
     private void showUserDialog(@Nullable UserData existingUser) {
-        try {
-            if (!isAdded() || getContext() == null) return;
+    try {
+        if (!isAdded() || getContext() == null) return;
 
-            boolean isEdit = existingUser != null;
-            View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_user_edit, null);
+        boolean isEdit = existingUser != null;
+        View dialogView = LayoutInflater.from(getContext()).inflate(R.layout.dialog_user_edit, null);
 
-            AlertDialog dialog = new AlertDialog.Builder(requireContext())
-                .setView(dialogView)
-                .setCancelable(false)
-                .create();
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+            .setView(dialogView)
+            .setCancelable(false)
+            .create();
 
-            if (dialog.getWindow() != null) {
-                dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        // استخراج عناصر الواجهة
+        TextView tvTitle = dialogView.findViewById(R.id.tvDialogTitle);
+        TextView tvSubtitle = dialogView.findViewById(R.id.tvDialogSubtitle);
+        EditText etDisplayName = dialogView.findViewById(R.id.etDisplayName);
+        EditText etUsername = dialogView.findViewById(R.id.etUsername);
+        EditText etPassword = dialogView.findViewById(R.id.etPassword);
+        EditText etEmployeeId = dialogView.findViewById(R.id.etEmployeeId);
+        
+        // ✅ التعديل هنا: استخدام EditText بدلاً من MaterialAutoCompleteTextView
+        EditText etBranch = dialogView.findViewById(R.id.etBranch);
+        EditText etRole = dialogView.findViewById(R.id.etRole);
+        
+        Button btnCancel = dialogView.findViewById(R.id.btnCancelUser);
+        Button btnNextStep = dialogView.findViewById(R.id.btnNextStep);
+        Button btnPrevStep = dialogView.findViewById(R.id.btnPrevStep);
+        Button btnSaveUser = dialogView.findViewById(R.id.btnSaveUser);
+        LinearLayout layoutStep1 = dialogView.findViewById(R.id.layoutStep1);
+        LinearLayout layoutStep2 = dialogView.findViewById(R.id.layoutStep2);
+        LinearLayout layoutButtons1 = dialogView.findViewById(R.id.layoutButtons1);
+        LinearLayout stepsIndicator = dialogView.findViewById(R.id.stepsIndicator);
+        ImageButton btnGeneratePassword = dialogView.findViewById(R.id.btnGeneratePassword);
+        ImageButton btnCopyPassword = dialogView.findViewById(R.id.btnCopyPassword);
+        ImageButton btnSuggestUsername = dialogView.findViewById(R.id.btnSuggestUsername);
+        FrameLayout loadingOverlay = dialogView.findViewById(R.id.loadingOverlay);
+        TextView tvLoadingText = dialogView.findViewById(R.id.tvLoadingText);
+
+        // العناوين
+        if (tvTitle != null) {
+            tvTitle.setText(isEdit
+                ? (isArabic ? "تعديل مستخدم" : "Edit User")
+                : (isArabic ? "إضافة مستخدم جديد" : "Add New User"));
+        }
+        if (tvSubtitle != null) {
+            tvSubtitle.setText(isEdit
+                ? (isArabic ? "تعديل بيانات المستخدم الحالي" : "Edit current user data")
+                : (isArabic ? "أدخل بيانات المستخدم الجديد" : "Enter new user data"));
+        }
+
+        // إعداد قائمة الفروع - استخدام AlertDialog بدلاً من dropdown
+        List<String> branchNames = new ArrayList<>();
+        int activeBranchId = branchesManager.getActiveBranchId();
+        int selectedBranchIndex = 0;
+
+        for (int i = 0; i < branchesList.size(); i++) {
+            BranchItem b = branchesList.get(i);
+            branchNames.add(b.name + " (" + b.code + ")");
+            if (b.id == activeBranchId) selectedBranchIndex = i;
+        }
+        if (branchNames.isEmpty()) {
+            branchNames.add(isArabic ? "الفرع الرئيسي (MAIN)" : "Main Branch (MAIN)");
+        }
+
+        if (etBranch != null) {
+            etBranch.setText(branchNames.get(Math.min(selectedBranchIndex, branchNames.size() - 1)));
+            etBranch.setFocusable(false);
+            etBranch.setClickable(true);
+            etBranch.setOnClickListener(v -> {
+                new AlertDialog.Builder(requireContext())
+                    .setTitle(isArabic ? "اختر الفرع" : "Select Branch")
+                    .setItems(branchNames.toArray(new String[0]), (dialog1, which) -> {
+                        etBranch.setText(branchNames.get(which));
+                    })
+                    .show();
+            });
+        }
+
+        // إعداد قائمة الصلاحيات
+        List<String> roleNames = new ArrayList<>();
+        String[] allowedRoles = getAllowedRoles();
+
+        for (String roleCode : allowedRoles) {
+            for (int i = 0; i < ROLES.length; i++) {
+                if (ROLES[i].equals(roleCode)) {
+                    roleNames.add(ROLE_ICONS[i] + " " + (isArabic ? ROLES_AR[i] : ROLES_EN[i]) + " (" + roleCode + ")");
+                    break;
+                }
             }
+        }
 
-            // استخراج عناصر الواجهة
-            TextView tvTitle = dialogView.findViewById(R.id.tvDialogTitle);
-            TextView tvSubtitle = dialogView.findViewById(R.id.tvDialogSubtitle);
-            EditText etDisplayName = dialogView.findViewById(R.id.etDisplayName);
-            EditText etUsername = dialogView.findViewById(R.id.etUsername);
-            EditText etPassword = dialogView.findViewById(R.id.etPassword);
-            EditText etEmployeeId = dialogView.findViewById(R.id.etEmployeeId);
-            com.google.android.material.textfield.MaterialAutoCompleteTextView etBranch =
-                dialogView.findViewById(R.id.etBranch);
-            com.google.android.material.textfield.MaterialAutoCompleteTextView etRole =
-                dialogView.findViewById(R.id.etRole);
-            Button btnCancel = dialogView.findViewById(R.id.btnCancelUser);
-            Button btnNextStep = dialogView.findViewById(R.id.btnNextStep);
-            Button btnPrevStep = dialogView.findViewById(R.id.btnPrevStep);
-            Button btnSaveUser = dialogView.findViewById(R.id.btnSaveUser);
-            LinearLayout layoutStep1 = dialogView.findViewById(R.id.layoutStep1);
-            LinearLayout layoutStep2 = dialogView.findViewById(R.id.layoutStep2);
-            LinearLayout layoutButtons1 = dialogView.findViewById(R.id.layoutButtons1);
-            LinearLayout stepsIndicator = dialogView.findViewById(R.id.stepsIndicator);
-            ImageButton btnGeneratePassword = dialogView.findViewById(R.id.btnGeneratePassword);
-            ImageButton btnCopyPassword = dialogView.findViewById(R.id.btnCopyPassword);
-            ImageButton btnSuggestUsername = dialogView.findViewById(R.id.btnSuggestUsername);
-            LinearLayout loadingOverlay = dialogView.findViewById(R.id.loadingOverlay);
-            TextView tvLoadingText = dialogView.findViewById(R.id.tvLoadingText);
-
-            // العناوين
-            if (tvTitle != null) {
-                tvTitle.setText(isEdit
-                    ? (isArabic ? "تعديل مستخدم" : "Edit User")
-                    : (isArabic ? "إضافة مستخدم جديد" : "Add New User"));
+        if (etRole != null) {
+            if (!roleNames.isEmpty()) {
+                int defaultIndex = Math.max(0, roleNames.size() - 2);
+                etRole.setText(roleNames.get(defaultIndex));
             }
-            if (tvSubtitle != null) {
-                tvSubtitle.setText(isEdit
-                    ? (isArabic ? "تعديل بيانات المستخدم الحالي" : "Edit current user data")
-                    : (isArabic ? "أدخل بيانات المستخدم الجديد" : "Enter new user data"));
-            }
+            etRole.setFocusable(false);
+            etRole.setClickable(true);
+            etRole.setOnClickListener(v -> {
+                new AlertDialog.Builder(requireContext())
+                    .setTitle(isArabic ? "اختر الصلاحية" : "Select Role")
+                    .setItems(roleNames.toArray(new String[0]), (dialog1, which) -> {
+                        etRole.setText(roleNames.get(which));
+                    })
+                    .show();
+            });
+        }
 
-            // إعداد قائمة الفروع
-            List<String> branchNames = new ArrayList<>();
-            int activeBranchId = branchesManager.getActiveBranchId();
-            int selectedBranchIndex = 0;
+        // رقم موظف تلقائي
+        String branchCode = branchesManager.getActiveBranchCode();
+        if (etEmployeeId != null) {
+            etEmployeeId.setText(generateEmployeeId(branchCode));
+            etEmployeeId.setEnabled(false);
+        }
 
-            for (int i = 0; i < branchesList.size(); i++) {
-                BranchItem b = branchesList.get(i);
-                branchNames.add(b.name + " (" + b.code + ")");
-                if (b.id == activeBranchId) selectedBranchIndex = i;
-            }
-            if (branchNames.isEmpty()) {
-                branchNames.add(isArabic ? "الفرع الرئيسي (MAIN)" : "Main Branch (MAIN)");
-            }
+        // أزرار كلمة المرور
+        if (btnGeneratePassword != null) {
+            btnGeneratePassword.setOnClickListener(v -> {
+                String pwd = generateStrongPassword(12);
+                if (etPassword != null) etPassword.setText(pwd);
+                showToast(isArabic ? "🔐 تم توليد كلمة مرور قوية!" : "🔐 Strong password generated!");
+            });
+        }
 
-            ArrayAdapter<String> branchAdapter = new ArrayAdapter<>(
-                requireContext(), android.R.layout.simple_dropdown_item_1line, branchNames);
+        if (btnCopyPassword != null) {
+            btnCopyPassword.setOnClickListener(v -> {
+                String pwd = etPassword != null ? etPassword.getText().toString() : "";
+                if (!pwd.isEmpty()) {
+                    copyToClipboard(pwd);
+                } else {
+                    showToast(isArabic ? "لا توجد كلمة مرور لنسخها" : "No password to copy");
+                }
+            });
+        }
+
+        if (btnSuggestUsername != null && etDisplayName != null && etUsername != null) {
+            btnSuggestUsername.setOnClickListener(v -> {
+                String name = etDisplayName.getText().toString().trim();
+                if (!name.isEmpty()) {
+                    etUsername.setText(suggestUsername(name));
+                } else {
+                    showToast(isArabic ? "أدخل الاسم الظاهر أولاً" : "Enter display name first");
+                }
+            });
+        }
+
+        // تعبئة بيانات التعديل
+        if (isEdit && existingUser != null) {
+            if (etDisplayName != null) etDisplayName.setText(existingUser.displayName);
+            if (etUsername != null) {
+                etUsername.setText(existingUser.username);
+                etUsername.setEnabled(false);
+            }
+            if (etPassword != null) {
+                etPassword.setHint(isArabic ? "اتركه فارغاً لعدم التغيير" : "Leave empty to keep unchanged");
+            }
+            if (etEmployeeId != null) etEmployeeId.setText(existingUser.employeeId);
+
             if (etBranch != null) {
-                etBranch.setAdapter(branchAdapter);
-                etBranch.setText(branchNames.get(Math.min(selectedBranchIndex, branchNames.size() - 1)), false);
-                etBranch.setOnClickListener(v -> etBranch.showDropDown());
-            }
-
-            // إعداد قائمة الصلاحيات
-            List<String> roleNames = new ArrayList<>();
-            String[] allowedRoles = getAllowedRoles();
-
-            for (String roleCode : allowedRoles) {
-                for (int i = 0; i < ROLES.length; i++) {
-                    if (ROLES[i].equals(roleCode)) {
-                        roleNames.add(ROLE_ICONS[i] + " " + (isArabic ? ROLES_AR[i] : ROLES_EN[i]) + " (" + roleCode + ")");
+                for (int i = 0; i < branchesList.size(); i++) {
+                    if (branchesList.get(i).id == existingUser.branchId) {
+                        if (i < branchNames.size()) {
+                            etBranch.setText(branchNames.get(i));
+                        }
                         break;
                     }
                 }
             }
 
-            ArrayAdapter<String> roleAdapter = new ArrayAdapter<>(
-                requireContext(), android.R.layout.simple_dropdown_item_1line, roleNames);
             if (etRole != null) {
-                etRole.setAdapter(roleAdapter);
-                if (!roleNames.isEmpty()) {
-                    int defaultIndex = Math.max(0, roleNames.size() - 2);
-                    etRole.setText(roleNames.get(defaultIndex), false);
-                }
-                etRole.setOnClickListener(v -> etRole.showDropDown());
-            }
-
-            // رقم موظف تلقائي
-            String branchCode = branchesManager.getActiveBranchCode();
-            if (etEmployeeId != null) {
-                etEmployeeId.setText(generateEmployeeId(branchCode));
-                etEmployeeId.setEnabled(false);
-            }
-
-            // أزرار كلمة المرور
-            if (btnGeneratePassword != null) {
-                btnGeneratePassword.setOnClickListener(v -> {
-                    String pwd = generateStrongPassword(12);
-                    if (etPassword != null) etPassword.setText(pwd);
-                    showToast(isArabic ? "🔐 تم توليد كلمة مرور قوية!" : "🔐 Strong password generated!");
-                });
-            }
-
-            if (btnCopyPassword != null) {
-                btnCopyPassword.setOnClickListener(v -> {
-                    String pwd = etPassword != null ? etPassword.getText().toString() : "";
-                    if (!pwd.isEmpty()) {
-                        copyToClipboard(pwd);
-                    } else {
-                        showToast(isArabic ? "لا توجد كلمة مرور لنسخها" : "No password to copy");
-                    }
-                });
-            }
-
-            if (btnSuggestUsername != null && etDisplayName != null && etUsername != null) {
-                btnSuggestUsername.setOnClickListener(v -> {
-                    String name = etDisplayName.getText().toString().trim();
-                    if (!name.isEmpty()) {
-                        etUsername.setText(suggestUsername(name));
-                    } else {
-                        showToast(isArabic ? "أدخل الاسم الظاهر أولاً" : "Enter display name first");
-                    }
-                });
-            }
-
-            // تعبئة بيانات التعديل
-            if (isEdit && existingUser != null) {
-                if (etDisplayName != null) etDisplayName.setText(existingUser.displayName);
-                if (etUsername != null) {
-                    etUsername.setText(existingUser.username);
-                    etUsername.setEnabled(false);
-                }
-                if (etPassword != null) {
-                    etPassword.setHint(isArabic ? "اتركه فارغاً لعدم التغيير" : "Leave empty to keep unchanged");
-                }
-                if (etEmployeeId != null) etEmployeeId.setText(existingUser.employeeId);
-
-                if (etBranch != null) {
-                    for (int i = 0; i < branchesList.size(); i++) {
-                        if (branchesList.get(i).id == existingUser.branchId) {
-                            if (i < branchNames.size()) {
-                                etBranch.setText(branchNames.get(i), false);
-                            }
-                            break;
-                        }
+                for (int i = 0; i < roleNames.size(); i++) {
+                    if (roleNames.get(i).contains(existingUser.role)) {
+                        etRole.setText(roleNames.get(i));
+                        break;
                     }
                 }
+            }
 
-                if (etRole != null) {
-                    for (int i = 0; i < roleNames.size(); i++) {
-                        if (roleNames.get(i).contains(existingUser.role)) {
-                            etRole.setText(roleNames.get(i), false);
-                            break;
-                        }
-                    }
+            if (layoutStep1 != null) layoutStep1.setVisibility(View.VISIBLE);
+            if (layoutStep2 != null) layoutStep2.setVisibility(View.VISIBLE);
+            if (stepsIndicator != null) stepsIndicator.setVisibility(View.GONE);
+            if (btnNextStep != null) btnNextStep.setVisibility(View.GONE);
+            if (btnPrevStep != null) btnPrevStep.setVisibility(View.GONE);
+            if (layoutButtons1 != null) layoutButtons1.setVisibility(View.VISIBLE);
+            if (btnCancel != null) btnCancel.setVisibility(View.VISIBLE);
+            if (btnSaveUser != null) btnSaveUser.setVisibility(View.VISIBLE);
+        } else {
+            if (layoutStep1 != null) layoutStep1.setVisibility(View.VISIBLE);
+            if (layoutStep2 != null) layoutStep2.setVisibility(View.GONE);
+            if (stepsIndicator != null) stepsIndicator.setVisibility(View.VISIBLE);
+            if (btnNextStep != null) btnNextStep.setVisibility(View.VISIBLE);
+            if (btnSaveUser != null) btnSaveUser.setVisibility(View.GONE);
+            if (btnPrevStep != null) btnPrevStep.setVisibility(View.GONE);
+            if (layoutButtons1 != null) layoutButtons1.setVisibility(View.GONE);
+            if (btnCancel != null) btnCancel.setVisibility(View.GONE);
+        }
+
+        // زر التالي
+        if (btnNextStep != null) {
+            btnNextStep.setOnClickListener(v -> {
+                String displayName = etDisplayName != null ? etDisplayName.getText().toString().trim() : "";
+                String username = etUsername != null ? etUsername.getText().toString().trim() : "";
+                String password = etPassword != null ? etPassword.getText().toString().trim() : "";
+
+                if (displayName.isEmpty()) {
+                    if (etDisplayName != null) etDisplayName.setError(isArabic ? "مطلوب" : "Required");
+                    return;
+                }
+                if (username.isEmpty()) {
+                    if (etUsername != null) etUsername.setError(isArabic ? "مطلوب" : "Required");
+                    return;
+                }
+                if (!isEdit && !isPasswordStrong(password)) {
+                    showToast(isArabic ? "كلمة المرور لا تستوفي المتطلبات الأمنية" : "Password does not meet security requirements");
+                    return;
                 }
 
-                if (layoutStep1 != null) layoutStep1.setVisibility(View.VISIBLE);
+                if (layoutStep1 != null) layoutStep1.setVisibility(View.GONE);
                 if (layoutStep2 != null) layoutStep2.setVisibility(View.VISIBLE);
-                if (stepsIndicator != null) stepsIndicator.setVisibility(View.GONE);
                 if (btnNextStep != null) btnNextStep.setVisibility(View.GONE);
-                if (btnPrevStep != null) btnPrevStep.setVisibility(View.GONE);
-                if (layoutButtons1 != null) layoutButtons1.setVisibility(View.VISIBLE);
-                if (btnCancel != null) btnCancel.setVisibility(View.VISIBLE);
                 if (btnSaveUser != null) btnSaveUser.setVisibility(View.VISIBLE);
-            } else {
+                if (btnPrevStep != null) btnPrevStep.setVisibility(View.VISIBLE);
+            });
+        }
+
+        // زر الرجوع
+        if (btnPrevStep != null) {
+            btnPrevStep.setOnClickListener(v -> {
                 if (layoutStep1 != null) layoutStep1.setVisibility(View.VISIBLE);
                 if (layoutStep2 != null) layoutStep2.setVisibility(View.GONE);
-                if (stepsIndicator != null) stepsIndicator.setVisibility(View.VISIBLE);
                 if (btnNextStep != null) btnNextStep.setVisibility(View.VISIBLE);
                 if (btnSaveUser != null) btnSaveUser.setVisibility(View.GONE);
                 if (btnPrevStep != null) btnPrevStep.setVisibility(View.GONE);
-                if (layoutButtons1 != null) layoutButtons1.setVisibility(View.GONE);
-                if (btnCancel != null) btnCancel.setVisibility(View.GONE);
-            }
-
-            // زر التالي
-            if (btnNextStep != null) {
-                btnNextStep.setOnClickListener(v -> {
-                    String displayName = etDisplayName != null ? etDisplayName.getText().toString().trim() : "";
-                    String username = etUsername != null ? etUsername.getText().toString().trim() : "";
-                    String password = etPassword != null ? etPassword.getText().toString().trim() : "";
-
-                    if (displayName.isEmpty()) {
-                        if (etDisplayName != null) etDisplayName.setError(isArabic ? "مطلوب" : "Required");
-                        return;
-                    }
-                    if (username.isEmpty()) {
-                        if (etUsername != null) etUsername.setError(isArabic ? "مطلوب" : "Required");
-                        return;
-                    }
-                    if (!isEdit && !isPasswordStrong(password)) {
-                        showToast(isArabic ? "كلمة المرور لا تستوفي المتطلبات الأمنية" : "Password does not meet security requirements");
-                        return;
-                    }
-
-                    if (layoutStep1 != null) layoutStep1.setVisibility(View.GONE);
-                    if (layoutStep2 != null) layoutStep2.setVisibility(View.VISIBLE);
-                    if (btnNextStep != null) btnNextStep.setVisibility(View.GONE);
-                    if (btnSaveUser != null) btnSaveUser.setVisibility(View.VISIBLE);
-                    if (btnPrevStep != null) btnPrevStep.setVisibility(View.VISIBLE);
-                });
-            }
-
-            // زر الرجوع
-            if (btnPrevStep != null) {
-                btnPrevStep.setOnClickListener(v -> {
-                    if (layoutStep1 != null) layoutStep1.setVisibility(View.VISIBLE);
-                    if (layoutStep2 != null) layoutStep2.setVisibility(View.GONE);
-                    if (btnNextStep != null) btnNextStep.setVisibility(View.VISIBLE);
-                    if (btnSaveUser != null) btnSaveUser.setVisibility(View.GONE);
-                    if (btnPrevStep != null) btnPrevStep.setVisibility(View.GONE);
-                });
-            }
-
-            // زر الإلغاء
-            if (btnCancel != null) {
-                btnCancel.setOnClickListener(v -> dialog.dismiss());
-            }
-
-            // زر الحفظ
-            if (btnSaveUser != null) {
-                btnSaveUser.setOnClickListener(v -> {
-                    String displayName = etDisplayName != null ? etDisplayName.getText().toString().trim() : "";
-                    String username = etUsername != null ? etUsername.getText().toString().trim() : "";
-                    String password = etPassword != null ? etPassword.getText().toString().trim() : "";
-                    String empId = etEmployeeId != null ? etEmployeeId.getText().toString().trim() : "";
-                    String branchStr = etBranch != null ? etBranch.getText().toString().trim() : "";
-                    String roleStr = etRole != null ? etRole.getText().toString().trim() : "";
-
-                    if (displayName.isEmpty()) {
-                        showToast(isArabic ? "الاسم مطلوب" : "Name is required");
-                        return;
-                    }
-                    if (username.isEmpty()) {
-                        showToast(isArabic ? "اسم المستخدم مطلوب" : "Username is required");
-                        return;
-                    }
-                    if (branchStr.isEmpty()) {
-                        showToast(isArabic ? "الفرع مطلوب" : "Branch is required");
-                        return;
-                    }
-                    if (roleStr.isEmpty()) {
-                        showToast(isArabic ? "الصلاحية مطلوبة" : "Role is required");
-                        return;
-                    }
-
-                    String role = extractRoleCode(roleStr);
-
-                    if (!isEdit && !isRoleAllowed(role)) {
-                        showToast(isArabic ? "❌ ليس لديك صلاحية لإنشاء هذا الدور" : "❌ You don't have permission to create this role");
-                        return;
-                    }
-
-                    int branchId = activeBranchId;
-                    String branchName = branchStr.split("\\(")[0].trim();
-                    for (BranchItem b : branchesList) {
-                        if (branchStr.contains(b.code) || branchStr.startsWith(b.name)) {
-                            branchId = b.id;
-                            branchName = b.name;
-                            break;
-                        }
-                    }
-
-                    if (loadingOverlay != null) loadingOverlay.setVisibility(View.VISIBLE);
-                    if (tvLoadingText != null) tvLoadingText.setText(isArabic ? "جاري الحفظ..." : "Saving...");
-                    if (btnSaveUser != null) btnSaveUser.setEnabled(false);
-
-                    final int fBranchId = branchId;
-                    final String fBranchName = branchName;
-
-                    Executors.newSingleThreadExecutor().execute(() -> {
-                        try {
-                            JSONObject payload = new JSONObject();
-                            payload.put("username", username);
-                            payload.put("display_name", displayName);
-                            payload.put("role", role);
-                            payload.put("employee_id", empId);
-                            payload.put("branch_id", fBranchId);
-                            payload.put("branch_name", fBranchName);
-
-                            if (!password.isEmpty()) {
-                                payload.put("password", password);
-                            }
-                            if (isEdit) {
-                                payload.put("user_id", existingUser.id);
-                            }
-
-                            MiraApiClient.ApiResponse response = isEdit
-                                ? apiClient.updateUser(payload)
-                                : apiClient.createUser(payload);
-
-                            mainHandler.post(() -> {
-                                if (loadingOverlay != null) loadingOverlay.setVisibility(View.GONE);
-
-                                if (response != null && response.isSuccess) {
-                                    String msg = isEdit
-                                        ? (isArabic ? "✅ تم تعديل المستخدم بنجاح" : "✅ User updated successfully")
-                                        : (isArabic ? "✅ تمت إضافة المستخدم بنجاح" : "✅ User added successfully");
-                                    showToast(msg);
-                                    dialog.dismiss();
-                                    loadUsers();
-                                } else {
-                                    String errorMsg = response != null && response.error != null
-                                        ? response.error
-                                        : (isArabic ? "فشل العملية" : "Operation failed");
-                                    showToast("❌ " + errorMsg);
-                                    if (btnSaveUser != null) btnSaveUser.setEnabled(true);
-                                }
-                            });
-                        } catch (Exception e) {
-                            mainHandler.post(() -> {
-                                if (loadingOverlay != null) loadingOverlay.setVisibility(View.GONE);
-                                showToast((isArabic ? "❌ خطأ: " : "❌ Error: ") + e.getMessage());
-                                if (btnSaveUser != null) btnSaveUser.setEnabled(true);
-                            });
-                        }
-                    });
-                });
-            }
-
-            dialog.show();
-        } catch (Exception e) {
-            showToast("Error showing dialog: " + e.getMessage());
+            });
         }
+
+        // زر الإلغاء
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        // زر الحفظ
+        if (btnSaveUser != null) {
+            btnSaveUser.setOnClickListener(v -> {
+                String displayName = etDisplayName != null ? etDisplayName.getText().toString().trim() : "";
+                String username = etUsername != null ? etUsername.getText().toString().trim() : "";
+                String password = etPassword != null ? etPassword.getText().toString().trim() : "";
+                String empId = etEmployeeId != null ? etEmployeeId.getText().toString().trim() : "";
+                String branchStr = etBranch != null ? etBranch.getText().toString().trim() : "";
+                String roleStr = etRole != null ? etRole.getText().toString().trim() : "";
+
+                if (displayName.isEmpty()) {
+                    showToast(isArabic ? "الاسم مطلوب" : "Name is required");
+                    return;
+                }
+                if (username.isEmpty()) {
+                    showToast(isArabic ? "اسم المستخدم مطلوب" : "Username is required");
+                    return;
+                }
+                if (branchStr.isEmpty()) {
+                    showToast(isArabic ? "الفرع مطلوب" : "Branch is required");
+                    return;
+                }
+                if (roleStr.isEmpty()) {
+                    showToast(isArabic ? "الصلاحية مطلوبة" : "Role is required");
+                    return;
+                }
+
+                String role = extractRoleCode(roleStr);
+
+                if (!isEdit && !isRoleAllowed(role)) {
+                    showToast(isArabic ? "❌ ليس لديك صلاحية لإنشاء هذا الدور" : "❌ You don't have permission to create this role");
+                    return;
+                }
+
+                int branchId = activeBranchId;
+                String branchName = branchStr.split("\\(")[0].trim();
+                for (BranchItem b : branchesList) {
+                    if (branchStr.contains(b.code) || branchStr.startsWith(b.name)) {
+                        branchId = b.id;
+                        branchName = b.name;
+                        break;
+                    }
+                }
+
+                if (loadingOverlay != null) loadingOverlay.setVisibility(View.VISIBLE);
+                if (tvLoadingText != null) tvLoadingText.setText(isArabic ? "جاري الحفظ..." : "Saving...");
+                if (btnSaveUser != null) btnSaveUser.setEnabled(false);
+
+                final int fBranchId = branchId;
+                final String fBranchName = branchName;
+
+                Executors.newSingleThreadExecutor().execute(() -> {
+                    try {
+                        JSONObject payload = new JSONObject();
+                        payload.put("username", username);
+                        payload.put("display_name", displayName);
+                        payload.put("role", role);
+                        payload.put("employee_id", empId);
+                        payload.put("branch_id", fBranchId);
+                        payload.put("branch_name", fBranchName);
+
+                        if (!password.isEmpty()) {
+                            payload.put("password", password);
+                        }
+                        if (isEdit) {
+                            payload.put("user_id", existingUser.id);
+                        }
+
+                        MiraApiClient.ApiResponse response = isEdit
+                            ? apiClient.updateUser(payload)
+                            : apiClient.createUser(payload);
+
+                        mainHandler.post(() -> {
+                            if (loadingOverlay != null) loadingOverlay.setVisibility(View.GONE);
+
+                            if (response != null && response.isSuccess) {
+                                String msg = isEdit
+                                    ? (isArabic ? "✅ تم تعديل المستخدم بنجاح" : "✅ User updated successfully")
+                                    : (isArabic ? "✅ تمت إضافة المستخدم بنجاح" : "✅ User added successfully");
+                                showToast(msg);
+                                dialog.dismiss();
+                                loadUsers();
+                            } else {
+                                String errorMsg = response != null && response.error != null
+                                    ? response.error
+                                    : (isArabic ? "فشل العملية" : "Operation failed");
+                                showToast("❌ " + errorMsg);
+                                if (btnSaveUser != null) btnSaveUser.setEnabled(true);
+                            }
+                        });
+                    } catch (Exception e) {
+                        mainHandler.post(() -> {
+                            if (loadingOverlay != null) loadingOverlay.setVisibility(View.GONE);
+                            showToast((isArabic ? "❌ خطأ: " : "❌ Error: ") + e.getMessage());
+                            if (btnSaveUser != null) btnSaveUser.setEnabled(true);
+                        });
+                    }
+                });
+            });
+        }
+
+        dialog.show();
+    } catch (Exception e) {
+        android.util.Log.e("UsersManagement", "Error showing dialog: " + e.getMessage());
+        e.printStackTrace();
+        showToast("Error showing dialog: " + e.getMessage());
     }
+}
 
     // ==================== Delete User ====================
 
