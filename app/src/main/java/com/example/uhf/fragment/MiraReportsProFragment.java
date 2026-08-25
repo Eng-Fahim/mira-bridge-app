@@ -24,6 +24,13 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.print.PrintManager;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintAttributes;
+
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
@@ -66,6 +73,12 @@ public class MiraReportsProFragment extends Fragment {
     private MiraPriceManager priceManager;
     private boolean isArabic;
     private int currentBranchId = 1;
+    
+    private JSONObject lastLoadedData = null;
+    private String lastLoadedType = "";
+    private String lastFromDate = "";
+    private String lastToDate = "";
+
 
     @Nullable
     @Override
@@ -323,7 +336,6 @@ private void fetchAndDisplayWithFilters(String type, RecyclerView rvData, View l
 
     executorService.execute(() -> {
         try {
-            // بناء URL مع الفلاتر
             StringBuilder endpoint = new StringBuilder("/reports-app?type=").append(type);
             endpoint.append("&from=").append(fromDate);
             endpoint.append("&to=").append(toDate);
@@ -369,9 +381,19 @@ private void fetchAndDisplayWithFilters(String type, RecyclerView rvData, View l
                     return;
                 }
 
-                // ✅ فلترة محلية إضافية للبيانات
+                // ✅ تخزين البيانات للتصدير
+                lastLoadedData = data;
+                lastLoadedType = type;
+                lastFromDate = fromDate;
+                lastToDate = toDate;
+
+                // ✅ تخزين في الكاش
+                String cacheKey = "cache_pro_" + type + "_" + fromDate + "_" + toDate;
+                if (offlineCache != null) {
+                    offlineCache.edit().putString(cacheKey, data.toString()).apply();
+                }
+
                 JSONObject filteredData = applyLocalFilters(type, data, filters);
-                
                 RecyclerView.Adapter<?> reportAdapter = createAdapterForType(type, filteredData);
                 rvData.setAdapter(reportAdapter);
             });
@@ -491,104 +513,144 @@ private boolean matchesFilters(JSONObject item, String search, String filter1, S
 }
 
 // ==================== طباعة محسنة ====================
+// ==================== طباعة HTML احترافية ====================
 private void printReport(ReportItem item, RecyclerView rvData, String[] dates, String[] filters) {
-    if (getContext() == null || rvData == null) return;
+    if (getContext() == null) return;
 
     try {
-        // ✅ إنشاء عرض مخصص للطباعة مع هيدر
-        View printView = LayoutInflater.from(requireContext()).inflate(R.layout.print_report_layout, null);
+        // ✅ إنشاء HTML احترافي
+        StringBuilder html = new StringBuilder();
+        String direction = isArabic ? "rtl" : "ltr";
+        String textAlign = isArabic ? "right" : "left";
         
-        // هيدر الطباعة
-        TextView tvPrintTitle = printView.findViewById(R.id.tvPrintTitle);
-        TextView tvPrintDate = printView.findViewById(R.id.tvPrintDate);
-        TextView tvPrintFilters = printView.findViewById(R.id.tvPrintFilters);
-        TextView tvPrintOrgName = printView.findViewById(R.id.tvPrintOrgName);
-        TextView tvPrintBranchName = printView.findViewById(R.id.tvPrintBranchName);
-        
-        if (tvPrintTitle != null) {
-            tvPrintTitle.setText(item.icon + " " + item.title);
-        }
-        
-        if (tvPrintDate != null) {
-            String dateRange = dates[0] + " → " + dates[1];
-            tvPrintDate.setText(isArabic ? "📅 الفترة: " + dateRange : "📅 Period: " + dateRange);
-        }
-        
-        if (tvPrintFilters != null && filters != null) {
-            StringBuilder filterStr = new StringBuilder();
-            if (!filters[0].isEmpty()) filterStr.append("بحث: ").append(filters[0]).append(" | ");
-            if (!filters[1].isEmpty()) filterStr.append("فلتر 1: ").append(filters[1]).append(" | ");
-            if (!filters[2].isEmpty()) filterStr.append("فلتر 2: ").append(filters[2]);
-            if (filterStr.length() > 0) {
-                tvPrintFilters.setText(isArabic ? "🔍 الفلاتر: " + filterStr : "🔍 Filters: " + filterStr);
-            }
-        }
-        
-        if (tvPrintOrgName != null && orgProfile != null) {
-            tvPrintOrgName.setText(orgProfile.getOrgName());
-        }
-        
-        if (tvPrintBranchName != null && branchesManager != null) {
-            tvPrintBranchName.setText(branchesManager.getActiveBranchName());
-        }
-        
-        // ✅ إنشاء PDF مع الهيدر والبيانات
-        android.print.PrintManager printManager = (android.print.PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
-        android.print.PrintAttributes attributes = new android.print.PrintAttributes.Builder()
-                .setMediaSize(android.print.PrintAttributes.MediaSize.ISO_A4)
-                .setResolution(new android.print.PrintAttributes.Resolution("pdf", "pdf", 600, 600))
-                .setMinMargins(android.print.PrintAttributes.Margins.NO_MARGINS)
-                .build();
+        html.append("<!DOCTYPE html><html dir='").append(direction).append("'><head><meta charset='utf-8'>")
+            .append("<style>")
+            .append("@page { size: A4; margin: 15mm; }")
+            .append("body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: ").append(direction).append("; text-align: ").append(textAlign).append("; margin: 0; padding: 20px; color: #1a1a2e; }")
+            .append(".header { text-align: center; border-bottom: 3px solid #1a237e; padding-bottom: 15px; margin-bottom: 20px; }")
+            .append(".org-name { font-size: 24px; font-weight: bold; color: #1a237e; margin: 0; }")
+            .append(".branch-name { font-size: 16px; color: #555; margin: 5px 0 0 0; }")
+            .append(".report-title { font-size: 20px; font-weight: bold; color: #333; margin: 10px 0 5px 0; }")
+            .append(".report-meta { font-size: 12px; color: #777; margin: 0; }")
+            .append(".filters-box { background: #f5f5f5; border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 15px 0; font-size: 11px; color: #555; }")
+            .append("table { width: 100%; border-collapse: collapse; margin-top: 15px; }")
+            .append("th { background: #1a237e; color: white; padding: 10px; font-size: 12px; text-align: center; }")
+            .append("td { padding: 8px; border: 1px solid #ddd; font-size: 11px; text-align: center; }")
+            .append("tr:nth-child(even) { background: #f9f9f9; }")
+            .append(".footer { margin-top: 30px; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #ccc; padding-top: 10px; }")
+            .append(".logo { text-align: center; margin-bottom: 15px; }")
+            .append(".logo span { font-size: 40px; }")
+            .append("</style></head><body>");
 
-        printManager.print(item.title, new android.print.PrintDocumentAdapter() {
-            @Override
-            public void onLayout(android.print.PrintAttributes oldAttributes, android.print.PrintAttributes newAttributes,
-                               android.os.CancellationSignal cancellationSignal,
-                               LayoutResultCallback callback, android.os.Bundle extras) {
-                callback.onLayoutFinished(new android.print.PrintDocumentInfo.Builder("report.pdf")
-                        .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
-                        .build(), true);
-            }
+        // ✅ الشعار
+        html.append("<div class='logo'><span>💎</span></div>");
 
-            @Override
-            public void onWrite(android.print.PageRange[] pages, android.os.ParcelFileDescriptor destination,
-                              android.os.CancellationSignal cancellationSignal, WriteResultCallback callback) {
-                try {
-                    android.graphics.pdf.PdfDocument pdfDocument = new android.graphics.pdf.PdfDocument();
-                    
-                    // صفحة الهيدر
-                    android.graphics.pdf.PdfDocument.PageInfo headerPageInfo = new android.graphics.pdf.PdfDocument.PageInfo.Builder(
-                            1080, 1920, 1).create();
-                    android.graphics.pdf.PdfDocument.Page headerPage = pdfDocument.startPage(headerPageInfo);
-                    android.graphics.Canvas headerCanvas = headerPage.getCanvas();
-                    headerCanvas.drawColor(android.graphics.Color.WHITE);
-                    
-                    printView.measure(
-                        View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
-                        View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.UNSPECIFIED)
-                    );
-                    printView.layout(0, 0, 1080, 1920);
-                    printView.draw(headerCanvas);
-                    pdfDocument.finishPage(headerPage);
-                    
-                    // صفحة البيانات
-                    android.graphics.pdf.PdfDocument.PageInfo dataPageInfo = new android.graphics.pdf.PdfDocument.PageInfo.Builder(
-                            1080, 1920, 1).create();
-                    android.graphics.pdf.PdfDocument.Page dataPage = pdfDocument.startPage(dataPageInfo);
-                    android.graphics.Canvas dataCanvas = dataPage.getCanvas();
-                    dataCanvas.drawColor(android.graphics.Color.WHITE);
-                    rvData.draw(dataCanvas);
-                    pdfDocument.finishPage(dataPage);
-                    
-                    pdfDocument.writeTo(new FileOutputStream(destination.getFileDescriptor()));
-                    pdfDocument.close();
-                    
-                    callback.onWriteFinished(new android.print.PageRange[]{android.print.PageRange.ALL_PAGES});
-                } catch (Exception e) {
-                    callback.onWriteFailed(e.getMessage());
+        // ✅ الهيدر
+        html.append("<div class='header'>")
+            .append("<h1 class='org-name'>").append(orgProfile != null ? orgProfile.getOrgName() : "MIRA System").append("</h1>")
+            .append("<p class='branch-name'>").append(branchesManager != null ? branchesManager.getActiveBranchName() : "").append("</p>")
+            .append("<h2 class='report-title'>").append(item.icon).append(" ").append(item.title).append("</h2>")
+            .append("<p class='report-meta'>").append(isArabic ? "تاريخ الإنشاء: " : "Generated: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date())).append("</p>")
+            .append("</div>");
+
+        // ✅ معلومات الفترة والفلاتر
+        html.append("<div class='filters-box'>")
+            .append("<strong>").append(isArabic ? "📅 الفترة: " : "📅 Period: ").append("</strong>")
+            .append(dates[0]).append(" → ").append(dates[1]);
+        
+        if (filters != null) {
+            if (!filters[0].isEmpty()) html.append("<br><strong>").append(isArabic ? "🔍 بحث: " : "🔍 Search: ").append("</strong>").append(filters[0]);
+            if (!filters[1].isEmpty()) html.append("<br><strong>").append(isArabic ? "فلتر 1: " : "Filter 1: ").append("</strong>").append(filters[1]);
+            if (!filters[2].isEmpty()) html.append("<br><strong>").append(isArabic ? "فلتر 2: " : "Filter 2: ").append("</strong>").append(filters[2]);
+        }
+        html.append("</div>");
+
+        // ✅ جدول البيانات
+        html.append("<table><thead><tr>");
+        
+        // ✅ تحديد أعمدة الجدول حسب نوع التقرير
+        switch (item.type) {
+            case "sales":
+                html.append("<th>#</th><th>").append(isArabic ? "رقم الفاتورة" : "Invoice").append("</th>")
+                    .append("<th>").append(isArabic ? "العميل" : "Customer").append("</th>")
+                    .append("<th>").append(isArabic ? "المبلغ" : "Amount").append("</th>")
+                    .append("<th>").append(isArabic ? "الدفع" : "Payment").append("</th>")
+                    .append("<th>").append(isArabic ? "البائع" : "Seller").append("</th>");
+                break;
+            case "inventory":
+                html.append("<th>#</th><th>").append(isArabic ? "القطعة" : "Item").append("</th>")
+                    .append("<th>").append(isArabic ? "العيار" : "Karat").append("</th>")
+                    .append("<th>").append(isArabic ? "الوزن" : "Weight").append("</th>")
+                    .append("<th>").append(isArabic ? "الحالة" : "Status").append("</th>")
+                    .append("<th>").append(isArabic ? "الموقع" : "Location").append("</th>");
+                break;
+            default:
+                html.append("<th>#</th><th>").append(isArabic ? "البيان" : "Details").append("</th>")
+                    .append("<th>").append(isArabic ? "القيمة" : "Value").append("</th>");
+                break;
+        }
+        html.append("</tr></thead><tbody>");
+
+        // ✅ الحصول على بيانات الـ RecyclerView
+        RecyclerView.Adapter<?> adapter = rvData.getAdapter();
+        int itemCount = adapter != null ? adapter.getItemCount() : 0;
+        
+        for (int i = 0; i < Math.min(itemCount, 50); i++) {
+            html.append("<tr><td>").append(i + 1).append("</td>");
+            
+            // ✅ استخراج بيانات كل صف
+            if (adapter instanceof GenericAdapter) {
+                // GenericAdapter
+                List<GenericItem> items = ((GenericAdapter) adapter).items;
+                if (i < items.size()) {
+                    html.append("<td>").append(items.get(i).key).append("</td>")
+                        .append("<td>").append(items.get(i).value).append("</td>");
+                }
+            } else if (adapter instanceof SalesAdapter) {
+                List<SalesItem> items = ((SalesAdapter) adapter).items;
+                if (i < items.size()) {
+                    SalesItem s = items.get(i);
+                    html.append("<td>").append(s.invoiceNo).append("</td>")
+                        .append("<td>").append(s.customer).append("</td>")
+                        .append("<td>").append(String.format("%.2f", s.amount)).append("</td>")
+                        .append("<td>").append(s.payment).append("</td>")
+                        .append("<td>").append(s.seller).append("</td>");
+                }
+            } else if (adapter instanceof InventoryAdapter) {
+                List<InventoryItem> items = ((InventoryAdapter) adapter).items;
+                if (i < items.size()) {
+                    InventoryItem inv = items.get(i);
+                    html.append("<td>").append(inv.title).append("</td>")
+                        .append("<td>").append(inv.karat).append("</td>")
+                        .append("<td>").append(String.format("%.2f g", inv.weight)).append("</td>")
+                        .append("<td>").append(inv.status).append("</td>")
+                        .append("<td>").append(inv.location).append("</td>");
                 }
             }
-        }, attributes);
+            html.append("</tr>");
+        }
+        
+        html.append("</tbody></table>");
+        html.append("<div class='footer'>").append(isArabic ? "© نظام MIRA لإدارة المجوهرات - تقرير آلي" : "© MIRA Jewelry Management System - Automated Report").append("</div>");
+        html.append("</body></html>");
+
+        // ✅ إنشاء WebView للطباعة
+        WebView webView = new WebView(requireContext());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                PrintManager printManager = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
+                if (printManager != null) {
+                    PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter("MIRA_Report_" + item.type);
+                    PrintAttributes attributes = new PrintAttributes.Builder()
+                            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+                            .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                            .build();
+                    printManager.print("MIRA_Report_" + item.type, printAdapter, attributes);
+                }
+            }
+        });
+        webView.loadDataWithBaseURL(null, html.toString(), "text/html", "UTF-8", null);
 
     } catch (Exception e) {
         Log.e(TAG, "Print error: " + e.getMessage());
@@ -685,27 +747,200 @@ private void exportReportToCSV(String type, String from, String to, JSONObject d
     }
 }
 
-    // ✅ دالة خاصة بتايم لاين المستخدم
-    private void showUserTimelineDialog(ReportItem item) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle(isArabic ? "⏱️ تايم لاين المستخدم" : "⏱️ User Timeline");
+// ✅ دالة عرض التقارير المتقدمة مع زر الطباعة
+private void showAdvancedReportDialog(String type, JSONObject data) {
+    View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
+    
+    TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
+    RecyclerView rvData = dialogView.findViewById(R.id.rvReportData);
+    View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
+    TextView tvLoadingStatus = dialogView.findViewById(R.id.tvLoadingStatus);
+    MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
+    MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
+    
+    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+    
+    tvTitle.setText(getReportTitle(type));
+    rvData.setLayoutManager(new LinearLayoutManager(getContext()));
+    
+    RecyclerView.Adapter<?> adapter = createAdvancedAdapter(type, data);
+    rvData.setAdapter(adapter);
+    
+    AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
+            .setView(dialogView)
+            .create();
+    
+    MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
+    if (btnClose != null) {
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+    }
+    
+    // ✅ تفعيل زر الطباعة
+    if (btnPrint != null) {
+        btnPrint.setVisibility(View.VISIBLE);
+        btnPrint.setOnClickListener(v -> {
+            printAdvancedReport(type, data, rvData);
+        });
+    }
+    
+    // ✅ تفعيل زر التصدير
+    if (btnExport != null) {
+        btnExport.setVisibility(View.VISIBLE);
+        btnExport.setOnClickListener(v -> {
+            exportAdvancedReport(type, data);
+        });
+    }
+    
+    dialog.show();
+}
+
+// ✅ دالة طباعة التقارير المتقدمة
+private void printAdvancedReport(String type, JSONObject data, RecyclerView rvData) {
+    if (getContext() == null) return;
+    
+    try {
+        String direction = isArabic ? "rtl" : "ltr";
+        String textAlign = isArabic ? "right" : "left";
         
-        View inputView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_input_user_id, null);
-        EditText etUserId = inputView.findViewById(R.id.etUserId);
+        StringBuilder html = new StringBuilder();
+        html.append("<!DOCTYPE html><html dir='").append(direction).append("'><head><meta charset='utf-8'>")
+            .append("<style>")
+            .append("@page { size: A4; margin: 15mm; }")
+            .append("body { font-family: 'Segoe UI', Tahoma, sans-serif; direction: ").append(direction).append("; text-align: ").append(textAlign).append("; padding: 20px; }")
+            .append(".header { text-align: center; border-bottom: 3px solid #1a237e; padding-bottom: 15px; margin-bottom: 20px; }")
+            .append(".org-name { font-size: 22px; font-weight: bold; color: #1a237e; }")
+            .append(".report-title { font-size: 18px; font-weight: bold; margin: 10px 0; }")
+            .append(".report-date { font-size: 12px; color: #777; }")
+            .append("table { width: 100%; border-collapse: collapse; margin-top: 15px; }")
+            .append("th { background: #1a237e; color: white; padding: 8px; font-size: 11px; }")
+            .append("td { padding: 6px; border: 1px solid #ddd; font-size: 10px; }")
+            .append(".footer { margin-top: 30px; text-align: center; font-size: 9px; color: #999; }")
+            .append("</style></head><body>");
         
-        builder.setView(inputView);
-        builder.setPositiveButton(isArabic ? "عرض" : "Show", (dialog, which) -> {
-            String userIdStr = etUserId.getText().toString().trim();
-            if (!userIdStr.isEmpty()) {
-                int userId = Integer.parseInt(userIdStr);
-                fetchAdvancedReport(item.type, userId, "", "", 0, getDefaultFromDate(), getDefaultToDate());
-            } else {
-                Toast.makeText(getContext(), isArabic ? "أدخل معرف المستخدم" : "Enter user ID", Toast.LENGTH_SHORT).show();
+        html.append("<div class='header'>")
+            .append("<div class='org-name'>").append(orgProfile != null ? orgProfile.getOrgName() : "MIRA System").append("</div>")
+            .append("<div class='report-title'>").append(getReportTitle(type)).append("</div>")
+            .append("<div class='report-date'>").append(isArabic ? "تاريخ الطباعة: " : "Print Date: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date())).append("</div>")
+            .append("</div>");
+        
+        // ✅ إضافة البيانات
+        html.append("<table><tbody>");
+        RecyclerView.Adapter<?> adapter = rvData.getAdapter();
+        if (adapter instanceof GenericAdapter) {
+            List<GenericItem> items = ((GenericAdapter) adapter).items;
+            for (GenericItem item : items) {
+                html.append("<tr><td style='width:30%;font-weight:bold;background:#f5f5f5;'>").append(item.key).append("</td>")
+                    .append("<td>").append(item.value.replace("\n", "<br>")).append("</td></tr>");
+            }
+        }
+        html.append("</tbody></table>");
+        html.append("<div class='footer'>").append(isArabic ? "© نظام MIRA - تقرير متقدم" : "© MIRA System - Advanced Report").append("</div>");
+        html.append("</body></html>");
+        
+        WebView webView = new WebView(requireContext());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                PrintManager printManager = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
+                if (printManager != null) {
+                    PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter("MIRA_Advanced_" + type);
+                    PrintAttributes attributes = new PrintAttributes.Builder()
+                            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+                            .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                            .build();
+                    printManager.print("MIRA_Advanced_" + type, printAdapter, attributes);
+                }
             }
         });
-        builder.setNegativeButton(isArabic ? "إلغاء" : "Cancel", null);
-        builder.show();
+        webView.loadDataWithBaseURL(null, html.toString(), "text/html", "UTF-8", null);
+        
+    } catch (Exception e) {
+        Log.e(TAG, "Advanced print error: " + e.getMessage());
+        Toast.makeText(getContext(), "Print error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
     }
+}
+
+    // ✅ دالة خاصة بتايم لاين المستخدم
+    // ✅ دالة محسنة لتايم لاين المستخدم - عرض قائمة المستخدمين
+private void showUserTimelineDialog(ReportItem item) {
+    // تحميل المستخدمين أولاً
+    Toast.makeText(getContext(), isArabic ? "🔄 جاري تحميل المستخدمين..." : "🔄 Loading users...", Toast.LENGTH_SHORT).show();
+    
+    executorService.execute(() -> {
+        try {
+            MiraApiClient.ApiResponse response = apiClient.getUsers();
+            
+            mainHandler.post(() -> {
+                if (response == null || !response.isSuccess || response.data == null) {
+                    Toast.makeText(getContext(), 
+                        isArabic ? "❌ فشل تحميل المستخدمين" : "❌ Failed to load users", 
+                        Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                
+                // استخراج قائمة المستخدمين
+                List<UserInfo> users = new ArrayList<>();
+                JSONArray usersArray = response.data.optJSONArray("users");
+                if (usersArray == null) {
+                    JSONObject dataObj = response.data.optJSONObject("data");
+                    if (dataObj != null) {
+                        usersArray = dataObj.optJSONArray("users");
+                    }
+                }
+                
+                if (usersArray != null) {
+                    for (int i = 0; i < usersArray.length(); i++) {
+                        JSONObject u = usersArray.optJSONObject(i);
+                        if (u != null) {
+                            UserInfo user = new UserInfo();
+                            user.id = u.optInt("id");
+                            user.name = u.optString("display_name", u.optString("username", "User " + user.id));
+                            user.username = u.optString("username", "");
+                            user.role = u.optString("role", "");
+                            users.add(user);
+                        }
+                    }
+                }
+                
+                if (users.isEmpty()) {
+                    Toast.makeText(getContext(), 
+                        isArabic ? "لا يوجد مستخدمين" : "No users found", 
+                        Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                
+                // عرض قائمة المستخدمين للاختيار
+                String[] userNames = new String[users.size()];
+                for (int i = 0; i < users.size(); i++) {
+                    UserInfo u = users.get(i);
+                    userNames[i] = "👤 " + u.name + " (@" + u.username + ")";
+                }
+                
+                new AlertDialog.Builder(requireContext())
+                    .setTitle(isArabic ? "👥 اختر المستخدم" : "👥 Select User")
+                    .setItems(userNames, (dialog, which) -> {
+                        UserInfo selectedUser = users.get(which);
+                        fetchAdvancedReport(item.type, selectedUser.id, "", "", 0, 
+                            getDefaultFromDate(), getDefaultToDate());
+                    })
+                    .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                    .show();
+            });
+        } catch (Exception e) {
+            mainHandler.post(() -> {
+                Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            });
+        }
+    });
+}
+
+// ✅ كلاس معلومات المستخدم
+private static class UserInfo {
+    int id;
+    String name;
+    String username;
+    String role;
+}
 
     // ✅ دالة خاصة ببصمة القطعة
     private void showItemPassportDialog(ReportItem item) {
@@ -1850,31 +2085,202 @@ private void exportReportToCSV(String type, String from, String to, JSONObject d
     }
 
     private void exportReportToCSV(String type, String from, String to) {
-        if (!isAdded() || getContext() == null) return;
-        try {
+    if (!isAdded() || getContext() == null) return;
+    
+    try {
+        // ✅ استخدام البيانات المخزنة مباشرة
+        JSONObject data = lastLoadedData;
+        
+        // إذا لم توجد بيانات مخزنة، حاول من الكاش
+        if (data == null) {
             String cacheKey = "cache_pro_" + type + "_" + from + "_" + to;
             String cached = offlineCache != null ? offlineCache.getString(cacheKey, null) : null;
-            if (cached == null) {
-                Toast.makeText(getContext(), isArabic ? "لا توجد بيانات" : "No data", Toast.LENGTH_SHORT).show();
-                return;
+            if (cached != null) {
+                try {
+                    data = new JSONObject(cached);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error parsing cached data", e);
+                }
             }
-            File exportDir = new File(requireContext().getCacheDir(), "exports");
-            if (!exportDir.exists()) exportDir.mkdirs();
-            File file = new File(exportDir, "MIRA_Report_" + type + "_" + System.currentTimeMillis() + ".csv");
-            FileOutputStream fos = new FileOutputStream(file);
-            fos.write(0xEF); fos.write(0xBB); fos.write(0xBF);
-            fos.write(cached.getBytes("UTF-8"));
-            fos.close();
-            Uri uri = FileProvider.getUriForFile(requireContext(), requireContext().getPackageName() + ".fileprovider", file);
-            Intent intent = new Intent(Intent.ACTION_SEND);
-            intent.setType("text/csv");
-            intent.putExtra(Intent.EXTRA_STREAM, uri);
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(Intent.createChooser(intent, "Share CSV"));
-        } catch (Exception e) {
-            Toast.makeText(getContext(), "Export failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
+        
+        // إذا لم توجد بيانات نهائياً
+        if (data == null) {
+            Toast.makeText(getContext(), 
+                isArabic ? "⚠️ لا توجد بيانات للتصدير - قم بتحميل التقرير أولاً" : 
+                "⚠️ No data to export - Load the report first", 
+                Toast.LENGTH_LONG).show();
+            return;
+        }
+        
+        // ✅ إنشاء CSV
+        StringBuilder csv = new StringBuilder();
+        csv.append('\uFEFF'); // BOM للعربية
+        
+        // هيدر
+        if (orgProfile != null) {
+            csv.append(isArabic ? "اسم الجهة" : "Organization").append(",")
+               .append(orgProfile.getOrgName()).append("\n");
+        }
+        csv.append(isArabic ? "نوع التقرير" : "Report Type").append(",").append(type).append("\n");
+        csv.append(isArabic ? "الفترة من" : "From").append(",").append(from).append("\n");
+        csv.append(isArabic ? "الفترة إلى" : "To").append(",").append(to).append("\n");
+        csv.append(isArabic ? "تاريخ التصدير" : "Export Date").append(",")
+           .append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()))
+           .append("\n\n");
+        
+        // ✅ استخراج البيانات من JSON
+        JSONArray items = null;
+        
+        // البحث عن المصفوفة في أماكن مختلفة
+        String[] possibleKeys = {"items", "data", "items_list", "invoices", "movements", 
+                                  "users", "gate_logs", "branches_performance", "journal_entries",
+                                  "reorder_items", "timeline", "gate_history"};
+        
+        for (String key : possibleKeys) {
+            items = data.optJSONArray(key);
+            if (items != null && items.length() > 0) break;
+        }
+        
+        // البحث في كائن data المتداخل
+        if (items == null) {
+            JSONObject dataObj = data.optJSONObject("data");
+            if (dataObj != null) {
+                for (String key : possibleKeys) {
+                    items = dataObj.optJSONArray(key);
+                    if (items != null && items.length() > 0) break;
+                }
+            }
+        }
+        
+        if (items != null && items.length() > 0) {
+            // استخراج الأعمدة من أول عنصر
+            JSONObject firstItem = items.optJSONObject(0);
+            if (firstItem != null) {
+                Iterator<String> keys = firstItem.keys();
+                List<String> columns = new ArrayList<>();
+                while (keys.hasNext()) {
+                    columns.add(keys.next());
+                }
+                
+                // كتابة رؤوس الأعمدة
+                for (int i = 0; i < columns.size(); i++) {
+                    if (i > 0) csv.append(",");
+                    csv.append(columns.get(i));
+                }
+                csv.append("\n");
+                
+                // كتابة البيانات
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject item = items.optJSONObject(i);
+                    if (item != null) {
+                        for (int j = 0; j < columns.size(); j++) {
+                            if (j > 0) csv.append(",");
+                            String value = item.optString(columns.get(j), "");
+                            value = value.replace(",", "،").replace("\n", " ").replace("\r", " ");
+                            csv.append("\"").append(value).append("\"");
+                        }
+                        csv.append("\n");
+                    }
+                }
+            }
+        } else {
+            // إذا لم توجد مصفوفة، نصدر البيانات كـ key-value
+            csv.append(isArabic ? "المفتاح" : "Key").append(",")
+               .append(isArabic ? "القيمة" : "Value").append("\n");
+            
+            Iterator<String> keys = data.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                Object value = data.opt(key);
+                if (value != null && !key.equals("success") && !key.equals("timestamp") && !key.equals("type")) {
+                    csv.append("\"").append(key).append("\",\"").append(value.toString().replace("\"", "'")).append("\"\n");
+                }
+            }
+        }
+        
+        // حفظ الملف
+        File exportDir = new File(requireContext().getCacheDir(), "exports");
+        if (!exportDir.exists()) exportDir.mkdirs();
+        
+        File file = new File(exportDir, "MIRA_Report_" + type + "_" + System.currentTimeMillis() + ".csv");
+        FileOutputStream fos = new FileOutputStream(file);
+        fos.write(csv.toString().getBytes("UTF-8"));
+        fos.close();
+        
+        // مشاركة الملف
+        Uri uri = FileProvider.getUriForFile(requireContext(), 
+            requireContext().getPackageName() + ".fileprovider", file);
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("text/csv");
+        intent.putExtra(Intent.EXTRA_STREAM, uri);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(Intent.createChooser(intent, isArabic ? "مشاركة التقرير" : "Share Report"));
+        
+        Toast.makeText(getContext(), 
+            isArabic ? "✅ تم تصدير التقرير بنجاح" : "✅ Report exported successfully", 
+            Toast.LENGTH_SHORT).show();
+        
+    } catch (Exception e) {
+        Log.e(TAG, "Export error: " + e.getMessage());
+        Toast.makeText(getContext(), 
+            isArabic ? "❌ فشل التصدير: " : "❌ Export failed: " + e.getMessage(), 
+            Toast.LENGTH_LONG).show();
     }
+}
+
+// ✅ دالة تصدير التقارير المتقدمة
+private void exportAdvancedReport(String type, JSONObject data) {
+    if (!isAdded() || getContext() == null || data == null) return;
+    
+    try {
+        StringBuilder csv = new StringBuilder();
+        csv.append('\uFEFF');
+        
+        csv.append(isArabic ? "نوع التقرير" : "Report Type").append(",").append(type).append("\n");
+        csv.append(isArabic ? "تاريخ التصدير" : "Export Date").append(",")
+           .append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()))
+           .append("\n\n");
+        
+        // استخراج data المتداخل
+        JSONObject dataObj = data.optJSONObject("data");
+        if (dataObj == null) dataObj = data;
+        
+        // تصدير كـ key-value
+        csv.append(isArabic ? "المفتاح" : "Key").append(",")
+           .append(isArabic ? "القيمة" : "Value").append("\n");
+        
+        Iterator<String> keys = dataObj.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            Object value = dataObj.opt(key);
+            if (value != null) {
+                String valueStr = value.toString().replace(",", "،").replace("\n", " ").replace("\"", "'");
+                csv.append("\"").append(key).append("\",\"").append(valueStr).append("\"\n");
+            }
+        }
+        
+        File exportDir = new File(requireContext().getCacheDir(), "exports");
+        if (!exportDir.exists()) exportDir.mkdirs();
+        
+        File file = new File(exportDir, "MIRA_Advanced_" + type + "_" + System.currentTimeMillis() + ".csv");
+        FileOutputStream fos = new FileOutputStream(file);
+        fos.write(csv.toString().getBytes("UTF-8"));
+        fos.close();
+        
+        Uri uri = FileProvider.getUriForFile(requireContext(), 
+            requireContext().getPackageName() + ".fileprovider", file);
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("text/csv");
+        intent.putExtra(Intent.EXTRA_STREAM, uri);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(Intent.createChooser(intent, isArabic ? "مشاركة التقرير" : "Share Report"));
+        
+    } catch (Exception e) {
+        Log.e(TAG, "Advanced export error: " + e.getMessage());
+        Toast.makeText(getContext(), "Export error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+    }
+}
 // ✅ دالة خاصة بمؤشر أمن البوابات
 private void showGateSecurityDialog(ReportItem item) {
     AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
