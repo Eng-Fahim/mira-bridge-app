@@ -8,31 +8,31 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.cardview.widget.CardView;
 import androidx.fragment.app.Fragment;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
-import com.google.android.material.button.MaterialButton;
-import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.tabs.TabLayout;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MiraAccountingChartsFragment extends Fragment {
-
-    private static final String TAG = "MiraAccountingChartsFragment";
 
     private MiraApiClient apiClient;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -42,9 +42,10 @@ public class MiraAccountingChartsFragment extends Fragment {
     private LinearLayout chartContainer;
     private TextView tvChartTitle;
     private TextView tvChartSummary;
+    private ProgressBar progressBar;
     
     private boolean isArabic = true;
-    private String currentChart = "revenue"; // revenue, gold, expenses
+    private String currentChart = "gold"; // gold, revenue, expenses
 
     @Nullable
     @Override
@@ -66,10 +67,12 @@ public class MiraAccountingChartsFragment extends Fragment {
         chartContainer = view.findViewById(R.id.chartContainer);
         tvChartTitle = view.findViewById(R.id.tvChartTitle);
         tvChartSummary = view.findViewById(R.id.tvChartSummary);
+        progressBar = view.findViewById(R.id.progressBar);
         
         if (tabChartType != null) {
+            tabChartType.removeAllTabs();
+            tabChartType.addTab(tabChartType.newTab().setText(isArabic ? "ميزان الذهب (24K)" : "Gold (24K)"));
             tabChartType.addTab(tabChartType.newTab().setText(isArabic ? "الإيرادات" : "Revenue"));
-            tabChartType.addTab(tabChartType.newTab().setText(isArabic ? "حركة الذهب" : "Gold Movement"));
             tabChartType.addTab(tabChartType.newTab().setText(isArabic ? "المصروفات" : "Expenses"));
         }
     }
@@ -80,8 +83,8 @@ public class MiraAccountingChartsFragment extends Fragment {
                 @Override
                 public void onTabSelected(TabLayout.Tab tab) {
                     switch (tab.getPosition()) {
-                        case 0: currentChart = "revenue"; break;
-                        case 1: currentChart = "gold"; break;
+                        case 0: currentChart = "gold"; break;
+                        case 1: currentChart = "revenue"; break;
                         case 2: currentChart = "expenses"; break;
                     }
                     loadChartData();
@@ -93,159 +96,143 @@ public class MiraAccountingChartsFragment extends Fragment {
     }
 
     private void loadChartData() {
+        if (progressBar != null) progressBar.setVisibility(View.VISIBLE);
         executor.execute(() -> {
             try {
                 MiraApiClient.ApiResponse response = null;
-                
-                switch (currentChart) {
-                    case "revenue":
-                        response = apiClient.getIncomeStatement("", 
-                            new java.text.SimpleDateFormat("yyyy-MM-01", Locale.US).format(new java.util.Date()),
-                            new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new java.util.Date()));
-                        break;
-                    case "gold":
-                        response = apiClient.getGoldMovementReport("", 
-                            new java.text.SimpleDateFormat("yyyy-MM-01", Locale.US).format(new java.util.Date()),
-                            new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new java.util.Date()));
-                        break;
-                    case "expenses":
-                        response = apiClient.getIncomeStatement("", 
-                            new java.text.SimpleDateFormat("yyyy-MM-01", Locale.US).format(new java.util.Date()),
-                            new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new java.util.Date()));
-                        break;
+                SimpleDateFormat sdfStart = new SimpleDateFormat("yyyy-MM-01", Locale.US);
+                SimpleDateFormat sdfEnd = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+                Date now = new Date();
+
+                if ("gold".equals(currentChart)) {
+                    response = apiClient.getGoldMovementReport("", sdfStart.format(now), sdfEnd.format(now));
+                } else {
+                    response = apiClient.getIncomeStatement("", sdfStart.format(now), sdfEnd.format(now));
                 }
                 
                 final MiraApiClient.ApiResponse finalResponse = response;
                 
                 mainHandler.post(() -> {
+                    if (progressBar != null) progressBar.setVisibility(View.GONE);
                     if (finalResponse != null && finalResponse.isSuccess && finalResponse.data != null) {
                         renderChart(finalResponse.data);
                     } else {
-                        Toast.makeText(getContext(), 
-                            isArabic ? "فشل تحميل البيانات" : "Failed to load data", 
-                            Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), isArabic ? "فشل تحميل التحليلات" : "Failed to load chart", Toast.LENGTH_SHORT).show();
                     }
                 });
             } catch (Exception e) {
-                e.printStackTrace();
+                mainHandler.post(() -> {
+                    if (progressBar != null) progressBar.setVisibility(View.GONE);
+                });
             }
         });
     }
 
-    /**
-     * ✅ رسم بياني بسيط باستخدام Views (بدون مكتبات خارجية)
-     */
     private void renderChart(JSONObject data) {
         try {
             chartContainer.removeAllViews();
-            
             JSONObject reportData = data.optJSONObject("data");
             if (reportData == null) reportData = data;
             
             List<ChartBar> bars = new ArrayList<>();
             double maxValue = 0;
             
-            if ("revenue".equals(currentChart) || "expenses".equals(currentChart)) {
-                JSONArray items = currentChart.equals("revenue") ? 
-                    reportData.optJSONArray("revenues") : reportData.optJSONArray("expenses");
-                
-                if (items != null) {
-                    for (int i = 0; i < items.length(); i++) {
-                        JSONObject item = items.getJSONObject(i);
-                        String name = item.optString("name", "");
-                        double amount = item.optDouble("amount", 0);
-                        bars.add(new ChartBar(name, amount, getBarColor(i)));
-                        maxValue = Math.max(maxValue, amount);
-                    }
-                }
-                
-                if ("revenue".equals(currentChart)) {
-                    tvChartTitle.setText(isArabic ? "📊 الإيرادات الشهرية" : "📊 Monthly Revenue");
-                    tvChartSummary.setText(isArabic ? "إجمالي: " : "Total: " + 
-                        String.format(Locale.US, "%,.2f", reportData.optDouble("total_revenue", 0)));
-                } else {
-                    tvChartTitle.setText(isArabic ? "📊 المصروفات" : "📊 Expenses");
-                    tvChartSummary.setText(isArabic ? "إجمالي: " : "Total: " + 
-                        String.format(Locale.US, "%,.2f", reportData.optDouble("total_expense", 0)));
-                }
-            } else if ("gold".equals(currentChart)) {
-                tvChartTitle.setText(isArabic ? "📊 حركة الذهب" : "📊 Gold Movement");
+            if ("gold".equals(currentChart)) {
+                tvChartTitle.setText(isArabic ? "📊 تدفق أوزان الذهب الخالص (24K)" : "📊 Net Gold Flow (24K)");
                 
                 double goldIn = reportData.optDouble("total_debit_gold", 0);
                 double goldOut = reportData.optDouble("total_credit_gold", 0);
                 double netGold = reportData.optDouble("net_gold_movement", 0);
                 
-                bars.add(new ChartBar(isArabic ? "وارد" : "In", goldIn, Color.parseColor("#4CAF50")));
-                bars.add(new ChartBar(isArabic ? "صادر" : "Out", goldOut, Color.parseColor("#F44336")));
-                bars.add(new ChartBar(isArabic ? "صافي" : "Net", netGold, Color.parseColor("#2196F3")));
+                bars.add(new ChartBar(isArabic ? "المقبوضات (وارد)" : "Inflow", goldIn, Color.parseColor("#2ECC71"), true));
+                bars.add(new ChartBar(isArabic ? "المسلمات (صادر)" : "Outflow", goldOut, Color.parseColor("#E74C3C"), true));
+                bars.add(new ChartBar(isArabic ? "الصافي المدور" : "Net Balance", netGold, Color.parseColor("#D4AF37"), true));
                 
                 maxValue = Math.max(goldIn, Math.max(goldOut, Math.abs(netGold)));
+                tvChartSummary.setText(String.format(Locale.US, isArabic ? "الصافي: %.3f جرام" : "Net: %.3f g", netGold));
+
+            } else {
+                boolean isRev = "revenue".equals(currentChart);
+                tvChartTitle.setText(isRev ? (isArabic ? "📊 تحليل مصادر الإيرادات" : "📊 Revenue Sources") : (isArabic ? "📊 بند المصروفات" : "📊 Expenses Breakdown"));
                 
-                tvChartSummary.setText(isArabic ? "صافي: " : "Net: " + 
-                    String.format(Locale.US, "%.3f g", netGold));
+                JSONArray items = isRev ? reportData.optJSONArray("revenues") : reportData.optJSONArray("expenses");
+                if (items != null) {
+                    for (int i = 0; i < items.length(); i++) {
+                        JSONObject item = items.getJSONObject(i);
+                        bars.add(new ChartBar(item.optString("name", ""), item.optDouble("amount", 0), getBarColor(i), false));
+                        maxValue = Math.max(maxValue, item.optDouble("amount", 0));
+                    }
+                }
+                
+                double total = isRev ? reportData.optDouble("total_revenue", 0) : reportData.optDouble("total_expense", 0);
+                tvChartSummary.setText(String.format(Locale.US, isArabic ? "الإجمالي: %,.2f" : "Total: %,.2f", total));
             }
             
-            // رسم الأعمدة
             for (ChartBar bar : bars) {
-                addBarToChart(bar, maxValue);
+                addDynamicBar(bar, maxValue);
             }
             
         } catch (Exception e) {
             e.printStackTrace();
-            Toast.makeText(getContext(), 
-                isArabic ? "خطأ في عرض الرسم" : "Error rendering chart", 
-                Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void addBarToChart(ChartBar bar, double maxValue) {
+    private void addDynamicBar(ChartBar bar, double maxValue) {
         if (chartContainer == null || getContext() == null) return;
         
-        LinearLayout barRow = new LinearLayout(getContext());
-        barRow.setOrientation(LinearLayout.VERTICAL);
-        barRow.setPadding(8, 4, 8, 4);
-        
-        // اسم العنصر
+        LinearLayout itemLayout = new LinearLayout(getContext());
+        itemLayout.setOrientation(LinearLayout.VERTICAL);
+        itemLayout.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        itemLayout.setPadding(0, 12, 0, 12);
+
+        // Name & Text Value Row
+        LinearLayout labelRow = new LinearLayout(getContext());
+        labelRow.setOrientation(LinearLayout.HORIZONTAL);
+
         TextView tvName = new TextView(getContext());
         tvName.setText(bar.name);
-        tvName.setTextSize(11);
-        tvName.setTextColor(Color.BLACK);
-        barRow.addView(tvName);
-        
-        // الشريط
-        LinearLayout barBackground = new LinearLayout(getContext());
-        barBackground.setOrientation(LinearLayout.HORIZONTAL);
-        barBackground.setPadding(0, 2, 0, 2);
-        
-        // قيمة الشريط
-        View barView = new View(getContext());
-        int barWidth = maxValue > 0 ? (int) ((bar.value / maxValue) * 300) : 0;
-        barWidth = Math.max(barWidth, 10);
-        barView.setLayoutParams(new LinearLayout.LayoutParams(barWidth, 30));
-        barView.setBackgroundColor(bar.color);
-        barBackground.addView(barView);
-        
-        // قيمة رقمية
-        TextView tvValue = new TextView(getContext());
-        tvValue.setText(String.format(Locale.US, "%,.2f", bar.value));
-        tvValue.setTextSize(10);
-        tvValue.setPadding(8, 0, 0, 0);
-        barBackground.addView(tvValue);
-        
-        barRow.addView(barBackground);
-        chartContainer.addView(barRow);
+        tvName.setTextSize(13);
+        tvName.setTextStyle(android.graphics.Typeface.BOLD);
+        tvName.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+        TextView tvVal = new TextView(getContext());
+        tvVal.setText(bar.isGold ? String.format(Locale.US, "%.3f g", bar.value) : String.format(Locale.US, "%,.2f", bar.value));
+        tvVal.setTextSize(13);
+        tvVal.setTextStyle(android.graphics.Typeface.BOLD);
+        tvVal.setTextColor(bar.color);
+
+        labelRow.addView(tvName);
+        labelRow.addView(tvVal);
+        itemLayout.addView(labelRow);
+
+        // Dynamic Percentage Bar Track
+        LinearLayout trackLayout = new LinearLayout(getContext());
+        trackLayout.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 24));
+        trackLayout.setBackgroundColor(Color.parseColor("#E0E0E0"));
+        trackLayout.setOrientation(LinearLayout.HORIZONTAL);
+        trackLayout.setWeightSum(100f);
+
+        float weightPercent = maxValue > 0 ? (float) ((Math.abs(bar.value) / maxValue) * 100f) : 0f;
+        weightPercent = Math.max(weightPercent, 2f); // Min visible bar width
+
+        CardView barView = new CardView(getContext());
+        LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, weightPercent);
+        barView.setLayoutParams(barParams);
+        barView.setCardBackgroundColor(bar.color);
+        barView.setRadius(6f);
+
+        trackLayout.addView(barView);
+        itemLayout.addView(trackLayout);
+
+        chartContainer.addView(itemLayout);
     }
 
     private int getBarColor(int index) {
         int[] colors = {
-            Color.parseColor("#4CAF50"),
-            Color.parseColor("#2196F3"),
-            Color.parseColor("#FF9800"),
-            Color.parseColor("#9C27B0"),
-            Color.parseColor("#F44336"),
-            Color.parseColor("#00BCD4"),
-            Color.parseColor("#795548"),
-            Color.parseColor("#607D8B")
+            Color.parseColor("#2ECC71"), Color.parseColor("#3498DB"),
+            Color.parseColor("#E67E22"), Color.parseColor("#9B59B6"),
+            Color.parseColor("#E74C3C"), Color.parseColor("#1ABC9C")
         };
         return colors[index % colors.length];
     }
@@ -258,16 +245,17 @@ public class MiraAccountingChartsFragment extends Fragment {
         }
     }
 
-    // ==================== MODEL ====================
     private static class ChartBar {
         String name;
         double value;
         int color;
+        boolean isGold;
         
-        ChartBar(String name, double value, int color) {
+        ChartBar(String name, double value, int color, boolean isGold) {
             this.name = name;
             this.value = value;
             this.color = color;
+            this.isGold = isGold;
         }
     }
 }
