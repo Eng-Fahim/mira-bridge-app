@@ -141,6 +141,10 @@ public class MiraReportsProFragment extends Fragment {
         MaterialButton btnApply = dialogView.findViewById(R.id.btnReportApplyFilter);
         MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
         MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
+        
+        MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
+
+
 
         final String[] selectedDates = new String[]{getDefaultFromDate(), getDefaultToDate()};
 
@@ -204,12 +208,78 @@ public class MiraReportsProFragment extends Fragment {
 
         btnExport.setOnClickListener(v -> exportReportToCSV(item.type, selectedDates[0], selectedDates[1]));
         btnClose.setOnClickListener(v -> dialog.dismiss());
+        btnPrint.setOnClickListener(v -> {
+        printRecyclerView(rvData, item.title);});
 
         dialog.show();
 
         fetchAndDisplay(item.type, rvData, layoutLoading, tvLoadingStatus, selectedDates[0], selectedDates[1]);
     }
 
+private void printRecyclerView(RecyclerView rvData, String title) {
+    if (getContext() == null || rvData == null) return;
+    
+    try {
+        // ✅ إنشاء Bitmap من RecyclerView
+        int width = rvData.getWidth();
+        int height = rvData.getHeight();
+        
+        if (width <= 0 || height <= 0) {
+            width = 1080;
+            height = 1920;
+        }
+        
+        android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
+        canvas.drawColor(android.graphics.Color.WHITE);
+        rvData.draw(canvas);
+        
+        // ✅ إنشاء PDF
+        android.print.PrintManager printManager = (android.print.PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
+        android.print.PrintAttributes attributes = new android.print.PrintAttributes.Builder()
+                .setMediaSize(android.print.PrintAttributes.MediaSize.ISO_A4)
+                .setResolution(new android.print.PrintAttributes.Resolution("pdf", "pdf", 600, 600))
+                .setMinMargins(android.print.PrintAttributes.Margins.NO_MARGINS)
+                .build();
+        
+        printManager.print(title, new android.print.PrintDocumentAdapter() {
+            @Override
+            public void onLayout(android.print.PrintAttributes oldAttributes, android.print.PrintAttributes newAttributes,
+                               android.os.CancellationSignal cancellationSignal,
+                               LayoutResultCallback callback, android.os.Bundle extras) {
+                callback.onLayoutFinished(new android.print.PrintDocumentInfo.Builder("report.pdf")
+                        .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
+                        .build(), true);
+            }
+            
+            @Override
+            public void onWrite(android.print.PageRange[] pages, android.os.ParcelFileDescriptor destination,
+                              android.os.CancellationSignal cancellationSignal, WriteResultCallback callback) {
+                try {
+                    android.graphics.pdf.PdfDocument pdfDocument = new android.graphics.pdf.PdfDocument();
+                    
+                    android.graphics.pdf.PdfDocument.PageInfo pageInfo = new android.graphics.pdf.PdfDocument.PageInfo.Builder(
+                            bitmap.getWidth(), bitmap.getHeight(), 1).create();
+                    
+                    android.graphics.pdf.PdfDocument.Page page = pdfDocument.startPage(pageInfo);
+                    page.getCanvas().drawBitmap(bitmap, 0, 0, null);
+                    pdfDocument.finishPage(page);
+                    
+                    pdfDocument.writeTo(new java.io.FileOutputStream(destination.getFileDescriptor()));
+                    pdfDocument.close();
+                    
+                    callback.onWriteFinished(new android.print.PageRange[]{android.print.PageRange.ALL_PAGES});
+                } catch (Exception e) {
+                    callback.onWriteFailed(e.getMessage());
+                }
+            }
+        }, attributes);
+        
+    } catch (Exception e) {
+        Log.e(TAG, "Print error: " + e.getMessage());
+        Toast.makeText(getContext(), "Print error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+    }
+}
     private void fetchAndDisplay(String type, RecyclerView rvData, View layoutLoading, 
                                   TextView tvLoadingStatus, String fromDate, String toDate) {
     if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
