@@ -96,7 +96,7 @@
     <string name="location_default">Main Showroom — Regional Branch</string>
     <string name="precious_inventory">Precious Inventory &amp; Mass</string>
     <string name="sold_today">Sold Today</string>
-    <string name="total_weight">Total Weight</string>
+   
     <string name="total_items">Total Items</string>
     <string name="sales_today">Today\'s Sales</string>
     <string name="sales_month">Monthly Sales</string>
@@ -295,7 +295,7 @@
     <string name="inventory_found">Found</string>
     <string name="inventory_missing">Missing</string>
     <string name="inventory_unexpected">Extra</string>
-    <string name="inventory_ready">Ready to start</string>
+  
     <string name="inventory_last_tag">Last Scanned Item:</string>
     <string name="inventory_start">▶ Start</string>
     <string name="inventory_pause">⏸ Pause</string>
@@ -1764,4 +1764,23 @@
 <string name="unknown">Unknown</string>
 <string name="no_enabled_actions">No Enabled Actions</string>
 <string name="devices_connected">Devices Connected</string>
+
+    
+    <string name="stop_inventory">🛑 Stop</string>
+    <string name="inventory_ready">📡 Ready to start inventory</string>
+    <string name="last_scan_none">Last scan: None</string>
+    <string name="expected_count">Expected</string>
+    <string name="scanned_count">Scanned</string>
+    <string name="variance_count">Variance</string>
+    <string name="accuracy">Accuracy</string>
+    <string name="total_weight">⚖️ Weight: 0.00 g</string>
+    <string name="total_value">💰 Value: —</string>
+    <string name="commit_report">📄 Commit</string>
+    <string name="archive_reports">Archive</string>
+    <string name="view_snapshots">Snapshots</string>
+    <string name="previous_count">Previous</string>
+    <string name="current_count">Current</string>
+    <string name="delta_count">Delta</string>
+    <string name="live_scan_log">📋 Live Scan Log</string>
+    <string name="no_scanned_items">No scanned items yet</string>
 </resources>
