@@ -569,6 +569,33 @@ private void loadSalesOffline() {
         });
     }
 
+private List<MiraSaleItem> parseSalesJson(JSONArray sales) {
+    List<MiraSaleItem> items = new ArrayList<>();
+    for (int i = 0; i < sales.length(); i++) {
+        JSONObject sale = sales.optJSONObject(i);
+        if (sale == null) continue;
+
+        MiraSaleItem item = new MiraSaleItem();
+        item.saleId = sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")));
+        item.customerName = sale.optString("customer_name", sale.optString("client_name", isArabic ? "عميل افتراضي" : "Customer"));
+        item.amount = sale.optDouble("final_amount", sale.optDouble("total_amount", sale.optDouble("amount", 0)));
+        item.itemCount = sale.optInt("item_count", sale.optInt("total_items", sale.optInt("count", 0)));
+        item.paymentMethod = sale.optString("payment_method", sale.optString("pay_type", "CASH"));
+        item.date = sale.optString("created_at", sale.optString("date", ""));
+        item.branchId = sale.optInt("branch_id", 0);
+        item.rawJson = sale.toString();
+        items.add(item);
+    }
+    return items;
+}
+
+private void saveSalesOffline(JSONArray sales, int page) {
+    try {
+        if (offlineCache == null) return;
+        offlineCache.edit().putString("sales_cache", sales.toString()).apply();
+    } catch (Exception ignored) {}
+}
+
     // ==================== الفلترة المحلية ====================
     
     private void filterSales(String query) {
