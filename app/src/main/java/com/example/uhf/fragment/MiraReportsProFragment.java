@@ -325,84 +325,23 @@ public class MiraReportsProFragment extends Fragment {
 
     // 1. تهيئة الحالة الأولية
     if (webView != null) {
-        webView.setVisibility(View.INVISIBLE); // INVISIBLE بدلاً من GONE لتجنب إعادة الرسم
+        webView.setVisibility(View.INVISIBLE);
         webView.setAlpha(0f);
         webView.clearView();
-        webView.loadUrl("about:blank"); // تنظيف أي محتوى قديم
+        webView.loadUrl("about:blank");
     }
     
     if (layoutLoading != null) {
         layoutLoading.setVisibility(View.VISIBLE);
         layoutLoading.setAlpha(1f);
-        layoutLoading.bringToFront(); // ضمان ظهورها فوق WebView
+        layoutLoading.bringToFront();
     }
     
     if (tvLoadingStatus != null) {
         tvLoadingStatus.setText(isArabic ? "جاري جلب وتحليل البيانات..." : "Fetching and analyzing data...");
     }
 
-    // 2. تعيين WebViewClient مع معالجة محسنة
-    if (webView != null) {
-        webView.setWebViewClient(new android.webkit.WebViewClient() {
-            private boolean pageFinished = false;
-            
-            @Override
-            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
-                super.onPageStarted(view, url, favicon);
-                pageFinished = false;
-                
-                // ضمان ظهور شاشة التحميل
-                if (layoutLoading != null) {
-                    layoutLoading.setVisibility(View.VISIBLE);
-                    layoutLoading.setAlpha(1f);
-                    layoutLoading.bringToFront();
-                }
-            }
-
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
-                
-                if (pageFinished) return; // منع التكرار
-                pageFinished = true;
-                
-                mainHandler.removeCallbacks(timeoutRunnable);
-                
-                // تأخير بسيط لضمان اكتمال الرسم
-                mainHandler.postDelayed(() -> {
-                    // إخفاء شاشة التحميل مع تأثير التلاشي
-                    if (layoutLoading != null) {
-                        layoutLoading.animate()
-                            .alpha(0f)
-                            .setDuration(250)
-                            .withEndAction(() -> {
-                                layoutLoading.setVisibility(View.GONE);
-                            })
-                            .start();
-                    }
-                    
-                    // إظهار WebView مع تأثير التلاشي
-                    if (webView != null) {
-                        webView.setVisibility(View.VISIBLE);
-                        webView.animate()
-                            .alpha(1f)
-                            .setDuration(250)
-                            .start();
-                    }
-                }, 100); // 100ms delay للضمان
-            }
-
-            @Override
-            public void onReceivedError(WebView view, android.webkit.WebResourceRequest request, 
-                                       android.webkit.WebResourceError error) {
-                super.onReceivedError(view, request, error);
-                mainHandler.removeCallbacks(timeoutRunnable);
-                handleReportError("WebView: " + error.getDescription(), layoutLoading);
-            }
-        });
-    }
-
-    // 3. المهلة الزمنية
+    // 2. تعريف المهلة الزمنية أولاً (قبل استخدامها في أي مكان)
     final Runnable timeoutRunnable = () -> {
         if (layoutLoading != null && layoutLoading.getVisibility() == View.VISIBLE) {
             layoutLoading.setVisibility(View.GONE);
@@ -417,7 +356,64 @@ public class MiraReportsProFragment extends Fragment {
     };
     mainHandler.postDelayed(timeoutRunnable, 10000);
 
-    // باقي الكود كما هو...
+    // 3. تعيين WebViewClient مع معالجة محسنة
+    if (webView != null) {
+        webView.setWebViewClient(new android.webkit.WebViewClient() {
+            private boolean pageFinished = false;
+            
+            @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                pageFinished = false;
+                
+                if (layoutLoading != null) {
+                    layoutLoading.setVisibility(View.VISIBLE);
+                    layoutLoading.setAlpha(1f);
+                    layoutLoading.bringToFront();
+                }
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                
+                if (pageFinished) return;
+                pageFinished = true;
+                
+                mainHandler.removeCallbacks(timeoutRunnable);
+                
+                mainHandler.postDelayed(() -> {
+                    if (layoutLoading != null) {
+                        layoutLoading.animate()
+                            .alpha(0f)
+                            .setDuration(250)
+                            .withEndAction(() -> {
+                                layoutLoading.setVisibility(View.GONE);
+                            })
+                            .start();
+                    }
+                    
+                    if (webView != null) {
+                        webView.setVisibility(View.VISIBLE);
+                        webView.animate()
+                            .alpha(1f)
+                            .setDuration(250)
+                            .start();
+                    }
+                }, 100);
+            }
+
+            @Override
+            public void onReceivedError(WebView view, android.webkit.WebResourceRequest request, 
+                                       android.webkit.WebResourceError error) {
+                super.onReceivedError(view, request, error);
+                mainHandler.removeCallbacks(timeoutRunnable);
+                handleReportError("WebView: " + error.getDescription(), layoutLoading);
+            }
+        });
+    }
+
+    // 4. باقي الكود
     boolean isAdvanced = "user_timeline".equals(item.type) || 
                         "item_passport".equals(item.type) || 
                         "inventory_aging".equals(item.type);
@@ -464,7 +460,6 @@ public class MiraReportsProFragment extends Fragment {
                         htmlData = generateExecutiveHTML(item.type, parsedData, fromDate, toDate);
                     }
 
-                    // تحميل البيانات
                     if (webView != null) {
                         webView.loadDataWithBaseURL("https://localhost/", htmlData, 
                                                    "text/html", "UTF-8", null);
@@ -1159,4 +1154,4 @@ private void handleReportError(String errorMessage, View layoutLoading) {
         @Override
         public String toString() { return name; }
     }
-            }
+        }
