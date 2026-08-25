@@ -405,7 +405,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                         });
                         return true;
                     } else if (id == R.id.nav_inventory) {
-                        checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadTagFragment(), "Scan"));
+                        checkInventoryLockAndExecute(() -> loadFragment(new MiraInventoryProFragment(), "Scan"));
                         return true;
                     } else if (id == R.id.nav_sales) {
                         checkInventoryLockAndExecute(() -> loadFragment(new MiraPosFragment(), "POS"));
