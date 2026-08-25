@@ -55,6 +55,7 @@ import com.example.uhf.fragment.MiraReportsProFragment;
 import com.example.uhf.fragment.MiraSecureGateFragment;
 import com.example.uhf.fragment.MiraTransferFragment;
 import com.example.uhf.fragment.MiraUHFReadTagFragment;
+import com.example.uhf.fragment.MiraInventoryProFragment;
 import com.example.uhf.fragment.MiraUHFRadarLocationFragment;
 import com.example.uhf.fragment.MiraProfileFragment;
 import com.example.uhf.fragment.UsersManagementFragment;
@@ -598,7 +599,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         
         switch (tag) {
             case "Dashboard": return new MiraDashboardFragment();
-            case "Scan": return new MiraUHFReadTagFragment();
+            case "Scan": return new MiraInventoryProFragment();
             case "POS": return new MiraPosFragment();
             case "Transfers": return new MiraTransferFragment();
             case "IdentityStudio": return new MiraIdentityStudioFragment();
