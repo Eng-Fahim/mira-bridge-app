@@ -1011,35 +1011,6 @@ private static class UserInfo {
         });
     }
 
-    // ✅ دالة لعرض التقارير المتقدمة في Dialog
-    private void showAdvancedReportDialog(String type, JSONObject data) {
-        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
-        
-        TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
-        RecyclerView rvData = dialogView.findViewById(R.id.rvReportData);
-        View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
-        TextView tvLoadingStatus = dialogView.findViewById(R.id.tvLoadingStatus);
-        
-        if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-        
-        tvTitle.setText(getReportTitle(type));
-        rvData.setLayoutManager(new LinearLayoutManager(getContext()));
-        
-        // استخدام المحول المناسب
-        RecyclerView.Adapter<?> adapter = createAdvancedAdapter(type, data);
-        rvData.setAdapter(adapter);
-        
-        AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
-                .setView(dialogView)
-                .create();
-        
-        MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
-        if (btnClose != null) {
-            btnClose.setOnClickListener(v -> dialog.dismiss());
-        }
-        
-        dialog.show();
-    }
 
     private String getReportTitle(String type) {
         if (isArabic) {
