@@ -215,13 +215,12 @@ private void loadSalesOffline() {
      */
     private void showBranchSelectionDialog() {
         List<BranchOption> branches = new ArrayList<>();
-        branches.add(new BranchOption(0, isArabic ? "🏢 جميع الفروع" : "🏢 All Branches"));
-        
-        // جلب الفروع من BranchManager
-        List<BranchItem> branchList = branchesManager.getAllBranches();
-        for (BranchItem branch : branchList) {
-            branches.add(new BranchOption(branch.id, branch.name));
-        }
+branches.add(new BranchOption(0, isArabic ? "🏢 جميع الفروع" : "🏢 All Branches"));
+
+List<MiraBranchesManager.BranchItem> branchList = branchesManager.getAllBranches();
+for (MiraBranchesManager.BranchItem branch : branchList) {
+    branches.add(new BranchOption(branch.id, branch.name));
+}
         
         String[] branchNames = new String[branches.size()];
         for (int i = 0; i < branches.size(); i++) {
@@ -789,15 +788,7 @@ private void saveSalesOffline(JSONArray sales, int page) {
         }
     }
     
-    static class BranchItem {
-        int id;
-        String name;
-        
-        BranchItem(int id, String name) {
-            this.id = id;
-            this.name = name;
-        }
-    }
+    
 
     static class MiraSalesAdapter extends RecyclerView.Adapter<MiraSalesAdapter.VH> {
         private final List<MiraSaleItem> items;
