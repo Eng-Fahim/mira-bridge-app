@@ -536,54 +536,62 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-        if (isFinishing() || isDestroyed() || fragment == null) return;
+    if (isFinishing() || isDestroyed() || fragment == null) return;
 
-        try {
-            PermissionManager pm = PermissionManager.getInstance(this);
-            if (!pm.canAccessFragment(tag)) {
-                Toast.makeText(this, 
-                    isArabic ? "⛔ غير مصرح لك بالوصول لهذه الواجهة" : "⛔ Access Denied",
-                    Toast.LENGTH_SHORT).show();
-                return;
-            }
-            
-            showLoading();
+    try {
+        PermissionManager pm = PermissionManager.getInstance(this);
+        if (!pm.canAccessFragment(tag)) {
+            Toast.makeText(this, 
+                isArabic ? "⛔ غير مصرح لك بالوصول لهذه الواجهة" : "⛔ Access Denied",
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        showLoading();
+        currentFragment = fragment;
+        currentFragmentTag = tag;
+        saveFragmentTagToPrefs(tag);
+        
+        FragmentTransaction transaction = fragmentManager.beginTransaction()
+                .replace(R.id.fragment_container, fragment, tag);
+        
+        if (addToBackStack) {
+            transaction.addToBackStack(tag);
+        }
+        
+        // ✅ استخدم commitAllowingStateLoss بدلاً من commitNowAllowingStateLoss
+        transaction.commitAllowingStateLoss();
+        
+        mainHandler.postDelayed(this::hideLoading, 200);
+
+    } catch (Exception e) {
+        Log.e(TAG, "Error switching fragment: " + e.getMessage());
+        hideLoading();
+    }
+}
+
+    private void loadFragmentByTag(String tag) {
+    try {
+        Fragment fragment = createFragmentByTag(tag);
+        if (fragment != null) {
             currentFragment = fragment;
             currentFragmentTag = tag;
-            saveFragmentTagToPrefs(tag);
             
             FragmentTransaction transaction = fragmentManager.beginTransaction()
                     .replace(R.id.fragment_container, fragment, tag);
             
-            if (addToBackStack) {
-                transaction.addToBackStack(tag);
-            }
-            
-            // 🟢 التنفيذ المباشر لتفادي الخلل في شاشات سامسونج والأندرويد الحديث
-            transaction.commitNowAllowingStateLoss();
-            hideLoading();
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error switching fragment: " + e.getMessage());
-            hideLoading();
+            // ✅ استخدم commitAllowingStateLoss
+            transaction.commitAllowingStateLoss();
+        } else {
+            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
         }
-    }
-
-    private void loadFragmentByTag(String tag) {
+    } catch (Exception e) {
+        Log.e(TAG, "Load fragment by tag error: " + e.getMessage(), e);
         try {
-            Fragment fragment = createFragmentByTag(tag);
-            if (fragment != null) {
-                loadFragment(fragment, tag, false);
-            } else {
-                loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Load fragment by tag error: " + e.getMessage(), e);
-            try {
-                loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-            } catch (Exception ignored) {}
-        }
+            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+        } catch (Exception ignored) {}
     }
+}
 
     private Fragment createFragmentByTag(String tag) {
         if (tag == null) return new MiraDashboardFragment();
