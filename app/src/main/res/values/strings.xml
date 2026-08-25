@@ -2043,7 +2043,7 @@
     <string name="employee_id">رقم الموظف</string>
     <string name="branch">الفرع</string>
     <string name="role">الصلاحية</string>
-    <string name="cancel">إلغاء</string>
+ 
     <string name="next_step">التالي ←</string>
     <string name="prev_step">→ السابق</string>
     <string name="save_user">💾 حفظ</string>
