@@ -173,15 +173,15 @@
             app:cornerRadius="8dp" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnReportPrint"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_marginStart="4dp"
-            android:layout_weight="1"
-            android:text="🖨️ طباعة"
-            android:textSize="12sp"
-            app:cornerRadius="8dp" />
+    android:id="@+id/btnReportPrint"
+    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+    android:layout_width="0dp"
+    android:layout_height="44dp"
+    android:layout_marginStart="4dp"  ← ✅ marginStart بدلاً من marginEnd
+    android:layout_weight="1"
+    android:text="🖨️ طباعة"
+    android:textSize="12sp"
+    app:cornerRadius="8dp" />
     </LinearLayout>
 
 </LinearLayout>
