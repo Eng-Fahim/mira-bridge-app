@@ -318,86 +318,198 @@ public class MiraReportsProFragment extends Fragment {
         }
     }
 
-    private void fetchAndRenderReportEx(ReportItem item, WebView webView, View layoutLoading,
-                                        TextView tvLoadingStatus, String fromDate, String toDate,
-                                        int userId, String itemCode, Dialog dialog) {
-        if (getContext() == null || !isAdded()) return;
+   private void fetchAndRenderReportEx(ReportItem item, WebView webView, View layoutLoading,
+                                    TextView tvLoadingStatus, String fromDate, String toDate,
+                                    int userId, String itemCode, Dialog dialog) {
+    if (getContext() == null || !isAdded()) return;
 
-        if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
-        if (tvLoadingStatus != null) tvLoadingStatus.setText(isArabic ? "جاري جلب وتحليل البيانات..." : "Fetching and analyzing data...");
+    // 1. تهيئة الحالة الأولية
+    if (webView != null) {
+        webView.setVisibility(View.INVISIBLE); // INVISIBLE بدلاً من GONE لتجنب إعادة الرسم
+        webView.setAlpha(0f);
+        webView.clearView();
+        webView.loadUrl("about:blank"); // تنظيف أي محتوى قديم
+    }
+    
+    if (layoutLoading != null) {
+        layoutLoading.setVisibility(View.VISIBLE);
+        layoutLoading.setAlpha(1f);
+        layoutLoading.bringToFront(); // ضمان ظهورها فوق WebView
+    }
+    
+    if (tvLoadingStatus != null) {
+        tvLoadingStatus.setText(isArabic ? "جاري جلب وتحليل البيانات..." : "Fetching and analyzing data...");
+    }
 
-        boolean isAdvanced = "user_timeline".equals(item.type) || "item_passport".equals(item.type) || "inventory_aging".equals(item.type);
-        String endpoint = isAdvanced ? "/reports-analytics" : "/reports-app";
-
-        StringBuilder urlBuilder = new StringBuilder();
-        urlBuilder.append(endpoint)
-                  .append("?type=").append(item.type)
-                  .append("&from=").append(fromDate)
-                  .append("&to=").append(toDate)
-                  .append("&branch_id=").append(currentBranchId);
-
-        if (userId > 0) {
-            urlBuilder.append("&user_id=").append(userId);
-        }
-        if (itemCode != null && !itemCode.trim().isEmpty()) {
-            urlBuilder.append("&item_code=").append(Uri.encode(itemCode.trim()));
-        }
-
-        String requestUrl = urlBuilder.toString();
-
-        apiClient.get(requestUrl, new MiraApiClient.ApiCallback() {
-    @Override
-    public void onSuccess(MiraApiClient.ApiResponse response) {
-        if (getActivity() == null || !isAdded()) return;
-
-        getActivity().runOnUiThread(() -> {
-            if (webView != null) {
-                webView.setVisibility(View.VISIBLE);
-                webView.bringToFront();
-
-                // تعيين الـ WebViewClient هنا لضمان إخفاء شاشة التحميل فور انتهاء الرندر
-                webView.setWebViewClient(new android.webkit.WebViewClient() {
-                    @Override
-                    public void onPageFinished(WebView view, String url) {
-                        super.onPageFinished(view, url);
-                        if (layoutLoading != null) {
-                            layoutLoading.setVisibility(View.GONE);
-                        }
-                    }
-                });
-
-                String responseBody = response.getBody();
-                JSONObject parsedData = parseJsonObject(responseBody);
+    // 2. تعيين WebViewClient مع معالجة محسنة
+    if (webView != null) {
+        webView.setWebViewClient(new android.webkit.WebViewClient() {
+            private boolean pageFinished = false;
+            
+            @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                pageFinished = false;
                 
-                if (offlineCache != null) {
-                    String cacheKey = "cache_pro_" + item.type + "_" + fromDate + "_" + toDate;
-                    offlineCache.edit().putString(cacheKey, parsedData.toString()).apply();
+                // ضمان ظهور شاشة التحميل
+                if (layoutLoading != null) {
+                    layoutLoading.setVisibility(View.VISIBLE);
+                    layoutLoading.setAlpha(1f);
+                    layoutLoading.bringToFront();
                 }
+            }
 
-                String htmlData;
-                if ("user_timeline".equals(item.type) || "item_passport".equals(item.type)) {
-                    htmlData = buildReportHtmlTemplate(item, responseBody, isArabic);
-                } else {
-                    htmlData = generateExecutiveHTML(item.type, parsedData, fromDate, toDate);
-                }
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                
+                if (pageFinished) return; // منع التكرار
+                pageFinished = true;
+                
+                mainHandler.removeCallbacks(timeoutRunnable);
+                
+                // تأخير بسيط لضمان اكتمال الرسم
+                mainHandler.postDelayed(() -> {
+                    // إخفاء شاشة التحميل مع تأثير التلاشي
+                    if (layoutLoading != null) {
+                        layoutLoading.animate()
+                            .alpha(0f)
+                            .setDuration(250)
+                            .withEndAction(() -> {
+                                layoutLoading.setVisibility(View.GONE);
+                            })
+                            .start();
+                    }
+                    
+                    // إظهار WebView مع تأثير التلاشي
+                    if (webView != null) {
+                        webView.setVisibility(View.VISIBLE);
+                        webView.animate()
+                            .alpha(1f)
+                            .setDuration(250)
+                            .start();
+                    }
+                }, 100); // 100ms delay للضمان
+            }
 
-                webView.loadDataWithBaseURL("https://localhost/", htmlData, "text/html", "UTF-8", null);
+            @Override
+            public void onReceivedError(WebView view, android.webkit.WebResourceRequest request, 
+                                       android.webkit.WebResourceError error) {
+                super.onReceivedError(view, request, error);
+                mainHandler.removeCallbacks(timeoutRunnable);
+                handleReportError("WebView: " + error.getDescription(), layoutLoading);
             }
         });
     }
 
-    @Override
-    public void onFailure(String errorMessage) {
-        handleReportError(errorMessage, layoutLoading);
+    // 3. المهلة الزمنية
+    final Runnable timeoutRunnable = () -> {
+        if (layoutLoading != null && layoutLoading.getVisibility() == View.VISIBLE) {
+            layoutLoading.setVisibility(View.GONE);
+            if (webView != null) {
+                webView.setVisibility(View.VISIBLE);
+                webView.setAlpha(1f);
+            }
+            Toast.makeText(getContext(), 
+                isArabic ? "انتهت مهلة التحميل" : "Loading timeout", 
+                Toast.LENGTH_SHORT).show();
+        }
+    };
+    mainHandler.postDelayed(timeoutRunnable, 10000);
+
+    // باقي الكود كما هو...
+    boolean isAdvanced = "user_timeline".equals(item.type) || 
+                        "item_passport".equals(item.type) || 
+                        "inventory_aging".equals(item.type);
+    String endpoint = isAdvanced ? "/reports-analytics" : "/reports-app";
+
+    StringBuilder urlBuilder = new StringBuilder();
+    urlBuilder.append(endpoint)
+              .append("?type=").append(item.type)
+              .append("&from=").append(fromDate)
+              .append("&to=").append(toDate)
+              .append("&branch_id=").append(currentBranchId);
+
+    if (userId > 0) {
+        urlBuilder.append("&user_id=").append(userId);
+    }
+    if (itemCode != null && !itemCode.trim().isEmpty()) {
+        urlBuilder.append("&item_code=").append(Uri.encode(itemCode.trim()));
     }
 
-    @Override
-    public void onError(String errorMessage) {
-        handleReportError(errorMessage, layoutLoading);
-    }
-});
+    String requestUrl = urlBuilder.toString();
 
-    }
+    apiClient.get(requestUrl, new MiraApiClient.ApiCallback() {
+        @Override
+        public void onSuccess(MiraApiClient.ApiResponse response) {
+            if (getActivity() == null || !isAdded()) {
+                mainHandler.removeCallbacks(timeoutRunnable);
+                return;
+            }
+
+            getActivity().runOnUiThread(() -> {
+                try {
+                    String responseBody = response.getBody();
+                    JSONObject parsedData = parseJsonObject(responseBody);
+                    
+                    if (offlineCache != null) {
+                        String cacheKey = "cache_pro_" + item.type + "_" + fromDate + "_" + toDate;
+                        offlineCache.edit().putString(cacheKey, parsedData.toString()).apply();
+                    }
+
+                    String htmlData;
+                    if ("user_timeline".equals(item.type) || "item_passport".equals(item.type)) {
+                        htmlData = buildReportHtmlTemplate(item, responseBody, isArabic);
+                    } else {
+                        htmlData = generateExecutiveHTML(item.type, parsedData, fromDate, toDate);
+                    }
+
+                    // تحميل البيانات
+                    if (webView != null) {
+                        webView.loadDataWithBaseURL("https://localhost/", htmlData, 
+                                                   "text/html", "UTF-8", null);
+                    }
+                    
+                } catch (Exception e) {
+                    Log.e(TAG, "Error rendering report", e);
+                    mainHandler.removeCallbacks(timeoutRunnable);
+                    handleReportError("Rendering error: " + e.getMessage(), layoutLoading);
+                }
+            });
+        }
+
+        @Override
+        public void onFailure(String errorMessage) {
+            mainHandler.removeCallbacks(timeoutRunnable);
+            handleReportError(errorMessage, layoutLoading);
+        }
+
+        @Override
+        public void onError(String errorMessage) {
+            mainHandler.removeCallbacks(timeoutRunnable);
+            handleReportError(errorMessage, layoutLoading);
+        }
+    });
+}
+
+// تحسين handleReportError لإخفاء شاشة التحميل بشكل سلس
+private void handleReportError(String errorMessage, View layoutLoading) {
+    if (getActivity() == null || !isAdded()) return;
+
+    getActivity().runOnUiThread(() -> {
+        if (layoutLoading != null) {
+            // تأثير التلاشي عند الإخفاء
+            layoutLoading.animate()
+                .alpha(0f)
+                .setDuration(200)
+                .withEndAction(() -> layoutLoading.setVisibility(View.GONE))
+                .start();
+        }
+        Toast.makeText(getContext(),
+                (isArabic ? "فشل جلب البيانات: " : "Error: ") + errorMessage,
+                Toast.LENGTH_LONG).show();
+    });
+}
 
     private JSONObject parseJsonObject(String json) {
         try {
@@ -431,16 +543,7 @@ public class MiraReportsProFragment extends Fragment {
         }
     }
 
-    private void handleReportError(String errorMessage, View layoutLoading) {
-        if (getActivity() == null || !isAdded()) return;
 
-        getActivity().runOnUiThread(() -> {
-            if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-            Toast.makeText(getContext(),
-                    (isArabic ? "فشل جلب البيانات: " : "Error: ") + errorMessage,
-                    Toast.LENGTH_LONG).show();
-        });
-    }
 
     private String buildReportHtmlTemplate(ReportItem item, String jsonResponse, boolean isArabic) {
         StringBuilder html = new StringBuilder();
@@ -1056,4 +1159,4 @@ public class MiraReportsProFragment extends Fragment {
         @Override
         public String toString() { return name; }
     }
-}
+            }
