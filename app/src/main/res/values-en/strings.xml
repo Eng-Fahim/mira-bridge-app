@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="menu_dashboard">Dashboard</string>
+    <string name="menu_quick_access">Quick Access Settings</string>
+    <string name="menu_gold_rates">Gold Rates & Exchange</string>
+    <string name="menu_branches">Branches</string>
+    <string name="menu_toggle_language">Change Language (العربية)</string>
+    <string name="menu_profile">Profile</string>
+    <string name="menu_logout">Sign Out</string>
+    <string name="menu_export_data">Export Data</string>
+    <string name="menu_device_version">Device Version</string>
     <string name="quick_action_rfid_write">RFID Write</string>
     <string name="quick_action_identity">Identity Studio</string>
     <string name="quick_action_radar">Radar Tracking</string>
