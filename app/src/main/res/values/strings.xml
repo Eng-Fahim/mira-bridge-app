@@ -2051,4 +2051,10 @@
     <string name="generate_password">توليد كلمة مرور</string>
     <string name="copy_password">نسخ كلمة المرور</string>
     <string name="suggest_username">اقتراح اسم المستخدم</string>
+
+
+    <string name="transfers_title">إدارة الشحنات وتحويل القطع</string>
+    <string name="new_transfer">+ تحويل جديد</string>
+    <string name="scan_verify">🔍 فتح كاشف المطابقة المسحية (RFID Live Scan)</string>
+    <string name="no_transfers">لا توجد بيانات تحويل مطابقة للفلتر المحدد</string>
 </resources>
