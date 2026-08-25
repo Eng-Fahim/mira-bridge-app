@@ -212,248 +212,285 @@ public class MiraReportsProFragment extends Fragment {
 
     private void fetchAndDisplay(String type, RecyclerView rvData, View layoutLoading, 
                                   TextView tvLoadingStatus, String fromDate, String toDate) {
-        if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
-        if (tvLoadingStatus != null) tvLoadingStatus.setText(isArabic ? "جاري التحميل..." : "Loading...");
+    if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
+    if (tvLoadingStatus != null) tvLoadingStatus.setText(isArabic ? "جاري التحميل..." : "Loading...");
 
-        executorService.execute(() -> {
-            try {
-                MiraApiClient.ApiResponse response = apiClient.getReportData(type, fromDate, toDate, currentBranchId);
+    executorService.execute(() -> {
+        try {
+            MiraApiClient.ApiResponse response = apiClient.getReportData(type, fromDate, toDate, currentBranchId);
 
-                mainHandler.post(() -> {
-                    if (!isAdded() || layoutLoading != null && layoutLoading.getVisibility() == View.VISIBLE) {
-                        if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-                    }
+            mainHandler.post(() -> {
+                if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
 
-                    if (response == null || !response.isSuccess || response.data == null) {
-                        Toast.makeText(getContext(), isArabic ? "فشل التحميل" : "Failed to load", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
+                if (response == null || !response.isSuccess || response.data == null) {
+                    Toast.makeText(getContext(), isArabic ? "فشل التحميل" : "Failed to load", Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
-                    JSONObject data = response.data;
-                    String cacheKey = "cache_pro_" + type + "_" + fromDate + "_" + toDate;
-                    if (offlineCache != null) {
-                        offlineCache.edit().putString(cacheKey, data.toString()).apply();
-                    }
+                JSONObject data = response.data;
+                
+                // ✅ السجل هنا - بعد الحصول على data
+                Log.d(TAG, "=== Report: " + type + " ===");
+                Log.d(TAG, "Keys: " + data.keys().toString());
+                Log.d(TAG, "Full: " + data.toString().substring(0, Math.min(500, data.toString().length())));
+                
+                String cacheKey = "cache_pro_" + type + "_" + fromDate + "_" + toDate;
+                if (offlineCache != null) {
+                    offlineCache.edit().putString(cacheKey, data.toString()).apply();
+                }
 
-                    // ✅ اختيار الـ Adapter المناسب
-                    switch (type) {
-                        case "sales":
-                            rvData.setAdapter(new SalesAdapter(parseSales(data)));
-                            break;
-                        case "inventory":
-                            rvData.setAdapter(new InventoryAdapter(parseInventory(data)));
-                            break;
-                        case "audit":
-                            rvData.setAdapter(new AuditAdapter(parseAudit(data)));
-                            break;
-                        case "reorder":
-                            rvData.setAdapter(new ReorderAdapter(parseReorder(data)));
-                            break;
-                        case "users":
-                            rvData.setAdapter(new UsersAdapter(parseUsers(data)));
-                            break;
-                        case "gates":
-                            rvData.setAdapter(new GatesAdapter(parseGates(data)));
-                            break;
-                        case "movement":
-                            rvData.setAdapter(new MovementAdapter(parseMovement(data)));
-                            break;
-                        case "branches":
-                            rvData.setAdapter(new BranchesAdapter(parseBranches(data)));
-                            break;
-                        case "financial":
-                            rvData.setAdapter(new FinancialAdapter(parseFinancial(data)));
-                            break;
-                        default:
-                            rvData.setAdapter(new GenericAdapter(parseGeneric(data)));
-                            break;
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Fetch error: " + e.getMessage());
-                mainHandler.post(() -> {
-                    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-                    Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                });
-            }
-        });
-    }
+                // ✅ اختيار الـ Adapter المناسب
+                switch (type) {
+                    case "sales":
+                        rvData.setAdapter(new SalesAdapter(parseSales(data)));
+                        break;
+                    case "inventory":
+                        rvData.setAdapter(new InventoryAdapter(parseInventory(data)));
+                        break;
+                    case "audit":
+                        rvData.setAdapter(new AuditAdapter(parseAudit(data)));
+                        break;
+                    case "reorder":
+                        rvData.setAdapter(new ReorderAdapter(parseReorder(data)));
+                        break;
+                    case "users":
+                        rvData.setAdapter(new UsersAdapter(parseUsers(data)));
+                        break;
+                    case "gates":
+                        rvData.setAdapter(new GatesAdapter(parseGates(data)));
+                        break;
+                    case "movement":
+                        rvData.setAdapter(new MovementAdapter(parseMovement(data)));
+                        break;
+                    case "branches":
+                        rvData.setAdapter(new BranchesAdapter(parseBranches(data)));
+                        break;
+                    case "financial":
+                        rvData.setAdapter(new FinancialAdapter(parseFinancial(data)));
+                        break;
+                    default:
+                        rvData.setAdapter(new GenericAdapter(parseGeneric(data)));
+                        break;
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Fetch error: " + e.getMessage());
+            mainHandler.post(() -> {
+                if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+                Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            });
+        }
+    });
+}
 
     // ==================== Parsing Functions ====================
 
     private List<SalesItem> parseSales(JSONObject data) {
-        List<SalesItem> items = new ArrayList<>();
-        JSONArray invoices = data.optJSONArray("invoices");
-        if (invoices != null) {
-            for (int i = 0; i < invoices.length(); i++) {
-                JSONObject inv = invoices.optJSONObject(i);
-                if (inv != null) {
-                    items.add(new SalesItem(
-                        inv.optString("invoice_no", inv.optString("sale_number", "-")),
-                        inv.optString("customer_name", "-"),
-                        inv.optDouble("final_amount", inv.optDouble("total", 0)),
-                        inv.optString("payment_method", "-"),
-                        inv.optString("seller_name", "-")
-                    ));
-                }
+    List<SalesItem> items = new ArrayList<>();
+    
+    // ✅ البيانات داخل data.sales.invoices
+    JSONObject salesObj = data.optJSONObject("sales");
+    if (salesObj == null) salesObj = data;
+    
+    JSONArray invoices = salesObj.optJSONArray("invoices");
+    if (invoices == null) invoices = salesObj.optJSONArray("sales");
+    if (invoices == null) invoices = data.optJSONArray("invoices");
+    
+    if (invoices != null) {
+        for (int i = 0; i < invoices.length(); i++) {
+            JSONObject inv = invoices.optJSONObject(i);
+            if (inv != null) {
+                items.add(new SalesItem(
+                    inv.optString("invoice_no", inv.optString("sale_number", inv.optString("id", "-"))),
+                    inv.optString("customer_name", "-"),
+                    inv.optDouble("final_amount", inv.optDouble("total", inv.optDouble("subtotal", 0))),
+                    inv.optString("payment_method", "-"),
+                    inv.optString("seller_name", "-")
+                ));
             }
         }
-        return items;
     }
+    return items;
+}
 
-    private List<InventoryItem> parseInventory(JSONObject data) {
-        List<InventoryItem> items = new ArrayList<>();
-        JSONArray arr = data.optJSONArray("items");
-        if (arr != null) {
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.optJSONObject(i);
-                if (obj != null) {
-                    items.add(new InventoryItem(
-                        obj.optString("item_title", "-"),
-                        obj.optString("gold_karat", "-"),
-                        obj.optDouble("gross_weight_grams", 0),
-                        obj.optString("vault_status", "-"),
-                        obj.optString("current_location", "-")
-                    ));
-                }
+private List<InventoryItem> parseInventory(JSONObject data) {
+    List<InventoryItem> items = new ArrayList<>();
+    
+    // ✅ البيانات داخل data.inventory.items أو data.items
+    JSONObject invObj = data.optJSONObject("inventory");
+    if (invObj == null) invObj = data;
+    
+    JSONArray arr = invObj.optJSONArray("items");
+    if (arr == null) arr = data.optJSONArray("items");
+    
+    if (arr != null) {
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject obj = arr.optJSONObject(i);
+            if (obj != null) {
+                items.add(new InventoryItem(
+                    obj.optString("item_title", obj.optString("title", "-")),
+                    obj.optString("gold_karat", obj.optString("karat", "-")),
+                    obj.optDouble("gross_weight_grams", obj.optDouble("weight", 0)),
+                    obj.optString("vault_status", obj.optString("status", "-")),
+                    obj.optString("current_location", obj.optString("location", "-"))
+                ));
             }
         }
-        return items;
     }
+    return items;
+}
 
-    private List<AuditItem> parseAudit(JSONObject data) {
-        List<AuditItem> items = new ArrayList<>();
-        JSONObject audit = data.optJSONObject("audit_summary");
-        if (audit != null) {
-            items.add(new AuditItem(
-                audit.optDouble("accuracy", 0),
-                audit.optInt("found_items", 0),
-                audit.optInt("missing_items", 0),
-                audit.optInt("total_sessions", 0)
-            ));
-        }
-        return items;
+private List<AuditItem> parseAudit(JSONObject data) {
+    List<AuditItem> items = new ArrayList<>();
+    
+    // ✅ البيانات داخل data.audit.audit_summary
+    JSONObject auditContainer = data.optJSONObject("audit");
+    if (auditContainer == null) auditContainer = data;
+    
+    JSONObject audit = auditContainer.optJSONObject("audit_summary");
+    if (audit == null) audit = auditContainer;
+    
+    if (audit != null) {
+        items.add(new AuditItem(
+            audit.optDouble("accuracy", 0),
+            audit.optInt("found_items", audit.optInt("found", 0)),
+            audit.optInt("missing_items", audit.optInt("missing", 0)),
+            audit.optInt("total_sessions", audit.optInt("sessions", 0))
+        ));
     }
+    return items;
+}
 
-    private List<ReorderItem> parseReorder(JSONObject data) {
-        List<ReorderItem> items = new ArrayList<>();
-        JSONArray arr = data.optJSONArray("reorder_items");
-        if (arr != null) {
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.optJSONObject(i);
-                if (obj != null) {
-                    items.add(new ReorderItem(
-                        obj.optString("gold_karat", "-"),
-                        obj.optInt("sold_count", 0),
-                        obj.optInt("remaining_stock", 0)
-                    ));
-                }
+private List<ReorderItem> parseReorder(JSONObject data) {
+    List<ReorderItem> items = new ArrayList<>();
+    
+    // ✅ البيانات داخل data.reorder_items أو data.karat_breakdown
+    JSONArray arr = data.optJSONArray("reorder_items");
+    if (arr == null) arr = data.optJSONArray("karat_breakdown");
+    if (arr == null) arr = data.optJSONArray("items");
+    
+    if (arr != null) {
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject obj = arr.optJSONObject(i);
+            if (obj != null) {
+                items.add(new ReorderItem(
+                    obj.optString("gold_karat", obj.optString("karat", "-")),
+                    obj.optInt("sold_count", obj.optInt("count", obj.optInt("sold", 0))),
+                    obj.optInt("remaining_stock", obj.optInt("remaining", 0))
+                ));
             }
         }
-        return items;
     }
+    return items;
+}
 
-    private List<UsersItem> parseUsers(JSONObject data) {
-        List<UsersItem> items = new ArrayList<>();
-        JSONArray arr = data.optJSONArray("users");
-        if (arr != null) {
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.optJSONObject(i);
-                if (obj != null) {
-                    items.add(new UsersItem(
-                        obj.optString("display_name", "-"),
-                        obj.optString("role_name", "-"),
-                        obj.optString("status", "-")
-                    ));
-                }
+private List<UsersItem> parseUsers(JSONObject data) {
+    List<UsersItem> items = new ArrayList<>();
+    JSONArray arr = data.optJSONArray("users");
+    if (arr != null) {
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject obj = arr.optJSONObject(i);
+            if (obj != null) {
+                items.add(new UsersItem(
+                    obj.optString("display_name", obj.optString("name", "-")),
+                    obj.optString("role_name", obj.optString("role", "-")),
+                    obj.optString("status", "-")
+                ));
             }
         }
-        return items;
     }
+    return items;
+}
 
-    private List<GatesItem> parseGates(JSONObject data) {
-        List<GatesItem> items = new ArrayList<>();
-        JSONArray arr = data.optJSONArray("gate_logs");
-        if (arr != null) {
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.optJSONObject(i);
-                if (obj != null) {
-                    items.add(new GatesItem(
-                        obj.optString("gate_name", "-"),
-                        obj.optString("epc", "-"),
-                        obj.optString("created_at", "-")
-                    ));
-                }
+private List<GatesItem> parseGates(JSONObject data) {
+    List<GatesItem> items = new ArrayList<>();
+    JSONArray arr = data.optJSONArray("gate_logs");
+    if (arr != null) {
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject obj = arr.optJSONObject(i);
+            if (obj != null) {
+                items.add(new GatesItem(
+                    obj.optString("gate_name", obj.optString("gate", "-")),
+                    obj.optString("epc", obj.optString("code", "-")),
+                    obj.optString("created_at", obj.optString("date", "-"))
+                ));
             }
         }
-        return items;
     }
+    return items;
+}
 
-    private List<MovementItem> parseMovement(JSONObject data) {
-        List<MovementItem> items = new ArrayList<>();
-        JSONArray arr = data.optJSONArray("movements");
-        if (arr != null) {
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.optJSONObject(i);
-                if (obj != null) {
-                    items.add(new MovementItem(
-                        obj.optString("from_branch", "-"),
-                        obj.optString("to_branch", "-"),
-                        obj.optString("created_at", "-")
-                    ));
-                }
+private List<MovementItem> parseMovement(JSONObject data) {
+    List<MovementItem> items = new ArrayList<>();
+    JSONArray arr = data.optJSONArray("movements");
+    if (arr != null) {
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject obj = arr.optJSONObject(i);
+            if (obj != null) {
+                items.add(new MovementItem(
+                    obj.optString("from_branch", obj.optString("from", "-")),
+                    obj.optString("to_branch", obj.optString("to", "-")),
+                    obj.optString("created_at", obj.optString("date", "-"))
+                ));
             }
         }
-        return items;
     }
+    return items;
+}
 
-    private List<BranchesItem> parseBranches(JSONObject data) {
-        List<BranchesItem> items = new ArrayList<>();
-        JSONArray arr = data.optJSONArray("branches_performance");
-        if (arr != null) {
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.optJSONObject(i);
-                if (obj != null) {
-                    items.add(new BranchesItem(
-                        obj.optString("branch_name", "-"),
-                        obj.optInt("items_count", 0)
-                    ));
-                }
+private List<BranchesItem> parseBranches(JSONObject data) {
+    List<BranchesItem> items = new ArrayList<>();
+    JSONArray arr = data.optJSONArray("branches_performance");
+    if (arr == null) arr = data.optJSONArray("branches");
+    if (arr != null) {
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject obj = arr.optJSONObject(i);
+            if (obj != null) {
+                items.add(new BranchesItem(
+                    obj.optString("branch_name", obj.optString("name", "-")),
+                    obj.optInt("items_count", obj.optInt("count", 0))
+                ));
             }
         }
-        return items;
     }
+    return items;
+}
 
-    private List<FinancialItem> parseFinancial(JSONObject data) {
-        List<FinancialItem> items = new ArrayList<>();
-        JSONArray arr = data.optJSONArray("journal_entries");
-        if (arr != null) {
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.optJSONObject(i);
-                if (obj != null) {
-                    items.add(new FinancialItem(
-                        obj.optString("description", "-"),
-                        obj.optDouble("amount", 0)
-                    ));
-                }
+private List<FinancialItem> parseFinancial(JSONObject data) {
+    List<FinancialItem> items = new ArrayList<>();
+    JSONArray arr = data.optJSONArray("journal_entries");
+    if (arr == null) arr = data.optJSONArray("entries");
+    if (arr != null) {
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject obj = arr.optJSONObject(i);
+            if (obj != null) {
+                items.add(new FinancialItem(
+                    obj.optString("description", obj.optString("details", "-")),
+                    obj.optDouble("amount", obj.optDouble("total", 0))
+                ));
             }
         }
-        return items;
     }
+    return items;
+}
 
-    private List<GenericItem> parseGeneric(JSONObject data) {
-        List<GenericItem> items = new ArrayList<>();
-        java.util.Iterator<String> keys = data.keys();
-        while (keys.hasNext()) {
-            String key = keys.next();
-            Object value = data.opt(key);
-            if (value != null) {
-                items.add(new GenericItem(key, value.toString()));
-            }
+private List<GenericItem> parseGeneric(JSONObject data) {
+    List<GenericItem> items = new ArrayList<>();
+    
+    // ✅ إذا كان هناك data داخل data
+    JSONObject innerData = data.optJSONObject("data");
+    if (innerData != null) data = innerData;
+    
+    java.util.Iterator<String> keys = data.keys();
+    while (keys.hasNext()) {
+        String key = keys.next();
+        Object value = data.opt(key);
+        if (value != null && !key.equals("success") && !key.equals("timestamp") && !key.equals("type")) {
+            items.add(new GenericItem(key, value.toString()));
         }
-        return items;
     }
-
+    return items;
+}
     // ==================== Data Classes ====================
 
     static class SalesItem { String invoiceNo, customer, payment, seller; double amount;
