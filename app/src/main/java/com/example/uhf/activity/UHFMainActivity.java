@@ -292,6 +292,14 @@ public boolean onCreateOptionsMenu(Menu menu) {
 private void applyToolbarMenuPermissions(Menu menu, PermissionManager pm) {
     if (pm == null) return;
     
+    // ✅ تحديث عنوان زر تغيير اللغة
+    MenuItem toggleLanguage = menu.findItem(R.id.action_toggle_language);
+    if (toggleLanguage != null) {
+        toggleLanguage.setTitle(isArabic ? 
+            "تغيير اللغة (English)" : 
+            "Change Language (العربية)");
+    }
+    
     // 1. أسعار الذهب - للمدراء فقط
     MenuItem actionGoldRates = menu.findItem(R.id.action_gold_rates);
     if (actionGoldRates != null) {
