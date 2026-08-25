@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+ <string name="menu_dashboard">الرئيسية</string>
+    <string name="menu_quick_access">تخصيص الوصول السريع</string>
+    <string name="menu_gold_rates">أسعار الذهب والبورصة</string>
+    <string name="menu_branches">الفروع</string>
+    <string name="menu_toggle_language">تغيير اللغة (English)</string>
+    <string name="menu_profile">الملف الشخصي</string>
+    <string name="menu_logout">تسجيل الخروج</string>
+    <string name="menu_export_data">تصدير البيانات</string>
+    <string name="menu_device_version">إصدار الجهاز</string>
+    
 <string name="quick_action_rfid_write">برمجة RFID</string>
     <string name="quick_action_identity">استوديو التكويد</string>
     <string name="quick_action_radar">رادار التتبع</string>
