@@ -346,49 +346,57 @@ public class MiraReportsProFragment extends Fragment {
         String requestUrl = urlBuilder.toString();
 
         apiClient.get(requestUrl, new MiraApiClient.ApiCallback() {
-            @Override
-            public void onSuccess(MiraApiClient.ApiResponse response) {
-                if (getActivity() == null || !isAdded()) return;
+    @Override
+    public void onSuccess(MiraApiClient.ApiResponse response) {
+        if (getActivity() == null || !isAdded()) return;
 
-                getActivity().runOnUiThread(() -> {
-                    if (layoutLoading != null) {
-                        layoutLoading.setVisibility(View.GONE);
-                    }
+        getActivity().runOnUiThread(() -> {
+            if (webView != null) {
+                webView.setVisibility(View.VISIBLE);
+                webView.bringToFront();
 
-                    if (webView != null) {
-                        webView.setVisibility(View.VISIBLE);
-                        webView.bringToFront();
-
-                        String responseBody = response.getBody();
-                        JSONObject parsedData = parseJsonObject(responseBody);
-                        
-                        if (offlineCache != null) {
-                            String cacheKey = "cache_pro_" + item.type + "_" + fromDate + "_" + toDate;
-                            offlineCache.edit().putString(cacheKey, parsedData.toString()).apply();
+                // تعيين الـ WebViewClient هنا لضمان إخفاء شاشة التحميل فور انتهاء الرندر
+                webView.setWebViewClient(new android.webkit.WebViewClient() {
+                    @Override
+                    public void onPageFinished(WebView view, String url) {
+                        super.onPageFinished(view, url);
+                        if (layoutLoading != null) {
+                            layoutLoading.setVisibility(View.GONE);
                         }
-
-                        String htmlData;
-                        if ("user_timeline".equals(item.type) || "item_passport".equals(item.type)) {
-                            htmlData = buildReportHtmlTemplate(item, responseBody, isArabic);
-                        } else {
-                            htmlData = generateExecutiveHTML(item.type, parsedData, fromDate, toDate);
-                        }
-
-                        webView.loadDataWithBaseURL("https://localhost/", htmlData, "text/html", "UTF-8", null);
                     }
                 });
-            }
 
-            @Override
-            public void onFailure(String errorMessage) {
-                handleReportError(errorMessage, layoutLoading);
-            }
+                String responseBody = response.getBody();
+                JSONObject parsedData = parseJsonObject(responseBody);
+                
+                if (offlineCache != null) {
+                    String cacheKey = "cache_pro_" + item.type + "_" + fromDate + "_" + toDate;
+                    offlineCache.edit().putString(cacheKey, parsedData.toString()).apply();
+                }
 
-            @Override
-            public void onError(String errorMessage) {
-                handleReportError(errorMessage, layoutLoading);
+                String htmlData;
+                if ("user_timeline".equals(item.type) || "item_passport".equals(item.type)) {
+                    htmlData = buildReportHtmlTemplate(item, responseBody, isArabic);
+                } else {
+                    htmlData = generateExecutiveHTML(item.type, parsedData, fromDate, toDate);
+                }
+
+                webView.loadDataWithBaseURL("https://localhost/", htmlData, "text/html", "UTF-8", null);
             }
         });
+    }
+
+    @Override
+    public void onFailure(String errorMessage) {
+        handleReportError(errorMessage, layoutLoading);
+    }
+
+    @Override
+    public void onError(String errorMessage) {
+        handleReportError(errorMessage, layoutLoading);
+    }
+});
+
     }
 
     private JSONObject parseJsonObject(String json) {
