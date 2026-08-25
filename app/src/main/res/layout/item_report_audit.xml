@@ -1,6 +1,0 @@
-<LinearLayout ...>
-    <TextView android:id="@+id/tvAccuracy" />
-    <TextView android:id="@+id/tvFound" />
-    <TextView android:id="@+id/tvMissing" />
-    <TextView android:id="@+id/tvSessions" />
-</LinearLayout>
