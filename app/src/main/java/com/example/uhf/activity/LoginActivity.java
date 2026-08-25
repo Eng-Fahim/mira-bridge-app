@@ -69,7 +69,7 @@ public class LoginActivity extends AppCompatActivity {
     private BiometricPrompt.PromptInfo promptInfo;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final ExecutorService bgExecutor = Executors.newSingleThreadExecutor();
+    private ExecutorService bgExecutor;
 
     private boolean isArabic = true;
     private String lastPassword = "";
@@ -85,7 +85,8 @@ public class LoginActivity extends AppCompatActivity {
             return;
         }
 
-        // 🟢 ضبط لغة التطبيق بناءً على الإعداد الحرفي للنظام أو الجلسة
+        bgExecutor = Executors.newSingleThreadExecutor();
+
         String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
         isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
 
@@ -94,7 +95,7 @@ public class LoginActivity extends AppCompatActivity {
         orgProfileManager = MiraOrgProfileManager.getInstance(this);
         
         initViews();
-        disableAutofill(); // 🟢 إلغاء شريط التعبئة التلقائية الكيبورد
+        disableAutofill();
         setupBiometric();
         setupServerConfigToggle();
         animateEntrance();
@@ -102,6 +103,20 @@ public class LoginActivity extends AppCompatActivity {
         updateUiLanguage(isArabic);
         setupProfileListener();
         loadOrgProfileFromCloud();
+    }
+
+    private void executeSafeBg(Runnable runnable) {
+        if (bgExecutor != null && !bgExecutor.isShutdown() && !bgExecutor.isTerminated()) {
+            try {
+                bgExecutor.execute(runnable);
+            } catch (Exception e) {
+                Log.e(TAG, "Task execution rejected", e);
+            }
+        }
+    }
+
+    private boolean isActivityAlive() {
+        return !isFinishing() && !isDestroyed();
     }
 
     private void initViews() {
@@ -150,7 +165,6 @@ public class LoginActivity extends AppCompatActivity {
             Toast.makeText(this, isArabic ? "✓ تم حفظ رابط الخادم بنجاح" : "✓ Server URL saved", Toast.LENGTH_SHORT).show();
         });
 
-        // 🟢 التحويل السلس بين اللغات مع إعادة تحميل ملائمة للواجهة
         if (btnToggleLanguage != null) {
             btnToggleLanguage.setOnClickListener(v -> {
                 isArabic = !isArabic;
@@ -167,9 +181,6 @@ public class LoginActivity extends AppCompatActivity {
         applyOrgProfile();
     }
 
-    /**
-     * 🟢 إيقاف التعبئة التلقائية للمحافظة على نظافة الكيبورد ومنع ظهور Enable autofill
-     */
     private void disableAutofill() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (etUsername != null) etUsername.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
@@ -178,25 +189,20 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    // ==================== Profile Listener ====================
-
     private void setupProfileListener() {
         if (orgProfileManager == null) return;
         
-        profileListener = new MiraOrgProfileManager.OnProfileChangedListener() {
-            @Override
-            public void onProfileChanged() {
-                mainHandler.post(() -> applyOrgProfile());
+        profileListener = () -> {
+            if (isActivityAlive()) {
+                mainHandler.post(this::applyOrgProfile);
             }
         };
         
         orgProfileManager.addListener(profileListener);
     }
 
-    // ==================== Cloud Org Profile ====================
-
     private void loadOrgProfileFromCloud() {
-        bgExecutor.execute(() -> {
+        executeSafeBg(() -> {
             try {
                 MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
                 
@@ -216,15 +222,15 @@ public class LoginActivity extends AppCompatActivity {
                         orgProfileManager.saveFromServer(rootOrg);
                     }
                     
-                    mainHandler.post(this::applyOrgProfile);
+                    if (isActivityAlive()) {
+                        mainHandler.post(this::applyOrgProfile);
+                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Cloud org load error: " + e.getMessage());
             }
         });
     }
-
-    // ==================== Language ====================
 
     private void updateUiLanguage(boolean arabic) {
         getWindow().getDecorView().setLayoutDirection(arabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
@@ -248,9 +254,9 @@ public class LoginActivity extends AppCompatActivity {
         applyOrgProfile();
     }
 
-    // ==================== Org Profile ====================
-
     private void applyOrgProfile() {
+        if (!isActivityAlive()) return;
+
         if (orgProfileManager == null) {
             orgProfileManager = MiraOrgProfileManager.getInstance(this);
         }
@@ -293,8 +299,6 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    // ==================== Server Config ====================
-
     private void setupServerConfigToggle() {
         if (tvServerSettings != null) {
             tvServerSettings.setOnClickListener(v -> {
@@ -317,8 +321,6 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    // ==================== Animation ====================
-
     private void animateEntrance() {
         if (loginCard == null) return;
         loginCard.setAlpha(0f);
@@ -329,8 +331,6 @@ public class LoginActivity extends AppCompatActivity {
             logoContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.fade_in_up));
         }
     }
-
-    // ==================== Text Watchers ====================
 
     private void setupTextWatchers() {
         TextWatcher watcher = new TextWatcher() {
@@ -356,8 +356,6 @@ public class LoginActivity extends AppCompatActivity {
         return (editText != null && editText.getText() != null) ? editText.getText().toString().trim() : "";
     }
 
-    // ==================== Tone ====================
-
     private void playTone(boolean isSuccess) {
         try {
             ToneGenerator toneGen = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80);
@@ -367,11 +365,6 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    // ==================== Login ====================
-
-    /**
-     * 🟢 محاولة تسجيل الدخول عبر الشبكة مع التراجع التلقائي للأوفلاين Offline Fallback عند تعذر الشبكة
-     */
     private void attemptApiLogin() {
         String username = getText(etUsername);
         String password = getText(etPassword);
@@ -395,16 +388,16 @@ public class LoginActivity extends AppCompatActivity {
         tilPassword.setError(null);
         showLoading(true);
 
-        bgExecutor.execute(() -> {
+        executeSafeBg(() -> {
             String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
             MiraApiClient.ApiResponse response = apiClient.login(username, password, deviceId);
             
             mainHandler.post(() -> {
+                if (!isActivityAlive()) return;
                 showLoading(false);
                 if (response != null && response.isSuccess) {
                     handleLoginSuccess(response, username, password);
                 } else {
-                    // 🟢 التحقق أوفلاين: هل تم حفظ بيانات هذا المستخدم مسبقاً للبصمة والجلسة؟
                     String lastBiometricUser = sessionManager.getLastBiometricUser();
                     if (!lastBiometricUser.isEmpty() && lastBiometricUser.equalsIgnoreCase(username)) {
                         executeOfflineLogin(username);
@@ -421,9 +414,6 @@ public class LoginActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * 🟢 التكفل بتسجيل الدخول أوفلاين بالاعتماد على بيانات الجلسة السابقة
-     */
     private void executeOfflineLogin(String username) {
         playTone(true);
         String lastRole = sessionManager.getLastBiometricRole();
@@ -514,12 +504,13 @@ public class LoginActivity extends AppCompatActivity {
 
     private void reconnectAndRestoreData(String username, String password, String serverUrl) {
         showLoading(true);
-        bgExecutor.execute(() -> {
+        executeSafeBg(() -> {
             try {
                 String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
                 MiraApiClient.ApiResponse reconnectResponse = apiClient.reconnectDevice(username, password, deviceId);
                 
                 mainHandler.post(() -> {
+                    if (!isActivityAlive()) return;
                     showLoading(false);
                     if (reconnectResponse != null && reconnectResponse.isSuccess) {
                         String newApiKey = reconnectResponse.optString("api_key", "");
@@ -544,6 +535,7 @@ public class LoginActivity extends AppCompatActivity {
             } catch (Exception e) {
                 Log.e(TAG, "Reconnect error: " + e.getMessage());
                 mainHandler.post(() -> {
+                    if (!isActivityAlive()) return;
                     showLoading(false);
                     Toast.makeText(this, isArabic ? "فشل إعادة الاتصال بالخادم" : "Failed to reconnect to server", Toast.LENGTH_LONG).show();
                 });
@@ -552,7 +544,7 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void restoreAllDataAfterLogin() {
-        bgExecutor.execute(() -> {
+        executeSafeBg(() -> {
             try {
                 MiraApiClient.ApiResponse goldResponse = apiClient.getGoldCurrencySettings();
                 if (goldResponse != null && goldResponse.isSuccess && goldResponse.data != null) {
@@ -577,7 +569,9 @@ public class LoginActivity extends AppCompatActivity {
                     if (org == null) org = orgResponse.data.optJSONObject("data");
                     if (org != null && orgProfileManager != null) {
                         orgProfileManager.saveFromServer(org);
-                        mainHandler.post(this::applyOrgProfile);
+                        if (isActivityAlive()) {
+                            mainHandler.post(this::applyOrgProfile);
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -585,8 +579,6 @@ public class LoginActivity extends AppCompatActivity {
             }
         });
     }
-
-    // ==================== Biometric ====================
 
     private void setupBiometric() {
         BiometricManager bm = BiometricManager.from(this);
@@ -673,8 +665,6 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    // ==================== Helpers ====================
-
     private void showLoading(boolean loading) {
         if (loadingContainer != null) loadingContainer.setVisibility(loading ? View.VISIBLE : View.GONE);
         if (btnLogin != null) {
@@ -692,13 +682,13 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void navigateToMain() {
-    Intent intent = new Intent(this, UHFMainActivity.class);
-    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-    intent.putExtra("fresh_start", true); // ✅ إشارة بداية جديدة
-    startActivity(intent);
-    finish();
-    overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
-}
+        Intent intent = new Intent(this, UHFMainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        intent.putExtra("fresh_start", true);
+        startActivity(intent);
+        finish();
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+    }
 
     @Override
     protected void onResume() {
@@ -714,8 +704,10 @@ public class LoginActivity extends AppCompatActivity {
             orgProfileManager.removeListener(profileListener);
         }
         
+        mainHandler.removeCallbacksAndMessages(null);
+
         if (bgExecutor != null && !bgExecutor.isShutdown()) {
-            bgExecutor.shutdown();
+            bgExecutor.shutdownNow();
         }
     }
 }
