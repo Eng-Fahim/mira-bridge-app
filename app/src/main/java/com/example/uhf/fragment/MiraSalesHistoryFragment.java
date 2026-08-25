@@ -34,6 +34,10 @@ import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.PermissionManager;
+import com.example.uhf.tools.SessionManager;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -51,29 +55,31 @@ import java.util.concurrent.Executors;
 public class MiraSalesHistoryFragment extends Fragment {
 
     private static final String TAG = "MiraSalesHistory";
-    private static final int PAGE_SIZE = 50; // عدد العمليات في كل صفحة
-    private static final int VISIBLE_THRESHOLD = 10; // تحميل المزيد قبل الوصول للنهاية بـ 10 عناصر
+    private static final int PAGE_SIZE = 50;
+    private static final int VISIBLE_THRESHOLD = 10;
 
     private RecyclerView rvSales;
     private View layoutEmptyState;
     private TextView tvEmpty;
     private ProgressBar pbLoading;
-    private ProgressBar pbLoadMore; // مؤشر تحميل المزيد
+    private ProgressBar pbLoadMore;
     private EditText etSearch;
     private View btnRefresh;
     private SwipeRefreshLayout swipeRefresh;
+    private ChipGroup chipGroupFilters;
+    private MaterialButton btnFilterPayment;
+    private MaterialButton btnFilterBranch;
     
     private View loadingMoreContainer;
     private TextView tvEndOfList;
     private TextView tvTotalRevenue;
     private TextView tvInvoicesCount;
-    private TextView tvShowingCount; // عداد العناصر المعروضة
+    private TextView tvShowingCount;
 
     private MiraSalesAdapter adapter;
     private final List<MiraSaleItem> saleList = new ArrayList<>();
     private final List<MiraSaleItem> filteredList = new ArrayList<>();
 
-    // Pagination variables
     private int currentPage = 0;
     private boolean isLoading = false;
     private boolean isLastPage = false;
@@ -81,6 +87,7 @@ public class MiraSalesHistoryFragment extends Fragment {
     private int totalItems = 0;
     private String searchQuery = "";
     private String currentFilter = "ALL"; // ALL, CASH, CARD, TRANSFER, CREDIT
+    private int selectedBranchId = 0; // 0 = الكل، >0 = فرع محدد
 
     private static final String OFFLINE_PREFS = "sales_history_cache";
     private SharedPreferences offlineCache;
@@ -89,6 +96,7 @@ public class MiraSalesHistoryFragment extends Fragment {
     private MiraBranchesManager branchesManager;
     private MiraPriceManager priceManager;
     private PermissionManager permissionManager;
+    private SessionManager sessionManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isArabic;
 
@@ -108,12 +116,14 @@ public class MiraSalesHistoryFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         isArabic = checkIsArabic();
+        view.setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
 
         if (getContext() != null) {
             apiClient = MiraApiClient.getInstance(getContext());
             branchesManager = MiraBranchesManager.getInstance(getContext());
             priceManager = MiraPriceManager.getInstance(getContext());
             permissionManager = PermissionManager.getInstance(getContext());
+            sessionManager = new SessionManager(getContext());
             offlineCache = requireContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
         }
 
@@ -121,11 +131,15 @@ public class MiraSalesHistoryFragment extends Fragment {
         setupRecyclerView();
         setupListeners();
         applyPermissions();
+        applyLanguage();
+        setupBranchFilter();
 
         loadSalesOffline();
         refreshSales(true);
     }
 
+    // ==================== الصلاحيات والفروع ====================
+    
     private void applyPermissions() {
         boolean canView = permissionManager.canView("sales_history") || 
                          permissionManager.isPosOperator() || 
@@ -134,56 +148,161 @@ public class MiraSalesHistoryFragment extends Fragment {
         if (!canView) {
             showEmptyState(isArabic ? "⛔ غير مصرح لك بالوصول لسجل المبيعات" : "⛔ Access Denied");
             if (pbLoading != null) pbLoading.setVisibility(View.GONE);
+            
+            // تعطيل جميع العناصر
+            if (etSearch != null) etSearch.setEnabled(false);
+            if (btnRefresh != null) btnRefresh.setEnabled(false);
+            if (swipeRefresh != null) swipeRefresh.setEnabled(false);
+            if (rvSales != null) rvSales.setVisibility(View.GONE);
+            if (chipGroupFilters != null) chipGroupFilters.setVisibility(View.GONE);
+            if (btnFilterPayment != null) btnFilterPayment.setEnabled(false);
+            if (btnFilterBranch != null) btnFilterBranch.setEnabled(false);
             return;
         }
     }
 
-    private void initViews(View view) {
-    rvSales = view.findViewById(R.id.rvMiraSalesHistory);
-    layoutEmptyState = view.findViewById(R.id.layoutEmptyState);
-    tvEmpty = view.findViewById(R.id.tvMiraEmptySales);
-    pbLoading = view.findViewById(R.id.pbSalesLoading);
-    etSearch = view.findViewById(R.id.etMiraSearchSales);
-    btnRefresh = view.findViewById(R.id.btnMiraRefreshSales);
-    swipeRefresh = view.findViewById(R.id.swipeRefreshSales);
+    /**
+     * ✅ إعداد فلترة الفروع
+     * - SYSTEM_ADMIN و ORG_ADMIN: يمكنهم رؤية جميع الفروع
+     * - BRANCH_MANAGER وما دون: يرون فرعهم فقط
+     */
+    private void setupBranchFilter() {
+        SessionManager.Role userRole = sessionManager.getUserRole();
+        int userBranchId = branchesManager.getActiveBranchId();
+        
+        // ✅ تحديد الصلاحيات حسب الدور
+        boolean canViewAllBranches = userRole == SessionManager.Role.SYSTEM_ADMIN || 
+                                     userRole == SessionManager.Role.ORG_ADMIN;
+        
+        if (canViewAllBranches) {
+            // ✅ الإدارة العليا - يمكنهم اختيار الفرع أو الكل
+            selectedBranchId = 0; // الكل افتراضياً
+            
+            if (btnFilterBranch != null) {
+                btnFilterBranch.setVisibility(View.VISIBLE);
+                btnFilterBranch.setText(isArabic ? "🏢 جميع الفروع" : "🏢 All Branches");
+                btnFilterBranch.setOnClickListener(v -> showBranchSelectionDialog());
+            }
+        } else {
+            // ✅ الفروع - يرون فرعهم فقط
+            selectedBranchId = userBranchId;
+            
+            if (btnFilterBranch != null) {
+                btnFilterBranch.setVisibility(View.GONE); // إخفاء زر اختيار الفرع
+            }
+        }
+    }
 
-    tvTotalRevenue = view.findViewById(R.id.tvTotalRevenue);
-    tvInvoicesCount = view.findViewById(R.id.tvInvoicesCount);
+    /**
+     * ✅ عرض قائمة الفروع للاختيار (للإدارة العليا فقط)
+     */
+    private void showBranchSelectionDialog() {
+        List<BranchOption> branches = new ArrayList<>();
+        branches.add(new BranchOption(0, isArabic ? "🏢 جميع الفروع" : "🏢 All Branches"));
+        
+        // جلب الفروع من BranchManager
+        List<BranchItem> branchList = branchesManager.getAllBranches();
+        for (BranchItem branch : branchList) {
+            branches.add(new BranchOption(branch.id, branch.name));
+        }
+        
+        String[] branchNames = new String[branches.size()];
+        for (int i = 0; i < branches.size(); i++) {
+            branchNames[i] = branches.get(i).name;
+        }
+        
+        new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle(isArabic ? "🏢 اختر الفرع" : "🏢 Select Branch")
+            .setItems(branchNames, (dialog, which) -> {
+                BranchOption selected = branches.get(which);
+                selectedBranchId = selected.id;
+                
+                if (btnFilterBranch != null) {
+                    btnFilterBranch.setText(selected.name);
+                }
+                
+                // إعادة تحميل البيانات مع الفرع الجديد
+                refreshSales(true);
+            })
+            .show();
+    }
+
+    /**
+     * ✅ عرض قائمة فلاتر طريقة الدفع
+     */
+    private void showPaymentFilterDialog() {
+        String[] filterNames = isArabic ? 
+            new String[]{"💰 الكل", "💵 نقداً", "💳 بطاقة", "🏦 تحويل", "📝 آجل"} :
+            new String[]{"💰 All", "💵 Cash", "💳 Card", "🏦 Transfer", "📝 Credit"};
+        
+        String[] filterValues = {"ALL", "CASH", "CARD", "TRANSFER", "CREDIT"};
+        
+        new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle(isArabic ? "💰 فلترة حسب طريقة الدفع" : "💰 Filter by Payment Method")
+            .setItems(filterNames, (dialog, which) -> {
+                currentFilter = filterValues[which];
+                
+                if (btnFilterPayment != null) {
+                    btnFilterPayment.setText(filterNames[which]);
+                }
+                
+                // إعادة تحميل مع الفلتر الجديد
+                refreshSales(true);
+            })
+            .show();
+    }
+
+    // ==================== تهيئة الواجهة ====================
     
-    // العناصر الجديدة
-    pbLoadMore = view.findViewById(R.id.pbLoadMore);
-    tvShowingCount = view.findViewById(R.id.tvShowingCount);
-    
-    // يمكنك إضافة مراجع للعناصر الجديدة
-    View loadingMoreContainer = view.findViewById(R.id.loadingMoreContainer);
-    TextView tvEndOfList = view.findViewById(R.id.tvEndOfList);
-    
-    // تخزين المراجع كمتغيرات عامة إذا كنت بحاجة إليها
-    this.loadingMoreContainer = loadingMoreContainer;
-    this.tvEndOfList = tvEndOfList;
-}
+    private void initViews(View view) {
+        rvSales = view.findViewById(R.id.rvMiraSalesHistory);
+        layoutEmptyState = view.findViewById(R.id.layoutEmptyState);
+        tvEmpty = view.findViewById(R.id.tvMiraEmptySales);
+        pbLoading = view.findViewById(R.id.pbSalesLoading);
+        etSearch = view.findViewById(R.id.etMiraSearchSales);
+        btnRefresh = view.findViewById(R.id.btnMiraRefreshSales);
+        swipeRefresh = view.findViewById(R.id.swipeRefreshSales);
+        tvTotalRevenue = view.findViewById(R.id.tvTotalRevenue);
+        tvInvoicesCount = view.findViewById(R.id.tvInvoicesCount);
+        pbLoadMore = view.findViewById(R.id.pbLoadMore);
+        tvShowingCount = view.findViewById(R.id.tvShowingCount);
+        loadingMoreContainer = view.findViewById(R.id.loadingMoreContainer);
+        tvEndOfList = view.findViewById(R.id.tvEndOfList);
+        
+        // ✅ عناصر الفلاتر
+        chipGroupFilters = view.findViewById(R.id.chipGroupFilters);
+        btnFilterPayment = view.findViewById(R.id.btnFilterPayment);
+        btnFilterBranch = view.findViewById(R.id.btnFilterBranch);
+    }
+
+    private void applyLanguage() {
+        if (etSearch != null) {
+            etSearch.setHint(isArabic ? "🔍 بحث في المبيعات..." : "🔍 Search sales...");
+        }
+        if (tvEmpty != null) {
+            tvEmpty.setText(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
+        }
+        if (btnFilterPayment != null) {
+            btnFilterPayment.setText(isArabic ? "💰 الكل" : "💰 All");
+        }
+    }
 
     private void setupRecyclerView() {
         if (rvSales != null) {
             LinearLayoutManager layoutManager = new LinearLayoutManager(getContext());
             rvSales.setLayoutManager(layoutManager);
-            
-            // تحسين الأداء
             rvSales.setHasFixedSize(true);
             rvSales.setItemViewCacheSize(20);
-            rvSales.setDrawingCacheEnabled(true);
-            rvSales.setDrawingCacheQuality(View.DRAWING_CACHE_QUALITY_HIGH);
             
             adapter = new MiraSalesAdapter(filteredList, this::openReceipt, isArabic, priceManager);
             rvSales.setAdapter(adapter);
             
-            // إضافة مستمع للتمرير للتحميل التدريجي
             rvSales.addOnScrollListener(new RecyclerView.OnScrollListener() {
                 @Override
                 public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
                     super.onScrolled(recyclerView, dx, dy);
                     
-                    if (dy > 0) { // التمرير للأسفل
+                    if (dy > 0) {
                         int totalItemCount = layoutManager.getItemCount();
                         int lastVisibleItem = layoutManager.findLastVisibleItemPosition();
                         
@@ -211,74 +330,31 @@ public class MiraSalesHistoryFragment extends Fragment {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
                 @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                     searchQuery = s.toString();
-                    // تأخير البحث لتجنب البحث مع كل حرف
                     mainHandler.removeCallbacks(searchRunnable);
                     mainHandler.postDelayed(searchRunnable, 300);
                 }
                 @Override public void afterTextChanged(Editable s) {}
             });
         }
+        
+        // ✅ زر فلترة الدفع
+        if (btnFilterPayment != null) {
+            btnFilterPayment.setOnClickListener(v -> showPaymentFilterDialog());
+        }
+        
+        // ✅ زر فلترة الفرع (للإدارة العليا فقط)
+        if (btnFilterBranch != null) {
+            btnFilterBranch.setOnClickListener(v -> showBranchSelectionDialog());
+        }
     }
     
     private final Runnable searchRunnable = () -> {
+        // البحث محلياً بدون إعادة تحميل
         filterSales(searchQuery);
     };
 
-    private void saveSalesOffline(JSONArray sales, int page) {
-        try {
-            if (offlineCache == null) return;
-            
-            SharedPreferences.Editor editor = offlineCache.edit();
-            
-            if (page == 0) {
-                // أول صفحة - حذف البيانات القديمة
-                editor.putString("sales_page_0", sales.toString());
-                editor.putInt("last_page", 0);
-                editor.putInt("total_items", sales.length());
-            } else {
-                // صفحات إضافية - إضافة للبيانات الموجودة
-                editor.putString("sales_page_" + page, sales.toString());
-                editor.putInt("last_page", page);
-                
-                // تحديث العدد الإجمالي
-                int currentTotal = offlineCache.getInt("total_items", 0);
-                editor.putInt("total_items", currentTotal + sales.length());
-            }
-            
-            editor.putLong("last_update", System.currentTimeMillis());
-            editor.apply();
-        } catch (Exception ignored) {}
-    }
-
-    private void loadSalesOffline() {
-        try {
-            if (offlineCache == null) return;
-            
-            int lastPage = offlineCache.getInt("last_page", -1);
-            if (lastPage < 0) return;
-            
-            List<MiraSaleItem> offlineItems = new ArrayList<>();
-            
-            for (int i = 0; i <= lastPage; i++) {
-                String json = offlineCache.getString("sales_page_" + i, "");
-                if (!json.isEmpty()) {
-                    JSONArray sales = new JSONArray(json);
-                    offlineItems.addAll(parseSalesJson(sales));
-                }
-            }
-            
-            if (!offlineItems.isEmpty()) {
-                saleList.clear();
-                saleList.addAll(offlineItems);
-                totalItems = offlineCache.getInt("total_items", offlineItems.size());
-                
-                String currentQuery = etSearch != null ? etSearch.getText().toString() : "";
-                filterSales(currentQuery);
-            }
-            
-        } catch (Exception ignored) {}
-    }
-
+    // ==================== تحميل البيانات ====================
+    
     private void refreshSales(boolean showProgress) {
         if (!isAdded()) return;
         
@@ -288,7 +364,6 @@ public class MiraSalesHistoryFragment extends Fragment {
             return;
         }
 
-        // إعادة تعيين متغيرات الترحيل
         currentPage = 0;
         isLastPage = false;
         hasMoreData = true;
@@ -302,230 +377,198 @@ public class MiraSalesHistoryFragment extends Fragment {
     }
     
     private void loadMoreSales() {
-    if (isLoading || !hasMoreData || isLastPage) {
-        // إظهار نهاية القائمة إذا كانت آخر صفحة
-        if (isLastPage && tvEndOfList != null) {
-            tvEndOfList.setVisibility(View.VISIBLE);
+        if (isLoading || !hasMoreData || isLastPage) {
+            if (isLastPage && tvEndOfList != null) {
+                tvEndOfList.setVisibility(View.VISIBLE);
+            }
+            return;
         }
-        return;
+        
+        isLoading = true;
+        if (loadingMoreContainer != null) {
+            loadingMoreContainer.setVisibility(View.VISIBLE);
+        }
+        if (tvEndOfList != null) {
+            tvEndOfList.setVisibility(View.GONE);
+        }
+        
+        loadSalesPage(currentPage + 1, false);
     }
-    
-    isLoading = true;
-    if (loadingMoreContainer != null) {
-        loadingMoreContainer.setVisibility(View.VISIBLE);
-    }
-    if (tvEndOfList != null) {
-        tvEndOfList.setVisibility(View.GONE);
-    }
-    
-    loadSalesPage(currentPage + 1, false);
-}
     
     private void loadSalesPage(int page, boolean isRefresh) {
-    Executors.newSingleThreadExecutor().execute(() -> {
-        try {
-            if (apiClient == null && getContext() != null) {
-                apiClient = MiraApiClient.getInstance(getContext());
-            }
-
-            if (apiClient == null) {
-                mainHandler.post(() -> {
-                    hideLoadingState();
-                    if (saleList.isEmpty()) {
-                        showEmptyState(isArabic ? "⚠️ خطأ في تهيئة النظام" : "⚠️ System initialization error");
-                    }
-                });
-                return;
-            }
-
-            // استخدام الدالة الجديدة مع البحث والفلترة
-            MiraApiClient.ApiResponse response;
-            
-            if (!searchQuery.isEmpty() || !currentFilter.equals("ALL")) {
-                // استخدام البحث المتقدم
-                response = apiClient.getSalesHistoryAdvanced(
-                    searchQuery, 
-                    currentFilter, 
-                    null, // fromDate
-                    null, // toDate
-                    page, 
-                    PAGE_SIZE
-                );
-            } else {
-                // تحميل عادي مع pagination
-                response = apiClient.getSalesHistoryPaginated(page, PAGE_SIZE);
-            }
-
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONArray sales = null;
-                int totalCount = 0;
-                boolean hasMore = false;
-
-                // استخراج البيانات
-                if (response.data.has("sales")) {
-                    sales = response.data.optJSONArray("sales");
-                } else if (response.data.has("data")) {
-                    Object dataObj = response.data.opt("data");
-                    if (dataObj instanceof JSONArray) {
-                        sales = (JSONArray) dataObj;
-                    } else if (dataObj instanceof JSONObject) {
-                        JSONObject dataJson = (JSONObject) dataObj;
-                        sales = dataJson.optJSONArray("sales");
-                        if (sales == null) {
-                            sales = dataJson.optJSONArray("items");
-                        }
-                        totalCount = dataJson.optInt("total", dataJson.optInt("total_count", 0));
-                        hasMore = dataJson.optBoolean("has_more", false);
-                    }
+        if (isLoading && !isRefresh) return;
+        
+        isLoading = true;
+        
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                if (apiClient == null && getContext() != null) {
+                    apiClient = MiraApiClient.getInstance(getContext());
                 }
 
-                // استخراج العدد الإجمالي
-                if (totalCount == 0) {
-                    totalCount = response.data.optInt("total", response.data.optInt("total_count", 0));
-                }
-                
-                // استخراج has_more
-                if (!hasMore) {
-                    hasMore = response.data.optBoolean("has_more", false);
-                }
-
-                final List<MiraSaleItem> items = (sales != null) ? parseSalesJson(sales) : new ArrayList<>();
-                final int finalTotalCount = totalCount;
-                final boolean finalHasMore = hasMore;
-                
-                // حفظ في الكاش
-                if (sales != null && sales.length() > 0) {
-                    saveSalesOffline(sales, page);
-                }
-                
-                // تحديد إذا كانت هذه آخر صفحة
-                boolean isLast = items.size() < PAGE_SIZE || 
-                               (finalTotalCount > 0 && (page + 1) * PAGE_SIZE >= finalTotalCount) ||
-                               !finalHasMore;
-
-                mainHandler.post(() -> {
-                    if (!isAdded()) return;
-                    
-                    if (isRefresh) {
+                if (apiClient == null) {
+                    mainHandler.post(() -> {
                         hideLoadingState();
-                        saleList.clear();
-                        saleList.addAll(items);
+                        isLoading = false;
+                        if (saleList.isEmpty()) {
+                            showEmptyState(isArabic ? "⚠️ خطأ في تهيئة النظام" : "⚠️ System initialization error");
+                        }
+                    });
+                    return;
+                }
+
+                MiraApiClient.ApiResponse response;
+                
+                // ✅ استخدام الفلترة المتقدمة مع branch_id
+                if (!searchQuery.isEmpty() || !currentFilter.equals("ALL") || selectedBranchId > 0) {
+                    response = apiClient.getSalesHistoryAdvanced(
+                        searchQuery, 
+                        currentFilter, 
+                        null, // fromDate
+                        null, // toDate
+                        page, 
+                        PAGE_SIZE
+                    );
+                } else {
+                    response = apiClient.getSalesHistoryPaginated(page, PAGE_SIZE);
+                }
+
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONArray sales = null;
+                    int totalCount = 0;
+                    boolean hasMore = false;
+
+                    if (response.data.has("sales")) {
+                        sales = response.data.optJSONArray("sales");
+                    } else if (response.data.has("data")) {
+                        Object dataObj = response.data.opt("data");
+                        if (dataObj instanceof JSONArray) {
+                            sales = (JSONArray) dataObj;
+                        } else if (dataObj instanceof JSONObject) {
+                            JSONObject dataJson = (JSONObject) dataObj;
+                            sales = dataJson.optJSONArray("sales");
+                            if (sales == null) {
+                                sales = dataJson.optJSONArray("items");
+                            }
+                            totalCount = dataJson.optInt("total", dataJson.optInt("total_count", 0));
+                            hasMore = dataJson.optBoolean("has_more", false);
+                        }
+                    }
+
+                    if (totalCount == 0) {
+                        totalCount = response.data.optInt("total", response.data.optInt("total_count", 0));
+                    }
+                    
+                    if (!hasMore) {
+                        hasMore = response.data.optBoolean("has_more", false);
+                    }
+
+                    List<MiraSaleItem> items = (sales != null) ? parseSalesJson(sales) : new ArrayList<>();
+                    
+                    // ✅ فلترة حسب الفرع إذا كان محدداً
+                    if (selectedBranchId > 0) {
+                        List<MiraSaleItem> filteredByBranch = new ArrayList<>();
+                        for (MiraSaleItem item : items) {
+                            if (item.branchId == selectedBranchId) {
+                                filteredByBranch.add(item);
+                            }
+                        }
+                        items = filteredByBranch;
+                    }
+                    
+                    final List<MiraSaleItem> finalItems = items;
+                    final int finalTotalCount = totalCount;
+                    final boolean finalHasMore = hasMore;
+                    
+                    if (sales != null && sales.length() > 0) {
+                        saveSalesOffline(sales, page);
+                    }
+                    
+                    boolean isLast = finalItems.size() < PAGE_SIZE || 
+                                   (finalTotalCount > 0 && (page + 1) * PAGE_SIZE >= finalTotalCount) ||
+                                   !finalHasMore;
+
+                    mainHandler.post(() -> {
+                        if (!isAdded()) return;
                         
-                        if (finalTotalCount > 0) {
-                            totalItems = finalTotalCount;
+                        isLoading = false;
+                        hideLoadingState();
+                        if (pbLoadMore != null) pbLoadMore.setVisibility(View.GONE);
+                        if (loadingMoreContainer != null) loadingMoreContainer.setVisibility(View.GONE);
+                        
+                        if (isRefresh) {
+                            saleList.clear();
+                            saleList.addAll(finalItems);
+                            totalItems = finalTotalCount > 0 ? finalTotalCount : finalItems.size();
+                            currentPage = 0;
+                            hasMoreData = !isLast && finalItems.size() == PAGE_SIZE;
+                            isLastPage = isLast;
                         } else {
-                            totalItems = items.size();
+                            saleList.addAll(finalItems);
+                            currentPage = page;
+                            hasMoreData = !isLast && finalItems.size() == PAGE_SIZE;
+                            isLastPage = isLast;
                         }
                         
-                        currentPage = 0;
-                        hasMoreData = !isLast && items.size() == PAGE_SIZE;
-                        isLastPage = isLast;
+                        filterSales(searchQuery);
                         
-                    } else {
-                        // إضافة عناصر جديدة
-                        saleList.addAll(items);
+                        if (saleList.isEmpty()) {
+                            showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
+                        }
                         
-                        currentPage = page;
-                        hasMoreData = !isLast && items.size() == PAGE_SIZE;
-                        isLastPage = isLast;
-                    }
-                    
-                    // تحديث الواجهة
-                    String currentQuery = etSearch != null ? etSearch.getText().toString() : "";
-                    filterSales(currentQuery);
-                    
-                    if (saleList.isEmpty()) {
-                        showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
-                    }
-                    
-                    // إخفاء مؤشر التحميل هنا - المكان الصحيح
-                    isLoading = false;
-                    if (pbLoadMore != null) {
-                        pbLoadMore.setVisibility(View.GONE);
-                    }
-                    
-                    // إخفاء حاوية التحميل الإضافي
-                    if (loadingMoreContainer != null) {
-                        loadingMoreContainer.setVisibility(View.GONE);
-                    }
-                    
-                    // إظهار نهاية القائمة إذا كانت آخر صفحة
-                    if (isLastPage && tvEndOfList != null) {
-                        tvEndOfList.setVisibility(View.VISIBLE);
-                    } else if (tvEndOfList != null) {
-                        tvEndOfList.setVisibility(View.GONE);
-                    }
-                });
-            } else {
+                        if (isLastPage && tvEndOfList != null) {
+                            tvEndOfList.setVisibility(View.VISIBLE);
+                        } else if (tvEndOfList != null) {
+                            tvEndOfList.setVisibility(View.GONE);
+                        }
+                    });
+                } else {
+                    mainHandler.post(() -> {
+                        if (!isAdded()) return;
+                        hideLoadingState();
+                        isLoading = false;
+                        if (pbLoadMore != null) pbLoadMore.setVisibility(View.GONE);
+                        if (loadingMoreContainer != null) loadingMoreContainer.setVisibility(View.GONE);
+                        
+                        if (saleList.isEmpty()) {
+                            showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Exception loading sales", e);
                 mainHandler.post(() -> {
                     if (!isAdded()) return;
                     hideLoadingState();
                     isLoading = false;
-                    if (pbLoadMore != null) {
-                        pbLoadMore.setVisibility(View.GONE);
-                    }
-                    
-                    if (loadingMoreContainer != null) {
-                        loadingMoreContainer.setVisibility(View.GONE);
-                    }
+                    if (pbLoadMore != null) pbLoadMore.setVisibility(View.GONE);
+                    if (loadingMoreContainer != null) loadingMoreContainer.setVisibility(View.GONE);
                     
                     if (saleList.isEmpty()) {
-                        showEmptyState(isArabic ? "📭 لا توجد مبيعات مسجلة" : "📭 No sales recorded");
+                        showEmptyState(isArabic ? "⚠️ خطأ في تحميل البيانات" : "⚠️ Error loading data");
                     }
                 });
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Exception loading sales", e);
-            mainHandler.post(() -> {
-                if (!isAdded()) return;
-                hideLoadingState();
-                isLoading = false;
-                if (pbLoadMore != null) {
-                    pbLoadMore.setVisibility(View.GONE);
-                }
-                
-                // إخفاء حاوية التحميل الإضافي في حالة الخطأ
-                if (loadingMoreContainer != null) {
-                    loadingMoreContainer.setVisibility(View.GONE);
-                }
-                
-                if (saleList.isEmpty()) {
-                    showEmptyState(isArabic ? "⚠️ خطأ في تحميل البيانات" : "⚠️ Error loading data");
-                }
-            });
-        }
-    });
-}
-
-    private List<MiraSaleItem> parseSalesJson(JSONArray sales) {
-        List<MiraSaleItem> items = new ArrayList<>();
-        for (int i = 0; i < sales.length(); i++) {
-            JSONObject sale = sales.optJSONObject(i);
-            if (sale == null) continue;
-
-            MiraSaleItem item = new MiraSaleItem();
-            item.saleId = sale.optString("sale_id", sale.optString("id", sale.optString("invoice_no", "—")));
-            item.customerName = sale.optString("customer_name", sale.optString("client_name", isArabic ? "عميل افتراضي" : "Customer"));
-            item.amount = sale.optDouble("final_amount", sale.optDouble("total_amount", sale.optDouble("amount", 0)));
-            item.itemCount = sale.optInt("item_count", sale.optInt("total_items", sale.optInt("count", 0)));
-            item.paymentMethod = sale.optString("payment_method", sale.optString("pay_type", "CASH"));
-            item.date = sale.optString("created_at", sale.optString("date", ""));
-            item.rawJson = sale.toString();
-            items.add(item);
-        }
-        return items;
+        });
     }
 
+    // ==================== الفلترة المحلية ====================
+    
     private void filterSales(String query) {
         List<MiraSaleItem> newFiltered = new ArrayList<>();
         
-        if ((query == null || query.trim().isEmpty()) && currentFilter.equals("ALL")) {
+        if ((query == null || query.trim().isEmpty()) && currentFilter.equals("ALL") && selectedBranchId == 0) {
             newFiltered.addAll(saleList);
         } else {
             String q = (query != null) ? query.toLowerCase(Locale.ROOT) : "";
             
             for (MiraSaleItem item : saleList) {
-                // فلترة حسب نوع الدفع
+                // ✅ فلترة حسب الفرع
+                if (selectedBranchId > 0 && item.branchId != selectedBranchId) {
+                    continue;
+                }
+                
+                // ✅ فلترة حسب طريقة الدفع
                 if (!currentFilter.equals("ALL")) {
                     String paymentMethod = item.paymentMethod != null ? item.paymentMethod.toUpperCase(Locale.ROOT) : "";
                     if (!paymentMethod.equals(currentFilter)) {
@@ -533,7 +576,7 @@ public class MiraSalesHistoryFragment extends Fragment {
                     }
                 }
                 
-                // فلترة حسب البحث
+                // ✅ فلترة حسب البحث
                 if (!q.isEmpty()) {
                     boolean matchesCustomer = item.customerName != null && 
                         item.customerName.toLowerCase(Locale.ROOT).contains(q);
@@ -670,6 +713,7 @@ public class MiraSalesHistoryFragment extends Fragment {
         String saleId, customerName, paymentMethod, date, rawJson;
         double amount;
         int itemCount;
+        int branchId; // ✅ إضافة معرف الفرع
 
         @Override
         public boolean equals(Object o) {
@@ -678,6 +722,7 @@ public class MiraSalesHistoryFragment extends Fragment {
             MiraSaleItem item = (MiraSaleItem) o;
             return Double.compare(item.amount, amount) == 0 &&
                     itemCount == item.itemCount &&
+                    branchId == item.branchId &&
                     Objects.equals(saleId, item.saleId) &&
                     Objects.equals(customerName, item.customerName) &&
                     Objects.equals(paymentMethod, item.paymentMethod) &&
@@ -686,7 +731,27 @@ public class MiraSalesHistoryFragment extends Fragment {
 
         @Override
         public int hashCode() {
-            return Objects.hash(saleId, customerName, paymentMethod, date, amount, itemCount);
+            return Objects.hash(saleId, customerName, paymentMethod, date, amount, itemCount, branchId);
+        }
+    }
+
+    static class BranchOption {
+        int id;
+        String name;
+        
+        BranchOption(int id, String name) {
+            this.id = id;
+            this.name = name;
+        }
+    }
+    
+    static class BranchItem {
+        int id;
+        String name;
+        
+        BranchItem(int id, String name) {
+            this.id = id;
+            this.name = name;
         }
     }
 
