@@ -2,7 +2,7 @@
 <resources>
     <string name="menu_dashboard">Dashboard</string>
     <string name="menu_quick_access">Quick Access Settings</string>
-    <string name="menu_gold_rates">Gold Rates & Exchange</string>
+    <string name="menu_gold_rates">Gold Rates &amp; Exchange</string>
     <string name="menu_branches">Branches</string>
     <string name="menu_toggle_language">Change Language (العربية)</string>
     <string name="menu_profile">Profile</string>
