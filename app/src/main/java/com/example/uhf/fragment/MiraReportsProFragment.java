@@ -85,7 +85,9 @@ public class MiraReportsProFragment extends Fragment {
         currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 1;
 
         rvReports = view.findViewById(R.id.rvReportsList);
-        rvReports.setLayoutManager(new LinearLayoutManager(getContext()));
+       // rvReports.setLayoutManager(new LinearLayoutManager(getContext()));
+       rvReports.setLayoutManager(new androidx.recyclerview.widget.GridLayoutManager(getContext(), 2));
+
 
         buildReportsList();
         adapter = new ReportsAdapter(reportList, this::openReportDialog);
@@ -1056,4 +1058,4 @@ public class MiraReportsProFragment extends Fragment {
         if (executorService != null && !executorService.isShutdown()) executorService.shutdownNow();
         super.onDestroyView();
     }
-}
+            }
