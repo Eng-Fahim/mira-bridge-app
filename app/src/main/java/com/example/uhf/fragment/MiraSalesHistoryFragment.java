@@ -138,6 +138,23 @@ public class MiraSalesHistoryFragment extends Fragment {
         refreshSales(true);
     }
 
+
+private void loadSalesOffline() {
+    try {
+        if (offlineCache == null) return;
+        
+        String cachedJson = offlineCache.getString("sales_cache", "");
+        if (cachedJson.isEmpty()) return;
+        
+        JSONArray sales = new JSONArray(cachedJson);
+        saleList.clear();
+        saleList.addAll(parseSalesJson(sales));
+        
+        filterSales(searchQuery);
+    } catch (Exception e) {
+        Log.e(TAG, "Error loading offline sales: " + e.getMessage());
+    }
+}
     // ==================== الصلاحيات والفروع ====================
     
     private void applyPermissions() {
