@@ -5,33 +5,54 @@
     <item
         android:id="@+id/action_dashboard"
         android:icon="@android:drawable/ic_menu_today"
-        android:title="الرئيسية"
+        android:title="@string/menu_dashboard"
         app:showAsAction="always" />
 
     <item
         android:id="@+id/action_quick_access_settings"
         android:icon="@android:drawable/ic_menu_preferences"
-        android:title="تخصيص الوصول السريع"
+        android:title="@string/menu_quick_access"
         app:showAsAction="always" />
 
     <item
         android:id="@+id/action_gold_rates"
         android:icon="@android:drawable/ic_menu_compass"
-        android:title="أسعار الذهب والبورصة"
+        android:title="@string/menu_gold_rates"
+        app:showAsAction="ifRoom" />
+
+    <!-- ✅ الفروع -->
+    <item
+        android:id="@+id/action_branches"
+        android:icon="@android:drawable/ic_menu_compass"
+        android:title="@string/menu_branches"
         app:showAsAction="ifRoom" />
 
     <item
         android:id="@+id/action_toggle_language"
-        android:title="تغيير اللغة (English/عربي)"
+        android:title="@string/menu_toggle_language"
         app:showAsAction="never" />
 
     <item
         android:id="@+id/action_profile"
-        android:title="الملف الشخصي"
+        android:title="@string/menu_profile"
         app:showAsAction="never" />
 
     <item
         android:id="@+id/action_logout"
-        android:title="تسجيل الخروج"
+        android:title="@string/menu_logout"
         app:showAsAction="never" />
+
+    <!-- ✅ مجموعة متقدمة -->
+    <group android:id="@+id/group_advanced">
+        <item
+            android:id="@+id/export"
+            android:title="@string/menu_export_data"
+            app:showAsAction="never" />
+
+        <item
+            android:id="@+id/UHF_ver"
+            android:title="@string/menu_device_version"
+            app:showAsAction="never" />
+    </group>
+
 </menu>
