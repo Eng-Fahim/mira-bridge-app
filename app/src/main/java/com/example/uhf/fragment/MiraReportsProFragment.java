@@ -137,109 +137,553 @@ public class MiraReportsProFragment extends Fragment {
         }
     }
 
-    private void openReportDialog(ReportItem item) {
-        if (getContext() == null || !isAdded()) return;
+    // ==================== Advanced Filter System ====================
 
-        if (permissionManager != null && !permissionManager.canAccessFragment("Reports")) {
-            Toast.makeText(getContext(), isArabic ? "⛔ غير مصرح" : "⛔ Access Denied", Toast.LENGTH_SHORT).show();
-            return;
+private void openReportDialog(ReportItem item) {
+    if (getContext() == null || !isAdded()) return;
+
+    if (permissionManager != null && !permissionManager.canAccessFragment("Reports")) {
+        Toast.makeText(getContext(), isArabic ? "⛔ غير مصرح" : "⛔ Access Denied", Toast.LENGTH_SHORT).show();
+        return;
+    }
+
+    // ✅ التقارير المتقدمة
+    if (item.type.equals("user_timeline")) {
+        showUserTimelineDialog(item);
+        return;
+    }
+    
+    if (item.type.equals("item_passport")) {
+        showItemPassportDialog(item);
+        return;
+    }
+    
+    if (item.type.equals("gate_security_index")) {
+        showGateSecurityDialog(item);
+        return;
+    }
+    
+    if (item.type.equals("inventory_aging")) {
+        showInventoryAgingDialog(item);
+        return;
+    }
+    
+    if (item.type.equals("audit_discrepancy_detail")) {
+        showAuditDiscrepancyDialog(item);
+        return;
+    }
+
+    // ✅ التقارير العادية مع فلاتر مخصصة
+    showFilteredReportDialog(item);
+}
+
+// ==================== 1. فلتر المبيعات ====================
+private void showFilteredReportDialog(ReportItem item) {
+    View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
+    
+    TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
+    RecyclerView rvData = dialogView.findViewById(R.id.rvReportData);
+    View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
+    TextView tvLoadingStatus = dialogView.findViewById(R.id.tvLoadingStatus);
+    
+    MaterialButton btnFrom = dialogView.findViewById(R.id.btnReportDateFrom);
+    MaterialButton btnTo = dialogView.findViewById(R.id.btnReportDateTo);
+    MaterialButton btnApply = dialogView.findViewById(R.id.btnReportApplyFilter);
+    MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
+    MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
+    MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
+    MaterialButton btnAdvancedFilter = dialogView.findViewById(R.id.btnAdvancedFilter);
+    
+    final String[] selectedDates = new String[]{getDefaultFromDate(), getDefaultToDate()};
+    final String[] selectedFilters = new String[]{"", "", ""}; // [0]=search, [1]=filter1, [2]=filter2
+    
+    btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
+    btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
+    
+    tvTitle.setText(item.icon + " " + item.title);
+    rvData.setLayoutManager(new LinearLayoutManager(getContext()));
+    
+    AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
+            .setView(dialogView)
+            .create();
+    
+    btnFrom.setOnClickListener(v -> showDatePicker(date -> {
+        selectedDates[0] = date;
+        btnFrom.setText((isArabic ? "من: " : "From: ") + date);
+    }));
+    
+    btnTo.setOnClickListener(v -> showDatePicker(date -> {
+        selectedDates[1] = date;
+        btnTo.setText((isArabic ? "إلى: " : "To: ") + date);
+    }));
+    
+    // ✅ زر الفلترة المتقدمة
+    if (btnAdvancedFilter != null) {
+        btnAdvancedFilter.setOnClickListener(v -> {
+            showAdvancedFilterDialog(item.type, selectedFilters, () -> {
+                fetchAndDisplayWithFilters(item.type, rvData, layoutLoading, tvLoadingStatus, 
+                    selectedDates[0], selectedDates[1], selectedFilters);
+            });
+        });
+    }
+    
+    btnApply.setOnClickListener(v -> 
+        fetchAndDisplayWithFilters(item.type, rvData, layoutLoading, tvLoadingStatus, 
+            selectedDates[0], selectedDates[1], selectedFilters)
+    );
+    
+    btnExport.setOnClickListener(v -> exportReportToCSV(item.type, selectedDates[0], selectedDates[1]));
+    btnClose.setOnClickListener(v -> dialog.dismiss());
+    
+    if (btnPrint != null) {
+        btnPrint.setOnClickListener(v -> printReport(item, rvData, selectedDates, selectedFilters));
+    }
+    
+    dialog.show();
+    
+    fetchAndDisplayWithFilters(item.type, rvData, layoutLoading, tvLoadingStatus, 
+        selectedDates[0], selectedDates[1], selectedFilters);
+}
+
+// ==================== دالة الفلترة المتقدمة ====================
+private void showAdvancedFilterDialog(String reportType, String[] filters, Runnable onApply) {
+    AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+    builder.setTitle(isArabic ? "🔍 فلترة متقدمة" : "🔍 Advanced Filter");
+    
+    View filterView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_advanced_filter, null);
+    
+    EditText etSearch = filterView.findViewById(R.id.etFilterSearch);
+    EditText etFilter1 = filterView.findViewById(R.id.etFilter1);
+    EditText etFilter2 = filterView.findViewById(R.id.etFilter2);
+    TextView tvFilter1Label = filterView.findViewById(R.id.tvFilter1Label);
+    TextView tvFilter2Label = filterView.findViewById(R.id.tvFilter2Label);
+    
+    // ✅ تخصيص الفلاتر حسب نوع التقرير
+    switch (reportType) {
+        case "sales":
+            tvFilter1Label.setText(isArabic ? "طريقة الدفع" : "Payment Method");
+            tvFilter2Label.setText(isArabic ? "العميل" : "Customer");
+            etFilter1.setHint(isArabic ? "cash, card, transfer..." : "cash, card, transfer...");
+            etFilter2.setHint(isArabic ? "اسم العميل" : "Customer name");
+            break;
+        case "inventory":
+            tvFilter1Label.setText(isArabic ? "العيار" : "Karat");
+            tvFilter2Label.setText(isArabic ? "الحالة" : "Status");
+            etFilter1.setHint(isArabic ? "21K, 18K..." : "21K, 18K...");
+            etFilter2.setHint(isArabic ? "in_stock, displayed..." : "in_stock, displayed...");
+            break;
+        case "movement":
+            tvFilter1Label.setText(isArabic ? "الحالة" : "Status");
+            tvFilter2Label.setText(isArabic ? "الفرع" : "Branch");
+            etFilter1.setHint(isArabic ? "draft, approved..." : "draft, approved...");
+            etFilter2.setHint(isArabic ? "اسم الفرع" : "Branch name");
+            break;
+        case "gates":
+            tvFilter1Label.setText(isArabic ? "البوابة" : "Gate");
+            tvFilter2Label.setText(isArabic ? "الحالة" : "Status");
+            etFilter1.setHint(isArabic ? "معرف البوابة" : "Gate ID");
+            etFilter2.setHint(isArabic ? "allowed, alert..." : "allowed, alert...");
+            break;
+        case "audit":
+            tvFilter1Label.setText(isArabic ? "الفرع" : "Branch");
+            tvFilter2Label.setText(isArabic ? "الدقة" : "Accuracy");
+            etFilter1.setHint(isArabic ? "معرف الفرع" : "Branch ID");
+            etFilter2.setHint(isArabic ? "≥ 90, ≥ 80..." : "≥ 90, ≥ 80...");
+            break;
+        case "users":
+            tvFilter1Label.setText(isArabic ? "الدور" : "Role");
+            tvFilter2Label.setText(isArabic ? "الحالة" : "Status");
+            etFilter1.setHint(isArabic ? "ADMIN, POS..." : "ADMIN, POS...");
+            etFilter2.setHint(isArabic ? "active, suspended..." : "active, suspended...");
+            break;
+    }
+    
+    // تعبئة القيم الحالية
+    etSearch.setText(filters[0]);
+    etFilter1.setText(filters[1]);
+    etFilter2.setText(filters[2]);
+    
+    builder.setView(filterView);
+    builder.setPositiveButton(isArabic ? "تطبيق" : "Apply", (dialog, which) -> {
+        filters[0] = etSearch.getText().toString().trim();
+        filters[1] = etFilter1.getText().toString().trim();
+        filters[2] = etFilter2.getText().toString().trim();
+        onApply.run();
+    });
+    builder.setNegativeButton(isArabic ? "إلغاء" : "Cancel", null);
+    builder.show();
+}
+
+// ==================== جلب البيانات مع الفلاتر ====================
+private void fetchAndDisplayWithFilters(String type, RecyclerView rvData, View layoutLoading, 
+                                      TextView tvLoadingStatus, String fromDate, String toDate, 
+                                      String[] filters) {
+    if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
+    if (tvLoadingStatus != null) tvLoadingStatus.setText(isArabic ? "جاري التحميل..." : "Loading...");
+
+    executorService.execute(() -> {
+        try {
+            // بناء URL مع الفلاتر
+            StringBuilder endpoint = new StringBuilder("/reports-app?type=").append(type);
+            endpoint.append("&from=").append(fromDate);
+            endpoint.append("&to=").append(toDate);
+            endpoint.append("&branch_id=").append(currentBranchId);
+            
+            if (filters != null && filters.length > 0) {
+                if (!filters[0].isEmpty()) endpoint.append("&search=").append(filters[0]);
+                if (!filters[1].isEmpty()) endpoint.append("&filter1=").append(filters[1]);
+                if (!filters[2].isEmpty()) endpoint.append("&filter2=").append(filters[2]);
+            }
+            
+            MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint.toString());
+
+            mainHandler.post(() -> {
+                if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+
+                if (response == null || !response.isSuccess) {
+                    Toast.makeText(getContext(), 
+                        isArabic ? "فشل التحميل" : "Failed to load", 
+                        Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                JSONObject data = response.data;
+                String rawBody = response.getBody();
+
+                if (data == null && rawBody != null) {
+                    try {
+                        if (rawBody.trim().startsWith("[")) {
+                            JSONArray rootArray = new JSONArray(rawBody);
+                            data = new JSONObject();
+                            data.put("items_list", rootArray);
+                        } else {
+                            data = new JSONObject(rawBody);
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Parse JSON error", e);
+                    }
+                }
+
+                if (data == null) {
+                    Toast.makeText(getContext(), isArabic ? "لا توجد بيانات" : "No data available", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                // ✅ فلترة محلية إضافية للبيانات
+                JSONObject filteredData = applyLocalFilters(type, data, filters);
+                
+                RecyclerView.Adapter<?> reportAdapter = createAdapterForType(type, filteredData);
+                rvData.setAdapter(reportAdapter);
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Fetch error: " + e.getMessage());
+            mainHandler.post(() -> {
+                if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+                Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            });
         }
+    });
+}
 
-        // ✅ معالجة خاصة للتقارير التي تحتاج مدخلات إضافية
-        if (item.type.equals("user_timeline")) {
-            showUserTimelineDialog(item);
-            return;
+// ==================== فلترة محلية ====================
+private JSONObject applyLocalFilters(String type, JSONObject data, String[] filters) {
+    try {
+        if (filters == null || filters.length < 3) return data;
+        
+        String search = filters[0].toLowerCase();
+        String filter1 = filters[1].toLowerCase();
+        String filter2 = filters[2].toLowerCase();
+        
+        if (search.isEmpty() && filter1.isEmpty() && filter2.isEmpty()) {
+            return data;
         }
         
-        if (item.type.equals("item_passport")) {
-            showItemPassportDialog(item);
-            return;
+        // البحث في البيانات وتطبيق الفلاتر
+        JSONArray items = data.optJSONArray("items");
+        if (items == null) items = data.optJSONArray("data");
+        if (items == null) items = data.optJSONArray("items_list");
+        
+        if (items != null) {
+            JSONArray filteredItems = new JSONArray();
+            
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject item = items.optJSONObject(i);
+                if (item != null && matchesFilters(item, search, filter1, filter2, type)) {
+                    filteredItems.put(item);
+                }
+            }
+            
+            JSONObject result = new JSONObject();
+            result.put("items", filteredItems);
+            result.put("total_count", filteredItems.length());
+            return result;
         }
-
-        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
-
-        TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
-        RecyclerView rvData = dialogView.findViewById(R.id.rvReportData);
-        View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
-        TextView tvLoadingStatus = dialogView.findViewById(R.id.tvLoadingStatus);
-
-        MaterialButton btnFrom = dialogView.findViewById(R.id.btnReportDateFrom);
-        MaterialButton btnTo = dialogView.findViewById(R.id.btnReportDateTo);
-        MaterialButton btnApply = dialogView.findViewById(R.id.btnReportApplyFilter);
-        MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
-        MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
-        MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
-
-        final String[] selectedDates = new String[]{getDefaultFromDate(), getDefaultToDate()};
-
-        btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
-        btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
-
-        MaterialButton btnQuickToday = dialogView.findViewById(R.id.btnQuickToday);
-        MaterialButton btnQuickWeek = dialogView.findViewById(R.id.btnQuickWeek);
-        MaterialButton btnQuickMonth = dialogView.findViewById(R.id.btnQuickMonth);
-
-        tvTitle.setText(item.icon + " " + item.title);
-        rvData.setLayoutManager(new LinearLayoutManager(getContext()));
-
-        AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
-                .setView(dialogView)
-                .create();
-
-        btnFrom.setOnClickListener(v -> showDatePicker(date -> {
-            selectedDates[0] = date;
-            btnFrom.setText((isArabic ? "من: " : "From: ") + date);
-        }));
-
-        btnTo.setOnClickListener(v -> showDatePicker(date -> {
-            selectedDates[1] = date;
-            btnTo.setText((isArabic ? "إلى: " : "To: ") + date);
-        }));
-
-        if (btnQuickToday != null) {
-            btnQuickToday.setOnClickListener(v -> {
-                selectedDates[0] = getDefaultToDate();
-                selectedDates[1] = getDefaultToDate();
-                btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
-                btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
-                fetchAndDisplay(item.type, rvData, layoutLoading, tvLoadingStatus, selectedDates[0], selectedDates[1]);
-            });
-        }
-
-        if (btnQuickWeek != null) {
-            btnQuickWeek.setOnClickListener(v -> {
-                selectedDates[0] = getCalculatedDate(-7);
-                selectedDates[1] = getDefaultToDate();
-                btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
-                btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
-                fetchAndDisplay(item.type, rvData, layoutLoading, tvLoadingStatus, selectedDates[0], selectedDates[1]);
-            });
-        }
-
-        if (btnQuickMonth != null) {
-            btnQuickMonth.setOnClickListener(v -> {
-                selectedDates[0] = getCalculatedDate(-30);
-                selectedDates[1] = getDefaultToDate();
-                btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
-                btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
-                fetchAndDisplay(item.type, rvData, layoutLoading, tvLoadingStatus, selectedDates[0], selectedDates[1]);
-            });
-        }
-
-        btnApply.setOnClickListener(v -> 
-            fetchAndDisplay(item.type, rvData, layoutLoading, tvLoadingStatus, selectedDates[0], selectedDates[1])
-        );
-
-        btnExport.setOnClickListener(v -> exportReportToCSV(item.type, selectedDates[0], selectedDates[1]));
-        btnClose.setOnClickListener(v -> dialog.dismiss());
-        if (btnPrint != null) {
-            btnPrint.setOnClickListener(v -> printRecyclerView(rvData, item.title));
-        }
-
-        dialog.show();
-
-        fetchAndDisplay(item.type, rvData, layoutLoading, tvLoadingStatus, selectedDates[0], selectedDates[1]);
+    } catch (Exception e) {
+        Log.e(TAG, "Local filter error: " + e.getMessage());
     }
+    
+    return data;
+}
+
+private boolean matchesFilters(JSONObject item, String search, String filter1, String filter2, String type) {
+    try {
+        // البحث العام
+        if (!search.isEmpty()) {
+            String itemStr = item.toString().toLowerCase();
+            if (!itemStr.contains(search)) {
+                return false;
+            }
+        }
+        
+        // الفلاتر المحددة
+        if (!filter1.isEmpty()) {
+            String value1 = "";
+            switch (type) {
+                case "sales":
+                    value1 = item.optString("payment_method", item.optString("payment", ""));
+                    break;
+                case "inventory":
+                    value1 = item.optString("gold_karat", item.optString("karat", ""));
+                    break;
+                case "movement":
+                    value1 = item.optString("status", "");
+                    break;
+                case "gates":
+                    value1 = item.optString("gate_name", item.optString("gate_id", ""));
+                    break;
+                case "users":
+                    value1 = item.optString("role_name", item.optString("role", ""));
+                    break;
+            }
+            if (!value1.toLowerCase().contains(filter1)) {
+                return false;
+            }
+        }
+        
+        if (!filter2.isEmpty()) {
+            String value2 = "";
+            switch (type) {
+                case "sales":
+                    value2 = item.optString("customer_name", item.optString("customer", ""));
+                    break;
+                case "inventory":
+                    value2 = item.optString("vault_status", item.optString("status", ""));
+                    break;
+                case "movement":
+                    value2 = item.optString("from_branch", item.optString("to_branch", ""));
+                    break;
+                case "gates":
+                    value2 = item.optString("status", "");
+                    break;
+                case "users":
+                    value2 = item.optString("status", "");
+                    break;
+            }
+            if (!value2.toLowerCase().contains(filter2)) {
+                return false;
+            }
+        }
+        
+        return true;
+    } catch (Exception e) {
+        return true;
+    }
+}
+
+// ==================== طباعة محسنة ====================
+private void printReport(ReportItem item, RecyclerView rvData, String[] dates, String[] filters) {
+    if (getContext() == null || rvData == null) return;
+
+    try {
+        // ✅ إنشاء عرض مخصص للطباعة مع هيدر
+        View printView = LayoutInflater.from(requireContext()).inflate(R.layout.print_report_layout, null);
+        
+        // هيدر الطباعة
+        TextView tvPrintTitle = printView.findViewById(R.id.tvPrintTitle);
+        TextView tvPrintDate = printView.findViewById(R.id.tvPrintDate);
+        TextView tvPrintFilters = printView.findViewById(R.id.tvPrintFilters);
+        TextView tvPrintOrgName = printView.findViewById(R.id.tvPrintOrgName);
+        TextView tvPrintBranchName = printView.findViewById(R.id.tvPrintBranchName);
+        
+        if (tvPrintTitle != null) {
+            tvPrintTitle.setText(item.icon + " " + item.title);
+        }
+        
+        if (tvPrintDate != null) {
+            String dateRange = dates[0] + " → " + dates[1];
+            tvPrintDate.setText(isArabic ? "📅 الفترة: " + dateRange : "📅 Period: " + dateRange);
+        }
+        
+        if (tvPrintFilters != null && filters != null) {
+            StringBuilder filterStr = new StringBuilder();
+            if (!filters[0].isEmpty()) filterStr.append("بحث: ").append(filters[0]).append(" | ");
+            if (!filters[1].isEmpty()) filterStr.append("فلتر 1: ").append(filters[1]).append(" | ");
+            if (!filters[2].isEmpty()) filterStr.append("فلتر 2: ").append(filters[2]);
+            if (filterStr.length() > 0) {
+                tvPrintFilters.setText(isArabic ? "🔍 الفلاتر: " + filterStr : "🔍 Filters: " + filterStr);
+            }
+        }
+        
+        if (tvPrintOrgName != null && orgProfile != null) {
+            tvPrintOrgName.setText(orgProfile.getOrgName());
+        }
+        
+        if (tvPrintBranchName != null && branchesManager != null) {
+            tvPrintBranchName.setText(branchesManager.getActiveBranchName());
+        }
+        
+        // ✅ إنشاء PDF مع الهيدر والبيانات
+        android.print.PrintManager printManager = (android.print.PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
+        android.print.PrintAttributes attributes = new android.print.PrintAttributes.Builder()
+                .setMediaSize(android.print.PrintAttributes.MediaSize.ISO_A4)
+                .setResolution(new android.print.PrintAttributes.Resolution("pdf", "pdf", 600, 600))
+                .setMinMargins(android.print.PrintAttributes.Margins.NO_MARGINS)
+                .build();
+
+        printManager.print(item.title, new android.print.PrintDocumentAdapter() {
+            @Override
+            public void onLayout(android.print.PrintAttributes oldAttributes, android.print.PrintAttributes newAttributes,
+                               android.os.CancellationSignal cancellationSignal,
+                               LayoutResultCallback callback, android.os.Bundle extras) {
+                callback.onLayoutFinished(new android.print.PrintDocumentInfo.Builder("report.pdf")
+                        .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
+                        .build(), true);
+            }
+
+            @Override
+            public void onWrite(android.print.PageRange[] pages, android.os.ParcelFileDescriptor destination,
+                              android.os.CancellationSignal cancellationSignal, WriteResultCallback callback) {
+                try {
+                    android.graphics.pdf.PdfDocument pdfDocument = new android.graphics.pdf.PdfDocument();
+                    
+                    // صفحة الهيدر
+                    android.graphics.pdf.PdfDocument.PageInfo headerPageInfo = new android.graphics.pdf.PdfDocument.PageInfo.Builder(
+                            1080, 1920, 1).create();
+                    android.graphics.pdf.PdfDocument.Page headerPage = pdfDocument.startPage(headerPageInfo);
+                    android.graphics.Canvas headerCanvas = headerPage.getCanvas();
+                    headerCanvas.drawColor(android.graphics.Color.WHITE);
+                    
+                    printView.measure(
+                        View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.UNSPECIFIED)
+                    );
+                    printView.layout(0, 0, 1080, 1920);
+                    printView.draw(headerCanvas);
+                    pdfDocument.finishPage(headerPage);
+                    
+                    // صفحة البيانات
+                    android.graphics.pdf.PdfDocument.PageInfo dataPageInfo = new android.graphics.pdf.PdfDocument.PageInfo.Builder(
+                            1080, 1920, 1).create();
+                    android.graphics.pdf.PdfDocument.Page dataPage = pdfDocument.startPage(dataPageInfo);
+                    android.graphics.Canvas dataCanvas = dataPage.getCanvas();
+                    dataCanvas.drawColor(android.graphics.Color.WHITE);
+                    rvData.draw(dataCanvas);
+                    pdfDocument.finishPage(dataPage);
+                    
+                    pdfDocument.writeTo(new FileOutputStream(destination.getFileDescriptor()));
+                    pdfDocument.close();
+                    
+                    callback.onWriteFinished(new android.print.PageRange[]{android.print.PageRange.ALL_PAGES});
+                } catch (Exception e) {
+                    callback.onWriteFailed(e.getMessage());
+                }
+            }
+        }, attributes);
+
+    } catch (Exception e) {
+        Log.e(TAG, "Print error: " + e.getMessage());
+        Toast.makeText(getContext(), "Print error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+    }
+}
+
+// ==================== تصدير CSV محسن ====================
+private void exportReportToCSV(String type, String from, String to, JSONObject data) {
+    if (!isAdded() || getContext() == null) return;
+    try {
+        StringBuilder csv = new StringBuilder();
+        
+        // ✅ إضافة BOM للدعم العربي
+        csv.append('\uFEFF');
+        
+        // ✅ هيدر المنظمة
+        if (orgProfile != null) {
+            csv.append(isArabic ? "اسم الجهة" : "Organization").append(",")
+               .append(orgProfile.getOrgName()).append("\n");
+        }
+        
+        // ✅ معلومات التقرير
+        csv.append(isArabic ? "نوع التقرير" : "Report Type").append(",")
+           .append(type).append("\n");
+        csv.append(isArabic ? "الفترة من" : "From").append(",")
+           .append(from).append("\n");
+        csv.append(isArabic ? "الفترة إلى" : "To").append(",")
+           .append(to).append("\n");
+        csv.append(isArabic ? "تاريخ التصدير" : "Export Date").append(",")
+           .append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()))
+           .append("\n\n");
+        
+        // ✅ تصدير البيانات
+        if (data != null) {
+            JSONArray items = data.optJSONArray("items");
+            if (items == null) items = data.optJSONArray("data");
+            if (items == null) items = data.optJSONArray("items_list");
+            
+            if (items != null && items.length() > 0) {
+                // ✅ استخراج الأعمدة من أول عنصر
+                JSONObject firstItem = items.optJSONObject(0);
+                if (firstItem != null) {
+                    Iterator<String> keys = firstItem.keys();
+                    List<String> columns = new ArrayList<>();
+                    while (keys.hasNext()) {
+                        columns.add(keys.next());
+                    }
+                    
+                    // ✅ كتابة رؤوس الأعمدة
+                    for (int i = 0; i < columns.size(); i++) {
+                        if (i > 0) csv.append(",");
+                        csv.append(columns.get(i));
+                    }
+                    csv.append("\n");
+                    
+                    // ✅ كتابة البيانات
+                    for (int i = 0; i < items.length(); i++) {
+                        JSONObject item = items.optJSONObject(i);
+                        if (item != null) {
+                            for (int j = 0; j < columns.size(); j++) {
+                                if (j > 0) csv.append(",");
+                                String value = item.optString(columns.get(j), "");
+                                // ✅ تنظيف القيم من الفواصل
+                                value = value.replace(",", "،").replace("\n", " ");
+                                csv.append(value);
+                            }
+                            csv.append("\n");
+                        }
+                    }
+                }
+            }
+        }
+        
+        // ✅ حفظ الملف
+        File exportDir = new File(requireContext().getCacheDir(), "exports");
+        if (!exportDir.exists()) exportDir.mkdirs();
+        
+        File file = new File(exportDir, "MIRA_Report_" + type + "_" + System.currentTimeMillis() + ".csv");
+        FileOutputStream fos = new FileOutputStream(file);
+        fos.write(csv.toString().getBytes("UTF-8"));
+        fos.close();
+        
+        // ✅ مشاركة الملف
+        Uri uri = FileProvider.getUriForFile(requireContext(), requireContext().getPackageName() + ".fileprovider", file);
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("text/csv");
+        intent.putExtra(Intent.EXTRA_STREAM, uri);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(Intent.createChooser(intent, isArabic ? "مشاركة التقرير" : "Share Report"));
+        
+    } catch (Exception e) {
+        Toast.makeText(getContext(), "Export failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+    }
+}
 
     // ✅ دالة خاصة بتايم لاين المستخدم
     private void showUserTimelineDialog(ReportItem item) {
@@ -1474,4 +1918,4 @@ public class MiraReportsProFragment extends Fragment {
         if (executorService != null && !executorService.isShutdown()) executorService.shutdownNow();
         super.onDestroyView();
     }
-}
+                                     }
