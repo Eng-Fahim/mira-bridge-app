@@ -141,10 +141,7 @@ public class MiraReportsProFragment extends Fragment {
         MaterialButton btnApply = dialogView.findViewById(R.id.btnReportApplyFilter);
         MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
         MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
-        
         MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
-
-
 
         final String[] selectedDates = new String[]{getDefaultFromDate(), getDefaultToDate()};
 
@@ -208,371 +205,464 @@ public class MiraReportsProFragment extends Fragment {
 
         btnExport.setOnClickListener(v -> exportReportToCSV(item.type, selectedDates[0], selectedDates[1]));
         btnClose.setOnClickListener(v -> dialog.dismiss());
-        btnPrint.setOnClickListener(v -> {
-        printRecyclerView(rvData, item.title);});
+        if (btnPrint != null) {
+            btnPrint.setOnClickListener(v -> printRecyclerView(rvData, item.title));
+        }
 
         dialog.show();
 
         fetchAndDisplay(item.type, rvData, layoutLoading, tvLoadingStatus, selectedDates[0], selectedDates[1]);
     }
 
-private void printRecyclerView(RecyclerView rvData, String title) {
-    if (getContext() == null || rvData == null) return;
-    
-    try {
-        // ✅ إنشاء Bitmap من RecyclerView
-        int width = rvData.getWidth();
-        int height = rvData.getHeight();
-        
-        if (width <= 0 || height <= 0) {
-            width = 1080;
-            height = 1920;
-        }
-        
-        android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888);
-        android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
-        canvas.drawColor(android.graphics.Color.WHITE);
-        rvData.draw(canvas);
-        
-        // ✅ إنشاء PDF
-        android.print.PrintManager printManager = (android.print.PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
-        android.print.PrintAttributes attributes = new android.print.PrintAttributes.Builder()
-                .setMediaSize(android.print.PrintAttributes.MediaSize.ISO_A4)
-                .setResolution(new android.print.PrintAttributes.Resolution("pdf", "pdf", 600, 600))
-                .setMinMargins(android.print.PrintAttributes.Margins.NO_MARGINS)
-                .build();
-        
-        printManager.print(title, new android.print.PrintDocumentAdapter() {
-            @Override
-            public void onLayout(android.print.PrintAttributes oldAttributes, android.print.PrintAttributes newAttributes,
-                               android.os.CancellationSignal cancellationSignal,
-                               LayoutResultCallback callback, android.os.Bundle extras) {
-                callback.onLayoutFinished(new android.print.PrintDocumentInfo.Builder("report.pdf")
-                        .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
-                        .build(), true);
-            }
-            
-            @Override
-            public void onWrite(android.print.PageRange[] pages, android.os.ParcelFileDescriptor destination,
-                              android.os.CancellationSignal cancellationSignal, WriteResultCallback callback) {
-                try {
-                    android.graphics.pdf.PdfDocument pdfDocument = new android.graphics.pdf.PdfDocument();
-                    
-                    android.graphics.pdf.PdfDocument.PageInfo pageInfo = new android.graphics.pdf.PdfDocument.PageInfo.Builder(
-                            bitmap.getWidth(), bitmap.getHeight(), 1).create();
-                    
-                    android.graphics.pdf.PdfDocument.Page page = pdfDocument.startPage(pageInfo);
-                    page.getCanvas().drawBitmap(bitmap, 0, 0, null);
-                    pdfDocument.finishPage(page);
-                    
-                    pdfDocument.writeTo(new java.io.FileOutputStream(destination.getFileDescriptor()));
-                    pdfDocument.close();
-                    
-                    callback.onWriteFinished(new android.print.PageRange[]{android.print.PageRange.ALL_PAGES});
-                } catch (Exception e) {
-                    callback.onWriteFailed(e.getMessage());
-                }
-            }
-        }, attributes);
-        
-    } catch (Exception e) {
-        Log.e(TAG, "Print error: " + e.getMessage());
-        Toast.makeText(getContext(), "Print error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-    }
-}
-    private void fetchAndDisplay(String type, RecyclerView rvData, View layoutLoading, 
-                              TextView tvLoadingStatus, String fromDate, String toDate) {
-    if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
-    if (tvLoadingStatus != null) tvLoadingStatus.setText(isArabic ? "جاري التحميل..." : "Loading...");
+    private void printRecyclerView(RecyclerView rvData, String title) {
+        if (getContext() == null || rvData == null) return;
 
-    executorService.execute(() -> {
         try {
-            // ✅ استخدام getReportData الموجودة في MiraApiClient
-            MiraApiClient.ApiResponse response = apiClient.getReportData(type, fromDate, toDate, currentBranchId);
+            int width = rvData.getWidth();
+            int height = rvData.getHeight();
 
-            mainHandler.post(() -> {
-                if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+            if (width <= 0 || height <= 0) {
+                width = 1080;
+                height = 1920;
+            }
 
-                if (response == null || !response.isSuccess) {
-                    Toast.makeText(getContext(), 
-                        isArabic ? "فشل التحميل" : "Failed to load", 
-                        Toast.LENGTH_SHORT).show();
-                    return;
+            android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
+            canvas.drawColor(android.graphics.Color.WHITE);
+            rvData.draw(canvas);
+
+            android.print.PrintManager printManager = (android.print.PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
+            android.print.PrintAttributes attributes = new android.print.PrintAttributes.Builder()
+                    .setMediaSize(android.print.PrintAttributes.MediaSize.ISO_A4)
+                    .setResolution(new android.print.PrintAttributes.Resolution("pdf", "pdf", 600, 600))
+                    .setMinMargins(android.print.PrintAttributes.Margins.NO_MARGINS)
+                    .build();
+
+            printManager.print(title, new android.print.PrintDocumentAdapter() {
+                @Override
+                public void onLayout(android.print.PrintAttributes oldAttributes, android.print.PrintAttributes newAttributes,
+                                   android.os.CancellationSignal cancellationSignal,
+                                   LayoutResultCallback callback, android.os.Bundle extras) {
+                    callback.onLayoutFinished(new android.print.PrintDocumentInfo.Builder("report.pdf")
+                            .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
+                            .build(), true);
                 }
 
-                // ✅ البيانات إما في response.data أو response.getBody()
-                JSONObject data = response.data;
-                if (data == null) {
-                    // محاولة تحليل النص الخام
+                @Override
+                public void onWrite(android.print.PageRange[] pages, android.os.ParcelFileDescriptor destination,
+                                  android.os.CancellationSignal cancellationSignal, WriteResultCallback callback) {
                     try {
-                        data = new JSONObject(response.getBody());
+                        android.graphics.pdf.PdfDocument pdfDocument = new android.graphics.pdf.PdfDocument();
+
+                        android.graphics.pdf.PdfDocument.PageInfo pageInfo = new android.graphics.pdf.PdfDocument.PageInfo.Builder(
+                                bitmap.getWidth(), bitmap.getHeight(), 1).create();
+
+                        android.graphics.pdf.PdfDocument.Page page = pdfDocument.startPage(pageInfo);
+                        page.getCanvas().drawBitmap(bitmap, 0, 0, null);
+                        pdfDocument.finishPage(page);
+
+                        pdfDocument.writeTo(new FileOutputStream(destination.getFileDescriptor()));
+                        pdfDocument.close();
+
+                        callback.onWriteFinished(new android.print.PageRange[]{android.print.PageRange.ALL_PAGES});
                     } catch (Exception e) {
-                        Toast.makeText(getContext(), "Data parse error", Toast.LENGTH_SHORT).show();
-                        return;
+                        callback.onWriteFailed(e.getMessage());
                     }
                 }
-                
-                // ✅ السجل للتشخيص
-                Log.d(TAG, "=== Report: " + type + " ===");
-                Log.d(TAG, "Data: " + data.toString().substring(0, Math.min(500, data.toString().length())));
-                
-                String cacheKey = "cache_pro_" + type + "_" + fromDate + "_" + toDate;
-                if (offlineCache != null) {
-                    offlineCache.edit().putString(cacheKey, data.toString()).apply();
-                }
+            }, attributes);
 
-                // ✅ اختيار الـ Adapter المناسب
-                switch (type) {
-                    case "sales":
-                        rvData.setAdapter(new SalesAdapter(parseSales(data)));
-                        break;
-                    case "inventory":
-                        rvData.setAdapter(new InventoryAdapter(parseInventory(data)));
-                        break;
-                    case "audit":
-                        rvData.setAdapter(new AuditAdapter(parseAudit(data)));
-                        break;
-                    case "reorder":
-                        rvData.setAdapter(new ReorderAdapter(parseReorder(data)));
-                        break;
-                    case "users":
-                        rvData.setAdapter(new UsersAdapter(parseUsers(data)));
-                        break;
-                    case "gates":
-                        rvData.setAdapter(new GatesAdapter(parseGates(data)));
-                        break;
-                    case "movement":
-                        rvData.setAdapter(new MovementAdapter(parseMovement(data)));
-                        break;
-                    case "branches":
-                        rvData.setAdapter(new BranchesAdapter(parseBranches(data)));
-                        break;
-                    case "financial":
-                        rvData.setAdapter(new FinancialAdapter(parseFinancial(data)));
-                        break;
-                    default:
-                        // ✅ للوحة القيادة - عرض منسق
-                        rvData.setAdapter(new DashboardAdapter(parseDashboard(data)));
-                        break;
-                }
-            });
         } catch (Exception e) {
-            Log.e(TAG, "Fetch error: " + e.getMessage());
-            mainHandler.post(() -> {
-                if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-                Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            });
+            Log.e(TAG, "Print error: " + e.getMessage());
+            Toast.makeText(getContext(), "Print error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
-    });
-}
+    }
+
+    private void fetchAndDisplay(String type, RecyclerView rvData, View layoutLoading, 
+                              TextView tvLoadingStatus, String fromDate, String toDate) {
+        if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
+        if (tvLoadingStatus != null) tvLoadingStatus.setText(isArabic ? "جاري التحميل..." : "Loading...");
+
+        executorService.execute(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getReportData(type, fromDate, toDate, currentBranchId);
+
+                mainHandler.post(() -> {
+                    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+
+                    if (response == null || !response.isSuccess) {
+                        Toast.makeText(getContext(), 
+                            isArabic ? "فشل التحميل" : "Failed to load", 
+                            Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    JSONObject data = response.data;
+                    String rawBody = response.getBody();
+
+                    if (data == null && rawBody != null) {
+                        try {
+                            if (rawBody.trim().startsWith("[")) {
+                                JSONArray rootArray = new JSONArray(rawBody);
+                                data = new JSONObject();
+                                data.put("items_list", rootArray);
+                            } else {
+                                data = new JSONObject(rawBody);
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Parse JSON error", e);
+                        }
+                    }
+
+                    if (data == null) {
+                        Toast.makeText(getContext(), isArabic ? "لا توجد بيانات" : "No data available", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    Log.d(TAG, "=== Report: " + type + " ===");
+                    Log.d(TAG, "Data: " + data.toString().substring(0, Math.min(500, data.toString().length())));
+
+                    String cacheKey = "cache_pro_" + type + "_" + fromDate + "_" + toDate;
+                    if (offlineCache != null) {
+                        offlineCache.edit().putString(cacheKey, data.toString()).apply();
+                    }
+
+                    switch (type) {
+                        case "sales":
+                            List<SalesItem> sales = parseSales(data);
+                            rvData.setAdapter(sales.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new SalesAdapter(sales));
+                            break;
+                        case "inventory":
+                            List<InventoryItem> inv = parseInventory(data);
+                            rvData.setAdapter(inv.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new InventoryAdapter(inv));
+                            break;
+                        case "audit":
+                            List<AuditItem> audit = parseAudit(data);
+                            rvData.setAdapter(audit.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new AuditAdapter(audit));
+                            break;
+                        case "reorder":
+                            List<ReorderItem> reorder = parseReorder(data);
+                            rvData.setAdapter(reorder.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new ReorderAdapter(reorder));
+                            break;
+                        case "users":
+                            List<UsersItem> users = parseUsers(data);
+                            rvData.setAdapter(users.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new UsersAdapter(users));
+                            break;
+                        case "gates":
+                            List<GatesItem> gates = parseGates(data);
+                            rvData.setAdapter(gates.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new GatesAdapter(gates));
+                            break;
+                        case "movement":
+                            List<MovementItem> movement = parseMovement(data);
+                            rvData.setAdapter(movement.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new MovementAdapter(movement));
+                            break;
+                        case "branches":
+                            List<BranchesItem> branches = parseBranches(data);
+                            rvData.setAdapter(branches.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new BranchesAdapter(branches));
+                            break;
+                        case "financial":
+                            List<FinancialItem> financial = parseFinancial(data);
+                            rvData.setAdapter(financial.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new FinancialAdapter(financial));
+                            break;
+                        default:
+                            rvData.setAdapter(new DashboardAdapter(parseDashboard(data)));
+                            break;
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Fetch error: " + e.getMessage());
+                mainHandler.post(() -> {
+                    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+                    Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
+    }
+
     // ==================== Parsing Functions ====================
 
     private List<SalesItem> parseSales(JSONObject data) {
-    List<SalesItem> items = new ArrayList<>();
-    
-    // ✅ البيانات داخل data.sales.invoices
-    JSONObject salesObj = data.optJSONObject("sales");
-    if (salesObj == null) salesObj = data;
-    
-    JSONArray invoices = salesObj.optJSONArray("invoices");
-    if (invoices == null) invoices = salesObj.optJSONArray("sales");
-    if (invoices == null) invoices = data.optJSONArray("invoices");
-    
-    if (invoices != null) {
-        for (int i = 0; i < invoices.length(); i++) {
-            JSONObject inv = invoices.optJSONObject(i);
-            if (inv != null) {
-                items.add(new SalesItem(
-                    inv.optString("invoice_no", inv.optString("sale_number", inv.optString("id", "-"))),
-                    inv.optString("customer_name", "-"),
-                    inv.optDouble("final_amount", inv.optDouble("total", inv.optDouble("subtotal", 0))),
-                    inv.optString("payment_method", "-"),
-                    inv.optString("seller_name", "-")
+        List<SalesItem> items = new ArrayList<>();
+        JSONObject salesObj = data.optJSONObject("sales");
+        if (salesObj == null) salesObj = data;
+
+        JSONArray invoices = salesObj.optJSONArray("invoices");
+        if (invoices == null) invoices = salesObj.optJSONArray("sales");
+        if (invoices == null) invoices = data.optJSONArray("invoices");
+        if (invoices == null) invoices = data.optJSONArray("items_list");
+
+        if (invoices != null) {
+            for (int i = 0; i < invoices.length(); i++) {
+                JSONObject inv = invoices.optJSONObject(i);
+                if (inv != null) {
+                    items.add(new SalesItem(
+                        inv.optString("invoice_no", inv.optString("sale_number", inv.optString("id", "-"))),
+                        inv.optString("customer_name", inv.optString("customer", "-")),
+                        inv.optDouble("final_amount", inv.optDouble("total", inv.optDouble("subtotal", 0))),
+                        inv.optString("payment_method", inv.optString("payment", "-")),
+                        inv.optString("seller_name", inv.optString("seller", "-"))
+                    ));
+                }
+            }
+        }
+        return items;
+    }
+
+    private List<InventoryItem> parseInventory(JSONObject data) {
+        List<InventoryItem> items = new ArrayList<>();
+        JSONObject invObj = data.optJSONObject("inventory");
+        if (invObj == null) invObj = data;
+
+        JSONArray arr = invObj.optJSONArray("items");
+        if (arr == null) arr = data.optJSONArray("items");
+        if (arr == null) arr = data.optJSONArray("items_list");
+
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject obj = arr.optJSONObject(i);
+                if (obj != null) {
+                    items.add(new InventoryItem(
+                        obj.optString("item_title", obj.optString("title", obj.optString("name", "-"))),
+                        obj.optString("gold_karat", obj.optString("karat", "-")),
+                        obj.optDouble("gross_weight_grams", obj.optDouble("weight", 0)),
+                        obj.optString("vault_status", obj.optString("status", "-")),
+                        obj.optString("current_location", obj.optString("location", "-"))
+                    ));
+                }
+            }
+        }
+        return items;
+    }
+
+    private List<AuditItem> parseAudit(JSONObject data) {
+        List<AuditItem> items = new ArrayList<>();
+        JSONObject auditContainer = data.optJSONObject("audit");
+        if (auditContainer == null) auditContainer = data;
+
+        JSONObject audit = auditContainer.optJSONObject("audit_summary");
+        if (audit == null) audit = auditContainer;
+
+        if (audit != null) {
+            items.add(new AuditItem(
+                audit.optDouble("accuracy", 0),
+                audit.optInt("found_items", audit.optInt("found", 0)),
+                audit.optInt("missing_items", audit.optInt("missing", 0)),
+                audit.optInt("total_sessions", audit.optInt("sessions", 0))
+            ));
+        }
+        return items;
+    }
+
+    private List<ReorderItem> parseReorder(JSONObject data) {
+        List<ReorderItem> items = new ArrayList<>();
+        JSONArray arr = data.optJSONArray("reorder_items");
+        if (arr == null) arr = data.optJSONArray("karat_breakdown");
+        if (arr == null) arr = data.optJSONArray("items");
+        if (arr == null) arr = data.optJSONArray("items_list");
+
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject obj = arr.optJSONObject(i);
+                if (obj != null) {
+                    items.add(new ReorderItem(
+                        obj.optString("gold_karat", obj.optString("karat", "-")),
+                        obj.optInt("sold_count", obj.optInt("count", obj.optInt("sold", 0))),
+                        obj.optInt("remaining_stock", obj.optInt("remaining", 0))
+                    ));
+                }
+            }
+        }
+        return items;
+    }
+
+    private List<UsersItem> parseUsers(JSONObject data) {
+        List<UsersItem> items = new ArrayList<>();
+        JSONArray arr = data.optJSONArray("users");
+        if (arr == null) arr = data.optJSONArray("data");
+        if (arr == null) arr = data.optJSONArray("items_list");
+
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject obj = arr.optJSONObject(i);
+                if (obj != null) {
+                    items.add(new UsersItem(
+                        obj.optString("display_name", obj.optString("name", obj.optString("username", "-"))),
+                        obj.optString("role_name", obj.optString("role", "-")),
+                        obj.optString("status", obj.optString("is_active", "Active"))
+                    ));
+                }
+            }
+        }
+        return items;
+    }
+
+    private List<GatesItem> parseGates(JSONObject data) {
+        List<GatesItem> items = new ArrayList<>();
+        JSONArray arr = data.optJSONArray("gate_logs");
+        if (arr == null) arr = data.optJSONArray("logs");
+        if (arr == null) arr = data.optJSONArray("data");
+        if (arr == null) arr = data.optJSONArray("items_list");
+
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject obj = arr.optJSONObject(i);
+                if (obj != null) {
+                    items.add(new GatesItem(
+                        obj.optString("gate_name", obj.optString("gate", obj.optString("device_id", "-"))),
+                        obj.optString("epc", obj.optString("code", obj.optString("tag_epc", "-"))),
+                        obj.optString("created_at", obj.optString("date", obj.optString("timestamp", "-")))
+                    ));
+                }
+            }
+        }
+        return items;
+    }
+
+    private List<MovementItem> parseMovement(JSONObject data) {
+        List<MovementItem> items = new ArrayList<>();
+        JSONArray arr = data.optJSONArray("movements");
+        if (arr == null) arr = data.optJSONArray("transfers");
+        if (arr == null) arr = data.optJSONArray("data");
+        if (arr == null) arr = data.optJSONArray("items_list");
+
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject obj = arr.optJSONObject(i);
+                if (obj != null) {
+                    items.add(new MovementItem(
+                        obj.optString("from_branch", obj.optString("from", obj.optString("source", "-"))),
+                        obj.optString("to_branch", obj.optString("to", obj.optString("destination", "-"))),
+                        obj.optString("created_at", obj.optString("date", obj.optString("transfer_date", "-")))
+                    ));
+                }
+            }
+        }
+        return items;
+    }
+
+    private List<BranchesItem> parseBranches(JSONObject data) {
+        List<BranchesItem> items = new ArrayList<>();
+        JSONArray arr = data.optJSONArray("branches_performance");
+        if (arr == null) arr = data.optJSONArray("branches");
+        if (arr == null) arr = data.optJSONArray("data");
+        if (arr == null) arr = data.optJSONArray("items_list");
+
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject obj = arr.optJSONObject(i);
+                if (obj != null) {
+                    items.add(new BranchesItem(
+                        obj.optString("branch_name", obj.optString("name", "-")),
+                        obj.optInt("items_count", obj.optInt("count", 0))
+                    ));
+                }
+            }
+        }
+        return items;
+    }
+
+    private List<FinancialItem> parseFinancial(JSONObject data) {
+        List<FinancialItem> items = new ArrayList<>();
+        JSONArray arr = data.optJSONArray("journal_entries");
+        if (arr == null) arr = data.optJSONArray("entries");
+        if (arr == null) arr = data.optJSONArray("financial");
+        if (arr == null) arr = data.optJSONArray("data");
+        if (arr == null) arr = data.optJSONArray("items_list");
+
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject obj = arr.optJSONObject(i);
+                if (obj != null) {
+                    items.add(new FinancialItem(
+                        obj.optString("description", obj.optString("details", obj.optString("note", "-"))),
+                        obj.optDouble("amount", obj.optDouble("total", obj.optDouble("credit", 0)))
+                    ));
+                }
+            }
+        }
+        return items;
+    }
+
+    private List<GenericItem> parseGeneric(JSONObject data) {
+        List<GenericItem> items = new ArrayList<>();
+        if (data == null) return items;
+
+        JSONObject innerData = data.optJSONObject("data");
+        if (innerData != null) data = innerData;
+
+        java.util.Iterator<String> keys = data.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            Object value = data.opt(key);
+            if (value != null && !key.equals("success") && !key.equals("timestamp") && !key.equals("type")) {
+                items.add(new GenericItem(key, value.toString()));
+            }
+        }
+        return items;
+    }
+
+    private List<DashboardItem> parseDashboard(JSONObject data) {
+        List<DashboardItem> items = new ArrayList<>();
+
+        JSONObject inv = data.optJSONObject("inventory");
+        if (inv != null) {
+            items.add(new DashboardItem(
+                isArabic ? "📦 إجمالي القطع" : "📦 Total Items",
+                String.valueOf(inv.optInt("total_items", 0))
+            ));
+            items.add(new DashboardItem(
+                isArabic ? "⚖️ الوزن الكلي" : "⚖️ Total Weight",
+                String.format(Locale.US, "%.1f g", inv.optDouble("total_weight", 0))
+            ));
+            items.add(new DashboardItem(
+                isArabic ? "✅ المتاح" : "✅ Available",
+                String.valueOf(inv.optInt("available_count", 0))
+            ));
+            items.add(new DashboardItem(
+                isArabic ? "💰 المباع" : "💰 Sold",
+                String.valueOf(inv.optInt("sold_count", 0))
+            ));
+        }
+
+        JSONObject sales = data.optJSONObject("sales");
+        if (sales != null) {
+            items.add(new DashboardItem(
+                isArabic ? "🧾 عدد الفواتير" : "🧾 Invoices",
+                String.valueOf(sales.optInt("invoices_count", 0))
+            ));
+            items.add(new DashboardItem(
+                isArabic ? "💵 الإيرادات" : "💵 Revenue",
+                String.format(Locale.US, "%,.2f", sales.optDouble("total_revenue", 0))
+            ));
+        }
+
+        JSONObject audit = data.optJSONObject("audit");
+        if (audit != null) {
+            JSONObject auditSummary = audit.optJSONObject("audit_summary");
+            if (auditSummary != null) {
+                items.add(new DashboardItem(
+                    isArabic ? "🎯 دقة الجرد" : "🎯 Audit Accuracy",
+                    String.format(Locale.US, "%.1f%%", auditSummary.optDouble("accuracy", 0))
                 ));
             }
         }
-    }
-    return items;
-}
 
-private List<InventoryItem> parseInventory(JSONObject data) {
-    List<InventoryItem> items = new ArrayList<>();
-    
-    // ✅ البيانات داخل data.inventory.items أو data.items
-    JSONObject invObj = data.optJSONObject("inventory");
-    if (invObj == null) invObj = data;
-    
-    JSONArray arr = invObj.optJSONArray("items");
-    if (arr == null) arr = data.optJSONArray("items");
-    
-    if (arr != null) {
-        for (int i = 0; i < arr.length(); i++) {
-            JSONObject obj = arr.optJSONObject(i);
-            if (obj != null) {
-                items.add(new InventoryItem(
-                    obj.optString("item_title", obj.optString("title", "-")),
-                    obj.optString("gold_karat", obj.optString("karat", "-")),
-                    obj.optDouble("gross_weight_grams", obj.optDouble("weight", 0)),
-                    obj.optString("vault_status", obj.optString("status", "-")),
-                    obj.optString("current_location", obj.optString("location", "-"))
-                ));
+        JSONArray karatBreakdown = data.optJSONArray("karat_breakdown");
+        if (karatBreakdown != null) {
+            for (int i = 0; i < karatBreakdown.length(); i++) {
+                JSONObject karat = karatBreakdown.optJSONObject(i);
+                if (karat != null) {
+                    items.add(new DashboardItem(
+                        isArabic ? "🏷️ عيار " + karat.optString("gold_karat", "") : 
+                                   "🏷️ Karat " + karat.optString("gold_karat", ""),
+                        karat.optInt("count", 0) + " " + (isArabic ? "قطعة" : "items")
+                    ));
+                }
             }
         }
-    }
-    return items;
-}
 
-private List<AuditItem> parseAudit(JSONObject data) {
-    List<AuditItem> items = new ArrayList<>();
-    
-    // ✅ البيانات داخل data.audit.audit_summary
-    JSONObject auditContainer = data.optJSONObject("audit");
-    if (auditContainer == null) auditContainer = data;
-    
-    JSONObject audit = auditContainer.optJSONObject("audit_summary");
-    if (audit == null) audit = auditContainer;
-    
-    if (audit != null) {
-        items.add(new AuditItem(
-            audit.optDouble("accuracy", 0),
-            audit.optInt("found_items", audit.optInt("found", 0)),
-            audit.optInt("missing_items", audit.optInt("missing", 0)),
-            audit.optInt("total_sessions", audit.optInt("sessions", 0))
-        ));
+        return items;
     }
-    return items;
-}
 
-private List<ReorderItem> parseReorder(JSONObject data) {
-    List<ReorderItem> items = new ArrayList<>();
-    
-    // ✅ البيانات داخل data.reorder_items أو data.karat_breakdown
-    JSONArray arr = data.optJSONArray("reorder_items");
-    if (arr == null) arr = data.optJSONArray("karat_breakdown");
-    if (arr == null) arr = data.optJSONArray("items");
-    
-    if (arr != null) {
-        for (int i = 0; i < arr.length(); i++) {
-            JSONObject obj = arr.optJSONObject(i);
-            if (obj != null) {
-                items.add(new ReorderItem(
-                    obj.optString("gold_karat", obj.optString("karat", "-")),
-                    obj.optInt("sold_count", obj.optInt("count", obj.optInt("sold", 0))),
-                    obj.optInt("remaining_stock", obj.optInt("remaining", 0))
-                ));
-            }
-        }
-    }
-    return items;
-}
-
-private List<UsersItem> parseUsers(JSONObject data) {
-    List<UsersItem> items = new ArrayList<>();
-    JSONArray arr = data.optJSONArray("users");
-    if (arr != null) {
-        for (int i = 0; i < arr.length(); i++) {
-            JSONObject obj = arr.optJSONObject(i);
-            if (obj != null) {
-                items.add(new UsersItem(
-                    obj.optString("display_name", obj.optString("name", "-")),
-                    obj.optString("role_name", obj.optString("role", "-")),
-                    obj.optString("status", "-")
-                ));
-            }
-        }
-    }
-    return items;
-}
-
-private List<GatesItem> parseGates(JSONObject data) {
-    List<GatesItem> items = new ArrayList<>();
-    JSONArray arr = data.optJSONArray("gate_logs");
-    if (arr != null) {
-        for (int i = 0; i < arr.length(); i++) {
-            JSONObject obj = arr.optJSONObject(i);
-            if (obj != null) {
-                items.add(new GatesItem(
-                    obj.optString("gate_name", obj.optString("gate", "-")),
-                    obj.optString("epc", obj.optString("code", "-")),
-                    obj.optString("created_at", obj.optString("date", "-"))
-                ));
-            }
-        }
-    }
-    return items;
-}
-
-private List<MovementItem> parseMovement(JSONObject data) {
-    List<MovementItem> items = new ArrayList<>();
-    JSONArray arr = data.optJSONArray("movements");
-    if (arr != null) {
-        for (int i = 0; i < arr.length(); i++) {
-            JSONObject obj = arr.optJSONObject(i);
-            if (obj != null) {
-                items.add(new MovementItem(
-                    obj.optString("from_branch", obj.optString("from", "-")),
-                    obj.optString("to_branch", obj.optString("to", "-")),
-                    obj.optString("created_at", obj.optString("date", "-"))
-                ));
-            }
-        }
-    }
-    return items;
-}
-
-private List<BranchesItem> parseBranches(JSONObject data) {
-    List<BranchesItem> items = new ArrayList<>();
-    JSONArray arr = data.optJSONArray("branches_performance");
-    if (arr == null) arr = data.optJSONArray("branches");
-    if (arr != null) {
-        for (int i = 0; i < arr.length(); i++) {
-            JSONObject obj = arr.optJSONObject(i);
-            if (obj != null) {
-                items.add(new BranchesItem(
-                    obj.optString("branch_name", obj.optString("name", "-")),
-                    obj.optInt("items_count", obj.optInt("count", 0))
-                ));
-            }
-        }
-    }
-    return items;
-}
-
-private List<FinancialItem> parseFinancial(JSONObject data) {
-    List<FinancialItem> items = new ArrayList<>();
-    JSONArray arr = data.optJSONArray("journal_entries");
-    if (arr == null) arr = data.optJSONArray("entries");
-    if (arr != null) {
-        for (int i = 0; i < arr.length(); i++) {
-            JSONObject obj = arr.optJSONObject(i);
-            if (obj != null) {
-                items.add(new FinancialItem(
-                    obj.optString("description", obj.optString("details", "-")),
-                    obj.optDouble("amount", obj.optDouble("total", 0))
-                ));
-            }
-        }
-    }
-    return items;
-}
-
-private List<GenericItem> parseGeneric(JSONObject data) {
-    List<GenericItem> items = new ArrayList<>();
-    
-    // ✅ إذا كان هناك data داخل data
-    JSONObject innerData = data.optJSONObject("data");
-    if (innerData != null) data = innerData;
-    
-    java.util.Iterator<String> keys = data.keys();
-    while (keys.hasNext()) {
-        String key = keys.next();
-        Object value = data.opt(key);
-        if (value != null && !key.equals("success") && !key.equals("timestamp") && !key.equals("type")) {
-            items.add(new GenericItem(key, value.toString()));
-        }
-    }
-    return items;
-}
     // ==================== Data Classes ====================
 
     static class SalesItem { String invoiceNo, customer, payment, seller; double amount;
@@ -595,6 +685,8 @@ private List<GenericItem> parseGeneric(JSONObject data) {
         FinancialItem(String d, double a) { description=d; amount=a; } }
     static class GenericItem { String key, value;
         GenericItem(String k, String v) { key=k; value=v; } }
+    static class DashboardItem { String label, value;
+        DashboardItem(String l, String v) { label = l; value = v; } }
 
     // ==================== Adapters ====================
 
@@ -822,7 +914,27 @@ private List<GenericItem> parseGeneric(JSONObject data) {
         }
     }
 
-    // ==================== Export CSV ====================
+    class DashboardAdapter extends RecyclerView.Adapter<DashboardAdapter.VH> {
+        private final List<DashboardItem> items;
+        DashboardAdapter(List<DashboardItem> items) { this.items = items; }
+        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
+            return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_report_generic, p, false)); }
+        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
+            DashboardItem item = items.get(pos);
+            h.tvKey.setText(item.label);
+            h.tvValue.setText(item.value);
+        }
+        @Override public int getItemCount() { return items.size(); }
+        class VH extends RecyclerView.ViewHolder {
+            TextView tvKey, tvValue;
+            VH(View v) { super(v);
+                tvKey = v.findViewById(R.id.tvKey);
+                tvValue = v.findViewById(R.id.tvValue);
+            }
+        }
+    }
+
+    // ==================== Export CSV & Helpers ====================
 
     private void exportReportToCSV(String type, String from, String to) {
         if (!isAdded() || getContext() == null) return;
@@ -893,113 +1005,4 @@ private List<GenericItem> parseGeneric(JSONObject data) {
         if (executorService != null && !executorService.isShutdown()) executorService.shutdownNow();
         super.onDestroyView();
     }
-    
-    // ✅ أضف هذه الدوال في نهاية الكلاس قبل الأقواس الختامية
-
-private List<DashboardItem> parseDashboard(JSONObject data) {
-    List<DashboardItem> items = new ArrayList<>();
-    
-    // ✅ المخزون
-    JSONObject inv = data.optJSONObject("inventory");
-    if (inv != null) {
-        items.add(new DashboardItem(
-            isArabic ? "📦 إجمالي القطع" : "📦 Total Items",
-            String.valueOf(inv.optInt("total_items", 0))
-        ));
-        items.add(new DashboardItem(
-            isArabic ? "⚖️ الوزن الكلي" : "⚖️ Total Weight",
-            String.format(Locale.US, "%.1f g", inv.optDouble("total_weight", 0))
-        ));
-        items.add(new DashboardItem(
-            isArabic ? "✅ المتاح" : "✅ Available",
-            String.valueOf(inv.optInt("available_count", 0))
-        ));
-        items.add(new DashboardItem(
-            isArabic ? "💰 المباع" : "💰 Sold",
-            String.valueOf(inv.optInt("sold_count", 0))
-        ));
-    }
-    
-    // ✅ المبيعات
-    JSONObject sales = data.optJSONObject("sales");
-    if (sales != null) {
-        items.add(new DashboardItem(
-            isArabic ? "🧾 عدد الفواتير" : "🧾 Invoices",
-            String.valueOf(sales.optInt("invoices_count", 0))
-        ));
-        items.add(new DashboardItem(
-            isArabic ? "💵 الإيرادات" : "💵 Revenue",
-            String.format(Locale.US, "%,.2f", sales.optDouble("total_revenue", 0))
-        ));
-    }
-    
-    // ✅ التدقيق
-    JSONObject audit = data.optJSONObject("audit");
-    if (audit != null) {
-        JSONObject auditSummary = audit.optJSONObject("audit_summary");
-        if (auditSummary != null) {
-            items.add(new DashboardItem(
-                isArabic ? "🎯 دقة الجرد" : "🎯 Audit Accuracy",
-                String.format(Locale.US, "%.1f%%", auditSummary.optDouble("accuracy", 0))
-            ));
-        }
-    }
-    
-    // ✅ توزيع العيارات
-    JSONArray karatBreakdown = data.optJSONArray("karat_breakdown");
-    if (karatBreakdown != null) {
-        for (int i = 0; i < karatBreakdown.length(); i++) {
-            JSONObject karat = karatBreakdown.optJSONObject(i);
-            if (karat != null) {
-                items.add(new DashboardItem(
-                    isArabic ? "🏷️ عيار " + karat.optString("gold_karat", "") : 
-                               "🏷️ Karat " + karat.optString("gold_karat", ""),
-                    karat.optInt("count", 0) + " " + (isArabic ? "قطعة" : "items")
-                ));
-            }
-        }
-    }
-    
-    return items;
-}
-
-static class DashboardItem {
-    String label, value;
-    DashboardItem(String l, String v) { label = l; value = v; }
-}
-
-class DashboardAdapter extends RecyclerView.Adapter<DashboardAdapter.VH> {
-    private final List<DashboardItem> items;
-    
-    DashboardAdapter(List<DashboardItem> items) { 
-        this.items = items; 
-    }
-    
-    @NonNull @Override 
-    public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
-        return new VH(LayoutInflater.from(p.getContext())
-            .inflate(R.layout.item_report_generic, p, false)); 
-    }
-    
-    @Override 
-    public void onBindViewHolder(@NonNull VH h, int pos) {
-        DashboardItem item = items.get(pos);
-        h.tvKey.setText(item.label);
-        h.tvValue.setText(item.value);
-    }
-    
-    @Override 
-    public int getItemCount() { 
-        return items.size(); 
-    }
-    
-    class VH extends RecyclerView.ViewHolder {
-        TextView tvKey, tvValue;
-        VH(View v) { 
-            super(v);
-            tvKey = v.findViewById(R.id.tvKey);
-            tvValue = v.findViewById(R.id.tvValue);
-        }
-    }
-}
 }
