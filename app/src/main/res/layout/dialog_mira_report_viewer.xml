@@ -98,6 +98,18 @@
             android:textSize="11sp" />
     </LinearLayout>
 
+    <!-- ✅ زر الفلترة المتقدمة في سطر منفصل -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnAdvancedFilter"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="8dp"
+        android:layout_marginTop="4dp"
+        android:text="🔍 فلترة متقدمة"
+        android:textSize="11sp"
+        app:icon="@android:drawable/ic_menu_search" />
+
     <!-- Loading Container -->
     <FrameLayout
         android:id="@+id/layoutLoadingContainer"
