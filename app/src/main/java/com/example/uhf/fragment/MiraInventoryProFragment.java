@@ -296,62 +296,70 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
 
     // ✅ تشغيل الأصوات المختلفة
-    private void playScanBeep(ScanFeedbackType feedbackType) {
-        long now = System.currentTimeMillis();
-        if (!soundLoaded || (now - lastBeepTime <= BEEP_THROTTLE_MS)) {
-            return;
-        }
-        
-        float rate = BEEP_RATE;
-        float volume = BEEP_VOLUME;
-        int soundId = beepSoundId;
-        
-        switch (feedbackType) {
-            case KNOWN_ITEM:
-                rate = 1.0f;
-                volume = 0.8f;
-                soundId = successSoundId;
-                break;
-            case UNKNOWN_ITEM:
-                rate = 0.7f;
-                volume = 0.6f;
-                soundId = errorSoundId;
-                break;
-            case DUPLICATE_ITEM:
-                rate = 1.5f;
-                volume = 0.5f;
-                soundId = duplicateSoundId;
-                break;
-            case MISSING_ITEM:
-                rate = 0.5f;
-                volume = 0.9f;
-                soundId = errorSoundId;
-                break;
-            case COMPLETED:
-                rate = 1.2f;
-                volume = 1.0f;
-                soundId = successSoundId;
-                // تشغيل مرتين للإكمال
-                soundPool.play(soundId, volume, volume, BEEP_PRIORITY, BEEP_LOOP, rate);
-                mainThreadHandler.postDelayed(() -> {
-                    soundPool.play(soundId, volume, volume, BEEP_PRIORITY, BEEP_LOOP, rate);
-                }, 200);
-                lastBeepTime = now;
-                return;
-            case ERROR:
-                rate = 0.6f;
-                volume = 0.8f;
-                soundId = errorSoundId;
-                break;
-        }
-        
-        try {
-            soundPool.play(soundId, volume, volume, BEEP_PRIORITY, BEEP_LOOP, rate);
-            lastBeepTime = now;
-        } catch (Exception e) {
-            Log.e(TAG, "Error playing sound", e);
-        }
+    // ==================== تشغيل الأصوات المختلفة ====================
+private void playScanBeep(ScanFeedbackType feedbackType) {
+    long now = System.currentTimeMillis();
+    if (!soundLoaded || (now - lastBeepTime <= BEEP_THROTTLE_MS)) {
+        return;
     }
+    
+    float rate = BEEP_RATE;
+    float volume = BEEP_VOLUME;
+    int soundId = beepSoundId;
+    
+    switch (feedbackType) {
+        case KNOWN_ITEM:
+            rate = 1.0f;
+            volume = 0.8f;
+            soundId = successSoundId;
+            break;
+        case UNKNOWN_ITEM:
+            rate = 0.7f;
+            volume = 0.6f;
+            soundId = errorSoundId;
+            break;
+        case DUPLICATE_ITEM:
+            rate = 1.5f;
+            volume = 0.5f;
+            soundId = duplicateSoundId;
+            break;
+        case MISSING_ITEM:
+            rate = 0.5f;
+            volume = 0.9f;
+            soundId = errorSoundId;
+            break;
+        case COMPLETED:
+            // ✅ استخدام متغيرات final
+            final float completedRate = 1.2f;
+            final float completedVolume = 1.0f;
+            final int completedSoundId = successSoundId;
+            
+            // تشغيل مرتين للإكمال
+            soundPool.play(completedSoundId, completedVolume, completedVolume, BEEP_PRIORITY, BEEP_LOOP, completedRate);
+            mainThreadHandler.postDelayed(() -> {
+                soundPool.play(completedSoundId, completedVolume, completedVolume, BEEP_PRIORITY, BEEP_LOOP, completedRate);
+            }, 200);
+            lastBeepTime = now;
+            return;
+        case ERROR:
+            rate = 0.6f;
+            volume = 0.8f;
+            soundId = errorSoundId;
+            break;
+    }
+    
+    // ✅ استخدام متغيرات final للعب الصوت
+    final float finalRate = rate;
+    final float finalVolume = volume;
+    final int finalSoundId = soundId;
+    
+    try {
+        soundPool.play(finalSoundId, finalVolume, finalVolume, BEEP_PRIORITY, BEEP_LOOP, finalRate);
+        lastBeepTime = now;
+    } catch (Exception e) {
+        Log.e(TAG, "Error playing sound", e);
+    }
+}
 
     private void initViews(View view) {
         tvExpectedCount = view.findViewById(R.id.tvExpectedCount);
