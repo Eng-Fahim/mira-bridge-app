@@ -1875,7 +1875,92 @@ private void exportReportToCSV(String type, String from, String to, JSONObject d
             Toast.makeText(getContext(), "Export failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
+// ✅ دالة خاصة بمؤشر أمن البوابات
+private void showGateSecurityDialog(ReportItem item) {
+    AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+    builder.setTitle(isArabic ? "🛡️ مؤشر أمن البوابات" : "🛡️ Gate Security Index");
+    
+    View inputView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_input_user_id, null);
+    EditText etGateId = inputView.findViewById(R.id.etUserId);
+    etGateId.setHint(isArabic ? "أدخل معرف البوابة (اختياري)" : "Enter gate ID (optional)");
+    
+    builder.setView(inputView);
+    builder.setPositiveButton(isArabic ? "عرض" : "Show", (dialog, which) -> {
+        String gateIdStr = etGateId.getText().toString().trim();
+        int gateId = 0;
+        if (!gateIdStr.isEmpty()) {
+            try {
+                gateId = Integer.parseInt(gateIdStr);
+            } catch (NumberFormatException e) {
+                // تجاهل
+            }
+        }
+        fetchAdvancedReport(item.type, 0, "", "", gateId, getDefaultFromDate(), getDefaultToDate());
+    });
+    builder.setNegativeButton(isArabic ? "إلغاء" : "Cancel", null);
+    builder.show();
+}
 
+// ✅ دالة خاصة بأعمار المخزون
+private void showInventoryAgingDialog(ReportItem item) {
+    // هذا التقرير لا يحتاج مدخلات إضافية، فقط الفرع الحالي
+    fetchAdvancedReport(item.type, 0, "", "", 0, "", "");
+}
+
+// ✅ دالة خاصة بتفاصيل الفروقات
+private void showAuditDiscrepancyDialog(ReportItem item) {
+    // عرض Dialog لاختيار التاريخ
+    View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
+    
+    TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
+    RecyclerView rvData = dialogView.findViewById(R.id.rvReportData);
+    View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
+    TextView tvLoadingStatus = dialogView.findViewById(R.id.tvLoadingStatus);
+    
+    MaterialButton btnFrom = dialogView.findViewById(R.id.btnReportDateFrom);
+    MaterialButton btnTo = dialogView.findViewById(R.id.btnReportDateTo);
+    MaterialButton btnApply = dialogView.findViewById(R.id.btnReportApplyFilter);
+    MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
+    
+    final String[] selectedDates = new String[]{getDefaultFromDate(), getDefaultToDate()};
+    
+    if (btnFrom != null) btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
+    if (btnTo != null) btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
+    
+    if (tvTitle != null) tvTitle.setText(item.icon + " " + item.title);
+    if (rvData != null) rvData.setLayoutManager(new LinearLayoutManager(getContext()));
+    
+    AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
+            .setView(dialogView)
+            .create();
+    
+    if (btnFrom != null) {
+        btnFrom.setOnClickListener(v -> showDatePicker(date -> {
+            selectedDates[0] = date;
+            btnFrom.setText((isArabic ? "من: " : "From: ") + date);
+        }));
+    }
+    
+    if (btnTo != null) {
+        btnTo.setOnClickListener(v -> showDatePicker(date -> {
+            selectedDates[1] = date;
+            btnTo.setText((isArabic ? "إلى: " : "To: ") + date);
+        }));
+    }
+    
+    if (btnApply != null) {
+        btnApply.setOnClickListener(v -> {
+            fetchAdvancedReport(item.type, 0, "", "", 0, selectedDates[0], selectedDates[1]);
+            dialog.dismiss();
+        });
+    }
+    
+    if (btnClose != null) {
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+    }
+    
+    dialog.show();
+}
     private String getDefaultFromDate() { return getCalculatedDate(-30); }
     private String getDefaultToDate() { return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()); }
     private String getCalculatedDate(int days) {
@@ -1918,4 +2003,4 @@ private void exportReportToCSV(String type, String from, String to, JSONObject d
         if (executorService != null && !executorService.isShutdown()) executorService.shutdownNow();
         super.onDestroyView();
     }
-                                     }
+                }
