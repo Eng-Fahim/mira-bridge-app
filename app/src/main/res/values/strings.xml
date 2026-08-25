@@ -22,8 +22,7 @@
     <string name="quick_action_server_config">إعدادات السيرفر</string>
     
     <!-- ✅ أضف فقط هذه إذا لم تكن موجودة -->
-<string name="menu_profile">ملفي</string>
-<string name="menu_logout">تسجيل الخروج</string>
+
 <!-- Bottom Navigation -->
 <string name="nav_dashboard">الرئيسية</string>
 <string name="nav_jewelry">المجوهرات</string>
