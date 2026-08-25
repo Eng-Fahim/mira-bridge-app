@@ -26,6 +26,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
+import com.example.uhf.tools.SessionManager;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.PermissionManager;
@@ -45,6 +46,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MiraTransferFragment extends Fragment {
+
+    private SessionManager sessionManager;
 
     private static final String TAG = "MiraTransfer";
     private static final String OFFLINE_PREFS = "transfers_cache";
@@ -78,56 +81,104 @@ public class MiraTransferFragment extends Fragment {
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    super.onViewCreated(view, savedInstanceState);
 
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
-        apiClient = MiraApiClient.getInstance(requireContext());
-        branchesManager = MiraBranchesManager.getInstance(requireContext());
-        permissionManager = PermissionManager.getInstance(requireContext());
-        offlineCache = requireContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
+    isArabic = Locale.getDefault().getLanguage().equals("ar");
+    
+    // ✅ تطبيق اتجاه التخطيط ديناميكياً
+    view.setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
+    
+    apiClient = MiraApiClient.getInstance(requireContext());
+    branchesManager = MiraBranchesManager.getInstance(requireContext());
+    permissionManager = PermissionManager.getInstance(requireContext());
+    offlineCache = requireContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
+    
+    sessionManager = new SessionManager(requireContext());
 
-        initViews(view);
-        setupFilterChips();
-        setupListeners();
-        applyPermissions();
+    initViews(view);
+    setupFilterChips();
+    setupListeners();
+    applyPermissions();
+    applyLanguage(); // ✅ إضافة تطبيق اللغة
 
-        rvTransfers.setLayoutManager(new LinearLayoutManager(getContext()));
-        adapter = new TransferAdapter(transferList, new TransferClickHandler() {
-            @Override public void onClick(TransferData t) { showTransferActions(t); }
-            @Override public void onAction(TransferData t, String action) { handleTransferAction(t, action); }
-        });
-        rvTransfers.setAdapter(adapter);
+    rvTransfers.setLayoutManager(new LinearLayoutManager(getContext()));
+    adapter = new TransferAdapter(transferList, new TransferClickHandler() {
+        @Override public void onClick(TransferData t) { showTransferActions(t); }
+        @Override public void onAction(TransferData t, String action) { handleTransferAction(t, action); }
+    }, isArabic); // ✅ تمرير isArabic للـ Adapter
+    rvTransfers.setAdapter(adapter);
 
-        loadTransfers();
-        loadOfflineTransfers();
+    loadTransfers();
+    loadOfflineTransfers();
+}
+
+// ✅ دالة تطبيق اللغة على الواجهة
+private void applyLanguage() {
+    if (btnNewTransfer != null) {
+        btnNewTransfer.setText(isArabic ? "📝 تحويل جديد" : "📝 New Transfer");
     }
+    if (btnScanVerify != null) {
+        btnScanVerify.setText(isArabic ? "📷 مسح وتدقيق" : "📷 Scan & Verify");
+    }
+    if (tvEmpty != null) {
+        tvEmpty.setText(isArabic ? "📭 لا توجد تحويلات" : "📭 No transfers");
+    }
+    
+    // ✅ تحديث الفلاتر
+    if (chipGroupFilters != null) {
+        chipGroupFilters.removeAllViews();
+        String[] filters = isArabic ? 
+            new String[]{"الكل", "مسودة", "معلق", "قيد النقل", "مستلم"} :
+            new String[]{"All", "Draft", "Pending", "In Transit", "Received"};
+        
+        int[] chipIds = {R.id.chipAll, R.id.chipDraft, R.id.chipPending, R.id.chipInTransit, R.id.chipCompleted};
+        
+        for (int i = 0; i < filters.length; i++) {
+            Chip chip = new Chip(requireContext());
+            chip.setId(chipIds[i]);
+            chip.setText(filters[i]);
+            chip.setCheckable(true);
+            chipGroupFilters.addView(chip);
+        }
+    }
+}
 
     // ✅ صلاحيات التحويلات حسب المرحلة
-    private void applyPermissions() {
-        boolean canCreate = permissionManager.canEdit("transfers") || 
-                           permissionManager.isManager() || 
-                           permissionManager.isInventoryManager();
-        
-        boolean canApprove = permissionManager.isManager() || 
-                             permissionManager.isBranchManager() || 
-                             permissionManager.canEdit("transfers");
-        
-        boolean canReceive = permissionManager.isManager() || 
-                             permissionManager.isBranchManager() || 
-                             permissionManager.canEdit("transfers");
+    /**
+ * ✅ الصلاحيات حسب الفرع
+ * - SYSTEM_ADMIN و ORG_ADMIN: يرون جميع التحويلات
+ * - BRANCH_MANAGER: يرون تحويلات فرعهم (من وإلى)
+ * - الآخرون: يرون تحويلات فرعهم فقط
+ */
+private void applyPermissions() {
+    SessionManager.Role userRole = sessionManager != null ? sessionManager.getUserRole() : SessionManager.Role.BRANCH_MANAGER;
+    int userBranchId = branchesManager.getActiveBranchId();
+    
+    boolean isTopLevel = userRole == SessionManager.Role.SYSTEM_ADMIN || 
+                         userRole == SessionManager.Role.ORG_ADMIN;
+    
+    boolean canCreate = isTopLevel || 
+                       userRole == SessionManager.Role.BRANCH_MANAGER || 
+                       permissionManager.canEdit("transfers");
+    
+    boolean canApprove = isTopLevel || 
+                         userRole == SessionManager.Role.BRANCH_MANAGER || 
+                         permissionManager.canEdit("transfers");
+    
+    boolean canReceive = isTopLevel || 
+                         userRole == SessionManager.Role.BRANCH_MANAGER || 
+                         permissionManager.canEdit("transfers");
 
-        // ✅ زر إنشاء تحويل جديد - للمديرين ومديري المخزون
-        if (btnNewTransfer != null) {
-            btnNewTransfer.setEnabled(canCreate);
-            btnNewTransfer.setAlpha(canCreate ? 1.0f : 0.5f);
-        }
-        
-        // ✅ زر المسح - للجميع المصرح لهم بالعرض
-        if (btnScanVerify != null) {
-            btnScanVerify.setEnabled(permissionManager.canView("transfers") || permissionManager.isManager());
-        }
+    if (btnNewTransfer != null) {
+        btnNewTransfer.setEnabled(canCreate);
+        btnNewTransfer.setAlpha(canCreate ? 1.0f : 0.5f);
     }
+    
+    if (btnScanVerify != null) {
+        btnScanVerify.setEnabled(permissionManager.canView("transfers") || isTopLevel);
+    }
+}
 
     private boolean canCreateTransfer() {
         return permissionManager.canEdit("transfers") || 
@@ -208,27 +259,43 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void loadTransfers() {
-        executor.execute(() -> {
-            int branchId = branchesManager.getActiveBranchId();
-            MiraApiClient.ApiResponse response = apiClient.getTransfers(branchId, currentFilter);
-            mainHandler.post(() -> {
-                transferList.clear();
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONArray transfers = response.data.optJSONArray("transfers");
-                    if (transfers != null) {
-                        for (int i = 0; i < transfers.length(); i++) {
-                            TransferData d = parseTransferData(transfers.optJSONObject(i));
-                            if (d != null) transferList.add(d);
+    executor.execute(() -> {
+        int branchId = branchesManager.getActiveBranchId();
+        
+        // ✅ للإدارة العليا - تحميل الكل
+        // للفروع - تحميل تحويلات فرعهم فقط
+        SessionManager.Role userRole = sessionManager != null ? sessionManager.getUserRole() : SessionManager.Role.BRANCH_MANAGER;
+        boolean isTopLevel = userRole == SessionManager.Role.SYSTEM_ADMIN || 
+                             userRole == SessionManager.Role.ORG_ADMIN;
+        
+        MiraApiClient.ApiResponse response = apiClient.getTransfers(branchId, currentFilter);
+        
+        mainHandler.post(() -> {
+            transferList.clear();
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONArray transfers = response.data.optJSONArray("transfers");
+                if (transfers != null) {
+                    for (int i = 0; i < transfers.length(); i++) {
+                        TransferData d = parseTransferData(transfers.optJSONObject(i));
+                        if (d != null) {
+                            // ✅ فلترة حسب الفرع للفروع غير الإدارية
+                            if (!isTopLevel) {
+                                if (d.fromBranchId == branchId || d.toBranchId == branchId) {
+                                    transferList.add(d);
+                                }
+                            } else {
+                                transferList.add(d);
+                            }
                         }
                     }
-                    saveTransfersOffline(transfers);
                 }
-                adapter.notifyDataSetChanged();
-                updateEmptyState();
-            });
+                saveTransfersOffline(transfers);
+            }
+            adapter.notifyDataSetChanged();
+            updateEmptyState();
         });
-    }
-
+    });
+}
     private TransferData parseTransferData(JSONObject t) {
         if (t == null) return null;
         TransferData d = new TransferData();
@@ -728,13 +795,15 @@ public class MiraTransferFragment extends Fragment {
     }
 
     class TransferAdapter extends RecyclerView.Adapter<TransferAdapter.VH> {
-        final List<TransferData> list;
-        final TransferClickHandler handler;
+    final List<TransferData> list;
+    final TransferClickHandler handler;
+    final boolean isArabic; // ✅ إضافة
 
-        TransferAdapter(List<TransferData> list, TransferClickHandler handler) {
-            this.list = list;
-            this.handler = handler;
-        }
+    TransferAdapter(List<TransferData> list, TransferClickHandler handler, boolean isArabic) {
+        this.list = list;
+        this.handler = handler;
+        this.isArabic = isArabic;
+    }
 
         @NonNull
         @Override
@@ -742,54 +811,57 @@ public class MiraTransferFragment extends Fragment {
             return new VH(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_transfer_row, parent, false));
         }
 
-        @Override
-        public void onBindViewHolder(@NonNull VH h, int pos) {
-            TransferData t = list.get(pos);
-            h.tvNumber.setText(t.transferNumber != null ? t.transferNumber : "TR-" + t.id);
-            h.tvFrom.setText("🏢 " + t.fromBranch);
-            h.tvTo.setText("➔ 🏢 " + t.toBranch);
-            h.tvDetails.setText(t.itemCount + " " + ar("قطعة", "pcs") + " • " + String.format(Locale.US, "%.1f g", t.totalWeight));
-            h.tvDate.setText(t.createdAt != null && t.createdAt.length() >= 10 ? t.createdAt.substring(0, 10) : "");
-            
-            h.tvStatus.setText(getStatusText(t.status));
-            int statusBgColor;
-            switch (t.status) {
-                case "draft": statusBgColor = R.color.status_draft; break;
-                case "pending": statusBgColor = R.color.status_pending; break;
-                case "approved": case "in_transit": statusBgColor = R.color.status_in_transit; break;
-                case "received": statusBgColor = R.color.status_completed; break;
-                default: statusBgColor = R.color.status_draft; break;
-            }
-            try {
-                h.tvStatus.getBackground().setTint(ContextCompat.getColor(requireContext(), statusBgColor));
-            } catch (Exception ignored) {}
-
-            h.itemView.setOnClickListener(v -> handler.onClick(t));
-
-            if ("draft".equals(t.status)) {
-                h.btnAction1.setVisibility(canCreateTransfer() ? View.VISIBLE : View.GONE);
-                h.btnAction1.setText(ar("📷 إضافة قطع", "📷 Add Items"));
-                h.btnAction1.setOnClickListener(v -> handler.onAction(t, "scan"));
-                h.btnAction2.setVisibility(View.GONE);
-            } else if ("pending".equals(t.status)) {
-                h.btnAction1.setVisibility(canApproveTransfer() ? View.VISIBLE : View.GONE);
-                h.btnAction1.setText(ar("✅ اعتماد", "✅ Approve"));
-                h.btnAction1.setOnClickListener(v -> handler.onAction(t, "approve"));
-                h.btnAction2.setVisibility(View.VISIBLE);
-                h.btnAction2.setText(ar("📷 تدقيق", "📷 Scan"));
-                h.btnAction2.setOnClickListener(v -> handler.onAction(t, "scan"));
-            } else if ("approved".equals(t.status) || "in_transit".equals(t.status)) {
-                h.btnAction1.setVisibility(canReceiveTransfer() ? View.VISIBLE : View.GONE);
-                h.btnAction1.setText(ar("📥 استلام", "📥 Receive"));
-                h.btnAction1.setOnClickListener(v -> handler.onAction(t, "receive"));
-                h.btnAction2.setVisibility(View.VISIBLE);
-                h.btnAction2.setText(ar("📷 تدقيق", "📷 Scan"));
-                h.btnAction2.setOnClickListener(v -> handler.onAction(t, "scan"));
-            } else {
-                h.btnAction1.setVisibility(View.GONE);
-                h.btnAction2.setVisibility(View.GONE);
-            }
+         @Override
+    public void onBindViewHolder(@NonNull VH h, int pos) {
+        TransferData t = list.get(pos);
+        h.tvNumber.setText(t.transferNumber != null ? t.transferNumber : "TR-" + t.id);
+        h.tvFrom.setText("🏢 " + t.fromBranch);
+        h.tvTo.setText("➔ 🏢 " + t.toBranch);
+        h.tvDetails.setText(t.itemCount + " " + (isArabic ? "قطعة" : "pcs") + " • " + 
+            String.format(Locale.US, "%.1f g", t.totalWeight));
+        h.tvDate.setText(t.createdAt != null && t.createdAt.length() >= 10 ? t.createdAt.substring(0, 10) : "");
+        
+        h.tvStatus.setText(getStatusText(t.status));
+        
+        // ✅ ألوان الحالة
+        int statusColor;
+        switch (t.status) {
+            case "draft": statusColor = ContextCompat.getColor(requireContext(), R.color.status_draft); break;
+            case "pending": statusColor = ContextCompat.getColor(requireContext(), R.color.status_pending); break;
+            case "approved": 
+            case "in_transit": statusColor = ContextCompat.getColor(requireContext(), R.color.status_in_transit); break;
+            case "received": statusColor = ContextCompat.getColor(requireContext(), R.color.status_completed); break;
+            default: statusColor = ContextCompat.getColor(requireContext(), R.color.status_draft); break;
         }
+        h.tvStatus.setTextColor(statusColor);
+
+        h.itemView.setOnClickListener(v -> handler.onClick(t));
+
+        // ✅ أزرار حسب الحالة والصلاحيات
+        if ("draft".equals(t.status)) {
+            h.btnAction1.setVisibility(canCreateTransfer() ? View.VISIBLE : View.GONE);
+            h.btnAction1.setText(isArabic ? "📷 إضافة قطع" : "📷 Add Items");
+            h.btnAction1.setOnClickListener(v -> handler.onAction(t, "scan"));
+            h.btnAction2.setVisibility(View.GONE);
+        } else if ("pending".equals(t.status)) {
+            h.btnAction1.setVisibility(canApproveTransfer() ? View.VISIBLE : View.GONE);
+            h.btnAction1.setText(isArabic ? "✅ اعتماد" : "✅ Approve");
+            h.btnAction1.setOnClickListener(v -> handler.onAction(t, "approve"));
+            h.btnAction2.setVisibility(View.VISIBLE);
+            h.btnAction2.setText(isArabic ? "📷 تدقيق" : "📷 Scan");
+            h.btnAction2.setOnClickListener(v -> handler.onAction(t, "scan"));
+        } else if ("approved".equals(t.status) || "in_transit".equals(t.status)) {
+            h.btnAction1.setVisibility(canReceiveTransfer() ? View.VISIBLE : View.GONE);
+            h.btnAction1.setText(isArabic ? "📥 استلام" : "📥 Receive");
+            h.btnAction1.setOnClickListener(v -> handler.onAction(t, "receive"));
+            h.btnAction2.setVisibility(View.VISIBLE);
+            h.btnAction2.setText(isArabic ? "📷 تدقيق" : "📷 Scan");
+            h.btnAction2.setOnClickListener(v -> handler.onAction(t, "scan"));
+        } else {
+            h.btnAction1.setVisibility(View.GONE);
+            h.btnAction2.setVisibility(View.GONE);
+        }
+    }
 
         @Override
         public int getItemCount() { return list.size(); }
