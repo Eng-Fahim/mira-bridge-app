@@ -42,7 +42,7 @@ public class MiraAuditLogAdapter extends RecyclerView.Adapter<MiraAuditLogAdapte
         setupActionChip(holder.chipAction, item.getAction());
     }
 
-    private void setupActionChip(Chip chip, String action) {
+        private void setupActionChip(Chip chip, String action) {
         String label = action;
         int color = Color.GRAY;
 
@@ -73,8 +73,7 @@ public class MiraAuditLogAdapter extends RecyclerView.Adapter<MiraAuditLogAdapte
         chip.setText(label);
         chip.setChipBackgroundColorResource(android.R.color.transparent);
         chip.setTextColor(color);
-        chip.setStrokeColor(android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT));
-
+        chip.setStrokeWidth(0f); // ✅ تصفير الحدود لمنع خطأ التجميع وتطبيق المظهر الشفاف
     }
 
     @Override
