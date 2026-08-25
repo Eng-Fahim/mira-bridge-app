@@ -193,13 +193,14 @@ public class MiraAccountingChartsFragment extends Fragment {
         TextView tvName = new TextView(getContext());
         tvName.setText(bar.name);
         tvName.setTextSize(13);
-        tvName.setTextStyle(android.graphics.Typeface.BOLD);
+        tvName.setTypeface(null, android.graphics.Typeface.BOLD);
         tvName.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
         TextView tvVal = new TextView(getContext());
         tvVal.setText(bar.isGold ? String.format(Locale.US, "%.3f g", bar.value) : String.format(Locale.US, "%,.2f", bar.value));
         tvVal.setTextSize(13);
-        tvVal.setTextStyle(android.graphics.Typeface.BOLD);
+        tvVal.setTypeface(null, android.graphics.Typeface.BOLD);
+
         tvVal.setTextColor(bar.color);
 
         labelRow.addView(tvName);
