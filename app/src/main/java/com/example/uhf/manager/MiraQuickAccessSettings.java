@@ -48,27 +48,27 @@ public class MiraQuickAccessSettings {
      * الحصول على جميع الإجراءات المتاحة
      */
     public List<QuickAction> getAllActions() {
-        List<QuickAction> actions = new ArrayList<>();
-        actions.add(new QuickAction("identity", "استوديو التكويد", "Identity Studio", true));
-        actions.add(new QuickAction("radar", "رادار التتبع", "Radar Tracking", true));
-        actions.add(new QuickAction("gate", "مراقبة البوابات", "Gate Monitor", true));
-        actions.add(new QuickAction("reports", "التقارير", "Reports", true));
-        actions.add(new QuickAction("accounting", "المحاسبة", "Accounting", true));
-        actions.add(new QuickAction("transfers", "التحويلات", "Transfers", true));
-        actions.add(new QuickAction("admin_hub", "الخيارات الإدارية", "Admin Hub", true));
-        actions.add(new QuickAction("sales_history", "سجل المبيعات", "Sales History", true));
-        actions.add(new QuickAction("server_config", "إعدادات السيرفر", "Server Config", true));
-        actions.add(new QuickAction("gold_rates", "أسعار الذهب", "Gold Rates", false));
-        actions.add(new QuickAction("users", "المستخدمين", "Users", false));
-        actions.add(new QuickAction("branches", "الفروع", "Branches", false));
-        
-        // تحميل الحالة المحفوظة
-        for (QuickAction action : actions) {
-            action.enabled = prefs.getBoolean(action.id, action.enabled);
-        }
-        
-        return actions;
+    List<QuickAction> actions = new ArrayList<>();
+    actions.add(new QuickAction("identity", "استوديو التكويد", "Identity Studio", true));
+    actions.add(new QuickAction("radar", "رادار التتبع", "Radar Tracking", true));
+    actions.add(new QuickAction("gate", "مراقبة البوابات", "Gate Monitor", true));
+    actions.add(new QuickAction("reports", "التقارير", "Reports", true));
+    actions.add(new QuickAction("accounting", "المحاسبة", "Accounting", true));
+    actions.add(new QuickAction("transfers", "التحويلات", "Transfers", true));
+    actions.add(new QuickAction("admin_hub", "الخيارات الإدارية", "Admin Hub", true));
+    actions.add(new QuickAction("sales_history", "سجل المبيعات", "Sales History", true));
+    actions.add(new QuickAction("server_config", "إعدادات السيرفر", "Server Config", true));
+    actions.add(new QuickAction("gold_rates", "أسعار الذهب", "Gold Rates", true)); // ✅
+    actions.add(new QuickAction("users", "المستخدمين", "Users", true)); // ✅
+    actions.add(new QuickAction("branches", "الفروع", "Branches", true)); // ✅
+    
+    // تحميل الحالة المحفوظة
+    for (QuickAction action : actions) {
+        action.enabled = prefs.getBoolean(action.id, action.enabled);
     }
+    
+    return actions;
+}
 
     /**
      * حفظ حالة إجراء
