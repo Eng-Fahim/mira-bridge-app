@@ -8,47 +8,68 @@
     android:layoutDirection="rtl"
     android:orientation="vertical">
 
-    <!-- Header Bar / الشريط العلوي -->
-    <LinearLayout
+    <!-- Header Section -->
+    <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorPrimary"
-        android:elevation="4dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="14dp">
+        app:cardCornerRadius="0dp"
+        app:cardElevation="2dp"
+        app:strokeWidth="0dp">
 
-        <TextView
-            android:layout_width="0dp"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="📊 مركز التقارير والتحليلات التنفيذية"
-            android:textColor="?attr/colorOnPrimary"
-            android:textSize="17sp"
-            android:textStyle="bold" />
+            android:background="?attr/colorPrimary"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="14dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnExportAll"
-            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
-            android:layout_width="wrap_content"
-            android:layout_height="38dp"
-            android:text="📤 ملخص الشامل"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            app:backgroundTint="?attr/colorSurface"
-            app:cornerRadius="8dp" />
-    </LinearLayout>
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-    <!-- قائمة التقارير الشبكية -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="مركز التقارير والتحليلات"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="متابعة الأداء والعمليات التنفيذية"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:alpha="0.8"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnExportAll"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:text="ملخص شامل 📤"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                app:cornerRadius="10dp" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Reports Grid List -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvReportsList"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:clipToPadding="false"
-        android:padding="8dp"
-        tools:listitem="@android:layout/simple_list_item_2" />
+        android:padding="12dp"
+        tools:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
+        tools:spanCount="2"
+        tools:listitem="@layout/item_report_card_pro" />
 
 </LinearLayout>
