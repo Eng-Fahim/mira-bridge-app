@@ -281,28 +281,40 @@ private void printRecyclerView(RecyclerView rvData, String title) {
     }
 }
     private void fetchAndDisplay(String type, RecyclerView rvData, View layoutLoading, 
-                                  TextView tvLoadingStatus, String fromDate, String toDate) {
+                              TextView tvLoadingStatus, String fromDate, String toDate) {
     if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
     if (tvLoadingStatus != null) tvLoadingStatus.setText(isArabic ? "جاري التحميل..." : "Loading...");
 
     executorService.execute(() -> {
         try {
+            // ✅ استخدام getReportData الموجودة في MiraApiClient
             MiraApiClient.ApiResponse response = apiClient.getReportData(type, fromDate, toDate, currentBranchId);
 
             mainHandler.post(() -> {
                 if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
 
-                if (response == null || !response.isSuccess || response.data == null) {
-                    Toast.makeText(getContext(), isArabic ? "فشل التحميل" : "Failed to load", Toast.LENGTH_SHORT).show();
+                if (response == null || !response.isSuccess) {
+                    Toast.makeText(getContext(), 
+                        isArabic ? "فشل التحميل" : "Failed to load", 
+                        Toast.LENGTH_SHORT).show();
                     return;
                 }
 
+                // ✅ البيانات إما في response.data أو response.getBody()
                 JSONObject data = response.data;
+                if (data == null) {
+                    // محاولة تحليل النص الخام
+                    try {
+                        data = new JSONObject(response.getBody());
+                    } catch (Exception e) {
+                        Toast.makeText(getContext(), "Data parse error", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                }
                 
-                // ✅ السجل هنا - بعد الحصول على data
+                // ✅ السجل للتشخيص
                 Log.d(TAG, "=== Report: " + type + " ===");
-                Log.d(TAG, "Keys: " + data.keys().toString());
-                Log.d(TAG, "Full: " + data.toString().substring(0, Math.min(500, data.toString().length())));
+                Log.d(TAG, "Data: " + data.toString().substring(0, Math.min(500, data.toString().length())));
                 
                 String cacheKey = "cache_pro_" + type + "_" + fromDate + "_" + toDate;
                 if (offlineCache != null) {
@@ -339,7 +351,8 @@ private void printRecyclerView(RecyclerView rvData, String title) {
                         rvData.setAdapter(new FinancialAdapter(parseFinancial(data)));
                         break;
                     default:
-                        rvData.setAdapter(new GenericAdapter(parseGeneric(data)));
+                        // ✅ للوحة القيادة - عرض منسق
+                        rvData.setAdapter(new DashboardAdapter(parseDashboard(data)));
                         break;
                 }
             });
@@ -352,7 +365,6 @@ private void printRecyclerView(RecyclerView rvData, String title) {
         }
     });
 }
-
     // ==================== Parsing Functions ====================
 
     private List<SalesItem> parseSales(JSONObject data) {
@@ -881,4 +893,113 @@ private List<GenericItem> parseGeneric(JSONObject data) {
         if (executorService != null && !executorService.isShutdown()) executorService.shutdownNow();
         super.onDestroyView();
     }
+    
+    // ✅ أضف هذه الدوال في نهاية الكلاس قبل الأقواس الختامية
+
+private List<DashboardItem> parseDashboard(JSONObject data) {
+    List<DashboardItem> items = new ArrayList<>();
+    
+    // ✅ المخزون
+    JSONObject inv = data.optJSONObject("inventory");
+    if (inv != null) {
+        items.add(new DashboardItem(
+            isArabic ? "📦 إجمالي القطع" : "📦 Total Items",
+            String.valueOf(inv.optInt("total_items", 0))
+        ));
+        items.add(new DashboardItem(
+            isArabic ? "⚖️ الوزن الكلي" : "⚖️ Total Weight",
+            String.format(Locale.US, "%.1f g", inv.optDouble("total_weight", 0))
+        ));
+        items.add(new DashboardItem(
+            isArabic ? "✅ المتاح" : "✅ Available",
+            String.valueOf(inv.optInt("available_count", 0))
+        ));
+        items.add(new DashboardItem(
+            isArabic ? "💰 المباع" : "💰 Sold",
+            String.valueOf(inv.optInt("sold_count", 0))
+        ));
+    }
+    
+    // ✅ المبيعات
+    JSONObject sales = data.optJSONObject("sales");
+    if (sales != null) {
+        items.add(new DashboardItem(
+            isArabic ? "🧾 عدد الفواتير" : "🧾 Invoices",
+            String.valueOf(sales.optInt("invoices_count", 0))
+        ));
+        items.add(new DashboardItem(
+            isArabic ? "💵 الإيرادات" : "💵 Revenue",
+            String.format(Locale.US, "%,.2f", sales.optDouble("total_revenue", 0))
+        ));
+    }
+    
+    // ✅ التدقيق
+    JSONObject audit = data.optJSONObject("audit");
+    if (audit != null) {
+        JSONObject auditSummary = audit.optJSONObject("audit_summary");
+        if (auditSummary != null) {
+            items.add(new DashboardItem(
+                isArabic ? "🎯 دقة الجرد" : "🎯 Audit Accuracy",
+                String.format(Locale.US, "%.1f%%", auditSummary.optDouble("accuracy", 0))
+            ));
+        }
+    }
+    
+    // ✅ توزيع العيارات
+    JSONArray karatBreakdown = data.optJSONArray("karat_breakdown");
+    if (karatBreakdown != null) {
+        for (int i = 0; i < karatBreakdown.length(); i++) {
+            JSONObject karat = karatBreakdown.optJSONObject(i);
+            if (karat != null) {
+                items.add(new DashboardItem(
+                    isArabic ? "🏷️ عيار " + karat.optString("gold_karat", "") : 
+                               "🏷️ Karat " + karat.optString("gold_karat", ""),
+                    karat.optInt("count", 0) + " " + (isArabic ? "قطعة" : "items")
+                ));
+            }
+        }
+    }
+    
+    return items;
+}
+
+static class DashboardItem {
+    String label, value;
+    DashboardItem(String l, String v) { label = l; value = v; }
+}
+
+class DashboardAdapter extends RecyclerView.Adapter<DashboardAdapter.VH> {
+    private final List<DashboardItem> items;
+    
+    DashboardAdapter(List<DashboardItem> items) { 
+        this.items = items; 
+    }
+    
+    @NonNull @Override 
+    public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
+        return new VH(LayoutInflater.from(p.getContext())
+            .inflate(R.layout.item_report_generic, p, false)); 
+    }
+    
+    @Override 
+    public void onBindViewHolder(@NonNull VH h, int pos) {
+        DashboardItem item = items.get(pos);
+        h.tvKey.setText(item.label);
+        h.tvValue.setText(item.value);
+    }
+    
+    @Override 
+    public int getItemCount() { 
+        return items.size(); 
+    }
+    
+    class VH extends RecyclerView.ViewHolder {
+        TextView tvKey, tvValue;
+        VH(View v) { 
+            super(v);
+            tvKey = v.findViewById(R.id.tvKey);
+            tvValue = v.findViewById(R.id.tvValue);
+        }
+    }
+}
 }
