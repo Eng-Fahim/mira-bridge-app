@@ -1,0 +1,7 @@
+<LinearLayout ...>
+    <TextView android:id="@+id/tvInvoiceNo" />
+    <TextView android:id="@+id/tvCustomerName" />
+    <TextView android:id="@+id/tvAmount" />
+    <TextView android:id="@+id/tvPaymentMethod" />
+    <TextView android:id="@+id/tvSellerName" />
+</LinearLayout>
