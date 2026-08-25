@@ -1783,4 +1783,23 @@
     <string name="delta_count">Delta</string>
     <string name="live_scan_log">📋 Live Scan Log</string>
     <string name="no_scanned_items">No scanned items yet</string>
+    
+    <string name="add_user_title">Add New User</string>
+    <string name="edit_user_title">Edit User</string>
+    <string name="add_user_subtitle">Enter new user data</string>
+    <string name="edit_user_subtitle">Edit current user data</string>
+    <string name="display_name">Display Name</string>
+    <string name="username">Username</string>
+    <string name="password">Password</string>
+    <string name="employee_id">Employee ID</string>
+    <string name="branch">Branch</string>
+    <string name="role">Role</string>
+    <string name="cancel">Cancel</string>
+    <string name="next_step">Next →</string>
+    <string name="prev_step">← Previous</string>
+    <string name="save_user">💾 Save</string>
+    <string name="saving">Saving...</string>
+    <string name="generate_password">Generate password</string>
+    <string name="copy_password">Copy password</string>
+    <string name="suggest_username">Suggest username</string>
 </resources>
