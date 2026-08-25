@@ -199,7 +199,7 @@
     <!-- DASHBOARD -->
     <string name="precious_inventory">المخزون الثمين والكتلة</string>
     <string name="sold_today">قطع مباعة (اليوم)</string>
-    <string name="total_weight">الوزن الكلي</string>
+   
     <string name="total_items">إجمالي القطع</string>
     <string name="sales_today">مبيعات اليوم</string>
     <string name="sales_month">مبيعات الشهر</string>
@@ -2013,5 +2013,25 @@
 <string name="showing_count">عدد العمليات المعروضة:</string>
 <string name="loading_more">جاري تحميل المزيد...</string>
 <string name="end_of_list">— نهاية القائمة —</string>
+
+    <string name="blind_inventory">⚡ جرد أعمى</string>
+    <string name="stop_inventory">🛑 إيقاف</string>
+    
+    <string name="last_scan_none">آخر قراءة: لا يوجد</string>
+    <string name="expected_count">المتوقع</string>
+    <string name="scanned_count">الممسوح</string>
+    <string name="variance_count">العجز</string>
+    <string name="accuracy">الدقة</string>
+    <string name="total_weight">⚖️ الوزن: 0.00 g</string>
+    <string name="total_value">💰 القيمة: —</string>
+    <string name="commit_report">📄 اعتماد</string>
+    <string name="archive_reports">الأرشيف</string>
+    <string name="view_snapshots">اللقطات</string>
+    <string name="previous_count">السابق</string>
+    <string name="current_count">الحالي</string>
+    <string name="delta_count">الفارق</string>
+    <string name="live_scan_log">📋 السجل الحي للقطع الممسوحة</string>
+    <string name="no_scanned_items">لا توجد عناصر ممسوحة حالياً</string>
+
 
 </resources>
