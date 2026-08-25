@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="?attr/colorSurface"
     android:orientation="vertical"
-    android:layoutDirection="rtl">
+    tools:layoutDirection="rtl">
 
     <!-- تبويبات الجرد الديناميكية -->
     <com.google.android.material.tabs.TabLayout
@@ -40,7 +40,7 @@
                 android:layout_height="48dp"
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
-                android:text="📡 بدء الجرد"
+                android:text="@string/start_inventory"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 app:cornerRadius="10dp"
@@ -53,7 +53,7 @@
                 android:layout_height="48dp"
                 android:layout_weight="1"
                 android:layout_marginHorizontal="2dp"
-                android:text="⚡ جرد أعمى"
+                android:text="@string/blind_inventory"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 app:cornerRadius="10dp" />
@@ -66,7 +66,7 @@
                 android:layout_marginStart="4dp"
                 android:backgroundTint="?attr/colorError"
                 android:enabled="false"
-                android:text="🛑 إيقاف"
+                android:text="@string/stop_inventory"
                 android:textColor="?attr/colorOnError"
                 android:textSize="12sp"
                 android:textStyle="bold"
@@ -101,7 +101,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="📡 جاهز لبدء عمليات الجرد"
+                        android:text="@string/inventory_ready"
                         android:textColor="?attr/colorPrimary"
                         android:textSize="12sp"
                         android:textStyle="bold" />
@@ -170,24 +170,25 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="آخر قراءة: لا يوجد"
+                    android:text="@string/last_scan_none"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="10sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- شبكة العدادات الإحصائية -->
-        <GridLayout
+        <!-- شبكة العدادات الإحصائية - استخدام LinearLayout بدلاً من GridLayout -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:columnCount="4"
-            android:rowCount="1">
+            android:orientation="horizontal"
+            android:weightSum="4">
 
+            <!-- المتوقع -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_columnWeight="1"
+                android:layout_weight="1"
                 android:layout_marginEnd="2dp"
                 app:cardBackgroundColor="?attr/colorSurfaceContainer"
                 app:cardCornerRadius="10dp"
@@ -198,7 +199,7 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="6dp">
+                    android:padding="8dp">
 
                     <TextView
                         android:id="@+id/tvExpectedCount"
@@ -206,22 +207,23 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"
+                        android:textSize="18sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="المتوقع"
+                        android:text="@string/expected_count"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="10sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- الممسوح -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_columnWeight="1"
+                android:layout_weight="1"
                 android:layout_marginHorizontal="2dp"
                 app:cardBackgroundColor="?attr/colorPrimaryContainer"
                 app:cardCornerRadius="10dp"
@@ -232,7 +234,7 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="6dp">
+                    android:padding="8dp">
 
                     <TextView
                         android:id="@+id/tvScannedCount"
@@ -240,22 +242,23 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="?attr/colorOnPrimaryContainer"
-                        android:textSize="16sp"
+                        android:textSize="18sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="الممسوح"
+                        android:text="@string/scanned_count"
                         android:textColor="?attr/colorOnPrimaryContainer"
                         android:textSize="10sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- العجز -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_columnWeight="1"
+                android:layout_weight="1"
                 android:layout_marginHorizontal="2dp"
                 app:cardBackgroundColor="?attr/colorErrorContainer"
                 app:cardCornerRadius="10dp"
@@ -266,7 +269,7 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="6dp">
+                    android:padding="8dp">
 
                     <TextView
                         android:id="@+id/tvVariance"
@@ -274,22 +277,23 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="?attr/colorOnErrorContainer"
-                        android:textSize="16sp"
+                        android:textSize="18sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="العجز"
+                        android:text="@string/variance_count"
                         android:textColor="?attr/colorOnErrorContainer"
                         android:textSize="10sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- الدقة -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_columnWeight="1"
+                android:layout_weight="1"
                 android:layout_marginStart="2dp"
                 app:cardBackgroundColor="?attr/colorTertiaryContainer"
                 app:cardCornerRadius="10dp"
@@ -300,7 +304,7 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="6dp">
+                    android:padding="8dp">
 
                     <TextView
                         android:id="@+id/tvAccuracy"
@@ -308,18 +312,18 @@
                         android:layout_height="wrap_content"
                         android:text="0%"
                         android:textColor="?attr/colorOnTertiaryContainer"
-                        android:textSize="16sp"
+                        android:textSize="18sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="الدقة"
+                        android:text="@string/accuracy"
                         android:textColor="?attr/colorOnTertiaryContainer"
                         android:textSize="10sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-        </GridLayout>
+        </LinearLayout>
 
         <!-- معلومات الوزن والقيمة مع أزرار التقارير -->
         <LinearLayout
@@ -339,7 +343,7 @@
                     android:id="@+id/tvTotalWeight"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="⚖️ الوزن: 0.00 g"
+                    android:text="@string/total_weight"
                     android:textColor="?attr/colorOnSurface"
                     android:textSize="11sp"
                     android:textStyle="bold" />
@@ -348,7 +352,7 @@
                     android:id="@+id/tvTotalValue"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="💰 القيمة: —"
+                    android:text="@string/total_value"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="10sp" />
             </LinearLayout>
@@ -360,7 +364,7 @@
                 android:layout_height="36dp"
                 android:enabled="false"
                 android:paddingHorizontal="12dp"
-                android:text="📄 اعتماد"
+                android:text="@string/commit_report"
                 android:textSize="11sp"
                 app:cornerRadius="8dp" />
 
@@ -371,7 +375,8 @@
                 android:layout_height="36dp"
                 android:layout_marginStart="4dp"
                 app:icon="@android:drawable/ic_menu_agenda"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="8dp"
+                tools:contentDescription="@string/archive_reports" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnViewSnapshots"
@@ -380,7 +385,8 @@
                 android:layout_height="36dp"
                 android:layout_marginStart="4dp"
                 app:icon="@android:drawable/ic_menu_camera"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="8dp"
+                tools:contentDescription="@string/view_snapshots" />
         </LinearLayout>
 
         <!-- بطاقة المقارنة -->
@@ -412,7 +418,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="السابق"
+                        android:text="@string/previous_count"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="9sp" />
 
@@ -436,7 +442,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="الحالي"
+                        android:text="@string/current_count"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="9sp" />
 
@@ -460,7 +466,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="الفارق"
+                        android:text="@string/delta_count"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="9sp" />
 
@@ -476,7 +482,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- حاوي القائمة RecyclerView الديناميكي المنتشر لملء باقي الشاشة -->
+        <!-- حاوي القائمة RecyclerView -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -504,7 +510,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="📋 السجل الحي للقطع الممسوحة"
+                        android:text="@string/live_scan_log"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="12sp"
                         android:textStyle="bold" />
@@ -545,7 +551,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="center"
-                        android:text="لا توجد عناصر ممسوحة حالياً"
+                        android:text="@string/no_scanned_items"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="12sp"
                         android:visibility="visible" />
