@@ -494,7 +494,9 @@ public class UsersManagementFragment extends Fragment {
 
     // ==================== User Dialog ====================
 
-    private void showUserDialog(@Nullable UserData existingUser) {
+    // ==================== User Dialog ====================
+
+private void showUserDialog(@Nullable UserData existingUser) {
     try {
         if (!isAdded() || getContext() == null) return;
 
@@ -503,11 +505,12 @@ public class UsersManagementFragment extends Fragment {
 
         AlertDialog dialog = new AlertDialog.Builder(requireContext())
             .setView(dialogView)
-            .setCancelable(false)
+            .setCancelable(true) // ✅ السماح بالإغلاق بالضغط خارج الموديل
             .create();
 
+        // ✅ إزالة الخلفية الشفافة - استخدام خلفية الثيم
         if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.white);
         }
 
         // استخراج عناصر الواجهة
@@ -517,8 +520,6 @@ public class UsersManagementFragment extends Fragment {
         EditText etUsername = dialogView.findViewById(R.id.etUsername);
         EditText etPassword = dialogView.findViewById(R.id.etPassword);
         EditText etEmployeeId = dialogView.findViewById(R.id.etEmployeeId);
-        
-        // ✅ التعديل هنا: استخدام EditText بدلاً من MaterialAutoCompleteTextView
         EditText etBranch = dialogView.findViewById(R.id.etBranch);
         EditText etRole = dialogView.findViewById(R.id.etRole);
         
@@ -533,8 +534,14 @@ public class UsersManagementFragment extends Fragment {
         ImageButton btnGeneratePassword = dialogView.findViewById(R.id.btnGeneratePassword);
         ImageButton btnCopyPassword = dialogView.findViewById(R.id.btnCopyPassword);
         ImageButton btnSuggestUsername = dialogView.findViewById(R.id.btnSuggestUsername);
+        ImageButton btnCloseDialog = dialogView.findViewById(R.id.btnCloseDialog);
         FrameLayout loadingOverlay = dialogView.findViewById(R.id.loadingOverlay);
         TextView tvLoadingText = dialogView.findViewById(R.id.tvLoadingText);
+
+        // ✅ زر إغلاق X
+        if (btnCloseDialog != null) {
+            btnCloseDialog.setOnClickListener(v -> dialog.dismiss());
+        }
 
         // العناوين
         if (tvTitle != null) {
@@ -548,7 +555,7 @@ public class UsersManagementFragment extends Fragment {
                 : (isArabic ? "أدخل بيانات المستخدم الجديد" : "Enter new user data"));
         }
 
-        // إعداد قائمة الفروع - استخدام AlertDialog بدلاً من dropdown
+        // إعداد قائمة الفروع
         List<String> branchNames = new ArrayList<>();
         int activeBranchId = branchesManager.getActiveBranchId();
         int selectedBranchIndex = 0;
@@ -676,23 +683,31 @@ public class UsersManagementFragment extends Fragment {
                 }
             }
 
+            // ✅ وضع التعديل: إظهار كل شيء
             if (layoutStep1 != null) layoutStep1.setVisibility(View.VISIBLE);
             if (layoutStep2 != null) layoutStep2.setVisibility(View.VISIBLE);
             if (stepsIndicator != null) stepsIndicator.setVisibility(View.GONE);
             if (btnNextStep != null) btnNextStep.setVisibility(View.GONE);
             if (btnPrevStep != null) btnPrevStep.setVisibility(View.GONE);
             if (layoutButtons1 != null) layoutButtons1.setVisibility(View.VISIBLE);
-            if (btnCancel != null) btnCancel.setVisibility(View.VISIBLE);
+            if (btnCancel != null) {
+                btnCancel.setVisibility(View.VISIBLE);
+                btnCancel.setText(isArabic ? "إلغاء" : "Cancel");
+            }
             if (btnSaveUser != null) btnSaveUser.setVisibility(View.VISIBLE);
         } else {
+            // ✅ وضع الإضافة: زر الإلغاء مرئي دائماً
             if (layoutStep1 != null) layoutStep1.setVisibility(View.VISIBLE);
             if (layoutStep2 != null) layoutStep2.setVisibility(View.GONE);
             if (stepsIndicator != null) stepsIndicator.setVisibility(View.VISIBLE);
             if (btnNextStep != null) btnNextStep.setVisibility(View.VISIBLE);
             if (btnSaveUser != null) btnSaveUser.setVisibility(View.GONE);
             if (btnPrevStep != null) btnPrevStep.setVisibility(View.GONE);
-            if (layoutButtons1 != null) layoutButtons1.setVisibility(View.GONE);
-            if (btnCancel != null) btnCancel.setVisibility(View.GONE);
+            if (layoutButtons1 != null) layoutButtons1.setVisibility(View.VISIBLE); // ✅ إظهار الأزرار
+            if (btnCancel != null) {
+                btnCancel.setVisibility(View.VISIBLE); // ✅ زر الإلغاء مرئي دائماً
+                btnCancel.setText(isArabic ? "إلغاء" : "Cancel");
+            }
         }
 
         // زر التالي
@@ -734,8 +749,10 @@ public class UsersManagementFragment extends Fragment {
             });
         }
 
-        // زر الإلغاء
+        // زر الإلغاء - ✅ دائماً مرئي وفعال
         if (btnCancel != null) {
+            btnCancel.setText(isArabic ? "إلغاء" : "Cancel");
+            btnCancel.setVisibility(View.VISIBLE);
             btnCancel.setOnClickListener(v -> dialog.dismiss());
         }
 
