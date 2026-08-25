@@ -801,119 +801,162 @@ public class MiraGoldCurrencyFragment extends Fragment {
         tvLiveUSD_AED.setText(String.format(Locale.US, "1 USD = %s د.إ (%s)", decimalFormat.format(getExchangeRate("AED")), rateType));
     }
 
-    private void loadLocalSettings() {
-        String goldSettingsJson = prefs.getString("gold_settings", "");
-        if (!goldSettingsJson.isEmpty()) {
-            try { applyGoldSettings(new JSONObject(goldSettingsJson)); } catch (Exception ignored) {}
+    
+    // ✅ دالة واحدة فقط بهذا الاسم
+private void applyGoldSettings(JSONObject json) {
+    try {
+        if (json == null) return;
+        
+        Log.d(TAG, "Applying gold settings: " + json.toString());
+        
+        // أسعار الذهب
+        if (json.has("gold_price_24k")) {
+            double val = json.optDouble("gold_price_24k", 0);
+            if (val > 0) etGoldPrice24k.setText(decimalFormat.format(val));
         }
-        String currencySettingsJson = prefs.getString("currency_settings", "");
-        if (!currencySettingsJson.isEmpty()) {
-            try { applyCurrencySettings(new JSONObject(currencySettingsJson)); } catch (Exception ignored) {}
+        if (json.has("gold_price_22k")) {
+            double val = json.optDouble("gold_price_22k", 0);
+            if (val > 0) etGoldPrice22k.setText(decimalFormat.format(val));
+        }
+        if (json.has("gold_price_21k")) {
+            double val = json.optDouble("gold_price_21k", 0);
+            if (val > 0) etGoldPrice21k.setText(decimalFormat.format(val));
+        }
+        if (json.has("gold_price_18k")) {
+            double val = json.optDouble("gold_price_18k", 0);
+            if (val > 0) etGoldPrice18k.setText(decimalFormat.format(val));
+        }
+        if (json.has("gold_price_14k")) {
+            double val = json.optDouble("gold_price_14k", 0);
+            if (val > 0) etGoldPrice14k.setText(decimalFormat.format(val));
         }
         
-        long lastUpdateTime = prefs.getLong("last_update_time", 0);
-        float lastGoldPrice = prefs.getFloat("last_gold_price_24k", 0);
-        if (lastGoldPrice > 0 && (System.currentTimeMillis() - lastUpdateTime) < 3600000) {
-            etGoldPrice24k.setText(decimalFormat.format(lastGoldPrice));
-            autoFillKaratPrices(lastGoldPrice);
+        // هوامش الربح
+        if (json.has("margin_24k")) {
+            double val = json.optDouble("margin_24k", 0);
+            if (val > 0) etMargin24k.setText(decimalFormat.format(val));
+        }
+        if (json.has("margin_22k")) {
+            double val = json.optDouble("margin_22k", 0);
+            if (val > 0) etMargin22k.setText(decimalFormat.format(val));
+        }
+        if (json.has("margin_21k")) {
+            double val = json.optDouble("margin_21k", 0);
+            if (val > 0) etMargin21k.setText(decimalFormat.format(val));
+        }
+        if (json.has("margin_18k")) {
+            double val = json.optDouble("margin_18k", 0);
+            if (val > 0) etMargin18k.setText(decimalFormat.format(val));
+        }
+        if (json.has("margin_14k")) {
+            double val = json.optDouble("margin_14k", 0);
+            if (val > 0) etMargin14k.setText(decimalFormat.format(val));
+        }
+        if (json.has("margin_12k")) {
+            double val = json.optDouble("margin_12k", 0);
+            if (val > 0) etMargin12k.setText(decimalFormat.format(val));
+        }
+        
+        // المصنعية
+        if (json.has("making_24k")) {
+            double val = json.optDouble("making_24k", 0);
+            if (val > 0) etMaking24k.setText(decimalFormat.format(val));
+        }
+        if (json.has("making_22k")) {
+            double val = json.optDouble("making_22k", 0);
+            if (val > 0) etMaking22k.setText(decimalFormat.format(val));
+        }
+        if (json.has("making_21k")) {
+            double val = json.optDouble("making_21k", 0);
+            if (val > 0) etMaking21k.setText(decimalFormat.format(val));
+        }
+        if (json.has("making_18k")) {
+            double val = json.optDouble("making_18k", 0);
+            if (val > 0) etMaking18k.setText(decimalFormat.format(val));
+        }
+        if (json.has("making_14k")) {
+            double val = json.optDouble("making_14k", 0);
+            if (val > 0) etMaking14k.setText(decimalFormat.format(val));
+        }
+        if (json.has("making_12k")) {
+            double val = json.optDouble("making_12k", 0);
+            if (val > 0) etMaking12k.setText(decimalFormat.format(val));
+        }
+        
+        // العملة والمزود
+        if (json.has("gold_default_currency")) {
+            spGoldCurrency.setSelection(getCurrencyPosition(json.optString("gold_default_currency", "USD")));
+        }
+        if (json.has("provider_id")) {
+            int providerId = json.optInt("provider_id");
+            prefs.edit().putInt("selected_provider_id", providerId).apply();
         }
         
         updateAllPrices();
+    } catch (Exception e) {
+        Log.e(TAG, "Error applying gold settings: " + e.getMessage(), e);
     }
+}
 
-    private void loadServerSettings() {
-        executor.execute(() -> {
-            try {
-                MiraApiClient client = MiraApiClient.getInstance(mContext);
-                MiraApiClient.ApiResponse response = client.getGoldCurrencySettings();
-                if (response.isSuccess && response.data != null) {
-                    JSONObject data = response.data.optJSONObject("data");
-                    if (data == null) data = response.data;
-                    JSONObject goldData = data.optJSONObject("gold");
-                    JSONObject currencyData = data.optJSONObject("currency");
-                    mainHandler.post(() -> {
-                        if (goldData != null) applyGoldSettings(goldData);
-                        if (currencyData != null) applyCurrencySettings(currencyData);
-                        updateAllPrices();
-                    });
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading server settings: " + e.getMessage());
-            }
-        });
+// ✅ دالة تحميل الإعدادات المحلية - نظيفة بدون تكرار
+private void loadLocalSettings() {
+    String goldSettingsJson = prefs.getString("gold_settings", "");
+    if (!goldSettingsJson.isEmpty()) {
+        try { applyGoldSettings(new JSONObject(goldSettingsJson)); } catch (Exception ignored) {}
     }
+    String currencySettingsJson = prefs.getString("currency_settings", "");
+    if (!currencySettingsJson.isEmpty()) {
+        try { applyCurrencySettings(new JSONObject(currencySettingsJson)); } catch (Exception ignored) {}
+    }
+    
+    long lastUpdateTime = prefs.getLong("last_update_time", 0);
+    float lastGoldPrice = prefs.getFloat("last_gold_price_24k", 0);
+    if (lastGoldPrice > 0 && (System.currentTimeMillis() - lastUpdateTime) < 3600000) {
+        etGoldPrice24k.setText(decimalFormat.format(lastGoldPrice));
+        autoFillKaratPrices(lastGoldPrice);
+    }
+    
+    updateAllPrices();
+}
 
-    private void applyGoldSettings(JSONObject json) {
+// ✅ دالة تحميل من السيرفر - نظيفة
+private void loadServerSettings() {
+    executor.execute(() -> {
         try {
-            if (json == null) return;
-            if (json.has("gold_price_24k")) etGoldPrice24k.setText(decimalFormat.format(json.optDouble("gold_price_24k")));
-            if (json.has("gold_price_22k")) etGoldPrice22k.setText(decimalFormat.format(json.optDouble("gold_price_22k")));
-            if (json.has("gold_price_21k")) etGoldPrice21k.setText(decimalFormat.format(json.optDouble("gold_price_21k")));
-            if (json.has("gold_price_18k")) etGoldPrice18k.setText(decimalFormat.format(json.optDouble("gold_price_18k")));
-            if (json.has("gold_price_14k")) etGoldPrice14k.setText(decimalFormat.format(json.optDouble("gold_price_14k")));
+            MiraApiClient client = MiraApiClient.getInstance(mContext);
+            MiraApiClient.ApiResponse response = client.getGoldCurrencySettings();
             
-            if (json.has("margin_24k")) {
-                double val = json.optDouble("margin_24k", 0);
-                etMargin24k.setText(decimalFormat.format(val > 0 ? val : 95.00));
-            }
-            if (json.has("margin_22k")) {
-                double val = json.optDouble("margin_22k", 0);
-                etMargin22k.setText(decimalFormat.format(val > 0 ? val : 88.00));
-            }
-            if (json.has("margin_21k")) {
-                double val = json.optDouble("margin_21k", 0);
-                etMargin21k.setText(decimalFormat.format(val > 0 ? val : 90.00));
-            }
-            if (json.has("margin_18k")) {
-                double val = json.optDouble("margin_18k", 0);
-                etMargin18k.setText(decimalFormat.format(val > 0 ? val : 100.80));
-            }
-            if (json.has("margin_14k")) {
-                double val = json.optDouble("margin_14k", 0);
-                etMargin14k.setText(decimalFormat.format(val > 0 ? val : 105.80));
-            }
-            if (json.has("margin_12k")) {
-                double val = json.optDouble("margin_12k", 0);
-                etMargin12k.setText(decimalFormat.format(val > 0 ? val : 110.00));
-            }
-            
-            if (json.has("making_24k")) {
-                double val = json.optDouble("making_24k", 0);
-                etMaking24k.setText(decimalFormat.format(val > 0 ? val : 5.00));
-            }
-            if (json.has("making_22k")) {
-                double val = json.optDouble("making_22k", 0);
-                etMaking22k.setText(decimalFormat.format(val > 0 ? val : 8.00));
-            }
-            if (json.has("making_21k")) {
-                double val = json.optDouble("making_21k", 0);
-                etMaking21k.setText(decimalFormat.format(val > 0 ? val : 10.00));
-            }
-            if (json.has("making_18k")) {
-                double val = json.optDouble("making_18k", 0);
-                etMaking18k.setText(decimalFormat.format(val > 0 ? val : 12.00));
-            }
-            if (json.has("making_14k")) {
-                double val = json.optDouble("making_14k", 0);
-                etMaking14k.setText(decimalFormat.format(val > 0 ? val : 15.00));
-            }
-            if (json.has("making_12k")) {
-                double val = json.optDouble("making_12k", 0);
-                etMaking12k.setText(decimalFormat.format(val > 0 ? val : 18.00));
-            }
-            
-            if (json.has("gold_default_currency")) {
-                spGoldCurrency.setSelection(getCurrencyPosition(json.optString("gold_default_currency", "USD")));
-            }
-            
-            if (json.has("provider_id")) {
-                int providerId = json.optInt("provider_id");
-                prefs.edit().putInt("selected_provider_id", providerId).apply();
+            if (response != null && response.isSuccess && response.data != null) {
+                Log.d(TAG, "Server settings response: " + response.data.toString());
+                
+                JSONObject data = response.data.optJSONObject("data");
+                if (data == null) data = response.data;
+                
+                JSONObject goldData = data.optJSONObject("gold");
+                if (goldData == null) {
+                    goldData = data;
+                }
+                
+                JSONObject currencyData = data.optJSONObject("currency");
+                
+                final JSONObject finalGoldData = goldData;
+                final JSONObject finalCurrencyData = currencyData;
+                
+                mainHandler.post(() -> {
+                    if (finalGoldData != null) {
+                        applyGoldSettings(finalGoldData);
+                    }
+                    if (finalCurrencyData != null) {
+                        applyCurrencySettings(finalCurrencyData);
+                    }
+                    updateAllPrices();
+                });
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error applying gold settings: " + e.getMessage());
+            Log.e(TAG, "Error loading server settings: " + e.getMessage());
         }
-    }
+    });
+}
 
     private void applyCurrencySettings(JSONObject json) {
         try {
