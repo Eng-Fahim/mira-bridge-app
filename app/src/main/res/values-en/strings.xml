@@ -1801,4 +1801,9 @@
     <string name="generate_password">Generate password</string>
     <string name="copy_password">Copy password</string>
     <string name="suggest_username">Suggest username</string>
+
+    <string name="transfers_title">Shipment & Transfer Management</string>
+    <string name="new_transfer">+ New Transfer</string>
+    <string name="scan_verify">🔍 Open RFID Live Scan Verification</string>
+    <string name="no_transfers">No transfers matching the selected filter</string>
 </resources>
