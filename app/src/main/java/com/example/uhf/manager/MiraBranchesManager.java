@@ -4,15 +4,13 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
-// ✅ أضف هذه imports
 import org.json.JSONArray;
 import org.json.JSONObject;
-// ✅ نهاية الإضافات
+
+import com.example.uhf.api.MiraApiClient; // ✅ import ناقص
 
 import java.util.ArrayList;
 import java.util.List;
-
-
 
 public class MiraBranchesManager {
 
@@ -29,11 +27,13 @@ public class MiraBranchesManager {
 
     private static MiraBranchesManager instance;
     private final SharedPreferences prefs;
-    private final Context context; // ✅ إضافة المتغير
+    private final Context context;
+    private MiraApiClient apiClient; // ✅ إضافة المتغير
 
     private MiraBranchesManager(Context context) {
-        this.context = context.getApplicationContext(); // ✅ حفظ المرجع
+        this.context = context.getApplicationContext();
         prefs = context.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        apiClient = MiraApiClient.getInstance(context); // ✅ تهيئة apiClient
     }
 
     public static MiraBranchesManager getInstance(Context context) {
@@ -108,29 +108,7 @@ public void saveBranchesFromServer(JSONObject data) {
     }
 }
 
-public List<BranchItem> getAllBranches() {
-    List<BranchItem> branches = new ArrayList<>();
-    try {
-        MiraApiClient.ApiResponse response = apiClient.getBranches();
-        if (response != null && response.isSuccess && response.data != null) {
-            JSONArray arr = response.data.optJSONArray("branches");
-            if (arr != null) {
-                for (int i = 0; i < arr.length(); i++) {
-                    JSONObject b = arr.optJSONObject(i);
-                    if (b != null) {
-                        BranchItem item = new BranchItem();
-                        item.id = b.optInt("id");
-                        item.name = b.optString("branch_name_ar", b.optString("branch_name", ""));
-                        branches.add(item);
-                    }
-                }
-            }
-        }
-    } catch (Exception e) {
-        Log.e("BranchesManager", "Error loading branches: " + e.getMessage());
-    }
-    return branches;
-}
+
 
     public int getActiveBranchId() {
         try {
@@ -209,5 +187,65 @@ public List<BranchItem> getAllBranches() {
     public void clear() {
         prefs.edit().clear().apply();
         Log.d(TAG, "Branches data cleared");
+    }
+/**
+     * ✅ جلب جميع الفروع من السيرفر
+     */
+    public List<BranchItem> getAllBranches() {
+        List<BranchItem> branches = new ArrayList<>();
+        try {
+            if (apiClient == null) {
+                apiClient = MiraApiClient.getInstance(context);
+            }
+            
+            MiraApiClient.ApiResponse response = apiClient.getBranches();
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONArray arr = response.data.optJSONArray("branches");
+                if (arr == null) {
+                    JSONObject dataObj = response.data.optJSONObject("data");
+                    if (dataObj != null) {
+                        arr = dataObj.optJSONArray("branches");
+                    }
+                }
+                
+                if (arr != null) {
+                    for (int i = 0; i < arr.length(); i++) {
+                        JSONObject b = arr.optJSONObject(i);
+                        if (b != null) {
+                            BranchItem item = new BranchItem();
+                            item.id = b.optInt("id");
+                            item.name = b.optString("branch_name_ar", b.optString("branch_name", ""));
+                            item.code = b.optString("branch_code", "");
+                            branches.add(item);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading branches: " + e.getMessage());
+        }
+        return branches;
+    }
+
+    /**
+     * ✅ كلاس معلومات الفرع
+     */
+    public static class BranchItem {
+        public int id;
+        public String name;
+        public String code;
+        
+        public BranchItem() {}
+        
+        public BranchItem(int id, String name) {
+            this.id = id;
+            this.name = name;
+        }
+        
+        public BranchItem(int id, String name, String code) {
+            this.id = id;
+            this.name = name;
+            this.code = code;
+        }
     }
 }
