@@ -10,7 +10,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
-import com.example.uhf.model.ApiProvider;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
@@ -28,6 +28,7 @@ import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.manager.PermissionManager;
+import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.SessionManager;
 
 import org.json.JSONObject;
@@ -300,59 +301,59 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     private void fetchLiveGoldPrices(boolean forceRefresh) {
-    if (apiClient == null) return;
+        if (apiClient == null) return;
 
-    long now = System.currentTimeMillis();
-    if (!forceRefresh && (now - lastGoldFetchTime) < CACHE_VALIDITY_MS) return;
+        long now = System.currentTimeMillis();
+        if (!forceRefresh && (now - lastGoldFetchTime) < CACHE_VALIDITY_MS) return;
 
-    cancelFuture(goldPriceFuture);
-    long startTime = System.currentTimeMillis();
+        cancelFuture(goldPriceFuture);
+        long startTime = System.currentTimeMillis();
 
-    goldPriceFuture = sharedExecutor.submit(() -> {
-        try {
-            // ✅ استخدام الدوال الموجودة
-            List<ApiProvider> providers = apiClient.getActiveProviders();
-            ApiProvider activeProvider = null;
-            
-            for (ApiProvider provider : providers) {
-                if (provider.isActive() && !provider.getApiKey().isEmpty()) {
-                    activeProvider = provider;
-                    break;
+        goldPriceFuture = sharedExecutor.submit(() -> {
+            try {
+                List<ApiProvider> providers = apiClient.getActiveProviders();
+                ApiProvider activeProvider = null;
+                
+                if (providers != null) {
+                    for (ApiProvider provider : providers) {
+                        if (provider.isActive() && provider.getApiKey() != null && !provider.getApiKey().isEmpty()) {
+                            activeProvider = provider;
+                            break;
+                        }
+                    }
+                    if (activeProvider == null && !providers.isEmpty()) {
+                        activeProvider = providers.get(0);
+                    }
                 }
-            }
-            
-            if (activeProvider == null && !providers.isEmpty()) {
-                activeProvider = providers.get(0);
-            }
-            
-            if (activeProvider == null) {
+                
+                if (activeProvider == null) {
+                    mainHandler.post(() -> {
+                        if (isAdded()) displayGoldPricesFromCache();
+                    });
+                    return;
+                }
+                
+                MiraApiClient.ApiResponse response = apiClient.fetchGoldPriceWithProvider(activeProvider.getId());
+                GoldPriceData priceData = parseGoldPriceData(response);
+                
+                mainHandler.post(() -> {
+                    lastGoldFetchTime = System.currentTimeMillis();
+                    logPerformance("fetchLiveGoldPrices", System.currentTimeMillis() - startTime);
+                    if (!isAdded()) return;
+                    
+                    if (priceData != null) {
+                        displayGoldPrices(priceData);
+                    } else {
+                        displayGoldPricesFromCache();
+                    }
+                });
+            } catch (Exception e) {
                 mainHandler.post(() -> {
                     if (isAdded()) displayGoldPricesFromCache();
                 });
-                return;
             }
-            
-            MiraApiClient.ApiResponse response = apiClient.fetchGoldPriceWithProvider(activeProvider.getId());
-            GoldPriceData priceData = parseGoldPriceData(response);
-            
-            mainHandler.post(() -> {
-                lastGoldFetchTime = System.currentTimeMillis();
-                logPerformance("fetchLiveGoldPrices", System.currentTimeMillis() - startTime);
-                if (!isAdded()) return;
-                
-                if (priceData != null) {
-                    displayGoldPrices(priceData);
-                } else {
-                    displayGoldPricesFromCache();
-                }
-            });
-        } catch (Exception e) {
-            mainHandler.post(() -> {
-                if (isAdded()) displayGoldPricesFromCache();
-            });
-        }
-    });
-}
+        });
+    }
 
     private GoldPriceData parseGoldPriceData(MiraApiClient.ApiResponse response) {
         if (response == null || !response.isSuccess || response.data == null) {
@@ -574,11 +575,12 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             }
         }
 
+        // 🟢 الإصلاح التقني: ربط الزر بـ MiraUHFReadTagFragment بدلاً من الفراغمنت المفقود
         if (btnInventory != null && permissionManager != null) {
             boolean canAccess = permissionManager.canAccessFragment("Scan");
             btnInventory.setVisibility(canAccess ? View.VISIBLE : View.GONE);
             if (canAccess) {
-                btnInventory.setOnClickListener(v -> navigateToFragment(new MiraInventoryProFragment(), "Scan"));
+                btnInventory.setOnClickListener(v -> navigateToFragment(new MiraUHFReadTagFragment(), "Scan"));
             }
         }
     }
