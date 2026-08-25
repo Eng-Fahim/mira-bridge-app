@@ -359,7 +359,245 @@ public class PermissionManager {
                 return true; // ✅ الواجهات غير المعروفة متاحة افتراضياً
         }
     }
+// أضف هذه الدوال إلى PermissionManager.java
 
+/**
+ * ✅ الحصول على عناصر القائمة السفلية المسموحة
+ */
+public List<Integer> getAllowedBottomNavItems() {
+    List<Integer> allowedItems = new ArrayList<>();
+    
+    // الرئيسية - متاحة للجميع
+    allowedItems.add(R.id.nav_home);
+    
+    // المخزون - حسب الصلاحية
+    if (canViewInventory()) {
+        allowedItems.add(R.id.nav_inventory);
+    }
+    
+    // المبيعات - حسب الصلاحية
+    if (canUsePos() || canViewSalesHistory()) {
+        allowedItems.add(R.id.nav_sales);
+    }
+    
+    // التحويلات - حسب الصلاحية
+    if (canViewTransfers()) {
+        allowedItems.add(R.id.nav_transfers);
+    }
+    
+    return allowedItems;
+}
+
+/**
+ * ✅ الحصول على عناصر القائمة العلوية المسموحة
+ */
+public List<Integer> getAllowedToolbarMenuItems() {
+    List<Integer> allowedItems = new ArrayList<>();
+    
+    // تغيير اللغة - متاح للجميع
+    allowedItems.add(R.id.action_change_language);
+    
+    // الفروع - للمدراء فقط
+    if (isManager() || canViewAdminHub()) {
+        allowedItems.add(R.id.action_branches);
+    }
+    
+    // الملف الشخصي - متاح للجميع
+    allowedItems.add(R.id.action_profile);
+    
+    // تسجيل الخروج - متاح للجميع
+    allowedItems.add(R.id.action_logout);
+    
+    // تصدير البيانات - للمدراء والمراجعين
+    if (canExportReports() || isManager() || isAuditor()) {
+        allowedItems.add(R.id.export);
+    }
+    
+    // إصدار الجهاز - للفنيين والمدراء
+    if (isAdmin() || isSystemAdmin()) {
+        allowedItems.add(R.id.UHF_ver);
+    }
+    
+    return allowedItems;
+}
+
+/**
+ * ✅ الحصول على أزرار الوصول السريع المسموحة
+ */
+public List<String> getAllowedQuickActions() {
+    List<String> allowedActions = new ArrayList<>();
+    
+    // استوديو التكويد - للمخزون والمدراء
+    if (canUseIdentity()) {
+        allowedActions.add("identity");
+    }
+    
+    // رادار التتبع - للأمن والمدراء
+    if (canViewRadar()) {
+        allowedActions.add("radar");
+    }
+    
+    // مراقبة البوابات - للأمن والمدراء
+    if (canViewGates()) {
+        allowedActions.add("gate");
+    }
+    
+    // التقارير - للمدراء والمراجعين
+    if (canViewReports()) {
+        allowedActions.add("reports");
+    }
+    
+    // المحاسبة - للمدراء والمراجعين
+    if (canViewAccounting()) {
+        allowedActions.add("accounting");
+    }
+    
+    // التحويلات - للمدراء
+    if (canViewTransfers()) {
+        allowedActions.add("transfers");
+    }
+    
+    // الخيارات الإدارية - للمدراء
+    if (canViewAdminHub()) {
+        allowedActions.add("admin_hub");
+    }
+    
+    // سجل المبيعات - للبائعين والمدراء
+    if (canViewSalesHistory()) {
+        allowedActions.add("sales_history");
+    }
+    
+    // إعدادات السيرفر - لمدير النظام فقط
+    if (canViewServerConfig()) {
+        allowedActions.add("server_config");
+    }
+    
+    // أسعار الذهب - للمدراء
+    if (canViewGoldRates()) {
+        allowedActions.add("gold_rates");
+    }
+    
+    // المستخدمين - للمدراء
+    if (canManageUsers()) {
+        allowedActions.add("users");
+    }
+    
+    // الفروع - للمدراء
+    if (isManager()) {
+        allowedActions.add("branches");
+    }
+    
+    return allowedActions;
+}
+
+/**
+ * ✅ هل الزر العائم متاح للمستخدم؟
+ */
+public boolean canAccessActionCenter() {
+    // الزر العائم متاح إذا كان لدى المستخدم أي إجراء مسموح
+    return getAllowedQuickActions().size() > 0;
+}
+
+/**
+ * ✅ الحصول على الصلاحيات الخاصة بدور معين
+ */
+public JSONObject getRolePermissions(String role) {
+    JSONObject rolePerms = new JSONObject();
+    
+    try {
+        switch (role) {
+            case ROLE_SYSTEM_ADMIN:
+                // كل شيء متاح
+                rolePerms.put("all_access", true);
+                break;
+                
+            case ROLE_ORG_ADMIN:
+                rolePerms.put("all_access", true);
+                break;
+                
+            case ROLE_ADMIN:
+                rolePerms.put(FEATURE_DASHBOARD, createPermObject(true, true, true, true));
+                rolePerms.put(FEATURE_INVENTORY, createPermObject(true, true, true, true));
+                rolePerms.put(FEATURE_POS, createPermObject(true, true, true, true));
+                rolePerms.put(FEATURE_TRANSFERS, createPermObject(true, true, true, true));
+                rolePerms.put(FEATURE_IDENTITY, createPermObject(true, true, true, true));
+                rolePerms.put(FEATURE_RADAR, createPermObject(true, true, true, true));
+                rolePerms.put(FEATURE_GATES, createPermObject(true, true, true, true));
+                rolePerms.put(FEATURE_REPORTS, createPermObject(true, true, true, true));
+                rolePerms.put(FEATURE_ACCOUNTING, createPermObject(true, true, true, true));
+                rolePerms.put(FEATURE_ADMIN, createPermObject(true, true, true, true));
+                rolePerms.put(FEATURE_USERS, createPermObject(true, true, true, true));
+                rolePerms.put(FEATURE_GOLD_RATES, createPermObject(true, true, true, true));
+                break;
+                
+            case ROLE_BRANCH_MANAGER:
+                rolePerms.put(FEATURE_DASHBOARD, createPermObject(true, true, true, true));
+                rolePerms.put(FEATURE_INVENTORY, createPermObject(true, true, false, true));
+                rolePerms.put(FEATURE_POS, createPermObject(true, true, false, true));
+                rolePerms.put(FEATURE_TRANSFERS, createPermObject(true, true, false, true));
+                rolePerms.put(FEATURE_IDENTITY, createPermObject(true, true, false, true));
+                rolePerms.put(FEATURE_RADAR, createPermObject(true, false, false, false));
+                rolePerms.put(FEATURE_GATES, createPermObject(true, true, false, true));
+                rolePerms.put(FEATURE_REPORTS, createPermObject(true, true, false, true));
+                rolePerms.put(FEATURE_ACCOUNTING, createPermObject(true, true, false, true));
+                rolePerms.put(FEATURE_ADMIN, createPermObject(true, false, false, false));
+                rolePerms.put(FEATURE_USERS, createPermObject(true, false, false, false));
+                rolePerms.put(FEATURE_GOLD_RATES, createPermObject(true, true, false, true));
+                break;
+                
+            case ROLE_INVENTORY_MGR:
+                rolePerms.put(FEATURE_DASHBOARD, createPermObject(true, false, false, false));
+                rolePerms.put(FEATURE_INVENTORY, createPermObject(true, true, false, true));
+                rolePerms.put(FEATURE_IDENTITY, createPermObject(true, true, false, true));
+                rolePerms.put(FEATURE_RADAR, createPermObject(true, false, false, false));
+                rolePerms.put(FEATURE_GATES, createPermObject(true, false, false, false));
+                rolePerms.put(FEATURE_REPORTS, createPermObject(true, false, false, true));
+                rolePerms.put(FEATURE_GOLD_RATES, createPermObject(true, false, false, false));
+                break;
+                
+            case ROLE_POS_OPERATOR:
+                rolePerms.put(FEATURE_DASHBOARD, createPermObject(true, false, false, false));
+                rolePerms.put(FEATURE_POS, createPermObject(true, true, false, true));
+                rolePerms.put(FEATURE_SALES_HISTORY, createPermObject(true, false, false, false));
+                break;
+                
+            case ROLE_SECURITY:
+            case ROLE_GATE_SECURITY:
+                rolePerms.put(FEATURE_DASHBOARD, createPermObject(true, false, false, false));
+                rolePerms.put(FEATURE_RADAR, createPermObject(true, false, false, false));
+                rolePerms.put(FEATURE_GATES, createPermObject(true, false, false, false));
+                break;
+                
+            case ROLE_AUDITOR:
+                rolePerms.put(FEATURE_DASHBOARD, createPermObject(true, false, false, false));
+                rolePerms.put(FEATURE_INVENTORY, createPermObject(true, false, false, true));
+                rolePerms.put(FEATURE_REPORTS, createPermObject(true, false, false, true));
+                rolePerms.put(FEATURE_ACCOUNTING, createPermObject(true, false, false, true));
+                rolePerms.put(FEATURE_RADAR, createPermObject(true, false, false, false));
+                break;
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Error creating role permissions: " + e.getMessage());
+    }
+    
+    return rolePerms;
+}
+
+/**
+ * ✅ إنشاء كائن صلاحية
+ */
+private JSONObject createPermObject(boolean view, boolean edit, boolean delete, boolean export) {
+    JSONObject perm = new JSONObject();
+    try {
+        perm.put("view", view);
+        perm.put("edit", edit);
+        perm.put("delete", delete);
+        perm.put("export", export);
+    } catch (Exception e) {
+        Log.e(TAG, "Error creating permission object: " + e.getMessage());
+    }
+    return perm;
+}
     /**
      * ✅ الحصول على قائمة الواجهات المسموحة
      */
