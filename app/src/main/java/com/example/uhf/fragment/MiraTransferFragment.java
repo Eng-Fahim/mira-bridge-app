@@ -212,21 +212,35 @@ private void applyPermissions() {
         chipGroupFilters = view.findViewById(R.id.chipGroupFilters);
     }
 
-    private void setupFilterChips() {
-        if (chipGroupFilters == null) return;
-        chipGroupFilters.setOnCheckedStateChangeListener((group, checkedIds) -> {
-            if (checkedIds.isEmpty()) {
-                filterBy("");
-                return;
-            }
-            int id = checkedIds.get(0);
-            if (id == R.id.chipAll) filterBy("");
-            else if (id == R.id.chipDraft) filterBy("draft");
-            else if (id == R.id.chipPending) filterBy("pending");
-            else if (id == R.id.chipInTransit) filterBy("in_transit");
-            else if (id == R.id.chipCompleted) filterBy("received");
+    // في setupFilterChips() استبدل الكود الحالي بهذا:
+private void setupFilterChips() {
+    if (chipGroupFilters == null) return;
+    
+    // ✅ إنشاء الفلاتر ديناميكياً
+    chipGroupFilters.removeAllViews();
+    
+    String[] filters = isArabic ? 
+        new String[]{"الكل", "مسودة", "معلق", "قيد النقل", "مستلم"} :
+        new String[]{"All", "Draft", "Pending", "In Transit", "Received"};
+    
+    String[] statusValues = {"", "draft", "pending", "in_transit", "received"};
+    
+    for (int i = 0; i < filters.length; i++) {
+        Chip chip = new Chip(requireContext());
+        chip.setText(filters[i]);
+        chip.setCheckable(true);
+        final int index = i;
+        chip.setOnClickListener(v -> {
+            currentFilter = statusValues[index];
+            loadTransfers();
         });
+        chipGroupFilters.addView(chip);
+        
+        if (i == 0) {
+            chip.setChecked(true);
+        }
     }
+}
 
     private void setupListeners() {
         btnNewTransfer.setOnClickListener(v -> {
