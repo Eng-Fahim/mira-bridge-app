@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="?attr/colorSurface">
+    android:background="?attr/colorSurface"
+    tools:layoutDirection="rtl">
 
     <!-- Header Toolbar -->
     <com.google.android.material.card.MaterialCardView
@@ -32,7 +34,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="إدارة الشحنات وتحويل القطع"
+                    android:text="@string/transfers_title"
                     android:textColor="?attr/colorOnPrimaryContainer"
                     android:textSize="17sp"
                     android:textStyle="bold" />
@@ -51,7 +53,7 @@
                 android:id="@+id/btnNewTransfer"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="+ تحويل جديد"
+                android:text="@string/new_transfer"
                 android:textSize="12sp"
                 app:cornerRadius="10dp" />
         </LinearLayout>
@@ -72,42 +74,7 @@
             android:layout_height="wrap_content"
             app:singleSelection="true"
             app:selectionRequired="true">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipAll"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="true"
-                android:text="الكل" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipDraft"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="المسودات" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipPending"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="قيد التجهيز" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipInTransit"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="في الطريق" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipCompleted"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="المستلمة" />
+            <!-- ✅ سيتم إضافة الفلاتر ديناميكياً من الكود -->
         </com.google.android.material.chip.ChipGroup>
     </HorizontalScrollView>
 
@@ -123,7 +90,7 @@
             style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:text="🔍 فتح كاشف المطابقة المسحية (RFID Live Scan)"
+            android:text="@string/scan_verify"
             android:textSize="13sp"
             app:icon="@android:drawable/ic_menu_search"
             app:cornerRadius="10dp" />
@@ -146,7 +113,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:text="لا توجد بيانات تحويل مطابقة للفلتر المحدد"
+            android:text="@string/no_transfers"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="14sp"
             android:visibility="gone" />
