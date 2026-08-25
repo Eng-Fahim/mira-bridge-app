@@ -727,31 +727,35 @@ private void parseItemResponse(String code, JSONObject data) {
         cartItem.location = item != null ? item.optString("location", "") : "";
         cartItem.itemId = item != null ? item.optInt("id", 0) : 0;
         
-        safeRun(() -> {
-            if (!isAvailable) {
-                showSuccessMessage(
-                    isArabic ? "❌ قطعة غير متاحة" : "❌ Item Unavailable",
-                    isArabic ? "حالة القطعة: " + vaultStatus : "Item status: " + vaultStatus,
-                    false
-                );
-                updateCartSummary();
-                return;
-            }
-            
-            scannedEpcs.add(code);
-            cartList.add(0, cartItem);
-            if (cartAdapter != null) cartAdapter.notifyItemInserted(0);
-            if (rvCartItems != null) rvCartItems.scrollToPosition(0);
-            
-            // ✅ رسالة نجاح سريعة (Toast محسن)
-            showSuccessMessage(
-                isArabic ? "✅ تمت الإضافة" : "✅ Added",
-                title + " - " + priceManager.formatPriceDefault(price),
-                true
-            );
-            
-            updateCartSummary();
-        });
+        // ✅ إنشاء متغير final للسعر
+final double finalPrice = price;
+final String finalTitle = title;
+
+safeRun(() -> {
+    if (!isAvailable) {
+        showSuccessMessage(
+            isArabic ? "❌ قطعة غير متاحة" : "❌ Item Unavailable",
+            isArabic ? "حالة القطعة: " + vaultStatus : "Item status: " + vaultStatus,
+            false
+        );
+        updateCartSummary();
+        return;
+    }
+    
+    scannedEpcs.add(code);
+    cartList.add(0, cartItem);
+    if (cartAdapter != null) cartAdapter.notifyItemInserted(0);
+    if (rvCartItems != null) rvCartItems.scrollToPosition(0);
+    
+    // ✅ رسالة نجاح سريعة
+    showSuccessMessage(
+        isArabic ? "✅ تمت الإضافة" : "✅ Added",
+        finalTitle + " - " + priceManager.formatPriceDefault(finalPrice),
+        true
+    );
+    
+    updateCartSummary();
+});
     } catch (Exception e) {
         Log.e(TAG, "Parse error: " + e.getMessage());
         handleItemNotFound(code);
