@@ -461,9 +461,9 @@ public class MiraReportsProFragment extends Fragment {
                     }
 
                     if (webView != null) {
-                        webView.loadDataWithBaseURL("https://localhost/", htmlData, 
-                                                   "text/html", "UTF-8", null);
-                    }
+    // ✅ loadData لا يحاول الاتصال بأي URL
+    webView.loadData(htmlData, "text/html; charset=utf-8", "UTF-8");
+}
                     
                 } catch (Exception e) {
                     Log.e(TAG, "Error rendering report", e);
@@ -1154,4 +1154,4 @@ private void handleReportError(String errorMessage, View layoutLoading) {
         @Override
         public String toString() { return name; }
     }
-        }
+    }
