@@ -142,13 +142,13 @@
     </LinearLayout>
 
        <!-- Content Container (WebView + Native Loading View) -->
+        <!-- Content Container (WebView + Native Loading View) -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:background="@android:color/white">
 
-        <!-- اجعل WebView مرئياً (VISIBLE) افتراضياً لتجنب مشاكل عدم العرض -->
         <WebView
             android:id="@+id/webReportView"
             android:layout_width="match_parent"
@@ -158,18 +158,16 @@
             android:focusableInTouchMode="true"
             android:visibility="visible" />
 
-        <!-- اجعل حاوية التحميل تغطي كامل المساحة بخلفية بيضاء لمنع ظهور تشوه الـ WebView أثناء التحميل -->
+        <!-- تعديل حاوية التحميل: إزالة الخصائص المحتكرة وإخفاؤها افتراضياً -->
         <LinearLayout
             android:id="@+id/layoutLoadingContainer"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@android:color/white"
-            android:clickable="true"
-            android:focusable="true"
+            android:background="#80FFFFFF"
             android:gravity="center"
             android:orientation="vertical"
             android:padding="16dp"
-            android:visibility="visible">
+            android:visibility="gone">
 
             <ProgressBar
                 android:id="@+id/progressReportLoading"
@@ -188,6 +186,7 @@
         </LinearLayout>
 
     </FrameLayout>
+
 
     <!-- Footer Actions -->
     <LinearLayout
