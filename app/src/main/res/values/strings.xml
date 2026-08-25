@@ -2033,5 +2033,22 @@
     <string name="live_scan_log">📋 السجل الحي للقطع الممسوحة</string>
     <string name="no_scanned_items">لا توجد عناصر ممسوحة حالياً</string>
 
-
+    <string name="add_user_title">إضافة مستخدم جديد</string>
+    <string name="edit_user_title">تعديل مستخدم</string>
+    <string name="add_user_subtitle">أدخل بيانات المستخدم الجديد</string>
+    <string name="edit_user_subtitle">تعديل بيانات المستخدم الحالي</string>
+    <string name="display_name">الاسم الظاهر</string>
+    <string name="username">اسم المستخدم</string>
+    <string name="password">كلمة المرور</string>
+    <string name="employee_id">رقم الموظف</string>
+    <string name="branch">الفرع</string>
+    <string name="role">الصلاحية</string>
+    <string name="cancel">إلغاء</string>
+    <string name="next_step">التالي ←</string>
+    <string name="prev_step">→ السابق</string>
+    <string name="save_user">💾 حفظ</string>
+    <string name="saving">جاري الحفظ...</string>
+    <string name="generate_password">توليد كلمة مرور</string>
+    <string name="copy_password">نسخ كلمة المرور</string>
+    <string name="suggest_username">اقتراح اسم المستخدم</string>
 </resources>
