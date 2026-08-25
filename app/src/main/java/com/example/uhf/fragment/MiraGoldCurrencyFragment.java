@@ -596,82 +596,105 @@ public class MiraGoldCurrencyFragment extends Fragment {
     }
 
     private void saveGoldSettings() {
-        if (selectedProvider == null) {
-            Toast.makeText(mContext, 
-                isArabic ? "يرجى اختيار مزود أولاً" : "Please select a provider first", 
-                Toast.LENGTH_SHORT).show();
-            return;
-        }
-        
-        pbGoldLoading.setVisibility(View.VISIBLE);
-        btnSaveGoldSettings.setEnabled(false);
-        
-        executor.execute(() -> {
-            try {
-                JSONObject goldData = new JSONObject();
-                goldData.put("gold_price_24k", getDouble(etGoldPrice24k));
-                goldData.put("gold_price_22k", getDouble(etGoldPrice22k));
-                goldData.put("gold_price_21k", getDouble(etGoldPrice21k));
-                goldData.put("gold_price_18k", getDouble(etGoldPrice18k));
-                goldData.put("gold_price_14k", getDouble(etGoldPrice14k));
-                
-                goldData.put("margin_24k", getDoubleOrDefault(etMargin24k, 95.00));
-                goldData.put("margin_22k", getDoubleOrDefault(etMargin22k, 88.00));
-                goldData.put("margin_21k", getDoubleOrDefault(etMargin21k, 90.00));
-                goldData.put("margin_18k", getDoubleOrDefault(etMargin18k, 100.80));
-                goldData.put("margin_14k", getDoubleOrDefault(etMargin14k, 105.80));
-                goldData.put("margin_12k", getDoubleOrDefault(etMargin12k, 110.00));
-                
-                goldData.put("making_24k", getDoubleOrDefault(etMaking24k, 5.00));
-                goldData.put("making_22k", getDoubleOrDefault(etMaking22k, 8.00));
-                goldData.put("making_21k", getDoubleOrDefault(etMaking21k, 10.00));
-                goldData.put("making_18k", getDoubleOrDefault(etMaking18k, 12.00));
-                goldData.put("making_14k", getDoubleOrDefault(etMaking14k, 15.00));
-                goldData.put("making_12k", getDoubleOrDefault(etMaking12k, 18.00));
-                
-                goldData.put("provider_id", selectedProvider.getId());
-                goldData.put("gold_default_currency", spGoldCurrency.getSelectedItem().toString());
-                
-                prefs.edit().putString("gold_settings", goldData.toString()).apply();
-                prefs.edit().putInt("selected_provider_id", selectedProvider.getId()).apply();
-                
-                MiraApiClient client = MiraApiClient.getInstance(mContext);
-                
-                MiraApiClient.ApiResponse goldResponse = client.saveGoldSettings(goldData);
-                MiraApiClient.ApiResponse activateResponse = client.activateProvider(selectedProvider.getId());
-                
-                final boolean serverSaved = goldResponse != null && goldResponse.isSuccess;
-                final boolean providerActivated = activateResponse != null && activateResponse.isSuccess;
-                
-                for (ApiProvider provider : providersList) {
-                    provider.setActive(provider.getId() == selectedProvider.getId());
-                }
-                
-                mainHandler.post(() -> {
-                    pbGoldLoading.setVisibility(View.GONE);
-                    btnSaveGoldSettings.setEnabled(true);
-                    
-                    String message;
-                    if (serverSaved && providerActivated) {
-                        message = isArabic ? "✅ تم الحفظ وتفعيل المزود" : "✅ Saved & provider activated";
-                    } else if (serverSaved) {
-                        message = isArabic ? "⚠️ تم الحفظ ولكن فشل تفعيل المزود" : "⚠️ Saved but provider activation failed";
-                    } else {
-                        message = isArabic ? "⚠️ تم الحفظ محلياً" : "⚠️ Saved locally";
-                    }
-                    
-                    Toast.makeText(mContext, message, Toast.LENGTH_SHORT).show();
-                    updateProvidersUI();
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Error saving gold settings: " + e.getMessage());
-                mainHandler.post(() -> {
-                    pbGoldLoading.setVisibility(View.GONE);
-                    btnSaveGoldSettings.setEnabled(true);
-                });
-            }
-        });
+    if (selectedProvider == null) {
+        Toast.makeText(mContext, 
+            isArabic ? "يرجى اختيار مزود أولاً" : "Please select a provider first", 
+            Toast.LENGTH_SHORT).show();
+        return;
     }
+    
+    pbGoldLoading.setVisibility(View.VISIBLE);
+    btnSaveGoldSettings.setEnabled(false);
+    
+    executor.execute(() -> {
+        try {
+            JSONObject goldData = new JSONObject();
+            goldData.put("gold_price_24k", getDouble(etGoldPrice24k));
+            goldData.put("gold_price_22k", getDouble(etGoldPrice22k));
+            goldData.put("gold_price_21k", getDouble(etGoldPrice21k));
+            goldData.put("gold_price_18k", getDouble(etGoldPrice18k));
+            goldData.put("gold_price_14k", getDouble(etGoldPrice14k));
+            
+            // ✅ الحصول على القيم الفعلية
+            double margin24k = getDouble(etMargin24k);
+            double making24k = getDouble(etMaking24k);
+            double margin21k = getDouble(etMargin21k);
+            double making21k = getDouble(etMaking21k);
+            
+            goldData.put("margin_24k", margin24k > 0 ? margin24k : 95.00);
+            goldData.put("margin_22k", getDoubleOrDefault(etMargin22k, 88.00));
+            goldData.put("margin_21k", margin21k > 0 ? margin21k : 90.00);
+            goldData.put("margin_18k", getDoubleOrDefault(etMargin18k, 100.80));
+            goldData.put("margin_14k", getDoubleOrDefault(etMargin14k, 105.80));
+            goldData.put("margin_12k", getDoubleOrDefault(etMargin12k, 110.00));
+            
+            goldData.put("making_24k", making24k > 0 ? making24k : 5.00);
+            goldData.put("making_22k", getDoubleOrDefault(etMaking22k, 8.00));
+            goldData.put("making_21k", making21k > 0 ? making21k : 10.00);
+            goldData.put("making_18k", getDoubleOrDefault(etMaking18k, 12.00));
+            goldData.put("making_14k", getDoubleOrDefault(etMaking14k, 15.00));
+            goldData.put("making_12k", getDoubleOrDefault(etMaking12k, 18.00));
+            
+            goldData.put("provider_id", selectedProvider.getId());
+            goldData.put("gold_default_currency", spGoldCurrency.getSelectedItem().toString());
+            
+            // ✅ عرض البيانات المرسلة في Toast
+            final String debugData = "margin_24k=" + margin24k + "\n" +
+                                     "margin_21k=" + margin21k + "\n" +
+                                     "making_24k=" + making24k + "\n" +
+                                     "making_21k=" + making21k;
+            
+            mainHandler.post(() -> {
+                Toast.makeText(mContext, 
+                    isArabic ? "📤 البيانات المرسلة:\n" + debugData : 
+                    "📤 Sending data:\n" + debugData, 
+                    Toast.LENGTH_LONG).show();
+            });
+            
+            prefs.edit().putString("gold_settings", goldData.toString()).apply();
+            prefs.edit().putInt("selected_provider_id", selectedProvider.getId()).apply();
+            
+            MiraApiClient client = MiraApiClient.getInstance(mContext);
+            
+            MiraApiClient.ApiResponse goldResponse = client.saveGoldSettings(goldData);
+            MiraApiClient.ApiResponse activateResponse = client.activateProvider(selectedProvider.getId());
+            
+            final boolean serverSaved = goldResponse != null && goldResponse.isSuccess;
+            final boolean providerActivated = activateResponse != null && activateResponse.isSuccess;
+            
+            // ✅ عرض نتيجة الحفظ في Toast
+            final String resultMessage;
+            if (serverSaved) {
+                resultMessage = isArabic ? "✅ تم الحفظ في السيرفر" : "✅ Saved to server";
+            } else {
+                String error = goldResponse != null ? goldResponse.error : "null response";
+                resultMessage = (isArabic ? "❌ فشل الحفظ: " : "❌ Save failed: ") + error;
+            }
+            
+            for (ApiProvider provider : providersList) {
+                provider.setActive(provider.getId() == selectedProvider.getId());
+            }
+            
+            mainHandler.post(() -> {
+                pbGoldLoading.setVisibility(View.GONE);
+                btnSaveGoldSettings.setEnabled(true);
+                
+                Toast.makeText(mContext, resultMessage, Toast.LENGTH_LONG).show();
+                updateProvidersUI();
+            });
+            
+        } catch (Exception e) {
+            mainHandler.post(() -> {
+                pbGoldLoading.setVisibility(View.GONE);
+                btnSaveGoldSettings.setEnabled(true);
+                Toast.makeText(mContext, 
+                    (isArabic ? "❌ خطأ: " : "❌ Error: ") + e.getMessage(), 
+                    Toast.LENGTH_LONG).show();
+            });
+        }
+    });
+}
+
 
     private double getDoubleOrDefault(EditText et, double defaultValue) {
         double value = getDouble(et);
