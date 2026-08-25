@@ -158,88 +158,86 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         updateToolbarTitle();
     }
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
+   @Override
+protected void onCreate(Bundle savedInstanceState) {
+    // ❌ احذف هذا السطر
+    // super.onCreate(savedInstanceState);
     
-    // ✅ التحقق من البداية الجديدة
-    boolean freshStart = getIntent().getBooleanExtra("fresh_start", false);
-    
-    if (freshStart) {
-        // ✅ مسح أي حالة قديمة
-        getSupportFragmentManager().popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
-    }
+    try {
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        String savedLang = MiraLanguageHelper.getSavedLanguage(this);
+        MiraLanguageHelper.applyLanguage(this, savedLang);
+        super.onCreate(savedInstanceState); // ✅ استدعاء واحد فقط هنا
+
+        ToastUtil.init(getApplicationContext());
+        initializeLanguageState();
+
+        sessionManager = new SessionManager(this);
+        if (!sessionManager.isLoggedIn()) {
+            navigateToLogin();
+            return;
+        }
+
+        branchesManager = MiraBranchesManager.getInstance(this);
+        if (branchesManager != null) {
+            lastActiveBranchId = branchesManager.getActiveBranchId();
+        }
+
+        setContentView(R.layout.activity_main);
+        loadingOverlay = findViewById(R.id.loading_overlay);
+        fragmentManager = getSupportFragmentManager();
+        
+        // ✅ بعد setContentView فقط يمكن مسح Back Stack
+        boolean freshStart = getIntent().getBooleanExtra("fresh_start", false);
+        if (freshStart) {
+            fragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+        }
+        
+        setupOrgProfileListener();
+        updateBottomNavLanguage();
+
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            setSupportActionBar(toolbar);
+            updateToolbarTitle();
+        }
+
+        View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
+        if (btnHardwareStatus != null) {
+            btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
+        }
+
+        checkReadWritePermission();
+
+        safeExecute(this::initSound, "Sound Init Error");
+        safeExecute(this::initUHF, "UHF Hardware Init Error");
+        safeExecute(this::configureReaderForDevice, "Reader Configuration Error");
+
+        setupQuickNav();
+
+        // ✅ استعادة الـ Fragment
+        if (savedInstanceState != null && savedInstanceState.containsKey("current_fragment")) {
+            currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
+        } else {
+            currentFragmentTag = "Dashboard"; // ✅ دائماً Dashboard عند البداية الجديدة
+        }
+        
+        loadFragmentByTag(currentFragmentTag);
+
+        showLoading();
+        mainHandler.postDelayed(this::hideLoading, 300);
+
+    } catch (Exception e) {
+        Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
         try {
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-            String savedLang = MiraLanguageHelper.getSavedLanguage(this);
-            MiraLanguageHelper.applyLanguage(this, savedLang);
-            super.onCreate(savedInstanceState);
-
-            ToastUtil.init(getApplicationContext());
-            initializeLanguageState();
-
-            sessionManager = new SessionManager(this);
-            if (!sessionManager.isLoggedIn()) {
-                navigateToLogin();
-                return;
+            if (fragmentManager != null) {
+                loadFragment(new MiraDashboardFragment(), "Dashboard", false);
             }
-
-            branchesManager = MiraBranchesManager.getInstance(this);
-            if (branchesManager != null) {
-                lastActiveBranchId = branchesManager.getActiveBranchId();
-            }
-
-            setContentView(R.layout.activity_main);
-            loadingOverlay = findViewById(R.id.loading_overlay);
-            fragmentManager = getSupportFragmentManager();
-            
-            setupOrgProfileListener();
-            updateBottomNavLanguage();
-
-            MaterialToolbar toolbar = findViewById(R.id.toolbar);
-            if (toolbar != null) {
-                setSupportActionBar(toolbar);
-                updateToolbarTitle();
-            }
-
-            View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
-            if (btnHardwareStatus != null) {
-                btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
-            }
-
-            checkReadWritePermission();
-
-            safeExecute(this::initSound, "Sound Init Error");
-            safeExecute(this::initUHF, "UHF Hardware Init Error");
-            safeExecute(this::configureReaderForDevice, "Reader Configuration Error");
-
-            setupQuickNav();
-
-            // ✅ استعادة الـ Fragment المحفوظ
-            if (savedInstanceState != null && savedInstanceState.containsKey("current_fragment")) {
-                currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
-            } else {
-                currentFragmentTag = getSavedFragmentTag();
-            }
-            
-            // ✅ تحميل الـ Fragment المناسب
-            loadFragmentByTag(currentFragmentTag);
-
-            showLoading();
-            mainHandler.postDelayed(this::hideLoading, 300);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
-            // ✅ محاولة تحميل الداشبورد كحل أخير
-            try {
-                if (fragmentManager != null) {
-                    loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-                }
-            } catch (Exception e2) {
-                Log.e(TAG, "Cannot load fallback fragment: " + e2.getMessage(), e2);
-            }
+        } catch (Exception e2) {
+            Log.e(TAG, "Cannot load fallback fragment: " + e2.getMessage(), e2);
         }
     }
+}
     
     @Override
     protected void onResume() {
