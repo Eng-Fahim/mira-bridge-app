@@ -505,10 +505,9 @@ private void showUserDialog(@Nullable UserData existingUser) {
 
         AlertDialog dialog = new AlertDialog.Builder(requireContext())
             .setView(dialogView)
-            .setCancelable(true) // ✅ السماح بالإغلاق بالضغط خارج الموديل
+            .setCancelable(true)
             .create();
 
-        // ✅ إزالة الخلفية الشفافة - استخدام خلفية الثيم
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawableResource(android.R.color.white);
         }
@@ -531,14 +530,18 @@ private void showUserDialog(@Nullable UserData existingUser) {
         LinearLayout layoutStep2 = dialogView.findViewById(R.id.layoutStep2);
         LinearLayout layoutButtons1 = dialogView.findViewById(R.id.layoutButtons1);
         LinearLayout stepsIndicator = dialogView.findViewById(R.id.stepsIndicator);
-        ImageButton btnGeneratePassword = dialogView.findViewById(R.id.btnGeneratePassword);
-        ImageButton btnCopyPassword = dialogView.findViewById(R.id.btnCopyPassword);
+        
+        // ✅ تصحيح: استخدام MaterialButton بدلاً من ImageButton
+        com.google.android.material.button.MaterialButton btnGeneratePassword = 
+            dialogView.findViewById(R.id.btnGeneratePassword);
+        com.google.android.material.button.MaterialButton btnCopyPassword = 
+            dialogView.findViewById(R.id.btnCopyPassword);
         ImageButton btnSuggestUsername = dialogView.findViewById(R.id.btnSuggestUsername);
         ImageButton btnCloseDialog = dialogView.findViewById(R.id.btnCloseDialog);
         FrameLayout loadingOverlay = dialogView.findViewById(R.id.loadingOverlay);
         TextView tvLoadingText = dialogView.findViewById(R.id.tvLoadingText);
 
-        // ✅ زر إغلاق X
+        // زر إغلاق X
         if (btnCloseDialog != null) {
             btnCloseDialog.setOnClickListener(v -> dialog.dismiss());
         }
@@ -683,7 +686,6 @@ private void showUserDialog(@Nullable UserData existingUser) {
                 }
             }
 
-            // ✅ وضع التعديل: إظهار كل شيء
             if (layoutStep1 != null) layoutStep1.setVisibility(View.VISIBLE);
             if (layoutStep2 != null) layoutStep2.setVisibility(View.VISIBLE);
             if (stepsIndicator != null) stepsIndicator.setVisibility(View.GONE);
@@ -696,16 +698,15 @@ private void showUserDialog(@Nullable UserData existingUser) {
             }
             if (btnSaveUser != null) btnSaveUser.setVisibility(View.VISIBLE);
         } else {
-            // ✅ وضع الإضافة: زر الإلغاء مرئي دائماً
             if (layoutStep1 != null) layoutStep1.setVisibility(View.VISIBLE);
             if (layoutStep2 != null) layoutStep2.setVisibility(View.GONE);
             if (stepsIndicator != null) stepsIndicator.setVisibility(View.VISIBLE);
             if (btnNextStep != null) btnNextStep.setVisibility(View.VISIBLE);
             if (btnSaveUser != null) btnSaveUser.setVisibility(View.GONE);
             if (btnPrevStep != null) btnPrevStep.setVisibility(View.GONE);
-            if (layoutButtons1 != null) layoutButtons1.setVisibility(View.VISIBLE); // ✅ إظهار الأزرار
+            if (layoutButtons1 != null) layoutButtons1.setVisibility(View.VISIBLE);
             if (btnCancel != null) {
-                btnCancel.setVisibility(View.VISIBLE); // ✅ زر الإلغاء مرئي دائماً
+                btnCancel.setVisibility(View.VISIBLE);
                 btnCancel.setText(isArabic ? "إلغاء" : "Cancel");
             }
         }
@@ -749,7 +750,7 @@ private void showUserDialog(@Nullable UserData existingUser) {
             });
         }
 
-        // زر الإلغاء - ✅ دائماً مرئي وفعال
+        // زر الإلغاء
         if (btnCancel != null) {
             btnCancel.setText(isArabic ? "إلغاء" : "Cancel");
             btnCancel.setVisibility(View.VISIBLE);
@@ -859,12 +860,10 @@ private void showUserDialog(@Nullable UserData existingUser) {
 
         dialog.show();
     } catch (Exception e) {
-        android.util.Log.e("UsersManagement", "Error showing dialog: " + e.getMessage());
-        e.printStackTrace();
-        showToast("Error showing dialog: " + e.getMessage());
+        android.util.Log.e("UsersManagement", "Error showing dialog: " + e.getMessage(), e);
+        showToast("Error: " + e.getMessage());
     }
 }
-
     // ==================== Delete User ====================
 
     private void deleteUser(int userId, String name, String role) {
@@ -1042,4 +1041,4 @@ private void showUserDialog(@Nullable UserData existingUser) {
             }
         }
     }
-}
+            }
