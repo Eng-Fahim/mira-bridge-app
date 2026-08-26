@@ -61,7 +61,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginTop="6dp">
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical">
 
             <TextView
                 android:id="@+id/tvFromBranch"
@@ -70,7 +71,9 @@
                 android:layout_weight="1"
                 android:text="🏢 الفرع الرئيسي"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="12sp" />
+                android:textSize="12sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -88,18 +91,44 @@
                 android:text="🏢 فرع عدن"
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="12sp"
-                android:gravity="end" />
+                android:gravity="end"
+                android:maxLines="1"
+                android:ellipsize="end" />
         </LinearLayout>
 
         <!-- التفاصيل -->
-        <TextView
-            android:id="@+id/tvTransferDetails"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:orientation="horizontal"
             android:layout_marginTop="6dp"
-            android:text="5 قطع • 125.5g"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="11sp" />
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvTransferDetails"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="5 قطع • 125.5g"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp" />
+
+            <!-- ✅ زر عرض القطع - دائماً متاح -->
+            <Button
+                android:id="@+id/btnViewItems"
+                android:layout_width="wrap_content"
+                android:layout_height="28dp"
+                android:text="📦 القطع"
+                android:textSize="10sp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="0dp"
+                android:backgroundTint="?attr/colorSecondaryContainer"
+                android:textColor="?attr/colorOnSecondaryContainer"
+                app:cornerRadius="14dp"
+                style="@style/Widget.Material3.Button.TextButton" />
+        </LinearLayout>
 
         <!-- أزرار الإجراءات -->
         <LinearLayout
@@ -109,6 +138,7 @@
             android:layout_marginTop="8dp"
             android:gravity="end">
 
+            <!-- ✅ الزر الثانوي (مسح / القطع) -->
             <Button
                 android:id="@+id/btnTransferAction2"
                 android:layout_width="wrap_content"
@@ -116,15 +146,22 @@
                 android:layout_marginEnd="6dp"
                 android:text="📷 مسح"
                 android:textSize="10sp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingHorizontal="12dp"
                 android:visibility="gone"
                 style="@style/Widget.Material3.Button.TextButton" />
 
+            <!-- ✅ الزر الرئيسي (اعتماد / استلام / إضافة) -->
             <Button
                 android:id="@+id/btnTransferAction1"
                 android:layout_width="wrap_content"
                 android:layout_height="34dp"
                 android:text="✅ اعتماد"
                 android:textSize="10sp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingHorizontal="12dp"
                 android:visibility="gone"
                 style="@style/Widget.Material3.Button.TonalButton" />
         </LinearLayout>
