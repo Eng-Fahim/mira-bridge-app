@@ -125,23 +125,6 @@ private void applyLanguage() {
         tvEmpty.setText(isArabic ? "📭 لا توجد تحويلات" : "📭 No transfers");
     }
     
-    // ✅ تحديث الفلاتر
-    if (chipGroupFilters != null) {
-        chipGroupFilters.removeAllViews();
-        String[] filters = isArabic ? 
-            new String[]{"الكل", "مسودة", "معلق", "قيد النقل", "مستلم"} :
-            new String[]{"All", "Draft", "Pending", "In Transit", "Received"};
-        
-        int[] chipIds = {R.id.chipAll, R.id.chipDraft, R.id.chipPending, R.id.chipInTransit, R.id.chipCompleted};
-        
-        for (int i = 0; i < filters.length; i++) {
-            Chip chip = new Chip(requireContext());
-            chip.setId(chipIds[i]);
-            chip.setText(filters[i]);
-            chip.setCheckable(true);
-            chipGroupFilters.addView(chip);
-        }
-    }
 }
 
     // ✅ صلاحيات التحويلات حسب المرحلة
@@ -192,11 +175,20 @@ private void applyPermissions() {
                permissionManager.canEdit("transfers");
     }
 
-    private boolean canReceiveTransfer() {
-        return permissionManager.isManager() || 
-               permissionManager.isBranchManager() || 
-               permissionManager.canEdit("transfers");
-    }
+    private boolean canReceiveTransfer(TransferData t) {
+    // ✅ الفرع المستقبل فقط هو المخول بالاستلام
+    int userBranchId = branchesManager.getActiveBranchId();
+    
+    // الإدارة العليا يمكنها الاستلام
+    SessionManager.Role userRole = sessionManager != null ? sessionManager.getUserRole() : SessionManager.Role.BRANCH_MANAGER;
+    boolean isTopLevel = userRole == SessionManager.Role.SYSTEM_ADMIN || 
+                         userRole == SessionManager.Role.ORG_ADMIN;
+    
+    if (isTopLevel) return true;
+    
+    // ✅ فقط الفرع المحول إليه (toBranchId) يمكنه الاستلام
+    return t.toBranchId == userBranchId;
+}
 
     private boolean canDeleteTransfer() {
         return permissionManager.isManager() || 
@@ -362,21 +354,28 @@ private void setupFilterChips() {
     }
 
     private void handleTransferAction(TransferData t, String action) {
-        selectedTransfer = t;
-        switch (action) {
-            case "approve": 
-                if (canApproveTransfer()) approveTransfer(t);
-                else showAccessDenied();
-                break;
-            case "receive": 
-                if (canReceiveTransfer()) receiveTransfer(t);
-                else showAccessDenied();
-                break;
-            case "scan": 
-                showScanItemsDialogForTransfer(t); 
-                break;
-        }
+    selectedTransfer = t;
+    switch (action) {
+        case "approve": 
+            if (canApproveTransfer()) approveTransfer(t);
+            else showAccessDenied();
+            break;
+        case "receive": 
+            if (canReceiveTransfer(t)) receiveTransfer(t);
+            else {
+                showErrorMessage(
+                    isArabic ? "غير مصرح" : "Not Authorized",
+                    isArabic ? "فقط الفرع المستقبل يمكنه تأكيد الاستلام" : 
+                               "Only the receiving branch can confirm receipt"
+                );
+            }
+            break;
+        case "scan": 
+            showScanItemsDialogForTransfer(t); 
+            break;
     }
+}
+
 
     private void showAccessDenied() {
         Toast.makeText(getContext(), 
@@ -401,12 +400,12 @@ private void setupFilterChips() {
             options.add(ar("🔍 تدقيق القائمة", "🔍 Scan Verification"));
             options.add(ar("📋 عرض التفاصيل", "📋 View Details"));
         } else if ("approved".equals(t.status) || "in_transit".equals(t.status)) {
-            if (canReceiveTransfer()) {
-                options.add(ar("📥 استلام مطابقة الشحنة", "📥 Receive Audit"));
-            }
-            options.add(ar("🔍 تدقيق القطع الميداني", "🔍 Field Scan Audit"));
-            options.add(ar("📋 عرض التفاصيل", "📋 View Details"));
-        } else {
+        if (canReceiveTransfer(t)) { // ✅ استخدام canReceiveTransfer(t)
+            options.add(isArabic ? "📥 استلام مطابقة الشحنة" : "📥 Receive Audit");
+        }
+        options.add(isArabic ? "🔍 تدقيق القطع الميداني" : "🔍 Field Scan Audit");
+        options.add(isArabic ? "📋 عرض التفاصيل" : "📋 View Details");
+    } else {
             options.add(ar("📋 عرض تفاصيل البيان", "📋 View Full Manifest"));
         }
 
@@ -480,57 +479,101 @@ private void setupFilterChips() {
     }
 
     private void approveTransfer(TransferData t) {
-        if (!canApproveTransfer()) {
-            showAccessDenied();
-            return;
-        }
-        
-        new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(ar("اعتماد وتجهيز الشحنة", "Approve Shipment"))
-            .setMessage(ar("هل تأكدت من مراجعة كل القطع المضافة وإقفال البيان للتجهيز؟", "Confirm shipment approval?"))
-            .setPositiveButton(ar("اعتماد الآن", "Approve Now"), (d, w) -> {
-                executor.execute(() -> {
-                    MiraApiClient.ApiResponse response = apiClient.approveTransfer(t.id);
-                    mainHandler.post(() -> {
-                        if (response != null && response.isSuccess) {
-                            Toast.makeText(getContext(), ar("✅ تم اعتماد الشحنة بنجاح", "✅ Approved"), Toast.LENGTH_SHORT).show();
-                            t.status = "approved";
-                            adapter.notifyDataSetChanged();
-                            loadTransfers();
-                        } else {
-                            Toast.makeText(getContext(), ar("❌ فشلت عملية الاعتماد", "❌ Failed"), Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                });
-            }).setNegativeButton(ar("إلغاء", "Cancel"), null).show();
+    if (!canApproveTransfer()) {
+        showAccessDenied();
+        return;
     }
+    
+    new MaterialAlertDialogBuilder(requireContext())
+        .setTitle(isArabic ? "اعتماد وتجهيز الشحنة" : "Approve Shipment")
+        .setMessage(isArabic ? "هل تأكدت من مراجعة كل القطع المضافة وإقفال البيان للتجهيز؟" : "Confirm shipment approval?")
+        .setPositiveButton(isArabic ? "اعتماد الآن" : "Approve Now"), (d, w) -> {
+            executor.execute(() -> {
+                MiraApiClient.ApiResponse response = apiClient.approveTransfer(t.id);
+                mainHandler.post(() -> {
+                    if (response != null && response.isSuccess) {
+                        // ✅ رسالة نجاح احترافية
+                        showSuccessMessage(
+                            isArabic ? "تم الاعتماد بنجاح" : "Approved Successfully",
+                            isArabic ? "تم اعتماد الشحنة " + t.transferNumber + "\nوتم تجهيزها للنقل" : 
+                                       "Shipment " + t.transferNumber + " approved\nand prepared for dispatch"
+                        );
+                        t.status = "approved";
+                        adapter.notifyDataSetChanged();
+                        loadTransfers();
+                    } else {
+                        showErrorMessage(
+                            isArabic ? "فشل الاعتماد" : "Approval Failed",
+                            response != null && response.error != null ? response.error : 
+                            (isArabic ? "حدث خطأ غير متوقع" : "Unexpected error occurred")
+                        );
+                    }
+                });
+            });
+        })
+        .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+        .show();
+}
+
 
     private void receiveTransfer(TransferData t) {
-        if (!canReceiveTransfer()) {
-            showAccessDenied();
-            return;
-        }
-        
-        new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(ar("تأكيد استلام الشحنة", "Receive Shipment"))
-            .setMessage(ar("هل استلمت الشحنة مع التدقيق واختبار مطابقة القطع؟", "Confirm receiving and updating branch stock?"))
-            .setPositiveButton(ar("تأكيد الاستلام", "Confirm Receive"), (d, w) -> {
-                executor.execute(() -> {
-                    MiraApiClient.ApiResponse response = apiClient.receiveTransfer(t.id);
-                    mainHandler.post(() -> {
-                        if (response != null && response.isSuccess) {
-                            Toast.makeText(getContext(), ar("✅ تم استلام الشحنة وتحديث المخزون", "✅ Received & Updated Stock"), Toast.LENGTH_SHORT).show();
-                            t.status = "received";
-                            adapter.notifyDataSetChanged();
-                            loadTransfers();
-                        } else {
-                            Toast.makeText(getContext(), ar("❌ فشل تسجيل الاستلام", "❌ Failed"), Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                });
-            }).setNegativeButton(ar("إلغاء", "Cancel"), null).show();
+    // ✅ التحقق من أن الفرع الحالي هو الفرع المستقبل
+    if (!canReceiveTransfer(t)) {
+        showErrorMessage(
+            isArabic ? "غير مصرح" : "Not Authorized",
+            isArabic ? "فقط الفرع المستقبل (" + t.toBranch + ") يمكنه تأكيد الاستلام" : 
+                       "Only the receiving branch (" + t.toBranch + ") can confirm receipt"
+        );
+        return;
     }
+    
+    new MaterialAlertDialogBuilder(requireContext())
+        .setTitle(isArabic ? "تأكيد استلام الشحنة" : "Receive Shipment")
+        .setMessage(isArabic ? "هل استلمت الشحنة مع التدقيق واختبار مطابقة القطع؟" : "Confirm receiving and updating branch stock?")
+        .setPositiveButton(isArabic ? "تأكيد الاستلام" : "Confirm Receive"), (d, w) -> {
+            executor.execute(() -> {
+                MiraApiClient.ApiResponse response = apiClient.receiveTransfer(t.id);
+                mainHandler.post(() -> {
+                    if (response != null && response.isSuccess) {
+                        // ✅ رسالة نجاح احترافية
+                        showSuccessMessage(
+                            isArabic ? "تم الاستلام بنجاح" : "Received Successfully",
+                            isArabic ? "تم استلام الشحنة " + t.transferNumber + "\nوتم تحديث المخزون" : 
+                                       "Shipment " + t.transferNumber + " received\nand stock updated"
+                        );
+                        t.status = "received";
+                        adapter.notifyDataSetChanged();
+                        loadTransfers();
+                    } else {
+                        showErrorMessage(
+                            isArabic ? "فشل الاستلام" : "Receive Failed",
+                            response != null && response.error != null ? response.error : 
+                            (isArabic ? "حدث خطأ غير متوقع" : "Unexpected error occurred")
+                        );
+                    }
+                });
+            });
+        })
+        .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+        .show();
+}
+// ==================== 3. رسائل احترافية ====================
 
+private void showSuccessMessage(String title, String message) {
+    new MaterialAlertDialogBuilder(requireContext())
+        .setTitle("✅ " + title)
+        .setMessage(message)
+        .setPositiveButton(isArabic ? "حسناً" : "OK", (d, w) -> d.dismiss())
+        .show();
+}
+
+private void showErrorMessage(String title, String message) {
+    new MaterialAlertDialogBuilder(requireContext())
+        .setTitle("❌ " + title)
+        .setMessage(message)
+        .setPositiveButton(isArabic ? "حسناً" : "OK", (d, w) -> d.dismiss())
+        .show();
+}
     private void deleteTransfer(TransferData t) {
         if (!canDeleteTransfer()) {
             showAccessDenied();
@@ -864,14 +907,16 @@ private void setupFilterChips() {
             h.btnAction2.setVisibility(View.VISIBLE);
             h.btnAction2.setText(isArabic ? "📷 تدقيق" : "📷 Scan");
             h.btnAction2.setOnClickListener(v -> handler.onAction(t, "scan"));
-        } else if ("approved".equals(t.status) || "in_transit".equals(t.status)) {
-            h.btnAction1.setVisibility(canReceiveTransfer() ? View.VISIBLE : View.GONE);
-            h.btnAction1.setText(isArabic ? "📥 استلام" : "📥 Receive");
-            h.btnAction1.setOnClickListener(v -> handler.onAction(t, "receive"));
-            h.btnAction2.setVisibility(View.VISIBLE);
-            h.btnAction2.setText(isArabic ? "📷 تدقيق" : "📷 Scan");
-            h.btnAction2.setOnClickListener(v -> handler.onAction(t, "scan"));
-        } else {
+        } else     
+    if ("approved".equals(t.status) || "in_transit".equals(t.status)) {
+        // ✅ استخدام canReceiveTransfer(t) بدلاً من canReceiveTransfer()
+        h.btnAction1.setVisibility(canReceiveTransfer(t) ? View.VISIBLE : View.GONE);
+        h.btnAction1.setText(isArabic ? "📥 استلام" : "📥 Receive");
+        h.btnAction1.setOnClickListener(v -> handler.onAction(t, "receive"));
+        h.btnAction2.setVisibility(View.VISIBLE);
+        h.btnAction2.setText(isArabic ? "📷 تدقيق" : "📷 Scan");
+        h.btnAction2.setOnClickListener(v -> handler.onAction(t, "scan"));
+    } else {
             h.btnAction1.setVisibility(View.GONE);
             h.btnAction2.setVisibility(View.GONE);
         }
