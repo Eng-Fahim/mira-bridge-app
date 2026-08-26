@@ -487,7 +487,7 @@ private void setupFilterChips() {
     new MaterialAlertDialogBuilder(requireContext())
         .setTitle(isArabic ? "اعتماد وتجهيز الشحنة" : "Approve Shipment")
         .setMessage(isArabic ? "هل تأكدت من مراجعة كل القطع المضافة وإقفال البيان للتجهيز؟" : "Confirm shipment approval?")
-        .setPositiveButton(isArabic ? "اعتماد الآن" : "Approve Now"), (d, w) -> {
+        .setPositiveButton(isArabic ? "اعتماد الآن" : "Approve Now", (d, w) -> {
             executor.execute(() -> {
                 MiraApiClient.ApiResponse response = apiClient.approveTransfer(t.id);
                 mainHandler.post(() -> {
@@ -514,6 +514,7 @@ private void setupFilterChips() {
         .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
         .show();
 }
+
 
 
     private void receiveTransfer(TransferData t) {
