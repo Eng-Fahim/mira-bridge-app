@@ -1,5 +1,8 @@
 plugins {
     id 'com.android.application'
+    // إضافة إضافات خدمات جوجل وكراشليتكس
+    id 'com.google.gms.google-services'
+    id 'com.google.firebase.crashlytics'
 }
 
 android {
@@ -62,6 +65,11 @@ android {
 }
 
 dependencies {
+    // Firebase BoM لإدارة إصدارات المكونات تلقائياً
+    implementation platform('com.google.firebase:firebase-bom:32.8.0')
+    implementation 'com.google.firebase:firebase-crashlytics'
+    implementation 'com.google.firebase:firebase-analytics'
+
     implementation 'androidx.biometric:biometric:1.2.0-alpha05'
     implementation fileTree(dir: 'libs', include: ['*.*'])
     implementation files('libs/jxl.jar')
@@ -87,14 +95,9 @@ dependencies {
     implementation "androidx.camera:camera-view:${camerax_version}"
     implementation 'androidx.gridlayout:gridlayout:1.0.0'
     implementation 'androidx.preference:preference:1.2.1'
-      // أضف هذا السطر لمكتبة التشفير
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
     
-    
-        
     // Room Database
     implementation "androidx.room:room-runtime:2.6.0"
     annotationProcessor "androidx.room:room-compiler:2.6.0"
-    // للـ Kotlin إذا كنت تستخدمه:
-    // kapt "androidx.room:room-compiler:2.6.0"
 }
