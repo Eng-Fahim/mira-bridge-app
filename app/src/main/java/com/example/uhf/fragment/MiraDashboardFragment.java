@@ -43,6 +43,7 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MiraDashboardFragment extends Fragment implements SharedPreferences.OnSharedPreferenceChangeListener {
 
@@ -50,9 +51,11 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private static final String OFFLINE_PREFS_BASE = "dashboard_cache_branch_";
     private static final double OUNCE_TO_GRAM = 31.1035;
     private static final int MAX_QUICK_ACTIONS = 9;
-    private static final long CACHE_VALIDITY_MS = 0;
+    private static final long CACHE_VALIDITY_MS = 0; // Always refresh
     private static final long GOLD_CACHE_VALIDITY_MS = 12 * 60 * 60 * 1000;
     private static final long PING_VALIDITY_MS = 30 * 1000;
+    private static final long REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes auto-refresh
+    
     private SharedPreferences goldCachePrefs;
 
     // UI Elements
@@ -81,7 +84,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private PermissionManager permissionManager;
     
     // Threading
-    private static final ExecutorService sharedExecutor = Executors.newFixedThreadPool(2);
+    private static final ExecutorService sharedExecutor = Executors.newFixedThreadPool(3);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Future<?> dataFuture;
     private Future<?> goldPriceFuture;
@@ -93,11 +96,26 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private SharedPreferences branchPrefs;
     private int currentBranchId = -1;
     private boolean isViewInitialized = false;
-    private boolean isLoading = false;
+    private final AtomicBoolean isLoading = new AtomicBoolean(false);
     private boolean isDataLoaded = false;
     private long lastDataFetchTime = 0;
     private long lastGoldFetchTime = 0;
     private long lastPingTime = 0;
+    private long lastResumeTime = 0;
+
+    // ✅ Runnable للتحديث التلقائي
+    private final Runnable autoRefreshRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (isAdded() && isViewInitialized) {
+                long now = System.currentTimeMillis();
+                if (now - lastDataFetchTime >= REFRESH_INTERVAL_MS) {
+                    fetchData();
+                }
+                mainHandler.postDelayed(this, REFRESH_INTERVAL_MS);
+            }
+        }
+    };
 
     // ThreadLocal Formatters
     private static final ThreadLocal<SimpleDateFormat> dateFormatsAr = 
@@ -152,6 +170,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             loadDataIfNeeded();
             
             isViewInitialized = true;
+            startAutoRefresh();
         } catch (Throwable e) {
             Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
         }
@@ -290,6 +309,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         try {
             long now = System.currentTimeMillis();
 
+            // ✅ Always fetch data on first load or when cache is invalid
             if (!isDataLoaded || (now - lastDataFetchTime) > CACHE_VALIDITY_MS || CACHE_VALIDITY_MS == 0) {
                 fetchData();
             }
@@ -353,7 +373,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             }
             
             cancelFuture(goldPriceFuture);
-            long startTime = System.currentTimeMillis();
             
             goldPriceFuture = sharedExecutor.submit(() -> {
                 try {
@@ -589,10 +608,20 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
+    /**
+     * ✅ جلب البيانات مع حماية من التحميل المتكرر
+     */
     private void fetchData() {
         try {
-            if (isLoading || apiClient == null) return;
-            isLoading = true;
+            if (isLoading.get() || apiClient == null || !isAdded()) return;
+            
+            // ✅ منع التحميل المتكرر خلال 2 ثانية
+            long now = System.currentTimeMillis();
+            if (now - lastDataFetchTime < 2000 && isDataLoaded) {
+                return;
+            }
+            
+            isLoading.set(true);
             
             if (tvLiveStatus != null) {
                 tvLiveStatus.setText(isArabic ? "جاري التحديث..." : "Updating...");
@@ -601,14 +630,13 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             
             cancelFuture(dataFuture);
             final int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-            long startTime = System.currentTimeMillis();
             
             dataFuture = sharedExecutor.submit(() -> {
                 try {
                     MiraApiClient.ApiResponse response = apiClient.getDashboardFull(activeBranchId);
                     mainHandler.post(() -> {
                         try {
-                            isLoading = false;
+                            isLoading.set(false);
                             lastDataFetchTime = System.currentTimeMillis();
                             if (!isAdded()) return;
                             
@@ -617,7 +645,8 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                                 processData(response.data);
                                 isDataLoaded = true;
                             } else {
-                                loadOfflineData();
+                                // ✅ Fallback: try fetching inventory directly
+                                fetchInventoryDataDirectly(activeBranchId);
                             }
                             showShimmer(false);
                             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
@@ -626,7 +655,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 } catch (Exception e) {
                     mainHandler.post(() -> {
                         try {
-                            isLoading = false;
+                            isLoading.set(false);
                             if (!isAdded()) return;
                             loadOfflineData();
                             showShimmer(false);
@@ -637,6 +666,65 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             });
         } catch (Exception e) {
             Log.e(TAG, "fetchData error: " + e.getMessage());
+            isLoading.set(false);
+        }
+    }
+
+    /**
+     * ✅ جلب بيانات المخزون مباشرة إذا فشل الداشبورد الكامل
+     */
+    private void fetchInventoryDataDirectly(int branchId) {
+        try {
+            if (apiClient == null || branchId <= 0) {
+                loadOfflineData();
+                return;
+            }
+            
+            sharedExecutor.execute(() -> {
+                try {
+                    MiraApiClient.ApiResponse response = apiClient.getBranchInventory(branchId);
+                    mainHandler.post(() -> {
+                        try {
+                            if (response != null && response.isSuccess && response.data != null) {
+                                int totalItems = response.data.optInt("total", 0);
+                                double totalWeight = 0;
+                                
+                                if (response.data.has("items")) {
+                                    org.json.JSONArray items = response.data.optJSONArray("items");
+                                    if (items != null) {
+                                        for (int i = 0; i < items.length(); i++) {
+                                            JSONObject item = items.optJSONObject(i);
+                                            if (item != null) {
+                                                totalWeight += item.optDouble("gross_weight_grams", 0);
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                setText(tvTotalItems, String.valueOf(totalItems));
+                                setText(tvTotalWeight, formatWeight(totalWeight));
+                                
+                                if (offlineCache != null) {
+                                    offlineCache.edit()
+                                        .putInt("total_items", totalItems)
+                                        .putFloat("total_weight", (float) totalWeight)
+                                        .putLong("last_update", System.currentTimeMillis())
+                                        .apply();
+                                }
+                            } else {
+                                loadOfflineData();
+                            }
+                        } catch (Exception e) {
+                            loadOfflineData();
+                        }
+                    });
+                } catch (Exception e) {
+                    mainHandler.post(() -> loadOfflineData());
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "fetchInventoryDataDirectly error: " + e.getMessage());
+            loadOfflineData();
         }
     }
 
@@ -692,9 +780,17 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
+    /**
+     * ✅ التحديث الداخلي - يستدعى من الفрагمنتات الأخرى
+     */
     public void refreshInternalData() {
         try {
             if (!isAdded()) return;
+            
+            // ✅ إعادة تعيين حالة التحميل
+            isDataLoaded = false;
+            lastDataFetchTime = 0;
+            
             fetchData();
             displayGoldPricesFromCache();
         } catch (Exception e) {
@@ -737,6 +833,21 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         } catch (Exception e) {
             Log.e(TAG, "initBranchCache error: " + e.getMessage());
         }
+    }
+
+    /**
+     * ✅ بدء التحديث التلقائي
+     */
+    private void startAutoRefresh() {
+        mainHandler.removeCallbacks(autoRefreshRunnable);
+        mainHandler.postDelayed(autoRefreshRunnable, REFRESH_INTERVAL_MS);
+    }
+
+    /**
+     * ✅ إيقاف التحديث التلقائي
+     */
+    private void stopAutoRefresh() {
+        mainHandler.removeCallbacks(autoRefreshRunnable);
     }
 
     private void navigateToFragment(Fragment fragment, String tag) {
@@ -856,14 +967,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         } catch (Exception e) {}
     }
 
-    private void logPerformance(String operation, long durationMs) {
-        try {
-            if (durationMs > 1000) {
-                Log.w(TAG, "Slow operation detected: " + operation + " took " + durationMs + "ms");
-            }
-        } catch (Exception e) {}
-    }
-
     public void onBranchChanged() {
         try {
             if (!isAdded()) return;
@@ -886,6 +989,8 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     public void onResume() {
         super.onResume();
         try {
+            lastResumeTime = System.currentTimeMillis();
+            
             if (branchPrefs != null) {
                 branchPrefs.registerOnSharedPreferenceChangeListener(this);
             }
@@ -896,6 +1001,8 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             } else if (isViewInitialized) {
                 setupQuickAccessGrid();
                 updateHeader();
+                
+                // ✅ Always refresh data on resume
                 refreshInternalData();
                 
                 long now = System.currentTimeMillis();
@@ -906,6 +1013,8 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                     displayGoldPricesFromCache();
                 }
             }
+            
+            startAutoRefresh();
         } catch (Exception e) {
             Log.e(TAG, "onResume error: " + e.getMessage());
         }
@@ -915,6 +1024,8 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     public void onPause() {
         super.onPause();
         try {
+            stopAutoRefresh();
+            
             if (branchPrefs != null) {
                 branchPrefs.unregisterOnSharedPreferenceChangeListener(this);
             }
@@ -944,6 +1055,8 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     public void onDestroyView() {
         super.onDestroyView();
         try {
+            stopAutoRefresh();
+            
             if (orgProfile != null && profileListener != null) {
                 orgProfile.removeListener(profileListener);
             }
@@ -966,4 +1079,4 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             }
         } catch (Exception e) {}
     }
-                        }
+}
