@@ -49,9 +49,10 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private static final String OFFLINE_PREFS_BASE = "dashboard_cache_branch_";
     private static final double OUNCE_TO_GRAM = 31.1035;
     private static final int MAX_QUICK_ACTIONS = 9;
-    private static final long CACHE_VALIDITY_MS = 5 * 60 * 1000;
-    private static final long PING_VALIDITY_MS = 30 * 1000;
-
+    private static final long CACHE_VALIDITY_MS = 0;
+    private static final long GOLD_CACHE_VALIDITY_MS = 12 * 60 * 60 * 1000;
+    private static final long PING_VALIDITY_MS = 30 * 1000; // ✅ موجودة
+    private SharedPreferences goldCachePrefs;
     // UI Elements
     private TextView tvGreeting, tvDate, tvLocation, tvLiveStatus;
     private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
@@ -164,6 +165,9 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         permissionManager = PermissionManager.getInstance(context);
         isArabic = Locale.getDefault().getLanguage().equals("ar");
         branchPrefs = context.getSharedPreferences("mira_branches_prefs", Context.MODE_PRIVATE);
+        goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE);
+        lastGoldFetchTime = goldCachePrefs.getLong("last_gold_fetch_time", 0);
+
     }
 
     private void initViews(View v) {
@@ -259,23 +263,32 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         });
     }
 
-    private void loadDataIfNeeded() {
-        long now = System.currentTimeMillis();
+    
+// ==================== 3. تعديل loadDataIfNeeded - تحديث داخلي فوري ====================
 
-        if (!isDataLoaded || (now - lastDataFetchTime) > CACHE_VALIDITY_MS) {
-            fetchData();
-        }
+private void loadDataIfNeeded() {
+    long now = System.currentTimeMillis();
 
-        if (permissionManager != null && permissionManager.canAccessFragment("GoldRates") 
-                && (now - lastGoldFetchTime) > CACHE_VALIDITY_MS) {
+    // ✅ البيانات الداخلية - تحديث فوري دائماً
+    if (!isDataLoaded || (now - lastDataFetchTime) > CACHE_VALIDITY_MS || CACHE_VALIDITY_MS == 0) {
+        fetchData();
+    }
+
+    // ✅ أسعار الذهب - من الكاش إذا لم يمر 12 ساعة
+    if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
+        if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
             fetchLiveGoldPrices(false);
-        }
-
-        if ((now - lastPingTime) > PING_VALIDITY_MS) {
-            updateLiveStatus();
-            lastPingTime = now;
+        } else {
+            displayGoldPricesFromCache();
         }
     }
+
+    // ✅ حالة الاتصال - كل 30 ثانية
+    if ((now - lastPingTime) > PING_VALIDITY_MS) {
+        updateLiveStatus();
+        lastPingTime = now;
+    }
+}
 
     private void updateLiveStatus() {
         if (tvLiveStatus == null || apiClient == null) return;
@@ -301,59 +314,66 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     private void fetchLiveGoldPrices(boolean forceRefresh) {
-        if (apiClient == null) return;
+    if (apiClient == null) return;
 
-        long now = System.currentTimeMillis();
-        if (!forceRefresh && (now - lastGoldFetchTime) < CACHE_VALIDITY_MS) return;
+    long now = System.currentTimeMillis();
+    
+    // ✅ التحقق من الكاش - 12 ساعة
+    if (!forceRefresh && (now - lastGoldFetchTime) < GOLD_CACHE_VALIDITY_MS) {
+        // ✅ استخدام الكاش المحلي
+        displayGoldPricesFromCache();
+        return;
+    }
 
-        cancelFuture(goldPriceFuture);
-        long startTime = System.currentTimeMillis();
+    cancelFuture(goldPriceFuture);
+    long startTime = System.currentTimeMillis();
 
-        goldPriceFuture = sharedExecutor.submit(() -> {
-            try {
-                List<ApiProvider> providers = apiClient.getActiveProviders();
-                ApiProvider activeProvider = null;
-                
-                if (providers != null) {
-                    for (ApiProvider provider : providers) {
-                        if (provider.isActive() && provider.getApiKey() != null && !provider.getApiKey().isEmpty()) {
-                            activeProvider = provider;
-                            break;
-                        }
-                    }
-                    if (activeProvider == null && !providers.isEmpty()) {
-                        activeProvider = providers.get(0);
+    goldPriceFuture = sharedExecutor.submit(() -> {
+        try {
+            List<ApiProvider> providers = apiClient.getActiveProviders();
+            ApiProvider activeProvider = null;
+            
+            if (providers != null) {
+                for (ApiProvider provider : providers) {
+                    if (provider.isActive() && provider.getApiKey() != null && !provider.getApiKey().isEmpty()) {
+                        activeProvider = provider;
+                        break;
                     }
                 }
-                
-                if (activeProvider == null) {
-                    mainHandler.post(() -> {
-                        if (isAdded()) displayGoldPricesFromCache();
-                    });
-                    return;
+                if (activeProvider == null && !providers.isEmpty()) {
+                    activeProvider = providers.get(0);
                 }
-                
-                MiraApiClient.ApiResponse response = apiClient.fetchGoldPriceWithProvider(activeProvider.getId());
-                GoldPriceData priceData = parseGoldPriceData(response);
-                
-                mainHandler.post(() -> {
-                    lastGoldFetchTime = System.currentTimeMillis();
-                    logPerformance("fetchLiveGoldPrices", System.currentTimeMillis() - startTime);
-                    if (!isAdded()) return;
-                    
-                    if (priceData != null) {
-                        displayGoldPrices(priceData);
-                    } else {
-                        displayGoldPricesFromCache();
-                    }
-                });
-            } catch (Exception e) {
+            }
+            
+            if (activeProvider == null) {
                 mainHandler.post(() -> {
                     if (isAdded()) displayGoldPricesFromCache();
                 });
+                return;
             }
-        });
-    }
+            
+            MiraApiClient.ApiResponse response = apiClient.fetchGoldPriceWithProvider(activeProvider.getId());
+            GoldPriceData priceData = parseGoldPriceData(response);
+            
+            mainHandler.post(() -> {
+                lastGoldFetchTime = System.currentTimeMillis();
+                logPerformance("fetchLiveGoldPrices", System.currentTimeMillis() - startTime);
+                if (!isAdded()) return;
+                
+                if (priceData != null) {
+                    displayGoldPrices(priceData);
+                } else {
+                    displayGoldPricesFromCache();
+                }
+            });
+        } catch (Exception e) {
+            mainHandler.post(() -> {
+                if (isAdded()) displayGoldPricesFromCache();
+            });
+        }
+    });
+}
+
 
     private GoldPriceData parseGoldPriceData(MiraApiClient.ApiResponse response) {
         if (response == null || !response.isSuccess || response.data == null) {
@@ -400,31 +420,58 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
         
         calculateTrend(data.price24);
+    if (goldCachePrefs != null) {
+        goldCachePrefs.edit().putLong("last_gold_fetch_time", System.currentTimeMillis()).apply();
+    }
+}
+
+    
+
+// ==================== 4. تعديل displayGoldPricesFromCache مع وقت 12 ساعة ====================
+
+private void displayGoldPricesFromCache() {
+    if (priceManager == null) return;
+
+    double price24 = priceManager.getGoldPricePerGram(24);
+    double price21 = priceManager.getGoldPricePerGram(21);
+    double price18 = priceManager.getGoldPricePerGram(18);
+
+    setGoldPrice(tvKarat24, "24K", price24);
+    setGoldPrice(tvKarat21, "21K", price21);
+    setGoldPrice(tvKarat18, "18K", price18);
+
+    if (tvOuncePrice != null && price24 > 0) {
+        tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", price24 * OUNCE_TO_GRAM));
     }
 
-    private void displayGoldPricesFromCache() {
-        if (priceManager == null) return;
-
-        double price24 = priceManager.getGoldPricePerGram(24);
-        double price21 = priceManager.getGoldPricePerGram(21);
-        double price18 = priceManager.getGoldPricePerGram(18);
-
-        setGoldPrice(tvKarat24, "24K", price24);
-        setGoldPrice(tvKarat21, "21K", price21);
-        setGoldPrice(tvKarat18, "18K", price18);
-
-        if (tvOuncePrice != null && price24 > 0) {
-            tvOuncePrice.setText(String.format(Locale.US, "💰 $%,.2f", price24 * OUNCE_TO_GRAM));
-        }
-
-        if (tvPriceSource != null) {
-            tvPriceSource.setText(isArabic ? "📡 كاش محلي" : "📡 Local cache");
-        }
-
-        if (tvLastUpdate != null) {
-            tvLastUpdate.setText(isArabic ? "⏰ وضع أوفلاين" : "⏰ Offline mode");
+    if (tvPriceSource != null) {
+        // ✅ حساب الوقت المتبقي للتحديث القادم
+        long now = System.currentTimeMillis();
+        long timeSinceLastFetch = now - lastGoldFetchTime;
+        long timeRemaining = GOLD_CACHE_VALIDITY_MS - timeSinceLastFetch;
+        
+        if (timeRemaining > 0) {
+            long hoursRemaining = timeRemaining / (60 * 60 * 1000);
+            long minutesRemaining = (timeRemaining % (60 * 60 * 1000)) / (60 * 1000);
+            
+            tvPriceSource.setText(isArabic ? 
+                "📡 كاش محلي - التحديث بعد " + hoursRemaining + " ساعة " + minutesRemaining + " دقيقة" : 
+                "📡 Cache - update in " + hoursRemaining + "h " + minutesRemaining + "m");
+        } else {
+            tvPriceSource.setText(isArabic ? "📡 جاهز للتحديث" : "📡 Ready to update");
         }
     }
+
+    if (tvLastUpdate != null && offlineCache != null) {
+        long lastUpdate = offlineCache.getLong("last_update", 0);
+        if (lastUpdate > 0) {
+            SimpleDateFormat timeFmt = timeFormatter.get();
+            String time = timeFmt != null ? timeFmt.format(new Date(lastUpdate)) : "";
+            tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
+        }
+    }
+}
+
 
     private void calculateTrend(double currentPrice) {
         if (tvGoldTrend == null || tvGoldChange == null || offlineCache == null) return;
@@ -585,13 +632,46 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    private void refreshAllData() {
-        showShimmer(true);
-        fetchData();
-        if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
+// ==================== 6. إضافة refreshInternalData للتحديث اللحظي ====================
+
+/**
+ * ✅ التحديث الداخلي اللحظي - يستدعى عند العودة للشاشة
+ * يجلب البيانات من قاعدة البيانات مباشرة بدون مزود خارجي
+ */
+public void refreshInternalData() {
+    if (!isAdded()) return;
+    
+    // ✅ تحديث البيانات الداخلية فوراً - بدون انتظار الكاش
+    fetchData();
+    
+    // ✅ استخدام الكاش المحلي للذهب (بدون استدعاء مزود خارجي)
+    displayGoldPricesFromCache();
+}
+
+
+    
+// ==================== 7. تعديل refreshAllData ====================
+
+private void refreshAllData() {
+    showShimmer(true);
+    
+    // ✅ تحديث البيانات الداخلية فوراً
+    fetchData();
+    
+    // ✅ الذهب - فقط إذا مر 12 ساعة أو كان السحب القسري
+    long now = System.currentTimeMillis();
+    if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
+        if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+            // ✅ مر 12 ساعة - جلب من المزود
             fetchLiveGoldPrices(true);
+        } else {
+            // ✅ لم يمر 12 ساعة - استخدام الكاش
+            displayGoldPricesFromCache();
+            showShimmer(false);
+            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
         }
     }
+}
 
     private void showShimmer(boolean show) {
         if (shimmerLayout != null) {
@@ -713,22 +793,37 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (branchPrefs != null) {
-            branchPrefs.registerOnSharedPreferenceChangeListener(this);
-        }
+    
+// ==================== 5. تعديل onResume - تحديث داخلي فوري ====================
 
-        int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-        if (latestBranchId != currentBranchId) {
-            onBranchChanged();
-        } else if (isViewInitialized) {
-            setupQuickAccessGrid();
-            updateHeader();
-            loadDataIfNeeded();
+@Override
+public void onResume() {
+    super.onResume();
+    if (branchPrefs != null) {
+        branchPrefs.registerOnSharedPreferenceChangeListener(this);
+    }
+
+    int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+    if (latestBranchId != currentBranchId) {
+        onBranchChanged();
+    } else if (isViewInitialized) {
+        setupQuickAccessGrid();
+        updateHeader();
+        
+        // ✅ تحديث داخلي فوري عند العودة للشاشة
+        refreshInternalData();
+        
+        // ✅ التحقق من الكاش للذهب - 12 ساعة
+        long now = System.currentTimeMillis();
+        if (permissionManager != null && permissionManager.canAccessFragment("GoldRates") 
+                && (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+            fetchLiveGoldPrices(false);
+        } else {
+            displayGoldPricesFromCache();
         }
     }
+}
+
 
     @Override
     public void onPause() {
