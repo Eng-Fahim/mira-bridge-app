@@ -38,6 +38,9 @@ import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.UIHelper;
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.RFIDManager;
+import com.example.uhf.fragment.MiraReceiptFragment;
+
+
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.textfield.TextInputLayout;
 
@@ -84,6 +87,9 @@ public class MiraPosFragment extends MiraBaseFragment {
 
     private boolean isRFIDModeActive = false;
     private boolean isArabic;
+    
+    private MiraApiClient.ApiResponse lastSaleResponse = null;
+
 
     public static class CartItem {
         public String epc, name, karat, status, serialNo, gtin, location;
@@ -935,80 +941,93 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
     }
 
     private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
-        try {
-            if (!isAdded()) return;
-            
-            final AlertDialog loadingDialog = showProfessionalLoadingDialog();
-            if (loadingDialog == null) return;
-            
-            setButtonsEnabled(false);
-            
-            new Thread(() -> {
-                try {
-                    Context ctx = getContext();
-                    if (ctx == null) return;
-                    MiraApiClient client = MiraApiClient.getInstance(ctx);
-                    SessionManager sessionManager = new SessionManager(ctx);
-                    
-                    JSONObject payload = new JSONObject();
-                    payload.put("action", "COMPLETE_POS_SALE");
-                    payload.put("gate_id", client.getGateId());
-                    payload.put("branch_id", getActiveBranchId());
-                    payload.put("user_id", sessionManager.getUserId());
-                    payload.put("username", sessionManager.getUsername());
-                    
-                    JSONObject customer = new JSONObject();
-                    customer.put("name", data.customerName);
-                    customer.put("phone", data.customerPhone);
-                    customer.put("payment_method", data.paymentMethod);
-                    payload.put("customer", customer);
-                    
-                    JSONArray itemsArr = new JSONArray();
-                    for (CartItem item : cartList) {
-                        JSONObject obj = new JSONObject();
-                        obj.put("epc", item.epc);
-                        obj.put("title", item.name);
-                        obj.put("karat", item.karat);
-                        obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
-                        obj.put("price_usd", item.price);
-                        itemsArr.put(obj);
-                    }
-                    payload.put("items", itemsArr);
-                    
-                    JSONObject payment = new JSONObject();
-                    payment.put("subtotal_usd", data.originalTotal);
-                    payment.put("discount_amount_usd", data.discountAmount);
-                    payment.put("final_amount_usd", data.finalAmount);
-                    payment.put("payment_method", data.paymentMethod);
-                    payload.put("payment", payment);
-                    
-                    MiraApiClient.ApiResponse response = client.checkout(payload);
-                    
-                    safeRun(() -> {
-                        dismissDialog(loadingDialog);
-                        setButtonsEnabled(true);
-                        
-                        if (response != null && response.isSuccess) {
-                            playAlertSound(1);
-                            clearCart();
-                            showSuccessDialog(data.finalAmount, cartList.size(), data.paymentMethod);
-                        } else {
-                            String errorMsg = response != null && response.error != null ? response.error : "Unknown error";
-                            showRetryDialog(isArabic ? "❌ فشل البيع" : "❌ Sale Failed", errorMsg, () -> executeCheckout(data));
-                        }
-                    });
-                } catch (Exception e) {
-                    safeRun(() -> {
-                        dismissDialog(loadingDialog);
-                        setButtonsEnabled(true);
-                        showRetryDialog(isArabic ? "❌ خطأ" : "❌ Error", e.getMessage(), null);
-                    });
+    try {
+        if (!isAdded()) return;
+        
+        final AlertDialog loadingDialog = showProfessionalLoadingDialog();
+        if (loadingDialog == null) return;
+        
+        setButtonsEnabled(false);
+        
+        new Thread(() -> {
+            try {
+                Context ctx = getContext();
+                if (ctx == null) return;
+                MiraApiClient client = MiraApiClient.getInstance(ctx);
+                SessionManager sessionManager = new SessionManager(ctx);
+                
+                JSONObject payload = new JSONObject();
+                payload.put("action", "COMPLETE_POS_SALE");
+                payload.put("gate_id", client.getGateId());
+                payload.put("branch_id", getActiveBranchId());
+                payload.put("user_id", sessionManager.getUserId());
+                payload.put("username", sessionManager.getUsername());
+                
+                JSONObject customer = new JSONObject();
+                customer.put("name", data.customerName);
+                customer.put("phone", data.customerPhone);
+                customer.put("payment_method", data.paymentMethod);
+                payload.put("customer", customer);
+                
+                JSONArray itemsArr = new JSONArray();
+                for (CartItem item : cartList) {
+                    JSONObject obj = new JSONObject();
+                    obj.put("epc", item.epc);
+                    obj.put("title", item.name);
+                    obj.put("karat", item.karat);
+                    obj.put("weight", item.scaleWeight > 0 ? item.scaleWeight : item.weight);
+                    obj.put("price_usd", item.price);
+                    obj.put("item_id", item.itemId);
+                    obj.put("serial_no", item.serialNo);
+                    itemsArr.put(obj);
                 }
-            }).start();
-        } catch (Exception e) {
-            Log.e(TAG, "executeCheckout error: " + e.getMessage());
-        }
+                payload.put("items", itemsArr);
+                
+                JSONObject payment = new JSONObject();
+                payment.put("subtotal_usd", data.originalTotal);
+                payment.put("discount_amount_usd", data.discountAmount);
+                payment.put("final_amount_usd", data.finalAmount);
+                payment.put("payment_method", data.paymentMethod);
+                payload.put("payment", payment);
+                
+                MiraApiClient.ApiResponse response = client.checkout(payload);
+                
+                // ✅✅✅ حفظ الاستجابة لاستخدامها في الفاتورة
+                lastSaleResponse = response;
+                
+                // ✅ حفظ عدد القطع قبل المسح
+                final int soldItemCount = cartList.size();
+                
+                safeRun(() -> {
+                    dismissDialog(loadingDialog);
+                    setButtonsEnabled(true);
+                    
+                    if (response != null && response.isSuccess) {
+                        playAlertSound(1);
+                        clearCart();
+                        
+                        // ✅✅✅ عرض الفاتورة مباشرة
+                        showReceipt(response);
+                    } else {
+                        String errorMsg = response != null && response.error != null ? response.error : "Unknown error";
+                        if (errorMsg == null || errorMsg.isEmpty()) {
+                            errorMsg = response != null && response.message != null ? response.message : "Unknown error";
+                        }
+                        showRetryDialog(isArabic ? "❌ فشل البيع" : "❌ Sale Failed", errorMsg, () -> executeCheckout(data));
+                    }
+                });
+            } catch (Exception e) {
+                safeRun(() -> {
+                    dismissDialog(loadingDialog);
+                    setButtonsEnabled(true);
+                    showRetryDialog(isArabic ? "❌ خطأ" : "❌ Error", e.getMessage(), null);
+                });
+            }
+        }).start();
+    } catch (Exception e) {
+        Log.e(TAG, "executeCheckout error: " + e.getMessage());
     }
+}
 
     private AlertDialog showProfessionalLoadingDialog() {
         try {
@@ -1091,36 +1110,54 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
         } catch (Exception e) {}
     }
 
-    private void showSuccessDialog(double amount, int itemCount, String paymentMethod) {
-        try {
-            Context ctx = getContext();
-            if (ctx == null || !isAdded()) return;
-            
-            LinearLayout layout = new LinearLayout(ctx);
-            layout.setOrientation(LinearLayout.VERTICAL);
-            layout.setPadding(30, 25, 30, 10);
-            
-            TextView tvIcon = new TextView(ctx);
-            tvIcon.setText("🎉");
-            tvIcon.setTextSize(44);
-            tvIcon.setGravity(android.view.Gravity.CENTER);
-            layout.addView(tvIcon);
-            
-            TextView tvTitle = new TextView(ctx);
-            tvTitle.setText(isArabic ? "تمت عملية البيع بنجاح!" : "Sale Completed!");
-            tvTitle.setTextSize(18);
-            tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-            tvTitle.setGravity(android.view.Gravity.CENTER);
-            tvTitle.setPadding(0, 10, 0, 20);
-            layout.addView(tvTitle);
-            
-            AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
-            builder.setView(layout);
-            builder.setPositiveButton(isArabic ? "متابعة" : "Continue", (d, w) -> d.dismiss());
-            builder.setCancelable(false);
-            builder.show();
-        } catch (Exception e) {}
+    // ✅ استبدال الدالة القديمة بالكامل
+private void showSuccessDialog(double amount, int itemCount, String paymentMethod) {
+    try {
+        if (!isAdded() || getContext() == null) return;
+        
+        // ✅ إذا كانت لدينا استجابة بيع محفوظة، نعرض الفاتورة
+        if (lastSaleResponse != null) {
+            showReceipt(lastSaleResponse);
+        } else {
+            // ✅ وإلا نعرض رسالة نجاح عادية
+            showSuccessMessage(
+                isArabic ? "تم البيع بنجاح" : "Sale Completed",
+                isArabic ? "تمت عملية البيع بنجاح" : "Sale completed successfully",
+                true
+            );
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "showSuccessDialog error: " + e.getMessage());
     }
+}
+
+// ✅✅✅ دالة جديدة لعرض الفاتورة
+private void showReceipt(MiraApiClient.ApiResponse response) {
+    try {
+        if (!isAdded() || getActivity() == null) return;
+        
+        // ✅ تحويل الاستجابة إلى JSON string
+        String receiptJson = "{}";
+        if (response != null && response.data != null) {
+            receiptJson = response.data.toString();
+        } else if (response != null && response.getBody() != null) {
+            receiptJson = response.getBody();
+        }
+        
+        // ✅ فتح MiraReceiptFragment
+        MiraReceiptFragment receiptFragment = MiraReceiptFragment.newInstance(receiptJson);
+        FragmentManager fm = getParentFragmentManager();
+        if (!fm.isStateSaved()) {
+            receiptFragment.show(fm, "MiraReceiptFragment");
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "showReceipt error: " + e.getMessage());
+        // ✅ إذا فشل عرض الفاتورة، عرض رسالة نجاح عادية
+        showSuccessMessage(isArabic ? "تم البيع بنجاح" : "Sale Completed", 
+            isArabic ? "تمت عملية البيع بنجاح" : "Sale completed successfully", true);
+    }
+}
+
 
     private void checkPendingSales() {
         try {
