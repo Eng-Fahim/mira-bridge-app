@@ -110,12 +110,17 @@ public class MiraPosFragment extends MiraBaseFragment {
     private SmartScaleConnector scaleConnector;
     private double liveScaleWeight = 0.0;
 
-    @Nullable
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
+   @Nullable
+@Override
+public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                         @Nullable Bundle savedInstanceState) {
+    try {
         return inflater.inflate(R.layout.fragment_mira_pos, container, false);
+    } catch (Exception e) {
+        Log.e(TAG, "onCreateView error: " + e.getMessage(), e);
+        return null;
     }
+}
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
