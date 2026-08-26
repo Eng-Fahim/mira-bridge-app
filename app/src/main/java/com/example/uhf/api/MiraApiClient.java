@@ -1230,7 +1230,29 @@ public ApiResponse syncOfflineTransactions(JSONArray transactionsArray) {
         return new ApiResponse(-1, null, e.getMessage());
     }
 }
-    
+    // ===================== 📦 MY BRANCH INVENTORY =====================
+
+/**
+ * ✅ جلب قطع فرع المستخدم الحالي المتاحة للتحويل
+ */
+public ApiResponse getMyBranchInventoryItems(String category) {
+    String endpoint = "/my-branch/inventory/items";
+    if (category != null && !category.isEmpty()) {
+        try {
+            endpoint += "?category=" + URLEncoder.encode(category, "UTF-8");
+        } catch (Exception e) {
+            endpoint += "?category=" + category;
+        }
+    }
+    return getWithAuth(endpoint);
+}
+
+/**
+ * ✅ جلب إحصائيات مخزون الفرع
+ */
+public ApiResponse getBranchInventoryStats(int branchId) {
+    return getWithAuth("/branches/" + branchId + "/inventory/stats");
+}
 
     // ===================== 👥 USER PERMISSIONS & LOGS =====================
 
@@ -1352,4 +1374,4 @@ public ApiResponse syncOfflineTransactions(JSONArray transactionsArray) {
             return null;
         }
     }
-                         }
+    }
