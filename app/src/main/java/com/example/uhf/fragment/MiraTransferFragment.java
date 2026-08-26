@@ -531,12 +531,12 @@ private void setupFilterChips() {
     new MaterialAlertDialogBuilder(requireContext())
         .setTitle(isArabic ? "تأكيد استلام الشحنة" : "Receive Shipment")
         .setMessage(isArabic ? "هل استلمت الشحنة مع التدقيق واختبار مطابقة القطع؟" : "Confirm receiving and updating branch stock?")
-        .setPositiveButton(isArabic ? "تأكيد الاستلام" : "Confirm Receive"), (d, w) -> {
+        // ✅ الإصلاح: الفاصلة داخل القوس
+        .setPositiveButton(isArabic ? "تأكيد الاستلام" : "Confirm Receive", (d, w) -> {
             executor.execute(() -> {
                 MiraApiClient.ApiResponse response = apiClient.receiveTransfer(t.id);
                 mainHandler.post(() -> {
                     if (response != null && response.isSuccess) {
-                        // ✅ رسالة نجاح احترافية
                         showSuccessMessage(
                             isArabic ? "تم الاستلام بنجاح" : "Received Successfully",
                             isArabic ? "تم استلام الشحنة " + t.transferNumber + "\nوتم تحديث المخزون" : 
