@@ -134,55 +134,6 @@
             app:cornerRadius="10dp" />
     </LinearLayout>
 
-    <!-- ✅ ملخص سريع للتحويلات -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingHorizontal="12dp"
-        android:paddingBottom="4dp">
-
-        <TextView
-            android:id="@+id/tvSummaryDraft"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="📝 0"
-            android:textSize="11sp"
-            android:textColor="?attr/colorOnSurfaceVariant" />
-
-        <TextView
-            android:id="@+id/tvSummaryPending"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="⏳ 0"
-            android:textSize="11sp"
-            android:textColor="?attr/colorOnSurfaceVariant" />
-
-        <TextView
-            android:id="@+id/tvSummaryInTransit"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="🚚 0"
-            android:textSize="11sp"
-            android:textColor="?attr/colorOnSurfaceVariant" />
-
-        <TextView
-            android:id="@+id/tvSummaryReceived"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:text="✅ 0"
-            android:textSize="11sp"
-            android:textColor="?attr/colorOnSurfaceVariant" />
-    </LinearLayout>
-
     <!-- قائمة التحويلات -->
     <FrameLayout
         android:layout_width="match_parent"
@@ -196,7 +147,7 @@
             android:padding="8dp"
             android:clipToPadding="false" />
 
-        <!-- ✅ حالة فارغة محسنة -->
+        <!-- حالة فارغة -->
         <LinearLayout
             android:id="@+id/emptyStateContainer"
             android:layout_width="wrap_content"
@@ -219,7 +170,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="اضغط على \"تحويل جديد\" للبدء"
+                android:text="اضغط على تحويل جديد للبدء"
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="12sp"
                 android:alpha="0.7"
