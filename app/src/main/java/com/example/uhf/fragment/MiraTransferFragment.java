@@ -420,9 +420,9 @@ private void setupFilterChips() {
                     else showAccessDenied();
                 }
                 else if (sel.contains("استلام") || sel.contains("Receive")) {
-                    if (canReceiveTransfer()) receiveTransfer(t);
-                    else showAccessDenied();
-                }
+    if (canReceiveTransfer(t)) receiveTransfer(t); // ✅ الصحيح
+    else showAccessDenied();
+}
                 else if (sel.contains("تدقيق") || sel.contains("Verification") || sel.contains("Audit")) showScanItemsDialogForTransfer(t);
                 else if (sel.contains("حذف") || sel.contains("Delete")) {
                     if (canDeleteTransfer()) deleteTransfer(t);
