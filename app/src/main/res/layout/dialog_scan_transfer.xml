@@ -7,14 +7,34 @@
     android:padding="16dp">
 
     <!-- Header Info -->
-    <TextView
-        android:id="@+id/tvScanTransferInfo"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="TR-1002 | الفرع الرئيسي ➔ الفرع الثاني"
-        android:textColor="?attr/colorOnSurface"
-        android:textSize="15sp"
-        android:textStyle="bold" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tvScanTransferInfo"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="TR-1002 | الفرع الرئيسي ➔ الفرع الثاني"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:maxLines="2"
+            android:ellipsize="end" />
+
+        <!-- ✅ زر عرض القطع المضافة مسبقاً -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnViewExistingItems"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📦 القطع"
+            android:textSize="11sp"
+            android:visibility="gone" />
+    </LinearLayout>
 
     <!-- Big Counter Box -->
     <com.google.android.material.card.MaterialCardView
@@ -47,6 +67,17 @@
                 android:textColor="?attr/colorOnSecondaryContainer"
                 android:textSize="36sp"
                 android:textStyle="bold" />
+
+            <!-- ✅ معلومات إضافية -->
+            <TextView
+                android:id="@+id/tvScanWeight"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="الوزن: 0.0g"
+                android:textColor="?attr/colorOnSecondaryContainer"
+                android:textSize="11sp"
+                android:layout_marginTop="4dp"
+                android:alpha="0.8" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
@@ -69,7 +100,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:singleLine="true"
-                android:textSize="12sp" />
+                android:textSize="12sp"
+                android:imeOptions="actionDone"
+                android:inputType="text" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.button.MaterialButton
@@ -77,25 +110,86 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:text="فحص" />
+            android:text="فحص"
+            app:icon="@android:drawable/ic_menu_search" />
+    </LinearLayout>
+
+    <!-- ✅ شريط تقدم صغير -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ProgressBar
+            android:id="@+id/progressScan"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="0dp"
+            android:layout_height="6dp"
+            android:layout_weight="1"
+            android:max="100"
+            android:progress="0"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvProgressText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text=""
+            android:textSize="10sp"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- Scanned List Screen Box -->
-    <ScrollView
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="160dp"
+        android:layout_height="wrap_content"
         android:layout_marginVertical="10dp"
-        android:background="?attr/colorSurfaceContainerLowest"
-        android:padding="8dp">
+        android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/tvScannedItems"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="قائمة المسح الضوئي فارغة..."
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp" />
-    </ScrollView>
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="قائمة القطع الممسوحة:"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvValidItemsCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 صالحة"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="150dp"
+            android:layout_marginTop="4dp"
+            android:background="?attr/colorSurfaceContainerLowest"
+            android:padding="8dp">
+
+            <TextView
+                android:id="@+id/tvScannedItems"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="قائمة المسح الضوئي فارغة..."
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp"
+                android:lineSpacingExtra="2dp" />
+        </ScrollView>
+    </LinearLayout>
 
     <!-- Dialog Actions -->
     <LinearLayout
@@ -117,6 +211,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:text="حفظ وتثبيت الشحنة" />
+            android:text="حفظ وتثبيت الشحنة"
+            app:icon="@android:drawable/ic_menu_save" />
     </LinearLayout>
+
 </LinearLayout>
