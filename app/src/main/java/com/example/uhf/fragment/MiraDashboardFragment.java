@@ -31,6 +31,7 @@ import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.SessionManager;
+import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 import org.json.JSONObject;
 
@@ -102,6 +103,10 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private long lastGoldFetchTime = 0;
     private long lastPingTime = 0;
     private long lastResumeTime = 0;
+    
+    // ✅ عداد محاولات الفشل
+    private int consecutiveFailures = 0;
+    private static final int MAX_CONSECUTIVE_FAILURES = 3;
 
     // ✅ Runnable للتحديث التلقائي
     private final Runnable autoRefreshRunnable = new Runnable() {
@@ -146,7 +151,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         try {
             return inflater.inflate(R.layout.fragment_mira_dashboard, container, false);
         } catch (Exception e) {
-            Log.e(TAG, "onCreateView error: " + e.getMessage());
+            logNonFatal("onCreateView", e);
             return null;
         }
     }
@@ -172,7 +177,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             isViewInitialized = true;
             startAutoRefresh();
         } catch (Throwable e) {
-            Log.e(TAG, "onViewCreated error: " + e.getMessage(), e);
+            logNonFatal("onViewCreated", e);
         }
     }
 
@@ -192,7 +197,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE);
             lastGoldFetchTime = goldCachePrefs.getLong("last_gold_fetch_time", 0);
         } catch (Exception e) {
-            Log.e(TAG, "initializeManagers error: " + e.getMessage());
+            logNonFatal("initializeManagers", e);
         }
     }
 
@@ -243,7 +248,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 btnRefreshGold.setOnClickListener(v2 -> fetchLiveGoldPrices(true));
             }
         } catch (Exception e) {
-            Log.e(TAG, "initViews error: " + e.getMessage());
+            logNonFatal("initViews", e);
         }
     }
 
@@ -269,7 +274,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 tvLocation.setText("📍 " + branchesManager.getActiveBranchDisplayName());
             }
         } catch (Exception e) {
-            Log.e(TAG, "updateHeader error: " + e.getMessage());
+            logNonFatal("updateHeader", e);
         }
     }
 
@@ -297,11 +302,11 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                         }
                     });
                 } catch (Exception e) {
-                    Log.e(TAG, "setupQuickAccessGrid inner error: " + e.getMessage());
+                    logNonFatal("setupQuickAccessGrid.inner", e);
                 }
             });
         } catch (Exception e) {
-            Log.e(TAG, "setupQuickAccessGrid error: " + e.getMessage());
+            logNonFatal("setupQuickAccessGrid", e);
         }
     }
 
@@ -309,7 +314,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         try {
             long now = System.currentTimeMillis();
 
-            // ✅ Always fetch data on first load or when cache is invalid
             if (!isDataLoaded || (now - lastDataFetchTime) > CACHE_VALIDITY_MS || CACHE_VALIDITY_MS == 0) {
                 fetchData();
             }
@@ -327,7 +331,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 lastPingTime = now;
             }
         } catch (Exception e) {
-            Log.e(TAG, "loadDataIfNeeded error: " + e.getMessage());
+            logNonFatal("loadDataIfNeeded", e);
         }
     }
 
@@ -344,21 +348,26 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                             if (!isAdded()) return;
                             tvLiveStatus.setText(isOnline ? (isArabic ? "🟢 متصل" : "🟢 Online") : (isArabic ? "🔴 غير متصل" : "🔴 Offline"));
                             tvLiveStatus.setTextColor(isOnline ? 0xFF16A34A : 0xFFDC2626);
-                        } catch (Exception e) {}
+                        } catch (Exception e) {
+                            logNonFatal("updateLiveStatus.post", e);
+                        }
                     });
                 } catch (Exception e) {
+                    logNonFatal("updateLiveStatus.thread", e);
                     mainHandler.post(() -> {
                         try {
                             if (isAdded()) {
                                 tvLiveStatus.setText(isArabic ? "🔴 غير متصل" : "🔴 Offline");
                                 tvLiveStatus.setTextColor(0xFFDC2626);
                             }
-                        } catch (Exception e2) {}
+                        } catch (Exception e2) {
+                            logNonFatal("updateLiveStatus.post.error", e2);
+                        }
                     });
                 }
             });
         } catch (Exception e) {
-            Log.e(TAG, "updateLiveStatus error: " + e.getMessage());
+            logNonFatal("updateLiveStatus", e);
         }
     }
 
@@ -410,18 +419,23 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                             } else {
                                 displayGoldPricesFromCache();
                             }
-                        } catch (Exception e) {}
+                        } catch (Exception e) {
+                            logNonFatal("fetchLiveGoldPrices.post", e);
+                        }
                     });
                 } catch (Exception e) {
+                    logNonFatal("fetchLiveGoldPrices.thread", e);
                     mainHandler.post(() -> {
                         try {
                             if (isAdded()) displayGoldPricesFromCache();
-                        } catch (Exception e2) {}
+                        } catch (Exception e2) {
+                            logNonFatal("fetchLiveGoldPrices.post.error", e2);
+                        }
                     });
                 }
             });
         } catch (Exception e) {
-            Log.e(TAG, "fetchLiveGoldPrices error: " + e.getMessage());
+            logNonFatal("fetchLiveGoldPrices", e);
         }
     }
 
@@ -443,6 +457,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             
             return new GoldPriceData(price24, price21, price18, ouncePrice, source);
         } catch (Exception e) {
+            logNonFatal("parseGoldPriceData", e);
             return null;
         }
     }
@@ -473,7 +488,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 goldCachePrefs.edit().putLong("last_gold_fetch_time", System.currentTimeMillis()).apply();
             }
         } catch (Exception e) {
-            Log.e(TAG, "displayGoldPrices error: " + e.getMessage());
+            logNonFatal("displayGoldPrices", e);
         }
     }
 
@@ -518,7 +533,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "displayGoldPricesFromCache error: " + e.getMessage());
+            logNonFatal("displayGoldPricesFromCache", e);
         }
     }
 
@@ -551,7 +566,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 offlineCache.edit().putFloat("gold_price_24k_prev", (float) currentPrice).apply();
             }
         } catch (Exception e) {
-            Log.e(TAG, "calculateTrend error: " + e.getMessage());
+            logNonFatal("calculateTrend", e);
         }
     }
 
@@ -577,7 +592,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 displayGoldPricesFromCache();
             }
         } catch (Exception e) {
-            Log.e(TAG, "loadOfflineData error: " + e.getMessage());
+            logNonFatal("loadOfflineData", e);
         }
     }
 
@@ -600,134 +615,240 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                         .putLong("last_update", System.currentTimeMillis())
                         .apply();
                 } catch (Exception e) {
-                    Log.e(TAG, "saveOfflineData inner error: " + e.getMessage());
+                    logNonFatal("saveOfflineData.inner", e);
                 }
             });
         } catch (Exception e) {
-            Log.e(TAG, "saveOfflineData error: " + e.getMessage());
+            logNonFatal("saveOfflineData", e);
         }
     }
 
     /**
-     * ✅ جلب البيانات مع حماية من التحميل المتكرر
+     * ✅ جلب البيانات مع تسجيل الأخطاء في Crashlytics
      */
-    private void fetchData() {
-        try {
-            if (isLoading.get() || apiClient == null || !isAdded()) return;
-            
-            // ✅ منع التحميل المتكرر خلال 2 ثانية
-            long now = System.currentTimeMillis();
-            if (now - lastDataFetchTime < 2000 && isDataLoaded) {
-                return;
-            }
-            
-            isLoading.set(true);
-            
-            if (tvLiveStatus != null) {
-                tvLiveStatus.setText(isArabic ? "جاري التحديث..." : "Updating...");
-                tvLiveStatus.setTextColor(0xFFF59E0B);
-            }
-            
-            cancelFuture(dataFuture);
-            final int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-            
-            dataFuture = sharedExecutor.submit(() -> {
-                try {
-                    MiraApiClient.ApiResponse response = apiClient.getDashboardFull(activeBranchId);
-                    mainHandler.post(() -> {
-                        try {
-                            isLoading.set(false);
-                            lastDataFetchTime = System.currentTimeMillis();
-                            if (!isAdded()) return;
+    /**
+ * ✅ جلب البيانات مع تسجيل مفصل في Crashlytics
+ */
+private void fetchData() {
+    try {
+        if (isLoading.get() || apiClient == null || !isAdded()) return;
+        
+        long now = System.currentTimeMillis();
+        if (now - lastDataFetchTime < 2000 && isDataLoaded) {
+            return;
+        }
+        
+        isLoading.set(true);
+        
+        if (tvLiveStatus != null) {
+            tvLiveStatus.setText(isArabic ? "جاري التحديث..." : "Updating...");
+            tvLiveStatus.setTextColor(0xFFF59E0B);
+        }
+        
+        cancelFuture(dataFuture);
+        final int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+        
+        dataFuture = sharedExecutor.submit(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getDashboardFull(activeBranchId);
+                mainHandler.post(() -> {
+                    try {
+                        isLoading.set(false);
+                        lastDataFetchTime = System.currentTimeMillis();
+                        if (!isAdded()) return;
+                        
+                        if (response != null && response.isSuccess && response.data != null) {
+                            // ✅ نجاح - إعادة تعيين العداد
+                            saveOfflineData(response.data);
+                            processData(response.data);
+                            isDataLoaded = true;
+                            consecutiveFailures = 0;
                             
-                            if (response != null && response.isSuccess && response.data != null) {
-                                saveOfflineData(response.data);
-                                processData(response.data);
-                                isDataLoaded = true;
-                            } else {
-                                // ✅ Fallback: try fetching inventory directly
-                                fetchInventoryDataDirectly(activeBranchId);
+                            // ✅ إزالة Custom Keys عند النجاح
+                            clearCrashlyticsCustomKeys();
+                        } else {
+                            // ✅✅✅ تسجيل مفصل مع Custom Keys
+                            FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
+                            crashlytics.setCustomKey("api_response_code", response != null ? response.code : -1);
+                            crashlytics.setCustomKey("active_branch_id", activeBranchId);
+                            crashlytics.setCustomKey("api_endpoint", "/dashboard/full");
+                            crashlytics.setCustomKey("error_type", "api_error");
+                            
+                            if (response != null && response.error != null) {
+                                crashlytics.setCustomKey("api_error_message", response.error);
                             }
-                            showShimmer(false);
-                            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                        } catch (Exception e) {}
-                    });
-                } catch (Exception e) {
-                    mainHandler.post(() -> {
-                        try {
-                            isLoading.set(false);
-                            if (!isAdded()) return;
-                            loadOfflineData();
-                            showShimmer(false);
-                            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                        } catch (Exception e2) {}
-                    });
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "fetchData error: " + e.getMessage());
-            isLoading.set(false);
-        }
-    }
-
-    /**
-     * ✅ جلب بيانات المخزون مباشرة إذا فشل الداشبورد الكامل
-     */
-    private void fetchInventoryDataDirectly(int branchId) {
-        try {
-            if (apiClient == null || branchId <= 0) {
-                loadOfflineData();
-                return;
+                            
+                            logNonFatal("fetchData.response", new Exception(
+                                "Dashboard API Failed - code=" + (response != null ? response.code : -1) + 
+                                ", error=" + (response != null ? response.error : "null response") +
+                                ", branch_id=" + activeBranchId
+                            ));
+                            
+                            fetchInventoryDataDirectly(activeBranchId);
+                        }
+                        showShimmer(false);
+                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                    } catch (Exception e) {
+                        logNonFatal("fetchData.post", e);
+                    }
+                });
+            } catch (Exception e) {
+                // ✅✅✅ استثناء في الـ Thread - تسجيل مفصل
+                FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
+                crashlytics.setCustomKey("active_branch_id", activeBranchId);
+                crashlytics.setCustomKey("api_endpoint", "/dashboard/full");
+                crashlytics.setCustomKey("error_type", "thread_exception");
+                crashlytics.setCustomKey("exception_class", e.getClass().getSimpleName());
+                
+                logNonFatal("fetchData.thread", e);
+                
+                mainHandler.post(() -> {
+                    try {
+                        isLoading.set(false);
+                        if (!isAdded()) return;
+                        
+                        consecutiveFailures++;
+                        
+                        loadOfflineData();
+                        showShimmer(false);
+                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                        
+                        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                            Toast.makeText(getContext(), 
+                                isArabic ? "تعذر تحديث البيانات من السيرفر" : "Could not update data from server", 
+                                Toast.LENGTH_SHORT).show();
+                            consecutiveFailures = 0;
+                        }
+                    } catch (Exception e2) {
+                        logNonFatal("fetchData.post.error", e2);
+                    }
+                });
             }
-            
-            sharedExecutor.execute(() -> {
-                try {
-                    MiraApiClient.ApiResponse response = apiClient.getBranchInventory(branchId);
-                    mainHandler.post(() -> {
-                        try {
-                            if (response != null && response.isSuccess && response.data != null) {
-                                int totalItems = response.data.optInt("total", 0);
-                                double totalWeight = 0;
-                                
-                                if (response.data.has("items")) {
-                                    org.json.JSONArray items = response.data.optJSONArray("items");
-                                    if (items != null) {
-                                        for (int i = 0; i < items.length(); i++) {
-                                            JSONObject item = items.optJSONObject(i);
-                                            if (item != null) {
-                                                totalWeight += item.optDouble("gross_weight_grams", 0);
-                                            }
+        });
+    } catch (Exception e) {
+        logNonFatal("fetchData", e);
+        isLoading.set(false);
+    }
+}
+
+/**
+ * ✅ جلب بيانات المخزون مباشرة - مع تسجيل مفصل
+ */
+private void fetchInventoryDataDirectly(int branchId) {
+    try {
+        if (apiClient == null || branchId <= 0) {
+            loadOfflineData();
+            return;
+        }
+        
+        sharedExecutor.execute(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getBranchInventory(branchId);
+                mainHandler.post(() -> {
+                    try {
+                        if (response != null && response.isSuccess && response.data != null) {
+                            int totalItems = response.data.optInt("total", 0);
+                            double totalWeight = 0;
+                            
+                            if (response.data.has("items")) {
+                                org.json.JSONArray items = response.data.optJSONArray("items");
+                                if (items != null) {
+                                    for (int i = 0; i < items.length(); i++) {
+                                        JSONObject item = items.optJSONObject(i);
+                                        if (item != null) {
+                                            totalWeight += item.optDouble("gross_weight_grams", 0);
                                         }
                                     }
                                 }
-                                
-                                setText(tvTotalItems, String.valueOf(totalItems));
-                                setText(tvTotalWeight, formatWeight(totalWeight));
-                                
-                                if (offlineCache != null) {
-                                    offlineCache.edit()
-                                        .putInt("total_items", totalItems)
-                                        .putFloat("total_weight", (float) totalWeight)
-                                        .putLong("last_update", System.currentTimeMillis())
-                                        .apply();
-                                }
-                            } else {
-                                loadOfflineData();
                             }
-                        } catch (Exception e) {
+                            
+                            setText(tvTotalItems, String.valueOf(totalItems));
+                            setText(tvTotalWeight, formatWeight(totalWeight));
+                            
+                            if (offlineCache != null) {
+                                offlineCache.edit()
+                                    .putInt("total_items", totalItems)
+                                    .putFloat("total_weight", (float) totalWeight)
+                                    .putLong("last_update", System.currentTimeMillis())
+                                    .apply();
+                            }
+                            
+                            // ✅ نجاح - إزالة Custom Keys
+                            clearCrashlyticsCustomKeys();
+                        } else {
+                            // ✅✅✅ تسجيل مفصل للفشل
+                            FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
+                            crashlytics.setCustomKey("api_response_code", response != null ? response.code : -1);
+                            crashlytics.setCustomKey("active_branch_id", branchId);
+                            crashlytics.setCustomKey("api_endpoint", "/branches/" + branchId + "/inventory");
+                            crashlytics.setCustomKey("error_type", "fallback_api_error");
+                            
+                            logNonFatal("fetchInventoryDataDirectly.response", new Exception(
+                                "Inventory API Failed - code=" + (response != null ? response.code : -1) + 
+                                ", error=" + (response != null ? response.error : "null response") +
+                                ", branch_id=" + branchId
+                            ));
+                            
                             loadOfflineData();
                         }
-                    });
-                } catch (Exception e) {
-                    mainHandler.post(() -> loadOfflineData());
-                }
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "fetchInventoryDataDirectly error: " + e.getMessage());
-            loadOfflineData();
-        }
+                    } catch (Exception e) {
+                        logNonFatal("fetchInventoryDataDirectly.post", e);
+                        loadOfflineData();
+                    }
+                });
+            } catch (Exception e) {
+                FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
+                crashlytics.setCustomKey("active_branch_id", branchId);
+                crashlytics.setCustomKey("api_endpoint", "/branches/" + branchId + "/inventory");
+                crashlytics.setCustomKey("error_type", "fallback_thread_exception");
+                
+                logNonFatal("fetchInventoryDataDirectly.thread", e);
+                mainHandler.post(() -> loadOfflineData());
+            }
+        });
+    } catch (Exception e) {
+        logNonFatal("fetchInventoryDataDirectly", e);
+        loadOfflineData();
     }
+}
 
+/**
+ * ✅ إزالة Custom Keys عند النجاح
+ */
+private void clearCrashlyticsCustomKeys() {
+    try {
+        FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
+        crashlytics.setCustomKey("api_response_code", 0);
+        crashlytics.setCustomKey("active_branch_id", 0);
+        crashlytics.setCustomKey("api_endpoint", "");
+        crashlytics.setCustomKey("error_type", "");
+        crashlytics.setCustomKey("api_error_message", "");
+        crashlytics.setCustomKey("exception_class", "");
+    } catch (Exception e) {
+        Log.e(TAG, "clearCrashlyticsCustomKeys error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅✅✅ تسجيل الأخطاء غير القاتلة في Firebase Crashlytics
+ */
+private void logNonFatal(String location, Throwable throwable) {
+    try {
+        Log.e(TAG, location + ": " + throwable.getMessage(), throwable);
+        
+        FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
+        
+        // ✅ إضافة موقع الخطأ
+        crashlytics.setCustomKey("error_location", location);
+        crashlytics.setCustomKey("fragment", "MiraDashboardFragment");
+        
+        // ✅ تسجيل الاستثناء
+        crashlytics.recordException(throwable);
+        crashlytics.log(location + ": " + throwable.getMessage());
+    } catch (Exception e) {
+        Log.e(TAG, "logNonFatal error: " + e.getMessage());
+    }
+}
     private void processData(JSONObject data) {
         try {
             JSONObject inv = data.optJSONObject("inventory");
@@ -744,7 +865,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 setText(tvSalesYear, formatCurrency(sales.optDouble("year", 0.0)));
             }
         } catch (Exception e) {
-            Log.e(TAG, "processData error: " + e.getMessage());
+            logNonFatal("processData", e);
         }
     }
 
@@ -754,7 +875,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             profileListener = () -> mainHandler.post(this::updateHeader);
             orgProfile.addListener(profileListener);
         } catch (Exception e) {
-            Log.e(TAG, "setupProfileListener error: " + e.getMessage());
+            logNonFatal("setupProfileListener", e);
         }
     }
 
@@ -776,7 +897,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "setupListeners error: " + e.getMessage());
+            logNonFatal("setupListeners", e);
         }
     }
 
@@ -787,14 +908,13 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         try {
             if (!isAdded()) return;
             
-            // ✅ إعادة تعيين حالة التحميل
             isDataLoaded = false;
             lastDataFetchTime = 0;
             
             fetchData();
             displayGoldPricesFromCache();
         } catch (Exception e) {
-            Log.e(TAG, "refreshInternalData error: " + e.getMessage());
+            logNonFatal("refreshInternalData", e);
         }
     }
 
@@ -814,7 +934,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "refreshAllData error: " + e.getMessage());
+            logNonFatal("refreshAllData", e);
         }
     }
 
@@ -822,7 +942,9 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         try {
             if (shimmerLayout != null) shimmerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
             if (swipeRefresh != null) swipeRefresh.setVisibility(show ? View.GONE : View.VISIBLE);
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            logNonFatal("showShimmer", e);
+        }
     }
 
     private void initBranchCache(int branchId) {
@@ -831,21 +953,15 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 offlineCache = requireContext().getSharedPreferences(OFFLINE_PREFS_BASE + branchId, Context.MODE_PRIVATE);
             }
         } catch (Exception e) {
-            Log.e(TAG, "initBranchCache error: " + e.getMessage());
+            logNonFatal("initBranchCache", e);
         }
     }
 
-    /**
-     * ✅ بدء التحديث التلقائي
-     */
     private void startAutoRefresh() {
         mainHandler.removeCallbacks(autoRefreshRunnable);
         mainHandler.postDelayed(autoRefreshRunnable, REFRESH_INTERVAL_MS);
     }
 
-    /**
-     * ✅ إيقاف التحديث التلقائي
-     */
     private void stopAutoRefresh() {
         mainHandler.removeCallbacks(autoRefreshRunnable);
     }
@@ -856,7 +972,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 ((UHFMainActivity) getActivity()).loadFragment(fragment, tag);
             }
         } catch (Exception e) {
-            Log.e(TAG, "navigateToFragment error: " + e.getMessage());
+            logNonFatal("navigateToFragment", e);
         }
     }
 
@@ -892,7 +1008,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "handleQuickAction error: " + e.getMessage());
+            logNonFatal("handleQuickAction", e);
         }
     }
 
@@ -958,13 +1074,17 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         try {
             if (tv == null) return;
             tv.setText(price > 0 ? String.format(Locale.US, "%s: $%,.2f/g", label, price) : label + ": —");
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            logNonFatal("setGoldPrice", e);
+        }
     }
 
     private void setText(TextView tv, String text) {
         try {
             if (tv != null) tv.setText(text);
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            logNonFatal("setText", e);
+        }
     }
 
     public void onBranchChanged() {
@@ -981,7 +1101,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 fetchData();
             }
         } catch (Exception e) {
-            Log.e(TAG, "onBranchChanged error: " + e.getMessage());
+            logNonFatal("onBranchChanged", e);
         }
     }
 
@@ -1002,7 +1122,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 setupQuickAccessGrid();
                 updateHeader();
                 
-                // ✅ Always refresh data on resume
                 refreshInternalData();
                 
                 long now = System.currentTimeMillis();
@@ -1016,7 +1135,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             
             startAutoRefresh();
         } catch (Exception e) {
-            Log.e(TAG, "onResume error: " + e.getMessage());
+            logNonFatal("onResume", e);
         }
     }
 
@@ -1029,7 +1148,9 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             if (branchPrefs != null) {
                 branchPrefs.unregisterOnSharedPreferenceChangeListener(this);
             }
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            logNonFatal("onPause", e);
+        }
     }
 
     @Override
@@ -1038,7 +1159,9 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             if ("active_branch_id".equals(key) || "active_branch".equals(key)) {
                 mainHandler.post(this::onBranchChanged);
             }
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            logNonFatal("onSharedPreferenceChanged", e);
+        }
     }
 
     @Override
@@ -1048,7 +1171,9 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             if (rvQuickActions != null) {
                 rvQuickActions.setItemViewCacheSize(0);
             }
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            logNonFatal("onLowMemory", e);
+        }
     }
 
     @Override
@@ -1068,7 +1193,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             mainHandler.removeCallbacksAndMessages(null);
             isViewInitialized = false;
         } catch (Exception e) {
-            Log.e(TAG, "onDestroyView error: " + e.getMessage());
+            logNonFatal("onDestroyView", e);
         }
     }
 
@@ -1077,6 +1202,8 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             if (future != null && !future.isDone()) {
                 future.cancel(true);
             }
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            logNonFatal("cancelFuture", e);
+        }
     }
-}
+            }
