@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "883043293926",
+    "project_id": "mira-id",
+    "storage_bucket": "mira-id.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:883043293926:android:6c289afd552a795599f927",
+        "android_client_info": {
+          "package_name": "com.example.uhf"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5oX2PPdUi3q-t_1srAh5qb5POIrMqtCM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:883043293926:android:fb001d39a053197599f927",
+        "android_client_info": {
+          "package_name": "com.mira.jewelry.enterprise"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5oX2PPdUi3q-t_1srAh5qb5POIrMqtCM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
