@@ -161,7 +161,26 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Error updating app title: " + e.getMessage());
         }
     }
-
+private void updateToolbarTitle() {
+    try {
+        if (getSupportActionBar() != null) {
+            String orgName = "MIRA";
+            if (orgProfileManager != null) {
+                String name = orgProfileManager.getDisplayName();
+                if (name != null && !name.trim().isEmpty()) {
+                    orgName = name;
+                }
+            }
+            getSupportActionBar().setTitle(orgName);
+            
+            if (branchesManager != null && branchesManager.hasActiveBranch()) {
+                getSupportActionBar().setSubtitle("📍 " + branchesManager.getActiveBranchDisplayName());
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Toolbar Update Error: " + e.getMessage());
+    }
+}
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         try {
@@ -1126,4 +1145,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
     }
-}
+                }
