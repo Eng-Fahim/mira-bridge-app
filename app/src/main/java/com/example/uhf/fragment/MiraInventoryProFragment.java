@@ -1529,15 +1529,18 @@ public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
                     
                     String normalizedEpc = normalizeCodeToEpc(primaryEpc);
                     
-                    // ✅ إنشاء InventoryItem مع جميع البيانات
+                    // ✅✅✅ استخدام الـ Constructor الصحيح مع karat
                     InventoryItem item = new InventoryItem(
-                        normalizedEpc,
-                        title,
-                        karat,
-                        "✓"
+                        normalizedEpc,        // epc
+                        gtin13,               // gtin
+                        serialNumber,         // serial
+                        title,                // title
+                        karat                 // karat ✅
                     );
-                    item.setWeight(weight); // ✅ إذا كان InventoryItem يدعم weight
-                    item.setPrice(price);   // ✅ إذا كان InventoryItem يدعم price
+                    
+                    // ✅✅✅ استخدام setters للوزن والسعر
+                    item.setWeight(weight);
+                    item.setPrice(price);
                     
                     catalog.put(normalizedEpc, item);
                     
@@ -2823,4 +2826,4 @@ public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
             this.status = status;
         }
     }
-                }
+                        }
