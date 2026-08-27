@@ -2,7 +2,8 @@ package com.example.uhf.manager;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-
+import android.os.Handler;
+import android.os.Looper;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
@@ -14,6 +15,8 @@ import java.util.List;
 public class MiraOrgProfileManager {
 
     private static final String PREFS_NAME = "MIRA_ORG_PROFILE";
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
     private static MiraOrgProfileManager instance;
     private final SharedPreferences prefs;
     private final Context context;
@@ -52,12 +55,28 @@ public class MiraOrgProfileManager {
 
     // ✅ إشعار جميع المستمعين
     private void notifyListeners() {
-        for (OnProfileChangedListener listener : listeners) {
-            if (listener != null) {
+    // ✅✅✅ ضمان التنفيذ على Main Thread
+    if (Looper.myLooper() != Looper.getMainLooper()) {
+        mainHandler.post(this::notifyListeners);
+        return;
+    }
+    
+    // ✅ نسخة آمنة من القائمة
+    List<OnProfileChangedListener> listenersCopy;
+    synchronized (listeners) {
+        listenersCopy = new ArrayList<>(listeners);
+    }
+    
+    for (OnProfileChangedListener listener : listenersCopy) {
+        if (listener != null) {
+            try {
                 listener.onProfileChanged();
+            } catch (Exception e) {
+                // تجاهل أخطاء المستمعين
             }
         }
     }
+}
 
     // ==================== Getters ====================
 
