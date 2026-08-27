@@ -759,16 +759,23 @@ public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod, 
     // ===================== 🚪 GATES =====================
 
     public ApiResponse createGate(JSONObject gateData) {
-        return postWithAuth("/gates", gateData);
-    }
+    return postWithAuth("/gates", gateData);
+}
 
-    public ApiResponse getGates() {
-        return getWithAuth("/gates");
-    }
+public ApiResponse getGates() {
+    return getWithAuth("/gates");
+}
 
-    public ApiResponse getGatesStats() {
-        return get("/gates/stats");
-    }
+/**
+ * ✅✅✅ جلب بوابات فرع محدد - دالة جديدة
+ */
+public ApiResponse getGatesByBranch(int branchId) {
+    return getWithAuth("/gates?branch_id=" + branchId);
+}
+
+public ApiResponse getGatesStats() {
+    return get("/gates/stats");
+}
 
     // ===================== 💓 HEARTBEAT & SETTINGS =====================
 
