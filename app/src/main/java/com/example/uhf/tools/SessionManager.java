@@ -27,7 +27,10 @@ public class SessionManager {
     private static final String KEY_API_KEY_ID = "apiKeyId";
     private static final String KEY_API_KEY_PREFIX = "apiKeyPrefix";
     private static final String KEY_API_KEY_CREATED_AT = "apiKeyCreatedAt";
-    private static final String KEY_GATE_ID = "gate_id"; // ✅ ثابت جديد
+    private static final String KEY_GATE_ID = "gate_id";
+    
+    // ✅ إضافة متغير لتذكر اسم المستخدم
+    private static final String KEY_LAST_USERNAME = "lastUsername";
 
     public enum Role {
         SYSTEM_ADMIN,
@@ -60,9 +63,6 @@ public class SessionManager {
 
     // ==================== API Key ====================
     
-    /**
-     * حفظ مفتاح API
-     */
     public void saveApiKey(String apiKey) {
         if (apiKey != null && !apiKey.isEmpty()) {
             editor.putString(KEY_API_KEY, apiKey);
@@ -70,38 +70,23 @@ public class SessionManager {
         }
     }
     
-    /**
-     * استرجاع مفتاح API المحفوظ
-     */
     public String getApiKey() {
         return pref.getString(KEY_API_KEY, "");
     }
     
-    /**
-     * التحقق من وجود مفتاح API
-     */
     public boolean hasApiKey() {
         String apiKey = getApiKey();
         return !apiKey.isEmpty();
     }
     
-    /**
-     * ✅ حفظ gate_id
-     */
     public void saveGateId(String gateId) {
-        pref.edit().putString(KEY_GATE_ID, gateId).apply(); // ✅ pref
+        pref.edit().putString(KEY_GATE_ID, gateId).apply();
     }
 
-    /**
-     * ✅ الحصول على gate_id
-     */
     public String getGateId() {
-        return pref.getString(KEY_GATE_ID, ""); // ✅ pref
+        return pref.getString(KEY_GATE_ID, "");
     }
     
-    /**
-     * حفظ معلومات مفتاح API الكاملة
-     */
     public void saveApiKeyInfo(String apiKey, String keyId, String keyPrefix, String createdAt) {
         editor.putString(KEY_API_KEY, apiKey);
         editor.putString(KEY_API_KEY_ID, keyId);
@@ -110,29 +95,47 @@ public class SessionManager {
         editor.apply();
     }
     
-    /**
-     * استرجاع معرف مفتاح API
-     */
     public String getApiKeyId() {
         return pref.getString(KEY_API_KEY_ID, "");
     }
     
-    /**
-     * استرجاع بادئة مفتاح API
-     */
     public String getApiKeyPrefix() {
         return pref.getString(KEY_API_KEY_PREFIX, "");
     }
     
-    /**
-     * حذف مفتاح API
-     */
     public void clearApiKey() {
         editor.remove(KEY_API_KEY);
         editor.remove(KEY_API_KEY_ID);
         editor.remove(KEY_API_KEY_PREFIX);
         editor.remove(KEY_API_KEY_CREATED_AT);
         editor.remove(KEY_GATE_ID);
+        editor.apply();
+    }
+
+    // ==================== تذكر اسم المستخدم ====================
+    
+    /**
+     * حفظ آخر اسم مستخدم تم تسجيل الدخول به بنجاح
+     */
+    public void saveLastUsername(String username) {
+        if (username != null && !username.isEmpty()) {
+            editor.putString(KEY_LAST_USERNAME, username);
+            editor.apply();
+        }
+    }
+    
+    /**
+     * استرجاع آخر اسم مستخدم تم استخدامه
+     */
+    public String getLastUsername() {
+        return pref.getString(KEY_LAST_USERNAME, "");
+    }
+    
+    /**
+     * مسح اسم المستخدم المحفوظ
+     */
+    public void clearLastUsername() {
+        editor.remove(KEY_LAST_USERNAME);
         editor.apply();
     }
 
@@ -259,9 +262,10 @@ public class SessionManager {
         int lastBranchId = pref.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, 1);
         String lastBranchName = pref.getString(KEY_LAST_BIOMETRIC_BRANCH_NAME, "");
         
-        // ✅ حفظ API Key و Gate ID قبل المسح
+        // حفظ API Key و Gate ID قبل المسح
         String apiKey = pref.getString(KEY_API_KEY, "");
         String gateId = pref.getString(KEY_GATE_ID, "");
+        String lastUsername = pref.getString(KEY_LAST_USERNAME, "");
 
         editor.clear();
 
@@ -276,12 +280,17 @@ public class SessionManager {
             editor.putString(KEY_LAST_BIOMETRIC_BRANCH_NAME, lastBranchName);
         }
         
-        // ✅ الاحتفاظ بـ API Key و Gate ID
+        // الاحتفاظ بـ API Key و Gate ID
         if (!apiKey.isEmpty()) {
             editor.putString(KEY_API_KEY, apiKey);
         }
         if (!gateId.isEmpty()) {
             editor.putString(KEY_GATE_ID, gateId);
+        }
+        
+        // الاحتفاظ بآخر اسم مستخدم
+        if (!lastUsername.isEmpty()) {
+            editor.putString(KEY_LAST_USERNAME, lastUsername);
         }
 
         editor.apply();
