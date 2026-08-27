@@ -319,10 +319,10 @@ private void applyToolbarMenuPermissions(Menu menu, PermissionManager pm) {
     }
     
     // 4. الفروع - للمدراء فقط
-    MenuItem actionBranches = menu.findItem(R.id.action_branches);
-    if (actionBranches != null) {
-        actionBranches.setVisible(pm.isManager());
-    }
+MenuItem actionBranches = menu.findItem(R.id.action_branches);
+if (actionBranches != null) {
+    actionBranches.setVisible(pm.isManager() || pm.isAdmin() || pm.isBranchManager());
+}
     
     // 5. الملف الشخصي - متاح للجميع
     MenuItem actionProfile = menu.findItem(R.id.action_profile);
@@ -350,35 +350,38 @@ private void applyToolbarMenuPermissions(Menu menu, PermissionManager pm) {
 }
 
     @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        int id = item.getItemId();
+public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+    int id = item.getItemId();
 
-        if (id == R.id.action_dashboard) {
-            checkInventoryLockAndExecute(() -> {
-                clearBackStack();
-                loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-            });
-            return true;
-        } else if (id == R.id.action_gold_rates) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraGoldCurrencyFragment(), "GoldRates"));
-            return true;
-        } else if (id == R.id.action_quick_access_settings) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
-            return true;
-        } else if (id == R.id.action_toggle_language) {
-            toggleLanguage();
-            return true;
-        } else if (id == R.id.action_profile) {
-            checkInventoryLockAndExecute(() -> loadFragment(new MiraProfileFragment(), "Profile"));
-            return true;
-        } else if (id == R.id.action_logout) {
-            confirmLogout();
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
+    if (id == R.id.action_dashboard) {
+        checkInventoryLockAndExecute(() -> {
+            clearBackStack();
+            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+        });
+        return true;
+    } else if (id == R.id.action_branches) {
+        // ✅✅✅ إضافة معالج الفروع
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraBranchesFragment(), "Branches"));
+        return true;
+    } else if (id == R.id.action_gold_rates) {
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraGoldCurrencyFragment(), "GoldRates"));
+        return true;
+    } else if (id == R.id.action_quick_access_settings) {
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
+        return true;
+    } else if (id == R.id.action_toggle_language) {
+        toggleLanguage();
+        return true;
+    } else if (id == R.id.action_profile) {
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraProfileFragment(), "Profile"));
+        return true;
+    } else if (id == R.id.action_logout) {
+        confirmLogout();
+        return true;
     }
 
+    return super.onOptionsItemSelected(item);
+}
     private void toggleLanguage() {
         try {
             String newLang = isArabic ? "en" : "ar";
@@ -686,31 +689,32 @@ private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dia
 }
 
     private Fragment createFragmentByTag(String tag) {
-        if (tag == null) return new MiraDashboardFragment();
-        
-        switch (tag) {
-            case "Dashboard": return new MiraDashboardFragment();
-            case "Scan": return new MiraInventoryProFragment();
-            case "POS": return new MiraPosFragment();
-            case "Transfers": return new MiraTransferFragment();
-            case "IdentityStudio": return new MiraIdentityStudioFragment();
-            case "Radar": return new MiraUHFRadarLocationFragment();
-            case "SecureGate": return new MiraSecureGateFragment();
-            case "Reports": return new MiraReportsProFragment();
-            case "Accounting": return new MiraAccountingFragment();
-            case "AdminHub": return new MiraAdminHubFragment();
-            case "SalesHistory": return new MiraSalesHistoryFragment();
-            case "ServerConfig": return new MiraServerConfigFragment();
-            case "GoldRates": return new MiraGoldCurrencyFragment();
-            case "Profile": return new MiraProfileFragment();
-            case "UsersManagement": return new UsersManagementFragment();
-            case "RFIDWrite": return new MiraUHFReadWriteFragment();
-            case "ReaderSetup": return new MiraReaderSetupFragment();
-            case "GateSettings": return new MiraGateSettingsFragment();
-            case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
-            default: return new MiraDashboardFragment();
-        }
+    if (tag == null) return new MiraDashboardFragment();
+    
+    switch (tag) {
+        case "Dashboard": return new MiraDashboardFragment();
+        case "Branches": return new MiraBranchesFragment(); // ✅✅✅ إضافة
+        case "Scan": return new MiraInventoryProFragment();
+        case "POS": return new MiraPosFragment();
+        case "Transfers": return new MiraTransferFragment();
+        case "IdentityStudio": return new MiraIdentityStudioFragment();
+        case "Radar": return new MiraUHFRadarLocationFragment();
+        case "SecureGate": return new MiraSecureGateFragment();
+        case "Reports": return new MiraReportsProFragment();
+        case "Accounting": return new MiraAccountingFragment();
+        case "AdminHub": return new MiraAdminHubFragment();
+        case "SalesHistory": return new MiraSalesHistoryFragment();
+        case "ServerConfig": return new MiraServerConfigFragment();
+        case "GoldRates": return new MiraGoldCurrencyFragment();
+        case "Profile": return new MiraProfileFragment();
+        case "UsersManagement": return new UsersManagementFragment();
+        case "RFIDWrite": return new MiraUHFReadWriteFragment();
+        case "ReaderSetup": return new MiraReaderSetupFragment();
+        case "GateSettings": return new MiraGateSettingsFragment();
+        case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
+        default: return new MiraDashboardFragment();
     }
+}
 
     private Fragment getTopFragment() {
         if (fragmentManager != null && fragmentManager.getBackStackEntryCount() > 0) {
@@ -1173,4 +1177,4 @@ private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dia
             }
         }
     }
-}
+        }
