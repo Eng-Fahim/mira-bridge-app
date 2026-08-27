@@ -1,47 +1,110 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:padding="24dp"
+    android:background="?attr/colorSurface">
 
-    <EditText
-        android:id="@+id/etFilterSearch"
+    <!-- العنوان -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🔍 فلترة متقدمة"
+        android:textColor="?attr/colorOnSurface"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="20dp" />
+
+    <!-- البحث العام -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilFilterSearch"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="بحث عام"
-        android:inputType="text"
-        android:padding="12dp" />
+        app:boxCornerRadiusBottomEnd="12dp"
+        app:boxCornerRadiusBottomStart="12dp"
+        app:boxCornerRadiusTopEnd="12dp"
+        app:boxCornerRadiusTopStart="12dp"
+        app:boxStrokeColor="?attr/colorPrimary"
+        app:startIconDrawable="@drawable/ic_search">
 
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etFilterSearch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text"
+            android:textSize="14sp"
+            android:padding="12dp" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- فلتر 1 -->
     <TextView
         android:id="@+id/tvFilter1Label"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="20dp"
         android:text="فلتر 1"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="13sp"
         android:textStyle="bold" />
 
-    <EditText
-        android:id="@+id/etFilter1"
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilFilter1"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:hint="قيمة الفلتر"
-        android:inputType="text"
-        android:padding="12dp" />
+        app:boxCornerRadiusBottomEnd="12dp"
+        app:boxCornerRadiusBottomStart="12dp"
+        app:boxCornerRadiusTopEnd="12dp"
+        app:boxCornerRadiusTopStart="12dp"
+        app:boxStrokeColor="?attr/colorPrimary">
 
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etFilter1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text"
+            android:textSize="14sp"
+            android:padding="12dp" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- فلتر 2 -->
     <TextView
         android:id="@+id/tvFilter2Label"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="20dp"
         android:text="فلتر 2"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textSize="13sp"
         android:textStyle="bold" />
 
-    <EditText
-        android:id="@+id/etFilter2"
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilFilter2"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:hint="قيمة الفلتر"
-        android:inputType="text"
-        android:padding="12dp" />
+        app:boxCornerRadiusBottomEnd="12dp"
+        app:boxCornerRadiusBottomStart="12dp"
+        app:boxCornerRadiusTopEnd="12dp"
+        app:boxCornerRadiusTopStart="12dp"
+        app:boxStrokeColor="?attr/colorPrimary">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etFilter2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text"
+            android:textSize="14sp"
+            android:padding="12dp" />
+    </com.google.android.material.textfield.TextInputLayout>
+
 </LinearLayout>
