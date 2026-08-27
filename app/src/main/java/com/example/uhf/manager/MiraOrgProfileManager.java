@@ -34,49 +34,48 @@ public class MiraOrgProfileManager {
         prefs = context.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
 
-    public static MiraOrgProfileManager getInstance(Context context) {
+    public static synchronized MiraOrgProfileManager getInstance(Context context) {
         if (instance == null) {
-            instance = new MiraOrgProfileManager(context);
+            instance = new MiraOrgProfileManager(context.getApplicationContext());
         }
         return instance;
     }
 
     // ✅ إضافة مستمع
     public void addListener(OnProfileChangedListener listener) {
-        if (!listeners.contains(listener)) {
-            listeners.add(listener);
+        synchronized (listeners) {
+            if (listener != null && !listeners.contains(listener)) {
+                listeners.add(listener);
+            }
         }
     }
 
     // ✅ إزالة مستمع
     public void removeListener(OnProfileChangedListener listener) {
-        listeners.remove(listener);
-    }
-
-    // ✅ إشعار جميع المستمعين
-    private void notifyListeners() {
-    // ✅✅✅ ضمان التنفيذ على Main Thread
-    if (Looper.myLooper() != Looper.getMainLooper()) {
-        mainHandler.post(this::notifyListeners);
-        return;
-    }
-    
-    // ✅ نسخة آمنة من القائمة
-    List<OnProfileChangedListener> listenersCopy;
-    synchronized (listeners) {
-        listenersCopy = new ArrayList<>(listeners);
-    }
-    
-    for (OnProfileChangedListener listener : listenersCopy) {
-        if (listener != null) {
-            try {
-                listener.onProfileChanged();
-            } catch (Exception e) {
-                // تجاهل أخطاء المستمعين
-            }
+        synchronized (listeners) {
+            listeners.remove(listener);
         }
     }
-}
+
+    // ✅ إشعار جميع المستمعين وآمن تماماً للـ UI والـ Thread Safety
+    public void notifyListeners() {
+        mainHandler.post(() -> {
+            List<OnProfileChangedListener> listenersCopy;
+            synchronized (listeners) {
+                listenersCopy = new ArrayList<>(listeners);
+            }
+            
+            for (OnProfileChangedListener listener : listenersCopy) {
+                if (listener != null) {
+                    try {
+                        listener.onProfileChanged();
+                    } catch (Exception e) {
+                        // تجاهل أخطاء المستمعين الفردية لضمان استمرار البقية
+                    }
+                }
+            }
+        });
+    }
 
     // ==================== Getters ====================
 
