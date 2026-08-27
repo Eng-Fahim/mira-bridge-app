@@ -143,20 +143,24 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         updateAppTitle();
     }
 
+    // ✅ دالة تحديث العنوان الآمنة الموحدة (تمت معالجة الخيط الخلفي بها)
     private void updateAppTitle() {
-    // ✅✅✅ إضافة هذا الفحص
-    if (Looper.myLooper() != Looper.getMainLooper()) {
-        mainHandler.post(this::updateAppTitle);
-        return;
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::updateAppTitle);
+            return;
+        }
+        
+        try {
+            if (getSupportActionBar() != null) {
+                String orgName = orgProfileManager != null ? 
+                    orgProfileManager.getDisplayName() : "MIRA";
+                getSupportActionBar().setTitle(orgName);
+            }
+            updateToolbarTitle();
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating app title: " + e.getMessage());
+        }
     }
-    
-    if (getSupportActionBar() != null) {
-        String orgName = orgProfileManager != null ? 
-            orgProfileManager.getDisplayName() : "MIRA";
-        getSupportActionBar().setTitle(orgName);
-    }
-    updateToolbarTitle();
-}
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -285,111 +289,99 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ==================== TOOLBAR MENU ====================
 
     @Override
-public boolean onCreateOptionsMenu(Menu menu) {
-    getMenuInflater().inflate(R.menu.main_menu, menu);
-    
-    PermissionManager pm = PermissionManager.getInstance(this);
-    
-    // ✅ تطبيق الصلاحيات على جميع عناصر القائمة
-    applyToolbarMenuPermissions(menu, pm);
-    
-    return true;
-}
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main_menu, menu);
+        
+        PermissionManager pm = PermissionManager.getInstance(this);
+        applyToolbarMenuPermissions(menu, pm);
+        
+        return true;
+    }
 
-// ✅ دالة جديدة لتطبيق صلاحيات القائمة العلوية
-private void applyToolbarMenuPermissions(Menu menu, PermissionManager pm) {
-    if (pm == null) return;
-    
-    // ✅ تحديث عنوان زر تغيير اللغة
-    MenuItem toggleLanguage = menu.findItem(R.id.action_toggle_language);
-    if (toggleLanguage != null) {
-        toggleLanguage.setTitle(isArabic ? 
-            "تغيير اللغة (English)" : 
-            "Change Language (العربية)");
+    private void applyToolbarMenuPermissions(Menu menu, PermissionManager pm) {
+        if (pm == null) return;
+        
+        MenuItem toggleLanguage = menu.findItem(R.id.action_toggle_language);
+        if (toggleLanguage != null) {
+            toggleLanguage.setTitle(isArabic ? 
+                "تغيير اللغة (English)" : 
+                "Change Language (العربية)");
+        }
+        
+        MenuItem actionGoldRates = menu.findItem(R.id.action_gold_rates);
+        if (actionGoldRates != null) {
+            actionGoldRates.setVisible(pm.canViewGoldRates());
+        }
+        
+        MenuItem actionQuickAccess = menu.findItem(R.id.action_quick_access_settings);
+        if (actionQuickAccess != null) {
+            actionQuickAccess.setVisible(pm.canManageQuickAccess());
+        }
+        
+        MenuItem actionDashboard = menu.findItem(R.id.action_dashboard);
+        if (actionDashboard != null) {
+            actionDashboard.setVisible(pm.canViewDashboard());
+        }
+        
+        MenuItem actionBranches = menu.findItem(R.id.action_branches);
+        if (actionBranches != null) {
+            actionBranches.setVisible(pm.isManager() || pm.isAdmin() || pm.isBranchManager());
+        }
+        
+        MenuItem actionProfile = menu.findItem(R.id.action_profile);
+        if (actionProfile != null) {
+            actionProfile.setVisible(pm.canViewProfile());
+        }
+        
+        MenuItem actionLogout = menu.findItem(R.id.action_logout);
+        if (actionLogout != null) {
+            actionLogout.setVisible(true);
+        }
+        
+        MenuItem exportItem = menu.findItem(R.id.export);
+        if (exportItem != null) {
+            exportItem.setVisible(pm.canExportReports() || pm.isManager() || pm.isAuditor());
+        }
+        
+        MenuItem uhfVer = menu.findItem(R.id.UHF_ver);
+        if (uhfVer != null) {
+            uhfVer.setVisible(pm.isAdmin() || pm.isSystemAdmin());
+        }
     }
-    
-    // 1. أسعار الذهب - للمدراء فقط
-    MenuItem actionGoldRates = menu.findItem(R.id.action_gold_rates);
-    if (actionGoldRates != null) {
-        actionGoldRates.setVisible(pm.canViewGoldRates());
-    }
-    
-    // 2. إعدادات الوصول السريع - للمدراء فقط
-    MenuItem actionQuickAccess = menu.findItem(R.id.action_quick_access_settings);
-    if (actionQuickAccess != null) {
-        actionQuickAccess.setVisible(pm.canManageQuickAccess());
-    }
-    
-    // 3. لوحة التحكم - متاحة للجميع
-    MenuItem actionDashboard = menu.findItem(R.id.action_dashboard);
-    if (actionDashboard != null) {
-        actionDashboard.setVisible(pm.canViewDashboard());
-    }
-    
-    // 4. الفروع - للمدراء فقط
-MenuItem actionBranches = menu.findItem(R.id.action_branches);
-if (actionBranches != null) {
-    actionBranches.setVisible(pm.isManager() || pm.isAdmin() || pm.isBranchManager());
-}
-    
-    // 5. الملف الشخصي - متاح للجميع
-    MenuItem actionProfile = menu.findItem(R.id.action_profile);
-    if (actionProfile != null) {
-        actionProfile.setVisible(pm.canViewProfile());
-    }
-    
-    // 6. تسجيل الخروج - متاح للجميع
-    MenuItem actionLogout = menu.findItem(R.id.action_logout);
-    if (actionLogout != null) {
-        actionLogout.setVisible(true);
-    }
-    
-    // 7. تصدير البيانات - للمدراء والمراجعين
-    MenuItem exportItem = menu.findItem(R.id.export);
-    if (exportItem != null) {
-        exportItem.setVisible(pm.canExportReports() || pm.isManager() || pm.isAuditor());
-    }
-    
-    // 8. إصدار الجهاز - للفنيين والمدراء فقط
-    MenuItem uhfVer = menu.findItem(R.id.UHF_ver);
-    if (uhfVer != null) {
-        uhfVer.setVisible(pm.isAdmin() || pm.isSystemAdmin());
-    }
-}
 
     @Override
-public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-    int id = item.getItemId();
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        int id = item.getItemId();
 
-    if (id == R.id.action_dashboard) {
-        checkInventoryLockAndExecute(() -> {
-            clearBackStack();
-            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-        });
-        return true;
-    } else if (id == R.id.action_branches) {
-        // ✅✅✅ إضافة معالج الفروع
-        checkInventoryLockAndExecute(() -> loadFragment(new MiraBranchesManagementFragment(), "Branches"));
-        return true;
-    } else if (id == R.id.action_gold_rates) {
-        checkInventoryLockAndExecute(() -> loadFragment(new MiraGoldCurrencyFragment(), "GoldRates"));
-        return true;
-    } else if (id == R.id.action_quick_access_settings) {
-        checkInventoryLockAndExecute(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
-        return true;
-    } else if (id == R.id.action_toggle_language) {
-        toggleLanguage();
-        return true;
-    } else if (id == R.id.action_profile) {
-        checkInventoryLockAndExecute(() -> loadFragment(new MiraProfileFragment(), "Profile"));
-        return true;
-    } else if (id == R.id.action_logout) {
-        confirmLogout();
-        return true;
+        if (id == R.id.action_dashboard) {
+            checkInventoryLockAndExecute(() -> {
+                clearBackStack();
+                loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+            });
+            return true;
+        } else if (id == R.id.action_branches) {
+            checkInventoryLockAndExecute(() -> loadFragment(new MiraBranchesManagementFragment(), "Branches"));
+            return true;
+        } else if (id == R.id.action_gold_rates) {
+            checkInventoryLockAndExecute(() -> loadFragment(new MiraGoldCurrencyFragment(), "GoldRates"));
+            return true;
+        } else if (id == R.id.action_quick_access_settings) {
+            checkInventoryLockAndExecute(() -> loadFragment(new MiraQuickAccessSettingsFragment(), "QuickAccessSettings"));
+            return true;
+        } else if (id == R.id.action_toggle_language) {
+            toggleLanguage();
+            return true;
+        } else if (id == R.id.action_profile) {
+            checkInventoryLockAndExecute(() -> loadFragment(new MiraProfileFragment(), "Profile"));
+            return true;
+        } else if (id == R.id.action_logout) {
+            confirmLogout();
+            return true;
+        }
+
+        return super.onOptionsItemSelected(item);
     }
 
-    return super.onOptionsItemSelected(item);
-}
     private void toggleLanguage() {
         try {
             String newLang = isArabic ? "en" : "ar";
@@ -421,211 +413,187 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
     // ==================== NAV SYSTEM & FRAGMENT MANAGEMENT ====================
 
     private void setupQuickNav() {
-    try {
-        BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
-        FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
-        
-        PermissionManager pm = PermissionManager.getInstance(this);
-        
-        // ✅ تطبيق صلاحيات الزر العائم
-        if (fabActionCenter != null) {
-            // الزر العائم يظهر فقط إذا كان لدى المستخدم أي إجراء متاح
-            boolean hasQuickActions = pm.getAllowedQuickActions().size() > 0;
-            fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
-            fabActionCenter.setEnabled(hasQuickActions);
-            fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
-        }
-        
-        // ✅ تطبيق صلاحيات القائمة السفلية
-        if (quickNav != null) {
-            applyBottomNavPermissions(quickNav, pm);
+        try {
+            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+            FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
             
-            quickNav.setOnItemSelectedListener(item -> {
-                int id = item.getItemId();
+            PermissionManager pm = PermissionManager.getInstance(this);
+            
+            if (fabActionCenter != null) {
+                boolean hasQuickActions = pm.getAllowedQuickActions().size() > 0;
+                fabActionCenter.setVisibility(hasQuickActions ? View.VISIBLE : View.GONE);
+                fabActionCenter.setEnabled(hasQuickActions);
+                fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
+            }
+            
+            if (quickNav != null) {
+                applyBottomNavPermissions(quickNav, pm);
                 
-                // ✅ التحقق من الصلاحية قبل التنقل
-                if (!pm.canAccessFragment(getFragmentTagForNavItem(id))) {
-                    showPermissionDenied();
+                quickNav.setOnItemSelectedListener(item -> {
+                    int id = item.getItemId();
+                    
+                    if (!pm.canAccessFragment(getFragmentTagForNavItem(id))) {
+                        showPermissionDenied();
+                        return false;
+                    }
+                    
+                    if (id == R.id.nav_home) {
+                        checkInventoryLockAndExecute(() -> {
+                            clearBackStack();
+                            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+                        });
+                        return true;
+                    } else if (id == R.id.nav_inventory) {
+                        checkInventoryLockAndExecute(() -> loadFragment(new MiraInventoryProFragment(), "Scan"));
+                        return true;
+                    } else if (id == R.id.nav_sales) {
+                        checkInventoryLockAndExecute(() -> loadFragment(new MiraPosFragment(), "POS"));
+                        return true;
+                    } else if (id == R.id.nav_transfers) {
+                        checkInventoryLockAndExecute(() -> loadFragment(new MiraTransferFragment(), "Transfers"));
+                        return true;
+                    } else if (id == R.id.nav_placeholder) {
+                        showQuickActionMenu();
+                        return false;
+                    }
                     return false;
-                }
-                
-                if (id == R.id.nav_home) {
-                    checkInventoryLockAndExecute(() -> {
-                        clearBackStack();
-                        loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-                    });
-                    return true;
-                } else if (id == R.id.nav_inventory) {
-                    checkInventoryLockAndExecute(() -> loadFragment(new MiraInventoryProFragment(), "Scan"));
-                    return true;
-                } else if (id == R.id.nav_sales) {
-                    checkInventoryLockAndExecute(() -> loadFragment(new MiraPosFragment(), "POS"));
-                    return true;
-                } else if (id == R.id.nav_transfers) {
-                    checkInventoryLockAndExecute(() -> loadFragment(new MiraTransferFragment(), "Transfers"));
-                    return true;
-                } else if (id == R.id.nav_placeholder) {
-                    showQuickActionMenu();
-                    return false;
-                }
-                return false;
-            });
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
     }
-}
 
-// ✅ دالة جديدة لتطبيق صلاحيات القائمة السفلية
-private void applyBottomNavPermissions(BottomNavigationView quickNav, PermissionManager pm) {
-    Menu menu = quickNav.getMenu();
-    
-    // الرئيسية - متاحة للجميع
-    MenuItem navHome = menu.findItem(R.id.nav_home);
-    if (navHome != null) {
-        navHome.setVisible(pm.canViewDashboard());
-    }
-    
-    // المخزون
-    MenuItem navInventory = menu.findItem(R.id.nav_inventory);
-    if (navInventory != null) {
-        navInventory.setVisible(pm.canViewInventory());
-    }
-    
-    // المبيعات
-    MenuItem navSales = menu.findItem(R.id.nav_sales);
-    if (navSales != null) {
-        navSales.setVisible(pm.canUsePos() || pm.canViewSalesHistory());
-    }
-    
-    // التحويلات
-    MenuItem navTransfers = menu.findItem(R.id.nav_transfers);
-    if (navTransfers != null) {
-        navTransfers.setVisible(pm.canViewTransfers());
-    }
-    
-    // العنصر الوهمي - يظهر فقط إذا كان هناك 3 عناصر أو أكثر
-    MenuItem navPlaceholder = menu.findItem(R.id.nav_placeholder);
-    if (navPlaceholder != null) {
-        int visibleCount = 0;
-        for (int i = 0; i < menu.size(); i++) {
-            if (menu.getItem(i).isVisible()) visibleCount++;
+    private void applyBottomNavPermissions(BottomNavigationView quickNav, PermissionManager pm) {
+        Menu menu = quickNav.getMenu();
+        
+        MenuItem navHome = menu.findItem(R.id.nav_home);
+        if (navHome != null) {
+            navHome.setVisible(pm.canViewDashboard());
         }
-        navPlaceholder.setVisible(visibleCount >= 3);
+        
+        MenuItem navInventory = menu.findItem(R.id.nav_inventory);
+        if (navInventory != null) {
+            navInventory.setVisible(pm.canViewInventory());
+        }
+        
+        MenuItem navSales = menu.findItem(R.id.nav_sales);
+        if (navSales != null) {
+            navSales.setVisible(pm.canUsePos() || pm.canViewSalesHistory());
+        }
+        
+        MenuItem navTransfers = menu.findItem(R.id.nav_transfers);
+        if (navTransfers != null) {
+            navTransfers.setVisible(pm.canViewTransfers());
+        }
+        
+        MenuItem navPlaceholder = menu.findItem(R.id.nav_placeholder);
+        if (navPlaceholder != null) {
+            int visibleCount = 0;
+            for (int i = 0; i < menu.size(); i++) {
+                if (menu.getItem(i).isVisible()) visibleCount++;
+            }
+            navPlaceholder.setVisible(visibleCount >= 3);
+        }
     }
-}
 
-// ✅ دالة مساعدة للحصول على tag من معرف القائمة
-private String getFragmentTagForNavItem(int itemId) {
-    if (itemId == R.id.nav_home) return "Dashboard";
-    if (itemId == R.id.nav_inventory) return "Scan";
-    if (itemId == R.id.nav_sales) return "POS";
-    if (itemId == R.id.nav_transfers) return "Transfers";
-    return "";
-}
+    private String getFragmentTagForNavItem(int itemId) {
+        if (itemId == R.id.nav_home) return "Dashboard";
+        if (itemId == R.id.nav_inventory) return "Scan";
+        if (itemId == R.id.nav_sales) return "POS";
+        if (itemId == R.id.nav_transfers) return "Transfers";
+        return "";
+    }
 
-// ✅ دالة عرض رسالة عدم الصلاحية
-private void showPermissionDenied() {
-    Toast.makeText(this, 
-        isArabic ? "⛔ غير مصرح لك بالوصول لهذه الواجهة" : "⛔ Access Denied",
-        Toast.LENGTH_SHORT).show();
-}
+    private void showPermissionDenied() {
+        Toast.makeText(this, 
+            isArabic ? "⛔ غير مصرح لك بالوصول لهذه الواجهة" : "⛔ Access Denied",
+            Toast.LENGTH_SHORT).show();
+    }
 
     private void showQuickActionMenu() {
-    try {
-        BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
-        View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
-        dialog.setContentView(view);
-        
-        PermissionManager pm = PermissionManager.getInstance(this);
-        MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(this);
-        
-        // ✅ الحصول على الإجراءات المسموحة من PermissionManager
-        List<String> allowedActions = pm.getAllowedQuickActions();
-        
-        // ✅ RFID Write - للمخزون والمدراء
-        View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
-        if (btnRfidWrite != null) {
-            boolean allowed = pm.canEditInventory() && quickAccess.isActionEnabled("rfid_write");
-            btnRfidWrite.setVisibility(allowed ? View.VISIBLE : View.GONE);
+        try {
+            BottomSheetDialog dialog = new BottomSheetDialog(this, R.style.TransparentBottomSheetDialog);
+            View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
+            dialog.setContentView(view);
+            
+            PermissionManager pm = PermissionManager.getInstance(this);
+            MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(this);
+            
+            List<String> allowedActions = pm.getAllowedQuickActions();
+            
+            View btnRfidWrite = view.findViewById(R.id.btnRfidWrite);
+            if (btnRfidWrite != null) {
+                boolean allowed = pm.canEditInventory() && quickAccess.isActionEnabled("rfid_write");
+                btnRfidWrite.setVisibility(allowed ? View.VISIBLE : View.GONE);
+                if (allowed) {
+                    btnRfidWrite.setOnClickListener(v -> {
+                        dialog.dismiss();
+                        checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadWriteFragment(), "RFIDWrite"));
+                    });
+                }
+            }
+            
+            applyQuickActionButton(view, R.id.btnIdentityStudio, dialog, 
+                allowedActions.contains("identity") && quickAccess.isActionEnabled("identity"),
+                new MiraIdentityStudioFragment(), "IdentityStudio");
+            
+            applyQuickActionButton(view, R.id.btnRadarLocation, dialog, 
+                allowedActions.contains("radar") && quickAccess.isActionEnabled("radar"),
+                new MiraUHFRadarLocationFragment(), "Radar");
+            
+            applyQuickActionButton(view, R.id.btnSecureGate, dialog, 
+                allowedActions.contains("gate") && quickAccess.isActionEnabled("gate"),
+                new MiraSecureGateFragment(), "SecureGate");
+            
+            applyQuickActionButton(view, R.id.btnReports, dialog, 
+                allowedActions.contains("reports") && quickAccess.isActionEnabled("reports"),
+                new MiraReportsProFragment(), "Reports");
+            
+            applyQuickActionButton(view, R.id.btnAccounting, dialog, 
+                allowedActions.contains("accounting") && quickAccess.isActionEnabled("accounting"),
+                new MiraAccountingFragment(), "Accounting");
+            
+            applyQuickActionButton(view, R.id.btnTransfer, dialog, 
+                allowedActions.contains("transfers") && quickAccess.isActionEnabled("transfers"),
+                new MiraTransferFragment(), "Transfers");
+            
+            applyQuickActionButton(view, R.id.btnSalesHistory, dialog, 
+                allowedActions.contains("sales_history") && quickAccess.isActionEnabled("sales_history"),
+                new MiraSalesHistoryFragment(), "SalesHistory");
+            
+            applyQuickActionButton(view, R.id.btnAdminHub, dialog, 
+                allowedActions.contains("admin_hub") && quickAccess.isActionEnabled("admin_hub"),
+                new MiraAdminHubFragment(), "AdminHub");
+            
+            applyQuickActionButton(view, R.id.btnServerConfig, dialog, 
+                allowedActions.contains("server_config") && quickAccess.isActionEnabled("server_config"),
+                new MiraServerConfigFragment(), "ServerConfig");
+            
+            View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
+            if (fabCloseSheet != null) {
+                fabCloseSheet.setOnClickListener(v -> dialog.dismiss());
+            }
+            
+            dialog.show();
+        } catch (Exception e) {
+            Log.e(TAG, "QuickActionMenu Error: " + e.getMessage(), e);
+        }
+    }
+
+    private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dialog, 
+                                        boolean allowed, Fragment fragment, String tag) {
+        View btn = root.findViewById(viewId);
+        if (btn != null) {
+            btn.setVisibility(allowed ? View.VISIBLE : View.GONE);
             if (allowed) {
-                btnRfidWrite.setOnClickListener(v -> {
+                btn.setOnClickListener(v -> {
                     dialog.dismiss();
-                    checkInventoryLockAndExecute(() -> loadFragment(new MiraUHFReadWriteFragment(), "RFIDWrite"));
+                    checkInventoryLockAndExecute(() -> loadFragment(fragment, tag));
                 });
             }
         }
-        
-        // ✅ استوديو التكويد
-        applyQuickActionButton(view, R.id.btnIdentityStudio, dialog, 
-            allowedActions.contains("identity") && quickAccess.isActionEnabled("identity"),
-            new MiraIdentityStudioFragment(), "IdentityStudio");
-        
-        // ✅ رادار التتبع
-        applyQuickActionButton(view, R.id.btnRadarLocation, dialog, 
-            allowedActions.contains("radar") && quickAccess.isActionEnabled("radar"),
-            new MiraUHFRadarLocationFragment(), "Radar");
-        
-        // ✅ مراقبة البوابات
-        applyQuickActionButton(view, R.id.btnSecureGate, dialog, 
-            allowedActions.contains("gate") && quickAccess.isActionEnabled("gate"),
-            new MiraSecureGateFragment(), "SecureGate");
-        
-        // ✅ التقارير
-        applyQuickActionButton(view, R.id.btnReports, dialog, 
-            allowedActions.contains("reports") && quickAccess.isActionEnabled("reports"),
-            new MiraReportsProFragment(), "Reports");
-        
-        // ✅ المحاسبة
-        applyQuickActionButton(view, R.id.btnAccounting, dialog, 
-            allowedActions.contains("accounting") && quickAccess.isActionEnabled("accounting"),
-            new MiraAccountingFragment(), "Accounting");
-        
-        // ✅ التحويلات
-        applyQuickActionButton(view, R.id.btnTransfer, dialog, 
-            allowedActions.contains("transfers") && quickAccess.isActionEnabled("transfers"),
-            new MiraTransferFragment(), "Transfers");
-        
-        // ✅ سجل المبيعات
-        applyQuickActionButton(view, R.id.btnSalesHistory, dialog, 
-            allowedActions.contains("sales_history") && quickAccess.isActionEnabled("sales_history"),
-            new MiraSalesHistoryFragment(), "SalesHistory");
-        
-        // ✅ الخيارات الإدارية
-        applyQuickActionButton(view, R.id.btnAdminHub, dialog, 
-            allowedActions.contains("admin_hub") && quickAccess.isActionEnabled("admin_hub"),
-            new MiraAdminHubFragment(), "AdminHub");
-        
-        // ✅ إعدادات السيرفر
-        applyQuickActionButton(view, R.id.btnServerConfig, dialog, 
-            allowedActions.contains("server_config") && quickAccess.isActionEnabled("server_config"),
-            new MiraServerConfigFragment(), "ServerConfig");
-        
-        View fabCloseSheet = view.findViewById(R.id.fabCloseSheet);
-        if (fabCloseSheet != null) {
-            fabCloseSheet.setOnClickListener(v -> dialog.dismiss());
-        }
-        
-        dialog.show();
-    } catch (Exception e) {
-        Log.e(TAG, "QuickActionMenu Error: " + e.getMessage(), e);
     }
-}
-
-// ✅ دالة مساعدة لتطبيق الصلاحيات على أزرار الوصول السريع
-private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dialog, 
-                                    boolean allowed, Fragment fragment, String tag) {
-    View btn = root.findViewById(viewId);
-    if (btn != null) {
-        btn.setVisibility(allowed ? View.VISIBLE : View.GONE);
-        if (allowed) {
-            btn.setOnClickListener(v -> {
-                dialog.dismiss();
-                checkInventoryLockAndExecute(() -> loadFragment(fragment, tag));
-            });
-        }
-    }
-}
 
     // ==================== FRAGMENT MANAGEMENT ====================
 
@@ -634,95 +602,92 @@ private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dia
     }
 
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-    if (isFinishing() || isDestroyed() || fragment == null) return;
-    
-    try {
-        PermissionManager pm = PermissionManager.getInstance(this);
+        if (isFinishing() || isDestroyed() || fragment == null) return;
         
-        // ✅ التحقق من الصلاحية قبل تحميل أي Fragment
-        if (!pm.canAccessFragment(tag)) {
-            showPermissionDenied();
-            return;
-        }
-        
-        showLoading();
-        currentFragment = fragment;
-        currentFragmentTag = tag;
-        saveFragmentTagToPrefs(tag);
-        
-        FragmentTransaction transaction = fragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, fragment, tag);
-        
-        if (addToBackStack) {
-            transaction.addToBackStack(tag);
-        }
-        
-        transaction.commitAllowingStateLoss();
-        
-        mainHandler.postDelayed(this::hideLoading, 200);
-        
-    } catch (Exception e) {
-        Log.e(TAG, "Error switching fragment: " + e.getMessage());
-        hideLoading();
-    }
-}
-
-    private void loadFragmentByTag(String tag) {
-    try {
-        // ✅ إضافة التحقق من الصلاحية هنا أيضاً
-        PermissionManager pm = PermissionManager.getInstance(this);
-        if (!pm.canAccessFragment(tag)) {
-            // العودة للوحة التحكم إذا لم يكن مصرحاً
-            tag = "Dashboard";
-        }
-        
-        Fragment fragment = createFragmentByTag(tag);
-        if (fragment != null) {
+        try {
+            PermissionManager pm = PermissionManager.getInstance(this);
+            
+            if (!pm.canAccessFragment(tag)) {
+                showPermissionDenied();
+                return;
+            }
+            
+            showLoading();
             currentFragment = fragment;
             currentFragmentTag = tag;
+            saveFragmentTagToPrefs(tag);
             
             FragmentTransaction transaction = fragmentManager.beginTransaction()
                     .replace(R.id.fragment_container, fragment, tag);
             
+            if (addToBackStack) {
+                transaction.addToBackStack(tag);
+            }
+            
             transaction.commitAllowingStateLoss();
-        } else {
-            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+            
+            mainHandler.postDelayed(this::hideLoading, 200);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error switching fragment: " + e.getMessage());
+            hideLoading();
         }
-    } catch (Exception e) {
-        Log.e(TAG, "Load fragment by tag error: " + e.getMessage(), e);
-        try {
-            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-        } catch (Exception ignored) {}
     }
-}
+
+    private void loadFragmentByTag(String tag) {
+        try {
+            PermissionManager pm = PermissionManager.getInstance(this);
+            if (!pm.canAccessFragment(tag)) {
+                tag = "Dashboard";
+            }
+            
+            Fragment fragment = createFragmentByTag(tag);
+            if (fragment != null) {
+                currentFragment = fragment;
+                currentFragmentTag = tag;
+                
+                FragmentTransaction transaction = fragmentManager.beginTransaction()
+                        .replace(R.id.fragment_container, fragment, tag);
+                
+                transaction.commitAllowingStateLoss();
+            } else {
+                loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Load fragment by tag error: " + e.getMessage(), e);
+            try {
+                loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+            } catch (Exception ignored) {}
+        }
+    }
 
     private Fragment createFragmentByTag(String tag) {
-    if (tag == null) return new MiraDashboardFragment();
-    
-    switch (tag) {
-        case "Dashboard": return new MiraDashboardFragment();
-        case "Branches": return new MiraBranchesManagementFragment(); // ✅✅✅ إضافة
-        case "Scan": return new MiraInventoryProFragment();
-        case "POS": return new MiraPosFragment();
-        case "Transfers": return new MiraTransferFragment();
-        case "IdentityStudio": return new MiraIdentityStudioFragment();
-        case "Radar": return new MiraUHFRadarLocationFragment();
-        case "SecureGate": return new MiraSecureGateFragment();
-        case "Reports": return new MiraReportsProFragment();
-        case "Accounting": return new MiraAccountingFragment();
-        case "AdminHub": return new MiraAdminHubFragment();
-        case "SalesHistory": return new MiraSalesHistoryFragment();
-        case "ServerConfig": return new MiraServerConfigFragment();
-        case "GoldRates": return new MiraGoldCurrencyFragment();
-        case "Profile": return new MiraProfileFragment();
-        case "UsersManagement": return new UsersManagementFragment();
-        case "RFIDWrite": return new MiraUHFReadWriteFragment();
-        case "ReaderSetup": return new MiraReaderSetupFragment();
-        case "GateSettings": return new MiraGateSettingsFragment();
-        case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
-        default: return new MiraDashboardFragment();
+        if (tag == null) return new MiraDashboardFragment();
+        
+        switch (tag) {
+            case "Dashboard": return new MiraDashboardFragment();
+            case "Branches": return new MiraBranchesManagementFragment();
+            case "Scan": return new MiraInventoryProFragment();
+            case "POS": return new MiraPosFragment();
+            case "Transfers": return new MiraTransferFragment();
+            case "IdentityStudio": return new MiraIdentityStudioFragment();
+            case "Radar": return new MiraUHFRadarLocationFragment();
+            case "SecureGate": return new MiraSecureGateFragment();
+            case "Reports": return new MiraReportsProFragment();
+            case "Accounting": return new MiraAccountingFragment();
+            case "AdminHub": return new MiraAdminHubFragment();
+            case "SalesHistory": return new MiraSalesHistoryFragment();
+            case "ServerConfig": return new MiraServerConfigFragment();
+            case "GoldRates": return new MiraGoldCurrencyFragment();
+            case "Profile": return new MiraProfileFragment();
+            case "UsersManagement": return new UsersManagementFragment();
+            case "RFIDWrite": return new MiraUHFReadWriteFragment();
+            case "ReaderSetup": return new MiraReaderSetupFragment();
+            case "GateSettings": return new MiraGateSettingsFragment();
+            case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
+            default: return new MiraDashboardFragment();
+        }
     }
-}
 
     private Fragment getTopFragment() {
         if (fragmentManager != null && fragmentManager.getBackStackEntryCount() > 0) {
@@ -753,47 +718,43 @@ private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dia
     }
 
     private void showHardwareOptionsDialog() {
-    PermissionManager pm = PermissionManager.getInstance(this);
-    
-    List<String> optionsList = new ArrayList<>();
-    
-    // إعدادات قارئ RFID - للمدراء وفنيي المخزون
-    if (pm.isAdmin() || pm.isInventoryManager()) {
-        optionsList.add(isArabic ? "إعدادات قارئ RFID" : "RFID Reader Setup");
+        PermissionManager pm = PermissionManager.getInstance(this);
+        
+        List<String> optionsList = new ArrayList<>();
+        
+        if (pm.isAdmin() || pm.isInventoryManager()) {
+            optionsList.add(isArabic ? "إعدادات قارئ RFID" : "RFID Reader Setup");
+        }
+        
+        if (pm.isAdmin() || pm.isSecurity() || pm.isGateSecurity()) {
+            optionsList.add(isArabic ? "تهيئة البوابات الأمنية" : "Gate Security Setup");
+        }
+        
+        if (pm.canViewServerConfig()) {
+            optionsList.add(isArabic ? "🌐 إعدادات السيرفر" : "🌐 Server Config");
+        }
+        
+        optionsList.add(isArabic ? "اختبار التوصيل" : "Connection Test");
+        
+        String[] options = optionsList.toArray(new String[0]);
+        
+        new AlertDialog.Builder(this)
+            .setTitle(isArabic ? "📡 أجهزة ومستشعرات المنظومة" : "📡 Hardware & Sensors")
+            .setItems(options, (dialog, which) -> {
+                String selected = options[which];
+                
+                if (selected.contains("RFID") || selected.contains("قارئ")) {
+                    loadFragment(new MiraReaderSetupFragment(), "ReaderSetup");
+                } else if (selected.contains("Gate") || selected.contains("بوابات")) {
+                    loadFragment(new MiraGateSettingsFragment(), "GateSettings");
+                } else if (selected.contains("Server") || selected.contains("سيرفر")) {
+                    loadFragment(new MiraServerConfigFragment(), "ServerConfig");
+                } else {
+                    Toast.makeText(this, isArabic ? "الأجهزة متصلة" : "Devices connected", Toast.LENGTH_SHORT).show();
+                }
+            })
+            .show();
     }
-    
-    // تهيئة البوابات - للمدراء والأمن
-    if (pm.isAdmin() || pm.isSecurity() || pm.isGateSecurity()) {
-        optionsList.add(isArabic ? "تهيئة البوابات الأمنية" : "Gate Security Setup");
-    }
-    
-    // إعدادات السيرفر - لمدير النظام فقط
-    if (pm.canViewServerConfig()) {
-        optionsList.add(isArabic ? "🌐 إعدادات السيرفر" : "🌐 Server Config");
-    }
-    
-    // اختبار التوصيل - متاح للجميع
-    optionsList.add(isArabic ? "اختبار التوصيل" : "Connection Test");
-    
-    String[] options = optionsList.toArray(new String[0]);
-    
-    new AlertDialog.Builder(this)
-        .setTitle(isArabic ? "📡 أجهزة ومستشعرات المنظومة" : "📡 Hardware & Sensors")
-        .setItems(options, (dialog, which) -> {
-            String selected = options[which];
-            
-            if (selected.contains("RFID") || selected.contains("قارئ")) {
-                loadFragment(new MiraReaderSetupFragment(), "ReaderSetup");
-            } else if (selected.contains("Gate") || selected.contains("بوابات")) {
-                loadFragment(new MiraGateSettingsFragment(), "GateSettings");
-            } else if (selected.contains("Server") || selected.contains("سيرفر")) {
-                loadFragment(new MiraServerConfigFragment(), "ServerConfig");
-            } else {
-                Toast.makeText(this, isArabic ? "الأجهزة متصلة" : "Devices connected", Toast.LENGTH_SHORT).show();
-            }
-        })
-        .show();
-}
 
     // ==================== LEGACY COMPATIBILITY METHODS ====================
 
@@ -897,51 +858,49 @@ private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dia
     }
 
     private void handleBackNavigation() {
-    if (fragmentManager != null) {
-        for (Fragment fragment : fragmentManager.getFragments()) {
-            if (fragment instanceof androidx.fragment.app.DialogFragment) {
-                androidx.fragment.app.DialogFragment dialogFragment = 
-                    (androidx.fragment.app.DialogFragment) fragment;
-                if (dialogFragment.getDialog() != null && dialogFragment.getDialog().isShowing()) {
-                    dialogFragment.dismissAllowingStateLoss();
-                    return;
+        if (fragmentManager != null) {
+            for (Fragment fragment : fragmentManager.getFragments()) {
+                if (fragment instanceof androidx.fragment.app.DialogFragment) {
+                    androidx.fragment.app.DialogFragment dialogFragment = 
+                        (androidx.fragment.app.DialogFragment) fragment;
+                    if (dialogFragment.getDialog() != null && dialogFragment.getDialog().isShowing()) {
+                        dialogFragment.dismissAllowingStateLoss();
+                        return;
+                    }
                 }
+            }
+            
+            if (fragmentManager.getBackStackEntryCount() > 0) {
+                fragmentManager.popBackStackImmediate();
+                Fragment topFragment = getTopFragment();
+                if (topFragment != null) {
+                    String tag = topFragment.getTag();
+                    
+                    PermissionManager pm = PermissionManager.getInstance(this);
+                    if (tag != null && !pm.canAccessFragment(tag)) {
+                        clearBackStack();
+                        loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+                        return;
+                    }
+                    
+                    currentFragment = topFragment;
+                    if (tag != null) {
+                        currentFragmentTag = tag;
+                        saveFragmentTagToPrefs(tag);
+                    }
+                }
+                return;
             }
         }
         
-        if (fragmentManager.getBackStackEntryCount() > 0) {
-            fragmentManager.popBackStackImmediate();
-            Fragment topFragment = getTopFragment();
-            if (topFragment != null) {
-                String tag = topFragment.getTag();
-                
-                // ✅ إضافة التحقق من الصلاحية
-                PermissionManager pm = PermissionManager.getInstance(this);
-                if (tag != null && !pm.canAccessFragment(tag)) {
-                    // إذا لم يكن مصرحاً، العودة للوحة التحكم
-                    clearBackStack();
-                    loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-                    return;
-                }
-                
-                currentFragment = topFragment;
-                if (tag != null) {
-                    currentFragmentTag = tag;
-                    saveFragmentTagToPrefs(tag);
-                }
-            }
+        if (currentFragment != null && !(currentFragment instanceof MiraDashboardFragment)) {
+            clearBackStack();
+            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
             return;
         }
+        
+        handleDoubleBackToExit();
     }
-    
-    if (currentFragment != null && !(currentFragment instanceof MiraDashboardFragment)) {
-        clearBackStack();
-        loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-        return;
-    }
-    
-    handleDoubleBackToExit();
-}
 
     private void handleDoubleBackToExit() {
         long currentTime = System.currentTimeMillis();
@@ -990,24 +949,6 @@ private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dia
 
     // ==================== SYSTEM & TOOLBAR HELPERS ====================
 
-    private void updateToolbarTitle() {
-        try {
-            if (getSupportActionBar() != null && sessionManager != null) {
-                MiraOrgProfileManager orgProfile = MiraOrgProfileManager.getInstance(this);
-                String orgName = (orgProfile != null) ? 
-                    orgProfile.getDisplayName() : "MIRA";
-                
-                getSupportActionBar().setTitle(orgName);
-                
-                if (branchesManager != null && branchesManager.hasActiveBranch()) {
-                    getSupportActionBar().setSubtitle("📍 " + branchesManager.getActiveBranchDisplayName());
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Toolbar Update Error: " + e.getMessage());
-        }
-    }
-    
     private void updateBottomNavLanguage() {
         try {
             BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
@@ -1185,4 +1126,4 @@ private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dia
             }
         }
     }
-        }
+}
