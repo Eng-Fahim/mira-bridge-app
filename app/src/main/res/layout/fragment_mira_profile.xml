@@ -432,6 +432,43 @@
                     android:layout_height="1dp"
                     android:background="?attr/colorOutlineVariant" />
 
+
+<LinearLayout
+    android:id="@+id/layoutAppThemeExpandable"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="16dp"
+    android:paddingBottom="16dp"
+    android:visibility="gone">
+
+    <!-- ✅ خيارات المظهر -->
+    <RadioGroup
+        android:id="@+id/radioThemeGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <RadioButton
+            android:id="@+id/radioThemeLight"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="☀️ فاتح"
+            android:checked="true" />
+
+        <RadioButton
+            android:id="@+id/radioThemeDark"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🌙 داكن" />
+
+        <RadioButton
+            android:id="@+id/radioThemeSystem"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⚙️ تلقائي (حسب النظام)" />
+    </RadioGroup>
+</LinearLayout>
                 <LinearLayout
                     android:id="@+id/headerAppTheme"
                     android:layout_width="match_parent"
