@@ -440,7 +440,10 @@ public class LoginActivity extends AppCompatActivity {
         sessionManager.saveBiometricBranch(branchId, branchName);
         
         // ✅✅✅ التحقق من إعداد البصمة من السيرفر
-        boolean biometricEnabled = response.optBoolean("biometric_enabled", true);
+        boolean biometricEnabled = true;
+        if (response.data != null) {
+        biometricEnabled = response.data.optBoolean("biometric_enabled", true);
+    }
         sessionManager.setBiometricLoginEnabled(biometricEnabled);
 
         MiraBranchesManager bm = MiraBranchesManager.getInstance(this);
