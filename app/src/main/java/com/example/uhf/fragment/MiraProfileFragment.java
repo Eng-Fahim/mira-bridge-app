@@ -26,6 +26,9 @@ import androidx.annotation.Nullable;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.fragment.app.Fragment;
+import android.content.SharedPreferences;
+import android.graphics.BitmapFactory;
+
 
 import com.bumptech.glide.Glide;
 import com.example.uhf.R;
@@ -304,151 +307,158 @@ public class MiraProfileFragment extends Fragment {
     /**
      * ✅ تحميل صورة المستخدم
      */
-    private void loadUserAvatar() {
-        try {
-            String avatarPath = sessionManager.getAvatarPath();
-            if (avatarPath != null && !avatarPath.isEmpty()) {
-                File avatarFile = new File(avatarPath);
-                if (avatarFile.exists() && imgUserAvatar != null && isAdded()) {
-                    Glide.with(requireContext())
-                        .load(avatarFile)
-                        .placeholder(R.drawable.ic_default_avatar)
-                        .error(R.drawable.ic_default_avatar)
-                        .circleCrop()
-                        .into(imgUserAvatar);
+    // ==================== 1. loadUserAvatar - بدون Glide ====================
+private void loadUserAvatar() {
+    try {
+        // ✅ استخدام SharedPreferences مباشرة بدلاً من sessionManager
+        SharedPreferences prefs = requireContext().getSharedPreferences("user_avatar", Context.MODE_PRIVATE);
+        String avatarPath = prefs.getString("avatar_path", "");
+        
+        if (!avatarPath.isEmpty()) {
+            File avatarFile = new File(avatarPath);
+            if (avatarFile.exists() && imgUserAvatar != null && isAdded()) {
+                Bitmap bitmap = BitmapFactory.decodeFile(avatarFile.getAbsolutePath());
+                if (bitmap != null) {
+                    imgUserAvatar.setImageBitmap(bitmap);
+                } else {
+                    imgUserAvatar.setImageResource(android.R.drawable.ic_menu_camera);
                 }
             }
-        } catch (Exception e) {
-            logNonFatal("loadUserAvatar", e);
         }
+    } catch (Exception e) {
+        logNonFatal("loadUserAvatar", e);
     }
+}
 
-    /**
-     * ✅ اختيار صورة من المعرض
-     */
-    private void pickImage() {
+// ==================== 2. uploadProfileImage - بدون setAvatarPath ====================
+private void uploadProfileImage(Uri imageUri) {
+    showLoading(true);
+    
+    executeSafely(() -> {
         try {
-            Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-            intent.setType("image/*");
-            imagePickerLauncher.launch(intent);
+            Bitmap bitmap = MediaStore.Images.Media.getBitmap(
+                requireContext().getContentResolver(), imageUri);
+            
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos);
+            byte[] imageBytes = baos.toByteArray();
+            
+            File avatarFile = new File(requireContext().getFilesDir(), "user_avatar.jpg");
+            FileOutputStream fos = new FileOutputStream(avatarFile);
+            fos.write(imageBytes);
+            fos.close();
+            
+            // ✅ حفظ في SharedPreferences بدلاً من sessionManager
+            SharedPreferences prefs = requireContext().getSharedPreferences("user_avatar", Context.MODE_PRIVATE);
+            prefs.edit().putString("avatar_path", avatarFile.getAbsolutePath()).apply();
+            
+            String base64Image = Base64.encodeToString(imageBytes, Base64.DEFAULT);
+            
+            JSONObject payload = new JSONObject();
+            payload.put("avatar_base64", base64Image);
+            payload.put("avatar_filename", "avatar.jpg");
+            
+            MiraApiClient.ApiResponse response = apiClient.updateUserProfile(payload);
+            
+            mainHandler.post(() -> {
+                if (isDestroyed.get() || !isAdded()) return;
+                showLoading(false);
+                
+                if (response != null && response.isSuccess) {
+                    showToast(isArabic ? "✅ تم تحديث الصورة" : "✅ Photo updated");
+                    loadUserAvatar();
+                } else {
+                    showToast(isArabic ? "💾 حفظ محلي فقط" : "💾 Local save only");
+                    loadUserAvatar();
+                }
+            });
         } catch (Exception e) {
-            logNonFatal("pickImage", e);
-            showToast(isArabic ? "❌ تعذر فتح المعرض" : "❌ Could not open gallery");
-        }
-    }
-
-    /**
-     * ✅ رفع صورة الملف الشخصي
-     */
-    private void uploadProfileImage(Uri imageUri) {
-        showLoading(true);
-        
-        executeSafely(() -> {
-            try {
-                // ✅ حفظ الصورة محلياً
-                Bitmap bitmap = MediaStore.Images.Media.getBitmap(
-                    requireContext().getContentResolver(), imageUri);
-                
-                // ✅ ضغط الصورة
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos);
-                byte[] imageBytes = baos.toByteArray();
-                
-                // ✅ حفظ محلياً
-                File avatarFile = new File(requireContext().getFilesDir(), "user_avatar.jpg");
-                FileOutputStream fos = new FileOutputStream(avatarFile);
-                fos.write(imageBytes);
-                fos.close();
-                
-                sessionManager.setAvatarPath(avatarFile.getAbsolutePath());
-                
-                // ✅ رفع للسيرفر
-                String base64Image = Base64.encodeToString(imageBytes, Base64.DEFAULT);
-                
-                JSONObject payload = new JSONObject();
-                payload.put("avatar_base64", base64Image);
-                payload.put("avatar_filename", "avatar.jpg");
-                
-                MiraApiClient.ApiResponse response = apiClient.updateUserProfile(payload);
-                
-                mainHandler.post(() -> {
-                    if (isDestroyed.get() || !isAdded()) return;
+            logNonFatal("uploadProfileImage", e);
+            mainHandler.post(() -> {
+                if (!isDestroyed.get() && isAdded()) {
                     showLoading(false);
-                    
-                    if (response != null && response.isSuccess) {
-                        showToast(isArabic ? "✅ تم تحديث الصورة" : "✅ Photo updated");
-                        loadUserAvatar();
-                    } else {
-                        // ✅ الصورة حفظت محلياً حتى لو فشل السيرفر
-                        showToast(isArabic ? "💾 حفظ محلي فقط" : "💾 Local save only");
-                        loadUserAvatar();
-                    }
-                });
-            } catch (Exception e) {
-                logNonFatal("uploadProfileImage", e);
-                mainHandler.post(() -> {
-                    if (!isDestroyed.get() && isAdded()) {
-                        showLoading(false);
-                        showToast(isArabic ? "❌ خطأ في رفع الصورة" : "❌ Upload error");
-                    }
-                });
-            }
-        });
-    }
-
-    /**
-     * ✅ جلب الملف من السيرفر
-     */
-    private void fetchProfileFromServer() {
-        if (isDestroyed.get() || !isAdded()) return;
-        
-        showLoading(true);
-
-        executeSafely(() -> {
-            try {
-                MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
-                
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject user = response.data.optJSONObject("user");
-                    JSONObject org = response.data.optJSONObject("organization");
-                    
-                    if (org != null) {
-                        orgProfileManager.saveFromServer(org);
-                    }
-                    
-                    if (user != null) {
-                        String displayName = user.optString("display_name", "");
-                        String username = user.optString("username", "");
-                        String role = user.optString("role", "");
-                        String phone = user.optString("phone", "");
-                        String avatarUrl = user.optString("avatar_url", "");
-                        
-                        if (!TextUtils.isEmpty(displayName)) sessionManager.setDisplayName(displayName);
-                        if (!TextUtils.isEmpty(username)) sessionManager.setUsername(username);
-                        if (!TextUtils.isEmpty(role)) sessionManager.setRole(role);
-                        if (!TextUtils.isEmpty(phone)) sessionManager.setPhone(phone);
-                    }
-                    
-                    final JSONObject finalUser = user;
-                    final JSONObject finalOrg = org;
-                    
-                    mainHandler.post(() -> {
-                        if (!isDestroyed.get() && isAdded()) {
-                            updateUIWithData(finalUser, finalOrg);
-                        }
-                    });
+                    showToast(isArabic ? "❌ خطأ في رفع الصورة" : "❌ Upload error");
                 }
-            } catch (Exception e) {
-                logNonFatal("fetchProfileFromServer.thread", e);
-            } finally {
+            });
+        }
+    });
+}
+
+// ==================== 3. fetchProfileFromServer - بدون setUsername ====================
+private void fetchProfileFromServer() {
+    if (isDestroyed.get() || !isAdded()) return;
+    
+    showLoading(true);
+
+    executeSafely(() -> {
+        try {
+            MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONObject user = response.data.optJSONObject("user");
+                JSONObject org = response.data.optJSONObject("organization");
+                
+                if (org != null) {
+                    orgProfileManager.saveFromServer(org);
+                }
+                
+                if (user != null) {
+                    String displayName = user.optString("display_name", "");
+                    String role = user.optString("role", "");
+                    String phone = user.optString("phone", "");
+                    
+                    if (!TextUtils.isEmpty(displayName)) sessionManager.setDisplayName(displayName);
+                    if (!TextUtils.isEmpty(role)) sessionManager.setRole(role);
+                    if (!TextUtils.isEmpty(phone)) sessionManager.setPhone(phone);
+                    
+                    // ✅ لا تستخدم setUsername - غير موجودة
+                }
+                
+                final JSONObject finalUser = user;
+                final JSONObject finalOrg = org;
+                
                 mainHandler.post(() -> {
                     if (!isDestroyed.get() && isAdded()) {
-                        showLoading(false);
+                        updateUIWithData(finalUser, finalOrg);
                     }
                 });
             }
+        } catch (Exception e) {
+            logNonFatal("fetchProfileFromServer.thread", e);
+        } finally {
+            mainHandler.post(() -> {
+                if (!isDestroyed.get() && isAdded()) {
+                    showLoading(false);
+                }
+            });
+        }
+    });
+}
+
+// ==================== 4. performLogout - بدون clearSession ====================
+private void performLogout() {
+    executeSafely(() -> {
+        try {
+            String token = sessionManager.getAuthToken();
+            if (!TextUtils.isEmpty(token)) {
+                apiClient.logout(token);
+            }
+        } catch (Exception e) {
+            logNonFatal("performLogout", e);
+        }
+        
+        mainHandler.post(() -> {
+            if (isDestroyed.get() || !isAdded()) return;
+            
+            // ✅ استخدام logout بدلاً من clearSession
+            sessionManager.logout();
+            
+            if (getActivity() instanceof UHFMainActivity) {
+                getActivity().finish();
+            }
         });
-    }
+    });
+}
 
     private void updateUIWithData(JSONObject user, JSONObject org) {
         if (user != null) {
@@ -660,32 +670,7 @@ public class MiraProfileFragment extends Fragment {
                 .show();
     }
 
-    /**
-     * ✅ تنفيذ تسجيل الخروج
-     */
-    private void performLogout() {
-        executeSafely(() -> {
-            try {
-                String token = sessionManager.getAuthToken();
-                if (!TextUtils.isEmpty(token)) {
-                    apiClient.logout(token);
-                }
-            } catch (Exception e) {
-                logNonFatal("performLogout", e);
-            }
-            
-            mainHandler.post(() -> {
-                if (isDestroyed.get() || !isAdded()) return;
-                
-                sessionManager.clearSession();
-                
-                // ✅ العودة لشاشة تسجيل الدخول
-                if (getActivity() instanceof UHFMainActivity) {
-                    getActivity().finish();
-                }
-            });
-        });
-    }
+   
 
     private void saveOrgProfileToServer(String nameAr, String nameEn, String phone, String email, String tax) {
         if (!permissionManager.isAdmin()) {
