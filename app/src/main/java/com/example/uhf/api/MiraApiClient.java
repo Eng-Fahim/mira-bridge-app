@@ -406,6 +406,19 @@ public class MiraApiClient {
     public ApiResponse updateUserProfile(JSONObject payload) {
         return postWithAuth("/profile/update-user", payload);
     }
+    public ApiResponse uploadUserAvatar(JSONObject payload) {
+    return postWithAuth("/profile/upload-avatar", payload);
+}
+
+// ✅✅✅ أضف هذه الدالة لتغيير كلمة المرور
+public ApiResponse changePassword(String currentPassword, String newPassword) {
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("current_password", currentPassword);
+        payload.put("new_password", newPassword);
+    } catch (Exception ignored) {}
+    return postWithAuth("/auth/change-password", payload);
+}
 
     // ===================== 👥 USERS =====================
 
