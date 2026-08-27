@@ -12,7 +12,7 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- ==================== 0. قسم المستخدم - الصورة والبيانات الأساسية ==================== -->
+        <!-- ==================== قسم المستخدم ==================== -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -142,7 +142,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ==================== 1. قسم المنظمة ==================== -->
+        <!-- ==================== قسم المنظمة ==================== -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -307,7 +307,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ==================== 3. قسم الأمان ==================== -->
+        <!-- ==================== قسم الأمان ==================== -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
