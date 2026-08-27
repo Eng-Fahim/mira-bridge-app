@@ -735,66 +735,109 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
-        playTone(true);
+    playTone(true);
 
-        String token = response.optString("token", "");
-        String roleStr = response.optString("role", "ADMIN");
-        String displayName = response.optString("display_name", username);
-        int userId = response.optInt("user_id", 0);
-        int branchId = response.optInt("branch_id", 1);
-        String branchName = response.optString("branch_name", "");
-        String branchCode = response.optString("branch_code", "");
-        String serverUrl = getText(etServerUrl);
-        
-        String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-        String apiKey = response.optString("api_key", "");
-        String gateId = response.optString("gate_id", "");
-        
-        if (!apiKey.isEmpty()) {
-            String effectiveGateId = !gateId.isEmpty() ? gateId : deviceId;
-            sessionManager.saveApiKey(apiKey);
-            sessionManager.saveGateId(effectiveGateId);
-            MiraServerConfig.getInstance(this).saveSession(apiKey, effectiveGateId, token);
-        }
-        
-        if (!serverUrl.isEmpty()) {
-            MiraServerConfig.getInstance(this).setBaseUrl(serverUrl);
-        }
-        
-        String permissionsJson = response.optString("permissions", "");
-        if (!permissionsJson.isEmpty()) {
-            PermissionManager pm = PermissionManager.getInstance(this);
-            pm.savePermissions(permissionsJson);
-        }
-
-        sessionManager.createLoginSession(username, roleStr, token, serverUrl);
-        sessionManager.setDisplayName(displayName);
-        sessionManager.setUserId(userId);
-
-        // حفظ بيانات البصمة
-        sessionManager.saveBiometricUser(username, roleStr, displayName, userId, token);
-        sessionManager.saveBiometricBranch(branchId, branchName);
-        
-        // التحقق من إعداد البصمة من السيرفر
-        boolean biometricEnabled = true;
-        if (response.data != null) {
-            biometricEnabled = response.data.optBoolean("biometric_enabled", true);
-        }
-        sessionManager.setBiometricLoginEnabled(biometricEnabled);
-
-        MiraBranchesManager bm = MiraBranchesManager.getInstance(this);
-        bm.setActiveBranch(branchId, branchName, branchCode, "", "");
-        bm.setUserBranchLocked(true);
-
-        restoreAllDataAfterLogin(() -> {
-            if (isActivityAlive()) {
-                Toast.makeText(this, (isArabic ? "أهلاً بك " : "Welcome ") + displayName + " ✓", 
-                    Toast.LENGTH_SHORT).show();
-                mainHandler.postDelayed(this::navigateToMain, 300);
-            }
-        });
+    String token = response.optString("token", "");
+    String roleStr = response.optString("role", "ADMIN");
+    String displayName = response.optString("display_name", username);
+    int userId = response.optInt("user_id", 0);
+    int branchId = response.optInt("branch_id", 1);
+    String branchName = response.optString("branch_name", "");
+    String branchCode = response.optString("branch_code", "");
+    String serverUrl = getText(etServerUrl);
+    
+    String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+    String apiKey = response.optString("api_key", "");
+    String gateId = response.optString("gate_id", "");
+    
+    if (!apiKey.isEmpty()) {
+        String effectiveGateId = !gateId.isEmpty() ? gateId : deviceId;
+        sessionManager.saveApiKey(apiKey);
+        sessionManager.saveGateId(effectiveGateId);
+        MiraServerConfig.getInstance(this).saveSession(apiKey, effectiveGateId, token);
+    }
+    
+    if (!serverUrl.isEmpty()) {
+        MiraServerConfig.getInstance(this).setBaseUrl(serverUrl);
+    }
+    
+    String permissionsJson = response.optString("permissions", "");
+    if (!permissionsJson.isEmpty()) {
+        PermissionManager pm = PermissionManager.getInstance(this);
+        pm.savePermissions(permissionsJson);
     }
 
+    sessionManager.createLoginSession(username, roleStr, token, serverUrl);
+    sessionManager.setDisplayName(displayName);
+    sessionManager.setUserId(userId);
+
+    // حفظ بيانات البصمة
+    sessionManager.saveBiometricUser(username, roleStr, displayName, userId, token);
+    sessionManager.saveBiometricBranch(branchId, branchName);
+    
+    // التحقق من إعداد البصمة من السيرفر
+    boolean biometricEnabled = true;
+    if (response.data != null) {
+        biometricEnabled = response.data.optBoolean("biometric_enabled", true);
+    }
+    sessionManager.setBiometricLoginEnabled(biometricEnabled);
+
+    MiraBranchesManager bm = MiraBranchesManager.getInstance(this);
+    bm.setActiveBranch(branchId, branchName, branchCode, "", "");
+    bm.setUserBranchLocked(true);
+
+    // ✅ عرض شاشة النجاح أولاً
+    showSuccessOverlay(displayName);
+    
+    // ✅ استعادة البيانات في الخلفية
+    restoreAllDataAfterLogin(() -> {
+        if (isActivityAlive()) {
+            // ✅ تأخير أطول للسماح للمستخدم برؤية شاشة النجاح
+            mainHandler.postDelayed(() -> {
+                if (isActivityAlive()) {
+                    navigateToMainWithAnimation();
+                }
+            }, 1500); // 1.5 ثانية
+        }
+    });
+}
+
+/**
+ * ✅ عرض شاشة نجاح جميلة
+ */
+private void showSuccessOverlay(String displayName) {
+    View successOverlay = findViewById(R.id.successOverlay);
+    MaterialTextView tvSuccessMessage = findViewById(R.id.tvSuccessMessage);
+    
+    if (successOverlay != null && tvSuccessMessage != null) {
+        String welcomeMessage = isArabic ? 
+            "أهلاً بك " + displayName + " 👋" : 
+            "Welcome " + displayName + " 👋";
+        tvSuccessMessage.setText(welcomeMessage);
+        
+        successOverlay.setVisibility(View.VISIBLE);
+        successOverlay.setAlpha(0f);
+        successOverlay.animate()
+            .alpha(1f)
+            .setDuration(400)
+            .setInterpolator(new AccelerateDecelerateInterpolator())
+            .start();
+    }
+}
+
+/**
+ * ✅ الانتقال مع أنيميشن سلس
+ */
+private void navigateToMainWithAnimation() {
+    Intent intent = new Intent(this, UHFMainActivity.class);
+    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+    intent.putExtra("fresh_start", true);
+    startActivity(intent);
+    
+    // ✅ أنيميشن انتقال مخصص
+    overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left);
+    finish();
+}
     private void restoreAllDataAfterLogin(Runnable onComplete) {
         executeSafeBg(() -> {
             try {
