@@ -42,7 +42,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     
     private static final int MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE = 1;
     private static final int RFID_INIT_TIMEOUT_MS = 10000; // 10 ثواني
-    
+    private int initRetryCount = 0;
     private final AtomicBoolean isDestroyed = new AtomicBoolean(false);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private ExecutorService executorService;
@@ -178,39 +178,45 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
      * ✅ معالجة نتيجة التهيئة
      */
     private void handleInitResult(boolean result) {
-        // ✅ إخفاء الحوار
-        dismissInitDialogSafely();
+    // ✅ إخفاء الحوار
+    dismissInitDialogSafely();
+    
+    // ✅ التحقق من أن النشاط ما زال موجوداً
+    if (isDestroyed.get() || isFinishing() || isDestroyed()) {
+        Log.w(TAG, "Activity destroyed - ignoring init result");
+        return;
+    }
+    
+    if (!result) {
+        isInitialized = false;
+        DeviceDetector.reset();
         
-        // ✅ التحقق من أن النشاط ما زال موجوداً
-        if (isDestroyed.get() || isFinishing() || isDestroyed()) {
-            Log.w(TAG, "Activity destroyed - ignoring init result");
-            return;
-        }
+        String errorMsg = "UHF Init Failed\nDevice: " + Build.MODEL;
+        Log.e(TAG, errorMsg);
+        toastMessageSafe(errorMsg);
         
-        if (!result) {
-            isInitialized = false;
-            DeviceDetector.reset();
-            
-            String errorMsg = "UHF Init Failed\nDevice: " + Build.MODEL;
-            Log.e(TAG, errorMsg);
-            toastMessageSafe(errorMsg);
-            
-            // ✅ إعادة المحاولة تلقائياً بعد 2 ثانية (اختياري)
+        // ✅ إعادة المحاولة مرة واحدة فقط
+        if (initRetryCount < 1) {
+            initRetryCount++;
             mainHandler.postDelayed(() -> {
                 if (!isDestroyed.get() && !isInitialized) {
-                    Log.i(TAG, "Retrying UHF init...");
+                    Log.i(TAG, "Retrying UHF init (attempt " + initRetryCount + ")");
                     initUHF();
                 }
-            }, 2000);
-            
+            }, 3000);
         } else {
-            isInitialized = true;
-            Log.i(TAG, "✅ UHF initialized successfully");
-            
-            // ✅ تكوين القارئ حسب الجهاز
-            configureReaderForDevice();
+            Log.w(TAG, "UHF init failed permanently - user can retry manually");
+            // ✅ إظهار رسالة نهائية
+            toastMessageSafe("UHF init failed - Please check device");
         }
+        
+    } else {
+        isInitialized = true;
+        initRetryCount = 0; // ✅ إعادة تعيين العداد عند النجاح
+        Log.i(TAG, "✅ UHF initialized successfully");
+        configureReaderForDevice();
     }
+}
 
     // ==================== PROGRESS DIALOG ====================
 
