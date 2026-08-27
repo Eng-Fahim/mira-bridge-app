@@ -64,6 +64,11 @@
         <item name="android:layout_marginTop">6dp</item>
         <item name="android:textStyle">bold</item>
     </style>
+    
+    <style name="CircleImageStyle">
+    <item name="cornerFamily">rounded</item>
+    <item name="cornerSize">50%</item>
+</style>
 
     <!-- Custom View Attributes for RFID / Radar components -->
     <declare-styleable name="RadarView">
