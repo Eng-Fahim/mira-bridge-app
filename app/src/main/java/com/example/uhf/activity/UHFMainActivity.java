@@ -144,13 +144,19 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void updateAppTitle() {
-        if (getSupportActionBar() != null) {
-            String orgName = orgProfileManager != null ? 
-                orgProfileManager.getDisplayName() : "MIRA";
-            getSupportActionBar().setTitle(orgName);
-        }
-        updateToolbarTitle();
+    // ✅✅✅ إضافة هذا الفحص
+    if (Looper.myLooper() != Looper.getMainLooper()) {
+        mainHandler.post(this::updateAppTitle);
+        return;
     }
+    
+    if (getSupportActionBar() != null) {
+        String orgName = orgProfileManager != null ? 
+            orgProfileManager.getDisplayName() : "MIRA";
+        getSupportActionBar().setTitle(orgName);
+    }
+    updateToolbarTitle();
+}
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -1179,4 +1185,4 @@ private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dia
             }
         }
     }
-}
+        }
