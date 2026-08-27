@@ -408,52 +408,49 @@ public class MiraProfileFragment extends Fragment {
     }
 
     private void fetchProfileFromServer() {
-        if (isDestroyed.get() || !isAdded()) return;
-        
-        showLoading(true);
+    if (isDestroyed.get() || !isAdded()) return;
+    
+    // ❌❌❌ احذف هذا السطر - يسبب الوميض
+    // showLoading(true);
 
-        executeSafely(() -> {
-            try {
-                MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
+    executeSafely(() -> {
+        try {
+            MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONObject user = response.data.optJSONObject("user");
+                JSONObject org = response.data.optJSONObject("organization");
                 
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject user = response.data.optJSONObject("user");
-                    JSONObject org = response.data.optJSONObject("organization");
-                    
-                    if (org != null) {
-                        orgProfileManager.saveFromServer(org);
-                    }
-                    
-                    if (user != null) {
-                        String displayName = user.optString("display_name", "");
-                        String role = user.optString("role", "");
-                        String phone = user.optString("phone", "");
-                        
-                        if (!TextUtils.isEmpty(displayName)) sessionManager.setDisplayName(displayName);
-                        if (!TextUtils.isEmpty(role)) sessionManager.setRole(role);
-                        if (!TextUtils.isEmpty(phone)) sessionManager.setPhone(phone);
-                    }
-                    
-                    final JSONObject finalUser = user;
-                    final JSONObject finalOrg = org;
-                    
-                    mainHandler.post(() -> {
-                        if (!isDestroyed.get() && isAdded()) {
-                            updateUIWithData(finalUser, finalOrg);
-                        }
-                    });
+                if (org != null) {
+                    orgProfileManager.saveFromServer(org);
                 }
-            } catch (Exception e) {
-                logNonFatal("fetchProfileFromServer.thread", e);
-            } finally {
+                
+                if (user != null) {
+                    String displayName = user.optString("display_name", "");
+                    String role = user.optString("role", "");
+                    String phone = user.optString("phone", "");
+                    
+                    if (!TextUtils.isEmpty(displayName)) sessionManager.setDisplayName(displayName);
+                    if (!TextUtils.isEmpty(role)) sessionManager.setRole(role);
+                    if (!TextUtils.isEmpty(phone)) sessionManager.setPhone(phone);
+                }
+                
+                final JSONObject finalUser = user;
+                final JSONObject finalOrg = org;
+                
                 mainHandler.post(() -> {
                     if (!isDestroyed.get() && isAdded()) {
-                        showLoading(false);
+                        updateUIWithData(finalUser, finalOrg);
                     }
                 });
             }
-        });
-    }
+        } catch (Exception e) {
+            logNonFatal("fetchProfileFromServer.thread", e);
+        }
+        // ❌❌❌ احذف هذا السطر أيضاً
+        // showLoading(false);
+    });
+}
 
     private void updateUIWithData(JSONObject user, JSONObject org) {
         if (user != null) {
