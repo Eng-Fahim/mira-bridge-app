@@ -357,46 +357,61 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void attemptApiLogin() {
-        String username = getText(etUsername);
-        String password = getText(etPassword);
+    String username = getText(etUsername);
+    String password = getText(etPassword);
 
-        if (username.isEmpty()) {
-            tilUsername.setError(isArabic ? "اسم المستخدم مطلوب" : "Username required");
-            shakeView(tilUsername);
-            playTone(false);
-            return;
-        }
-        if (password.length() < 4) {
-            tilPassword.setError(isArabic ? "كلمة المرور قصيرة جداً" : "Password too short");
-            shakeView(tilPassword);
-            playTone(false);
-            return;
-        }
-
-        tilUsername.setError(null);
-        tilPassword.setError(null);
-        showLoading(true);
-
-        executeSafeBg(() -> {
-            String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-            MiraApiClient.ApiResponse response = apiClient.login(username, password, deviceId);
-            
-            mainHandler.post(() -> {
-                if (!isActivityAlive()) return;
-                showLoading(false);
-                if (response != null && response.isSuccess) {
-                    handleLoginSuccess(response, username, password);
-                } else {
-                    playTone(false);
-                    String errorMsg = response != null
-                        ? response.optString("message", isArabic ? "بيانات الاعتماد غير صالحة" : "Invalid credentials")
-                        : (isArabic ? "فشل الاتصال بالخادم" : "Connection failed");
-                    Toast.makeText(LoginActivity.this, errorMsg, Toast.LENGTH_LONG).show();
-                    shakeView(loginCard);
-                }
-            });
-        });
+    if (username.isEmpty()) {
+        tilUsername.setError(isArabic ? "اسم المستخدم مطلوب" : "Username required");
+        shakeView(tilUsername);
+        playTone(false);
+        return;
     }
+    if (password.length() < 4) {
+        tilPassword.setError(isArabic ? "كلمة المرور قصيرة جداً" : "Password too short");
+        shakeView(tilPassword);
+        playTone(false);
+        return;
+    }
+
+    tilUsername.setError(null);
+    tilPassword.setError(null);
+    showLoading(true);
+
+    executeSafeBg(() -> {
+        String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        MiraApiClient.ApiResponse response = apiClient.login(username, password, deviceId);
+        
+        mainHandler.post(() -> {
+            if (!isActivityAlive()) return;
+            showLoading(false);
+            
+            if (response != null && response.isSuccess) {
+                // ✅✅✅ التحقق من حالة المستخدم
+                String userStatus = "active";
+                if (response.data != null) {
+                    userStatus = response.data.optString("user_status", "active");
+                }
+                
+                if ("suspended".equals(userStatus)) {
+                    playTone(false);
+                    Toast.makeText(LoginActivity.this, 
+                        isArabic ? "⛔ حسابك موقوف - تواصل مع الإدارة" : "⛔ Account suspended - Contact admin",
+                        Toast.LENGTH_LONG).show();
+                    return;
+                }
+                
+                handleLoginSuccess(response, username, password);
+            } else {
+                playTone(false);
+                String errorMsg = response != null
+                    ? (response.data != null ? response.data.optString("message", isArabic ? "بيانات الاعتماد غير صالحة" : "Invalid credentials") : (isArabic ? "بيانات الاعتماد غير صالحة" : "Invalid credentials"))
+                    : (isArabic ? "فشل الاتصال بالخادم" : "Connection failed");
+                Toast.makeText(LoginActivity.this, errorMsg, Toast.LENGTH_LONG).show();
+                shakeView(loginCard);
+            }
+        });
+    });
+}
 
     private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
         playTone(true);
