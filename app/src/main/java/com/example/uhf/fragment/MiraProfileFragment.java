@@ -151,18 +151,30 @@ public class MiraProfileFragment extends Fragment {
     }
 
     private void setupImagePicker() {
-        imagePickerLauncher = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                if (result.getResultCode() == android.app.Activity.RESULT_OK && result.getData() != null) {
-                    Uri imageUri = result.getData().getData();
-                    if (imageUri != null) {
-                        uploadProfileImage(imageUri);
-                    }
+    imagePickerLauncher = registerForActivityResult(
+        new ActivityResultContracts.StartActivityForResult(),
+        result -> {
+            if (result.getResultCode() == android.app.Activity.RESULT_OK && result.getData() != null) {
+                Uri imageUri = result.getData().getData();
+                if (imageUri != null) {
+                    uploadProfileImage(imageUri);
                 }
             }
-        );
+        }
+    );
+}
+
+// ✅✅✅ أضف هنا
+private void pickImage() {
+    try {
+        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        intent.setType("image/*");
+        imagePickerLauncher.launch(intent);
+    } catch (Exception e) {
+        logNonFatal("pickImage", e);
+        showToast(isArabic ? "❌ تعذر فتح المعرض" : "❌ Could not open gallery");
     }
+}
 
     private void setupListeners(View root) {
         // ✅ زر تعديل المنظمة
