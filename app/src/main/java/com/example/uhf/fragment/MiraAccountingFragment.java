@@ -36,6 +36,7 @@ import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.PermissionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.tabs.TabLayout;
+import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -45,6 +46,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MiraAccountingFragment extends Fragment {
 
@@ -54,7 +57,12 @@ public class MiraAccountingFragment extends Fragment {
     private MiraBranchesManager branchesManager;
     private PermissionManager permissionManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    
+    // ✅✅✅ استخدام ExecutorService ثابت - لا يُغلق أبداً
+    private static final ExecutorService executor = Executors.newFixedThreadPool(3);
+    
+    // ✅ AtomicBoolean للتحقق من حالة الفراغمنت
+    private final AtomicBoolean isDestroyed = new AtomicBoolean(false);
 
     private RecyclerView rvAccountingData;
     private ProgressBar pbLoading;
@@ -77,6 +85,8 @@ public class MiraAccountingFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_mira_accounting, container, false);
+        
+        isDestroyed.set(false); // ✅ إعادة تعيين الحالة
         
         apiClient = MiraApiClient.getInstance(requireContext());
         branchesManager = MiraBranchesManager.getInstance(requireContext());
@@ -164,9 +174,7 @@ public class MiraAccountingFragment extends Fragment {
                 if (permissionManager.canEdit("accounting") || permissionManager.isAdmin()) {
                     showCreateEntryDialog();
                 } else {
-                    Toast.makeText(getContext(), 
-                        isArabic ? "⛔ غير مصرح لك بإنشاء قيود" : "⛔ Access Denied",
-                        Toast.LENGTH_SHORT).show();
+                    showToast(isArabic ? "⛔ غير مصرح لك بإنشاء قيود" : "⛔ Access Denied");
                 }
             });
         }
@@ -179,9 +187,7 @@ public class MiraAccountingFragment extends Fragment {
                             new MiraFinancialReportsFragment(), "FinancialReports");
                     }
                 } else {
-                    Toast.makeText(getContext(), 
-                        isArabic ? "⛔ غير مصرح لك بالوصول للتقارير المالية" : "⛔ Access Denied",
-                        Toast.LENGTH_SHORT).show();
+                    showToast(isArabic ? "⛔ غير مصرح لك بالوصول للتقارير المالية" : "⛔ Access Denied");
                 }
             });
         }
@@ -197,7 +203,13 @@ public class MiraAccountingFragment extends Fragment {
         }
     }
 
+    /**
+     * ✅ تحميل البيانات - مع تنفيذ آمن
+     */
     private void loadData(String tab) {
+        if (isDestroyed.get() || !isAdded()) return;
+        
+        // ✅ التحقق من الصلاحيات
         if (!permissionManager.canView("accounting") && !permissionManager.isAdmin() && 
             !permissionManager.isBranchManager() && 
             !"AUDITOR".equals(new com.example.uhf.tools.SessionManager(requireContext()).getRoleString())) {
@@ -212,7 +224,8 @@ public class MiraAccountingFragment extends Fragment {
         if (pbLoading != null) pbLoading.setVisibility(View.VISIBLE);
         if (tvEmptyData != null) tvEmptyData.setVisibility(View.GONE);
         
-        executor.execute(() -> {
+        // ✅✅✅ استخدام executeSafely بدلاً من executor.execute مباشرة
+        executeSafely(() -> {
             try {
                 int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
                 String branchIdStr = String.valueOf(branchId);
@@ -234,6 +247,8 @@ public class MiraAccountingFragment extends Fragment {
                 final MiraApiClient.ApiResponse finalResponse = response;
                 
                 mainHandler.post(() -> {
+                    if (isDestroyed.get() || !isAdded()) return;
+                    
                     if (pbLoading != null) pbLoading.setVisibility(View.GONE);
                     
                     if (finalResponse != null && finalResponse.isSuccess && finalResponse.data != null) {
@@ -243,8 +258,9 @@ public class MiraAccountingFragment extends Fragment {
                     }
                 });
             } catch (Exception e) {
-                Log.e(TAG, "Error: " + e.getMessage(), e);
+                logNonFatal("loadData.thread", e);
                 mainHandler.post(() -> {
+                    if (isDestroyed.get() || !isAdded()) return;
                     if (pbLoading != null) pbLoading.setVisibility(View.GONE);
                     showEmptyState(true);
                 });
@@ -252,10 +268,36 @@ public class MiraAccountingFragment extends Fragment {
         });
     }
 
+    /**
+     * ✅ تنفيذ آمن مع Fallback
+     */
+    private void executeSafely(Runnable task) {
+        // ✅ التحقق من أن الـ Executor يعمل
+        if (executor != null && !executor.isShutdown() && !executor.isTerminated()) {
+            try {
+                executor.execute(task);
+                return;
+            } catch (RejectedExecutionException e) {
+                logNonFatal("executeSafely.rejected", e);
+            }
+        }
+        
+        // ✅ Fallback: استخدام Thread مباشرة
+        new Thread(task).start();
+    }
+
     private void parseAndDisplay(JSONObject data, String tab) {
         try {
             entriesList.clear();
             JSONArray items = data.optJSONArray("data");
+            
+            if (items == null) {
+                // ✅ قد يكون في صيغة أخرى
+                JSONObject dataObj = data.optJSONObject("data");
+                if (dataObj != null) {
+                    items = dataObj.optJSONArray("entries");
+                }
+            }
             
             if (items != null && items.length() > 0) {
                 for (int i = 0; i < items.length(); i++) {
@@ -294,7 +336,7 @@ public class MiraAccountingFragment extends Fragment {
             showEmptyState(entriesList.isEmpty());
             
         } catch (Exception e) {
-            Log.e(TAG, "Error parsing: " + e.getMessage());
+            logNonFatal("parseAndDisplay", e);
             showEmptyState(true);
         }
     }
@@ -352,6 +394,8 @@ public class MiraAccountingFragment extends Fragment {
     }
 
     private void showEmptyState(boolean show) {
+        if (isDestroyed.get() || !isAdded()) return;
+        
         if (tvEmptyData != null) {
             tvEmptyData.setVisibility(show ? View.VISIBLE : View.GONE);
         }
@@ -361,12 +405,10 @@ public class MiraAccountingFragment extends Fragment {
     }
 
     private void showCreateEntryDialog() {
-        if (getContext() == null) return;
+        if (getContext() == null || isDestroyed.get()) return;
         
         if (!permissionManager.canEdit("accounting") && !permissionManager.isAdmin()) {
-            Toast.makeText(getContext(), 
-                isArabic ? "⛔ غير مصرح" : "⛔ Access Denied",
-                Toast.LENGTH_SHORT).show();
+            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
             return;
         }
         
@@ -402,9 +444,7 @@ public class MiraAccountingFragment extends Fragment {
                 String cashStr = etCashAmount != null ? etCashAmount.getText().toString().trim() : "";
                 
                 if (ref.isEmpty() || desc.isEmpty()) {
-                    Toast.makeText(getContext(), 
-                        isArabic ? "يرجى تعبئة المرجع والبيان" : "Please fill reference and description", 
-                        Toast.LENGTH_SHORT).show();
+                    showToast(isArabic ? "يرجى تعبئة المرجع والبيان" : "Please fill reference and description");
                     return;
                 }
                 
@@ -420,8 +460,11 @@ public class MiraAccountingFragment extends Fragment {
         dialog.show();
     }
 
+    /**
+     * ✅ إنشاء قيد محاسبي - مع تنفيذ آمن
+     */
     private void createJournalEntry(String ref, String desc, double grossWeight, String karat, double cashAmount) {
-        executor.execute(() -> {
+        executeSafely(() -> {
             try {
                 JSONObject payload = new JSONObject();
                 payload.put("reference", ref);
@@ -461,24 +504,21 @@ public class MiraAccountingFragment extends Fragment {
                 MiraApiClient.ApiResponse response = apiClient.createJournalEntry(payload);
                 
                 mainHandler.post(() -> {
+                    if (isDestroyed.get() || !isAdded()) return;
+                    
                     if (response != null && response.isSuccess) {
-                        Toast.makeText(getContext(), 
-                            isArabic ? "✅ تم إنشاء القيد" : "✅ Entry created", 
-                            Toast.LENGTH_SHORT).show();
+                        showToast(isArabic ? "✅ تم إنشاء القيد" : "✅ Entry created");
                         loadData(currentTab);
                     } else {
                         String error = response != null ? response.error : "Unknown";
-                        Toast.makeText(getContext(), 
-                            isArabic ? "❌ فشل: " + error : "❌ Failed: " + error, 
-                            Toast.LENGTH_LONG).show();
+                        showToast((isArabic ? "❌ فشل: " : "❌ Failed: ") + error);
                     }
                 });
             } catch (Exception e) {
-                e.printStackTrace();
+                logNonFatal("createJournalEntry.thread", e);
                 mainHandler.post(() -> {
-                    Toast.makeText(getContext(), 
-                        isArabic ? "❌ خطأ في الإنشاء" : "❌ Error", 
-                        Toast.LENGTH_SHORT).show();
+                    if (isDestroyed.get() || !isAdded()) return;
+                    showToast(isArabic ? "❌ خطأ في الإنشاء" : "❌ Error");
                 });
             }
         });
@@ -495,12 +535,41 @@ public class MiraAccountingFragment extends Fragment {
         }
     }
 
+    /**
+     * ✅ عرض Toast بأمان
+     */
+    private void showToast(String message) {
+        try {
+            if (isAdded() && !isDestroyed.get() && getContext() != null) {
+                Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            logNonFatal("showToast", e);
+        }
+    }
+
+    /**
+     * ✅ تسجيل الأخطاء في Crashlytics
+     */
+    private void logNonFatal(String location, Throwable throwable) {
+        try {
+            Log.e(TAG, location + ": " + throwable.getMessage(), throwable);
+            FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
+            crashlytics.setCustomKey("error_location", location);
+            crashlytics.setCustomKey("fragment", "MiraAccountingFragment");
+            crashlytics.recordException(throwable);
+        } catch (Exception e) {
+            Log.e(TAG, "logNonFatal error: " + e.getMessage());
+        }
+    }
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        if (executor != null && !executor.isShutdown()) {
-            executor.shutdown();
-        }
+        isDestroyed.set(true);
+        mainHandler.removeCallbacksAndMessages(null);
+        
+        // ❌ لا تغلق الـ Executor هنا - إنه ثابت
     }
 
     private static class AccountingEntry {
