@@ -61,6 +61,8 @@ import com.example.uhf.fragment.MiraProfileFragment;
 import com.example.uhf.fragment.UsersManagementFragment;
 import com.example.uhf.fragment.MiraUHFReadWriteFragment;
 import com.example.uhf.manager.MiraBranchesManager;
+
+import com.example.uhf.fragment.MiraBranchesManagementFragment;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.MiraLanguageHelper;
 import com.example.uhf.tools.SessionManager;
@@ -361,7 +363,7 @@ public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         return true;
     } else if (id == R.id.action_branches) {
         // ✅✅✅ إضافة معالج الفروع
-        checkInventoryLockAndExecute(() -> loadFragment(new MiraBranchesFragment(), "Branches"));
+        checkInventoryLockAndExecute(() -> loadFragment(new MiraBranchesManagementFragment(), "Branches"));
         return true;
     } else if (id == R.id.action_gold_rates) {
         checkInventoryLockAndExecute(() -> loadFragment(new MiraGoldCurrencyFragment(), "GoldRates"));
@@ -693,7 +695,7 @@ private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dia
     
     switch (tag) {
         case "Dashboard": return new MiraDashboardFragment();
-        case "Branches": return new MiraBranchesFragment(); // ✅✅✅ إضافة
+        case "Branches": return new MiraBranchesManagementFragment(); // ✅✅✅ إضافة
         case "Scan": return new MiraInventoryProFragment();
         case "POS": return new MiraPosFragment();
         case "Transfers": return new MiraTransferFragment();
@@ -1177,4 +1179,4 @@ private void applyQuickActionButton(View root, int viewId, BottomSheetDialog dia
             }
         }
     }
-        }
+}
