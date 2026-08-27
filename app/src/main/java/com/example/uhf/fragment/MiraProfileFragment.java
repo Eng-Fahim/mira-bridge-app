@@ -30,7 +30,6 @@ import android.content.SharedPreferences;
 import android.graphics.BitmapFactory;
 
 
-import com.bumptech.glide.Glide;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
