@@ -623,10 +623,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    /**
-     * ✅ جلب البيانات مع تسجيل الأخطاء في Crashlytics
-     */
-    /**
+   /**
  * ✅ جلب البيانات مع تسجيل مفصل في Crashlytics
  */
 private void fetchData() {
@@ -640,9 +637,10 @@ private void fetchData() {
         
         isLoading.set(true);
         
+        // ✅ لا تغير حالة الاتصال هنا - فقط أظهر التحميل
         if (tvLiveStatus != null) {
-            tvLiveStatus.setText(isArabic ? "جاري التحديث..." : "Updating...");
-            tvLiveStatus.setTextColor(0xFFF59E0B);
+            tvLiveStatus.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
+            tvLiveStatus.setTextColor(0xFFF59E0B); // لون برتقالي
         }
         
         cancelFuture(dataFuture);
@@ -658,31 +656,25 @@ private void fetchData() {
                         if (!isAdded()) return;
                         
                         if (response != null && response.isSuccess && response.data != null) {
-                            // ✅ نجاح - إعادة تعيين العداد
+                            // ✅ نجاح
                             saveOfflineData(response.data);
                             processData(response.data);
                             isDataLoaded = true;
                             consecutiveFailures = 0;
                             
+                            // ✅✅✅ إعادة تعيين حالة الاتصال إلى "متصل"
+                            updateLiveStatusAfterSuccess();
+                            
                             // ✅ إزالة Custom Keys عند النجاح
                             clearCrashlyticsCustomKeys();
                         } else {
-                            // ✅✅✅ تسجيل مفصل مع Custom Keys
-                            FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
-                            crashlytics.setCustomKey("api_response_code", response != null ? response.code : -1);
-                            crashlytics.setCustomKey("active_branch_id", activeBranchId);
-                            crashlytics.setCustomKey("api_endpoint", "/dashboard/full");
-                            crashlytics.setCustomKey("error_type", "api_error");
-                            
-                            if (response != null && response.error != null) {
-                                crashlytics.setCustomKey("api_error_message", response.error);
-                            }
-                            
+                            // ✅ فشل الاستجابة
                             logNonFatal("fetchData.response", new Exception(
-                                "Dashboard API Failed - code=" + (response != null ? response.code : -1) + 
-                                ", error=" + (response != null ? response.error : "null response") +
-                                ", branch_id=" + activeBranchId
+                                "Dashboard API Failed - code=" + (response != null ? response.code : -1)
                             ));
+                            
+                            // ✅✅✅ إعادة تعيين حالة الاتصال إلى "غير متصل"
+                            updateLiveStatusAfterFailure();
                             
                             fetchInventoryDataDirectly(activeBranchId);
                         }
@@ -693,13 +685,6 @@ private void fetchData() {
                     }
                 });
             } catch (Exception e) {
-                // ✅✅✅ استثناء في الـ Thread - تسجيل مفصل
-                FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
-                crashlytics.setCustomKey("active_branch_id", activeBranchId);
-                crashlytics.setCustomKey("api_endpoint", "/dashboard/full");
-                crashlytics.setCustomKey("error_type", "thread_exception");
-                crashlytics.setCustomKey("exception_class", e.getClass().getSimpleName());
-                
                 logNonFatal("fetchData.thread", e);
                 
                 mainHandler.post(() -> {
@@ -708,6 +693,9 @@ private void fetchData() {
                         if (!isAdded()) return;
                         
                         consecutiveFailures++;
+                        
+                        // ✅✅✅ إعادة تعيين حالة الاتصال إلى "غير متصل"
+                        updateLiveStatusAfterFailure();
                         
                         loadOfflineData();
                         showShimmer(false);
@@ -732,12 +720,41 @@ private void fetchData() {
 }
 
 /**
- * ✅ جلب بيانات المخزون مباشرة - مع تسجيل مفصل
+ * ✅✅✅ تحديث حالة الاتصال بعد النجاح
+ */
+private void updateLiveStatusAfterSuccess() {
+    try {
+        if (tvLiveStatus != null && isAdded()) {
+            tvLiveStatus.setText(isArabic ? "🟢 متصل" : "🟢 Online");
+            tvLiveStatus.setTextColor(0xFF16A34A); // لون أخضر
+        }
+    } catch (Exception e) {
+        logNonFatal("updateLiveStatusAfterSuccess", e);
+    }
+}
+
+/**
+ * ✅✅✅ تحديث حالة الاتصال بعد الفشل
+ */
+private void updateLiveStatusAfterFailure() {
+    try {
+        if (tvLiveStatus != null && isAdded()) {
+            tvLiveStatus.setText(isArabic ? "🔴 غير متصل" : "🔴 Offline");
+            tvLiveStatus.setTextColor(0xFFDC2626); // لون أحمر
+        }
+    } catch (Exception e) {
+        logNonFatal("updateLiveStatusAfterFailure", e);
+    }
+}
+
+/**
+ * ✅ جلب بيانات المخزون مباشرة - مع تسجيل مفصل وتحديث حالة الاتصال
  */
 private void fetchInventoryDataDirectly(int branchId) {
     try {
         if (apiClient == null || branchId <= 0) {
             loadOfflineData();
+            updateLiveStatusAfterFailure(); // ✅ إضافة
             return;
         }
         
@@ -773,8 +790,15 @@ private void fetchInventoryDataDirectly(int branchId) {
                                     .apply();
                             }
                             
+                            // ✅✅✅ نجاح - تحديث حالة الاتصال
+                            updateLiveStatusAfterSuccess();
+                            
                             // ✅ نجاح - إزالة Custom Keys
                             clearCrashlyticsCustomKeys();
+                            
+                            // ✅ إخفاء shimmer
+                            showShimmer(false);
+                            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                         } else {
                             // ✅✅✅ تسجيل مفصل للفشل
                             FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
@@ -783,32 +807,68 @@ private void fetchInventoryDataDirectly(int branchId) {
                             crashlytics.setCustomKey("api_endpoint", "/branches/" + branchId + "/inventory");
                             crashlytics.setCustomKey("error_type", "fallback_api_error");
                             
+                            if (response != null && response.error != null) {
+                                crashlytics.setCustomKey("api_error_message", response.error);
+                            }
+                            
                             logNonFatal("fetchInventoryDataDirectly.response", new Exception(
                                 "Inventory API Failed - code=" + (response != null ? response.code : -1) + 
                                 ", error=" + (response != null ? response.error : "null response") +
                                 ", branch_id=" + branchId
                             ));
                             
+                            // ✅✅✅ فشل - تحديث حالة الاتصال
+                            updateLiveStatusAfterFailure();
+                            
+                            // ✅ تحميل البيانات المحلية
                             loadOfflineData();
+                            
+                            // ✅ إخفاء shimmer
+                            showShimmer(false);
+                            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                         }
                     } catch (Exception e) {
                         logNonFatal("fetchInventoryDataDirectly.post", e);
                         loadOfflineData();
+                        updateLiveStatusAfterFailure(); // ✅ إضافة
+                        
+                        // ✅ إخفاء shimmer
+                        showShimmer(false);
+                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                     }
                 });
             } catch (Exception e) {
+                // ✅✅✅ استثناء في الـ Thread
                 FirebaseCrashlytics crashlytics = FirebaseCrashlytics.getInstance();
                 crashlytics.setCustomKey("active_branch_id", branchId);
                 crashlytics.setCustomKey("api_endpoint", "/branches/" + branchId + "/inventory");
                 crashlytics.setCustomKey("error_type", "fallback_thread_exception");
+                crashlytics.setCustomKey("exception_class", e.getClass().getSimpleName());
                 
                 logNonFatal("fetchInventoryDataDirectly.thread", e);
-                mainHandler.post(() -> loadOfflineData());
+                
+                mainHandler.post(() -> {
+                    try {
+                        loadOfflineData();
+                        updateLiveStatusAfterFailure(); // ✅ إضافة
+                        
+                        // ✅ إخفاء shimmer
+                        showShimmer(false);
+                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                    } catch (Exception e2) {
+                        logNonFatal("fetchInventoryDataDirectly.post.error", e2);
+                    }
+                });
             }
         });
     } catch (Exception e) {
         logNonFatal("fetchInventoryDataDirectly", e);
         loadOfflineData();
+        updateLiveStatusAfterFailure(); // ✅ إضافة
+        
+        // ✅ إخفاء shimmer
+        showShimmer(false);
+        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
     }
 }
 
@@ -918,25 +978,38 @@ private void logNonFatal(String location, Throwable throwable) {
         }
     }
 
-    private void refreshAllData() {
-        try {
-            showShimmer(true);
-            fetchData();
-            
-            long now = System.currentTimeMillis();
-            if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
-                if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
-                    fetchLiveGoldPrices(true);
-                } else {
-                    displayGoldPricesFromCache();
-                    showShimmer(false);
-                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                }
-            }
-        } catch (Exception e) {
-            logNonFatal("refreshAllData", e);
+   private void refreshAllData() {
+    try {
+        showShimmer(true);
+        
+        // ✅✅✅ تحديث حالة الاتصال قبل البدء
+        if (tvLiveStatus != null) {
+            tvLiveStatus.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
+            tvLiveStatus.setTextColor(0xFFF59E0B);
         }
+        
+        fetchData();
+        
+        long now = System.currentTimeMillis();
+        if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
+            if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+                fetchLiveGoldPrices(true);
+            } else {
+                displayGoldPricesFromCache();
+                showShimmer(false);
+                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                
+                // ✅✅✅ إعادة تعيين حالة الاتصال
+                updateLiveStatusAfterSuccess();
+            }
+        } else {
+            showShimmer(false);
+            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+        }
+    } catch (Exception e) {
+        logNonFatal("refreshAllData", e);
     }
+}
 
     private void showShimmer(boolean show) {
         try {
