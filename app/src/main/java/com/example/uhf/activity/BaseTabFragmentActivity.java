@@ -4,9 +4,10 @@ import android.Manifest;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -27,24 +28,66 @@ import com.example.uhf.tools.UIHelper;
 import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.utility.StringUtility;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class BaseTabFragmentActivity extends AppCompatActivity {
 
+    private static final String TAG = "BaseTabFragmentActivity";
+    
     public RFIDWithUHFUART mReader;
     public KeyDwonFragment currentFragment = null;
     public int TidLen = 6;
+    
     private static final int MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE = 1;
+    private static final int RFID_INIT_TIMEOUT_MS = 10000; // 10 ثواني
+    
+    private final AtomicBoolean isDestroyed = new AtomicBoolean(false);
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private ExecutorService executorService;
+    
     private boolean isInitialized = false;
+    private ProgressDialog initDialog;
+    private long initStartTime = 0;
 
     private static final int[] SCAN_KEY_CODES = {
         139, 280, 291, 293, 294, 311, 312, 313, 315, 591, 593, 594, 596
     };
 
+    // ==================== LIFECYCLE ====================
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        isDestroyed.set(false);
+        
+        // ✅ طلب إذن القراءة من التخزين الخارجي
+        checkStoragePermission();
+    }
+
+    @Override
+    protected void onDestroy() {
+        isDestroyed.set(true);
+        
+        // ✅ إلغاء الحوار إذا كان معروضاً
+        dismissInitDialogSafely();
+        
+        // ✅ إيقاف ExecutorService
+        shutdownExecutorSafely();
+        
+        // ✅ تحرير القارئ
+        freeReaderSafely();
+        
+        // ✅ إزالة جميع المهام المؤجلة
+        mainHandler.removeCallbacksAndMessages(null);
+        
+        super.onDestroy();
+    }
+
+    // ==================== PERMISSIONS ====================
+
+    private void checkStoragePermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
@@ -53,22 +96,207 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
         }
     }
 
-    public void initUHF() {
-        try {
-            mReader = RFIDWithUHFUART.getInstance();
-        } catch (Exception ex) {
-            toastMessage("Failed to get UHF instance: " + ex.getMessage());
-            Log.e("UHF", "getInstance failed", ex);
-            return;
-        }
-        if (mReader != null) {
-            new InitTask().execute();
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        
+        if (requestCode == MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE) {
+            boolean granted = grantResults.length > 0 && 
+                            grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            
+            Log.i(TAG, granted ? 
+                "✅ SD Card permission granted" : 
+                "❌ SD Card permission denied");
+            
+            if (!granted) {
+                // ✅ يمكن إضافة تنبيه للمستخدم هنا
+                Log.w(TAG, "Storage permission denied - some features may not work");
+            }
         }
     }
 
+    // ==================== UHF INITIALIZATION ====================
+
+    /**
+     * ✅ تهيئة قارئ UHF بشكل آمن
+     */
+    public void initUHF() {
+        if (isDestroyed.get()) {
+            Log.w(TAG, "Activity destroyed - skipping UHF init");
+            return;
+        }
+        
+        try {
+            mReader = RFIDWithUHFUART.getInstance();
+        } catch (Exception ex) {
+            Log.e(TAG, "Failed to get UHF instance", ex);
+            toastMessageSafe("Failed to get UHF instance: " + ex.getMessage());
+            return;
+        }
+        
+        if (mReader != null) {
+            initializeReaderAsync();
+        }
+    }
+
+    /**
+     * ✅ تهيئة القارئ في خيط منفصل مع التحقق من الحالة
+     */
+    private void initializeReaderAsync() {
+        // ✅ عرض حوار التحميل
+        showInitDialog();
+        initStartTime = System.currentTimeMillis();
+        
+        // ✅ إنشاء ExecutorService إذا لم يكن موجوداً
+        if (executorService == null || executorService.isShutdown()) {
+            executorService = Executors.newSingleThreadExecutor();
+        }
+        
+        executorService.execute(() -> {
+            try {
+                // ✅ تهيئة القارئ
+                boolean result = mReader.init(BaseTabFragmentActivity.this);
+                
+                // ✅ التحقق من المهلة
+                long elapsed = System.currentTimeMillis() - initStartTime;
+                if (elapsed > RFID_INIT_TIMEOUT_MS) {
+                    Log.w(TAG, "UHF init took too long: " + elapsed + "ms");
+                }
+                
+                // ✅ العودة للخيط الرئيسي
+                mainHandler.post(() -> handleInitResult(result));
+                
+            } catch (Exception e) {
+                Log.e(TAG, "UHF init error", e);
+                mainHandler.post(() -> handleInitResult(false));
+            }
+        });
+    }
+
+    /**
+     * ✅ معالجة نتيجة التهيئة
+     */
+    private void handleInitResult(boolean result) {
+        // ✅ إخفاء الحوار
+        dismissInitDialogSafely();
+        
+        // ✅ التحقق من أن النشاط ما زال موجوداً
+        if (isDestroyed.get() || isFinishing() || isDestroyed()) {
+            Log.w(TAG, "Activity destroyed - ignoring init result");
+            return;
+        }
+        
+        if (!result) {
+            isInitialized = false;
+            DeviceDetector.reset();
+            
+            String errorMsg = "UHF Init Failed\nDevice: " + Build.MODEL;
+            Log.e(TAG, errorMsg);
+            toastMessageSafe(errorMsg);
+            
+            // ✅ إعادة المحاولة تلقائياً بعد 2 ثانية (اختياري)
+            mainHandler.postDelayed(() -> {
+                if (!isDestroyed.get() && !isInitialized) {
+                    Log.i(TAG, "Retrying UHF init...");
+                    initUHF();
+                }
+            }, 2000);
+            
+        } else {
+            isInitialized = true;
+            Log.i(TAG, "✅ UHF initialized successfully");
+            
+            // ✅ تكوين القارئ حسب الجهاز
+            configureReaderForDevice();
+        }
+    }
+
+    // ==================== PROGRESS DIALOG ====================
+
+    /**
+     * ✅ عرض حوار التحميل بأمان
+     */
+    private void showInitDialog() {
+        if (isDestroyed.get() || isFinishing() || isDestroyed()) {
+            return;
+        }
+        
+        try {
+            dismissInitDialogSafely();
+            
+            initDialog = new ProgressDialog(this);
+            initDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+            initDialog.setMessage("Initializing UHF...");
+            initDialog.setCanceledOnTouchOutside(false);
+            initDialog.setCancelable(false);
+            initDialog.show();
+        } catch (Exception e) {
+            Log.e(TAG, "Show dialog error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ إخفاء حوار التحميل بأمان
+     */
+    private void dismissInitDialogSafely() {
+        try {
+            if (initDialog != null && initDialog.isShowing()) {
+                initDialog.dismiss();
+            }
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Dismiss dialog error: " + e.getMessage());
+        } catch (Exception e) {
+            Log.e(TAG, "Dismiss dialog unexpected error: " + e.getMessage());
+        } finally {
+            initDialog = null;
+        }
+    }
+
+    // ==================== EXECUTOR SERVICE ====================
+
+    /**
+     * ✅ إيقاف ExecutorService بأمان
+     */
+    private void shutdownExecutorSafely() {
+        try {
+            if (executorService != null && !executorService.isShutdown()) {
+                executorService.shutdownNow();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Shutdown executor error: " + e.getMessage());
+        } finally {
+            executorService = null;
+        }
+    }
+
+    // ==================== READER MANAGEMENT ====================
+
+    /**
+     * ✅ تحرير القارئ بأمان
+     */
+    private void freeReaderSafely() {
+        try {
+            if (mReader != null) {
+                mReader.free();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Free reader error: " + e.getMessage());
+        } finally {
+            mReader = null;
+        }
+    }
+
+    /**
+     * ✅ تكوين القارئ حسب نوع الجهاز
+     */
     public void configureReaderForDevice() {
         if (mReader == null || !isInitialized) {
-            Log.w("UHF", "Cannot configure - reader not initialized");
+            Log.w(TAG, "Cannot configure - reader not initialized");
+            return;
+        }
+        
+        if (isDestroyed.get() || isFinishing()) {
             return;
         }
 
@@ -76,63 +304,41 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
             String model = Build.MODEL;
             DeviceDetector.DeviceModel deviceModel = DeviceDetector.getDeviceModel();
             
-            Log.i("UHF", "===================================");
-            Log.i("UHF", "Device Model: " + model);
-            Log.i("UHF", "Detected as: " + deviceModel.name());
+            Log.i(TAG, "===================================");
+            Log.i(TAG, "Device Model: " + model);
+            Log.i(TAG, "Detected as: " + deviceModel.name());
             
-            // استخدام DeviceDetector.configure
+            // ✅ استخدام DeviceDetector.configure
             DeviceDetector.DeviceProfile profile = DeviceDetector.configure(mReader);
             
             if (profile != null && profile.ready) {
-                Log.i("UHF", "Power set to: " + profile.appliedPower + " dBm (OK)");
-                Log.i("UHF", "Frequency Range: " + profile.frequencyRange);
+                Log.i(TAG, "Power set to: " + profile.appliedPower + " dBm (OK)");
+                Log.i(TAG, "Frequency Range: " + profile.frequencyRange);
             } else {
-                Log.w("UHF", "Profile not ready: " + DeviceDetector.getLastError());
+                Log.w(TAG, "Profile not ready: " + DeviceDetector.getLastError());
             }
             
-            Log.i("UHF", "===================================");
+            Log.i(TAG, "===================================");
             
         } catch (Exception e) {
-            Log.e("UHF", "Configuration error", e);
+            Log.e(TAG, "Configuration error", e);
         }
     }
 
+    /**
+     * ✅ التحقق من جاهزية القارئ
+     */
     public boolean isReaderReady() {
-        return mReader != null && isInitialized;
+        return mReader != null && isInitialized && !isDestroyed.get();
     }
+
+    // ==================== KEY HANDLING ====================
 
     private boolean isScanKey(int keyCode) {
         for (int code : SCAN_KEY_CODES) {
             if (code == keyCode) return true;
         }
         return false;
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.main, menu);
-        if (BuildConfig.Test) {
-            menu.findItem(R.id.speed).setVisible(true);
-        }
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-        if (id == android.R.id.home) return false;
-        if (id == R.id.UHF_ver) { getUHFVersion(); return true; }
-        if (id == R.id.export) { exportData(); return true; }
-        if (id == R.id.speed) {
-            startActivity(new Intent(this, TestActivity.class));
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
-    public void exportData() {
-        Toast.makeText(this, "Export", Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -146,78 +352,127 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
         return super.onKeyDown(keyCode, event);
     }
 
-    public void toastMessage(String msg) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+    // ==================== MENU ====================
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.main, menu);
+        
+        if (BuildConfig.Test) {
+            MenuItem speedItem = menu.findItem(R.id.speed);
+            if (speedItem != null) {
+                speedItem.setVisible(true);
+            }
+        }
+        
+        return true;
     }
 
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        
+        if (id == android.R.id.home) {
+            return false;
+        }
+        
+        if (id == R.id.UHF_ver) {
+            getUHFVersion();
+            return true;
+        }
+        
+        if (id == R.id.export) {
+            exportData();
+            return true;
+        }
+        
+        if (id == R.id.speed) {
+            startActivity(new Intent(this, TestActivity.class));
+            return true;
+        }
+        
+        return super.onOptionsItemSelected(item);
+    }
+
+    // ==================== UTILITY METHODS ====================
+
+    /**
+     * ✅ تصدير البيانات (يمكن تجاوزها في الفئات الفرعية)
+     */
+    public void exportData() {
+        toastMessageSafe("Export");
+    }
+
+    /**
+     * ✅ عرض رسالة Toast بأمان
+     */
+    public void toastMessage(String msg) {
+        toastMessageSafe(msg);
+    }
+
+    /**
+     * ✅ عرض Toast مع التحقق من الحالة
+     */
+    private void toastMessageSafe(String msg) {
+        if (isDestroyed.get() || isFinishing()) {
+            return;
+        }
+        
+        mainHandler.post(() -> {
+            if (!isDestroyed.get() && !isFinishing()) {
+                Toast.makeText(BaseTabFragmentActivity.this, msg, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    /**
+     * ✅ التحقق من صحة الإدخال السداسي
+     */
     public boolean vailHexInput(String str) {
         if (str == null || str.length() == 0) return false;
         if (str.length() % 2 == 0) return StringUtility.isHexNumberRex(str);
         return false;
     }
 
+    /**
+     * ✅ الحصول على إصدار UHF
+     */
     public void getUHFVersion() {
-        if (mReader != null) {
+        if (mReader == null || isDestroyed.get()) {
+            toastMessageSafe("Reader not available");
+            return;
+        }
+        
+        try {
             String rfidVer = mReader.getVersion();
             String hardwareVersion = mReader.getHardwareVersion();
             String deviceInfo = DeviceDetector.getDeviceInfo();
-            String version = "=== Device ===\n" + deviceInfo + "\n=== UHF ===\n" +
-                           "Software: " + rfidVer + "\nHardware: " + hardwareVersion;
+            
+            String version = "=== Device ===\n" + 
+                           deviceInfo + 
+                           "\n=== UHF ===\n" +
+                           "Software: " + rfidVer + 
+                           "\nHardware: " + hardwareVersion;
+            
             UIHelper.alert(this, R.string.action_uhf_ver, version, R.drawable.webtext);
+        } catch (Exception e) {
+            Log.e(TAG, "Get UHF version error: " + e.getMessage());
+            toastMessageSafe("Error getting UHF version");
         }
     }
 
+    /**
+     * ✅ الحصول على اسم الإصدار
+     */
     public String getVerName() {
         try {
-            return this.getPackageManager().getPackageInfo(this.getPackageName(), 0).versionName;
+            return this.getPackageManager()
+                      .getPackageInfo(this.getPackageName(), 0)
+                      .versionName;
         } catch (Exception e) {
+            Log.e(TAG, "Get version error: " + e.getMessage());
             return "";
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE) {
-            Log.e("TEST", grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED
-                ? "SD Card permission granted" : "SD Card permission denied");
-        }
-    }
-
-    public class InitTask extends AsyncTask<String, Integer, Boolean> {
-        ProgressDialog mypDialog;
-
-        @Override
-        protected Boolean doInBackground(String... params) {
-            return mReader.init(BaseTabFragmentActivity.this);
-        }
-
-        @Override
-        protected void onPostExecute(Boolean result) {
-            super.onPostExecute(result);
-            mypDialog.cancel();
-            
-            if (!result) {
-                isInitialized = false;
-                DeviceDetector.reset();
-                Toast.makeText(BaseTabFragmentActivity.this,
-                    "UHF Init Failed\nDevice: " + Build.MODEL, Toast.LENGTH_LONG).show();
-            } else {
-                isInitialized = true;
-                configureReaderForDevice();
-                Log.i("UHF", "UHF initialized successfully");
-            }
-        }
-
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-            mypDialog = new ProgressDialog(BaseTabFragmentActivity.this);
-            mypDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
-            mypDialog.setMessage("Initializing UHF...");
-            mypDialog.setCanceledOnTouchOutside(false);
-            mypDialog.show();
         }
     }
 }
