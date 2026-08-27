@@ -716,7 +716,7 @@ public class LoginActivity extends AppCompatActivity {
                     recordFailedAttempt();
                     
                     playTone(false);
-                    int errorCode = response != null ? response.errorCode : 0;
+                    int errorCode = response != null ? response.code : 0;
                     String errorMsg;
                     
                     if (response != null && response.data != null) {
@@ -1046,4 +1046,4 @@ private void navigateToMainWithAnimation() {
         
         mainHandler.removeCallbacksAndMessages(null);
     }
-}
+                                              }
