@@ -49,6 +49,7 @@ import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -78,6 +79,7 @@ public class MiraProfileFragment extends Fragment {
     private static final ExecutorService executor = Executors.newFixedThreadPool(3);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean isDestroyed = new AtomicBoolean(false);
+    private boolean isBindingTheme = false; // 🟢 لمنع إعادة التكرار عند تغيير المظهر برمجيًا
     
     private boolean isArabic = true;
     private ActivityResultLauncher<Intent> imagePickerLauncher;
@@ -129,7 +131,6 @@ public class MiraProfileFragment extends Fragment {
         switchBiometricLogin = root.findViewById(R.id.switchBiometricLogin);
         switchBiometricConfirm = root.findViewById(R.id.switchBiometricConfirm);
         
-        // ✅ عناصر المظهر
         radioThemeGroup = root.findViewById(R.id.radioThemeGroup);
         radioThemeLight = root.findViewById(R.id.radioThemeLight);
         radioThemeDark = root.findViewById(R.id.radioThemeDark);
@@ -221,10 +222,10 @@ public class MiraProfileFragment extends Fragment {
             });
         }
         
-        // ✅ مستمع تغيير المظهر
+        // 🟢 مستمع المظهر محمي من التكرار الدائري
         if (radioThemeGroup != null) {
             radioThemeGroup.setOnCheckedChangeListener((group, checkedId) -> {
-                if (isDestroyed.get()) return;
+                if (isDestroyed.get() || isBindingTheme) return;
                 
                 int mode;
                 if (checkedId == R.id.radioThemeDark) {
@@ -235,9 +236,8 @@ public class MiraProfileFragment extends Fragment {
                     mode = AppCompatDelegate.MODE_NIGHT_NO;
                 }
                 
-                AppCompatDelegate.setDefaultNightMode(mode);
                 saveThemePreference(mode);
-                
+                AppCompatDelegate.setDefaultNightMode(mode);
                 showToast(isArabic ? "✅ تم تغيير المظهر" : "✅ Theme changed");
             });
         }
@@ -295,7 +295,6 @@ public class MiraProfileFragment extends Fragment {
             if (switchBiometricLogin != null) switchBiometricLogin.setChecked(sessionManager.isBiometricLoginEnabled());
             if (switchBiometricConfirm != null) switchBiometricConfirm.setChecked(sessionManager.isBiometricConfirmEnabled());
             
-            // ✅ تحميل إعداد المظهر
             loadThemePreference();
             
         } catch (Exception e) {
@@ -303,27 +302,30 @@ public class MiraProfileFragment extends Fragment {
         }
     }
 
-    /**
-     * ✅ تحميل إعداد المظهر
-     */
     private void loadThemePreference() {
         try {
+            if (getContext() == null) return;
             SharedPreferences prefs = requireContext().getSharedPreferences("app_theme", Context.MODE_PRIVATE);
             int mode = prefs.getInt("theme_mode", AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
             
-            if (radioThemeLight != null) radioThemeLight.setChecked(mode == AppCompatDelegate.MODE_NIGHT_NO);
-            if (radioThemeDark != null) radioThemeDark.setChecked(mode == AppCompatDelegate.MODE_NIGHT_YES);
-            if (radioThemeSystem != null) radioThemeSystem.setChecked(mode == AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+            isBindingTheme = true; // تفعيل الحماية من الاحداث
+            if (mode == AppCompatDelegate.MODE_NIGHT_NO && radioThemeLight != null) {
+                radioThemeLight.setChecked(true);
+            } else if (mode == AppCompatDelegate.MODE_NIGHT_YES && radioThemeDark != null) {
+                radioThemeDark.setChecked(true);
+            } else if (radioThemeSystem != null) {
+                radioThemeSystem.setChecked(true);
+            }
+            isBindingTheme = false;
         } catch (Exception e) {
+            isBindingTheme = false;
             logNonFatal("loadThemePreference", e);
         }
     }
 
-    /**
-     * ✅ حفظ إعداد المظهر
-     */
     private void saveThemePreference(int mode) {
         try {
+            if (getContext() == null) return;
             SharedPreferences prefs = requireContext().getSharedPreferences("app_theme", Context.MODE_PRIVATE);
             prefs.edit().putInt("theme_mode", mode).apply();
         } catch (Exception e) {
@@ -331,35 +333,64 @@ public class MiraProfileFragment extends Fragment {
         }
     }
 
+    // 🟢 قراءة الصورة خلف الكواليس لتفادي التوقف اللحظي في الواجهة
     private void loadUserAvatar() {
-        try {
-            SharedPreferences prefs = requireContext().getSharedPreferences("user_avatar", Context.MODE_PRIVATE);
-            String avatarPath = prefs.getString("avatar_path", "");
-            
-            if (!avatarPath.isEmpty()) {
-                File avatarFile = new File(avatarPath);
-                if (avatarFile.exists() && imgUserAvatar != null && isAdded()) {
-                    Bitmap bitmap = BitmapFactory.decodeFile(avatarFile.getAbsolutePath());
-                    if (bitmap != null) {
-                        imgUserAvatar.setImageBitmap(bitmap);
+        executeSafely(() -> {
+            try {
+                if (getContext() == null) return;
+                SharedPreferences prefs = requireContext().getSharedPreferences("user_avatar", Context.MODE_PRIVATE);
+                String avatarPath = prefs.getString("avatar_path", "");
+                
+                if (!avatarPath.isEmpty()) {
+                    File avatarFile = new File(avatarPath);
+                    if (avatarFile.exists()) {
+                        Bitmap bitmap = BitmapFactory.decodeFile(avatarFile.getAbsolutePath());
+                        if (bitmap != null) {
+                            mainHandler.post(() -> {
+                                if (!isDestroyed.get() && isAdded() && imgUserAvatar != null) {
+                                    imgUserAvatar.setImageBitmap(bitmap);
+                                }
+                            });
+                        }
                     }
                 }
+            } catch (Exception e) {
+                logNonFatal("loadUserAvatar", e);
             }
-        } catch (Exception e) {
-            logNonFatal("loadUserAvatar", e);
-        }
+        });
     }
 
+    // 🟢 ضغط حجم الصورة وتصغير أبعادها لتفادي نفاد الذاكرة
     private void uploadProfileImage(Uri imageUri) {
         showLoading(true);
         
         executeSafely(() -> {
             try {
-                Bitmap bitmap = MediaStore.Images.Media.getBitmap(
-                    requireContext().getContentResolver(), imageUri);
+                if (getContext() == null) return;
+                
+                InputStream inputStream = requireContext().getContentResolver().openInputStream(imageUri);
+                Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
+                if (inputStream != null) inputStream.close();
+
+                if (bitmap == null) {
+                    mainHandler.post(() -> {
+                        showLoading(false);
+                        showToast(isArabic ? "❌ فشل تحميل الصورة" : "❌ Image load error");
+                    });
+                    return;
+                }
+
+                // تصغير أبعاد الصورة إذا كانت كبيرة جداً (أقصى عرض 512px)
+                int maxDimension = 512;
+                if (bitmap.getWidth() > maxDimension || bitmap.getHeight() > maxDimension) {
+                    float ratio = Math.min((float) maxDimension / bitmap.getWidth(), (float) maxDimension / bitmap.getHeight());
+                    int width = Math.round(ratio * bitmap.getWidth());
+                    int height = Math.round(ratio * bitmap.getHeight());
+                    bitmap = Bitmap.createScaledBitmap(bitmap, width, height, true);
+                }
                 
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos);
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 75, baos);
                 byte[] imageBytes = baos.toByteArray();
                 
                 File avatarFile = new File(requireContext().getFilesDir(), "user_avatar.jpg");
@@ -375,7 +406,6 @@ public class MiraProfileFragment extends Fragment {
                 JSONObject payload = new JSONObject();
                 payload.put("avatar_base64", base64Image);
                 
-                // ✅✅✅ استخدام الدالة الصحيحة
                 MiraApiClient.ApiResponse response = apiClient.uploadUserAvatar(payload);
                 
                 mainHandler.post(() -> {
@@ -383,8 +413,7 @@ public class MiraProfileFragment extends Fragment {
                     showLoading(false);
                     
                     if (response != null && response.isSuccess) {
-                        String serverUrl = response.data != null ? 
-                            response.data.optString("avatar_url", "") : "";
+                        String serverUrl = response.data != null ? response.data.optString("avatar_url", "") : "";
                         if (!serverUrl.isEmpty()) {
                             prefs.edit().putString("avatar_url", serverUrl).apply();
                         }
@@ -408,49 +437,44 @@ public class MiraProfileFragment extends Fragment {
     }
 
     private void fetchProfileFromServer() {
-    if (isDestroyed.get() || !isAdded()) return;
-    
-    // ❌❌❌ احذف هذا السطر - يسبب الوميض
-    // showLoading(true);
+        if (isDestroyed.get() || !isAdded()) return;
 
-    executeSafely(() -> {
-        try {
-            MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
-            
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONObject user = response.data.optJSONObject("user");
-                JSONObject org = response.data.optJSONObject("organization");
+        executeSafely(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
                 
-                if (org != null) {
-                    orgProfileManager.saveFromServer(org);
-                }
-                
-                if (user != null) {
-                    String displayName = user.optString("display_name", "");
-                    String role = user.optString("role", "");
-                    String phone = user.optString("phone", "");
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONObject user = response.data.optJSONObject("user");
+                    JSONObject org = response.data.optJSONObject("organization");
                     
-                    if (!TextUtils.isEmpty(displayName)) sessionManager.setDisplayName(displayName);
-                    if (!TextUtils.isEmpty(role)) sessionManager.setRole(role);
-                    if (!TextUtils.isEmpty(phone)) sessionManager.setPhone(phone);
-                }
-                
-                final JSONObject finalUser = user;
-                final JSONObject finalOrg = org;
-                
-                mainHandler.post(() -> {
-                    if (!isDestroyed.get() && isAdded()) {
-                        updateUIWithData(finalUser, finalOrg);
+                    if (org != null) {
+                        orgProfileManager.saveFromServer(org);
                     }
-                });
+                    
+                    if (user != null) {
+                        String displayName = user.optString("display_name", "");
+                        String role = user.optString("role", "");
+                        String phone = user.optString("phone", "");
+                        
+                        if (!TextUtils.isEmpty(displayName)) sessionManager.setDisplayName(displayName);
+                        if (!TextUtils.isEmpty(role)) sessionManager.setRole(role);
+                        if (!TextUtils.isEmpty(phone)) sessionManager.setPhone(phone);
+                    }
+                    
+                    final JSONObject finalUser = user;
+                    final JSONObject finalOrg = org;
+                    
+                    mainHandler.post(() -> {
+                        if (!isDestroyed.get() && isAdded()) {
+                            updateUIWithData(finalUser, finalOrg);
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                logNonFatal("fetchProfileFromServer.thread", e);
             }
-        } catch (Exception e) {
-            logNonFatal("fetchProfileFromServer.thread", e);
-        }
-        // ❌❌❌ احذف هذا السطر أيضاً
-        // showLoading(false);
-    });
-}
+        });
+    }
 
     private void updateUIWithData(JSONObject user, JSONObject org) {
         if (user != null) {
@@ -585,10 +609,6 @@ public class MiraProfileFragment extends Fragment {
         
         executeSafely(() -> {
             try {
-                JSONObject payload = new JSONObject();
-                payload.put("current_password", currentPassword);
-                payload.put("new_password", newPassword);
-                
                 MiraApiClient.ApiResponse response = apiClient.changePassword(currentPassword, newPassword);
                 
                 mainHandler.post(() -> {
@@ -620,9 +640,7 @@ public class MiraProfileFragment extends Fragment {
         new MaterialAlertDialogBuilder(getContext())
                 .setTitle(isArabic ? "🚪 تسجيل الخروج" : "🚪 Logout")
                 .setMessage(isArabic ? "هل أنت متأكد من تسجيل الخروج؟" : "Are you sure you want to logout?")
-                .setPositiveButton(isArabic ? "تسجيل الخروج" : "Logout", (dialog, which) -> {
-                    performLogout();
-                })
+                .setPositiveButton(isArabic ? "تسجيل الخروج" : "Logout", (dialog, which) -> performLogout())
                 .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
                 .show();
     }
@@ -666,7 +684,6 @@ public class MiraProfileFragment extends Fragment {
                 payload.put("tax_number", tax);
 
                 MiraApiClient.ApiResponse response = apiClient.saveOrgProfile(payload);
-                
                 final boolean success = response != null && response.isSuccess;
                 
                 mainHandler.post(() -> {
@@ -681,7 +698,6 @@ public class MiraProfileFragment extends Fragment {
                         if (tvTaxNum != null) tvTaxNum.setText((isArabic ? "الرقم الضريبي: " : "Tax Number: ") + tax);
                         
                         orgProfileManager.saveFullProfile(nameAr, nameEn, phone, email, tax);
-                        
                         showToast(isArabic ? "✅ تم حفظ بيانات المنظمة" : "✅ Organization saved");
                     } else {
                         String error = response != null ? response.error : "Unknown error";
@@ -710,7 +726,6 @@ public class MiraProfileFragment extends Fragment {
                 payload.put("phone", phone);
 
                 MiraApiClient.ApiResponse response = apiClient.updateUserProfile(payload);
-                
                 final boolean success = response != null && response.isSuccess;
                 
                 mainHandler.post(() -> {
@@ -812,7 +827,6 @@ public class MiraProfileFragment extends Fragment {
         isDestroyed.set(true);
         mainHandler.removeCallbacksAndMessages(null);
         
-        // ✅✅✅ إخفاء الـ Loading Overlay عند مغادرة الشاشة
         try {
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).hideLoading();
