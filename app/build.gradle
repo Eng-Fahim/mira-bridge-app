@@ -98,6 +98,12 @@ dependencies {
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
     implementation 'com.github.bumptech.glide:glide:4.16.0'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
+     // للتشفير الآمن
+    implementation "androidx.security:security-crypto:1.1.0-alpha06"
+    
+    // للتشفير
+    implementation "javax.crypto:javax.crypto-api:1.0"
+    
     // Room Database
     implementation "androidx.room:room-runtime:2.6.0"
     annotationProcessor "androidx.room:room-compiler:2.6.0"
