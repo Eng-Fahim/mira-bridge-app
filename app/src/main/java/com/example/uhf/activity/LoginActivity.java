@@ -693,11 +693,12 @@ protected void onCreate(Bundle savedInstanceState) {
         showLoading(true);
 
         // تشفير كلمة المرور قبل الإرسال
-        final String encryptedPassword = encryptPassword(password);
+        // ✅ إرسال كلمة المرور الأصلية - HTTPS يقوم بالتشفير
+final String finalPassword = password;
 
         executeSafeBg(() -> {
             String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-            MiraApiClient.ApiResponse response = apiClient.login(username, encryptedPassword, deviceId);
+            MiraApiClient.ApiResponse response = apiClient.login(username, finalPassword, deviceId);
             
             mainHandler.post(() -> {
                 if (!isActivityAlive()) return;
@@ -1068,4 +1069,4 @@ private void navigateToMainWithAnimation() {
         
         mainHandler.removeCallbacksAndMessages(null);
     }
-                                              }
+            }
