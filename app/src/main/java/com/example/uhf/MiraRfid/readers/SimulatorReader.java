@@ -9,16 +9,13 @@ import android.util.Log;
 import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
-import com.example.uhf.model.InventoryItem;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -27,6 +24,7 @@ import java.util.concurrent.Executors;
  * - يجلب الوسوم من قاعدة البيانات
  * - يطبق الإعدادات الديناميكية
  * - يحاكي RSSI واقعياً
+ * - معالج ضد أخطاء NullPointerException أثناء الـ Thread Handling
  */
 public class SimulatorReader implements MiraIRFIDReader {
     
@@ -179,9 +177,11 @@ public class SimulatorReader implements MiraIRFIDReader {
         // جلب الوسوم من قاعدة البيانات عند الاتصال
         fetchTagsFromDatabase();
         
-        if (listener != null) {
-            mainHandler.post(() -> listener.onConnectionChanged(true));
-        }
+        mainHandler.post(() -> {
+            if (listener != null) {
+                listener.onConnectionChanged(true);
+            }
+        });
         Log.i(TAG, "✅ Simulator connected with " + databaseTags.size() + " tags");
         return true;
     }
@@ -190,9 +190,11 @@ public class SimulatorReader implements MiraIRFIDReader {
     public void disconnect() {
         stopScan();
         isConnected = false;
-        if (listener != null) {
-            mainHandler.post(() -> listener.onConnectionChanged(false));
-        }
+        mainHandler.post(() -> {
+            if (listener != null) {
+                listener.onConnectionChanged(false);
+            }
+        });
     }
     
     @Override
@@ -214,9 +216,11 @@ public class SimulatorReader implements MiraIRFIDReader {
         }
         
         isScanning = true;
-        if (listener != null) {
-            mainHandler.post(() -> listener.onScanStarted());
-        }
+        mainHandler.post(() -> {
+            if (listener != null) {
+                listener.onScanStarted();
+            }
+        });
         
         scanExecutor.execute(this::simulationLoop);
         
@@ -256,11 +260,13 @@ public class SimulatorReader implements MiraIRFIDReader {
                 // تطبيق عتبة RSSI
                 if (rssi >= rssiThreshold) {
                     consecutiveMisses = 0;
-                    if (listener != null) {
-                        final String finalEpc = epc;
-                        final int finalRssi = rssi;
-                        mainHandler.post(() -> listener.onTagRead(finalEpc, finalRssi));
-                    }
+                    final String finalEpc = epc;
+                    final int finalRssi = rssi;
+                    mainHandler.post(() -> {
+                        if (listener != null) {
+                            listener.onTagRead(finalEpc, finalRssi);
+                        }
+                    });
                 } else {
                     consecutiveMisses++;
                     // إذا فشل القراءة عدة مرات، تخطى هذا الوسم
@@ -287,8 +293,12 @@ public class SimulatorReader implements MiraIRFIDReader {
                 Log.d(TAG, "Simulation loop interrupted");
                 break;
             } catch (Exception e) {
-                if (isScanning && listener != null) {
-                    mainHandler.post(() -> listener.onError(e.getMessage()));
+                if (isScanning) {
+                    mainHandler.post(() -> {
+                        if (listener != null) {
+                            listener.onError(e.getMessage());
+                        }
+                    });
                 }
                 Log.e(TAG, "Simulation loop error", e);
                 break;
@@ -326,9 +336,11 @@ public class SimulatorReader implements MiraIRFIDReader {
     @Override
     public void stopScan() {
         isScanning = false;
-        if (listener != null) {
-            mainHandler.post(() -> listener.onScanStopped());
-        }
+        mainHandler.post(() -> {
+            if (listener != null) {
+                listener.onScanStopped();
+            }
+        });
     }
     
     @Override
