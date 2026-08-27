@@ -58,7 +58,11 @@ public class MiraReportsProFragment extends Fragment {
 
     private static final String TAG = "MiraReportsPro";
     private static final String CACHE_PREFS = "mira_reports_pro_cache";
-
+    
+    // في بداية الكلاس - إضافة متغيرات للأنيميشن
+    private android.animation.ObjectAnimator loadingAnimator;
+    private android.view.animation.Animation fadeInAnimation;
+    private android.view.animation.Animation slideUpAnimation;
     private RecyclerView rvReports;
     private ReportsAdapter adapter;
     private final List<ReportItem> reportList = new ArrayList<>();
@@ -190,6 +194,60 @@ private void openReportDialog(ReportItem item) {
     showFilteredReportDialog(item);
 }
 
+
+/**
+ * ✅ تأثير ضغط على الأزرار
+ */
+private void animateButtonPress(View view) {
+    view.animate()
+        .scaleX(0.95f)
+        .scaleY(0.95f)
+        .setDuration(100)
+        .withEndAction(() -> {
+            view.animate()
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(100)
+                .start();
+        })
+        .start();
+}
+
+/**
+ * ✅ شاشة تحميل مخصصة مع أنيميشن
+ */
+private void showCustomLoading(View layoutLoading, TextView tvLoadingStatus) {
+    if (layoutLoading == null) return;
+    
+    layoutLoading.setVisibility(View.VISIBLE);
+    layoutLoading.setAlpha(0f);
+    layoutLoading.animate().alpha(1f).setDuration(300).start();
+    
+    if (tvLoadingStatus != null) {
+        tvLoadingStatus.setText(isArabic ? "⏳ جاري تحميل البيانات..." : "⏳ Loading data...");
+        
+        // ✅ أنيميشن نبض للنص
+        tvLoadingStatus.setAlpha(0.3f);
+        android.animation.ObjectAnimator pulse = android.animation.ObjectAnimator.ofFloat(tvLoadingStatus, "alpha", 0.3f, 1f);
+        pulse.setDuration(800);
+        pulse.setRepeatCount(android.animation.ObjectAnimator.INFINITE);
+        pulse.setRepeatMode(android.animation.ObjectAnimator.REVERSE);
+        pulse.start();
+    }
+}
+
+/**
+ * ✅ إخفاء شاشة التحميل مع أنيميشن
+ */
+private void hideCustomLoading(View layoutLoading) {
+    if (layoutLoading == null) return;
+    
+    layoutLoading.animate()
+        .alpha(0f)
+        .setDuration(300)
+        .withEndAction(() -> layoutLoading.setVisibility(View.GONE))
+        .start();
+}
 // ==================== 1. فلتر المبيعات ====================
 private void showFilteredReportDialog(ReportItem item) {
     View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
@@ -208,7 +266,7 @@ private void showFilteredReportDialog(ReportItem item) {
     MaterialButton btnAdvancedFilter = dialogView.findViewById(R.id.btnAdvancedFilter);
     
     final String[] selectedDates = new String[]{getDefaultFromDate(), getDefaultToDate()};
-    final String[] selectedFilters = new String[]{"", "", ""}; // [0]=search, [1]=filter1, [2]=filter2
+    final String[] selectedFilters = new String[]{"", "", ""};
     
     btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
     btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
@@ -216,23 +274,45 @@ private void showFilteredReportDialog(ReportItem item) {
     tvTitle.setText(item.icon + " " + item.title);
     rvData.setLayoutManager(new LinearLayoutManager(getContext()));
     
+    // ✅ إضافة أنيميشن للعناصر
+    tvTitle.setAlpha(0f);
+    tvTitle.setTranslationY(-20f);
+    tvTitle.animate().alpha(1f).translationY(0f).setDuration(500).start();
+    
     AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
             .setView(dialogView)
             .create();
     
-    btnFrom.setOnClickListener(v -> showDatePicker(date -> {
-        selectedDates[0] = date;
-        btnFrom.setText((isArabic ? "من: " : "From: ") + date);
-    }));
+    // ✅ أنيميشن فتح الحوار
+    if (dialog.getWindow() != null) {
+        dialog.getWindow().getAttributes().windowAnimations = R.style.DialogAnimation;
+    }
     
-    btnTo.setOnClickListener(v -> showDatePicker(date -> {
-        selectedDates[1] = date;
-        btnTo.setText((isArabic ? "إلى: " : "To: ") + date);
-    }));
+    btnFrom.setOnClickListener(v -> {
+        // ✅ تأثير ضغط
+        animateButtonPress(btnFrom);
+        showDatePicker(date -> {
+            selectedDates[0] = date;
+            btnFrom.setText((isArabic ? "من: " : "From: ") + date);
+            // ✅ أنيميشن تحديث النص
+            btnFrom.setAlpha(0f);
+            btnFrom.animate().alpha(1f).setDuration(300).start();
+        });
+    });
     
-    // ✅ زر الفلترة المتقدمة
+    btnTo.setOnClickListener(v -> {
+        animateButtonPress(btnTo);
+        showDatePicker(date -> {
+            selectedDates[1] = date;
+            btnTo.setText((isArabic ? "إلى: " : "To: ") + date);
+            btnTo.setAlpha(0f);
+            btnTo.animate().alpha(1f).setDuration(300).start();
+        });
+    });
+    
     if (btnAdvancedFilter != null) {
         btnAdvancedFilter.setOnClickListener(v -> {
+            animateButtonPress(btnAdvancedFilter);
             showAdvancedFilterDialog(item.type, selectedFilters, () -> {
                 fetchAndDisplayWithFilters(item.type, rvData, layoutLoading, tvLoadingStatus, 
                     selectedDates[0], selectedDates[1], selectedFilters);
@@ -240,19 +320,40 @@ private void showFilteredReportDialog(ReportItem item) {
         });
     }
     
-    btnApply.setOnClickListener(v -> 
+    btnApply.setOnClickListener(v -> {
+        animateButtonPress(btnApply);
+        // ✅ أنيميشن تحميل مخصص
+        showCustomLoading(layoutLoading, tvLoadingStatus);
         fetchAndDisplayWithFilters(item.type, rvData, layoutLoading, tvLoadingStatus, 
-            selectedDates[0], selectedDates[1], selectedFilters)
-    );
+            selectedDates[0], selectedDates[1], selectedFilters);
+    });
     
-    btnExport.setOnClickListener(v -> exportReportToCSV(item.type, selectedDates[0], selectedDates[1]));
-    btnClose.setOnClickListener(v -> dialog.dismiss());
+    btnExport.setOnClickListener(v -> {
+        animateButtonPress(btnExport);
+        exportReportToCSV(item.type, selectedDates[0], selectedDates[1]);
+    });
+    
+    btnClose.setOnClickListener(v -> {
+        animateButtonPress(btnClose);
+        // ✅ أنيميشن إغلاق
+        dialogView.animate().alpha(0f).setDuration(200).withEndAction(dialog::dismiss).start();
+    });
     
     if (btnPrint != null) {
-        btnPrint.setOnClickListener(v -> printReport(item, rvData, selectedDates, selectedFilters));
+        btnPrint.setOnClickListener(v -> {
+            animateButtonPress(btnPrint);
+            printReport(item, rvData, selectedDates, selectedFilters);
+        });
     }
     
     dialog.show();
+    
+    // ✅ أنيميشن ظهور المحتوى
+    if (dialog.getWindow() != null && dialog.getWindow().getDecorView() != null) {
+        View decorView = dialog.getWindow().getDecorView();
+        decorView.setAlpha(0f);
+        decorView.animate().alpha(1f).setDuration(300).start();
+    }
     
     fetchAndDisplayWithFilters(item.type, rvData, layoutLoading, tvLoadingStatus, 
         selectedDates[0], selectedDates[1], selectedFilters);
@@ -271,7 +372,20 @@ private void showAdvancedFilterDialog(String reportType, String[] filters, Runna
     TextView tvFilter1Label = filterView.findViewById(R.id.tvFilter1Label);
     TextView tvFilter2Label = filterView.findViewById(R.id.tvFilter2Label);
     
-    // ✅ تخصيص الفلاتر حسب نوع التقرير
+    // ✅ أنيميشن ظهور عناصر الفلتر
+    etSearch.setAlpha(0f);
+    etSearch.setTranslationX(-30f);
+    etSearch.animate().alpha(1f).translationX(0f).setDuration(400).setStartDelay(100).start();
+    
+    etFilter1.setAlpha(0f);
+    etFilter1.setTranslationX(-30f);
+    etFilter1.animate().alpha(1f).translationX(0f).setDuration(400).setStartDelay(200).start();
+    
+    etFilter2.setAlpha(0f);
+    etFilter2.setTranslationX(-30f);
+    etFilter2.animate().alpha(1f).translationX(0f).setDuration(400).setStartDelay(300).start();
+    
+    // تخصيص الفلاتر حسب نوع التقرير
     switch (reportType) {
         case "sales":
             tvFilter1Label.setText(isArabic ? "طريقة الدفع" : "Payment Method");
@@ -324,15 +438,32 @@ private void showAdvancedFilterDialog(String reportType, String[] filters, Runna
         onApply.run();
     });
     builder.setNegativeButton(isArabic ? "إلغاء" : "Cancel", null);
-    builder.show();
+    
+    AlertDialog dialog = builder.create();
+    dialog.show();
+    
+    // ✅ أنيميشن ظهور الحوار
+    if (dialog.getWindow() != null && dialog.getWindow().getDecorView() != null) {
+        View decorView = dialog.getWindow().getDecorView();
+        decorView.setAlpha(0f);
+        decorView.setScaleX(0.9f);
+        decorView.setScaleY(0.9f);
+        decorView.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(300)
+            .setInterpolator(new AccelerateDecelerateInterpolator())
+            .start();
+    }
 }
 
 // ==================== جلب البيانات مع الفلاتر ====================
 private void fetchAndDisplayWithFilters(String type, RecyclerView rvData, View layoutLoading, 
                                       TextView tvLoadingStatus, String fromDate, String toDate, 
                                       String[] filters) {
-    if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
-    if (tvLoadingStatus != null) tvLoadingStatus.setText(isArabic ? "جاري التحميل..." : "Loading...");
+    // ✅ إظهار تحميل مخصص
+    showCustomLoading(layoutLoading, tvLoadingStatus);
 
     executorService.execute(() -> {
         try {
@@ -350,11 +481,12 @@ private void fetchAndDisplayWithFilters(String type, RecyclerView rvData, View l
             MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint.toString());
 
             mainHandler.post(() -> {
-                if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+                // ✅ إخفاء التحميل مع أنيميشن
+                hideCustomLoading(layoutLoading);
 
                 if (response == null || !response.isSuccess) {
                     Toast.makeText(getContext(), 
-                        isArabic ? "فشل التحميل" : "Failed to load", 
+                        isArabic ? "❌ فشل التحميل" : "❌ Failed to load", 
                         Toast.LENGTH_SHORT).show();
                     return;
                 }
@@ -395,12 +527,27 @@ private void fetchAndDisplayWithFilters(String type, RecyclerView rvData, View l
 
                 JSONObject filteredData = applyLocalFilters(type, data, filters);
                 RecyclerView.Adapter<?> reportAdapter = createAdapterForType(type, filteredData);
+                
+                // ✅ أنيميشن ظهور البيانات
+                rvData.setAlpha(0f);
+                rvData.setTranslationY(30f);
                 rvData.setAdapter(reportAdapter);
+                rvData.animate()
+                    .alpha(1f)
+                    .translationY(0f)
+                    .setDuration(500)
+                    .setInterpolator(new AccelerateDecelerateInterpolator())
+                    .start();
+                
+                // ✅ رسالة نجاح
+                Toast.makeText(getContext(), 
+                    isArabic ? "✅ تم تحميل التقرير بنجاح" : "✅ Report loaded successfully", 
+                    Toast.LENGTH_SHORT).show();
             });
         } catch (Exception e) {
             Log.e(TAG, "Fetch error: " + e.getMessage());
             mainHandler.post(() -> {
-                if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+                hideCustomLoading(layoutLoading);
                 Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             });
         }
@@ -763,8 +910,23 @@ private void showAdvancedReportDialog(String type, JSONObject data) {
     tvTitle.setText(getReportTitle(type));
     rvData.setLayoutManager(new LinearLayoutManager(getContext()));
     
+    // ✅ أنيميشن العنوان
+    tvTitle.setAlpha(0f);
+    tvTitle.setTranslationY(-20f);
+    tvTitle.animate().alpha(1f).translationY(0f).setDuration(500).start();
+    
     RecyclerView.Adapter<?> adapter = createAdvancedAdapter(type, data);
+    
+    // ✅ أنيميشن ظهور البيانات
+    rvData.setAlpha(0f);
+    rvData.setTranslationY(30f);
     rvData.setAdapter(adapter);
+    rvData.animate()
+        .alpha(1f)
+        .translationY(0f)
+        .setDuration(500)
+        .setInterpolator(new AccelerateDecelerateInterpolator())
+        .start();
     
     AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
             .setView(dialogView)
@@ -772,26 +934,36 @@ private void showAdvancedReportDialog(String type, JSONObject data) {
     
     MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
     if (btnClose != null) {
-        btnClose.setOnClickListener(v -> dialog.dismiss());
+        btnClose.setOnClickListener(v -> {
+            animateButtonPress(btnClose);
+            dialogView.animate().alpha(0f).setDuration(200).withEndAction(dialog::dismiss).start();
+        });
     }
     
-    // ✅ تفعيل زر الطباعة
     if (btnPrint != null) {
         btnPrint.setVisibility(View.VISIBLE);
         btnPrint.setOnClickListener(v -> {
+            animateButtonPress(btnPrint);
             printAdvancedReport(type, data, rvData);
         });
     }
     
-    // ✅ تفعيل زر التصدير
     if (btnExport != null) {
         btnExport.setVisibility(View.VISIBLE);
         btnExport.setOnClickListener(v -> {
+            animateButtonPress(btnExport);
             exportAdvancedReport(type, data);
         });
     }
     
     dialog.show();
+    
+    // ✅ أنيميشن ظهور الحوار
+    if (dialog.getWindow() != null && dialog.getWindow().getDecorView() != null) {
+        View decorView = dialog.getWindow().getDecorView();
+        decorView.setAlpha(0f);
+        decorView.animate().alpha(1f).setDuration(300).start();
+    }
 }
 
 // ✅ دالة طباعة التقارير المتقدمة
@@ -2357,20 +2529,89 @@ private void showAuditDiscrepancyDialog(ReportItem item) {
         ReportItem(String i, String t, String s, String ty) { icon=i; title=t; subtitle=s; type=ty; } }
 
     class ReportsAdapter extends RecyclerView.Adapter<ReportsAdapter.VH> {
-        final List<ReportItem> list; final OnReportClickListener listener;
-        ReportsAdapter(List<ReportItem> l, OnReportClickListener c) { list=l; listener=c; }
-        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
-            return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_report_card_pro, p, false)); }
-        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
-            ReportItem item = list.get(pos);
-            h.tvIcon.setText(item.icon); h.tvTitle.setText(item.title); h.tvSubtitle.setText(item.subtitle);
-            h.itemView.setOnClickListener(v -> listener.onClick(item)); }
-        @Override public int getItemCount() { return list.size(); }
-        class VH extends RecyclerView.ViewHolder {
-            TextView tvIcon, tvTitle, tvSubtitle;
-            VH(View v) { super(v); tvIcon = v.findViewById(R.id.tvReportIcon); tvTitle = v.findViewById(R.id.tvReportTitle); tvSubtitle = v.findViewById(R.id.tvReportSubtitle); }
+    final List<ReportItem> list; 
+    final OnReportClickListener listener;
+    private int lastPosition = -1;
+    
+    ReportsAdapter(List<ReportItem> l, OnReportClickListener c) { 
+        list = l; 
+        listener = c; 
+    }
+    
+    @NonNull @Override 
+    public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
+        return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_report_card_pro, p, false)); 
+    }
+    
+    @Override 
+    public void onBindViewHolder(@NonNull VH h, int pos) {
+        ReportItem item = list.get(pos);
+        h.tvIcon.setText(item.icon); 
+        h.tvTitle.setText(item.title); 
+        h.tvSubtitle.setText(item.subtitle);
+        
+        // ✅ أنيميشن ظهور البطاقات
+        setAnimation(h.itemView, pos);
+        
+        h.itemView.setOnClickListener(v -> {
+            // ✅ تأثير ضغط على البطاقة
+            v.animate()
+                .scaleX(0.95f)
+                .scaleY(0.95f)
+                .setDuration(100)
+                .withEndAction(() -> {
+                    v.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(100)
+                        .start();
+                })
+                .start();
+            
+            // ✅ تأخير بسيط قبل الفتح
+            v.postDelayed(() -> listener.onClick(item), 150);
+        });
+    }
+    
+    /**
+     * ✅ أنيميشن ظهور البطاقات
+     */
+    private void setAnimation(View viewToAnimate, int position) {
+        if (position > lastPosition) {
+            viewToAnimate.setAlpha(0f);
+            viewToAnimate.setTranslationY(50f);
+            viewToAnimate.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(400)
+                .setStartDelay(position * 50) // ✅ تأخير تدريجي
+                .setInterpolator(new AccelerateDecelerateInterpolator())
+                .start();
+            lastPosition = position;
         }
     }
+    
+    @Override 
+    public void onViewDetachedFromWindow(@NonNull VH holder) {
+        super.onViewDetachedFromWindow(holder);
+        holder.itemView.clearAnimation();
+    }
+    
+    @Override 
+    public int getItemCount() { 
+        return list.size(); 
+    }
+    
+    class VH extends RecyclerView.ViewHolder {
+        TextView tvIcon, tvTitle, tvSubtitle;
+        VH(View v) { 
+            super(v); 
+            tvIcon = v.findViewById(R.id.tvReportIcon); 
+            tvTitle = v.findViewById(R.id.tvReportTitle); 
+            tvSubtitle = v.findViewById(R.id.tvReportSubtitle); 
+        }
+    }
+}
 
     interface OnReportClickListener { void onClick(ReportItem item); }
     interface DatePickerCallback { void onDate(String date); }
