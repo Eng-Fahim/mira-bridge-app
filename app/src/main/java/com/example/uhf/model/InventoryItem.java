@@ -9,6 +9,10 @@ public class InventoryItem {
     private final String title;
     private String karat; // إضافة متغير العيار
     
+    // ✅✅✅ إضافة حقول جديدة
+    private double weight;
+    private double price;
+    
     private int readCount = 0;
     private int lastRssi = -128;
     private long firstSeenTimestamp = 0;
@@ -20,12 +24,18 @@ public class InventoryItem {
         this.serial = serial != null ? serial : "";
         this.title = title != null ? title : "";
         this.karat = "";
+        // ✅✅✅ تهيئة القيم الجديدة
+        this.weight = 0;
+        this.price = 0;
     }
 
     // Overloaded Constructor ليدعم العيار مباشرة عند الإنشاء
     public InventoryItem(String epc, String gtin, String serial, String title, String karat) {
         this(epc, gtin, serial, title);
         this.karat = karat != null ? karat : "";
+        // ✅✅✅ تهيئة القيم الجديدة
+        this.weight = 0;
+        this.price = 0;
     }
 
     public static String normalizeEpc(String rawEpc) {
@@ -55,6 +65,13 @@ public class InventoryItem {
     // الميثود التي كان يبحث عنها المترجم (Compiler)
     public String getKarat() { return karat; }
     public void setKarat(String karat) { this.karat = karat; }
+
+    // ✅✅✅ إضافة getters و setters للوزن والسعر
+    public double getWeight() { return weight; }
+    public void setWeight(double weight) { this.weight = weight; }
+    
+    public double getPrice() { return price; }
+    public void setPrice(double price) { this.price = price; }
 
     public int getReadCount() { return readCount; }
     public int getLastRssi() { return lastRssi; }
