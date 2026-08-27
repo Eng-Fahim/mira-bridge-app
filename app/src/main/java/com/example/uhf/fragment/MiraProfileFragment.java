@@ -369,7 +369,7 @@ private void uploadProfileImage(Uri imageUri) {
             payload.put("avatar_base64", base64Image);
             payload.put("avatar_filename", "avatar.jpg");
             
-            MiraApiClient.ApiResponse response = apiClient.updateUserProfile(payload);
+            MiraApiClient.ApiResponse response = apiClient.uploadUserAvatar(payload);
             
             mainHandler.post(() -> {
                 if (isDestroyed.get() || !isAdded()) return;
