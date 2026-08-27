@@ -80,7 +80,8 @@ public class LoginActivity extends AppCompatActivity {
     private MaterialCardView serverConfigCard;
     private ProgressBar pbLoading;
     private View loadingContainer, loginCard, logoContainer;
-
+    private MaterialTextView tvLockStatus;
+    
     private SessionManager sessionManager;
     private MiraApiClient apiClient;
     private MiraOrgProfileManager orgProfileManager;
@@ -242,21 +243,33 @@ public class LoginActivity extends AppCompatActivity {
      * التحقق من حالة القفل المؤقت
      */
     private void checkLockoutStatus() {
-        if (encryptedPrefs != null) {
-            lockoutUntil = encryptedPrefs.getLong("lockout_until", 0);
-            int savedAttempts = encryptedPrefs.getInt("failed_attempts", 0);
-            failedAttempts.set(savedAttempts);
+    if (encryptedPrefs != null) {
+        lockoutUntil = encryptedPrefs.getLong("lockout_until", 0);
+        int savedAttempts = encryptedPrefs.getInt("failed_attempts", 0);
+        failedAttempts.set(savedAttempts);
+        
+        if (System.currentTimeMillis() < lockoutUntil) {
+            long remainingSeconds = (lockoutUntil - System.currentTimeMillis()) / 1000;
+            long remainingMinutes = remainingSeconds / 60;
+            long remainingSecs = remainingSeconds % 60;
             
-            if (System.currentTimeMillis() < lockoutUntil) {
-                long remainingMinutes = (lockoutUntil - System.currentTimeMillis()) / (60 * 1000);
-                if (btnLogin != null) {
-                    btnLogin.setEnabled(false);
-                    btnLogin.setText(String.format(isArabic ? "محظور لمدة %d دقيقة" : "Locked for %d min", 
-                        Math.max(1, remainingMinutes)));
-                }
+            if (tvLockStatus != null) {
+                tvLockStatus.setVisibility(View.VISIBLE);
+                tvLockStatus.setText(String.format(
+                    isArabic ? "⛔ تم قفل تسجيل الدخول - حاول بعد %02d:%02d" : 
+                    "⛔ Login locked - Try in %02d:%02d",
+                    remainingMinutes, remainingSecs));
             }
+            
+            if (btnLogin != null) {
+                btnLogin.setEnabled(false);
+                btnLogin.setAlpha(0.5f);
+            }
+        } else if (tvLockStatus != null) {
+            tvLockStatus.setVisibility(View.GONE);
         }
     }
+}
 
     private void executeSafeBg(Runnable runnable) {
         if (bgExecutor != null && !bgExecutor.isShutdown() && !bgExecutor.isTerminated()) {
@@ -287,6 +300,7 @@ public class LoginActivity extends AppCompatActivity {
         btnSaveServer = findViewById(R.id.btnSaveServer);
         btnToggleLanguage = findViewById(R.id.btnToggleLanguage);
         tvServerSettings = findViewById(R.id.tvServerSettings);
+        tvLockStatus = findViewById(R.id.tvLockStatus);
         tvAppVersion = findViewById(R.id.tvAppVersion);
         tvBrandName = findViewById(R.id.tvBrandName);
         tvBrandSubtitle = findViewById(R.id.tvBrandSubtitle);
@@ -989,4 +1003,4 @@ public class LoginActivity extends AppCompatActivity {
         
         mainHandler.removeCallbacksAndMessages(null);
     }
-        }
+}
