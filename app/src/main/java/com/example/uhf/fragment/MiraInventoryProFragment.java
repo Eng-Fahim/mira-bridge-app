@@ -150,6 +150,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private final Set<String> catalogEpcs = 
         Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<String, Long> recentTagReads = new ConcurrentHashMap<>();
+    // ✅ خريطة EPC → معلومات القطعة الكاملة
+    private final Map<String, InventoryItem> catalogItemsMap = new ConcurrentHashMap<>();
     
     // ✅ خريطة عكسية للباركود → EPC موحد
     private final Map<String, String> barcodeToEpcMap = new ConcurrentHashMap<>();
@@ -867,99 +869,165 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     /**
      * إضافة عنصر ممسوح للعرض
      */
-    private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
-        if (!isAdded() || isFragmentDestroyed || scannedItemsAdapter == null) {
-            return;
-        }
-        
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainThreadHandler.post(() -> addScannedItemToDisplay(epc, rssi, item));
-            return;
-        }
-        
-        synchronized (scannedItemsDisplayList) {
-            boolean exists = false;
-            int existingIndex = -1;
+    /**
+ * إضافة عنصر ممسوح للعرض
+ * ✅ مع جلب معلومات القطعة الكاملة من الخريطة
+ */
+private void addScannedItemToDisplay(String epc, int rssi, InventoryItem item) {
+    if (!isAdded() || isFragmentDestroyed || scannedItemsAdapter == null) {
+        return;
+    }
+    
+    if (Looper.myLooper() != Looper.getMainLooper()) {
+        mainThreadHandler.post(() -> addScannedItemToDisplay(epc, rssi, item));
+        return;
+    }
+    
+    synchronized (scannedItemsDisplayList) {
+        boolean exists = false;
+        int existingIndex = -1;
 
-            for (int i = 0; i < scannedItemsDisplayList.size(); i++) {
-                ScannedItemDisplay display = scannedItemsDisplayList.get(i);
-                if (display != null && epc.equals(display.epc)) {
-                    display.count++;
-                    display.rssi = rssi;
-                    display.time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-                        .format(new Date());
-                    exists = true;
-                    existingIndex = i;
-                    break;
-                }
-            }
-
-            ScanFeedbackType feedbackType;
-            boolean isKnown = catalogEpcs.contains(epc);
-
-            if (!exists) {
-                feedbackType = isKnown ? ScanFeedbackType.KNOWN_ITEM : 
-                    ScanFeedbackType.UNKNOWN_ITEM;
-
-                String title = isArabic ? "قطعة غير معروفة" : "Unknown item";
-                String karat = "—";
-
-                if (item != null) {
-                    title = item.getTitle() != null ? item.getTitle() : 
-                        (isArabic ? "قطعة ذهبية" : "Gold item");
-                    karat = item.getKarat() != null ? item.getKarat() : "—";
-                } else if (isKnown) {
-                    title = isArabic ? "مادة مسجلة بالكتالوج" : "Catalog registered item";
-                }
-
-                String currentTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        // ✅ التحقق من وجود العنصر مسبقاً
+        for (int i = 0; i < scannedItemsDisplayList.size(); i++) {
+            ScannedItemDisplay display = scannedItemsDisplayList.get(i);
+            if (display != null && epc.equals(display.epc)) {
+                display.count++;
+                display.rssi = rssi;
+                display.time = new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
                     .format(new Date());
+                exists = true;
+                existingIndex = i;
+                break;
+            }
+        }
 
-                ScannedItemDisplay display = new ScannedItemDisplay(
-                    epc, title, karat, 1, rssi, currentTime
-                );
+        ScanFeedbackType feedbackType;
+        boolean isKnown = catalogEpcs.contains(epc);
 
-                scannedItemsDisplayList.add(0, display);
-                scannedItemsAdapter.notifyItemInserted(0);
+        if (!exists) {
+            feedbackType = isKnown ? ScanFeedbackType.KNOWN_ITEM : 
+                ScanFeedbackType.UNKNOWN_ITEM;
 
-                if (rvInventoryItems != null) {
-                    rvInventoryItems.scrollToPosition(0);
-                }
-            } else {
-                feedbackType = ScanFeedbackType.DUPLICATE_ITEM;
-                scannedItemsAdapter.notifyItemChanged(existingIndex);
+            // ✅✅✅ القيم الافتراضية
+            String title = isArabic ? "قطعة غير معروفة" : "Unknown item";
+            String karat = "—";
+            double weight = 0;
+            double price = 0;
+
+            // ✅✅✅ البحث في الخريطة الكاملة أولاً
+            InventoryItem catalogItem = catalogItemsMap.get(epc);
+            
+            if (catalogItem != null) {
+                // ✅ وجدت في الكتالوج - استخدام المعلومات الكاملة
+                title = catalogItem.getTitle() != null && !catalogItem.getTitle().isEmpty() 
+                    ? catalogItem.getTitle() 
+                    : (isArabic ? "قطعة ذهبية" : "Gold item");
+                karat = catalogItem.getKarat() != null && !catalogItem.getKarat().isEmpty() 
+                    ? catalogItem.getKarat() 
+                    : "—";
+                weight = catalogItem.getWeight();
+                price = catalogItem.getPrice();
+            } else if (item != null) {
+                // ✅ وجدت من المعامل المباشر
+                title = item.getTitle() != null && !item.getTitle().isEmpty() 
+                    ? item.getTitle() 
+                    : (isArabic ? "قطعة ذهبية" : "Gold item");
+                karat = item.getKarat() != null && !item.getKarat().isEmpty() 
+                    ? item.getKarat() 
+                    : "—";
+                weight = item.getWeight();
+                price = item.getPrice();
+            } else if (isKnown) {
+                // ✅ موجودة في الـ Set لكن بدون معلومات كاملة
+                title = isArabic ? "مادة مسجلة بالكتالوج" : "Catalog registered item";
             }
 
-            playScanBeep(feedbackType);
+            String currentTime = new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                .format(new Date());
 
-            if (tvEmptyState != null && !scannedItemsDisplayList.isEmpty()) {
-                tvEmptyState.setVisibility(View.GONE);
+            // ✅ إنشاء العنصر مع جميع البيانات
+            ScannedItemDisplay display = new ScannedItemDisplay(
+                epc, title, karat, 1, rssi, currentTime
+            );
+            display.weight = weight;  // ✅ الوزن
+            display.price = price;    // ✅ السعر
+
+            // ✅ إضافة للقائمة
+            scannedItemsDisplayList.add(0, display);
+            scannedItemsAdapter.notifyItemInserted(0);
+
+            if (rvInventoryItems != null) {
+                rvInventoryItems.scrollToPosition(0);
             }
+            
+            // ✅✅✅ تحديث الوزن والقيمة الإجمالية
+            updateTotalWeightAndValue();
+        } else {
+            feedbackType = ScanFeedbackType.DUPLICATE_ITEM;
+            scannedItemsAdapter.notifyItemChanged(existingIndex);
+        }
+
+        playScanBeep(feedbackType);
+
+        if (tvEmptyState != null && !scannedItemsDisplayList.isEmpty()) {
+            tvEmptyState.setVisibility(View.GONE);
         }
     }
+}
 
     /**
      * نموذج عرض العنصر
      */
-    private static class ScannedItemDisplay {
-        String epc;
-        String title;
-        String karat;
-        int count;
-        int rssi;
-        String time;
-        
-        ScannedItemDisplay(String epc, String title, String karat, 
-                          int count, int rssi, String time) {
-            this.epc = epc;
-            this.title = title;
-            this.karat = karat;
-            this.count = count;
-            this.rssi = rssi;
-            this.time = time;
+   private static class ScannedItemDisplay {
+    String epc;
+    String title;
+    String karat;
+    int count;
+    int rssi;
+    String time;
+    double weight; // ✅ إضافة
+    double price;  // ✅ إضافة
+    
+    ScannedItemDisplay(String epc, String title, String karat, 
+                      int count, int rssi, String time) {
+        this.epc = epc;
+        this.title = title;
+        this.karat = karat;
+        this.count = count;
+        this.rssi = rssi;
+        this.time = time;
+        this.weight = 0;
+        this.price = 0;
+    }
+}
+
+
+/**
+ * ✅ تحديث الوزن والقيمة الإجمالية
+ */
+private void updateTotalWeightAndValue() {
+    double totalWeight = 0;
+    double totalValue = 0;
+    
+    synchronized (scannedItemsDisplayList) {
+        for (ScannedItemDisplay item : scannedItemsDisplayList) {
+            totalWeight += item.weight * item.count;
+            totalValue += item.price * item.count;
         }
     }
-
+    
+    final double finalWeight = totalWeight;
+    final double finalValue = totalValue;
+    
+    mainThreadHandler.post(() -> {
+        if (tvTotalWeight != null) {
+            tvTotalWeight.setText(String.format(Locale.US, "%.2f g", finalWeight));
+        }
+        if (tvTotalValue != null) {
+            tvTotalValue.setText(String.format(Locale.US, "$%,.2f", finalValue));
+        }
+    });
+}
     /**
      * محول القائمة
      */
@@ -980,20 +1048,34 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         }
         
         @Override
-        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            ScannedItemDisplay item = items.get(position);
+public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+    ScannedItemDisplay item = items.get(position);
 
-            if (!"—".equals(item.karat)) {
-                holder.tvTagTitle.setText(item.title + " (" + item.karat + ")");
-            } else {
-                holder.tvTagTitle.setText(item.title);
-            }
+    if (!"—".equals(item.karat)) {
+        holder.tvTagTitle.setText(item.title + " (" + item.karat + ")");
+    } else {
+        holder.tvTagTitle.setText(item.title);
+    }
 
-            holder.tvTagEpc.setText(item.epc);
-            holder.tvTagDetails.setText((isArabic ? "التكرار: " : "Repeat: ") + 
-                item.count + (isArabic ? " مرة" : " times"));
-            holder.tvTagRssi.setText(item.rssi + " dBm");
-            holder.tvTagTime.setText(item.time != null ? item.time : "--:--:--");
+    holder.tvTagEpc.setText(item.epc);
+    
+    // ✅✅✅ عرض الوزن والسعر
+    String details = (isArabic ? "التكرار: " : "Repeat: ") + 
+        item.count + (isArabic ? " مرة" : " times");
+    
+    if (item.weight > 0) {
+        details += (isArabic ? " • الوزن: " : " • Weight: ") + 
+            String.format(Locale.US, "%.2f g", item.weight);
+    }
+    if (item.price > 0) {
+        details += (isArabic ? " • السعر: " : " • Price: ") + 
+            String.format(Locale.US, "$%,.2f", item.price);
+    }
+    
+    holder.tvTagDetails.setText(details);
+    holder.tvTagRssi.setText(item.rssi + " dBm");
+    holder.tvTagTime.setText(item.time != null ? item.time : "--:--:--");
+
 
             if (expectedCount > 0 && !catalogEpcs.isEmpty()) {
                 if (catalogEpcs.contains(item.epc)) {
@@ -1289,6 +1371,8 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         }
     }
 
+
+
     /**
      * بدء المسح
      */
@@ -1385,99 +1469,102 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             });
         });
     }
+
+
     
     /**
      * جلب الكتالوج من الخادم
      * ✅ مع بناء الخريطة العكسية للباركود
      */
     private Map<String, InventoryItem> fetchCatalogFromServer() {
-        Map<String, InventoryItem> catalog = new ConcurrentHashMap<>();
-        
-        try {
-            if (apiClient == null || branchesManager == null) {
-                Log.w(TAG, "API client or branches manager is null");
-                return catalog;
-            }
-            
-            int branchId = branchesManager.getActiveBranchId();
-            MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(branchId);
-            
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONArray items = response.data.optJSONArray("items");
-                
-                if (items == null) {
-                    JSONObject dataObj = response.data.optJSONObject("data");
-                    if (dataObj != null) {
-                        items = dataObj.optJSONArray("items");
-                    }
-                }
-                
-                if (items != null) {
-                    for (int i = 0; i < items.length(); i++) {
-                        JSONObject obj = items.getJSONObject(i);
-                        
-                        // ✅ استخراج جميع المعرفات الممكنة
-                        String gtin13 = obj.optString("gtin13", "").trim();
-                        String serialNumber = obj.optString("serial_number", "").trim();
-                        String epcCode = obj.optString("epc", "").trim();
-                        
-                        String title = obj.optString("title", 
-                            isArabic ? "قطعة ذهبية" : "Gold Item");
-                        String karat = obj.optString("karat", "21K");
-                        
-                        // ✅ تحديد المعرف الأساسي للكتالوج
-                        String primaryEpc;
-                        
-                        if (!epcCode.isEmpty()) {
-                            primaryEpc = epcCode.toUpperCase();
-                        } else if (!serialNumber.isEmpty()) {
-                            primaryEpc = serialNumber.toUpperCase();
-                        } else if (!gtin13.isEmpty()) {
-                            primaryEpc = "EAN13:" + gtin13;
-                        } else {
-                            continue;
-                        }
-                        
-                        // ✅ تطبيع المعرف
-                        String normalizedEpc = normalizeCodeToEpc(primaryEpc);
-                        
-                        // ✅ إنشاء العنصر
-                        InventoryItem item = new InventoryItem(
-                            normalizedEpc,
-                            title,
-                            karat,
-                            "✓"
-                        );
-                        catalog.put(normalizedEpc, item);
-                        
-                        // ✅ بناء الخريطة العكسية للباركود
-                        if (!gtin13.isEmpty()) {
-                            barcodeToEpcMap.put(gtin13, normalizedEpc);
-                            epcToBarcodeMap.put(normalizedEpc, gtin13);
-                        }
-                        
-                        // ✅ ربط الرقم التسلسلي أيضاً
-                        if (!serialNumber.isEmpty()) {
-                            barcodeToEpcMap.put(serialNumber, normalizedEpc);
-                            epcToBarcodeMap.put(normalizedEpc, serialNumber);
-                        }
-                        
-                        // ✅ ربط EPC نفسه
-                        if (!epcCode.isEmpty()) {
-                            barcodeToEpcMap.put(epcCode.toUpperCase(), normalizedEpc);
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error fetching catalog from server", e);
+    Map<String, InventoryItem> catalog = new ConcurrentHashMap<>();
+    
+    try {
+        if (apiClient == null || branchesManager == null) {
+            return catalog;
         }
         
-        Log.d(TAG, "Catalog loaded: " + catalog.size() + " items, " + 
-            "Barcode mappings: " + barcodeToEpcMap.size());
+        int branchId = branchesManager.getActiveBranchId();
+        MiraApiClient.ApiResponse response = apiClient.getBranchItemsList(branchId);
         
-        return catalog;
+        if (response != null && response.isSuccess && response.data != null) {
+            JSONArray items = response.data.optJSONArray("items");
+            
+            if (items == null) {
+                JSONObject dataObj = response.data.optJSONObject("data");
+                if (dataObj != null) {
+                    items = dataObj.optJSONArray("items");
+                }
+            }
+            
+            if (items != null) {
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject obj = items.getJSONObject(i);
+                    
+                    // ✅ استخراج جميع الحقول
+                    String gtin13 = obj.optString("gtin13", "").trim();
+                    String serialNumber = obj.optString("serial_number", "").trim();
+                    String epcCode = obj.optString("epc", obj.optString("rfid_epc", "")).trim();
+                    
+                    String title = obj.optString("item_title", 
+                        obj.optString("title", isArabic ? "قطعة ذهبية" : "Gold Item"));
+                    String karat = obj.optString("gold_karat", 
+                        obj.optString("karat", "21K"));
+                    double weight = obj.optDouble("gross_weight_grams", 
+                        obj.optDouble("weight", 0));
+                    double price = obj.optDouble("retail_price_usd", 
+                        obj.optDouble("retail_price", obj.optDouble("price", 0)));
+                    
+                    // ✅ تحديد المعرف الأساسي
+                    String primaryEpc;
+                    if (!epcCode.isEmpty()) {
+                        primaryEpc = epcCode.toUpperCase();
+                    } else if (!serialNumber.isEmpty()) {
+                        primaryEpc = serialNumber.toUpperCase();
+                    } else if (!gtin13.isEmpty()) {
+                        primaryEpc = "EAN13:" + gtin13;
+                    } else {
+                        continue;
+                    }
+                    
+                    String normalizedEpc = normalizeCodeToEpc(primaryEpc);
+                    
+                    // ✅ إنشاء InventoryItem مع جميع البيانات
+                    InventoryItem item = new InventoryItem(
+                        normalizedEpc,
+                        title,
+                        karat,
+                        "✓"
+                    );
+                    item.setWeight(weight); // ✅ إذا كان InventoryItem يدعم weight
+                    item.setPrice(price);   // ✅ إذا كان InventoryItem يدعم price
+                    
+                    catalog.put(normalizedEpc, item);
+                    
+                    // ✅✅✅ تخزين في الخريطة الكاملة
+                    catalogItemsMap.put(normalizedEpc, item);
+                    
+                    // ✅ بناء الخرائط العكسية
+                    if (!gtin13.isEmpty()) {
+                        barcodeToEpcMap.put(gtin13, normalizedEpc);
+                        epcToBarcodeMap.put(normalizedEpc, gtin13);
+                    }
+                    if (!serialNumber.isEmpty()) {
+                        barcodeToEpcMap.put(serialNumber, normalizedEpc);
+                        epcToBarcodeMap.put(normalizedEpc, serialNumber);
+                    }
+                    if (!epcCode.isEmpty()) {
+                        barcodeToEpcMap.put(epcCode.toUpperCase(), normalizedEpc);
+                    }
+                }
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Error fetching catalog from server", e);
     }
+    
+    return catalog;
+}
     
     /**
      * بدء مصدر القراءة
@@ -2670,6 +2757,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         scannedItemsDisplayList.clear();
         scannedItemsList.clear();
         catalogEpcs.clear();
+        catalogItemsMap.clear();
         recentTagReads.clear();
         barcodeToEpcMap.clear();
         epcToBarcodeMap.clear();
@@ -2735,4 +2823,4 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             this.status = status;
         }
     }
-}
+                }
