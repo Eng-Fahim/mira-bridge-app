@@ -374,9 +374,9 @@
                 android:layout_width="36dp"
                 android:layout_height="36dp"
                 android:layout_marginStart="4dp"
+                android:contentDescription="@string/archive_reports"
                 app:icon="@android:drawable/ic_menu_agenda"
-                app:cornerRadius="8dp"
-                tools:contentDescription="@string/archive_reports" />
+                app:cornerRadius="8dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnViewSnapshots"
@@ -384,9 +384,9 @@
                 android:layout_width="36dp"
                 android:layout_height="36dp"
                 android:layout_marginStart="4dp"
+                android:contentDescription="@string/view_snapshots"
                 app:icon="@android:drawable/ic_menu_camera"
-                app:cornerRadius="8dp"
-                tools:contentDescription="@string/view_snapshots" />
+                app:cornerRadius="8dp" />
         </LinearLayout>
 
         <!-- بطاقة المقارنة -->
@@ -427,6 +427,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
+                        tools:text="125"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="12sp"
                         android:textStyle="bold" />
@@ -451,6 +452,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
+                        tools:text="120"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="12sp"
                         android:textStyle="bold" />
@@ -475,6 +477,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
+                        tools:text="-5"
                         android:textColor="?attr/colorPrimary"
                         android:textSize="12sp"
                         android:textStyle="bold" />
