@@ -100,94 +100,112 @@ public class LoginActivity extends AppCompatActivity {
 
     private boolean isArabic = true;
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        
-        isDestroyed.set(false);
+   @Override
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    
+    isDestroyed.set(false);
+    
+    // ✅ 1. أولاً: تهيئة الواجهة
+    setContentView(R.layout.activity_login);
+    
+    // ✅ 2. ثانياً: تهيئة SessionManager (لا يحتاج تشفير)
+    sessionManager = new SessionManager(this);
 
-        // تهيئة التشفير الآمن
-        initializeEncryption();
-        
-        sessionManager = new SessionManager(this);
-
-        if (sessionManager.isLoggedIn()) {
-            navigateToMain();
-            return;
-        }
-
-        String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
-        isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
-
-        setContentView(R.layout.activity_login);
-        
-        orgProfileManager = MiraOrgProfileManager.getInstance(this);
-        
-        initViews();
-        disableAutofill();
-        setupBiometric();
-        setupServerConfigToggle();
-        animateEntrance();
-        setupTextWatchers();
-        updateUiLanguage(isArabic);
-        setupProfileListener();
-        loadOrgProfileFromCloud();
-        updateBiometricButtonState();
-        restoreLastUsername();
-        checkLockoutStatus();
+    // ✅ 3. التحقق من تسجيل الدخول
+    if (sessionManager.isLoggedIn()) {
+        navigateToMain();
+        return;
     }
+
+    // ✅ 4. اللغة
+    String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
+    isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
+
+    // ✅ 5. تهيئة التشفير بعد الواجهة
+    initializeEncryption();
+    
+    // ✅ 6. باقي التهيئة
+    orgProfileManager = MiraOrgProfileManager.getInstance(this);
+    
+    initViews();
+    disableAutofill();
+    setupBiometric();
+    setupServerConfigToggle();
+    animateEntrance();
+    setupTextWatchers();
+    updateUiLanguage(isArabic);
+    setupProfileListener();
+    updateBiometricButtonState();
+    restoreLastUsername();
+    checkLockoutStatus();
+    
+    // ✅ 7. تحميل البيانات من السحابة - بعد كل شيء
+    loadOrgProfileFromCloud();
+}
 
     /**
      * تهيئة التشفير الآمن باستخدام EncryptedSharedPreferences
      */
     private void initializeEncryption() {
+    try {
+        // ✅ استخدام MasterKey مع التحقق من وجوده
+        MasterKey masterKey = new MasterKey.Builder(this)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build();
+
+        encryptedPrefs = EncryptedSharedPreferences.create(
+            this,
+            "secure_login_prefs",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        );
+
+        // ✅ استخدام مفتاح ثابت بدلاً من توليد مفتاح جديد
+        // هذا يمنع مشكلة "BadPaddingException" عند تحديث التطبيق
+        byte[] keyBytes = new byte[32]; // 256-bit key
+        byte[] defaultKey = "MIRA_LOGIN_ENCRYPTION_KEY_2024_v1".getBytes("UTF-8");
+        System.arraycopy(defaultKey, 0, keyBytes, 0, Math.min(defaultKey.length, keyBytes.length));
+        encryptionKey = new SecretKeySpec(keyBytes, ENCRYPTION_ALGORITHM);
+        
+    } catch (GeneralSecurityException | IOException e) {
+        Log.e(TAG, "Encryption initialization failed", e);
+        
+        // ✅ Fallback آمن - استخدام SharedPreferences العادي
+        encryptedPrefs = getSharedPreferences("fallback_login_prefs", MODE_PRIVATE);
+        
+        // ✅ مفتاح بديل ثابت
         try {
-            MasterKey masterKey = new MasterKey.Builder(this)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build();
-
-            encryptedPrefs = EncryptedSharedPreferences.create(
-                this,
-                "secure_login_prefs",
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            );
-
-            // إنشاء أو استرجاع مفتاح التشفير
-            String storedKey = encryptedPrefs.getString(ENCRYPTION_KEY, null);
-            if (storedKey == null) {
-                KeyGenerator keyGenerator = KeyGenerator.getInstance(ENCRYPTION_ALGORITHM);
-                keyGenerator.init(256);
-                encryptionKey = keyGenerator.generateKey();
-                encryptedPrefs.edit().putString(ENCRYPTION_KEY, 
-                    Base64.encodeToString(encryptionKey.getEncoded(), Base64.NO_WRAP)).apply();
-            } else {
-                byte[] keyBytes = Base64.decode(storedKey, Base64.NO_WRAP);
-                encryptionKey = new SecretKeySpec(keyBytes, ENCRYPTION_ALGORITHM);
-            }
-        } catch (GeneralSecurityException | IOException e) {
-            Log.e(TAG, "Encryption initialization failed", e);
-            // Fallback إلى SharedPreferences العادي
-            encryptedPrefs = getSharedPreferences("fallback_login_prefs", MODE_PRIVATE);
+            byte[] keyBytes = "MIRA_FALLBACK_KEY_1234567890".getBytes("UTF-8");
+            encryptionKey = new SecretKeySpec(keyBytes, ENCRYPTION_ALGORITHM);
+        } catch (Exception ex) {
+            Log.e(TAG, "Fallback key creation failed", ex);
+            encryptionKey = null;
         }
     }
+}
 
     /**
      * تشفير كلمة المرور قبل الإرسال
      */
     private String encryptPassword(String password) {
-        try {
-            Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
-            cipher.init(Cipher.ENCRYPT_MODE, encryptionKey);
-            byte[] encryptedBytes = cipher.doFinal(password.getBytes("UTF-8"));
-            return Base64.encodeToString(encryptedBytes, Base64.NO_WRAP);
-        } catch (Exception e) {
-            Log.e(TAG, "Password encryption failed", e);
-            // Fallback: استخدام SHA-256 hash
-            return hashPassword(password);
-        }
+    // ✅ التحقق أولاً
+    if (encryptionKey == null) {
+        Log.w(TAG, "encryptionKey is null, using SHA-256 hash");
+        return hashPassword(password);
     }
+    
+    try {
+        Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
+        cipher.init(Cipher.ENCRYPT_MODE, encryptionKey);
+        byte[] encryptedBytes = cipher.doFinal(password.getBytes("UTF-8"));
+        return Base64.encodeToString(encryptedBytes, Base64.NO_WRAP);
+    } catch (Exception e) {
+        Log.e(TAG, "Password encryption failed, using SHA-256 hash", e);
+        return hashPassword(password);
+    }
+}
 
     /**
      * Hash كلمة المرور كطبقة حماية إضافية
@@ -243,31 +261,34 @@ public class LoginActivity extends AppCompatActivity {
      * التحقق من حالة القفل المؤقت
      */
     private void checkLockoutStatus() {
-    if (encryptedPrefs != null) {
-        lockoutUntil = encryptedPrefs.getLong("lockout_until", 0);
-        int savedAttempts = encryptedPrefs.getInt("failed_attempts", 0);
-        failedAttempts.set(savedAttempts);
+    if (encryptedPrefs == null) {
+        Log.w(TAG, "encryptedPrefs is null, skipping lockout check");
+        return;
+    }
+    
+    lockoutUntil = encryptedPrefs.getLong("lockout_until", 0);
+    int savedAttempts = encryptedPrefs.getInt("failed_attempts", 0);
+    failedAttempts.set(savedAttempts);
+    
+    if (System.currentTimeMillis() < lockoutUntil) {
+        long remainingSeconds = (lockoutUntil - System.currentTimeMillis()) / 1000;
+        long remainingMinutes = remainingSeconds / 60;
+        long remainingSecs = remainingSeconds % 60;
         
-        if (System.currentTimeMillis() < lockoutUntil) {
-            long remainingSeconds = (lockoutUntil - System.currentTimeMillis()) / 1000;
-            long remainingMinutes = remainingSeconds / 60;
-            long remainingSecs = remainingSeconds % 60;
-            
-            if (tvLockStatus != null) {
-                tvLockStatus.setVisibility(View.VISIBLE);
-                tvLockStatus.setText(String.format(
-                    isArabic ? "⛔ تم قفل تسجيل الدخول - حاول بعد %02d:%02d" : 
-                    "⛔ Login locked - Try in %02d:%02d",
-                    remainingMinutes, remainingSecs));
-            }
-            
-            if (btnLogin != null) {
-                btnLogin.setEnabled(false);
-                btnLogin.setAlpha(0.5f);
-            }
-        } else if (tvLockStatus != null) {
-            tvLockStatus.setVisibility(View.GONE);
+        if (tvLockStatus != null) {
+            tvLockStatus.setVisibility(View.VISIBLE);
+            tvLockStatus.setText(String.format(
+                isArabic ? "⛔ تم قفل تسجيل الدخول - حاول بعد %02d:%02d" : 
+                "⛔ Login locked - Try in %02d:%02d",
+                remainingMinutes, remainingSecs));
         }
+        
+        if (btnLogin != null) {
+            btnLogin.setEnabled(false);
+            btnLogin.setAlpha(0.5f);
+        }
+    } else if (tvLockStatus != null) {
+        tvLockStatus.setVisibility(View.GONE);
     }
 }
 
@@ -378,26 +399,27 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void loadOrgProfileFromCloud() {
-        executeSafeBg(() -> {
-            try {
-                MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
-                
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject org = response.data.optJSONObject("organization");
-                    
-                    if (org != null) {
-                        orgProfileManager.saveFromServer(org);
-                    }
-                    
-                    if (isActivityAlive()) {
-                        mainHandler.post(this::applyOrgProfile);
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Cloud org load error: " + e.getMessage());
-            }
-        });
+    if (apiClient == null) {
+        Log.w(TAG, "apiClient is null, skipping cloud profile load");
+        return;
     }
+    
+    executeSafeBg(() -> {
+        MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
+        
+        if (response != null && response.isSuccess && response.data != null) {
+            JSONObject org = response.data.optJSONObject("organization");
+            
+            if (org != null && orgProfileManager != null) {
+                orgProfileManager.saveFromServer(org);
+            }
+            
+            if (isActivityAlive()) {
+                mainHandler.post(this::applyOrgProfile);
+            }
+        }
+    });
+}
 
     private void updateUiLanguage(boolean arabic) {
         getWindow().getDecorView().setLayoutDirection(arabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
