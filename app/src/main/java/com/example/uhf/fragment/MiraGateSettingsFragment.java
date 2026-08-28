@@ -189,7 +189,7 @@ private void loadBranches() {
     if (branchesList.isEmpty()) {
         branchesList.add(new BranchItem(1, "الفرع الرئيسي"));
     }
-}
+
     
     // ✅ إذا لم توجد فروع، أضف الفرع الحالي + الرئيسي
     if (branchesList.isEmpty()) {
@@ -896,4 +896,4 @@ private boolean isArabic() {
     interface OnGateToggleListener {
         void onToggle(int position, boolean open);
     }
-}
+        }
