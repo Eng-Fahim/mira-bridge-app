@@ -134,7 +134,11 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-
+<!-- ✅ خدمة المراقبة الخلفية -->
+<service
+    android:name=".service.MiraGateMonitorService"
+    android:exported="false"
+    android:foregroundServiceType="dataSync" />
     </application>
 
 </manifest>
