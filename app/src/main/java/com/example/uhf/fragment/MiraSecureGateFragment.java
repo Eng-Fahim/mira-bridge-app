@@ -528,63 +528,86 @@ private String getCurrentGateName() {
     }
 
     private void queryMiraGateServer(String epc) {
-        if (isDestroyed || gateExecutor == null || gateExecutor.isShutdown()) return;
-        
-        gateExecutor.execute(() -> {
-            Future<MiraApiClient.ApiResponse> future = null;
-            try {
-                MiraApiClient client = MiraApiClient.getInstance(mContext);
-                if (client == null) {
-                    mainHandler.post(() -> handleGateDecision(false, 
-                        isArabic() ? "🚨 خطأ أوفلاين / لا يوجد اتصال" : "🚨 Offline error", epc));
-                    return;
-                }
-                
-                JSONObject extraParams = new JSONObject();
-                extraParams.put("context", "gate");
-                
-                final String finalEpc = epc;
-                future = gateExecutor.submit(() -> client.authorize(finalEpc, "gate", extraParams));
-                
-                MiraApiClient.ApiResponse response = future.get(API_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject decision = response.data.optJSONObject("decision");
-                    JSONObject item = response.data.optJSONObject("item");
-                    
-                    boolean allowed = decision != null && decision.optBoolean("allowed", false);
-                    String itemTitle = item != null ? item.optString("title", 
-                        isArabic() ? "قطعة مجوهرات" : "Jewelry Item") : (isArabic() ? "غير مسجلة" : "Unregistered");
-                    String serial = item != null ? item.optString("serial", epc) : epc;
-                    
-                    if (allowed) {
-                        localAllowedEpcCache.add(epc);
-                    } else {
-                        localAllowedEpcCache.remove(epc);
-                    }
-                    
-                    final boolean finalAllowed = allowed;
-                    final String finalTitle = itemTitle;
-                    final String finalSerial = serial;
-                    
-                    mainHandler.post(() -> handleGateDecision(finalAllowed, finalTitle, finalSerial));
-                } else {
-                    mainHandler.post(() -> handleGateDecision(false, 
-                        isArabic() ? "🚨 خروج غير مصرح - سيرفر" : "🚨 Unauthorized - Server", epc));
-                }
-            } catch (TimeoutException e) {
-                Log.e(TAG, "Query gate timeout: " + e.getMessage());
-                if (future != null) future.cancel(true);
+    if (isDestroyed || gateExecutor == null || gateExecutor.isShutdown()) return;
+    
+    gateExecutor.execute(() -> {
+        Future<MiraApiClient.ApiResponse> future = null;
+        try {
+            MiraApiClient client = MiraApiClient.getInstance(mContext);
+            if (client == null) {
                 mainHandler.post(() -> handleGateDecision(false, 
-                    isArabic() ? "⚠️ انقطاع اتصال (Timeout) - مرفوض أمنياً" : "⚠️ Timeout - Denied", epc));
-            } catch (Exception e) {
-                Log.e(TAG, "Query gate error: " + e.getMessage());
-                if (future != null) future.cancel(true);
-                mainHandler.post(() -> handleGateDecision(false, 
-                    isArabic() ? "🚨 خروج غير مصرح (أوفلاين)" : "🚨 Unauthorized (Offline)", epc));
+                    isArabic() ? "🚨 خطأ أوفلاين" : "🚨 Offline error", epc));
+                return;
             }
-        });
+            
+            // ✅ إرسال context=gate و gate_id و branch_id
+            JSONObject extraParams = new JSONObject();
+            extraParams.put("context", "gate");
+            extraParams.put("gate_id", currentGateId);
+            extraParams.put("branch_id", getCurrentBranchId());
+            
+            final String finalEpc = epc;
+            future = gateExecutor.submit(() -> client.authorize(finalEpc, "gate", extraParams));
+            
+            MiraApiClient.ApiResponse response = future.get(API_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONObject decision = response.data.optJSONObject("decision");
+                JSONObject item = response.data.optJSONObject("item");
+                
+                boolean allowed = decision != null && decision.optBoolean("allowed", false);
+                String reason = decision != null ? decision.optString("reason", "") : "";
+                String message = decision != null ? decision.optString("message", "") : "";
+                String itemTitle = item != null ? item.optString("title", 
+                    isArabic() ? "قطعة مجوهرات" : "Jewelry Item") : (isArabic() ? "غير مسجلة" : "Unregistered");
+                String serial = item != null ? item.optString("serial", epc) : epc;
+                
+                if (allowed) {
+                    localAllowedEpcCache.add(epc);
+                } else {
+                    localAllowedEpcCache.remove(epc);
+                }
+                
+                final boolean finalAllowed = allowed;
+                final String finalTitle = itemTitle;
+                final String finalSerial = serial;
+                final String finalMessage = message;
+                
+                mainHandler.post(() -> {
+                    handleGateDecision(finalAllowed, finalTitle, finalSerial);
+                    
+                    // ✅ عرض رسالة السبب
+                    if (!finalMessage.isEmpty()) {
+                        logConsole(finalAllowed ? "✅ " : "🚨 " + finalMessage);
+                    }
+                });
+            } else {
+                mainHandler.post(() -> handleGateDecision(false, 
+                    isArabic() ? "🚨 خروج غير مصرح" : "🚨 Unauthorized", epc));
+            }
+        } catch (TimeoutException e) {
+            if (future != null) future.cancel(true);
+            mainHandler.post(() -> handleGateDecision(false, 
+                isArabic() ? "⚠️ انقطاع اتصال - مرفوض أمنياً" : "⚠️ Timeout - Denied", epc));
+        } catch (Exception e) {
+            if (future != null) future.cancel(true);
+            mainHandler.post(() -> handleGateDecision(false, 
+                isArabic() ? "🚨 خروج غير مصرح (أوفلاين)" : "🚨 Unauthorized (Offline)", epc));
+        }
+    });
+}
+
+/**
+ * ✅ جلب branch_id الحالي
+ */
+private int getCurrentBranchId() {
+    if (mContext != null) {
+        com.example.uhf.manager.MiraBranchesManager bm = 
+            com.example.uhf.manager.MiraBranchesManager.getInstance(mContext);
+        return bm != null ? bm.getActiveBranchId() : 0;
     }
+    return 0;
+}
 
     private void handleGateDecision(boolean allowed, String itemTitle, String serial) {
         if (isDestroyed || !isAdded()) return;
@@ -927,4 +950,4 @@ private void updateGateStatusOnServerForSpecificGate(String gateId, String statu
         gateActive = false;
         isAlarmActive = false;
     }
-                }
+        }
