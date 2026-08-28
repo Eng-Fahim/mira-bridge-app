@@ -318,15 +318,21 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void updateMonitorList(List<GateMonitorItem> items) {
-        monitorList.clear();
-        monitorList.addAll(items);
-        if (monitorAdapter != null) monitorAdapter.notifyDataSetChanged();
-        int pass = 0, deny = 0;
-        for (GateMonitorItem item : items) { pass += item.passCount; deny += item.denyCount; }
-        if (tvPassCount != null) tvPassCount.setText("✅ مسموح: " + pass);
-        if (tvDenyCount != null) tvDenyCount.setText("🚨 إنذار: " + deny);
-        if (tvTotalCount != null) tvTotalCount.setText("🚪 البوابات: " + items.size());
+    monitorList.clear();
+    monitorList.addAll(items);
+    if (monitorAdapter != null) monitorAdapter.notifyDataSetChanged();
+    
+    int pass = 0, deny = 0;
+    for (GateMonitorItem item : items) { 
+        pass += item.passCount; 
+        deny += item.denyCount; 
     }
+    
+    if (tvPassCount != null) tvPassCount.setText(String.valueOf(pass));
+    if (tvDenyCount != null) tvDenyCount.setText(String.valueOf(deny));
+    if (tvTotalCount != null) tvTotalCount.setText(String.valueOf(items.size()));
+}
+
 
     private int getCurrentBranchId() {
         try {
@@ -433,22 +439,33 @@ public class MiraSecureGateFragment extends Fragment {
     // ============================================
 
     private void triggerAlarm(String itemTitle, String serial) {
-        mainHandler.post(() -> {
-            if (overlayAlarm != null) {
-                tvOverlayTitle.setText("🚨 إنذار أمني");
-                tvOverlayDetails.setText(itemTitle + " [" + serial + "]");
-                overlayAlarm.setVisibility(View.VISIBLE);
-            }
-            if (vibrator != null) vibrator.vibrate(new long[]{0, 500, 200, 500}, -1);
-            SoundGenerator.playSound(miraGatesSettings.getSoundAlarm());
-        });
-    }
+    mainHandler.post(() -> {
+        if (overlayAlarm != null) {
+            tvOverlayTitle.setText("🚨 إنذار أمني: خروج غير مصرح");
+            tvOverlayDetails.setText(itemTitle + "\n[" + serial + "]");
+            overlayAlarm.setVisibility(View.VISIBLE);
+            
+            // إضافة حركة الفلاش للتنبيـه
+            android.view.animation.Animation anim = new android.view.animation.AlphaAnimation(0.4f, 1.0f);
+            anim.setDuration(300);
+            anim.setRepeatMode(android.view.animation.Animation.REVERSE);
+            anim.setRepeatCount(android.view.animation.Animation.INFINITE);
+            overlayAlarm.startAnimation(anim);
+        }
+        if (vibrator != null) vibrator.vibrate(new long[]{0, 500, 200, 500}, -1);
+        SoundGenerator.playSound(miraGatesSettings.getSoundAlarm());
+    });
+}
 
-    private void stopAlarm() {
-        if (overlayAlarm != null) overlayAlarm.setVisibility(View.GONE);
-        if (vibrator != null) vibrator.cancel();
-        logConsole("🔕 تم إيقاف الإنذار");
+private void stopAlarm() {
+    if (overlayAlarm != null) {
+        overlayAlarm.clearAnimation();
+        overlayAlarm.setVisibility(View.GONE);
     }
+    if (vibrator != null) vibrator.cancel();
+    logConsole("🔕 تم إيقاف الإنذار أوتوماتيكياً/يدوياً");
+}
+
 
     // ============================================
     // 📝 السجل
