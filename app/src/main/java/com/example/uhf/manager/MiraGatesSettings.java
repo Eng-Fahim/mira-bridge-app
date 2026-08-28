@@ -71,19 +71,21 @@ public class MiraGatesSettings {
     public int rfidPower = 28;
     public int scanInterval = 500;
     public boolean autoArm;
-    public String soundPass;
-    public String soundDeny;
-    public String soundAlarm;
+    public String soundPass = "beep_success";
+    public String soundDeny = "beep_warning";
+    public String soundAlarm = "alarm_breach_security";
+    public boolean vibrationEnabled = true;
+    public boolean flashEnabled = true;
+    public int alarmDuration = 10;
     
-    // ✅ الحقول الجديدة
+    // ✅ الإحصائيات
     public int passCount = 0;
     public int denyCount = 0;
     public String lastEvent = "";
     
-    // ✅✅✅ أضف هذه الحقول
+    // ✅ الفرع
     public int branchId = 0;
     public String branchName = "";
-
 
     public JSONObject toJson() {
         JSONObject json = new JSONObject();
@@ -104,9 +106,14 @@ public class MiraGatesSettings {
             json.put("sound_pass", soundPass);
             json.put("sound_deny", soundDeny);
             json.put("sound_alarm", soundAlarm);
+            json.put("vibration_enabled", vibrationEnabled);
+            json.put("flash_enabled", flashEnabled);
+            json.put("alarm_duration", alarmDuration);
             json.put("pass_count", passCount);
             json.put("deny_count", denyCount);
             json.put("last_event", lastEvent);
+            json.put("branch_id", branchId);
+            json.put("branch_name", branchName);
         } catch (Exception e) {
             Log.e(TAG, "GateDevice toJson error: " + e.getMessage());
         }
@@ -130,10 +137,15 @@ public class MiraGatesSettings {
         gate.autoArm = json.optBoolean("auto_arm", false);
         gate.soundPass = json.optString("sound_pass", "beep_success");
         gate.soundDeny = json.optString("sound_deny", "beep_warning");
-        gate.soundAlarm = json.optString("sound_alarm", "alarm_sold_item");
+        gate.soundAlarm = json.optString("sound_alarm", "alarm_breach_security");
+        gate.vibrationEnabled = json.optBoolean("vibration_enabled", true);
+        gate.flashEnabled = json.optBoolean("flash_enabled", true);
+        gate.alarmDuration = json.optInt("alarm_duration", 10);
         gate.passCount = json.optInt("pass_count", 0);
         gate.denyCount = json.optInt("deny_count", 0);
         gate.lastEvent = json.optString("last_event", "");
+        gate.branchId = json.optInt("branch_id", 0);
+        gate.branchName = json.optString("branch_name", "");
         return gate;
     }
 }
@@ -202,6 +214,38 @@ public class MiraGatesSettings {
         }
         saveGates(gates);
     }
+    
+    /**
+ * ✅ حفظ إعدادات بوابة محددة
+ */
+public void saveGateSettings(String gateId, String soundPass, String soundDeny, 
+                              String soundAlarm, boolean vibration, boolean flash, 
+                              int alarmDuration, int rfidPower) {
+    SharedPreferences.Editor editor = prefs.edit();
+    editor.putString("gate_sound_pass_" + gateId, soundPass);
+    editor.putString("gate_sound_deny_" + gateId, soundDeny);
+    editor.putString("gate_sound_alarm_" + gateId, soundAlarm);
+    editor.putBoolean("gate_vibration_" + gateId, vibration);
+    editor.putBoolean("gate_flash_" + gateId, flash);
+    editor.putInt("gate_alarm_duration_" + gateId, alarmDuration);
+    editor.putInt("gate_rfid_power_" + gateId, rfidPower);
+    editor.apply();
+}
+
+/**
+ * ✅ استرجاع إعدادات بوابة محددة
+ */
+public GateSettings getGateSettings(String gateId) {
+    GateSettings gs = new GateSettings();
+    gs.soundPass = prefs.getString("gate_sound_pass_" + gateId, getSoundPass());
+    gs.soundDeny = prefs.getString("gate_sound_deny_" + gateId, getSoundDeny());
+    gs.soundAlarm = prefs.getString("gate_sound_alarm_" + gateId, getSoundAlarm());
+    gs.vibrationEnabled = prefs.getBoolean("gate_vibration_" + gateId, isVibrationEnabled());
+    gs.flashEnabled = prefs.getBoolean("gate_flash_" + gateId, isFlashEnabled());
+    gs.alarmDuration = prefs.getInt("gate_alarm_duration_" + gateId, getAlarmDuration());
+    gs.rfidPower = prefs.getInt("gate_rfid_power_" + gateId, getRfidPower());
+    return gs;
+}
 
     /**
      * الحصول على البوابة الأساسية
@@ -462,4 +506,17 @@ public class MiraGatesSettings {
             return new ChainwaySettings();
         }
     }
+    
+    /**
+ * ✅ إعدادات بوابة محددة
+ */
+public static class GateSettings {
+    public String soundPass = "beep_success";
+    public String soundDeny = "beep_warning";
+    public String soundAlarm = "alarm_breach_security";
+    public boolean vibrationEnabled = true;
+    public boolean flashEnabled = true;
+    public int alarmDuration = 10;
+    public int rfidPower = 28;
+}
 }
