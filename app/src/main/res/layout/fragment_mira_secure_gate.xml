@@ -28,90 +28,43 @@
                 android:gravity="center"
                 android:layout_marginBottom="12dp" />
 
-            <!-- ✅ العناصر القديمة - مخفية لكنها موجودة للكود -->
-            <TextView
-                android:id="@+id/tvGateIcon"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🚪"
-                android:textSize="42sp"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/tvGateStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="🔒 معطلة"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/tvLastEvent"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text=""
-                android:visibility="gone" />
-
-            <View
-                android:id="@+id/statusIndicator"
-                android:layout_width="12dp"
-                android:layout_height="12dp"
-                android:background="@drawable/circle_indicator_red"
-                android:visibility="gone" />
-
-            <Spinner
-                android:id="@+id/spGateSelector"
+            <!-- ✅ زر تفعيل/إيقاف المسح -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnToggleScan"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:visibility="gone" />
+                android:layout_height="48dp"
+                android:text="🛡️ تفعيل مسح RFID"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                app:cornerRadius="8dp"
+                android:layout_marginBottom="8dp" />
 
-            <EditText
-                android:id="@+id/etManualEpc"
+            <!-- ✅ أزرار المحاكاة -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="رقم القطعة"
-                android:visibility="gone" />
+                android:orientation="horizontal"
+                android:layout_marginBottom="12dp">
 
-            <Button
-                android:id="@+id/btnArmGate"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Arm"
-                android:visibility="gone" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSimulateAllowed"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="✅ محاكاة مسموح"
+                    android:layout_marginEnd="4dp"
+                    app:cornerRadius="8dp" />
 
-            <Button
-                android:id="@+id/btnDisarmGate"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Disarm"
-                android:visibility="gone" />
-
-            <Button
-                android:id="@+id/btnSubmitManual"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Check"
-                android:visibility="gone" />
-
-            <Button
-                android:id="@+id/btnScanBarcode"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Scan"
-                android:visibility="gone" />
-
-            <Button
-                android:id="@+id/btnSimulateAllowed"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Sim Allowed"
-                android:visibility="gone" />
-
-            <Button
-                android:id="@+id/btnSimulateDenied"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Sim Denied"
-                android:visibility="gone" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSimulateDenied"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="🚨 محاكاة مرفوض"
+                    android:layout_marginStart="4dp"
+                    app:cornerRadius="8dp" />
+            </LinearLayout>
 
             <!-- ✅ إحصائيات عامة -->
             <LinearLayout
