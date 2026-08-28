@@ -787,7 +787,7 @@ public ApiResponse getGatesByBranch(int branchId) {
 }
 
 public ApiResponse getGatesStats() {
-    return get("/gates/stats");
+    return getWithAuth("/gates/stats");
 }
 
     // ===================== 💓 HEARTBEAT & SETTINGS =====================
@@ -1400,4 +1400,4 @@ public ApiResponse getBranchInventoryStats(int branchId) {
         return null;
     }
 }
-                }
+            }
