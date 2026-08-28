@@ -180,7 +180,11 @@ public class MiraBranchesManagementFragment extends Fragment {
     }
 
     private void parseAndDisplay(JSONArray arr) {
-        branchList.clear();
+        if (!isAdded() || getContext() == null) {
+        return; // ✅ الخروج إذا كان الـ Fragment منفصلاً
+    }
+    
+    branchList.clear();
         for (int i = 0; i < arr.length(); i++) {
             JSONObject b = arr.optJSONObject(i);
             if (b == null) continue;
@@ -199,50 +203,55 @@ public class MiraBranchesManagementFragment extends Fragment {
     }
 
     private void displayBranches() {
-        branchesContainer.removeAllViews();
-        int activeBranchId = getActiveBranchId();
-
-        for (BranchData b : branchList) {
-            View card = LayoutInflater.from(getContext()).inflate(R.layout.item_branch, branchesContainer, false);
-            
-            TextView tvName = card.findViewById(R.id.tvBranchName);
-            TextView tvCode = card.findViewById(R.id.tvBranchCode);
-            TextView tvDetails = card.findViewById(R.id.tvBranchDetails);
-            TextView tvAddress = card.findViewById(R.id.tvBranchAddress);
-            View vStatus = card.findViewById(R.id.vBranchStatus);
-
-            String prefix = (b.id == activeBranchId) ? "✅ " : "";
-            if (tvName != null) tvName.setText(prefix + b.name);
-            if (tvCode != null) tvCode.setText("🏷️ " + b.code);
-            if (tvDetails != null) tvDetails.setText("📦 " + b.itemCount + " قطعة | 📞 " + b.phone);
-            if (tvAddress != null) tvAddress.setText(b.address.isEmpty() ? "" : "📍 " + b.address + (b.city.isEmpty() ? "" : " - " + b.city));
-            if (vStatus != null) vStatus.setBackgroundResource(b.isActive ? R.drawable.circle_green : R.drawable.circle_red);
-
-            final BranchData fb = b;
-            card.setOnClickListener(v -> {
-                if (canManageBranches()) {
-                    showBranchDialog(fb);
-                } else {
-                    Toast.makeText(getContext(), 
-                        isArabic() ? "⛔ غير مصرح بالتعديل" : "⛔ Access Denied",
-                        Toast.LENGTH_SHORT).show();
-                }
-            });
-            card.setOnLongClickListener(v -> {
-                if (canManageBranches()) {
-                    showBranchActions(fb);
-                } else {
-                    Toast.makeText(getContext(), 
-                        isArabic() ? "⛔ غير مصرح" : "⛔ Access Denied",
-                        Toast.LENGTH_SHORT).show();
-                }
-                return true;
-            });
-
-            branchesContainer.addView(card);
-        }
-        updateStats();
+    Context context = getContext();
+    if (context == null || !isAdded()) {
+        return;
     }
+    
+    branchesContainer.removeAllViews();
+    int activeBranchId = getActiveBranchId();
+
+    for (BranchData b : branchList) {
+        View card = LayoutInflater.from(context).inflate(R.layout.item_branch, branchesContainer, false);
+        
+        TextView tvName = card.findViewById(R.id.tvBranchName);
+        TextView tvCode = card.findViewById(R.id.tvBranchCode);
+        TextView tvDetails = card.findViewById(R.id.tvBranchDetails);
+        TextView tvAddress = card.findViewById(R.id.tvBranchAddress);
+        View vStatus = card.findViewById(R.id.vBranchStatus);
+
+        String prefix = (b.id == activeBranchId) ? "✅ " : "";
+        if (tvName != null) tvName.setText(prefix + b.name);
+        if (tvCode != null) tvCode.setText("🏷️ " + b.code);
+        if (tvDetails != null) tvDetails.setText("📦 " + b.itemCount + " قطعة | 📞 " + b.phone);
+        if (tvAddress != null) tvAddress.setText(b.address.isEmpty() ? "" : "📍 " + b.address + (b.city.isEmpty() ? "" : " - " + b.city));
+        if (vStatus != null) vStatus.setBackgroundResource(b.isActive ? R.drawable.circle_green : R.drawable.circle_red);
+
+        final BranchData fb = b;
+        card.setOnClickListener(v -> {
+            if (canManageBranches()) {
+                showBranchDialog(fb);
+            } else {
+                Toast.makeText(context, 
+                    isArabic() ? "⛔ غير مصرح بالتعديل" : "⛔ Access Denied",
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
+        card.setOnLongClickListener(v -> {
+            if (canManageBranches()) {
+                showBranchActions(fb);
+            } else {
+                Toast.makeText(context, 
+                    isArabic() ? "⛔ غير مصرح" : "⛔ Access Denied",
+                    Toast.LENGTH_SHORT).show();
+            }
+            return true;
+        });
+
+        branchesContainer.addView(card);
+    }
+    updateStats();
+}
 
     private int getActiveBranchId() {
         try {
