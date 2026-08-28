@@ -2,9 +2,11 @@ package com.example.uhf.tools;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.Log;
 
 public class SessionManager {
 
+    private static final String TAG = "SessionManager";
     private static final String PREF_NAME = "MiraEnterpriseSession";
     private static final String KEY_IS_LOGGED_IN = "isLoggedIn";
     private static final String KEY_USERNAME = "username";
@@ -31,6 +33,9 @@ public class SessionManager {
     
     // ✅ إضافة متغير لتذكر اسم المستخدم
     private static final String KEY_LAST_USERNAME = "lastUsername";
+    
+    // ✅ إضافة الرابط الافتراضي
+    private static final String DEFAULT_SERVER_URL = "https://sa.mirabarcode.com/wp-json/";
 
     public enum Role {
         SYSTEM_ADMIN,
@@ -57,8 +62,56 @@ public class SessionManager {
         editor.putString(KEY_USERNAME, username);
         editor.putString(KEY_USER_ROLE, role);
         editor.putString(KEY_AUTH_TOKEN, token);
-        editor.putString(KEY_SERVER_URL, serverUrl);
+        editor.putString(KEY_SERVER_URL, serverUrl != null && !serverUrl.isEmpty() ? serverUrl : DEFAULT_SERVER_URL);
         editor.apply();
+        
+        Log.d(TAG, "Login session created for user: " + username);
+    }
+
+    // ==================== Server URL ====================
+    
+    /**
+     * ✅ الحصول على عنوان الخادم
+     * في حال عدم وجود عنوان محفوظ، يتم استخدام الافتراضي
+     */
+    public String getServerUrl() {
+        String url = pref.getString(KEY_SERVER_URL, "");
+        
+        // ✅ إذا كان فارغاً، استخدم الافتراضي
+        if (url == null || url.isEmpty()) {
+            Log.d(TAG, "No saved server URL, using default");
+            url = DEFAULT_SERVER_URL;
+            setServerUrl(DEFAULT_SERVER_URL);
+        }
+        
+        return url;
+    }
+    
+    /**
+     * ✅ حفظ عنوان الخادم
+     */
+    public void setServerUrl(String url) {
+        if (url == null || url.isEmpty()) {
+            Log.e(TAG, "Cannot save empty server URL!");
+            return;
+        }
+        
+        // ✅ التأكد من وجود / في النهاية
+        if (!url.endsWith("/")) {
+            url += "/";
+        }
+        
+        editor.putString(KEY_SERVER_URL, url);
+        editor.apply();
+        Log.d(TAG, "Server URL saved: " + url);
+    }
+    
+    /**
+     * ✅ التحقق من وجود عنوان خادم محفوظ
+     */
+    public boolean hasServerUrl() {
+        String url = pref.getString(KEY_SERVER_URL, "");
+        return url != null && !url.isEmpty();
     }
 
     // ==================== API Key ====================
@@ -67,6 +120,7 @@ public class SessionManager {
         if (apiKey != null && !apiKey.isEmpty()) {
             editor.putString(KEY_API_KEY, apiKey);
             editor.apply();
+            Log.d(TAG, "API Key saved");
         }
     }
     
@@ -80,7 +134,11 @@ public class SessionManager {
     }
     
     public void saveGateId(String gateId) {
-        pref.edit().putString(KEY_GATE_ID, gateId).apply();
+        if (gateId != null && !gateId.isEmpty()) {
+            editor.putString(KEY_GATE_ID, gateId);
+            editor.apply();
+            Log.d(TAG, "Gate ID saved");
+        }
     }
 
     public String getGateId() {
@@ -110,6 +168,7 @@ public class SessionManager {
         editor.remove(KEY_API_KEY_CREATED_AT);
         editor.remove(KEY_GATE_ID);
         editor.apply();
+        Log.d(TAG, "API Key cleared");
     }
 
     // ==================== تذكر اسم المستخدم ====================
@@ -190,36 +249,47 @@ public class SessionManager {
     public void setUserId(int userId) { editor.putInt(KEY_USER_ID, userId); editor.apply(); }
     public int getUserId() { return pref.getInt(KEY_USER_ID, 0); }
 
-    public void setDisplayName(String displayName) { editor.putString(KEY_DISPLAY_NAME, displayName); editor.apply(); }
+    public void setDisplayName(String displayName) { 
+        editor.putString(KEY_DISPLAY_NAME, displayName); 
+        editor.apply(); 
+    }
+    
     public String getDisplayName() {
         String name = pref.getString(KEY_DISPLAY_NAME, "");
         return name.isEmpty() ? getUsername() : name;
     }
 
-    public String getServerUrl() { return pref.getString(KEY_SERVER_URL, ""); }
-    public void setServerUrl(String url) { editor.putString(KEY_SERVER_URL, url); editor.apply(); }
-
     public String getPhone() { 
         return pref.getString("phone", ""); 
     }
+    
     public void setPhone(String phone) { 
         editor.putString("phone", phone); 
         editor.apply(); 
     }
 
-    public void setBiometricEnabled(boolean enabled) { editor.putBoolean(KEY_BIOMETRIC_ENABLED, enabled); editor.apply(); }
-    public boolean isBiometricEnabled() { return pref.getBoolean(KEY_BIOMETRIC_ENABLED, false); }
+    public void setBiometricEnabled(boolean enabled) { 
+        editor.putBoolean(KEY_BIOMETRIC_ENABLED, enabled); 
+        editor.apply(); 
+    }
+    
+    public boolean isBiometricEnabled() { 
+        return pref.getBoolean(KEY_BIOMETRIC_ENABLED, false); 
+    }
 
     public void setBiometricLoginEnabled(boolean enabled) { 
         setBiometricEnabled(enabled); 
     }
+    
     public boolean isBiometricLoginEnabled() { 
         return isBiometricEnabled(); 
     }
+    
     public void setBiometricConfirmEnabled(boolean enabled) { 
         editor.putBoolean("biometric_confirm_enabled", enabled); 
         editor.apply(); 
     }
+    
     public boolean isBiometricConfirmEnabled() { 
         return pref.getBoolean("biometric_confirm_enabled", false); 
     }
@@ -253,48 +323,54 @@ public class SessionManager {
     }
 
     public void logoutUser() {
-    // ✅ حفظ القيم التي يجب أن تبقى
-    boolean keepBiometric = pref.getBoolean(KEY_BIOMETRIC_ENABLED, false);
-    String lastUser = pref.getString(KEY_LAST_BIOMETRIC_USER, "");
-    String lastRole = pref.getString(KEY_LAST_BIOMETRIC_ROLE, "");
-    String lastDisplayName = pref.getString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, "");
-    int lastUserId = pref.getInt(KEY_LAST_BIOMETRIC_USER_ID, 0);
-    String lastToken = pref.getString(KEY_LAST_BIOMETRIC_TOKEN, "");
-    int lastBranchId = pref.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, 1);
-    String lastBranchName = pref.getString(KEY_LAST_BIOMETRIC_BRANCH_NAME, "");
-    String apiKey = pref.getString(KEY_API_KEY, "");
-    String gateId = pref.getString(KEY_GATE_ID, "");
-    String lastUsername = pref.getString(KEY_LAST_USERNAME, "");
-    String serverUrl = pref.getString(KEY_SERVER_URL, ""); // ✅ أضف هذا السطر
+        // ✅ حفظ القيم التي يجب أن تبقى
+        boolean keepBiometric = pref.getBoolean(KEY_BIOMETRIC_ENABLED, false);
+        String lastUser = pref.getString(KEY_LAST_BIOMETRIC_USER, "");
+        String lastRole = pref.getString(KEY_LAST_BIOMETRIC_ROLE, "");
+        String lastDisplayName = pref.getString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, "");
+        int lastUserId = pref.getInt(KEY_LAST_BIOMETRIC_USER_ID, 0);
+        String lastToken = pref.getString(KEY_LAST_BIOMETRIC_TOKEN, "");
+        int lastBranchId = pref.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, 1);
+        String lastBranchName = pref.getString(KEY_LAST_BIOMETRIC_BRANCH_NAME, "");
+        String apiKey = pref.getString(KEY_API_KEY, "");
+        String gateId = pref.getString(KEY_GATE_ID, "");
+        String lastUsername = pref.getString(KEY_LAST_USERNAME, "");
+        String serverUrl = pref.getString(KEY_SERVER_URL, "");
 
-    editor.clear();
+        editor.clear();
 
-    if (keepBiometric) {
-        editor.putBoolean(KEY_BIOMETRIC_ENABLED, true);
-        editor.putString(KEY_LAST_BIOMETRIC_USER, lastUser);
-        editor.putString(KEY_LAST_BIOMETRIC_ROLE, lastRole);
-        editor.putString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, lastDisplayName);
-        editor.putInt(KEY_LAST_BIOMETRIC_USER_ID, lastUserId);
-        editor.putString(KEY_LAST_BIOMETRIC_TOKEN, lastToken);
-        editor.putInt(KEY_LAST_BIOMETRIC_BRANCH_ID, lastBranchId);
-        editor.putString(KEY_LAST_BIOMETRIC_BRANCH_NAME, lastBranchName);
-    }
-    
-    if (!apiKey.isEmpty()) {
-        editor.putString(KEY_API_KEY, apiKey);
-    }
-    if (!gateId.isEmpty()) {
-        editor.putString(KEY_GATE_ID, gateId);
-    }
-    if (!lastUsername.isEmpty()) {
-        editor.putString(KEY_LAST_USERNAME, lastUsername);
-    }
-    if (!serverUrl.isEmpty()) {
-        editor.putString(KEY_SERVER_URL, serverUrl); // ✅ أضف هذا السطر
+        if (keepBiometric) {
+            editor.putBoolean(KEY_BIOMETRIC_ENABLED, true);
+            editor.putString(KEY_LAST_BIOMETRIC_USER, lastUser);
+            editor.putString(KEY_LAST_BIOMETRIC_ROLE, lastRole);
+            editor.putString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, lastDisplayName);
+            editor.putInt(KEY_LAST_BIOMETRIC_USER_ID, lastUserId);
+            editor.putString(KEY_LAST_BIOMETRIC_TOKEN, lastToken);
+            editor.putInt(KEY_LAST_BIOMETRIC_BRANCH_ID, lastBranchId);
+            editor.putString(KEY_LAST_BIOMETRIC_BRANCH_NAME, lastBranchName);
+        }
+        
+        if (!apiKey.isEmpty()) {
+            editor.putString(KEY_API_KEY, apiKey);
+        }
+        if (!gateId.isEmpty()) {
+            editor.putString(KEY_GATE_ID, gateId);
+        }
+        if (!lastUsername.isEmpty()) {
+            editor.putString(KEY_LAST_USERNAME, lastUsername);
+        }
+        if (!serverUrl.isEmpty()) {
+            editor.putString(KEY_SERVER_URL, serverUrl);
+        } else {
+            // ✅ إذا كان فارغاً، احفظ الافتراضي
+            editor.putString(KEY_SERVER_URL, DEFAULT_SERVER_URL);
+        }
+
+        editor.apply();
+        Log.d(TAG, "User logged out, preserved necessary data");
     }
 
-    editor.apply();
-}
-
-    public void logout() { logoutUser(); }
+    public void logout() { 
+        logoutUser(); 
+    }
 }
