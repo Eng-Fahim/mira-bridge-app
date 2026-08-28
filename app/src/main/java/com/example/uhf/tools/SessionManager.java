@@ -35,7 +35,7 @@ public class SessionManager {
     private static final String KEY_LAST_USERNAME = "lastUsername";
     
     // ✅ إضافة الرابط الافتراضي
-    private static final String DEFAULT_SERVER_URL = "https://sa.mirabarcode.com/wp-json/";
+    private static final String DEFAULT_SERVER_URL = "https://sa.mirabarcode.com/wp-json";
 
     public enum Role {
         SYSTEM_ADMIN,
