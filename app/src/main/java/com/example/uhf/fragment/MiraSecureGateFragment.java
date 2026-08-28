@@ -59,7 +59,7 @@ public class MiraSecureGateFragment extends Fragment {
     private static final long SCAN_COOL_DOWN_MS = 2500;
     private static final int API_TIMEOUT_SECONDS = 5;
     private static final int MONITOR_INTERVAL_SECONDS = 5;
-
+    
     private UHFMainActivity mContext;
     private MiraGatesSettings miraGatesSettings;
     private PermissionManager permissionManager;
@@ -78,8 +78,13 @@ public class MiraSecureGateFragment extends Fragment {
     private FrameLayout overlayAlarm;
     private TextView tvOverlayTitle, tvOverlayDetails;
     private Button btnStopAlarm, btnToggleScan;
-private Button btnSimulateAllowed, btnSimulateDenied;  // ✅ أضف هذا
+    private Button btnSimulateAllowed, btnSimulateDenied;  // ✅ أضف هذا
     
+    // ✅ متغيرات المحاكاة الحقيقية
+    private String soldEpc = "";
+    private String soldTitle = "";
+    private String unsoldEpc = "";
+    private String unsoldTitle = "";
     // حالة
     private volatile boolean isDestroyed = false;
     private volatile boolean isScanning = false;
@@ -103,6 +108,7 @@ private Button btnSimulateAllowed, btnSimulateDenied;  // ✅ أضف هذا
         
         startMonitoring();
         autoStartScanning(); // ✅ تلقائياً عند الفتح
+        loadTestEpcs();
         
         logConsole("🚀 تم تشغيل البوابة الأمنية MIRA");
         logConsole("📡 جاري تشغيل قارئ RFID تلقائياً...");
@@ -155,16 +161,28 @@ btnSimulateDenied = view.findViewById(R.id.btnSimulateDenied);    // ✅ بدو�
         }
         
         if (btnSimulateAllowed != null) {
-        btnSimulateAllowed.setOnClickListener(v -> {
-        String mockEpc = "E20041000000000000009999";
-        processInputEpc(mockEpc, "SIMULATION");
+    btnSimulateAllowed.setOnClickListener(v -> {
+        if (!soldEpc.isEmpty()) {
+            logConsole("🟢 محاكاة: قطعة مباعة من قاعدة البيانات");
+            queryMiraGateServer(soldEpc);
+        } else {
+            Toast.makeText(getContext(), 
+                "⚠️ لا توجد قطعة مباعة للمحاكاة", 
+                Toast.LENGTH_SHORT).show();
+        }
     });
 }
 
 if (btnSimulateDenied != null) {
     btnSimulateDenied.setOnClickListener(v -> {
-        String mockEpc = "E20041000000000000001111";
-        processInputEpc(mockEpc, "SIMULATION");
+        if (!unsoldEpc.isEmpty()) {
+            logConsole("🔴 محاكاة: قطعة غير مباعة من قاعدة البيانات");
+            queryMiraGateServer(unsoldEpc);
+        } else {
+            Toast.makeText(getContext(), 
+                "⚠️ لا توجد قطعة غير مباعة للمحاكاة", 
+                Toast.LENGTH_SHORT).show();
+        }
     });
 }
     }
@@ -298,6 +316,41 @@ if (btnSimulateDenied != null) {
         if (dataObj != null) return dataObj.optJSONArray("gates");
         return null;
     }
+    
+    /**
+ * ✅ جلب EPCs حقيقية من قاعدة البيانات للمحاكاة
+ */
+private void loadTestEpcs() {
+    if (gateExecutor == null || getContext() == null) return;
+    
+    gateExecutor.execute(() -> {
+        try {
+            MiraApiClient client = MiraApiClient.getInstance(getContext());
+            if (client == null) return;
+            
+            MiraApiClient.ApiResponse response = client.getTestEpcs();
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                soldEpc = response.data.optString("sold_epc", "");
+                soldTitle = response.data.optString("sold_title", "");
+                unsoldEpc = response.data.optString("unsold_epc", "");
+                unsoldTitle = response.data.optString("unsold_title", "");
+                
+                mainHandler.post(() -> {
+                    logConsole("✅ تم تحميل EPCs للمحاكاة من قاعدة البيانات");
+                    if (!soldTitle.isEmpty()) {
+                        logConsole("🟢 مباعة: " + soldTitle);
+                    }
+                    if (!unsoldTitle.isEmpty()) {
+                        logConsole("🔴 غير مباعة: " + unsoldTitle);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Load test EPCs: " + e.getMessage());
+        }
+    });
+}
 
     private void updateMonitorList(List<GateMonitorItem> items) {
         monitorList.clear();
@@ -516,4 +569,4 @@ if (btnSimulateDenied != null) {
         if (gateExecutor != null) gateExecutor.shutdownNow();
         mainHandler.removeCallbacksAndMessages(null);
     }
-                              }
+}
