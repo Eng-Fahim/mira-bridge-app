@@ -263,7 +263,85 @@
                 app:backgroundTint="#DC2626"
                 app:cornerRadius="8dp" />
         </LinearLayout>
+<!-- ✅ مؤشر المخاطر الأمنية -->
+<com.google.android.material.card.MaterialCardView
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    app:cardBackgroundColor="#1E293B"
+    app:cardCornerRadius="10dp"
+    app:strokeColor="#334155"
+    app:strokeWidth="1dp">
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📊 مؤشر المخاطر الأمنية"
+            android:textColor="#94A3B8"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="6dp" />
+
+        <ProgressBar
+            android:id="@+id/pbRiskMeter"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="12dp"
+            android:max="100"
+            android:progress="0"
+            android:progressTint="#EF4444" />
+
+        <TextView
+            android:id="@+id/tvRiskPercentage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="نسبة الإنذارات: 0%"
+            android:textColor="#F87171"
+            android:textSize="10sp"
+            android:layout_marginTop="4dp" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>
+
+<!-- ✅ أزرار فلترة السجل -->
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:layout_marginBottom="4dp">
+
+    <Button
+        android:id="@+id/btnFilterAll"
+        android:layout_width="0dp"
+        android:layout_height="28dp"
+        android:layout_weight="1"
+        android:text="الكل"
+        android:textSize="9sp"
+        android:backgroundTint="#475569" />
+
+    <Button
+        android:id="@+id/btnFilterAlerts"
+        android:layout_width="0dp"
+        android:layout_height="28dp"
+        android:layout_weight="1"
+        android:text="🚨 إنذارات"
+        android:textSize="9sp"
+        android:backgroundTint="#DC2626" />
+
+    <Button
+        android:id="@+id/btnFilterPass"
+        android:layout_width="0dp"
+        android:layout_height="28dp"
+        android:layout_weight="1"
+        android:text="✅ مقبول"
+        android:textSize="9sp"
+        android:backgroundTint="#16A34A" />
+</LinearLayout>
         <!-- 5. شبكة البوابات الحية (Visual Gate Monitor) -->
         <TextView
             android:layout_width="match_parent"
