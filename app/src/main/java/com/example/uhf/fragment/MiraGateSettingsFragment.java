@@ -139,26 +139,28 @@ public class MiraGateSettingsFragment extends Fragment {
      * ✅ جلب قائمة الفروع
      */
     private void loadBranches() {
-        branchesList.clear();
-        try {
-            if (branchesManager != null) {
-                List<MiraBranchesManager.Branch> allBranches = branchesManager.getAllBranches();
-                if (allBranches != null) {
-                    for (MiraBranchesManager.Branch branch : allBranches) {
-                        branchesList.add(new BranchItem(branch.id, branch.branchName));
-                    }
+    branchesList.clear();
+    try {
+        if (branchesManager != null) {
+            List<MiraBranchesManager.BranchItem> allBranches = branchesManager.getAllBranches();
+            if (allBranches != null) {
+                for (MiraBranchesManager.BranchItem branch : allBranches) {
+                    branchesList.add(new BranchItem(branch.id, branch.name));
                 }
             }
-        } catch (Exception e) {
-            Log.e(TAG, "loadBranches error: " + e.getMessage());
         }
-        
-        // إذا لم توجد فروع، أضف الفرع الافتراضي
-        if (branchesList.isEmpty()) {
-            branchesList.add(new BranchItem(1, "الفرع الرئيسي"));
-        }
+    } catch (Exception e) {
+        Log.e(TAG, "loadBranches error: " + e.getMessage());
     }
+    
+    if (branchesList.isEmpty()) {
+        branchesList.add(new BranchItem(1, "الفرع الرئيسي"));
+    }
+}
 
+private boolean isArabic() {
+    return java.util.Locale.getDefault().getLanguage().equals("ar");
+}
     private void startStatusRefresh() {
         statusRefreshRunnable = new Runnable() {
             @Override
