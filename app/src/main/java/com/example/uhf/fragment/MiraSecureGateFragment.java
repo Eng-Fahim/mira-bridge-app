@@ -366,13 +366,19 @@ private void loadGatesForSelector() {
         return;
     }
     
+    // ✅ جلب إعدادات البوابة المحددة
+    MiraGatesSettings.GateSettings gateSpecificSettings = 
+        miraGatesSettings.getGateSettings(currentGateId);
+    
     gateActive = true;
     updateUI();
     logConsole(isArabic() ? "🛡️ تم تفعيل البوابة: " : "🛡️ Gate armed: " + getCurrentGateName());
+    logConsole("🔊 صوت الإنذار: " + gateSpecificSettings.soundAlarm);
+    logConsole("📡 قوة RFID: " + gateSpecificSettings.rfidPower + " dBm");
     
     syncLocalAllowedCache();
     startRealtimeDbSync();
-    startContinuousRfidScan();
+    startContinuousRfidScanWithSettings(gateSpecificSettings);
     updateGateStatusOnServerForSpecificGate(currentGateId, "armed");
 }
 
@@ -921,4 +927,4 @@ private void updateGateStatusOnServerForSpecificGate(String gateId, String statu
         gateActive = false;
         isAlarmActive = false;
     }
-        }
+                }
