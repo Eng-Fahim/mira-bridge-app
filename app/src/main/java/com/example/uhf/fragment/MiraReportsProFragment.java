@@ -84,8 +84,25 @@ public class MiraReportsProFragment extends Fragment {
     private String lastLoadedType = "";
     private String lastFromDate = "";
     private String lastToDate = "";
+    
+    
+    // في بداية الكلاس
+@Override
+public void onResume() {
+    super.onResume();
+    // ✅ تحديث معرف الفرع عند العودة للـ Fragment
+    if (branchesManager != null) {
+        currentBranchId = branchesManager.getActiveBranchId();
+    }
+}
 
-
+// دالة لتحديث الفرع
+private void refreshCurrentBranch() {
+    if (branchesManager != null) {
+        currentBranchId = branchesManager.getActiveBranchId();
+        Log.d(TAG, "Updated branch ID: " + currentBranchId);
+    }
+}
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -313,6 +330,16 @@ private void showFilteredReportDialog(ReportItem item) {
     });
     
     if (btnAdvancedFilter != null) {
+    if (item.type.equals("gates")) {
+        // ✅ للبوابات - زر اختيار البوابة
+        btnAdvancedFilter.setText(isArabic ? "🚪 اختر البوابة" : "🚪 Select Gate");
+        btnAdvancedFilter.setOnClickListener(v -> {
+            animateButtonPress(btnAdvancedFilter);
+            showGateSelectionForReport(dialogView, rvData, layoutLoading, tvLoadingStatus, 
+                selectedDates, selectedFilters);
+        });
+    } else {
+        // ✅ للتقارير الأخرى - فلتر متقدم
         btnAdvancedFilter.setOnClickListener(v -> {
             animateButtonPress(btnAdvancedFilter);
             showAdvancedFilterDialog(item.type, selectedFilters, () -> {
@@ -321,7 +348,7 @@ private void showFilteredReportDialog(ReportItem item) {
             });
         });
     }
-    
+}
     btnApply.setOnClickListener(v -> {
         animateButtonPress(btnApply);
         // ✅ أنيميشن تحميل مخصص
@@ -359,6 +386,82 @@ private void showFilteredReportDialog(ReportItem item) {
     
     fetchAndDisplayWithFilters(item.type, rvData, layoutLoading, tvLoadingStatus, 
         selectedDates[0], selectedDates[1], selectedFilters);
+}
+
+
+// دالة اختيار البوابة للتقرير العادي
+private void showGateSelectionForReport(View dialogView, RecyclerView rvData, 
+                                       View layoutLoading, TextView tvLoadingStatus,
+                                       String[] dates, String[] filters) {
+    // ✅ فحص السلامة
+    if (!isAdded() || getContext() == null) return;
+    
+    executorService.execute(() -> {
+        try {
+            refreshCurrentBranch(); // تحديث الفرع
+            String endpoint = "/gates?branch_id=" + currentBranchId;
+            MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint);
+            
+            mainHandler.post(() -> {
+                if (!isAdded() || getContext() == null) return;
+                
+                List<GateInfo> gates = new ArrayList<>();
+                
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONArray gatesArray = response.data.optJSONArray("gates");
+                    if (gatesArray == null) {
+                        JSONObject dataObj = response.data.optJSONObject("data");
+                        if (dataObj != null) {
+                            gatesArray = dataObj.optJSONArray("gates");
+                        }
+                    }
+                    
+                    if (gatesArray != null) {
+                        for (int i = 0; i < gatesArray.length(); i++) {
+                            JSONObject gate = gatesArray.optJSONObject(i);
+                            if (gate != null) {
+                                GateInfo info = new GateInfo();
+                                info.id = gate.optInt("id", 0);
+                                info.gateId = gate.optString("gate_id", "");
+                                info.name = gate.optString("gate_name", "بوابة " + (i+1));
+                                gates.add(info);
+                            }
+                        }
+                    }
+                }
+                
+                String[] options = new String[gates.size() + 1];
+                options[0] = isArabic ? "كل البوابات" : "All Gates";
+                for (int i = 0; i < gates.size(); i++) {
+                    options[i + 1] = gates.get(i).name + " (" + gates.get(i).gateId + ")";
+                }
+                
+                Context context = getContext();
+                if (context == null) return;
+                
+                new AlertDialog.Builder(context)
+                    .setTitle(isArabic ? "اختر البوابة" : "Select Gate")
+                    .setItems(options, (dialog, which) -> {
+                        if (which == 0) {
+                            filters[1] = "";
+                        } else {
+                            filters[1] = gates.get(which - 1).gateId;
+                        }
+                        
+                        showCustomLoading(layoutLoading, tvLoadingStatus);
+                        fetchAndDisplayWithFilters("gates", rvData, layoutLoading, 
+                            tvLoadingStatus, dates[0], dates[1], filters);
+                    })
+                    .show();
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Gate selection error: " + e.getMessage());
+        }
+    });
+}
+// ✅ إضافة هذه الدالة
+private Context getContextSafely() {
+    return isAdded() ? getContext() : null;
 }
 
 // ==================== دالة الفلترة المتقدمة ====================
@@ -808,93 +911,6 @@ private void printReport(ReportItem item, RecyclerView rvData, String[] dates, S
 }
 
 // ==================== تصدير CSV محسن ====================
-private void exportReportToCSV(String type, String from, String to, JSONObject data) {
-    if (!isAdded() || getContext() == null) return;
-    try {
-        StringBuilder csv = new StringBuilder();
-        
-        // ✅ إضافة BOM للدعم العربي
-        csv.append('\uFEFF');
-        
-        // ✅ هيدر المنظمة
-        if (orgProfile != null) {
-            csv.append(isArabic ? "اسم الجهة" : "Organization").append(",")
-               .append(orgProfile.getOrgName()).append("\n");
-        }
-        
-        // ✅ معلومات التقرير
-        csv.append(isArabic ? "نوع التقرير" : "Report Type").append(",")
-           .append(type).append("\n");
-        csv.append(isArabic ? "الفترة من" : "From").append(",")
-           .append(from).append("\n");
-        csv.append(isArabic ? "الفترة إلى" : "To").append(",")
-           .append(to).append("\n");
-        csv.append(isArabic ? "تاريخ التصدير" : "Export Date").append(",")
-           .append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()))
-           .append("\n\n");
-        
-        // ✅ تصدير البيانات
-        if (data != null) {
-            JSONArray items = data.optJSONArray("items");
-            if (items == null) items = data.optJSONArray("data");
-            if (items == null) items = data.optJSONArray("items_list");
-            
-            if (items != null && items.length() > 0) {
-                // ✅ استخراج الأعمدة من أول عنصر
-                JSONObject firstItem = items.optJSONObject(0);
-                if (firstItem != null) {
-                    Iterator<String> keys = firstItem.keys();
-                    List<String> columns = new ArrayList<>();
-                    while (keys.hasNext()) {
-                        columns.add(keys.next());
-                    }
-                    
-                    // ✅ كتابة رؤوس الأعمدة
-                    for (int i = 0; i < columns.size(); i++) {
-                        if (i > 0) csv.append(",");
-                        csv.append(columns.get(i));
-                    }
-                    csv.append("\n");
-                    
-                    // ✅ كتابة البيانات
-                    for (int i = 0; i < items.length(); i++) {
-                        JSONObject item = items.optJSONObject(i);
-                        if (item != null) {
-                            for (int j = 0; j < columns.size(); j++) {
-                                if (j > 0) csv.append(",");
-                                String value = item.optString(columns.get(j), "");
-                                // ✅ تنظيف القيم من الفواصل
-                                value = value.replace(",", "،").replace("\n", " ");
-                                csv.append(value);
-                            }
-                            csv.append("\n");
-                        }
-                    }
-                }
-            }
-        }
-        
-        // ✅ حفظ الملف
-        File exportDir = new File(requireContext().getCacheDir(), "exports");
-        if (!exportDir.exists()) exportDir.mkdirs();
-        
-        File file = new File(exportDir, "MIRA_Report_" + type + "_" + System.currentTimeMillis() + ".csv");
-        FileOutputStream fos = new FileOutputStream(file);
-        fos.write(csv.toString().getBytes("UTF-8"));
-        fos.close();
-        
-        // ✅ مشاركة الملف
-        Uri uri = FileProvider.getUriForFile(requireContext(), requireContext().getPackageName() + ".fileprovider", file);
-        Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.setType("text/csv");
-        intent.putExtra(Intent.EXTRA_STREAM, uri);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(intent, isArabic ? "مشاركة التقرير" : "Share Report"));
-        
-    } catch (Exception e) {
-        Toast.makeText(getContext(), "Export failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-    }
-}
 
 // ✅ دالة عرض التقارير المتقدمة مع زر الطباعة
 private void showAdvancedReportDialog(String type, JSONObject data) {
@@ -1139,51 +1155,57 @@ private static class UserInfo {
 
     // ✅ دالة جديدة لجلب التقارير المتقدمة
     private void fetchAdvancedReport(String type, int userId, String serialNumber, 
-                                     String gtin13, int gateId, String fromDate, String toDate) {
-        executorService.execute(() -> {
-            try {
-                // بناء الـ endpoint مع المعاملات الإضافية
-                StringBuilder endpoint = new StringBuilder("/reports-analytics?type=").append(type);
-                
-                if (userId > 0) endpoint.append("&user_id=").append(userId);
-                if (!serialNumber.isEmpty()) endpoint.append("&serial_number=").append(serialNumber);
-                if (!gtin13.isEmpty()) endpoint.append("&gtin13=").append(gtin13);
-                if (gateId > 0) endpoint.append("&gate_id=").append(gateId);
-                if (!fromDate.isEmpty()) endpoint.append("&from=").append(fromDate);
-                if (!toDate.isEmpty()) endpoint.append("&to=").append(toDate);
-                if (currentBranchId > 0) endpoint.append("&branch_id=").append(currentBranchId);
-
-                Log.d(TAG, "Advanced Report URL: " + endpoint.toString());
-                
-                MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint.toString());
-
-                mainHandler.post(() -> {
-                    if (response == null || !response.isSuccess) {
-                        Toast.makeText(getContext(), 
-                            isArabic ? "فشل التحميل" : "Failed to load", 
-                            Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-
-                    JSONObject data = response.data;
-                    if (data == null) {
-                        Toast.makeText(getContext(), isArabic ? "لا توجد بيانات" : "No data available", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-
-                    Log.d(TAG, "Advanced Report Data: " + data.toString());
-
-                    // عرض البيانات في Dialog
-                    showAdvancedReportDialog(type, data);
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Advanced report error: " + e.getMessage());
-                mainHandler.post(() -> {
-                    Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                });
+                                 String gtin13, int gateId, String fromDate, String toDate) {
+    // ✅ تحديث الفرع الحالي قبل الجلب
+    refreshCurrentBranch();
+    
+    executorService.execute(() -> {
+        try {
+            StringBuilder endpoint = new StringBuilder("/reports-analytics?type=").append(type);
+            
+            if (userId > 0) endpoint.append("&user_id=").append(userId);
+            if (!serialNumber.isEmpty()) endpoint.append("&serial_number=").append(serialNumber);
+            if (!gtin13.isEmpty()) endpoint.append("&gtin13=").append(gtin13);
+            if (gateId > 0) endpoint.append("&gate_id=").append(gateId);
+            if (!fromDate.isEmpty()) endpoint.append("&from=").append(fromDate);
+            if (!toDate.isEmpty()) endpoint.append("&to=").append(toDate);
+            
+            // ✅ إضافة معرف الفرع دائماً
+            if (currentBranchId > 0) {
+                endpoint.append("&branch_id=").append(currentBranchId);
             }
-        });
-    }
+
+            Log.d(TAG, "Advanced Report URL: " + endpoint.toString());
+            
+            MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint.toString());
+
+            mainHandler.post(() -> {
+                if (response == null || !response.isSuccess) {
+                    Toast.makeText(getContext(), 
+                        isArabic ? "فشل التحميل" : "Failed to load", 
+                        Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                JSONObject data = response.data;
+                if (data == null) {
+                    Toast.makeText(getContext(), 
+                        isArabic ? "لا توجد بيانات" : "No data available", 
+                        Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                showAdvancedReportDialog(type, data);
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "Advanced report error: " + e.getMessage());
+            mainHandler.post(() -> {
+                Toast.makeText(getContext(), "Error: " + e.getMessage(), 
+                    Toast.LENGTH_SHORT).show();
+            });
+        }
+    });
+}
 
 
     private String getReportTitle(String type) {
@@ -1343,50 +1365,68 @@ private static class UserInfo {
     }
 
     private List<GenericItem> parseGateSecurity(JSONObject data) {
-        List<GenericItem> items = new ArrayList<>();
-        if (data == null) return items;
-        
-        // البحث عن مصفوفة بيانات البوابات
-        JSONArray gatesArr = null;
-        Iterator<String> keys = data.keys();
-        while (keys.hasNext()) {
-            String key = keys.next();
-            Object value = data.opt(key);
-            if (value instanceof JSONArray) {
-                JSONArray arr = (JSONArray) value;
-                if (arr.length() > 0) {
-                    JSONObject first = arr.optJSONObject(0);
-                    if (first != null && first.has("total_events")) {
-                        gatesArr = arr;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        if (gatesArr != null) {
-            for (int i = 0; i < gatesArr.length(); i++) {
-                JSONObject gate = gatesArr.optJSONObject(i);
-                if (gate != null) {
-                    String gateId = gate.optString("gate_id", "-");
-                    int totalEvents = gate.optInt("total_events", 0);
-                    int alerts = gate.optInt("alerts", 0);
-                    int passed = gate.optInt("passed", 0);
-                    
-                    items.add(new GenericItem(
-                        (isArabic ? "🚪 بوابة " : "🚪 Gate ") + gateId,
-                        String.format(Locale.US, 
-                            "%s: %d\n%s: %d\n%s: %d",
-                            isArabic ? "إجمالي الأحداث" : "Total Events", totalEvents,
-                            isArabic ? "إنذارات" : "Alerts", alerts,
-                            isArabic ? "مسموح" : "Passed", passed)
-                    ));
-                }
-            }
-        }
-        
-        return items;
+    List<GenericItem> items = new ArrayList<>();
+    if (data == null) return items;
+    
+    // ✅ إضافة معلومات الفرع
+    if (branchesManager != null) {
+        items.add(new GenericItem(
+            isArabic ? "🏢 الفرع" : "🏢 Branch",
+            branchesManager.getActiveBranchName()
+        ));
     }
+    
+    // البحث عن مصفوفة بيانات البوابات
+    JSONArray gatesArr = null;
+    Iterator<String> keys = data.keys();
+    while (keys.hasNext()) {
+        String key = keys.next();
+        Object value = data.opt(key);
+        if (value instanceof JSONArray) {
+            JSONArray arr = (JSONArray) value;
+            if (arr.length() > 0) {
+                JSONObject first = arr.optJSONObject(0);
+                if (first != null && (first.has("total_events") || first.has("gate_id"))) {
+                    gatesArr = arr;
+                    break;
+                }
+            }
+        }
+    }
+    
+    if (gatesArr != null) {
+        for (int i = 0; i < gatesArr.length(); i++) {
+            JSONObject gate = gatesArr.optJSONObject(i);
+            if (gate != null) {
+                String gateId = gate.optString("gate_id", gate.optString("gate_name", "-"));
+                int totalEvents = gate.optInt("total_events", 0);
+                int alerts = gate.optInt("alerts", gate.optInt("alert_count", 0));
+                int passed = gate.optInt("passed", gate.optInt("pass_count", 0));
+                
+                // ✅ حساب نسبة الأمان
+                double securityRate = totalEvents > 0 ? 
+                    ((double)(totalEvents - alerts) / totalEvents * 100) : 100.0;
+                
+                items.add(new GenericItem(
+                    (isArabic ? "🚪 بوابة " : "🚪 Gate ") + gateId,
+                    String.format(Locale.US, 
+                        "%s: %d\n%s: %d\n%s: %d\n%s: %.1f%%",
+                        isArabic ? "إجمالي الأحداث" : "Total Events", totalEvents,
+                        isArabic ? "إنذارات" : "Alerts", alerts,
+                        isArabic ? "مسموح" : "Passed", passed,
+                        isArabic ? "معدل الأمان" : "Security Rate", securityRate)
+                ));
+            }
+        }
+    } else {
+        items.add(new GenericItem(
+            isArabic ? "لا توجد بيانات" : "No Data",
+            isArabic ? "لم يتم العثور على بوابات لهذا الفرع" : "No gates found for this branch"
+        ));
+    }
+    
+    return items;
+}
 
     private List<GenericItem> parseInventoryAging(JSONObject data) {
         List<GenericItem> items = new ArrayList<>();
@@ -2428,6 +2468,83 @@ private void exportAdvancedReport(String type, JSONObject data) {
 }
 // ✅ دالة خاصة بمؤشر أمن البوابات
 private void showGateSecurityDialog(ReportItem item) {
+    // ✅ أولاً تحميل بوابات الفرع الحالي
+    executorService.execute(() -> {
+        try {
+            // جلب بوابات الفرع الحالي
+            String endpoint = "/gates?branch_id=" + currentBranchId;
+            MiraApiClient.ApiResponse gatesResponse = apiClient.getWithAuth(endpoint);
+            
+            mainHandler.post(() -> {
+                List<GateInfo> gates = new ArrayList<>();
+                
+                if (gatesResponse != null && gatesResponse.isSuccess && gatesResponse.data != null) {
+                    JSONArray gatesArray = gatesResponse.data.optJSONArray("gates");
+                    if (gatesArray == null) {
+                        JSONObject dataObj = gatesResponse.data.optJSONObject("data");
+                        if (dataObj != null) {
+                            gatesArray = dataObj.optJSONArray("gates");
+                        }
+                    }
+                    
+                    if (gatesArray != null) {
+                        for (int i = 0; i < gatesArray.length(); i++) {
+                            JSONObject gate = gatesArray.optJSONObject(i);
+                            if (gate != null) {
+                                GateInfo info = new GateInfo();
+                                info.id = gate.optInt("id", 0);
+                                info.gateId = gate.optString("gate_id", "");
+                                info.name = gate.optString("gate_name", gate.optString("name", "بوابة " + (i+1)));
+                                info.location = gate.optString("gate_location", gate.optString("location", ""));
+                                gates.add(info);
+                            }
+                        }
+                    }
+                }
+                
+                // ✅ إضافة خيار "كل البوابات"
+                if (!gates.isEmpty()) {
+                    showGateSelectionDialog(gates, item);
+                } else {
+                    // إذا لا توجد بوابات محددة، اعرض إدخال يدوي
+                    showManualGateInput(item);
+                }
+            });
+        } catch (Exception e) {
+            mainHandler.post(() -> showManualGateInput(item));
+        }
+    });
+}
+
+private void showGateSelectionDialog(List<GateInfo> gates, ReportItem item) {
+    // إضافة خيار "كل البوابات"
+    String[] options = new String[gates.size() + 1];
+    options[0] = isArabic ? "🚪 كل البوابات" : "🚪 All Gates";
+    
+    for (int i = 0; i < gates.size(); i++) {
+        GateInfo g = gates.get(i);
+        options[i + 1] = "🚪 " + g.name + " (" + g.gateId + ")" + 
+                        (g.location.isEmpty() ? "" : " - " + g.location);
+    }
+    
+    new AlertDialog.Builder(requireContext())
+        .setTitle(isArabic ? "🛡️ اختر البوابة" : "🛡️ Select Gate")
+        .setItems(options, (dialog, which) -> {
+            if (which == 0) {
+                // كل البوابات
+                fetchAdvancedReport(item.type, 0, "", "", 0, 
+                    getDefaultFromDate(), getDefaultToDate());
+            } else {
+                GateInfo selectedGate = gates.get(which - 1);
+                fetchAdvancedReport(item.type, 0, "", "", selectedGate.id, 
+                    getDefaultFromDate(), getDefaultToDate());
+            }
+        })
+        .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+        .show();
+}
+
+private void showManualGateInput(ReportItem item) {
     AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
     builder.setTitle(isArabic ? "🛡️ مؤشر أمن البوابات" : "🛡️ Gate Security Index");
     
@@ -2446,10 +2563,19 @@ private void showGateSecurityDialog(ReportItem item) {
                 // تجاهل
             }
         }
-        fetchAdvancedReport(item.type, 0, "", "", gateId, getDefaultFromDate(), getDefaultToDate());
+        fetchAdvancedReport(item.type, 0, "", "", gateId, 
+            getDefaultFromDate(), getDefaultToDate());
     });
     builder.setNegativeButton(isArabic ? "إلغاء" : "Cancel", null);
     builder.show();
+}
+
+// ✅ كلاس معلومات البوابة
+private static class GateInfo {
+    int id;
+    String gateId;
+    String name;
+    String location;
 }
 
 // ✅ دالة خاصة بأعمار المخزون
@@ -2619,8 +2745,27 @@ private void showAuditDiscrepancyDialog(ReportItem item) {
     interface DatePickerCallback { void onDate(String date); }
 
     @Override
-    public void onDestroyView() {
-        if (executorService != null && !executorService.isShutdown()) executorService.shutdownNow();
-        super.onDestroyView();
+public void onDestroyView() {
+    super.onDestroyView();
+    
+    // ✅ إزالة callbacks
+    mainHandler.removeCallbacksAndMessages(null);
+    
+    // ✅ إغلاق executor بشكل آمن
+    if (executorService != null && !executorService.isShutdown()) {
+        executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
-                }
+    
+    // ✅ تنظيف المراجع
+    rvReports = null;
+    adapter = null;
+}
+                    }
