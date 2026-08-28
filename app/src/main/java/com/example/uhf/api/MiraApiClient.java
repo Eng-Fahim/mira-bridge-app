@@ -57,7 +57,7 @@ public class MiraApiClient {
      * ✅ تحديث القيم من MiraServerConfig
      */
     private void refreshCredentials() {
-        this.apiUrl = serverConfig.getBaseUrl() + "mira-gate/v1";
+        this.apiUrl = serverConfig.getBaseUrl() + "wp-json/mira-gate/v1";
         this.apiKey = serverConfig.getApiKey();
         this.gateId = serverConfig.getGateId();
 
@@ -1400,4 +1400,4 @@ public ApiResponse getBranchInventoryStats(int branchId) {
         return null;
     }
 }
-    }
+                }
