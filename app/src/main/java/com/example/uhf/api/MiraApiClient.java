@@ -29,11 +29,16 @@ public class MiraApiClient {
 
     private static final String TAG = "MiraApiClient";
     private static final String SESSION_PREFS = "MiraEnterpriseSession";
+    
+    // ✅ إضافة عنوان الخادم الافتراضي
+    private static final String DEFAULT_BASE_URL = "https://sa.mirabarcode.com/wp-json/";
+    private static final String API_PREFIX = "mira-gate/v1/";
 
     private final Context context;
     private final MiraServerConfig serverConfig;
 
     // ✅ قيم ديناميكية تتحدث بعد تسجيل الدخول
+    private String baseUrl;
     private String apiUrl;
     private String apiKey;
     private String gateId;
@@ -50,6 +55,16 @@ public class MiraApiClient {
     private MiraApiClient(Context context) {
         this.context = context;
         this.serverConfig = MiraServerConfig.getInstance(context);
+        
+        // ✅ التحقق من وجود عنوان الخادم واستخدام الافتراضي إذا لم يوجد
+        String savedBaseUrl = serverConfig.getBaseUrl();
+        if (savedBaseUrl == null || savedBaseUrl.isEmpty()) {
+            baseUrl = DEFAULT_BASE_URL;
+            serverConfig.setBaseUrl(DEFAULT_BASE_URL);
+        } else {
+            baseUrl = savedBaseUrl;
+        }
+        
         refreshCredentials();
     }
 
@@ -57,7 +72,8 @@ public class MiraApiClient {
      * ✅ تحديث القيم من MiraServerConfig
      */
     private void refreshCredentials() {
-        this.apiUrl = serverConfig.getBaseUrl() + "wp-json/mira-gate/v1";
+        // ✅ استخدام baseUrl وليس getBaseUrl() المباشر
+        this.apiUrl = baseUrl + API_PREFIX;
         this.apiKey = serverConfig.getApiKey();
         this.gateId = serverConfig.getGateId();
 
@@ -69,6 +85,33 @@ public class MiraApiClient {
      */
     public static synchronized void reloadInstance(Context context) {
         instance = new MiraApiClient(context.getApplicationContext());
+    }
+
+    /**
+     * ✅ دالة لإعادة تهيئة عنوان الخادم
+     */
+    public boolean reinitializeWithServer(String newServerUrl) {
+        try {
+            // تنظيف الرابط
+            String cleanUrl = newServerUrl.trim();
+            if (!cleanUrl.endsWith("/")) {
+                cleanUrl += "/";
+            }
+            
+            // حفظ الرابط الجديد
+            serverConfig.setBaseUrl(cleanUrl);
+            
+            // إعادة تهيئة الإعدادات
+            baseUrl = cleanUrl;
+            refreshCredentials();
+            
+            // اختبار الاتصال
+            return pingApi();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Reinitialize error: " + e.getMessage());
+            return false;
+        }
     }
 
     private String getEffectiveApiKey() {
@@ -136,6 +179,12 @@ public class MiraApiClient {
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(15000);
             return buildResponse(conn);
+        } catch (java.net.UnknownHostException e) {
+            Log.e(TAG, "❌ Host not found: " + e.getMessage());
+            return new ApiResponse(-1, null, "الخادم غير موجود - تحقق من الرابط");
+        } catch (java.net.ConnectException e) {
+            Log.e(TAG, "❌ Connection failed: " + e.getMessage());
+            return new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
         } catch (Exception e) {
             Log.e(TAG, "GET Auth Error [" + endpoint + "]: " + e.getMessage());
             return new ApiResponse(-1, null, e.getMessage());
@@ -169,6 +218,12 @@ public class MiraApiClient {
                 }
             }
             return buildResponse(conn);
+        } catch (java.net.UnknownHostException e) {
+            Log.e(TAG, "❌ Host not found: " + e.getMessage());
+            return new ApiResponse(-1, null, "الخادم غير موجود - تحقق من الرابط");
+        } catch (java.net.ConnectException e) {
+            Log.e(TAG, "❌ Connection failed: " + e.getMessage());
+            return new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
         } catch (Exception e) {
             Log.e(TAG, "POST Auth Error [" + endpoint + "]: " + e.getMessage());
             return new ApiResponse(-1, null, e.getMessage());
@@ -180,6 +235,12 @@ public class MiraApiClient {
     private ApiResponse post(String endpoint, JSONObject payload) {
         HttpURLConnection conn = null;
         try {
+            // ✅ التحقق من وجود عنوان الخادم
+            if (apiUrl == null || apiUrl.isEmpty() || apiUrl.contains("null")) {
+                Log.e(TAG, "❌ API URL is null or empty!");
+                return new ApiResponse(-1, null, "الخادم غير موجود - تحقق من الإعدادات");
+            }
+            
             String fullUrl = apiUrl + endpoint;
             URL url = new URL(fullUrl);
             conn = (HttpURLConnection) url.openConnection();
@@ -197,6 +258,12 @@ public class MiraApiClient {
                 }
             }
             return buildResponse(conn);
+        } catch (java.net.UnknownHostException e) {
+            Log.e(TAG, "❌ Host not found: " + e.getMessage());
+            return new ApiResponse(-1, null, "الخادم غير موجود - تحقق من الرابط");
+        } catch (java.net.ConnectException e) {
+            Log.e(TAG, "❌ Connection failed: " + e.getMessage());
+            return new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
         } catch (Exception e) {
             Log.e(TAG, "POST Error [" + endpoint + "]: " + e.getMessage());
             return new ApiResponse(-1, null, e.getMessage());
@@ -208,6 +275,12 @@ public class MiraApiClient {
     private ApiResponse get(String endpoint) {
         HttpURLConnection conn = null;
         try {
+            // ✅ التحقق من وجود عنوان الخادم
+            if (apiUrl == null || apiUrl.isEmpty() || apiUrl.contains("null")) {
+                Log.e(TAG, "❌ API URL is null or empty!");
+                return new ApiResponse(-1, null, "الخادم غير موجود - تحقق من الإعدادات");
+            }
+            
             String fullUrl = apiUrl + endpoint;
             URL url = new URL(fullUrl);
             conn = (HttpURLConnection) url.openConnection();
@@ -217,6 +290,12 @@ public class MiraApiClient {
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(15000);
             return buildResponse(conn);
+        } catch (java.net.UnknownHostException e) {
+            Log.e(TAG, "❌ Host not found: " + e.getMessage());
+            return new ApiResponse(-1, null, "الخادم غير موجود - تحقق من الرابط");
+        } catch (java.net.ConnectException e) {
+            Log.e(TAG, "❌ Connection failed: " + e.getMessage());
+            return new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
         } catch (Exception e) {
             Log.e(TAG, "GET Error [" + endpoint + "]: " + e.getMessage());
             return new ApiResponse(-1, null, e.getMessage());
@@ -264,8 +343,19 @@ public class MiraApiClient {
             payload.put("username", username);
             payload.put("password", password);
             payload.put("device_id", deviceId != null ? deviceId : "");
-            payload.put("gate_id", getEffectiveGateId());
+            
+            // ✅ استخدام gate_id من الإعدادات أو deviceId
+            String effectiveGateId = getEffectiveGateId();
+            if (effectiveGateId.isEmpty()) {
+                effectiveGateId = deviceId != null ? deviceId : "default-gate";
+                serverConfig.setGateId(effectiveGateId);
+            }
+            
+            payload.put("gate_id", effectiveGateId);
             payload.put("app_version", "MIRA-ANDROID-v3.0");
+            
+            Log.d(TAG, "Login attempt: URL=" + apiUrl + "/auth/login");
+            Log.d(TAG, "Login payload: " + payload.toString());
         } catch (Exception e) {
             Log.e(TAG, "Error building login payload: " + e.getMessage());
         }
@@ -305,6 +395,8 @@ public class MiraApiClient {
                 refreshCredentials();
                 Log.d(TAG, "✅ Using existing API Key with gate_id: " + effectiveGateId);
             }
+        } else {
+            Log.e(TAG, "❌ Login failed: " + (response.error != null ? response.error : "Unknown error"));
         }
 
         return response;
@@ -1348,9 +1440,6 @@ public ApiResponse getBranchInventoryStats(int branchId) {
 
     // ===================== ApiResponse =====================
 
-
-    // ===================== ApiResponse =====================
-
     public static class ApiResponse {
     public final int code;
     public final JSONObject data;
@@ -1405,4 +1494,4 @@ public ApiResponse getBranchInventoryStats(int branchId) {
         return null;
     }
 }
-}
+            }
