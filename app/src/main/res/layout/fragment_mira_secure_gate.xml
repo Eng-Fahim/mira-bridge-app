@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/rootGateLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -16,103 +15,20 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp"
-            android:gravity="center_horizontal">
+            android:padding="12dp">
 
-            <!-- مؤشر حالة البوابة -->
-            <FrameLayout
-                android:layout_width="90dp"
-                android:layout_height="90dp"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="12dp">
-
-                <View
-                    android:id="@+id/statusIndicator"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:background="@drawable/circle_indicator_red" />
-
-                <TextView
-                    android:id="@+id/tvGateIcon"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="🚪"
-                    android:textSize="42sp" />
-            </FrameLayout>
-
-            <!-- عناوين البوابة -->
+            <!-- ✅ عنوان -->
             <TextView
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/mira_gate_title"
-                android:textAppearance="?attr/textAppearanceHeadlineSmall"
-                android:textColor="?attr/colorOnBackground"
-                android:textStyle="bold" />
-                
-                <!-- ✅ قبل أزرار Arm/Disarm -->
-<TextView
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="🚪 اختر البوابة:"
-    android:textColor="?attr/colorOnSurfaceVariant"
-    android:textSize="12sp" />
-
-<Spinner
-    android:id="@+id/spGateSelector"
-    android:layout_width="match_parent"
-    android:layout_height="44dp"
-    android:layout_marginBottom="8dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/mira_gate_subtitle"
-                android:textAppearance="?attr/textAppearanceBodySmall"
-                android:textColor="?attr/colorOnSurfaceVariant"
+                android:text="🚪 لوحة مراقبة البوابات"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="?attr/colorPrimary"
+                android:gravity="center"
                 android:layout_marginBottom="12dp" />
 
-            <!-- حالة البوابة -->
-            <TextView
-                android:id="@+id/tvGateStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/gate_status_disarmed"
-                android:textAppearance="?attr/textAppearanceTitleLarge"
-                android:textStyle="bold"
-                android:gravity="center"
-                android:padding="6dp"
-                android:layout_marginBottom="8dp" />
-
-            <!-- بطاقة آخر حدث -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="2dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutline">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="10dp"
-                    android:gravity="center">
-
-                    <TextView
-                        android:id="@+id/tvLastEvent"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/status_waiting"
-                        android:textAppearance="?attr/textAppearanceBodyMedium"
-                        android:textColor="?attr/colorOnSurface"
-                        android:gravity="center" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- الإحصائيات -->
+            <!-- ✅ إحصائيات عامة -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -120,242 +36,65 @@
                 android:layout_marginBottom="12dp"
                 android:weightSum="3">
 
-                <!-- مسموح -->
-                <com.google.android.material.card.MaterialCardView
+                <TextView
+                    android:id="@+id/tvTotalCount"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginEnd="4dp"
-                    app:cardCornerRadius="10dp"
-                    app:cardElevation="1dp">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="8dp"
-                        android:gravity="center">
-                        <TextView
-                            android:id="@+id/tvPassCount"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="0"
-                            android:textColor="@color/gate_pass_green"
-                            android:textSize="22sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/stat_authorized"
-                            android:textAppearance="?attr/textAppearanceLabelSmall" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
+                    android:text="إجمالي: 0"
+                    android:gravity="center"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorOnSurface" />
 
-                <!-- مرفوض -->
-                <com.google.android.material.card.MaterialCardView
+                <TextView
+                    android:id="@+id/tvPassCount"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="2dp"
-                    android:layout_marginEnd="2dp"
-                    app:cardCornerRadius="10dp"
-                    app:cardElevation="1dp">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="8dp"
-                        android:gravity="center">
-                        <TextView
-                            android:id="@+id/tvDenyCount"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="0"
-                            android:textColor="@color/gate_deny_red"
-                            android:textSize="22sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/stat_unauthorized"
-                            android:textAppearance="?attr/textAppearanceLabelSmall" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
+                    android:text="✅ مسموح: 0"
+                    android:gravity="center"
+                    android:textStyle="bold"
+                    android:textColor="#2E7D32" />
 
-                <!-- الإجمالي -->
-                <com.google.android.material.card.MaterialCardView
+                <TextView
+                    android:id="@+id/tvDenyCount"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="4dp"
-                    app:cardCornerRadius="10dp"
-                    app:cardElevation="1dp">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="8dp"
-                        android:gravity="center">
-                        <TextView
-                            android:id="@+id/tvTotalCount"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="0"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="22sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/stat_total_scans"
-                            android:textAppearance="?attr/textAppearanceLabelSmall" />
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
+                    android:text="🚨 إنذار: 0"
+                    android:gravity="center"
+                    android:textStyle="bold"
+                    android:textColor="#C62828" />
             </LinearLayout>
 
-            <!-- أزرار التشغيل -->
-            <LinearLayout
+            <!-- ✅ قائمة البوابات الحية -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvGatesMonitor"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="12dp">
+                android:nestedScrollingEnabled="false"
+                android:layout_marginBottom="12dp" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnArmGate"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="4dp"
-                    android:text="@string/btn_arm_gate"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="8dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnDisarmGate"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="4dp"
-                    android:text="@string/btn_disarm_gate"
-                    android:textColor="@color/gate_deny_red"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    app:strokeColor="@color/gate_deny_red"
-                    app:cornerRadius="8dp" />
-            </LinearLayout>
-
-            <!-- قسم الإدخال -->
+            <!-- ✅ سجل الأحداث -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                app:cardCornerRadius="8dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="?attr/colorOutline">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="12dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/gate_input_title"
-                        android:textAppearance="?attr/textAppearanceLabelMedium"
-                        android:textStyle="bold"
-                        android:layout_marginBottom="8dp"/>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="8dp">
-
-                        <com.google.android.material.textfield.TextInputLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:hint="@string/gate_input_hint"
-                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/etManualEpc"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:inputType="textCapCharacters"
-                                android:maxLines="1"/>
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnSubmitManual"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_gravity="center_vertical"
-                            android:layout_marginStart="8dp"
-                            android:text="@string/gate_btn_check" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnScanBarcode"
-                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginEnd="4dp"
-                            android:text="@string/gate_btn_camera"
-                            app:icon="@android:drawable/ic_menu_camera" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnSimulateAllowed"
-                            style="@style/Widget.MaterialComponents.Button.TextButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/gate_btn_sim_allowed"
-                            android:textColor="@color/gate_sim_green" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnSimulateDenied"
-                            style="@style/Widget.MaterialComponents.Button.TextButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/gate_btn_sim_denied"
-                            android:textColor="@color/gate_sim_red" />
-                    </LinearLayout>
-
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- Console -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="130dp"
-                app:cardBackgroundColor="@color/gate_console_bg"
-                app:cardCornerRadius="6dp">
+                android:layout_height="150dp"
+                app:cardBackgroundColor="#1E1E1E"
+                app:cardCornerRadius="8dp">
 
                 <ScrollView
                     android:id="@+id/scrollDebugLog"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:padding="8dp"
-                    android:nestedScrollingEnabled="true">
+                    android:padding="8dp">
 
                     <TextView
                         android:id="@+id/tvDebugConsole"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="@string/gate_console_initial"
-                        android:textColor="@color/gate_console_text"
-                        android:textSize="11sp"
+                        android:text="🚀 جاهز للمراقبة..."
+                        android:textColor="#FFFFFF"
+                        android:textSize="10sp"
                         android:fontFamily="monospace" />
                 </ScrollView>
             </com.google.android.material.card.MaterialCardView>
@@ -363,12 +102,12 @@
         </LinearLayout>
     </ScrollView>
 
-    <!-- غطاء الطوارئ -->
+    <!-- ✅ غطاء الإنذار -->
     <FrameLayout
         android:id="@+id/overlayAlarm"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/gate_alarm_bg"
+        android:background="#CC000000"
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true">
@@ -382,48 +121,33 @@
             android:padding="24dp">
 
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/gate_alarm_title"
-                android:textColor="#FFFFFF"
-                android:textSize="32sp"
-                android:textStyle="bold"
-                android:gravity="center"
-                android:layout_marginBottom="8dp"/>
-
-            <TextView
                 android:id="@+id/tvOverlayTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/gate_alarm_message"
-                android:textColor="@color/gate_alarm_title_yellow"
-                android:textSize="24sp"
+                android:text="🚨 إنذار أمني"
+                android:textColor="#FFD600"
+                android:textSize="28sp"
                 android:textStyle="bold"
-                android:gravity="center"
-                android:layout_marginBottom="16dp"/>
+                android:layout_marginBottom="8dp"/>
 
             <TextView
                 android:id="@+id/tvOverlayDetails"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/gate_alarm_epc"
+                android:text=""
                 android:textColor="#FFFFFF"
                 android:textSize="16sp"
                 android:gravity="center"
-                android:layout_marginBottom="32dp"/>
+                android:layout_marginBottom="24dp"/>
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnStopAlarm"
                 android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:text="@string/gate_alarm_stop"
-                android:textSize="18sp"
+                android:layout_height="56dp"
+                android:text="🔕 إيقاف الإنذار"
+                android:textSize="16sp"
                 android:textStyle="bold"
-                android:textColor="#000000"
-                app:backgroundTint="#FFFFFF"
-                app:cornerRadius="12dp"
-                app:strokeColor="#000000"
-                app:strokeWidth="2dp"/>
+                app:cornerRadius="12dp"/>
         </LinearLayout>
     </FrameLayout>
 
