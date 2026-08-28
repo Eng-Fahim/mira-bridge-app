@@ -31,8 +31,8 @@ public class MiraApiClient {
     private static final String SESSION_PREFS = "MiraEnterpriseSession";
     
     // ✅ إضافة عنوان الخادم الافتراضي
-    private static final String DEFAULT_BASE_URL = "https://sa.mirabarcode.com/wp-json/";
-    private static final String API_PREFIX = "mira-gate/v1/";
+    private static final String API_PREFIX = "mira-gate/v1";
+    private static final String DEFAULT_BASE_URL = "https://sa.mirabarcode.com/wp-json";
 
     private final Context context;
     private final MiraServerConfig serverConfig;
@@ -72,13 +72,20 @@ public class MiraApiClient {
      * ✅ تحديث القيم من MiraServerConfig
      */
     private void refreshCredentials() {
-        // ✅ استخدام baseUrl وليس getBaseUrl() المباشر
-        this.apiUrl = baseUrl + API_PREFIX;
-        this.apiKey = serverConfig.getApiKey();
-        this.gateId = serverConfig.getGateId();
-
-        Log.d(TAG, "Credentials: URL=" + apiUrl + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "SET") + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId));
+    // تنظيف الـ baseUrl
+    String cleanBaseUrl = baseUrl;
+    if (!cleanBaseUrl.endsWith("/")) {
+        cleanBaseUrl += "/";
     }
+    
+    // بناء الرابط الصحيح
+    this.apiUrl = cleanBaseUrl + API_PREFIX + "/";
+    
+    this.apiKey = serverConfig.getApiKey();
+    this.gateId = serverConfig.getGateId();
+    
+    Log.d(TAG, "Credentials: URL=" + apiUrl + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "SET") + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId));
+}
 
     /**
      * إعادة تحميل الإعدادات بعد تغيير الدومين
@@ -164,14 +171,18 @@ public class MiraApiClient {
     // ===================== CORE HTTP METHODS =====================
 
     public ApiResponse getWithAuth(String endpoint) {
-        if (!hasValidCredentials()) {
-            Log.w(TAG, "⚠️ No valid credentials for: " + endpoint + " - trying anyway");
+    HttpURLConnection conn = null;
+    try {
+        // ✅ إزالة الـ / من بداية الـ endpoint
+        String cleanEndpoint = endpoint;
+        if (cleanEndpoint.startsWith("/")) {
+            cleanEndpoint = cleanEndpoint.substring(1);
         }
-
-        HttpURLConnection conn = null;
-        try {
-            String fullUrl = apiUrl + endpoint;
-            URL url = new URL(fullUrl);
+        
+        String fullUrl = apiUrl + cleanEndpoint;
+        Log.d(TAG, "GET Auth Request: " + fullUrl);
+        
+        URL url = new URL(fullUrl);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             applyStandardHeaders(conn, true);
@@ -194,15 +205,18 @@ public class MiraApiClient {
     }
 
     public ApiResponse postWithAuth(String endpoint, JSONObject payload) {
-        if (!hasValidCredentials()) {
-            Log.e(TAG, "Attempting API call without valid credentials: " + endpoint);
-            return new ApiResponse(401, null, "Unauthorized - Please login first");
+    HttpURLConnection conn = null;
+    try {
+        // ✅ إزالة الـ / من بداية الـ endpoint
+        String cleanEndpoint = endpoint;
+        if (cleanEndpoint.startsWith("/")) {
+            cleanEndpoint = cleanEndpoint.substring(1);
         }
-
-        HttpURLConnection conn = null;
-        try {
-            String fullUrl = apiUrl + endpoint;
-            URL url = new URL(fullUrl);
+        
+        String fullUrl = apiUrl + cleanEndpoint;
+        Log.d(TAG, "POST Auth Request: " + fullUrl);
+        
+        URL url = new URL(fullUrl);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             applyStandardHeaders(conn, true);
@@ -233,16 +247,18 @@ public class MiraApiClient {
     }
 
     private ApiResponse post(String endpoint, JSONObject payload) {
-        HttpURLConnection conn = null;
-        try {
-            // ✅ التحقق من وجود عنوان الخادم
-            if (apiUrl == null || apiUrl.isEmpty() || apiUrl.contains("null")) {
-                Log.e(TAG, "❌ API URL is null or empty!");
-                return new ApiResponse(-1, null, "الخادم غير موجود - تحقق من الإعدادات");
-            }
-            
-            String fullUrl = apiUrl + endpoint;
-            URL url = new URL(fullUrl);
+    HttpURLConnection conn = null;
+    try {
+        // ✅ إزالة الـ / من بداية الـ endpoint
+        String cleanEndpoint = endpoint;
+        if (cleanEndpoint.startsWith("/")) {
+            cleanEndpoint = cleanEndpoint.substring(1);
+        }
+        
+        String fullUrl = apiUrl + cleanEndpoint;
+        Log.d(TAG, "POST Request: " + fullUrl);
+        
+        URL url = new URL(fullUrl);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             applyStandardHeaders(conn, false);
@@ -273,16 +289,18 @@ public class MiraApiClient {
     }
 
     private ApiResponse get(String endpoint) {
-        HttpURLConnection conn = null;
-        try {
-            // ✅ التحقق من وجود عنوان الخادم
-            if (apiUrl == null || apiUrl.isEmpty() || apiUrl.contains("null")) {
-                Log.e(TAG, "❌ API URL is null or empty!");
-                return new ApiResponse(-1, null, "الخادم غير موجود - تحقق من الإعدادات");
-            }
-            
-            String fullUrl = apiUrl + endpoint;
-            URL url = new URL(fullUrl);
+    HttpURLConnection conn = null;
+    try {
+        // ✅ إزالة الـ / من بداية الـ endpoint
+        String cleanEndpoint = endpoint;
+        if (cleanEndpoint.startsWith("/")) {
+            cleanEndpoint = cleanEndpoint.substring(1);
+        }
+        
+        String fullUrl = apiUrl + cleanEndpoint;
+        Log.d(TAG, "GET Request: " + fullUrl);
+        
+        URL url = new URL(fullUrl);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             applyStandardHeaders(conn, false);
@@ -554,30 +572,30 @@ public ApiResponse changePassword(String currentPassword, String newPassword) {
     // ===================== 📡 PING =====================
 
     public boolean pingApi() {
-        HttpURLConnection conn = null;
-        try {
-            String baseUrl = this.apiUrl;
-            if (baseUrl.endsWith("/")) {
-                baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
-            }
-
-            URL url = new URL(baseUrl + "/ping");
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            applyStandardHeaders(conn, true);
-
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(8000);
-
-            int responseCode = conn.getResponseCode();
-            return (responseCode >= 200 && responseCode < 400);
-        } catch (Exception e) {
-            Log.e(TAG, "Ping error: " + e.getMessage());
-            return false;
-        } finally {
-            if (conn != null) conn.disconnect();
+    HttpURLConnection conn = null;
+    try {
+        String cleanUrl = this.apiUrl;
+        if (cleanUrl.endsWith("/")) {
+            cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
         }
+
+        URL url = new URL(cleanUrl + "/ping");
+        conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        applyStandardHeaders(conn, true);
+
+        conn.setConnectTimeout(8000);
+        conn.setReadTimeout(8000);
+
+        int responseCode = conn.getResponseCode();
+        return (responseCode >= 200 && responseCode < 400);
+    } catch (Exception e) {
+        Log.e(TAG, "Ping error: " + e.getMessage());
+        return false;
+    } finally {
+        if (conn != null) conn.disconnect();
     }
+}
 
     // ===================== 📊 DASHBOARD =====================
 
