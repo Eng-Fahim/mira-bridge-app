@@ -66,6 +66,7 @@ import javax.crypto.spec.SecretKeySpec;
 public class LoginActivity extends AppCompatActivity {
 
     private static final String TAG = "LoginActivity";
+    private static final String DEFAULT_SERVER_URL = "https://sa.mirabarcode.com";
     private static final int MAX_LOGIN_ATTEMPTS = 5;
     private static final long LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 دقائق
     private static final String ENCRYPTION_ALGORITHM = "AES";
@@ -337,8 +338,15 @@ protected void onCreate(Bundle savedInstanceState) {
 
         String savedUrl = sessionManager.getServerUrl();
         if (savedUrl != null && !savedUrl.isEmpty()) {
-            etServerUrl.setText(savedUrl);
-        }
+           etServerUrl.setText(savedUrl);
+           } else {
+           // ✅ استخدام العنوان الافتراضي
+           etServerUrl.setText(DEFAULT_SERVER_URL);
+           sessionManager.setServerUrl(DEFAULT_SERVER_URL);
+           }
+               
+    // ✅ إخفاء إعدادات الخادم من المستخدم
+    hideServerConfigFields();
 
         try {
             tvAppVersion.setText("v" + getPackageManager().getPackageInfo(getPackageName(), 0).versionName + " Enterprise");
@@ -377,6 +385,14 @@ protected void onCreate(Bundle savedInstanceState) {
 
         applyOrgProfile();
     }
+    
+    private void hideServerConfigFields() {
+    if (tilServerUrl != null) tilServerUrl.setVisibility(View.GONE);
+    if (etServerUrl != null) etServerUrl.setVisibility(View.GONE);
+    if (tvServerSettings != null) tvServerSettings.setVisibility(View.GONE);
+    if (serverConfigCard != null) serverConfigCard.setVisibility(View.GONE);
+    if (btnSaveServer != null) btnSaveServer.setVisibility(View.GONE);
+}
 
     private void disableAutofill() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
