@@ -27,7 +27,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
-import com.example.uhf.manager.OfflineGateCache;
 import com.example.uhf.manager.MiraGatesSettings;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SoundGenerator;
@@ -42,6 +41,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 
 public class MiraGateSettingsFragment extends Fragment {
 
@@ -53,7 +54,10 @@ public class MiraGateSettingsFragment extends Fragment {
     private MiraBranchesManager branchesManager;
     private SoundPool soundPool;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    
+    // ✅ تعريف واحد فقط للـ executor
+    private ExecutorService executor;
+    private static final Object EXECUTOR_LOCK = new Object();
 
     private RecyclerView rvGates;
     private Spinner spSoundPass, spSoundDeny, spSoundAlarm;
@@ -101,6 +105,32 @@ public class MiraGateSettingsFragment extends Fragment {
         startStatusRefresh();
     }
 
+    // ✅ دالة موحدة للحصول على executor
+    private ExecutorService getExecutor() {
+        synchronized (EXECUTOR_LOCK) {
+            if (executor == null || executor.isShutdown() || executor.isTerminated()) {
+                executor = Executors.newSingleThreadExecutor();
+            }
+            return executor;
+        }
+    }
+
+    // ✅ دالة موحدة لتنفيذ المهام بأمان
+    private void executeTask(Runnable task) {
+        try {
+            ExecutorService exec = getExecutor();
+            if (!exec.isShutdown() && !exec.isTerminated()) {
+                exec.execute(task);
+            } else {
+                Log.w(TAG, "Executor is not available");
+            }
+        } catch (RejectedExecutionException e) {
+            Log.e(TAG, "Failed to execute task: " + e.getMessage());
+        } catch (Exception e) {
+            Log.e(TAG, "Unexpected error executing task: " + e.getMessage());
+        }
+    }
+
     private void initViews(View view) {
         rvGates = view.findViewById(R.id.rvGates);
         spSoundPass = view.findViewById(R.id.spSoundPass);
@@ -139,7 +169,8 @@ public class MiraGateSettingsFragment extends Fragment {
     private void loadBranches() {
         branchesList.clear();
         
-        executor.execute(() -> {
+        // ✅ استخدام executeTask بدلاً من executor مباشرة
+        executeTask(() -> {
             try {
                 Context context = getContext();
                 if (context == null) return;
@@ -151,8 +182,6 @@ public class MiraGateSettingsFragment extends Fragment {
                 
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray arr = response.data.optJSONArray("branches");
-                    
-                    Log.d(TAG, "Branches response: " + response.data.toString());
                     
                     if (arr != null && arr.length() > 0) {
                         List<BranchItem> serverBranches = new ArrayList<>();
@@ -172,14 +201,10 @@ public class MiraGateSettingsFragment extends Fragment {
                                 if (isAdded() && getContext() != null) {
                                     branchesList.clear();
                                     branchesList.addAll(serverBranches);
-                                    Log.d(TAG, "✅ تم تحميل " + serverBranches.size() + " فرع");
                                 }
                             });
                         }
                     }
-                } else {
-                    Log.e(TAG, "Branches failed: code=" + (response != null ? response.code : -1) 
-                        + ", msg=" + (response != null ? response.message : "null"));
                 }
             } catch (Exception e) {
                 Log.e(TAG, "loadBranches error: " + e.getMessage());
@@ -202,15 +227,18 @@ public class MiraGateSettingsFragment extends Fragment {
         statusRefreshRunnable = new Runnable() {
             @Override
             public void run() {
-                loadGateStats();
-                mainHandler.postDelayed(this, STATUS_REFRESH_INTERVAL);
+                if (isAdded()) {
+                    loadGateStats();
+                    mainHandler.postDelayed(this, STATUS_REFRESH_INTERVAL);
+                }
             }
         };
         mainHandler.postDelayed(statusRefreshRunnable, STATUS_REFRESH_INTERVAL);
     }
 
     private void loadGateStats() {
-        executor.execute(() -> {
+        // ✅ استخدام executeTask
+        executeTask(() -> {
             try {
                 Context context = getContext();
                 if (context == null) return;
@@ -250,23 +278,27 @@ public class MiraGateSettingsFragment extends Fragment {
             if (gatesArray != null) {
                 for (int i = 0; i < gatesArray.length(); i++) {
                     JSONObject gateJson = gatesArray.optJSONObject(i);
-                    String gateId = gateJson.optString("gate_id", "");
-                    String status = gateJson.optString("status", "offline");
-                    String lastEvent = gateJson.optString("last_event", "");
-                    int passCount = gateJson.optInt("pass_count", 0);
-                    int denyCount = gateJson.optInt("deny_count", 0);
-                    
-                    for (MiraGatesSettings.GateDevice gate : gatesList) {
-                        if (gate.gateId.equals(gateId)) {
-                            gate.status = status;
-                            gate.lastEvent = lastEvent;
-                            gate.passCount = passCount;
-                            gate.denyCount = denyCount;
-                            break;
+                    if (gateJson != null) {
+                        String gateId = gateJson.optString("gate_id", "");
+                        String status = gateJson.optString("status", "offline");
+                        String lastEvent = gateJson.optString("last_event", "");
+                        int passCount = gateJson.optInt("pass_count", 0);
+                        int denyCount = gateJson.optInt("deny_count", 0);
+                        
+                        for (MiraGatesSettings.GateDevice gate : gatesList) {
+                            if (gate.gateId.equals(gateId)) {
+                                gate.status = status;
+                                gate.lastEvent = lastEvent;
+                                gate.passCount = passCount;
+                                gate.denyCount = denyCount;
+                                break;
+                            }
                         }
                     }
                 }
-                gateAdapter.notifyDataSetChanged();
+                if (gateAdapter != null) {
+                    gateAdapter.notifyDataSetChanged();
+                }
             }
             
             if (tvLastEvent != null) {
@@ -437,7 +469,9 @@ public class MiraGateSettingsFragment extends Fragment {
     private void loadGatesFromLocal() {
         gatesList.clear();
         gatesList.addAll(settings.getGates());
-        gateAdapter.notifyDataSetChanged();
+        if (gateAdapter != null) {
+            gateAdapter.notifyDataSetChanged();
+        }
     }
 
     private void loadGatesFromServer() {
@@ -447,7 +481,8 @@ public class MiraGateSettingsFragment extends Fragment {
             return;
         }
         
-        executor.execute(() -> {
+        // ✅ استخدام executeTask الموحدة
+        executeTask(() -> {
             try {
                 Context context = getContext();
                 if (context == null) return;
@@ -660,7 +695,8 @@ public class MiraGateSettingsFragment extends Fragment {
     }
 
     private void syncGateToServer(MiraGatesSettings.GateDevice gate, int branchId) {
-        executor.execute(() -> {
+        // ✅ استخدام executeTask
+        executeTask(() -> {
             try {
                 Context context = getContext();
                 if (context == null) return;
@@ -748,7 +784,9 @@ public class MiraGateSettingsFragment extends Fragment {
                     Toast.LENGTH_SHORT).show();
             }
             
-            gateAdapter.notifyDataSetChanged();
+            if (gateAdapter != null) {
+                gateAdapter.notifyDataSetChanged();
+            }
         }
     }
 
@@ -758,9 +796,9 @@ public class MiraGateSettingsFragment extends Fragment {
         if (statusRefreshRunnable != null) {
             mainHandler.removeCallbacks(statusRefreshRunnable);
         }
-        if (executor != null && !executor.isShutdown()) {
-            executor.shutdown();
-        }
+        
+        // ✅ إغلاق آمن للـ executor
+        shutdownExecutorSafely();
     }
 
     @Override
@@ -769,6 +807,33 @@ public class MiraGateSettingsFragment extends Fragment {
         if (soundPool != null) {
             soundPool.release();
             soundPool = null;
+        }
+        
+        // ✅ ضمان إغلاق الـ executor
+        shutdownExecutorSafely();
+    }
+
+    // ✅ دالة الإغلاق الآمن
+    private void shutdownExecutorSafely() {
+        synchronized (EXECUTOR_LOCK) {
+            if (executor != null && !executor.isShutdown()) {
+                executor.shutdown();
+                try {
+                    // انتظر حتى 3 ثواني للمهام الحالية للانتهاء
+                    if (!executor.awaitTermination(3, TimeUnit.SECONDS)) {
+                        executor.shutdownNow();
+                        // انتظر مرة أخرى للمهام التي تم إلغاؤها
+                        if (!executor.awaitTermination(1, TimeUnit.SECONDS)) {
+                            Log.e(TAG, "Executor did not terminate");
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    executor.shutdownNow();
+                    Thread.currentThread().interrupt();
+                } finally {
+                    executor = null;
+                }
+            }
         }
     }
 
@@ -886,4 +951,4 @@ public class MiraGateSettingsFragment extends Fragment {
     interface OnGateToggleListener {
         void onToggle(int position, boolean open);
     }
-    }
+}
