@@ -79,6 +79,11 @@ public class MiraGatesSettings {
     public int passCount = 0;
     public int denyCount = 0;
     public String lastEvent = "";
+    
+    // ✅✅✅ أضف هذه الحقول
+    public int branchId = 0;
+    public String branchName = "";
+
 
     public JSONObject toJson() {
         JSONObject json = new JSONObject();
