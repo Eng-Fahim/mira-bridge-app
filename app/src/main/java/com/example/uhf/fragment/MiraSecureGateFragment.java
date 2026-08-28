@@ -1,6 +1,7 @@
 package com.example.uhf.fragment;
 
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
@@ -11,8 +12,11 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -30,6 +34,7 @@ import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraGatesSettings;
 import com.example.uhf.manager.PermissionManager;
+import com.example.uhf.service.MiraGateMonitorService;
 import com.example.uhf.tools.SoundGenerator;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
@@ -81,33 +86,32 @@ public class MiraSecureGateFragment extends Fragment {
     private FrameLayout overlayAlarm;
     private TextView tvOverlayTitle, tvOverlayDetails;
     private TextView tvPingLatency, tvSystemStatus, tvLiveTickerText;
+    private ProgressBar pbRiskMeter;
+    private TextView tvRiskPercentage;
     private Button btnStopAlarm, btnToggleScan;
     private Button btnSimulateAllowed, btnSimulateDenied;
     private Button btnScanBarcode, btnEmergencyLockdown, btnClearConsole;
+    private Button btnFilterAll, btnFilterAlerts, btnFilterPass;
     
     // متغيرات المحاكاة
-    private String soldEpc = "";
-    private String soldTitle = "";
-    private String unsoldEpc = "";
-    private String unsoldTitle = "";
+    private String soldEpc = "", soldTitle = "";
+    private String unsoldEpc = "", unsoldTitle = "";
     
     // حالة
     private volatile boolean isDestroyed = false;
     private volatile boolean isScanning = false;
     private volatile boolean isLockdown = false;
+    private String logFilter = "ALL";
     private final Set<String> localAllowedEpcCache = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<String, Long> scanDebounceMap = new ConcurrentHashMap<>();
     private Vibrator vibrator;
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
 
-    // كاميرا
     private final ActivityResultLauncher<ScanOptions> barcodeLauncher = registerForActivityResult(
         new ScanContract(),
         result -> {
             if (result.getContents() != null && !isDestroyed) {
-                String barcode = result.getContents().trim();
-                logConsole("📷 [كاميرا]: " + barcode);
-                processInputEpc(barcode, "CAMERA");
+                processInputEpc(result.getContents().trim(), "CAMERA");
             }
         }
     );
@@ -129,6 +133,7 @@ public class MiraSecureGateFragment extends Fragment {
         startPingMonitor();
         loadTestEpcs();
         autoStartScanning();
+        startBackgroundService();
         
         updateSystemStatus(true);
         logConsole("🚀 MIRA SECURITY COMMAND CENTER ACTIVATED");
@@ -162,6 +167,8 @@ public class MiraSecureGateFragment extends Fragment {
         tvPingLatency = view.findViewById(R.id.tvPingLatency);
         tvSystemStatus = view.findViewById(R.id.tvSystemStatus);
         tvLiveTickerText = view.findViewById(R.id.tvLiveTickerText);
+        pbRiskMeter = view.findViewById(R.id.pbRiskMeter);
+        tvRiskPercentage = view.findViewById(R.id.tvRiskPercentage);
         btnStopAlarm = view.findViewById(R.id.btnStopAlarm);
         btnToggleScan = view.findViewById(R.id.btnToggleScan);
         btnSimulateAllowed = view.findViewById(R.id.btnSimulateAllowed);
@@ -169,6 +176,9 @@ public class MiraSecureGateFragment extends Fragment {
         btnScanBarcode = view.findViewById(R.id.btnScanBarcode);
         btnEmergencyLockdown = view.findViewById(R.id.btnEmergencyLockdown);
         btnClearConsole = view.findViewById(R.id.btnClearConsole);
+        btnFilterAll = view.findViewById(R.id.btnFilterAll);
+        btnFilterAlerts = view.findViewById(R.id.btnFilterAlerts);
+        btnFilterPass = view.findViewById(R.id.btnFilterPass);
         
         if (rvGatesMonitor != null) {
             rvGatesMonitor.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -183,26 +193,16 @@ public class MiraSecureGateFragment extends Fragment {
         
         if (btnSimulateAllowed != null) {
             btnSimulateAllowed.setOnClickListener(v -> {
-                if (!soldEpc.isEmpty()) {
-                    logConsole("🟢 محاكاة: قطعة مباعة");
-                    queryMiraGateServer(soldEpc);
-                } else {
-                    Toast.makeText(getContext(), "⚠️ لا توجد قطعة مباعة", Toast.LENGTH_SHORT).show();
-                }
+                if (!soldEpc.isEmpty()) queryMiraGateServer(soldEpc);
+                else Toast.makeText(getContext(), "⚠️ لا توجد قطعة مباعة", Toast.LENGTH_SHORT).show();
             });
         }
-        
         if (btnSimulateDenied != null) {
             btnSimulateDenied.setOnClickListener(v -> {
-                if (!unsoldEpc.isEmpty()) {
-                    logConsole("🔴 محاكاة: قطعة غير مباعة");
-                    queryMiraGateServer(unsoldEpc);
-                } else {
-                    Toast.makeText(getContext(), "⚠️ لا توجد قطعة غير مباعة", Toast.LENGTH_SHORT).show();
-                }
+                if (!unsoldEpc.isEmpty()) queryMiraGateServer(unsoldEpc);
+                else Toast.makeText(getContext(), "⚠️ لا توجد قطعة غير مباعة", Toast.LENGTH_SHORT).show();
             });
         }
-        
         if (btnScanBarcode != null) {
             btnScanBarcode.setOnClickListener(v -> {
                 ScanOptions options = new ScanOptions();
@@ -212,32 +212,45 @@ public class MiraSecureGateFragment extends Fragment {
                 barcodeLauncher.launch(options);
             });
         }
-        
-        if (btnEmergencyLockdown != null) {
-            btnEmergencyLockdown.setOnClickListener(v -> toggleLockdown());
-        }
+        if (btnEmergencyLockdown != null) btnEmergencyLockdown.setOnClickListener(v -> toggleLockdown());
         
         if (btnClearConsole != null) {
             btnClearConsole.setOnClickListener(v -> {
                 if (tvDebugConsole != null) tvDebugConsole.setText("");
-                logConsole("🗑️ تم مسح السجل");
             });
+        }
+        
+        // ✅ فلترة السجل
+        if (btnFilterAll != null) btnFilterAll.setOnClickListener(v -> { logFilter = "ALL"; logConsole("🔍 فلتر: الكل"); });
+        if (btnFilterAlerts != null) btnFilterAlerts.setOnClickListener(v -> { logFilter = "ALERTS"; logConsole("🔍 فلتر: الإنذارات"); });
+        if (btnFilterPass != null) btnFilterPass.setOnClickListener(v -> { logFilter = "PASS"; logConsole("🔍 فلتر: المقبول"); });
+    }
+
+    // ============================================
+    // ✅ خدمة الخلفية
+    // ============================================
+    private void startBackgroundService() {
+        try {
+            Context context = getContext();
+            if (context != null) {
+                Intent serviceIntent = new Intent(context, MiraGateMonitorService.class);
+                context.startForegroundService(serviceIntent);
+                logConsole("📱 خدمة المراقبة الخلفية مفعلة");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Start service: " + e.getMessage());
         }
     }
 
     // ============================================
-    // 🔴 Lockdown - إغلاق طارئ
+    // 🔴 Lockdown
     // ============================================
-
     private void toggleLockdown() {
         isLockdown = !isLockdown;
-        
         if (isLockdown) {
-            // ✅ إغلاق جميع البوابات
             lockAllGates();
             updateSystemStatus(false);
-            logConsole("🔴 LOCKDOWN ACTIVATED - جميع البوابات مغلقة");
-            Toast.makeText(getContext(), "🔴 إغلاق طارئ مفعل!", Toast.LENGTH_LONG).show();
+            logConsole("🔴 LOCKDOWN ACTIVATED");
             if (btnEmergencyLockdown != null) {
                 btnEmergencyLockdown.setText("🔓 فتح البوابات");
                 btnEmergencyLockdown.setBackgroundColor(Color.parseColor("#16A34A"));
@@ -245,7 +258,7 @@ public class MiraSecureGateFragment extends Fragment {
         } else {
             unlockAllGates();
             updateSystemStatus(true);
-            logConsole("🟢 LOCKDOWN DEACTIVATED - البوابات مفتوحة");
+            logConsole("🟢 LOCKDOWN DEACTIVATED");
             if (btnEmergencyLockdown != null) {
                 btnEmergencyLockdown.setText("🔒 إغلاق طارئ");
                 btnEmergencyLockdown.setBackgroundColor(Color.parseColor("#DC2626"));
@@ -262,9 +275,7 @@ public class MiraSecureGateFragment extends Fragment {
                 payload.put("command", "LOCK_ALL");
                 payload.put("branch_id", getCurrentBranchId());
                 client.postWithAuth("/gate-command", payload);
-            } catch (Exception e) {
-                Log.e(TAG, "Lock all: " + e.getMessage());
-            }
+            } catch (Exception e) {}
         });
     }
 
@@ -277,22 +288,17 @@ public class MiraSecureGateFragment extends Fragment {
                 payload.put("command", "UNLOCK_ALL");
                 payload.put("branch_id", getCurrentBranchId());
                 client.postWithAuth("/gate-command", payload);
-            } catch (Exception e) {
-                Log.e(TAG, "Unlock all: " + e.getMessage());
-            }
+            } catch (Exception e) {}
         });
     }
 
     // ============================================
-    // 📡 Ping Monitor
+    // 📡 Ping
     // ============================================
-
     private void startPingMonitor() {
         pingScheduler = Executors.newSingleThreadScheduledExecutor();
         pingScheduler.scheduleAtFixedRate(() -> {
-            if (!isDestroyed && isAdded()) {
-                checkPing();
-            }
+            if (!isDestroyed && isAdded()) checkPing();
         }, 0, PING_INTERVAL_SECONDS, TimeUnit.SECONDS);
     }
 
@@ -302,25 +308,16 @@ public class MiraSecureGateFragment extends Fragment {
             try {
                 MiraApiClient client = MiraApiClient.getInstance(getContext());
                 long start = System.currentTimeMillis();
-                boolean pingOk = client.pingApi();
+                boolean ok = client.pingApi();
                 long latency = System.currentTimeMillis() - start;
-                
                 mainHandler.post(() -> {
                     if (tvPingLatency != null) {
-                        if (pingOk) {
-                            tvPingLatency.setText("📡 Ping: " + latency + " ms | Server: ✅ متصل");
-                        } else {
-                            tvPingLatency.setText("📡 Ping: -- ms | Server: ⚠️ غير متصل");
-                        }
+                        tvPingLatency.setText(ok ? "📡 Ping: " + latency + " ms | ✅ متصل" : "📡 Ping: -- | ⚠️ غير متصل");
                     }
                 });
             } catch (Exception e) {}
         });
     }
-
-    // ============================================
-    // ✅ System Status
-    // ============================================
 
     private void updateSystemStatus(boolean armed) {
         if (tvSystemStatus != null) {
@@ -337,20 +334,14 @@ public class MiraSecureGateFragment extends Fragment {
         }
     }
 
-    // ============================================
-    // ✅ Live Ticker
-    // ============================================
-
     private void updateLiveTicker(String message, boolean isAlert) {
         if (tvLiveTickerText != null) {
             tvLiveTickerText.setText(message);
             tvLiveTickerText.setTextColor(isAlert ? Color.parseColor("#F87171") : Color.parseColor("#4ADE80"));
-            
-            // وميض عند الإنذار
             if (isAlert) {
-                android.view.animation.Animation anim = new android.view.animation.AlphaAnimation(0.3f, 1.0f);
+                Animation anim = new AlphaAnimation(0.3f, 1.0f);
                 anim.setDuration(300);
-                anim.setRepeatMode(android.view.animation.Animation.REVERSE);
+                anim.setRepeatMode(Animation.REVERSE);
                 anim.setRepeatCount(5);
                 tvLiveTickerText.startAnimation(anim);
             }
@@ -358,20 +349,16 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     // ============================================
-    // ✅ التشغيل التلقائي
+    // ✅ المسح
     // ============================================
-
     private void autoStartScanning() {
         mainHandler.postDelayed(() -> {
-            if (!isDestroyed && isAdded() && !isLockdown) {
-                startScanning();
-            }
+            if (!isDestroyed && isAdded() && !isLockdown) startScanning();
         }, 1000);
     }
 
     private void toggleScanning() {
-        if (isScanning) stopScanning();
-        else startScanning();
+        if (isScanning) stopScanning(); else startScanning();
     }
 
     private void startScanning() {
@@ -379,15 +366,13 @@ public class MiraSecureGateFragment extends Fragment {
             logConsole("⚠️ قارئ RFID غير متوفر - استخدم الكاميرا");
             return;
         }
-        
         try {
-            int rfidPower = miraGatesSettings.getRfidPower();
-            mContext.mReader.setPower(rfidPower);
+            mContext.mReader.setPower(miraGatesSettings.getRfidPower());
             mContext.mReader.setInventoryCallback(new IUHFInventoryCallback() {
                 @Override
-                public void callback(UHFTAGInfo uhftagInfo) {
-                    if (!isDestroyed && uhftagInfo != null && uhftagInfo.getEPC() != null) {
-                        processInputEpc(uhftagInfo.getEPC(), "RFID");
+                public void callback(UHFTAGInfo info) {
+                    if (!isDestroyed && info != null && info.getEPC() != null) {
+                        processInputEpc(info.getEPC(), "RFID");
                     }
                 }
             });
@@ -402,20 +387,15 @@ public class MiraSecureGateFragment extends Fragment {
 
     private void stopScanning() {
         if (mContext != null && mContext.mReader != null) {
-            try {
-                mContext.mReader.stopInventory();
-                mContext.mReader.setInventoryCallback(null);
-            } catch (Exception e) {}
+            try { mContext.mReader.stopInventory(); mContext.mReader.setInventoryCallback(null); } catch (Exception e) {}
         }
         isScanning = false;
         if (btnToggleScan != null) btnToggleScan.setText("🛡️ تفعيل المسح");
-        logConsole("🔒 تم إيقاف المسح");
     }
 
     // ============================================
     // 📡 المراقبة
     // ============================================
-
     private void startMonitoring() {
         monitorScheduler = Executors.newSingleThreadScheduledExecutor();
         monitorScheduler.scheduleAtFixedRate(() -> {
@@ -470,6 +450,18 @@ public class MiraSecureGateFragment extends Fragment {
         if (tvPassCount != null) tvPassCount.setText(String.valueOf(pass));
         if (tvDenyCount != null) tvDenyCount.setText(String.valueOf(deny));
         if (tvTotalCount != null) tvTotalCount.setText(String.valueOf(items.size()));
+        
+        // ✅ مؤشر المخاطر
+        updateRiskMeter(pass, deny);
+    }
+
+    private void updateRiskMeter(int pass, int deny) {
+        int total = pass + deny;
+        if (total > 0) {
+            int risk = (deny * 100) / total;
+            if (pbRiskMeter != null) pbRiskMeter.setProgress(risk);
+            if (tvRiskPercentage != null) tvRiskPercentage.setText("نسبة الإنذارات: " + risk + "%");
+        }
     }
 
     private int getCurrentBranchId() {
@@ -481,9 +473,8 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     // ============================================
-    // ✅ EPCs للمحاكاة
+    // ✅ EPCs
     // ============================================
-
     private void loadTestEpcs() {
         if (gateExecutor == null || getContext() == null) return;
         gateExecutor.execute(() -> {
@@ -492,9 +483,7 @@ public class MiraSecureGateFragment extends Fragment {
                 MiraApiClient.ApiResponse response = client.getTestEpcs();
                 if (response != null && response.isSuccess && response.data != null) {
                     soldEpc = response.data.optString("sold_epc", "");
-                    soldTitle = response.data.optString("sold_title", "");
                     unsoldEpc = response.data.optString("unsold_epc", "");
-                    unsoldTitle = response.data.optString("unsold_title", "");
                     mainHandler.post(() -> logConsole("✅ EPCs للمحاكاة جاهزة"));
                 }
             } catch (Exception e) {}
@@ -504,19 +493,17 @@ public class MiraSecureGateFragment extends Fragment {
     // ============================================
     // 📡 فحص القطع
     // ============================================
-
     private void processInputEpc(String epc, String sourceType) {
         if (isDestroyed || !isAdded()) return;
         if (epc == null || epc.trim().isEmpty()) return;
         final String cleanedEpc = epc.trim().toUpperCase();
         
-        long currentTime = System.currentTimeMillis();
-        Long lastTime = scanDebounceMap.putIfAbsent(cleanedEpc, currentTime);
-        if (lastTime != null && currentTime - lastTime < SCAN_COOL_DOWN_MS) return;
-        scanDebounceMap.put(cleanedEpc, currentTime);
+        long now = System.currentTimeMillis();
+        Long last = scanDebounceMap.putIfAbsent(cleanedEpc, now);
+        if (last != null && now - last < SCAN_COOL_DOWN_MS) return;
+        scanDebounceMap.put(cleanedEpc, now);
         
         logConsole("📡 [" + sourceType + "] فحص: " + cleanedEpc);
-        
         if (localAllowedEpcCache.contains(cleanedEpc)) {
             mainHandler.post(() -> handleGateDecision(true, "قطعة مصرح بها", cleanedEpc));
         } else {
@@ -529,20 +516,20 @@ public class MiraSecureGateFragment extends Fragment {
         gateExecutor.execute(() -> {
             try {
                 MiraApiClient client = MiraApiClient.getInstance(mContext);
-                JSONObject extraParams = new JSONObject();
-                extraParams.put("context", "gate");
-                extraParams.put("branch_id", getCurrentBranchId());
+                JSONObject params = new JSONObject();
+                params.put("context", "gate");
+                params.put("branch_id", getCurrentBranchId());
                 
-                Future<MiraApiClient.ApiResponse> future = gateExecutor.submit(() -> client.authorize(epc, "gate", extraParams));
+                Future<MiraApiClient.ApiResponse> future = gateExecutor.submit(() -> client.authorize(epc, "gate", params));
                 MiraApiClient.ApiResponse response = future.get(API_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONObject decision = response.data.optJSONObject("decision");
                     JSONObject item = response.data.optJSONObject("item");
                     boolean allowed = decision != null && decision.optBoolean("allowed", false);
-                    String message = decision != null ? decision.optString("message", "") : "";
                     String itemTitle = item != null ? item.optString("title", "قطعة") : "قطعة";
                     String serial = item != null ? item.optString("serial", epc) : epc;
+                    String message = decision != null ? decision.optString("message", "") : "";
                     
                     if (allowed) localAllowedEpcCache.add(epc);
                     
@@ -562,13 +549,17 @@ public class MiraSecureGateFragment extends Fragment {
     private void handleGateDecision(boolean allowed, String itemTitle, String serial) {
         if (isDestroyed || !isAdded()) return;
         
+        // ✅ الفلترة
+        if (allowed && "ALERTS".equals(logFilter)) return;
+        if (!allowed && "PASS".equals(logFilter)) return;
+        
         if (allowed) {
             logConsole("✅ خروج شرعي: " + itemTitle);
-            updateLiveTicker("✅ " + itemTitle + " - خروج شرعي", false);
+            updateLiveTicker("✅ " + itemTitle, false);
             SoundGenerator.playSound(miraGatesSettings.getSoundPass());
         } else {
             logConsole("🚨 خروج غير شرعي: " + itemTitle);
-            updateLiveTicker("🚨 " + itemTitle + " - إنذار!", true);
+            updateLiveTicker("🚨 " + itemTitle, true);
             triggerAlarm(itemTitle, serial);
         }
     }
@@ -576,18 +567,16 @@ public class MiraSecureGateFragment extends Fragment {
     // ============================================
     // 🚨 الإنذار
     // ============================================
-
     private void triggerAlarm(String itemTitle, String serial) {
         mainHandler.post(() -> {
             if (overlayAlarm != null) {
                 tvOverlayTitle.setText("🚨 ALERT: UNAUTHORIZED BREACH");
                 tvOverlayDetails.setText(itemTitle + "\n[" + serial + "]");
                 overlayAlarm.setVisibility(View.VISIBLE);
-                
-                android.view.animation.Animation anim = new android.view.animation.AlphaAnimation(0.4f, 1.0f);
+                Animation anim = new AlphaAnimation(0.4f, 1.0f);
                 anim.setDuration(300);
-                anim.setRepeatMode(android.view.animation.Animation.REVERSE);
-                anim.setRepeatCount(android.view.animation.Animation.INFINITE);
+                anim.setRepeatMode(Animation.REVERSE);
+                anim.setRepeatCount(Animation.INFINITE);
                 overlayAlarm.startAnimation(anim);
             }
             if (vibrator != null) vibrator.vibrate(new long[]{0, 500, 200, 500}, -1);
@@ -596,24 +585,19 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void stopAlarm() {
-        if (overlayAlarm != null) {
-            overlayAlarm.clearAnimation();
-            overlayAlarm.setVisibility(View.GONE);
-        }
+        if (overlayAlarm != null) { overlayAlarm.clearAnimation(); overlayAlarm.setVisibility(View.GONE); }
         if (vibrator != null) vibrator.cancel();
-        logConsole("🔕 تم إيقاف الإنذار");
     }
 
     // ============================================
     // 📝 السجل
     // ============================================
-
     private void logConsole(String message) {
         mainHandler.post(() -> {
             if (isDestroyed || !isAdded()) return;
-            String logLine = "[" + timeFormat.format(new Date()) + "] " + message + "\n";
+            String line = "[" + timeFormat.format(new Date()) + "] " + message + "\n";
             if (tvDebugConsole != null) {
-                tvDebugConsole.append(logLine);
+                tvDebugConsole.append(line);
                 if (scrollDebugLog != null) scrollDebugLog.fullScroll(View.FOCUS_DOWN);
             }
             Log.d(TAG, message);
@@ -623,7 +607,6 @@ public class MiraSecureGateFragment extends Fragment {
     // ============================================
     // 📦 Adapter
     // ============================================
-
     private static class GateMonitorItem {
         String gateId, gateName, location, status, lastEvent;
         int passCount, denyCount;
@@ -646,14 +629,14 @@ public class MiraSecureGateFragment extends Fragment {
             h.tvGateStats.setText("✅ " + item.passCount + " | ❌ " + item.denyCount);
             h.tvGateLastEvent.setText(item.lastEvent.isEmpty() ? "لا أحداث" : item.lastEvent);
             
-            if ("online".equals(item.status) || "armed".equals(item.status)) {
-                h.tvGateStatus.setText("🟢 نشطة");
-                h.tvGateStatus.setTextColor(Color.parseColor("#4ADE80"));
-                h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_green);
-            } else if ("alert".equals(item.status)) {
+            if ("alert".equals(item.status)) {
                 h.tvGateStatus.setText("🔴 إنذار");
                 h.tvGateStatus.setTextColor(Color.parseColor("#EF4444"));
                 h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_red);
+            } else if ("online".equals(item.status) || "armed".equals(item.status)) {
+                h.tvGateStatus.setText("🟢 نشطة");
+                h.tvGateStatus.setTextColor(Color.parseColor("#4ADE80"));
+                h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_green);
             } else {
                 h.tvGateStatus.setText("⚪ غير نشطة");
                 h.tvGateStatus.setTextColor(Color.parseColor("#94A3B8"));
@@ -680,7 +663,6 @@ public class MiraSecureGateFragment extends Fragment {
     // ============================================
     // 🔄 دورة الحياة
     // ============================================
-
     @Override
     public void onPause() {
         super.onPause();
@@ -704,4 +686,4 @@ public class MiraSecureGateFragment extends Fragment {
         if (gateExecutor != null) gateExecutor.shutdownNow();
         mainHandler.removeCallbacksAndMessages(null);
     }
-    }
+}
