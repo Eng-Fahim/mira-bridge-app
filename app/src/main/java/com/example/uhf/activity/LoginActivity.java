@@ -66,7 +66,7 @@ import javax.crypto.spec.SecretKeySpec;
 public class LoginActivity extends AppCompatActivity {
 
     private static final String TAG = "LoginActivity";
-    private static final String DEFAULT_SERVER_URL = "https://sa.mirabarcode.com";
+    private static final String DEFAULT_SERVER_URL = "https://sa.mirabarcode.com/wp-json/";
     private static final int MAX_LOGIN_ATTEMPTS = 5;
     private static final long LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 دقائق
     private static final String ENCRYPTION_ALGORITHM = "AES";
@@ -336,14 +336,16 @@ protected void onCreate(Bundle savedInstanceState) {
         loginCard = findViewById(R.id.loginCard);
         logoContainer = findViewById(R.id.logoContainer);
 
+        // ✅ تحسين: استخدام العنوان الافتراضي إذا لم يوجد
         String savedUrl = sessionManager.getServerUrl();
         if (savedUrl != null && !savedUrl.isEmpty()) {
-           etServerUrl.setText(savedUrl);
-           } else {
-           // ✅ استخدام العنوان الافتراضي
-           etServerUrl.setText(DEFAULT_SERVER_URL);
-           sessionManager.setServerUrl(DEFAULT_SERVER_URL);
-           }
+            etServerUrl.setText(savedUrl);
+        } else {
+            // ✅ استخدام العنوان الافتراضي
+            etServerUrl.setText(DEFAULT_SERVER_URL);
+            sessionManager.setServerUrl(DEFAULT_SERVER_URL);
+            MiraServerConfig.getInstance(this).setBaseUrl(DEFAULT_SERVER_URL);
+        }
                
     // ✅ إخفاء إعدادات الخادم من المستخدم
     hideServerConfigFields();
@@ -361,7 +363,17 @@ protected void onCreate(Bundle savedInstanceState) {
         btnSaveServer.setOnClickListener(v -> {
             String url = getText(etServerUrl);
             if (isValidServerUrl(url)) {
+                // ✅ تنظيف الرابط
+                if (!url.endsWith("/")) {
+                    url += "/";
+                }
                 sessionManager.setServerUrl(url);
+                MiraServerConfig.getInstance(this).setBaseUrl(url);
+                
+                // ✅ إعادة تهيئة API Client
+                MiraApiClient.reloadInstance(this);
+                apiClient = MiraApiClient.getInstance(this);
+                
                 Toast.makeText(this, isArabic ? "✓ تم حفظ رابط الخادم بنجاح" : "✓ Server URL saved", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, 
@@ -682,6 +694,15 @@ protected void onCreate(Bundle savedInstanceState) {
         String password = getText(etPassword);
         String serverUrl = getText(etServerUrl);
 
+        // ✅ إذا كان الرابط فارغاً، استخدم الافتراضي
+        if (serverUrl.isEmpty()) {
+            serverUrl = sessionManager.getServerUrl();
+            if (serverUrl.isEmpty()) {
+                serverUrl = DEFAULT_SERVER_URL;
+            }
+            etServerUrl.setText(serverUrl);
+        }
+
         // التحقق من صحة URL
         if (!isValidServerUrl(serverUrl)) {
             tilServerUrl.setError(isArabic ? "يجب استخدام HTTPS" : "HTTPS required");
@@ -689,6 +710,10 @@ protected void onCreate(Bundle savedInstanceState) {
             playTone(false);
             return;
         }
+
+        // ✅ حفظ الرابط قبل المحاولة
+        sessionManager.setServerUrl(serverUrl);
+        MiraServerConfig.getInstance(this).setBaseUrl(serverUrl);
 
         if (username.isEmpty()) {
             tilUsername.setError(isArabic ? "اسم المستخدم مطلوب" : "Username required");
@@ -708,9 +733,13 @@ protected void onCreate(Bundle savedInstanceState) {
         tilServerUrl.setError(null);
         showLoading(true);
 
+        // ✅ إعادة تهيئة API Client بالرابط الجديد
+        MiraApiClient.reloadInstance(this);
+        apiClient = MiraApiClient.getInstance(this);
+
         // تشفير كلمة المرور قبل الإرسال
         // ✅ إرسال كلمة المرور الأصلية - HTTPS يقوم بالتشفير
-final String finalPassword = password;
+        final String finalPassword = password;
 
         executeSafeBg(() -> {
             String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -785,6 +814,11 @@ final String finalPassword = password;
     String branchCode = response.optString("branch_code", "");
     String serverUrl = getText(etServerUrl);
     
+    // ✅ إذا كان الرابط فارغاً، استخدم المحفوظ
+    if (serverUrl.isEmpty()) {
+        serverUrl = sessionManager.getServerUrl();
+    }
+    
     String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
     String apiKey = response.optString("api_key", "");
     String gateId = response.optString("gate_id", "");
@@ -798,6 +832,7 @@ final String finalPassword = password;
     
     if (!serverUrl.isEmpty()) {
         MiraServerConfig.getInstance(this).setBaseUrl(serverUrl);
+        sessionManager.setServerUrl(serverUrl);
     }
     
     String permissionsJson = response.optString("permissions", "");
