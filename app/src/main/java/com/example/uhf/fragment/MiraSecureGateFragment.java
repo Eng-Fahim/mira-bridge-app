@@ -526,6 +526,30 @@ private String getCurrentGateName() {
             }
         }
     }
+private void startContinuousRfidScanWithSettings(MiraGatesSettings.GateSettings gateSettings) {
+    if (isDestroyed || mContext == null || mContext.mReader == null) {
+        logConsole(isArabic() ? "⚠️ قارئ RFID غير متوفر" : "⚠️ RFID reader unavailable");
+        return;
+    }
+    
+    try {
+        int rfidPower = gateSettings.rfidPower;
+        mContext.mReader.setPower(rfidPower);
+        logConsole("📡 RFID Power: " + rfidPower + " dBm");
+
+        mContext.mReader.setInventoryCallback(new IUHFInventoryCallback() {
+            @Override
+            public void callback(UHFTAGInfo uhftagInfo) {
+                if (!isDestroyed && uhftagInfo != null && uhftagInfo.getEPC() != null) {
+                    processInputEpc(uhftagInfo.getEPC(), "RFID_HW");
+                }
+            }
+        });
+        mContext.mReader.startInventoryTag();
+    } catch (Exception e) {
+        logConsole("⚠️ " + (isArabic() ? "خطأ في القارئ: " : "Reader error: ") + e.getMessage());
+    }
+}
 
     private void queryMiraGateServer(String epc) {
     if (isDestroyed || gateExecutor == null || gateExecutor.isShutdown()) return;
@@ -950,4 +974,4 @@ private void updateGateStatusOnServerForSpecificGate(String gateId, String statu
         gateActive = false;
         isAlarmActive = false;
     }
-        }
+}
