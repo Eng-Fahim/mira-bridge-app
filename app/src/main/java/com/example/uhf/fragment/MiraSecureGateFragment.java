@@ -66,6 +66,10 @@ public class MiraSecureGateFragment extends Fragment {
     private static final int API_TIMEOUT_SECONDS = 5;
     private static final int MONITOR_INTERVAL_SECONDS = 5;
     private static final int PING_INTERVAL_SECONDS = 10;
+    
+    // ✅ متغيرات Offline
+    private OfflineGateCache offlineCache;
+    private volatile boolean isOnline = true;
 
     private UHFMainActivity mContext;
     private MiraGatesSettings miraGatesSettings;
@@ -146,7 +150,7 @@ public class MiraSecureGateFragment extends Fragment {
         if (getActivity() instanceof UHFMainActivity) {
             mContext = (UHFMainActivity) getActivity();
         }
-        
+        offlineCache = OfflineGateCache.getInstance(context);
         miraGatesSettings = MiraGatesSettings.getInstance(context);
         permissionManager = PermissionManager.getInstance(context);
         vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
@@ -397,12 +401,17 @@ public class MiraSecureGateFragment extends Fragment {
     // 📡 المراقبة
     // ============================================
     private void startMonitoring() {
-        monitorScheduler = Executors.newSingleThreadScheduledExecutor();
-        monitorScheduler.scheduleAtFixedRate(() -> {
-            if (!isDestroyed && isAdded()) loadAllGatesStatus();
-        }, 0, MONITOR_INTERVAL_SECONDS, TimeUnit.SECONDS);
-        loadAllGatesStatus();
-    }
+    monitorScheduler = Executors.newSingleThreadScheduledExecutor();
+    monitorScheduler.scheduleAtFixedRate(() -> {
+        if (!isDestroyed && isAdded()) {
+            loadAllGatesStatus();
+            checkConnection();
+        }
+    }, 0, MONITOR_INTERVAL_SECONDS, TimeUnit.SECONDS);
+    
+    loadAllGatesStatus();
+    updateLocalAllowedCache();
+}
 
     private void loadAllGatesStatus() {
         if (gateExecutor == null || getContext() == null) return;
@@ -494,22 +503,122 @@ public class MiraSecureGateFragment extends Fragment {
     // 📡 فحص القطع
     // ============================================
     private void processInputEpc(String epc, String sourceType) {
-        if (isDestroyed || !isAdded()) return;
-        if (epc == null || epc.trim().isEmpty()) return;
-        final String cleanedEpc = epc.trim().toUpperCase();
-        
-        long now = System.currentTimeMillis();
-        Long last = scanDebounceMap.putIfAbsent(cleanedEpc, now);
-        if (last != null && now - last < SCAN_COOL_DOWN_MS) return;
-        scanDebounceMap.put(cleanedEpc, now);
-        
-        logConsole("📡 [" + sourceType + "] فحص: " + cleanedEpc);
-        if (localAllowedEpcCache.contains(cleanedEpc)) {
-            mainHandler.post(() -> handleGateDecision(true, "قطعة مصرح بها", cleanedEpc));
-        } else {
-            queryMiraGateServer(cleanedEpc);
-        }
+    if (isDestroyed || !isAdded()) return;
+    if (epc == null || epc.trim().isEmpty()) return;
+    final String cleanedEpc = epc.trim().toUpperCase();
+    
+    long now = System.currentTimeMillis();
+    Long last = scanDebounceMap.putIfAbsent(cleanedEpc, now);
+    if (last != null && now - last < SCAN_COOL_DOWN_MS) return;
+    scanDebounceMap.put(cleanedEpc, now);
+    
+    logConsole("📡 [" + sourceType + "] فحص: " + cleanedEpc);
+    
+    // ✅ 1. التحقق من الكاش المحلي أولاً
+    if (offlineCache != null && offlineCache.isAllowedLocally(cleanedEpc)) {
+        mainHandler.post(() -> handleGateDecision(true, "قطعة مصرح بها (محلي)", cleanedEpc));
+        return;
     }
+    
+    // ✅ 2. إذا غير متصل - رفض فوري مع تسجيل محلي
+    if (!isOnline) {
+        logConsole("⚠️ بدون إنترنت - رفض أمني فوري");
+        mainHandler.post(() -> {
+            handleGateDecision(false, "بدون إنترنت", cleanedEpc);
+            if (offlineCache != null) {
+                offlineCache.saveOfflineEvent(cleanedEpc, false, "بدون إنترنت", "local");
+            }
+        });
+        return;
+    }
+    
+    // ✅ 3. متصل - فحص عبر السيرفر
+    queryMiraGateServer(cleanedEpc);
+}
+
+
+
+// ✅ مزامنة الأحداث المحلية
+private void syncOfflineEvents() {
+    if (gateExecutor == null || offlineCache == null) return;
+    
+    gateExecutor.execute(() -> {
+        try {
+            JSONArray pendingEvents = offlineCache.getOfflineEvents();
+            if (pendingEvents.length() == 0) return;
+            
+            MiraApiClient client = MiraApiClient.getInstance(getContext());
+            MiraApiClient.ApiResponse response = client.syncOfflineTransactions(pendingEvents);
+            
+            if (response != null && response.isSuccess) {
+                offlineCache.clearOfflineEvents();
+                offlineCache.saveLastSyncTime(System.currentTimeMillis());
+                mainHandler.post(() -> logConsole("✅ تمت مزامنة " + pendingEvents.length() + " حدث"));
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Sync offline: " + e.getMessage());
+        }
+    });
+}
+
+// ✅ تحديث القائمة المسموحة محلياً
+private void updateLocalAllowedCache() {
+    if (gateExecutor == null || getContext() == null) return;
+    
+    gateExecutor.execute(() -> {
+        try {
+            MiraApiClient client = MiraApiClient.getInstance(getContext());
+            MiraApiClient.ApiResponse response = client.getWithAuth("/allowed-list");
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONArray arr = response.data.optJSONArray("allowed_epcs");
+                if (arr != null) {
+                    Set<String> allowed = ConcurrentHashMap.newKeySet();
+                    for (int i = 0; i < arr.length(); i++) {
+                        String epc = arr.optString(i, "");
+                        if (!epc.isEmpty()) allowed.add(epc);
+                    }
+                    
+                    localAllowedEpcCache.clear();
+                    localAllowedEpcCache.addAll(allowed);
+                    
+                    if (offlineCache != null) {
+                        offlineCache.saveAllowedEpcs(allowed);
+                    }
+                    
+                    mainHandler.post(() -> logConsole("✅ القائمة المسموحة: " + allowed.size()));
+                }
+            }
+        } catch (Exception e) {}
+    });
+}
+
+// ✅ مراقبة الاتصال
+private void checkConnection() {
+    if (gateExecutor == null) return;
+    gateExecutor.execute(() -> {
+        try {
+            MiraApiClient client = MiraApiClient.getInstance(getContext());
+            boolean wasOnline = isOnline;
+            isOnline = client.pingApi();
+            
+            if (isOnline != wasOnline) {
+                mainHandler.post(() -> {
+                    if (isOnline) {
+                        logConsole("🟢 عاد الاتصال - جاري المزامنة...");
+                        updateLocalAllowedCache();
+                        syncOfflineEvents();
+                    } else {
+                        logConsole("🔴 انقطع الاتصال - الوضع المحلي");
+                    }
+                    if (offlineCache != null) offlineCache.saveConnectionState(isOnline);
+                });
+            }
+        } catch (Exception e) {
+            isOnline = false;
+        }
+    });
+}
 
     private void queryMiraGateServer(String epc) {
         if (gateExecutor == null) return;
