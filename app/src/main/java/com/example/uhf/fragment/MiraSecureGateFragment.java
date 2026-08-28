@@ -25,6 +25,9 @@ import androidx.annotation.RequiresApi;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.manager.MiraGatesSettings;
@@ -64,6 +67,11 @@ import java.util.List;
 
 @RequiresApi(api = Build.VERSION_CODES.O)
 public class MiraSecureGateFragment extends Fragment {
+
+private RecyclerView rvGatesMonitor;
+private GateMonitorAdapter monitorAdapter;
+private final List<GateMonitorItem> monitorList = new ArrayList<>();
+
 
     private static final String TAG = "MiraSecureGate";
     private static final long SCAN_COOL_DOWN_MS = 2500;
@@ -127,20 +135,22 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    super.onViewCreated(view, savedInstanceState);
 
-        initializeComponents();
-        initViews(view);
-        setupClickListeners();
-        applyPermissions();
-        updateUI();
+    initializeComponents();
+    initViews(view);
+    setupClickListeners();
+    applyPermissions();
+    updateUI();
+    
+    // ✅ بدء المراقبة الحية
+    startGateMonitoringLoop();
+    loadAllGatesStatus();
 
-        logConsole("🚀 تم تشغيل MIRA Secure Gate™");
-        logConsole("🔊 صوت الإنذار: " + miraGatesSettings.getSoundAlarm());
-        logConsole("📡 قوة RFID: " + miraGatesSettings.getRfidPower() + " dBm");
-    }
-
+    logConsole("🚀 تم تشغيل لوحة مراقبة MIRA Secure Gate™");
+    logConsole("📡 مراقبة جميع البوابات كل 5 ثواني...");
+}
     private void initializeComponents() {
         if (getActivity() instanceof UHFMainActivity) {
             mContext = (UHFMainActivity) getActivity();
@@ -200,14 +210,71 @@ public class MiraSecureGateFragment extends Fragment {
         btnStopAlarm = view.findViewById(R.id.btnStopAlarm);
         
         spGateSelector = view.findViewById(R.id.spGateSelector);
-    
-    // تحميل البوابات
-    loadGatesForSelector();
+    if (spGateSelector != null) {
+        // تحميل البوابات
+        loadGatesForSelector();
+    }
+        
+    rvGatesMonitor = view.findViewById(R.id.rvGatesMonitor);
+    if (rvGatesMonitor != null) {
+        rvGatesMonitor.setLayoutManager(new LinearLayoutManager(getContext()));
+        monitorAdapter = new GateMonitorAdapter(monitorList);
+        rvGatesMonitor.setAdapter(monitorAdapter);
+    }
     }
 
 
+// أضف دالة المراقبة المستمرة
+private void startGateMonitoringLoop() {
+    ScheduledExecutorService monitorScheduler = Executors.newSingleThreadScheduledExecutor();
+    monitorScheduler.scheduleAtFixedRate(() -> {
+        if (isDestroyed) return;
+        loadAllGatesStatus();
+    }, 0, 5, TimeUnit.SECONDS);  // ✅ تحديث كل 5 ثواني
+}
+
+private void loadAllGatesStatus() {
+    gateExecutor.execute(() -> {
+        try {
+            MiraApiClient client = MiraApiClient.getInstance(getContext());
+            int branchId = getCurrentBranchId();
+            MiraApiClient.ApiResponse response = client.getGatesByBranch(branchId);
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONArray gatesArray = response.data.optJSONArray("gates");
+                if (gatesArray == null) {
+                    JSONObject dataObj = response.data.optJSONObject("data");
+                    if (dataObj != null) gatesArray = dataObj.optJSONArray("gates");
+                }
+                
+                if (gatesArray != null) {
+                    List<GateMonitorItem> items = new ArrayList<>();
+                    for (int i = 0; i < gatesArray.length(); i++) {
+                        JSONObject g = gatesArray.optJSONObject(i);
+                        GateMonitorItem item = new GateMonitorItem();
+                        item.gateId = g.optString("gate_id", "");
+                        item.gateName = g.optString("gate_name", "");
+                        item.status = g.optString("status", "offline");
+                        item.passCount = g.optInt("pass_count", 0);
+                        item.denyCount = g.optInt("deny_count", 0);
+                        item.lastEvent = g.optString("last_event", "");
+                        items.add(item);
+                    }
+                    
+                    mainHandler.post(() -> {
+                        monitorList.clear();
+                        monitorList.addAll(items);
+                        monitorAdapter.notifyDataSetChanged();
+                    });
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Monitor error: " + e.getMessage());
+        }
+    });
+}
 private void loadGatesForSelector() {
-    if (miraGatesSettings == null) return;
+    if (miraGatesSettings == null || spGateSelector == null) return;
     
     // ✅ جلب جميع البوابات المحفوظة
     List<MiraGatesSettings.GateDevice> allGates = miraGatesSettings.getGates();
@@ -721,6 +788,67 @@ private int getCurrentBranchId() {
     updateGateStatusOnServerForSpecificGate(currentGateId, status);
 }
 
+// كلاس العنصر
+private static class GateMonitorItem {
+    String gateId;
+    String gateName;
+    String status;
+    int passCount;
+    int denyCount;
+    String lastEvent;
+}
+
+// Adapter
+private class GateMonitorAdapter extends RecyclerView.Adapter<GateMonitorAdapter.VH> {
+    private final List<GateMonitorItem> items;
+    
+    GateMonitorAdapter(List<GateMonitorItem> items) {
+        this.items = items;
+    }
+    
+    @NonNull
+    @Override
+    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext())
+            .inflate(R.layout.item_gate_monitor, parent, false);
+        return new VH(view);
+    }
+    
+    @Override
+    public void onBindViewHolder(@NonNull VH h, int position) {
+        GateMonitorItem item = items.get(position);
+        h.tvGateName.setText(item.gateName);
+        h.tvGateStats.setText("✅ " + item.passCount + " | ❌ " + item.denyCount);
+        h.tvGateLastEvent.setText(item.lastEvent.isEmpty() ? "لا أحداث" : item.lastEvent);
+        
+        if ("online".equals(item.status) || "armed".equals(item.status)) {
+            h.tvGateStatus.setText("🟢 نشطة");
+            h.tvGateStatus.setTextColor(0xFF2E7D32);
+            h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_green);
+        } else {
+            h.tvGateStatus.setText("⚪ غير نشطة");
+            h.tvGateStatus.setTextColor(0xFF9E9E9E);
+            h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_red);
+        }
+    }
+    
+    @Override
+    public int getItemCount() { return items.size(); }
+    
+    class VH extends RecyclerView.ViewHolder {
+        TextView tvGateName, tvGateStatus, tvGateStats, tvGateLastEvent;
+        View vStatusDot;
+        
+        VH(@NonNull View itemView) {
+            super(itemView);
+            tvGateName = itemView.findViewById(R.id.tvGateName);
+            tvGateStatus = itemView.findViewById(R.id.tvGateStatus);
+            tvGateStats = itemView.findViewById(R.id.tvGateStats);
+            tvGateLastEvent = itemView.findViewById(R.id.tvGateLastEvent);
+            vStatusDot = itemView.findViewById(R.id.vGateStatusDot);
+        }
+    }
+}
 private void updateGateStatusOnServerForSpecificGate(String gateId, String status) {
     if (isDestroyed || gateExecutor == null) return;
     
