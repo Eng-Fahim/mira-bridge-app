@@ -45,6 +45,17 @@
                     android:text="📍 المدخل الرئيسي"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="10sp" />
+
+                <!-- ✅ عرض الفرع -->
+                <TextView
+                    android:id="@+id/tvGateBranch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="🏢 الفرع الرئيسي"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <TextView
