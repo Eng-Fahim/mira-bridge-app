@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="70dp"
+    android:layout_height="70dp"
+    android:layout_margin="4dp">
+
+    <!-- توهج خارجي -->
+    <View
+        android:id="@+id/vNodeGlow"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_gravity="center"
+        android:background="@drawable/circle_indicator_green"
+        android:alpha="0.5" />
+
+    <!-- الدائرة الداخلية -->
+    <View
+        android:id="@+id/vNodeCore"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_gravity="center"
+        android:background="@drawable/circle_indicator_green" />
+
+    <!-- اسم البوابة -->
+    <TextView
+        android:id="@+id/tvNodeName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="🚪"
+        android:textSize="22sp" />
+</FrameLayout>
