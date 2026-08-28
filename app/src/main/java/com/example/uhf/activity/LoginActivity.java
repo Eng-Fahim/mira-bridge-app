@@ -1001,13 +1001,11 @@ private void navigateToMainWithAnimation() {
         });
 
         promptInfo = new BiometricPrompt.PromptInfo.Builder()
-            .setTitle(isArabic ? "تسجيل الدخول الحيوي" : "Biometric Sign In")
-            .setSubtitle(isArabic ? "استخدم بصمة الإصبع أو رمز PIN" : "Use fingerprint or PIN")
-            .setNegativeButtonText(isArabic ? "استخدام كلمة المرور" : "Use password")
-            .setAllowedAuthenticators(
-                BiometricManager.Authenticators.BIOMETRIC_STRONG | 
-                BiometricManager.Authenticators.DEVICE_CREDENTIAL)
-            .build();
+    .setTitle(isArabic ? "تسجيل الدخول الحيوي" : "Biometric Sign In")
+    .setSubtitle(isArabic ? "استخدم بصمة الإصبع" : "Use fingerprint")
+    .setNegativeButtonText(isArabic ? "استخدام كلمة المرور" : "Use password")
+    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+    .build();
 
         if (btnBiometric != null) {
             btnBiometric.setOnClickListener(v -> {
