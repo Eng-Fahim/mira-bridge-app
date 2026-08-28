@@ -253,48 +253,48 @@ public class SessionManager {
     }
 
     public void logoutUser() {
-        boolean keepBiometric = pref.getBoolean(KEY_BIOMETRIC_ENABLED, false);
-        String lastUser = pref.getString(KEY_LAST_BIOMETRIC_USER, "");
-        String lastRole = pref.getString(KEY_LAST_BIOMETRIC_ROLE, "");
-        String lastDisplayName = pref.getString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, "");
-        int lastUserId = pref.getInt(KEY_LAST_BIOMETRIC_USER_ID, 0);
-        String lastToken = pref.getString(KEY_LAST_BIOMETRIC_TOKEN, "");
-        int lastBranchId = pref.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, 1);
-        String lastBranchName = pref.getString(KEY_LAST_BIOMETRIC_BRANCH_NAME, "");
-        
-        // حفظ API Key و Gate ID قبل المسح
-        String apiKey = pref.getString(KEY_API_KEY, "");
-        String gateId = pref.getString(KEY_GATE_ID, "");
-        String lastUsername = pref.getString(KEY_LAST_USERNAME, "");
+    // ✅ حفظ القيم التي يجب أن تبقى
+    boolean keepBiometric = pref.getBoolean(KEY_BIOMETRIC_ENABLED, false);
+    String lastUser = pref.getString(KEY_LAST_BIOMETRIC_USER, "");
+    String lastRole = pref.getString(KEY_LAST_BIOMETRIC_ROLE, "");
+    String lastDisplayName = pref.getString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, "");
+    int lastUserId = pref.getInt(KEY_LAST_BIOMETRIC_USER_ID, 0);
+    String lastToken = pref.getString(KEY_LAST_BIOMETRIC_TOKEN, "");
+    int lastBranchId = pref.getInt(KEY_LAST_BIOMETRIC_BRANCH_ID, 1);
+    String lastBranchName = pref.getString(KEY_LAST_BIOMETRIC_BRANCH_NAME, "");
+    String apiKey = pref.getString(KEY_API_KEY, "");
+    String gateId = pref.getString(KEY_GATE_ID, "");
+    String lastUsername = pref.getString(KEY_LAST_USERNAME, "");
+    String serverUrl = pref.getString(KEY_SERVER_URL, ""); // ✅ أضف هذا السطر
 
-        editor.clear();
+    editor.clear();
 
-        if (keepBiometric) {
-            editor.putBoolean(KEY_BIOMETRIC_ENABLED, true);
-            editor.putString(KEY_LAST_BIOMETRIC_USER, lastUser);
-            editor.putString(KEY_LAST_BIOMETRIC_ROLE, lastRole);
-            editor.putString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, lastDisplayName);
-            editor.putInt(KEY_LAST_BIOMETRIC_USER_ID, lastUserId);
-            editor.putString(KEY_LAST_BIOMETRIC_TOKEN, lastToken);
-            editor.putInt(KEY_LAST_BIOMETRIC_BRANCH_ID, lastBranchId);
-            editor.putString(KEY_LAST_BIOMETRIC_BRANCH_NAME, lastBranchName);
-        }
-        
-        // الاحتفاظ بـ API Key و Gate ID
-        if (!apiKey.isEmpty()) {
-            editor.putString(KEY_API_KEY, apiKey);
-        }
-        if (!gateId.isEmpty()) {
-            editor.putString(KEY_GATE_ID, gateId);
-        }
-        
-        // الاحتفاظ بآخر اسم مستخدم
-        if (!lastUsername.isEmpty()) {
-            editor.putString(KEY_LAST_USERNAME, lastUsername);
-        }
-
-        editor.apply();
+    if (keepBiometric) {
+        editor.putBoolean(KEY_BIOMETRIC_ENABLED, true);
+        editor.putString(KEY_LAST_BIOMETRIC_USER, lastUser);
+        editor.putString(KEY_LAST_BIOMETRIC_ROLE, lastRole);
+        editor.putString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, lastDisplayName);
+        editor.putInt(KEY_LAST_BIOMETRIC_USER_ID, lastUserId);
+        editor.putString(KEY_LAST_BIOMETRIC_TOKEN, lastToken);
+        editor.putInt(KEY_LAST_BIOMETRIC_BRANCH_ID, lastBranchId);
+        editor.putString(KEY_LAST_BIOMETRIC_BRANCH_NAME, lastBranchName);
     }
+    
+    if (!apiKey.isEmpty()) {
+        editor.putString(KEY_API_KEY, apiKey);
+    }
+    if (!gateId.isEmpty()) {
+        editor.putString(KEY_GATE_ID, gateId);
+    }
+    if (!lastUsername.isEmpty()) {
+        editor.putString(KEY_LAST_USERNAME, lastUsername);
+    }
+    if (!serverUrl.isEmpty()) {
+        editor.putString(KEY_SERVER_URL, serverUrl); // ✅ أضف هذا السطر
+    }
+
+    editor.apply();
+}
 
     public void logout() { logoutUser(); }
 }
