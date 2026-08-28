@@ -33,6 +33,7 @@ import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraGatesSettings;
+import com.example.uhf.manager.OfflineGateCache;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.service.MiraGateMonitorService;
 import com.example.uhf.tools.SoundGenerator;
