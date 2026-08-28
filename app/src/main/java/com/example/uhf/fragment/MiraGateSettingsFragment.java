@@ -138,22 +138,58 @@ public class MiraGateSettingsFragment extends Fragment {
     /**
      * ✅ جلب قائمة الفروع
      */
-    private void loadBranches() {
+private void loadBranches() {
     branchesList.clear();
-    try {
-        if (branchesManager != null) {
-            // ✅ جلب جميع الفروع من السيرفر
-            List<MiraBranchesManager.BranchItem> allBranches = branchesManager.getAllBranches();
+    
+    // ✅ جلب مباشر من السيرفر - بدون الاعتماد على MiraBranchesManager
+    executor.execute(() -> {
+        try {
+            MiraApiClient client = MiraApiClient.getInstance(getContext());
+            if (client == null) return;
             
-            if (allBranches != null && !allBranches.isEmpty()) {
-                for (MiraBranchesManager.BranchItem branch : allBranches) {
-                    branchesList.add(new BranchItem(branch.id, branch.name));
+            MiraApiClient.ApiResponse response = client.getBranches();
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                // ✅ السيرفر يرجع "branches" مباشرة
+                JSONArray arr = response.data.optJSONArray("branches");
+                
+                Log.d(TAG, "Branches response: " + response.data.toString());
+                
+                if (arr != null && arr.length() > 0) {
+                    List<BranchItem> serverBranches = new ArrayList<>();
+                    for (int i = 0; i < arr.length(); i++) {
+                        JSONObject b = arr.optJSONObject(i);
+                        if (b != null) {
+                            int id = b.optInt("id", 0);
+                            String name = b.optString("branch_name_ar", b.optString("branch_name", ""));
+                            if (id > 0 && !name.isEmpty()) {
+                                serverBranches.add(new BranchItem(id, name));
+                            }
+                        }
+                    }
+                    
+                    if (!serverBranches.isEmpty()) {
+                        mainHandler.post(() -> {
+                            branchesList.clear();
+                            branchesList.addAll(serverBranches);
+                            Log.d(TAG, "✅ تم تحميل " + serverBranches.size() + " فرع");
+                        });
+                    }
                 }
+            } else {
+                Log.e(TAG, "Branches failed: code=" + (response != null ? response.code : -1) 
+                    + ", msg=" + (response != null ? response.message : "null"));
             }
+        } catch (Exception e) {
+            Log.e(TAG, "loadBranches error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.e(TAG, "loadBranches error: " + e.getMessage());
+    });
+    
+    // ✅ افتراضي فوري
+    if (branchesList.isEmpty()) {
+        branchesList.add(new BranchItem(1, "الفرع الرئيسي"));
     }
+}
     
     // ✅ إذا لم توجد فروع، أضف الفرع الحالي + الرئيسي
     if (branchesList.isEmpty()) {
