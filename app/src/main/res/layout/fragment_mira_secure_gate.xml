@@ -64,6 +64,17 @@
                     android:text="🚨 محاكاة مرفوض"
                     android:layout_marginStart="4dp"
                     app:cornerRadius="8dp" />
+
+                <!-- ✅ بعد أزرار المحاكاة -->
+                <com.google.android.material.button.MaterialButton
+    android:id="@+id/btnScanBarcode"
+    style="@style/Widget.Material3.Button.OutlinedButton"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:text="📷 مسح باركود بالكاميرا"
+    android:textSize="14sp"
+    app:cornerRadius="8dp"
+    android:layout_marginBottom="8dp" />
             </LinearLayout>
 
             <!-- ✅ إحصائيات عامة -->
