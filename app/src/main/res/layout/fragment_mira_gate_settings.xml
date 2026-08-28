@@ -126,6 +126,22 @@
                     android:textSize="10sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
+        
+        <!-- ✅ فلتر الفرع - يظهر فقط للمدير العام -->
+<com.google.android.material.textfield.TextInputLayout
+    android:id="@+id/tilBranchFilter"
+    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:hint="🏢 تصفية حسب الفرع"
+    android:visibility="gone">
+
+    <Spinner
+        android:id="@+id/spBranchFilter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+</com.google.android.material.textfield.TextInputLayout>
 
         <!-- أزرار -->
         <LinearLayout
@@ -133,6 +149,8 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:layout_marginBottom="8dp">
+            
+            
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnAddGate"
