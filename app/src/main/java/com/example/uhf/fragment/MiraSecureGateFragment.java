@@ -12,122 +12,71 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
-import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
-
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
+import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraGatesSettings;
-import com.example.uhf.manager.MiraSettingsManager;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SoundGenerator;
-import com.journeyapps.barcodescanner.ScanContract;
-import com.journeyapps.barcodescanner.ScanOptions;
-import com.rscja.deviceapi.entity.UHFTAGInfo;
-import com.rscja.deviceapi.interfaces.IUHFInventoryCallback;
-
-import com.example.uhf.api.MiraApiClient;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
-import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
-import android.widget.Spinner;
-import java.util.ArrayList;
-import java.util.List;
 
 @RequiresApi(api = Build.VERSION_CODES.O)
 public class MiraSecureGateFragment extends Fragment {
 
-private RecyclerView rvGatesMonitor;
-private GateMonitorAdapter monitorAdapter;
-private final List<GateMonitorItem> monitorList = new ArrayList<>();
+    private static final String TAG = "MiraSecureGateMonitor";
+    private static final int MONITOR_INTERVAL_SECONDS = 5; // ✅ تحديث كل 5 ثواني
 
-
-    private static final String TAG = "MiraSecureGate";
-    private static final long SCAN_COOL_DOWN_MS = 2500;
-    private static final int API_TIMEOUT_SECONDS = 5;
-    private static final int SYNC_INTERVAL_SECONDS = 30;
-    private static final int UI_RESET_DELAY_MS = 3000;
-
+    // ✅ المكونات
     private UHFMainActivity mContext;
-    private MiraSettingsManager settingsManager;
     private MiraGatesSettings miraGatesSettings;
     private PermissionManager permissionManager;
+    private MiraBranchesManager branchesManager;
     
+    // ✅ المعالجات
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final Handler flashHandler = new Handler(Looper.getMainLooper());
-    private final Handler soundHandler = new Handler(Looper.getMainLooper());
-    
     private ExecutorService gateExecutor;
-    private ScheduledExecutorService dbSyncScheduler;
-
-    private TextView tvGateIcon, tvGateStatus, tvLastEvent, tvDebugConsole;
+    private ScheduledExecutorService monitorScheduler;
+    
+    // ✅ عناصر UI
+    private RecyclerView rvGatesMonitor;
+    private GateMonitorAdapter monitorAdapter;
+    private final List<GateMonitorItem> monitorList = new ArrayList<>();
     private TextView tvPassCount, tvDenyCount, tvTotalCount;
-    private TextView tvOverlayTitle, tvOverlayDetails;
-    private EditText etManualEpc;
-    private View statusIndicator;
-    private FrameLayout overlayAlarm;
-    private Button btnArmGate, btnDisarmGate, btnSubmitManual, btnScanBarcode;
-    private Button btnSimulateAllowed, btnSimulateDenied, btnStopAlarm;
+    private TextView tvDebugConsole;
     private ScrollView scrollDebugLog;
-
-    private volatile boolean gateActive = false;
-    private volatile boolean isAlarmActive = false;
+    private FrameLayout overlayAlarm;
+    private TextView tvOverlayTitle, tvOverlayDetails;
+    private Button btnStopAlarm;
+    
+    // ✅ الحالة
     private volatile boolean isDestroyed = false;
-    private int passCount = 0;
-    private int denyCount = 0;
-    private int totalCount = 0;
-
-    private boolean flashState = false;
-    private Runnable flashRunnable;
-    private Runnable soundLoopRunnable;
-
-    private final Set<String> localAllowedEpcCache = ConcurrentHashMap.newKeySet();
-    private final ConcurrentHashMap<String, Long> scanDebounceMap = new ConcurrentHashMap<>();
-
     private Vibrator vibrator;
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
-
-    private final ActivityResultLauncher<ScanOptions> barcodeLauncher = registerForActivityResult(
-            new ScanContract(),
-            result -> {
-                if (result.getContents() != null && !isDestroyed) {
-                    String scannedBarcode = result.getContents().trim();
-                    logConsole("📷 [الكاميرا]: تم التقاط الباركود: " + scannedBarcode);
-                    processInputEpc(scannedBarcode, "CAMERA");
-                }
-            }
-    );
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -135,73 +84,42 @@ private final List<GateMonitorItem> monitorList = new ArrayList<>();
     }
 
     @Override
-public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-    super.onViewCreated(view, savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        
+        initializeComponents();
+        initViews(view);
+        setupListeners();
+        
+        // ✅ بدء المراقبة الحية فوراً
+        startMonitoring();
+        
+        logConsole("🚀 تم تشغيل لوحة مراقبة البوابات الأمنية");
+        logConsole("📡 المراقبة الحية تعمل - تحديث كل " + MONITOR_INTERVAL_SECONDS + " ثواني");
+    }
 
-    initializeComponents();
-    initViews(view);
-    setupClickListeners();
-    applyPermissions();
-    updateUI();
-    
-    // ✅ بدء المراقبة الحية
-    startGateMonitoringLoop();
-    loadAllGatesStatus();
-
-    logConsole("🚀 تم تشغيل لوحة مراقبة MIRA Secure Gate™");
-    logConsole("📡 مراقبة جميع البوابات كل 5 ثواني...");
-}
     private void initializeComponents() {
+        Context context = getContext();
+        if (context == null) return;
+        
         if (getActivity() instanceof UHFMainActivity) {
             mContext = (UHFMainActivity) getActivity();
-            settingsManager = MiraSettingsManager.getInstance(mContext);
-            miraGatesSettings = MiraGatesSettings.getInstance(mContext);
-            permissionManager = PermissionManager.getInstance(mContext);
-            vibrator = (Vibrator) mContext.getSystemService(Context.VIBRATOR_SERVICE);
         }
+        
+        miraGatesSettings = MiraGatesSettings.getInstance(context);
+        permissionManager = PermissionManager.getInstance(context);
+        branchesManager = MiraBranchesManager.getInstance(context);
+        vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+        
         gateExecutor = Executors.newFixedThreadPool(4);
         isDestroyed = false;
     }
 
-    private void applyPermissions() {
-        boolean canManageGates = permissionManager.canEdit("gates") || 
-                                  permissionManager.isAdmin() || 
-                                  permissionManager.isBranchManager();
-        
-        if (btnArmGate != null) btnArmGate.setEnabled(canManageGates);
-        if (btnDisarmGate != null) btnDisarmGate.setEnabled(canManageGates);
-        if (btnSimulateAllowed != null) btnSimulateAllowed.setEnabled(canManageGates);
-        if (btnSimulateDenied != null) btnSimulateDenied.setEnabled(canManageGates);
-        
-        if (!canManageGates) {
-            if (tvGateStatus != null) {
-                tvGateStatus.setText(isArabic() ? "⛔ وضع المراقبة فقط" : "⛔ Monitor only mode");
-            }
-        }
-    }
-
-    private boolean isArabic() {
-        return Locale.getDefault().getLanguage().equals("ar");
-    }
-
-    private Spinner spGateSelector;
-    private List<MiraGatesSettings.GateDevice> gatesList = new ArrayList<>();
-    private String currentGateId = "";
     private void initViews(View view) {
-        tvGateIcon = view.findViewById(R.id.tvGateIcon);
-        tvGateStatus = view.findViewById(R.id.tvGateStatus);
-        tvLastEvent = view.findViewById(R.id.tvLastEvent);
+        rvGatesMonitor = view.findViewById(R.id.rvGatesMonitor);
         tvPassCount = view.findViewById(R.id.tvPassCount);
         tvDenyCount = view.findViewById(R.id.tvDenyCount);
         tvTotalCount = view.findViewById(R.id.tvTotalCount);
-        etManualEpc = view.findViewById(R.id.etManualEpc);
-        statusIndicator = view.findViewById(R.id.statusIndicator);
-        btnArmGate = view.findViewById(R.id.btnArmGate);
-        btnDisarmGate = view.findViewById(R.id.btnDisarmGate);
-        btnSubmitManual = view.findViewById(R.id.btnSubmitManual);
-        btnScanBarcode = view.findViewById(R.id.btnScanBarcode);
-        btnSimulateAllowed = view.findViewById(R.id.btnSimulateAllowed);
-        btnSimulateDenied = view.findViewById(R.id.btnSimulateDenied);
         tvDebugConsole = view.findViewById(R.id.tvDebugConsole);
         scrollDebugLog = view.findViewById(R.id.scrollDebugLog);
         overlayAlarm = view.findViewById(R.id.overlayAlarm);
@@ -209,795 +127,180 @@ public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceStat
         tvOverlayDetails = view.findViewById(R.id.tvOverlayDetails);
         btnStopAlarm = view.findViewById(R.id.btnStopAlarm);
         
-        spGateSelector = view.findViewById(R.id.spGateSelector);
-    if (spGateSelector != null) {
-        // تحميل البوابات
-        loadGatesForSelector();
+        if (rvGatesMonitor != null) {
+            rvGatesMonitor.setLayoutManager(new LinearLayoutManager(getContext()));
+            monitorAdapter = new GateMonitorAdapter(monitorList);
+            rvGatesMonitor.setAdapter(monitorAdapter);
+        }
     }
+
+    private void setupListeners() {
+        if (btnStopAlarm != null) {
+            btnStopAlarm.setOnClickListener(v -> stopAlarm());
+        }
+    }
+
+    // ============================================
+    // 📡 المراقبة الحية
+    // ============================================
+
+    private void startMonitoring() {
+        if (monitorScheduler != null && !monitorScheduler.isShutdown()) {
+            monitorScheduler.shutdownNow();
+        }
         
-    rvGatesMonitor = view.findViewById(R.id.rvGatesMonitor);
-    if (rvGatesMonitor != null) {
-        rvGatesMonitor.setLayoutManager(new LinearLayoutManager(getContext()));
-        monitorAdapter = new GateMonitorAdapter(monitorList);
-        rvGatesMonitor.setAdapter(monitorAdapter);
-    }
-    }
-
-
-// أضف دالة المراقبة المستمرة
-private void startGateMonitoringLoop() {
-    ScheduledExecutorService monitorScheduler = Executors.newSingleThreadScheduledExecutor();
-    monitorScheduler.scheduleAtFixedRate(() -> {
-        if (isDestroyed) return;
+        monitorScheduler = Executors.newSingleThreadScheduledExecutor();
+        monitorScheduler.scheduleAtFixedRate(() -> {
+            if (!isDestroyed && isAdded()) {
+                loadAllGatesStatus();
+            }
+        }, 0, MONITOR_INTERVAL_SECONDS, TimeUnit.SECONDS);
+        
+        // ✅ تحميل فوري
         loadAllGatesStatus();
-    }, 0, 5, TimeUnit.SECONDS);  // ✅ تحديث كل 5 ثواني
-}
-
-private void loadAllGatesStatus() {
-    gateExecutor.execute(() -> {
-        try {
-            MiraApiClient client = MiraApiClient.getInstance(getContext());
-            int branchId = getCurrentBranchId();
-            MiraApiClient.ApiResponse response = client.getGatesByBranch(branchId);
-            
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONArray gatesArray = response.data.optJSONArray("gates");
-                if (gatesArray == null) {
-                    JSONObject dataObj = response.data.optJSONObject("data");
-                    if (dataObj != null) gatesArray = dataObj.optJSONArray("gates");
-                }
-                
-                if (gatesArray != null) {
-                    List<GateMonitorItem> items = new ArrayList<>();
-                    for (int i = 0; i < gatesArray.length(); i++) {
-                        JSONObject g = gatesArray.optJSONObject(i);
-                        GateMonitorItem item = new GateMonitorItem();
-                        item.gateId = g.optString("gate_id", "");
-                        item.gateName = g.optString("gate_name", "");
-                        item.status = g.optString("status", "offline");
-                        item.passCount = g.optInt("pass_count", 0);
-                        item.denyCount = g.optInt("deny_count", 0);
-                        item.lastEvent = g.optString("last_event", "");
-                        items.add(item);
-                    }
-                    
-                    mainHandler.post(() -> {
-                        monitorList.clear();
-                        monitorList.addAll(items);
-                        monitorAdapter.notifyDataSetChanged();
-                    });
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Monitor error: " + e.getMessage());
-        }
-    });
-}
-private void loadGatesForSelector() {
-    if (miraGatesSettings == null || spGateSelector == null) return;
-    
-    // ✅ جلب جميع البوابات المحفوظة
-    List<MiraGatesSettings.GateDevice> allGates = miraGatesSettings.getGates();
-    
-    // ✅ جلب branch_id الحالي
-    int currentBranchId = 0;
-    if (mContext != null) {
-        com.example.uhf.manager.MiraBranchesManager bm = 
-            com.example.uhf.manager.MiraBranchesManager.getInstance(mContext);
-        currentBranchId = bm != null ? bm.getActiveBranchId() : 0;
-    }
-    
-    // ✅ فلترة البوابات حسب الفرع
-    gatesList.clear();
-    boolean isGlobalAdmin = permissionManager != null && 
-        (permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin());
-    
-    for (MiraGatesSettings.GateDevice gate : allGates) {
-        if (isGlobalAdmin || currentBranchId <= 0 || gate.branchId <= 0 || gate.branchId == currentBranchId) {
-            gatesList.add(gate);
-        }
-    }
-    
-    // ✅ إذا لا توجد بوابات، أضف الجهاز الحالي
-    if (gatesList.isEmpty()) {
-        MiraGatesSettings.GateDevice currentGate = new MiraGatesSettings.GateDevice();
-        currentGate.gateId = "handheld_c72";
-        currentGate.gateName = isArabic() ? "هذا الجهاز (C72)" : "This Device (C72)";
-        currentGate.location = isArabic() ? "غير محدد" : "Unknown";
-        currentGate.branchId = currentBranchId;
-        gatesList.add(currentGate);
-    }
-    
-    // ✅ تعبئة الـ Spinner مع عرض الفرع
-    String[] gateNames = new String[gatesList.size()];
-    for (int i = 0; i < gatesList.size(); i++) {
-        MiraGatesSettings.GateDevice gate = gatesList.get(i);
-        String branchInfo = (gate.branchName != null && !gate.branchName.isEmpty()) 
-            ? " 🏢 " + gate.branchName 
-            : "";
-        gateNames[i] = gate.gateName + " (" + gate.location + ")" + branchInfo;
-    }
-    
-    ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
-        android.R.layout.simple_spinner_item, gateNames);
-    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-    spGateSelector.setAdapter(adapter);
-    
-    if (!gatesList.isEmpty()) {
-        currentGateId = gatesList.get(0).gateId;
-    }
-    
-    spGateSelector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-        @Override
-        public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-            if (position < gatesList.size()) {
-                currentGateId = gatesList.get(position).gateId;
-                logConsole(isArabic() ? "🚪 تم اختيار: " : "🚪 Selected: " + gatesList.get(position).gateName);
-                
-                if (gateActive) {
-                    disarmGate();
-                    armGate();
-                }
-            }
-        }
-        @Override
-        public void onNothingSelected(AdapterView<?> parent) {}
-    });
-}
-    private void setupClickListeners() {
-        btnArmGate.setOnClickListener(v -> {
-            if (permissionManager.canEdit("gates") || permissionManager.isAdmin() || permissionManager.isBranchManager()) {
-                armGate();
-            } else {
-                Toast.makeText(getContext(), 
-                    isArabic() ? "⛔ غير مصرح" : "⛔ Access Denied", 
-                    Toast.LENGTH_SHORT).show();
-            }
-        });
-        
-        btnDisarmGate.setOnClickListener(v -> {
-            if (permissionManager.canEdit("gates") || permissionManager.isAdmin() || permissionManager.isBranchManager()) {
-                disarmGate();
-            } else {
-                Toast.makeText(getContext(), 
-                    isArabic() ? "⛔ غير مصرح" : "⛔ Access Denied", 
-                    Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        btnSubmitManual.setOnClickListener(v -> {
-            if (isDestroyed) return;
-            String manualCode = etManualEpc.getText().toString().trim();
-            if (!manualCode.isEmpty()) {
-                etManualEpc.setText("");
-                processInputEpc(manualCode, "MANUAL");
-            } else {
-                Toast.makeText(getContext(), 
-                    isArabic() ? "يرجى كتابة رقم القطعة أولاً" : "Please enter item code first", 
-                    Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        btnScanBarcode.setOnClickListener(v -> {
-            if (isDestroyed) return;
-            if (!gateActive) {
-                Toast.makeText(getContext(), 
-                    isArabic() ? "قم بتفعيل البوابة أولاً!" : "Arm the gate first!", 
-                    Toast.LENGTH_SHORT).show();
-                return;
-            }
-            ScanOptions options = new ScanOptions();
-            options.setPrompt(isArabic() ? "وجه الكاميرا نحو باركود أو QR القطعة" : "Point camera at item barcode or QR");
-            options.setBeepEnabled(false);
-            options.setOrientationLocked(true);
-            options.setCaptureActivity(com.journeyapps.barcodescanner.CaptureActivity.class);
-            barcodeLauncher.launch(options);
-        });
-
-        btnSimulateAllowed.setOnClickListener(v -> {
-            if (isDestroyed) return;
-            if (!(permissionManager.canEdit("gates") || permissionManager.isAdmin() || permissionManager.isBranchManager())) {
-                Toast.makeText(getContext(), 
-                    isArabic() ? "⛔ غير مصرح" : "⛔ Access Denied", 
-                    Toast.LENGTH_SHORT).show();
-                return;
-            }
-            String mockAllowedEpc = "E20041000000000000009999";
-            localAllowedEpcCache.add(mockAllowedEpc);
-            processInputEpc(mockAllowedEpc, "SIMULATION_ALLOWED");
-        });
-
-        btnSimulateDenied.setOnClickListener(v -> {
-            if (isDestroyed) return;
-            if (!(permissionManager.canEdit("gates") || permissionManager.isAdmin() || permissionManager.isBranchManager())) {
-                Toast.makeText(getContext(), 
-                    isArabic() ? "⛔ غير مصرح" : "⛔ Access Denied", 
-                    Toast.LENGTH_SHORT).show();
-                return;
-            }
-            String mockDeniedEpc = "E20041000000000000001111";
-            localAllowedEpcCache.remove(mockDeniedEpc);
-            processInputEpc(mockDeniedEpc, "SIMULATION_DENIED");
-        });
-
-        btnStopAlarm.setOnClickListener(v -> stopAlarmEffects());
     }
 
-    private void armGate() {
-    if (isDestroyed) return;
-    
-    if (currentGateId.isEmpty()) {
-        Toast.makeText(getContext(), 
-            isArabic() ? "⚠️ اختر بوابة أولاً" : "⚠️ Select a gate first", 
-            Toast.LENGTH_SHORT).show();
-        return;
-    }
-    
-    // ✅ جلب إعدادات البوابة المحددة
-    MiraGatesSettings.GateSettings gateSpecificSettings = 
-        miraGatesSettings.getGateSettings(currentGateId);
-    
-    gateActive = true;
-    updateUI();
-    logConsole(isArabic() ? "🛡️ تم تفعيل البوابة: " : "🛡️ Gate armed: " + getCurrentGateName());
-    logConsole("🔊 صوت الإنذار: " + gateSpecificSettings.soundAlarm);
-    logConsole("📡 قوة RFID: " + gateSpecificSettings.rfidPower + " dBm");
-    
-    syncLocalAllowedCache();
-    startRealtimeDbSync();
-    startContinuousRfidScanWithSettings(gateSpecificSettings);
-    updateGateStatusOnServerForSpecificGate(currentGateId, "armed");
-}
-
-private String getCurrentGateName() {
-    for (MiraGatesSettings.GateDevice gate : gatesList) {
-        if (gate.gateId.equals(currentGateId)) {
-            return gate.gateName;
-        }
-    }
-    return "";
-}
-
-    private void disarmGate() {
-        if (isDestroyed) return;
-        
-        if (!(permissionManager.canEdit("gates") || permissionManager.isAdmin() || permissionManager.isBranchManager())) {
-            Toast.makeText(getContext(), 
-                isArabic() ? "⛔ غير مصرح" : "⛔ Access Denied", 
-                Toast.LENGTH_SHORT).show();
-            return;
-        }
-        
-        gateActive = false;
-        stopAlarmEffects();
-        stopContinuousRfidScan();
-        stopRealtimeDbSync();
-
-        passCount = 0;
-        denyCount = 0;
-        totalCount = 0;
-        updateCounters();
-
-        scanDebounceMap.clear();
-        updateUI();
-
-        logConsole(isArabic() ? "🔒 تم إيقاف البوابة." : "🔒 Gate disarmed.");
-        updateGateStatusOnServer("offline");
-
-        if (isAdded()) {
-            Toast.makeText(requireContext(), 
-                isArabic() ? "تم إيقاف البوابة" : "Gate disarmed", 
-                Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void startContinuousRfidScan() {
-        if (isDestroyed || mContext == null || mContext.mReader == null) {
-            logConsole(isArabic() ? "⚠️ قارئ RFID غير متوفر" : "⚠️ RFID reader unavailable");
-            return;
-        }
-        
-        try {
-            int rfidPower = miraGatesSettings.getRfidPower();
-            mContext.mReader.setPower(rfidPower);
-            logConsole("📡 RFID Power: " + rfidPower + " dBm");
-
-            mContext.mReader.setInventoryCallback(new IUHFInventoryCallback() {
-                @Override
-                public void callback(UHFTAGInfo uhftagInfo) {
-                    if (!isDestroyed && uhftagInfo != null && uhftagInfo.getEPC() != null) {
-                        processInputEpc(uhftagInfo.getEPC(), "RFID_HW");
-                    }
-                }
-            });
-            mContext.mReader.startInventoryTag();
-        } catch (Exception e) {
-            logConsole("⚠️ " + (isArabic() ? "خطأ في القارئ المادي: " : "Hardware reader error: ") + e.getMessage());
-        }
-    }
-
-    private void stopContinuousRfidScan() {
-        if (mContext != null && mContext.mReader != null) {
-            try {
-                mContext.mReader.stopInventory();
-                mContext.mReader.setInventoryCallback(null);
-                mContext.mReader.setPower(30);
-            } catch (Exception e) {
-                Log.e(TAG, "Error stopping reader: " + e.getMessage());
-            }
-        }
-    }
-
-    private void startRealtimeDbSync() {
-        stopRealtimeDbSync();
-        dbSyncScheduler = Executors.newSingleThreadScheduledExecutor();
-        dbSyncScheduler.scheduleAtFixedRate(
-            this::syncLocalAllowedCache, 
-            0, 
-            SYNC_INTERVAL_SECONDS, 
-            TimeUnit.SECONDS
-        );
-    }
-
-    private void stopRealtimeDbSync() {
-        if (dbSyncScheduler != null && !dbSyncScheduler.isShutdown()) {
-            dbSyncScheduler.shutdownNow();
-            dbSyncScheduler = null;
-        }
-    }
-
-    private void processInputEpc(String epc, String sourceType) {
-        if (isDestroyed || !gateActive || !isAdded()) return;
-        if (epc == null || epc.trim().isEmpty()) return;
-
-        final String cleanedEpc = epc.trim().toUpperCase();
-        long currentTime = System.currentTimeMillis();
-        
-        cleanupDebounceMap(currentTime);
-
-        Long lastTime = scanDebounceMap.putIfAbsent(cleanedEpc, currentTime);
-        
-        if (lastTime != null) {
-            if (currentTime - lastTime < SCAN_COOL_DOWN_MS) {
-                return;
-            }
-            scanDebounceMap.put(cleanedEpc, currentTime);
-        }
-
-        mainHandler.post(() -> {
-            if (isDestroyed || !isAdded()) return;
-            totalCount++;
-            updateCounters();
-            String shortEpc = cleanedEpc.length() > 8 ? cleanedEpc.substring(cleanedEpc.length() - 8) : cleanedEpc;
-            tvLastEvent.setText((isArabic() ? "جاري التحقق..." : "Verifying...") + " [" + sourceType + ": " + shortEpc + "]");
-        });
-
-        boolean isLocallyAllowed = localAllowedEpcCache.contains(cleanedEpc);
-
-        if (isLocallyAllowed) {
-            mainHandler.post(() -> handleGateDecision(true, 
-                isArabic() ? "قطعة مصرح بها (مباعة)" : "Authorized item (Sold)", cleanedEpc));
-        } else {
-            queryMiraGateServer(cleanedEpc);
-        }
-    }
-
-    private void cleanupDebounceMap(long currentTime) {
-        if (scanDebounceMap.size() > 100) {
-            Iterator<Map.Entry<String, Long>> iterator = scanDebounceMap.entrySet().iterator();
-            while (iterator.hasNext()) {
-                Map.Entry<String, Long> entry = iterator.next();
-                if (currentTime - entry.getValue() > SCAN_COOL_DOWN_MS * 2) {
-                    iterator.remove();
-                }
-            }
-        }
-    }
-private void startContinuousRfidScanWithSettings(MiraGatesSettings.GateSettings gateSettings) {
-    if (isDestroyed || mContext == null || mContext.mReader == null) {
-        logConsole(isArabic() ? "⚠️ قارئ RFID غير متوفر" : "⚠️ RFID reader unavailable");
-        return;
-    }
-    
-    try {
-        int rfidPower = gateSettings.rfidPower;
-        mContext.mReader.setPower(rfidPower);
-        logConsole("📡 RFID Power: " + rfidPower + " dBm");
-
-        mContext.mReader.setInventoryCallback(new IUHFInventoryCallback() {
-            @Override
-            public void callback(UHFTAGInfo uhftagInfo) {
-                if (!isDestroyed && uhftagInfo != null && uhftagInfo.getEPC() != null) {
-                    processInputEpc(uhftagInfo.getEPC(), "RFID_HW");
-                }
-            }
-        });
-        mContext.mReader.startInventoryTag();
-    } catch (Exception e) {
-        logConsole("⚠️ " + (isArabic() ? "خطأ في القارئ: " : "Reader error: ") + e.getMessage());
-    }
-}
-
-    private void queryMiraGateServer(String epc) {
-    if (isDestroyed || gateExecutor == null || gateExecutor.isShutdown()) return;
-    
-    gateExecutor.execute(() -> {
-        Future<MiraApiClient.ApiResponse> future = null;
-        try {
-            MiraApiClient client = MiraApiClient.getInstance(mContext);
-            if (client == null) {
-                mainHandler.post(() -> handleGateDecision(false, 
-                    isArabic() ? "🚨 خطأ أوفلاين" : "🚨 Offline error", epc));
-                return;
-            }
-            
-            // ✅ إرسال context=gate و gate_id و branch_id
-            JSONObject extraParams = new JSONObject();
-            extraParams.put("context", "gate");
-            extraParams.put("gate_id", currentGateId);
-            extraParams.put("branch_id", getCurrentBranchId());
-            
-            final String finalEpc = epc;
-            future = gateExecutor.submit(() -> client.authorize(finalEpc, "gate", extraParams));
-            
-            MiraApiClient.ApiResponse response = future.get(API_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            
-            if (response != null && response.isSuccess && response.data != null) {
-                JSONObject decision = response.data.optJSONObject("decision");
-                JSONObject item = response.data.optJSONObject("item");
-                
-                boolean allowed = decision != null && decision.optBoolean("allowed", false);
-                String reason = decision != null ? decision.optString("reason", "") : "";
-                String message = decision != null ? decision.optString("message", "") : "";
-                String itemTitle = item != null ? item.optString("title", 
-                    isArabic() ? "قطعة مجوهرات" : "Jewelry Item") : (isArabic() ? "غير مسجلة" : "Unregistered");
-                String serial = item != null ? item.optString("serial", epc) : epc;
-                
-                if (allowed) {
-                    localAllowedEpcCache.add(epc);
-                } else {
-                    localAllowedEpcCache.remove(epc);
-                }
-                
-                final boolean finalAllowed = allowed;
-                final String finalTitle = itemTitle;
-                final String finalSerial = serial;
-                final String finalMessage = message;
-                
-                mainHandler.post(() -> {
-                    handleGateDecision(finalAllowed, finalTitle, finalSerial);
-                    
-                    // ✅ عرض رسالة السبب
-                    if (!finalMessage.isEmpty()) {
-                        logConsole(finalAllowed ? "✅ " : "🚨 " + finalMessage);
-                    }
-                });
-            } else {
-                mainHandler.post(() -> handleGateDecision(false, 
-                    isArabic() ? "🚨 خروج غير مصرح" : "🚨 Unauthorized", epc));
-            }
-        } catch (TimeoutException e) {
-            if (future != null) future.cancel(true);
-            mainHandler.post(() -> handleGateDecision(false, 
-                isArabic() ? "⚠️ انقطاع اتصال - مرفوض أمنياً" : "⚠️ Timeout - Denied", epc));
-        } catch (Exception e) {
-            if (future != null) future.cancel(true);
-            mainHandler.post(() -> handleGateDecision(false, 
-                isArabic() ? "🚨 خروج غير مصرح (أوفلاين)" : "🚨 Unauthorized (Offline)", epc));
-        }
-    });
-}
-
-/**
- * ✅ جلب branch_id الحالي
- */
-private int getCurrentBranchId() {
-    if (mContext != null) {
-        com.example.uhf.manager.MiraBranchesManager bm = 
-            com.example.uhf.manager.MiraBranchesManager.getInstance(mContext);
-        return bm != null ? bm.getActiveBranchId() : 0;
-    }
-    return 0;
-}
-
-    private void handleGateDecision(boolean allowed, String itemTitle, String serial) {
-        if (isDestroyed || !isAdded()) return;
-        
-        logGateEventToServer(serial, allowed ? "PASS" : "DENY_ALARM", itemTitle);
-
-        if (allowed) {
-            passCount++;
-            updateCounters();
-            updateUIForPass(itemTitle, serial);
-        } else {
-            denyCount++;
-            updateCounters();
-            updateUIForDeny(itemTitle, serial);
-        }
-    }
-
-    private void updateUIForPass(String itemTitle, String serial) {
-        if (isDestroyed || !isAdded()) return;
-        
-        tvGateStatus.setText(isArabic() ? "✅ مسموح" : "✅ PASS");
-        tvGateStatus.setTextColor(Color.parseColor("#2E7D32"));
-        statusIndicator.setBackgroundResource(R.drawable.circle_indicator_green);
-        tvLastEvent.setText("✅ " + itemTitle + " [" + serial + "]");
-        tvGateIcon.setText("✅");
-
-        logConsole("✅ " + (isArabic() ? "قرار البوابة: PASS - " : "Gate decision: PASS - ") + itemTitle);
-        SoundGenerator.playSound(miraGatesSettings.getSoundPass());
-
-        mainHandler.removeCallbacks(resetUIRunnable);
-        mainHandler.postDelayed(resetUIRunnable, UI_RESET_DELAY_MS);
-    }
-
-    private void updateUIForDeny(String itemTitle, String serial) {
-        if (isDestroyed || !isAdded()) return;
-        
-        tvGateStatus.setText(isArabic() ? "🚨 إنذار" : "🚨 ALARM");
-        tvGateStatus.setTextColor(Color.parseColor("#C62828"));
-        statusIndicator.setBackgroundResource(R.drawable.circle_indicator_red);
-        tvLastEvent.setText("🚨 " + itemTitle + " [" + serial + "]");
-        tvGateIcon.setText("🚨");
-
-        logConsole("🚨 " + (isArabic() ? "قرار البوابة: DENY ALARM - " : "Gate decision: DENY ALARM - ") + itemTitle);
-        triggerAlarmEffects(itemTitle, serial);
-    }
-
-    private void syncLocalAllowedCache() {
-        if (isDestroyed || gateExecutor == null || gateExecutor.isShutdown()) return;
+    private void loadAllGatesStatus() {
+        if (gateExecutor == null || gateExecutor.isShutdown()) return;
+        if (getContext() == null) return;
         
         gateExecutor.execute(() -> {
             try {
-                MiraApiClient client = MiraApiClient.getInstance(mContext);
+                MiraApiClient client = MiraApiClient.getInstance(getContext());
                 if (client == null) return;
                 
-                MiraApiClient.ApiResponse response = client.getWithAuth("/allowed-list");
+                int branchId = getCurrentBranchId();
+                MiraApiClient.ApiResponse response = client.getGatesByBranch(branchId);
                 
                 if (response != null && response.isSuccess && response.data != null) {
-                    JSONArray allowedArray = response.data.optJSONArray("allowed_epcs");
-                    if (allowedArray != null) {
-                        Set<String> latestAllowed = ConcurrentHashMap.newKeySet();
-                        for (int i = 0; i < allowedArray.length(); i++) {
-                            String epc = allowedArray.optString(i, "");
-                            if (!epc.isEmpty()) {
-                                latestAllowed.add(epc);
-                            }
+                    JSONArray gatesArray = extractGatesArray(response.data);
+                    
+                    if (gatesArray != null) {
+                        List<GateMonitorItem> items = new ArrayList<>();
+                        
+                        for (int i = 0; i < gatesArray.length(); i++) {
+                            JSONObject g = gatesArray.optJSONObject(i);
+                            if (g == null) continue;
+                            
+                            GateMonitorItem item = new GateMonitorItem();
+                            item.gateId = g.optString("gate_id", "");
+                            item.gateName = g.optString("gate_name", g.optString("name", "بوابة"));
+                            item.location = g.optString("gate_location", g.optString("location", ""));
+                            item.status = g.optString("status", "offline");
+                            item.passCount = g.optInt("pass_count", g.optInt("scan_count", 0));
+                            item.denyCount = g.optInt("deny_count", 0);
+                            item.lastEvent = g.optString("last_event", g.optString("last_heartbeat", ""));
+                            item.branchName = g.optString("branch_name", "");
+                            items.add(item);
                         }
-                        
-                        localAllowedEpcCache.clear();
-                        localAllowedEpcCache.addAll(latestAllowed);
-                        
-                        Log.d(TAG, "✅ Allowed cache synced: " + latestAllowed.size() + " EPCs");
                         
                         mainHandler.post(() -> {
                             if (!isDestroyed && isAdded()) {
-                                logConsole("🔄 " + (isArabic() ? "تم تحديث القائمة المسموحة: " : "Allowed list updated: ") + latestAllowed.size());
+                                updateMonitorList(items);
                             }
                         });
                     }
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Sync allowed cache error: " + e.getMessage());
+                Log.e(TAG, "Monitor error: " + e.getMessage());
             }
         });
     }
 
-    private void updateGateStatusOnServer(String status) {
-    updateGateStatusOnServerForSpecificGate(currentGateId, status);
-}
-
-// كلاس العنصر
-private static class GateMonitorItem {
-    String gateId;
-    String gateName;
-    String status;
-    int passCount;
-    int denyCount;
-    String lastEvent;
-}
-
-// Adapter
-private class GateMonitorAdapter extends RecyclerView.Adapter<GateMonitorAdapter.VH> {
-    private final List<GateMonitorItem> items;
-    
-    GateMonitorAdapter(List<GateMonitorItem> items) {
-        this.items = items;
-    }
-    
-    @NonNull
-    @Override
-    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext())
-            .inflate(R.layout.item_gate_monitor, parent, false);
-        return new VH(view);
-    }
-    
-    @Override
-    public void onBindViewHolder(@NonNull VH h, int position) {
-        GateMonitorItem item = items.get(position);
-        h.tvGateName.setText(item.gateName);
-        h.tvGateStats.setText("✅ " + item.passCount + " | ❌ " + item.denyCount);
-        h.tvGateLastEvent.setText(item.lastEvent.isEmpty() ? "لا أحداث" : item.lastEvent);
+    private JSONArray extractGatesArray(JSONObject data) {
+        JSONArray arr = data.optJSONArray("gates");
+        if (arr != null) return arr;
         
-        if ("online".equals(item.status) || "armed".equals(item.status)) {
-            h.tvGateStatus.setText("🟢 نشطة");
-            h.tvGateStatus.setTextColor(0xFF2E7D32);
-            h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_green);
-        } else {
-            h.tvGateStatus.setText("⚪ غير نشطة");
-            h.tvGateStatus.setTextColor(0xFF9E9E9E);
-            h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_red);
+        JSONObject dataObj = data.optJSONObject("data");
+        if (dataObj != null) {
+            arr = dataObj.optJSONArray("gates");
+            if (arr != null) return arr;
         }
-    }
-    
-    @Override
-    public int getItemCount() { return items.size(); }
-    
-    class VH extends RecyclerView.ViewHolder {
-        TextView tvGateName, tvGateStatus, tvGateStats, tvGateLastEvent;
-        View vStatusDot;
         
-        VH(@NonNull View itemView) {
-            super(itemView);
-            tvGateName = itemView.findViewById(R.id.tvGateName);
-            tvGateStatus = itemView.findViewById(R.id.tvGateStatus);
-            tvGateStats = itemView.findViewById(R.id.tvGateStats);
-            tvGateLastEvent = itemView.findViewById(R.id.tvGateLastEvent);
-            vStatusDot = itemView.findViewById(R.id.vGateStatusDot);
-        }
+        return data.optJSONArray("items");
     }
-}
-private void updateGateStatusOnServerForSpecificGate(String gateId, String status) {
-    if (isDestroyed || gateExecutor == null) return;
-    
-    gateExecutor.execute(() -> {
-        try {
-            MiraApiClient client = MiraApiClient.getInstance(mContext);
-            if (client == null) return;
-            
-            JSONObject payload = new JSONObject();
-            payload.put("gate_id", gateId);
-            payload.put("status", status);
-            
-            // استخدم heartbeat مع gate_id محدد
-            client.heartbeat(status, 100);
-            
-            Log.d(TAG, "✅ Gate " + gateId + " status updated: " + status);
-        } catch (Exception e) {
-            Log.e(TAG, "Update gate status error: " + e.getMessage());
+
+    private void updateMonitorList(List<GateMonitorItem> items) {
+        monitorList.clear();
+        monitorList.addAll(items);
+        
+        if (monitorAdapter != null) {
+            monitorAdapter.notifyDataSetChanged();
         }
-    });
-}
-
-    private void logGateEventToServer(String epc, String decision, String itemTitle) {
-    if (isDestroyed || gateExecutor == null) return;
-    
-    gateExecutor.execute(() -> {
-        try {
-            MiraApiClient client = MiraApiClient.getInstance(mContext);
-            if (client == null) return;
-            
-            JSONObject payload = new JSONObject();
-            payload.put("gate_id", currentGateId);
-            payload.put("epc", epc);
-            payload.put("decision", decision);
-            payload.put("item_title", itemTitle);
-            payload.put("timestamp", System.currentTimeMillis());
-            
-            client.postWithAuth("/gate-log", payload);
-        } catch (Exception e) {
-            Log.e(TAG, "Log gate event error: " + e.getMessage());
+        
+        // ✅ تحديث الإحصائيات
+        int totalPass = 0;
+        int totalDeny = 0;
+        int totalGates = items.size();
+        
+        for (GateMonitorItem item : items) {
+            totalPass += item.passCount;
+            totalDeny += item.denyCount;
         }
-    });
-}
+        
+        if (tvPassCount != null) tvPassCount.setText("✅ مسموح: " + totalPass);
+        if (tvDenyCount != null) tvDenyCount.setText("🚨 إنذار: " + totalDeny);
+        if (tvTotalCount != null) tvTotalCount.setText("🚪 البوابات: " + totalGates);
+    }
 
+    private int getCurrentBranchId() {
+        if (branchesManager != null) {
+            return branchesManager.getActiveBranchId();
+        }
+        return 0;
+    }
 
-    private void triggerAlarmEffects(String itemTitle, String serial) {
+    // ============================================
+    // 🚨 الإنذار
+    // ============================================
+
+    public void triggerAlarm(String gateName, String itemTitle, String serial) {
         if (isDestroyed || !isAdded()) return;
         
-        isAlarmActive = true;
-
-        if (miraGatesSettings.isFlashEnabled() && overlayAlarm != null) {
-            tvOverlayTitle.setText("🚨 " + itemTitle);
-            tvOverlayDetails.setText((isArabic() ? "رقم القطعة / Serial: " : "Serial: ") + serial);
-            overlayAlarm.setVisibility(View.VISIBLE);
-
-            flashRunnable = new Runnable() {
-                @Override
-                public void run() {
-                    if (isDestroyed || !isAlarmActive || overlayAlarm == null) return;
-                    flashState = !flashState;
-                    overlayAlarm.setBackgroundColor(flashState ? Color.parseColor("#D32F2F") : Color.parseColor("#000000"));
-                    flashHandler.postDelayed(this, 250);
-                }
-            };
-            flashHandler.post(flashRunnable);
-        }
-
-        soundLoopRunnable = new Runnable() {
-            @Override
-            public void run() {
-                if (isDestroyed || !isAlarmActive) return;
-
-                SoundGenerator.playSound(miraGatesSettings.getSoundAlarm());
-
-                if (miraGatesSettings.isVibrationEnabled() && vibrator != null && vibrator.hasVibrator()) {
-                    long[] pattern = {0, 400, 200, 400};
-                    vibrator.vibrate(pattern, -1);
-                }
-
-                int alarmInterval = miraGatesSettings.getAlarmInterval();
-                soundHandler.postDelayed(this, alarmInterval);
+        mainHandler.post(() -> {
+            if (overlayAlarm != null) {
+                tvOverlayTitle.setText("🚨 إنذار - " + gateName);
+                tvOverlayDetails.setText(itemTitle + " [" + serial + "]");
+                overlayAlarm.setVisibility(View.VISIBLE);
+                overlayAlarm.setAlpha(0f);
+                overlayAlarm.animate().alpha(1f).setDuration(300).start();
             }
-        };
-        soundHandler.post(soundLoopRunnable);
+            
+            // ✅ اهتزاز
+            if (vibrator != null && vibrator.hasVibrator()) {
+                long[] pattern = {0, 400, 200, 400};
+                vibrator.vibrate(pattern, -1);
+            }
+            
+            // ✅ صوت
+            if (miraGatesSettings != null) {
+                SoundGenerator.playSound(miraGatesSettings.getSoundAlarm());
+            }
+            
+            logConsole("🚨 إنذار: " + gateName + " - " + itemTitle);
+        });
     }
 
-    private void stopAlarmEffects() {
-        isAlarmActive = false;
-        
-        if (flashHandler != null) {
-            flashHandler.removeCallbacks(flashRunnable);
-        }
-        if (soundHandler != null) {
-            soundHandler.removeCallbacks(soundLoopRunnable);
-        }
-
+    private void stopAlarm() {
         if (overlayAlarm != null) {
-            overlayAlarm.setVisibility(View.GONE);
+            overlayAlarm.animate().alpha(0f).setDuration(200)
+                .withEndAction(() -> overlayAlarm.setVisibility(View.GONE))
+                .start();
         }
-
+        
         if (vibrator != null) {
             vibrator.cancel();
         }
-
-        resetGateUI();
-        logConsole(isArabic() ? "🔕 تم إيقاف التنبيه الصوتي والمرئي." : "🔕 Alarm stopped.");
-    }
-
-    private final Runnable resetUIRunnable = () -> {
-        if (!isDestroyed && gateActive && isAdded() && !isAlarmActive) {
-            resetGateUI();
-        }
-    };
-
-    private void resetGateUI() {
-        if (isDestroyed || !isAdded()) return;
         
-        tvGateIcon.setText("🚪");
-        tvGateStatus.setText(isArabic() ? "🛡️ مفعلة" : "🛡️ Armed");
-        tvGateStatus.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.tab_indicator_text));
-        statusIndicator.setBackgroundResource(R.drawable.circle_indicator_green);
+        logConsole("🔕 تم إيقاف الإنذار");
     }
 
-    private void updateUI() {
-        if (isDestroyed || !isAdded()) return;
-        
-        if (gateActive) {
-            tvGateStatus.setText(isArabic() ? "🛡️ مفعلة" : "🛡️ Armed");
-            statusIndicator.setBackgroundResource(R.drawable.circle_indicator_green);
-            btnArmGate.setEnabled(false);
-            btnDisarmGate.setEnabled(true);
-        } else {
-            tvGateStatus.setText(isArabic() ? "🔒 معطلة" : "🔒 Disarmed");
-            statusIndicator.setBackgroundResource(R.drawable.circle_indicator_red);
-            btnArmGate.setEnabled(true);
-            btnDisarmGate.setEnabled(false);
-        }
-    }
-
-    private void updateCounters() {
-        if (isDestroyed || !isAdded()) return;
-        
-        tvPassCount.setText(String.valueOf(passCount));
-        tvDenyCount.setText(String.valueOf(denyCount));
-        tvTotalCount.setText(String.valueOf(totalCount));
-    }
+    // ============================================
+    // 📝 السجل
+    // ============================================
 
     private void logConsole(String message) {
-        if (isDestroyed) return;
+        if (isDestroyed || !isAdded()) return;
         
         mainHandler.post(() -> {
             if (isDestroyed || !isAdded()) return;
@@ -1015,21 +318,83 @@ private void updateGateStatusOnServerForSpecificGate(String gateId, String statu
         });
     }
 
-    @Override
-    public void onPause() {
-        super.onPause();
-        if (gateActive) {
-            stopContinuousRfidScan();
+    // ============================================
+    // 📦 Adapter
+    // ============================================
+
+    private static class GateMonitorItem {
+        String gateId;
+        String gateName;
+        String location;
+        String status;
+        int passCount;
+        int denyCount;
+        String lastEvent;
+        String branchName;
+    }
+
+    private class GateMonitorAdapter extends RecyclerView.Adapter<GateMonitorAdapter.VH> {
+        private final List<GateMonitorItem> items;
+        
+        GateMonitorAdapter(List<GateMonitorItem> items) {
+            this.items = items;
+        }
+        
+        @NonNull
+        @Override
+        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_gate_monitor, parent, false);
+            return new VH(view);
+        }
+        
+        @Override
+        public void onBindViewHolder(@NonNull VH h, int position) {
+            GateMonitorItem item = items.get(position);
+            
+            h.tvGateName.setText(item.gateName);
+            
+            String locationText = item.location.isEmpty() ? "" : " 📍 " + item.location;
+            String branchText = item.branchName.isEmpty() ? "" : " 🏢 " + item.branchName;
+            h.tvGateName.setText(item.gateName + locationText + branchText);
+            
+            h.tvGateStats.setText("✅ " + item.passCount + " | ❌ " + item.denyCount);
+            h.tvGateLastEvent.setText(item.lastEvent.isEmpty() ? "لا أحداث" : item.lastEvent);
+            
+            if ("online".equals(item.status) || "armed".equals(item.status)) {
+                h.tvGateStatus.setText("🟢 نشطة");
+                h.tvGateStatus.setTextColor(0xFF2E7D32);
+                h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_green);
+            } else {
+                h.tvGateStatus.setText("⚪ غير نشطة");
+                h.tvGateStatus.setTextColor(0xFF9E9E9E);
+                h.vStatusDot.setBackgroundResource(R.drawable.circle_indicator_red);
+            }
+        }
+        
+        @Override
+        public int getItemCount() { 
+            return items.size(); 
+        }
+        
+        class VH extends RecyclerView.ViewHolder {
+            TextView tvGateName, tvGateStatus, tvGateStats, tvGateLastEvent;
+            View vStatusDot;
+            
+            VH(@NonNull View itemView) {
+                super(itemView);
+                tvGateName = itemView.findViewById(R.id.tvGateName);
+                tvGateStatus = itemView.findViewById(R.id.tvGateStatus);
+                tvGateStats = itemView.findViewById(R.id.tvGateStats);
+                tvGateLastEvent = itemView.findViewById(R.id.tvGateLastEvent);
+                vStatusDot = itemView.findViewById(R.id.vGateStatusDot);
+            }
         }
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (gateActive) {
-            startContinuousRfidScan();
-        }
-    }
+    // ============================================
+    // 🔄 دورة الحياة
+    // ============================================
 
     @Override
     public void onDestroyView() {
@@ -1037,69 +402,20 @@ private void updateGateStatusOnServerForSpecificGate(String gateId, String statu
         
         isDestroyed = true;
         
-        stopAlarmEffects();
-        stopContinuousRfidScan();
-        stopRealtimeDbSync();
+        if (monitorScheduler != null && !monitorScheduler.isShutdown()) {
+            monitorScheduler.shutdownNow();
+        }
         
-        if (mainHandler != null) mainHandler.removeCallbacksAndMessages(null);
-        if (flashHandler != null) flashHandler.removeCallbacksAndMessages(null);
-        if (soundHandler != null) soundHandler.removeCallbacksAndMessages(null);
+        if (gateExecutor != null && !gateExecutor.isShutdown()) {
+            gateExecutor.shutdownNow();
+        }
         
-        shutdownExecutors();
-        cleanupResources();
+        if (vibrator != null) {
+            vibrator.cancel();
+        }
+        
+        mainHandler.removeCallbacksAndMessages(null);
         
         Log.d(TAG, "Fragment destroyed and resources cleaned");
-    }
-
-    private void shutdownExecutors() {
-        if (gateExecutor != null && !gateExecutor.isShutdown()) {
-            gateExecutor.shutdown();
-            try {
-                if (!gateExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
-                    gateExecutor.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                gateExecutor.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
-        }
-        
-        if (dbSyncScheduler != null && !dbSyncScheduler.isShutdown()) {
-            dbSyncScheduler.shutdownNow();
-        }
-    }
-
-    private void cleanupResources() {
-        mContext = null;
-        settingsManager = null;
-        miraGatesSettings = null;
-        vibrator = null;
-        
-        localAllowedEpcCache.clear();
-        scanDebounceMap.clear();
-        
-        tvGateIcon = null;
-        tvGateStatus = null;
-        tvLastEvent = null;
-        tvDebugConsole = null;
-        tvPassCount = null;
-        tvDenyCount = null;
-        tvTotalCount = null;
-        tvOverlayTitle = null;
-        tvOverlayDetails = null;
-        etManualEpc = null;
-        statusIndicator = null;
-        overlayAlarm = null;
-        btnArmGate = null;
-        btnDisarmGate = null;
-        btnSubmitManual = null;
-        btnScanBarcode = null;
-        btnSimulateAllowed = null;
-        btnSimulateDenied = null;
-        btnStopAlarm = null;
-        scrollDebugLog = null;
-        
-        gateActive = false;
-        isAlarmActive = false;
     }
 }
