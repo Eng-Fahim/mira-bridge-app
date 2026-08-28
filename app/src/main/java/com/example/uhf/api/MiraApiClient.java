@@ -790,6 +790,11 @@ public ApiResponse getGatesStats() {
     return getWithAuth("/gates/stats");
 }
 
+// ✅ أضف بعد getGatesStats()
+public ApiResponse getTestEpcs() {
+    return getWithAuth("/test-epcs");
+}
+
     // ===================== 💓 HEARTBEAT & SETTINGS =====================
 
     public ApiResponse heartbeat(String status, int battery) {
@@ -1400,4 +1405,4 @@ public ApiResponse getBranchInventoryStats(int branchId) {
         return null;
     }
 }
-            }
+}
