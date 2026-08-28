@@ -4,7 +4,7 @@
     android:id="@+id/rootGateLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0F172A"> <!-- Dark Slate Background -->
+    android:background="#0F172A">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -12,11 +12,11 @@
         android:orientation="vertical"
         android:padding="12dp">
 
-        <!-- 1. شريط ترويسة غرفة التحكم (Header Bar) -->
+        <!-- 1. شريط ترويسة غرفة التحكم ومؤشر الاتصال -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
+            android:layout_marginBottom="8dp"
             app:cardBackgroundColor="#1E293B"
             app:cardCornerRadius="12dp"
             app:strokeColor="#334155"
@@ -27,15 +27,30 @@
                 android:layout_height="wrap_content"
                 android:padding="12dp">
 
-                <TextView
-                    android:id="@+id/tvHeaderTitle"
+                <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="sans-serif-medium"
-                    android:text="🛡️ مركز المراقبة والأمن - MIRA GATE"
-                    android:textColor="#F8FAFC"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                    android:layout_alignParentStart="true"
+                    android:layout_centerVertical="true"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="🛡️ MIRA SECURITY COMMAND CENTER"
+                        android:textColor="#F8FAFC"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvPingLatency"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="📡 Ping: -- ms | Server: Connecting..."
+                        android:textColor="#94A3B8"
+                        android:textSize="11sp" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/tvSystemStatus"
@@ -43,25 +58,63 @@
                     android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
-                    android:background="@drawable/bg_status_chip"
-                    android:paddingHorizontal="8dp"
+                    android:paddingHorizontal="10dp"
                     android:paddingVertical="4dp"
-                    android:text="🟢 ONLINE"
+                    android:text="🟢 SYSTEM ARMED"
                     android:textColor="#4ADE80"
                     android:textSize="11sp"
                     android:textStyle="bold" />
             </RelativeLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 2. بطاقات مؤشرات الأداء الحية (KPI Cards) -->
+        <!-- 2. شريط البث الحي لآخر عملية عبور (Live Event Ticker) -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardLiveTicker"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            app:cardBackgroundColor="#0F172A"
+            app:cardCornerRadius="8dp"
+            app:strokeColor="#334155"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="LIVE EVENT:"
+                    android:textColor="#38BDF8"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvLiveTickerText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="في انتظار أول حركة مرور..."
+                    android:textColor="#E2E8F0"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 3. بطاقات مؤشرات الأداء الحية (KPI Cards) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
+            android:layout_marginBottom="10dp"
             android:baselineAligned="false"
             android:orientation="horizontal">
 
-            <!-- بطاقة البوابات -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -77,7 +130,7 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="10dp">
+                    android:padding="8dp">
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -92,12 +145,11 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="#F8FAFC"
-                        android:textSize="20sp"
+                        android:textSize="18sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- بطاقة خروج شرعي -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -113,12 +165,12 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="10dp">
+                    android:padding="8dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="✅ مسموح"
+                        android:text="✅ عبور شرعي"
                         android:textColor="#86EFAC"
                         android:textSize="11sp" />
 
@@ -128,12 +180,11 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="#22C55E"
-                        android:textSize="20sp"
+                        android:textSize="18sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- بطاقة الإنذارات -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -149,12 +200,12 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="10dp">
+                    android:padding="8dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="🚨 إنذار"
+                        android:text="🚨 إنذارات"
                         android:textColor="#FCA5A5"
                         android:textSize="11sp" />
 
@@ -164,27 +215,27 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="#EF4444"
-                        android:textSize="20sp"
+                        android:textSize="18sp"
                         android:textStyle="bold" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
 
-        <!-- 3. لوحة أدوات التحكم السريعة -->
+        <!-- 4. أدوات التحكم والـ LockDown -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
+            android:layout_marginBottom="10dp"
             android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnToggleScan"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_marginEnd="4dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="3dp"
                 android:layout_weight="1"
                 android:text="🛡️ إيقاف/تفعيل RFID"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 app:backgroundTint="#0EA5E9"
                 app:cornerRadius="8dp" />
 
@@ -192,22 +243,33 @@
                 android:id="@+id/btnScanBarcode"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_marginStart="4dp"
+                android:layout_height="44dp"
+                android:layout_marginHorizontal="3dp"
                 android:layout_weight="1"
                 android:text="📷 مسح باركود"
                 android:textColor="#CBD5E1"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 app:cornerRadius="8dp"
                 app:strokeColor="#475569" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnEmergencyLockdown"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="3dp"
+                android:layout_weight="1"
+                android:text="🔒 إغلاق طارئ"
+                android:textSize="11sp"
+                app:backgroundTint="#DC2626"
+                app:cornerRadius="8dp" />
         </LinearLayout>
 
-        <!-- 4. قائمة مراقبة البوابات المباشرة -->
+        <!-- 5. شبكة البوابات الحية (Visual Gate Monitor) -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="6dp"
-            android:text="📡 حالة البوابات النشطة"
+            android:text="📡 شبكة البوابات والأجهزة الميدانية"
             android:textColor="#64748B"
             android:textSize="12sp"
             android:textStyle="bold" />
@@ -217,40 +279,52 @@
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:layout_marginBottom="12dp" />
+            android:layout_marginBottom="8dp" />
 
-        <!-- 5. أدوات المحاكاة والـ Debug Console -->
+        <!-- 6. أدوات المحاكاة السريعة + Console Log -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="6dp"
+            android:layout_marginBottom="4dp"
             android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSimulateAllowed"
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="36dp"
+                android:layout_height="32dp"
                 android:layout_weight="1"
-                android:text="🧪 محاكاة (مسموح)"
+                android:padding="0dp"
+                android:text="🧪 تجربة (مسموح)"
                 android:textColor="#4ADE80"
-                android:textSize="11sp" />
+                android:textSize="10sp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSimulateDenied"
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="36dp"
+                android:layout_height="32dp"
                 android:layout_weight="1"
-                android:text="🧪 محاكاة (إنذار)"
+                android:padding="0dp"
+                android:text="🧪 تجربة (إنذار)"
                 android:textColor="#F87171"
-                android:textSize="11sp" />
+                android:textSize="10sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnClearConsole"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="0.8"
+                android:padding="0dp"
+                android:text="🗑️ مسح السجل"
+                android:textColor="#94A3B8"
+                android:textSize="10sp" />
         </LinearLayout>
 
-        <!-- Terminal-Style Console Log -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
-            android:layout_height="120dp"
+            android:layout_height="100dp"
             app:cardBackgroundColor="#020617"
             app:cardCornerRadius="8dp"
             app:strokeColor="#1E293B"
@@ -260,14 +334,14 @@
                 android:id="@+id/scrollDebugLog"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:padding="8dp">
+                android:padding="6dp">
 
                 <TextView
                     android:id="@+id/tvDebugConsole"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:fontFamily="monospace"
-                    android:text="[SYSTEM] MIRA Security Gateway Core Ready...\n"
+                    android:text="[SYSTEM] MIRA Security Gateway Command Center Initialized...\n"
                     android:textColor="#38BDF8"
                     android:textSize="10sp" />
             </ScrollView>
@@ -280,7 +354,7 @@
         android:id="@+id/overlayAlarm"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#E6991B1B"
+        android:background="#E67F1D1D"
         android:clickable="true"
         android:focusable="true"
         android:visibility="gone">
@@ -298,7 +372,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:text="🚨 ALERT: UNAUTHORIZED EXIT"
+                android:text="🚨 ALERT: UNAUTHORIZED BREACH"
                 android:textColor="#FFFFFF"
                 android:textSize="22sp"
                 android:textStyle="bold" />
@@ -314,7 +388,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnStopAlarm"
-                android:layout_width="200dp"
+                android:layout_width="220dp"
                 android:layout_height="56dp"
                 android:text="🔕 إيقاف الإنذار"
                 android:textColor="#7F1D1D"
