@@ -3,72 +3,71 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="6dp"
-    app:cardBackgroundColor="?attr/colorSurface"
-    app:cardCornerRadius="10dp"
-    app:cardElevation="2dp">
+    android:layout_marginBottom="8dp"
+    app:cardBackgroundColor="#1E293B"
+    app:cardCornerRadius="8dp"
+    app:strokeColor="#334155"
+    app:strokeWidth="1dp">
 
-    <LinearLayout
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="10dp">
+        android:padding="12dp">
+
+        <View
+            android:id="@+id/vGateStatusDot"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:layout_marginEnd="10dp"
+            android:background="@drawable/circle_indicator_green" />
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <View
-                android:id="@+id/vGateStatusDot"
-                android:layout_width="12dp"
-                android:layout_height="12dp"
-                android:background="@drawable/circle_indicator_green" />
+            android:layout_centerVertical="true"
+            android:layout_toEndOf="@id/vGateStatusDot"
+            android:orientation="vertical">
 
             <TextView
                 android:id="@+id/tvGateName"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="8dp"
-                android:text="بوابة"
-                android:textStyle="bold"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="13sp" />
+                android:textColor="#F1F5F9"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvGateLastEvent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#64748B"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:gravity="end"
+            android:orientation="vertical">
 
             <TextView
                 android:id="@+id/tvGateStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="🟢 نشطة"
+                android:textColor="#38BDF8"
                 android:textSize="11sp"
                 android:textStyle="bold" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:orientation="horizontal">
 
             <TextView
                 android:id="@+id/tvGateStats"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="✅ 0 | ❌ 0"
-                android:textSize="10sp" />
-
-            <TextView
-                android:id="@+id/tvGateLastEvent"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1.5"
-                android:gravity="end"
-                android:text="لا أحداث"
-                android:textSize="9sp"
-                android:textColor="?attr/colorOnSurfaceVariant" />
+                android:textColor="#94A3B8"
+                android:textSize="11sp" />
         </LinearLayout>
-    </LinearLayout>
+    </RelativeLayout>
 </com.google.android.material.card.MaterialCardView>
