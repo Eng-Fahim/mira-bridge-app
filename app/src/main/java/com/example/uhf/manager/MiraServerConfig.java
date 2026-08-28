@@ -1,6 +1,8 @@
 package com.example.uhf.manager;
+
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.Log;
 
 /**
  * MIRA Server Configuration Manager
@@ -8,11 +10,15 @@ import android.content.SharedPreferences;
  */
 public class MiraServerConfig {
 
+    private static final String TAG = "MiraServerConfig";
     private static final String PREFS_NAME = "MIRA_SERVER_CONFIG";
     private static final String KEY_BASE_URL = "base_url";
     private static final String KEY_API_KEY = "api_key";
     private static final String KEY_GATE_ID = "gate_id";
     private static final String KEY_AUTH_TOKEN = "auth_token";
+    
+    // ✅ إضافة العنوان الافتراضي كـ constant
+    private static final String DEFAULT_BASE_URL = "https://sa.mirabarcode.com/wp-json/";
     
     private static MiraServerConfig instance;
     private final SharedPreferences prefs;
@@ -29,16 +35,37 @@ public class MiraServerConfig {
     }
 
     /**
-     * ✅ الرابط الافتراضي
+     * ✅ الحصول على الرابط الأساسي
+     * في حال عدم وجود رابط محفوظ، يتم استخدام الرابط الافتراضي
      */
     public String getBaseUrl() {
-        return prefs.getString(KEY_BASE_URL, "https://sa.mirabarcode.com/wp-json/");
+        String url = prefs.getString(KEY_BASE_URL, "");
+        
+        // ✅ إذا كان الرابط فارغاً، استخدم الافتراضي واحفظه
+        if (url == null || url.isEmpty()) {
+            Log.d(TAG, "No saved URL, using default: " + DEFAULT_BASE_URL);
+            url = DEFAULT_BASE_URL;
+            setBaseUrl(DEFAULT_BASE_URL);
+        }
+        
+        return url;
     }
 
+    /**
+     * ✅ حفظ الرابط الأساسي
+     */
     public void setBaseUrl(String baseUrl) {
+        if (baseUrl == null || baseUrl.isEmpty()) {
+            Log.e(TAG, "Cannot save empty base URL!");
+            return;
+        }
+        
+        // ✅ التأكد من وجود / في نهاية الرابط
         if (!baseUrl.endsWith("/")) {
             baseUrl += "/";
         }
+        
+        Log.d(TAG, "Saving base URL: " + baseUrl);
         prefs.edit().putString(KEY_BASE_URL, baseUrl).apply();
     }
 
@@ -50,7 +77,8 @@ public class MiraServerConfig {
     }
 
     public void setApiKey(String apiKey) {
-        prefs.edit().putString(KEY_API_KEY, apiKey).apply();
+        Log.d(TAG, "Saving API Key: " + (apiKey != null && !apiKey.isEmpty() ? "SET" : "EMPTY"));
+        prefs.edit().putString(KEY_API_KEY, apiKey != null ? apiKey : "").apply();
     }
 
     /**
@@ -61,14 +89,18 @@ public class MiraServerConfig {
     }
 
     public void setGateId(String gateId) {
-        prefs.edit().putString(KEY_GATE_ID, gateId).apply();
+        Log.d(TAG, "Saving Gate ID: " + (gateId != null && !gateId.isEmpty() ? "SET" : "EMPTY"));
+        prefs.edit().putString(KEY_GATE_ID, gateId != null ? gateId : "").apply();
     }
 
     /**
      * ✅ حفظ بيانات الجلسة بعد تسجيل الدخول
      */
     public void saveSession(String apiKey, String gateId, String authToken) {
-        // ✅ استخدام prefs الموجود في الكلاس مباشرة
+        Log.d(TAG, "Saving session - API Key: " + (apiKey != null && !apiKey.isEmpty() ? "SET" : "EMPTY") + 
+                   ", Gate ID: " + (gateId != null && !gateId.isEmpty() ? "SET" : "EMPTY") + 
+                   ", Auth Token: " + (authToken != null && !authToken.isEmpty() ? "SET" : "EMPTY"));
+        
         prefs.edit()
             .putString(KEY_API_KEY, apiKey != null ? apiKey : "")
             .putString(KEY_GATE_ID, gateId != null ? gateId : "")
@@ -87,6 +119,7 @@ public class MiraServerConfig {
      * ✅ مسح الجلسة عند تسجيل الخروج
      */
     public void clearSession() {
+        Log.d(TAG, "Clearing session");
         prefs.edit()
             .remove(KEY_API_KEY)
             .remove(KEY_GATE_ID)
@@ -95,24 +128,74 @@ public class MiraServerConfig {
     }
 
     /**
+     * ✅ مسح كل البيانات (عند تسجيل الخروج الكامل)
+     */
+    public void clearAllData() {
+        Log.d(TAG, "Clearing all data");
+        prefs.edit()
+            .clear()
+            .apply();
+    }
+
+    /**
      * ✅ التحقق من وجود جلسة نشطة
      */
     public boolean hasSession() {
-        return !getApiKey().isEmpty() && !getAuthToken().isEmpty();
+        boolean hasKey = !getApiKey().isEmpty();
+        boolean hasToken = !getAuthToken().isEmpty();
+        boolean hasSession = hasKey && hasToken;
+        
+        Log.d(TAG, "Has session: " + hasSession + " (Key: " + hasKey + ", Token: " + hasToken + ")");
+        return hasSession;
     }
 
+    /**
+     * ✅ التحقق من وجود عنوان خادم محفوظ
+     */
+    public boolean hasSavedBaseUrl() {
+        String url = prefs.getString(KEY_BASE_URL, "");
+        return url != null && !url.isEmpty();
+    }
+
+    /**
+     * ✅ اختبار الاتصال بالخادم
+     */
     public boolean testConnection(String baseUrl) {
         try {
-            java.net.URL url = new java.net.URL(baseUrl);
+            Log.d(TAG, "Testing connection to: " + baseUrl);
+            
+            // ✅ تنظيف الرابط
+            String cleanUrl = baseUrl.trim();
+            if (!cleanUrl.endsWith("/")) {
+                cleanUrl += "/";
+            }
+            
+            // ✅ إضافة مسار البينج
+            String pingUrl = cleanUrl + "wp-json/mira-gate/v1/ping";
+            
+            java.net.URL url = new java.net.URL(pingUrl);
             java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(8000);
             conn.setRequestMethod("GET");
+            
             int responseCode = conn.getResponseCode();
+            Log.d(TAG, "Connection test response: " + responseCode);
+            
             conn.disconnect();
-            return responseCode > 0;
+            return responseCode > 0 && responseCode < 500;
         } catch (Exception e) {
+            Log.e(TAG, "Connection test failed: " + e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * ✅ إعادة تعيين الإعدادات إلى الافتراضي
+     */
+    public void resetToDefault() {
+        Log.d(TAG, "Resetting to default settings");
+        setBaseUrl(DEFAULT_BASE_URL);
+        clearSession();
     }
 }
