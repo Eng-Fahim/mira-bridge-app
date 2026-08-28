@@ -79,6 +79,7 @@ import java.util.HashMap;
 import java.util.List;
 
 public class UHFMainActivity extends BaseTabFragmentActivity {
+    private boolean isProfileListenerSetup = false; // ✅ أضف هذا
 
     private static final String TAG = "UHFMainActivity";
     private static final int PERMISSION_REQUEST_CODE = 1001;
@@ -129,19 +130,26 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         this.activeRfidListener = listener;
     }
     
-    private void setupOrgProfileListener() {
-        orgProfileManager = MiraOrgProfileManager.getInstance(this);
-        
-        profileListener = new MiraOrgProfileManager.OnProfileChangedListener() {
-            @Override
-            public void onProfileChanged() {
-                updateAppTitle();
-            }
-        };
-        
-        orgProfileManager.addListener(profileListener);
-        updateAppTitle();
+    
+private void setupOrgProfileListener() {
+    // ✅ منع الإعداد المتكرر
+    if (isProfileListenerSetup) {
+        return;
     }
+    isProfileListenerSetup = true;
+    
+    orgProfileManager = MiraOrgProfileManager.getInstance(this);
+    
+    profileListener = new MiraOrgProfileManager.OnProfileChangedListener() {
+        @Override
+        public void onProfileChanged() {
+            updateAppTitle();
+        }
+    };
+    
+    orgProfileManager.addListener(profileListener);
+    updateAppTitle();
+}
 
     // ✅ دالة تحديث العنوان الآمنة الموحدة (تمت معالجة الخيط الخلفي بها)
     private void updateAppTitle() {
@@ -253,15 +261,17 @@ private void updateToolbarTitle() {
 
     @Override
     protected void onResume() {
-        super.onResume();
-        try {
-            if (currentFragment == null || !currentFragment.isAdded()) {
-                loadFragmentByTag(currentFragmentTag);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "onResume error: " + e.getMessage());
+    super.onResume();
+    try {
+        // ✅ فقط إذا لم يكن هناك fragment محمل
+        if (currentFragment == null || !currentFragment.isAdded()) {
+            loadFragmentByTag(currentFragmentTag);
         }
+        // ✅ لا تستدعي updateAppTitle هنا - ستتحدث تلقائياً
+    } catch (Exception e) {
+        Log.e(TAG, "onResume error: " + e.getMessage());
     }
+}
 
     private void initializeLanguageState() {
         try {
@@ -1145,4 +1155,4 @@ private void updateToolbarTitle() {
             }
         }
     }
-                }
+    }
