@@ -443,6 +443,9 @@ public class MiraBranchesManagementFragment extends Fragment {
         SwitchMaterial swActive = dialogView.findViewById(R.id.swBranchActive);
         Button btnCancel = dialogView.findViewById(R.id.btnCancel);
         Button btnSave = dialogView.findViewById(R.id.btnSaveBranch);
+        
+        com.google.android.material.textfield.MaterialAutoCompleteTextView etBranchManager = 
+        dialogView.findViewById(R.id.etBranchManager);
 
         boolean isEdit = existing != null;
         if (tvTitle != null) tvTitle.setText(isEdit ? "تعديل فرع" : "إضافة فرع جديد");
@@ -461,6 +464,7 @@ public class MiraBranchesManagementFragment extends Fragment {
             btnSave.setOnClickListener(v -> {
                 String name = etName != null ? etName.getText().toString().trim() : "";
                 String code = etCode != null ? etCode.getText().toString().trim() : "";
+                String managerName = etBranchManager != null ? etBranchManager.getText().toString().trim() : "";
                 if (name.isEmpty() || code.isEmpty()) {
                     showToast("الاسم والكود مطلوبان");
                     return;
