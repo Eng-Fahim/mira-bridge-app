@@ -209,21 +209,46 @@ public class MiraSecureGateFragment extends Fragment {
 private void loadGatesForSelector() {
     if (miraGatesSettings == null) return;
     
-    gatesList = miraGatesSettings.getGates();
+    // ✅ جلب جميع البوابات المحفوظة
+    List<MiraGatesSettings.GateDevice> allGates = miraGatesSettings.getGates();
     
+    // ✅ جلب branch_id الحالي
+    int currentBranchId = 0;
+    if (mContext != null) {
+        com.example.uhf.manager.MiraBranchesManager bm = 
+            com.example.uhf.manager.MiraBranchesManager.getInstance(mContext);
+        currentBranchId = bm != null ? bm.getActiveBranchId() : 0;
+    }
+    
+    // ✅ فلترة البوابات حسب الفرع
+    gatesList.clear();
+    boolean isGlobalAdmin = permissionManager != null && 
+        (permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin());
+    
+    for (MiraGatesSettings.GateDevice gate : allGates) {
+        if (isGlobalAdmin || currentBranchId <= 0 || gate.branchId <= 0 || gate.branchId == currentBranchId) {
+            gatesList.add(gate);
+        }
+    }
+    
+    // ✅ إذا لا توجد بوابات، أضف الجهاز الحالي
     if (gatesList.isEmpty()) {
-        // إذا لا توجد بوابات، أضف البوابة الحالية
         MiraGatesSettings.GateDevice currentGate = new MiraGatesSettings.GateDevice();
         currentGate.gateId = "handheld_c72";
         currentGate.gateName = isArabic() ? "هذا الجهاز (C72)" : "This Device (C72)";
         currentGate.location = isArabic() ? "غير محدد" : "Unknown";
+        currentGate.branchId = currentBranchId;
         gatesList.add(currentGate);
     }
     
-    // تعبئة الـ Spinner
+    // ✅ تعبئة الـ Spinner مع عرض الفرع
     String[] gateNames = new String[gatesList.size()];
     for (int i = 0; i < gatesList.size(); i++) {
-        gateNames[i] = gatesList.get(i).gateName + " (" + gatesList.get(i).location + ")";
+        MiraGatesSettings.GateDevice gate = gatesList.get(i);
+        String branchInfo = (gate.branchName != null && !gate.branchName.isEmpty()) 
+            ? " 🏢 " + gate.branchName 
+            : "";
+        gateNames[i] = gate.gateName + " (" + gate.location + ")" + branchInfo;
     }
     
     ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
@@ -231,12 +256,10 @@ private void loadGatesForSelector() {
     adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
     spGateSelector.setAdapter(adapter);
     
-    // اختيار أول بوابة
     if (!gatesList.isEmpty()) {
         currentGateId = gatesList.get(0).gateId;
     }
     
-    // مستمع التغيير
     spGateSelector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
         @Override
         public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -244,7 +267,6 @@ private void loadGatesForSelector() {
                 currentGateId = gatesList.get(position).gateId;
                 logConsole(isArabic() ? "🚪 تم اختيار: " : "🚪 Selected: " + gatesList.get(position).gateName);
                 
-                // إذا كانت البوابة مفعلة، أعد التشغيل للبوابة الجديدة
                 if (gateActive) {
                     disarmGate();
                     armGate();
@@ -899,4 +921,4 @@ private void updateGateStatusOnServerForSpecificGate(String gateId, String statu
         gateActive = false;
         isAlarmActive = false;
     }
-                            }
+        }
