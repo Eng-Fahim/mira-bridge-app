@@ -27,6 +27,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
+import com.example.uhf.manager.OfflineGateCache;
 import com.example.uhf.manager.MiraGatesSettings;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SoundGenerator;
@@ -885,4 +886,4 @@ public class MiraGateSettingsFragment extends Fragment {
     interface OnGateToggleListener {
         void onToggle(int position, boolean open);
     }
-}
+    }
