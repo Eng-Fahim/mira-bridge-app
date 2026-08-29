@@ -4,172 +4,134 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/report_background">
+    android:background="@color/bg_main">
 
-    <!-- شريط علوي -->
+    <!-- شريط علوي مرن -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/report_primary"
-        app:elevation="4dp">
+        android:background="@color/bg_card"
+        app:elevation="2dp">
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="16dp">
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp">
 
-            <!-- عنوان التقرير -->
             <TextView
                 android:id="@+id/tvReportDialogTitle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="تقرير المبيعات"
-                android:textColor="@android:color/white"
-                android:textSize="20sp"
+                android:text="نتائج التقرير المالي والجرام"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
                 android:textStyle="bold"
+                app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toStartOf="@id/btnReportClose"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
 
-            <!-- زر إغلاق -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnReportClose"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:backgroundTint="@android:color/transparent"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:text="✕"
-                android:textColor="@android:color/white"
-                android:textSize="20sp"
-                android:textStyle="bold"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                app:icon="@android:drawable/ic_menu_close_clear_cancel"
+                app:iconTint="@color/text_primary"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
-        <!-- شريط الفلاتر -->
+        <!-- لوحة التحكم بالفلاتر والتاريخ -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:padding="8dp">
+            android:paddingHorizontal="12dp"
+            android:paddingBottom="8dp">
 
-            <!-- من تاريخ -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnReportDateFrom"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="38dp"
                 android:layout_weight="1"
-                android:text="📅 من: 2024-01-01"
+                android:padding="0dp"
+                android:text="من: 2026-08-01"
                 android:textSize="11sp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                app:cornerRadius="8dp" />
 
-            <!-- إلى تاريخ -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnReportDateTo"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="6dp"
                 android:layout_weight="1"
-                android:text="📅 إلى: 2024-01-31"
+                android:padding="0dp"
+                android:text="إلى: 2026-08-30"
                 android:textSize="11sp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                app:cornerRadius="8dp" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnReportApplyFilter"
+                android:layout_width=" wrap_content"
+                android:layout_height="38dp"
+                android:layout_marginStart="6dp"
+                android:text="تحديث"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                app:backgroundTint="@color/accent_dark"
+                app:cornerRadius="8dp" />
         </LinearLayout>
 
-        <!-- أزرار الإجراءات -->
+        <!-- أزرار الإجراءات السريعة (تصدير - طباعة) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:padding="8dp">
+            android:paddingHorizontal="12dp"
+            android:paddingBottom="8dp">
 
-            <!-- تطبيق -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnReportApplyFilter"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="✓ تطبيق"
-                android:textColor="@android:color/white"
-                android:textSize="11sp"
-                app:backgroundTint="@color/report_success" />
-
-            <!-- فلتر متقدم -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnAdvancedFilter"
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
-                android:text="⚙️ فلتر"
-                android:textSize="11sp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                android:text="فلترة خيارات"
+                android:textSize="10sp"
+                app:cornerRadius="8dp" />
 
-            <!-- تصدير -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnReportExport"
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="6dp"
                 android:layout_weight="1"
-                android:text="📄 تصدير"
-                android:textSize="11sp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                android:text="تصدير Excel/PDF"
+                android:textSize="10sp"
+                app:cornerRadius="8dp" />
 
-            <!-- طباعة -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnReportPrint"
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="6dp"
                 android:layout_weight="1"
-                android:text="🖨️ طباعة"
-                android:textSize="11sp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                android:text="طباعة"
+                android:textSize="10sp"
+                app:cornerRadius="8dp" />
 
         </LinearLayout>
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- حاوية التحميل -->
-    <FrameLayout
-        android:id="@+id/layoutLoadingContainer"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#CCFFFFFF"
-        android:visibility="gone"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:orientation="vertical"
-            android:gravity="center">
-
-            <com.google.android.material.progressindicator.CircularProgressIndicator
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                app:indicatorColor="@color/report_primary"
-                app:indicatorSize="50dp"
-                app:trackThickness="4dp" />
-
-            <TextView
-                android:id="@+id/tvLoadingStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="جاري تحميل البيانات..."
-                android:textColor="@color/report_text_primary"
-                android:textSize="14sp" />
-
-        </LinearLayout>
-
-    </FrameLayout>
-
-    <!-- قائمة البيانات -->
+    <!-- منطقة البيانات والـ Recycler -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvReportData"
         android:layout_width="match_parent"
@@ -178,7 +140,49 @@
         android:padding="8dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
-    <!-- رسالة فارغة -->
+    <!-- مؤشر التحميل -->
+    <FrameLayout
+        android:id="@+id/layoutLoadingContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#80000000"
+        android:visibility="gone"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="6dp"
+            app:cardBackgroundColor="@color/bg_card">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="24dp"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <com.google.android.material.progressindicator.CircularProgressIndicator
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:indeterminate="true"
+                    app:indicatorColor="@color/accent_dark" />
+
+                <TextView
+                    android:id="@+id/tvLoadingStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="جاري تحليل البيانات وإعداد الجدول..."
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </FrameLayout>
+
+    <!-- الشاشة الفارغة -->
     <LinearLayout
         android:id="@+id/layoutEmptyState"
         android:layout_width="match_parent"
@@ -188,29 +192,27 @@
         android:visibility="gone"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <TextView
-            android:layout_width="120dp"
-            android:layout_height="120dp"
-            android:background="#F0F0F0"
-            android:gravity="center"
-            android:text="📊"
-            android:textSize="48sp" />
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:src="@android:drawable/ic_menu_info_details"
+            app:tint="#B0BEC5" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="لا توجد بيانات"
-            android:textColor="@color/report_text_secondary"
-            android:textSize="16sp"
+            android:layout_marginTop="12dp"
+            android:text="لا توجد بيانات متاحة لهذا التقرير"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"
             android:textStyle="bold" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="قم بتغيير الفلاتر أو الفترة الزمنية"
-            android:textColor="@color/report_text_secondary"
+            android:layout_marginTop="4dp"
+            android:text="يرجى مراجعة نطاق التاريخ أو خيارات الفلترة"
+            android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 
     </LinearLayout>
