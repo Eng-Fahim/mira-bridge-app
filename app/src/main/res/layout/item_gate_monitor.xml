@@ -4,9 +4,9 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"
-    app:cardBackgroundColor="#1E293B"
+    app:cardBackgroundColor="?attr/colorSurface"
     app:cardCornerRadius="8dp"
-    app:strokeColor="#334155"
+    app:strokeColor="?attr/colorOutline"
     app:strokeWidth="1dp">
 
     <RelativeLayout
@@ -34,7 +34,7 @@
                 android:id="@+id/tvGateName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#F1F5F9"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="14sp"
                 android:textStyle="bold" />
 
@@ -42,7 +42,7 @@
                 android:id="@+id/tvGateLastEvent"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#64748B"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="11sp" />
         </LinearLayout>
 
@@ -58,7 +58,7 @@
                 android:id="@+id/tvGateStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#38BDF8"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="11sp"
                 android:textStyle="bold" />
 
@@ -66,7 +66,7 @@
                 android:id="@+id/tvGateStats"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#94A3B8"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="11sp" />
         </LinearLayout>
     </RelativeLayout>
