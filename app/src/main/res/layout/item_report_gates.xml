@@ -1,44 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView 
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="4dp"
-    app:cardBackgroundColor="?attr/colorSurface"
-    app:cardCornerRadius="8dp"
-    app:cardElevation="1dp">
+    app:cardBackgroundColor="@color/bg_card"
+    app:cardCornerRadius="14dp"
+    app:cardElevation="2dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="#12000000">
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="10dp">
+        android:padding="12dp">
 
+        <!-- مؤشر أمان جانبي -->
+        <View
+            android:id="@+id/viewIndicator"
+            android:layout_width="3dp"
+            android:layout_height="0dp"
+            android:background="@color/accent_dark"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- اسم البوابة -->
         <TextView
             android:id="@+id/tvGateName"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="البوابة الرئيسية"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            android:layout_marginStart="10dp"
+            android:text="بوابة الخزنة الرئيسية"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toStartOf="@id/tvDate"
+            app:layout_constraintStart_toEndOf="@id/viewIndicator"
+            app:layout_constraintTop_toTopOf="parent" />
 
+        <!-- رمز التاغ EPC -->
         <TextView
             android:id="@+id/tvEpc"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="EPC"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="10sp" />
+            android:layout_marginStart="10dp"
+            android:layout_marginTop="4dp"
+            android:fontFamily="monospace"
+            android:text="EPC: E28011602000700123456789"
+            android:textColor="@color/accent_dark"
+            android:textSize="11sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/viewIndicator"
+            app:layout_constraintTop_toBottomOf="@id/tvGateName" />
 
+        <!-- توقيت العبور -->
         <TextView
             android:id="@+id/tvDate"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="التاريخ"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="9sp" />
-    </LinearLayout>
+            android:text="2026-08-30 11:45 AM"
+            android:textColor="@color/text_secondary"
+            android:textSize="10sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>
