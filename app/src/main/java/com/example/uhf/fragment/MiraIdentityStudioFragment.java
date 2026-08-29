@@ -243,78 +243,137 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     private void setupListeners() {
-        try {
-            binding.etEpc.addTextChangedListener(new TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    binding.tvStatusBadge.setText(s.length() > 0 ? "BOUND" : "WAITING");
-                }
-                @Override public void afterTextChanged(Editable s) {}
-            });
-
-            if (binding.tilEpc != null) {
-                binding.tilEpc.setEndIconOnClickListener(v -> openBarcodeScannerForEPC());
+    try {
+        // ==================== 1. EPC TextWatcher ====================
+        binding.etEpc.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                binding.tvStatusBadge.setText(s.length() > 0 ? "BOUND" : "WAITING");
             }
+            @Override public void afterTextChanged(Editable s) {}
+        });
 
-            binding.btnScanRfid.setOnClickListener(v -> {
-                if (permissionManager.canEdit("identity") || permissionManager.isManager()) {
-                    if (isRfidScanning) stopRfidScanningMode();
-                    else activateRFIDModeForEncoding();
-                } else {
-                    showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-                }
-            });
+        // ==================== 2. Barcode Scanner ====================
+        if (binding.tilEpc != null) {
+            binding.tilEpc.setEndIconOnClickListener(v -> openBarcodeScannerForEPC());
+        }
 
-            binding.switchHasStones.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                binding.layoutStonesDetails.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+        // ==================== 3. RFID Scan Button ====================
+        binding.btnScanRfid.setOnClickListener(v -> {
+            if (permissionManager.canEdit("identity") || permissionManager.isManager()) {
+                if (isRfidScanning) stopRfidScanningMode();
+                else activateRFIDModeForEncoding();
+            } else {
+                showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            }
+        });
+
+        // ==================== 4. Stones Switch - حاوية كاملة قابلة للنقر ====================
+        // ✅✅✅ الحاوية الكاملة للأحجار الكريمة
+        View stonesContainer = binding.getRoot().findViewById(R.id.layoutStonesContainer);
+        if (stonesContainer != null) {
+            stonesContainer.setOnClickListener(v -> {
+                // ✅ تبديل حالة الـ Switch
+                boolean newState = !binding.switchHasStones.isChecked();
+                binding.switchHasStones.setChecked(newState);
+                
+                // ✅ إظهار/إخفاء التفاصيل مع أنيميشن سلس
+                toggleStonesDetails(newState);
+                
+                // ✅ إعادة حساب القيمة
                 calculateEstimatedGoldValue();
             });
-
-            TextWatcher calculationWatcher = new TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    calculateEstimatedGoldValue();
-                }
-                @Override public void afterTextChanged(Editable s) {}
-            };
-
-            binding.etGrossWeight.addTextChangedListener(calculationWatcher);
-            binding.etStoneWeight.addTextChangedListener(calculationWatcher);
-            binding.etStoneValue.addTextChangedListener(calculationWatcher);
-
-            binding.chipGroupKarat.setOnCheckedStateChangeListener((group, checkedIds) -> calculateEstimatedGoldValue());
-
-            binding.chipGroupTypes.setOnCheckedStateChangeListener((group, checkedIds) -> {
-                if (checkedIds.isEmpty()) return;
-                int id = checkedIds.get(0);
-                if (id == binding.chipRing.getId()) populateSuggestions("rings");
-                else if (id == binding.chipSet.getId()) populateSuggestions("sets");
-                else if (id == binding.chipBracelet.getId()) populateSuggestions("bracelets");
-                else if (id == binding.chipNecklace.getId()) populateSuggestions("necklaces");
-            });
-
-            binding.btnAddPhotos.setOnClickListener(v -> {
-                if (permissionManager.canEdit("identity") || permissionManager.isManager()) {
-                    showImageSourceDialog();
-                } else {
-                    showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-                }
-            });
-            
-            binding.btnSaveIdentity.setOnClickListener(v -> {
-                if (permissionManager.canEdit("identity") || permissionManager.isManager()) {
-                    finalizeItemIdentity();
-                } else {
-                    showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-                }
-            });
-            
-            binding.btnViewPending.setOnClickListener(v -> showPendingItemsDialog());
-
-        } catch (Exception e) {
-            Log.e(TAG, "setupListeners error: " + e.getMessage());
         }
+
+        // ✅✅✅ الـ Switch نفسه - يستجيب أيضاً
+        binding.switchHasStones.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            // ✅ إظهار/إخفاء التفاصيل مع أنيميشن سلس
+            toggleStonesDetails(isChecked);
+            
+            // ✅ إعادة حساب القيمة
+            calculateEstimatedGoldValue();
+        });
+
+        // ==================== 5. Calculation TextWatcher ====================
+        TextWatcher calculationWatcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                calculateEstimatedGoldValue();
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        };
+
+        binding.etGrossWeight.addTextChangedListener(calculationWatcher);
+        binding.etStoneWeight.addTextChangedListener(calculationWatcher);
+        binding.etStoneValue.addTextChangedListener(calculationWatcher);
+
+        // ==================== 6. Karat ChipGroup ====================
+        binding.chipGroupKarat.setOnCheckedStateChangeListener((group, checkedIds) -> calculateEstimatedGoldValue());
+
+        // ==================== 7. Types ChipGroup ====================
+        binding.chipGroupTypes.setOnCheckedStateChangeListener((group, checkedIds) -> {
+            if (checkedIds.isEmpty()) return;
+            int id = checkedIds.get(0);
+            if (id == binding.chipRing.getId()) populateSuggestions("rings");
+            else if (id == binding.chipSet.getId()) populateSuggestions("sets");
+            else if (id == binding.chipBracelet.getId()) populateSuggestions("bracelets");
+            else if (id == binding.chipNecklace.getId()) populateSuggestions("necklaces");
+        });
+
+        // ==================== 8. Add Photos Button ====================
+        binding.btnAddPhotos.setOnClickListener(v -> {
+            if (permissionManager.canEdit("identity") || permissionManager.isManager()) {
+                showImageSourceDialog();
+            } else {
+                showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            }
+        });
+        
+        // ==================== 9. Save Identity Button ====================
+        binding.btnSaveIdentity.setOnClickListener(v -> {
+            if (permissionManager.canEdit("identity") || permissionManager.isManager()) {
+                finalizeItemIdentity();
+            } else {
+                showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            }
+        });
+        
+        // ==================== 10. View Pending Button ====================
+        binding.btnViewPending.setOnClickListener(v -> showPendingItemsDialog());
+
+    } catch (Exception e) {
+        Log.e(TAG, "setupListeners error: " + e.getMessage());
     }
+}
+
+/**
+ * ✅✅✅ دالة جديدة - تبديل عرض تفاصيل الأحجار مع أنيميشن سلس
+ */
+private void toggleStonesDetails(boolean show) {
+    if (binding == null || binding.layoutStonesDetails == null) return;
+    
+    if (show) {
+        // ✅ إظهار مع أنيميشن
+        binding.layoutStonesDetails.setVisibility(View.VISIBLE);
+        binding.layoutStonesDetails.setAlpha(0f);
+        binding.layoutStonesDetails.setTranslationY(-10f);
+        binding.layoutStonesDetails.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(250)
+            .setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator())
+            .start();
+    } else {
+        // ✅ إخفاء مع أنيميشن
+        binding.layoutStonesDetails.animate()
+            .alpha(0f)
+            .translationY(-10f)
+            .setDuration(200)
+            .setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator())
+            .withEndAction(() -> binding.layoutStonesDetails.setVisibility(View.GONE))
+            .start();
+    }
+}
 
     private int getSelectedKaratNumber() {
         try {
