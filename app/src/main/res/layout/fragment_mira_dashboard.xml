@@ -40,6 +40,32 @@
             android:background="@drawable/shimmer_background" />
     </LinearLayout>
 
+    <!-- ==================== LOADING OVERLAY ==================== -->
+    <LinearLayout
+        android:id="@+id/loadingOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="?android:attr/colorBackground"
+        android:visibility="gone"
+        android:alpha="0.95">
+
+        <ProgressBar
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:indeterminate="true"
+            android:indeterminateTint="?attr/colorPrimary" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⏳ جاري تحميل البيانات..."
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="14sp"
+            android:layout_marginTop="12dp" />
+    </LinearLayout>
+
     <!-- ==================== MAIN CONTENT ==================== -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
@@ -127,23 +153,38 @@
                         android:layout_height="wrap_content"
                         android:padding="14dp">
 
-                        <!-- Greeting (Dynamic) -->
+                        <!-- ✅ اسم الجهة (سطر مستقل) -->
                         <TextView
-                            android:id="@+id/tvGreeting"
+                            android:id="@+id/tvOrgName"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_marginEnd="12dp"
                             android:ellipsize="end"
                             android:maxLines="1"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="15sp"
+                            android:textColor="?attr/colorPrimary"
+                            android:textSize="13sp"
                             android:textStyle="bold"
                             app:layout_constraintEnd_toStartOf="@id/tcLiveTime"
                             app:layout_constraintStart_toStartOf="parent"
                             app:layout_constraintTop_toTopOf="parent"
-                            tools:text="البوعاني للمجوهرات - مرحباً، سلمان" />
+                            tools:text="البوعاني للمجوهرات" />
 
-                        <!-- Location / Branch (Dynamic) -->
+                        <!-- ✅ الترحيب بالمستخدم (سطر مستقل) -->
+                        <TextView
+                            android:id="@+id/tvGreeting"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp"
+                            app:layout_constraintEnd_toEndOf="@id/tvOrgName"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toBottomOf="@id/tvOrgName"
+                            tools:text="مرحباً، سلمان" />
+
+                        <!-- ✅ الموقع/الفرع -->
                         <TextView
                             android:id="@+id/tvLocation"
                             android:layout_width="0dp"
@@ -158,7 +199,7 @@
                             app:layout_constraintTop_toBottomOf="@id/tvGreeting"
                             tools:text="📍 فرع حده" />
 
-                        <!-- Live Clock -->
+                        <!-- ✅ الساعة الحية -->
                         <TextClock
                             android:id="@+id/tcLiveTime"
                             android:layout_width="wrap_content"
@@ -171,7 +212,7 @@
                             app:layout_constraintEnd_toEndOf="parent"
                             app:layout_constraintTop_toTopOf="parent" />
 
-                        <!-- Dynamic Date -->
+                        <!-- ✅ التاريخ -->
                         <TextView
                             android:id="@+id/tvDate"
                             android:layout_width="wrap_content"
@@ -339,16 +380,31 @@
                                 android:textSize="14sp"
                                 android:textStyle="bold" />
 
-                            <ImageButton
-                                android:id="@+id/btnRefreshGold"
-                                android:layout_width="28dp"
-                                android:layout_height="28dp"
+                            <!-- ✅ زر التحديث مع مؤشر تحميل -->
+                            <FrameLayout
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
                                 android:layout_alignParentEnd="true"
-                                android:layout_centerVertical="true"
-                                android:background="?attr/selectableItemBackgroundBorderless"
-                                android:contentDescription="Refresh"
-                                android:src="@android:drawable/ic_popup_sync"
-                                app:tint="?attr/colorPrimary" />
+                                android:layout_centerVertical="true">
+
+                                <ImageButton
+                                    android:id="@+id/btnRefreshGold"
+                                    android:layout_width="36dp"
+                                    android:layout_height="36dp"
+                                    android:background="?attr/selectableItemBackgroundBorderless"
+                                    android:contentDescription="Refresh"
+                                    android:src="@android:drawable/ic_popup_sync"
+                                    app:tint="?attr/colorPrimary" />
+
+                                <ProgressBar
+                                    android:id="@+id/pbGoldLoading"
+                                    android:layout_width="18dp"
+                                    android:layout_height="18dp"
+                                    android:layout_gravity="center"
+                                    android:indeterminate="true"
+                                    android:indeterminateTint="?attr/colorPrimary"
+                                    android:visibility="gone" />
+                            </FrameLayout>
                         </RelativeLayout>
 
                         <LinearLayout
