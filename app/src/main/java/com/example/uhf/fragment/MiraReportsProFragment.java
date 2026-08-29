@@ -737,11 +737,12 @@ public class MiraReportsProFragment extends Fragment {
     
     private RecyclerView.Adapter<?> createAdapterForType(String type, JSONObject data) {
         JSONArray itemsArray = extractItemsArray(data);
-        String currency = priceManager != null ? priceManager.getCurrencySymbol() : "";
+        String currency = "";
+    
         
         switch (type) {
             case "sales":
-                return new ReportAdapters.SalesAdapter(itemsArray, isArabic, currency);
+            return new ReportAdapters.SalesAdapter(itemsArray, isArabic, currency);
             case "inventory":
                 return new ReportAdapters.InventoryAdapter(itemsArray, isArabic);
             case "gates":
@@ -1051,4 +1052,4 @@ public class MiraReportsProFragment extends Fragment {
         super.onDestroyView();
         mainHandler.removeCallbacksAndMessages(null);
     }
-}
+                }
