@@ -1811,8 +1811,7 @@
     <string name="print_btn">🖨️ Print</string>
     <string name="share_btn">📤 Share</string>
     <string name="save_pdf_btn">💾 Save PDF</string>
-<!-- res/values-en/strings.xml (الإنجليزية) -->
-    
+
     <string name="gate_command_center">🛡️ SECURITY COMMAND CENTER</string>
     <string name="gate_ping">📡 Ping: -- ms</string>
     <string name="gate_system_armed">🟢 SYSTEM ARMED</string>
@@ -1832,7 +1831,7 @@
     <string name="gate_filter_all">All</string>
     <string name="gate_filter_alerts">🚨 Alerts</string>
     <string name="gate_filter_pass">✅ Pass</string>
-    <string name="gate_network">📡 Gate Network & Field Devices</string>
+    <string name="gate_network">📡 Gate Network &amp; Field Devices</string>
     <string name="gate_simulate_allowed">🧪 Simulate (Allowed)</string>
     <string name="gate_simulate_denied">🧪 Simulate (Denied)</string>
     <string name="gate_clear_console">🗑️ Clear Log</string>
