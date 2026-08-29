@@ -7,7 +7,7 @@
     android:background="?android:attr/colorBackground"
     android:orientation="vertical">
 
-    <!-- Header Bar / شريط العنوان والحالة -->
+    <!-- Header Bar -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -47,7 +47,7 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Scan Actions Bar / أزرار أنماط المسح -->
+    <!-- Scan Actions Bar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -56,7 +56,7 @@
         android:orientation="horizontal"
         android:paddingHorizontal="12dp"
         android:paddingTop="8dp"
-        android:paddingBottom="8dp">
+        android:paddingBottom="4dp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnOpenScanner"
@@ -89,7 +89,21 @@
             app:iconPadding="8dp" />
     </LinearLayout>
 
-    <!-- Status Strip / شريط التنبيهات والحالة -->
+    <!-- ✅ زر المرتجع - مستقل تحت أزرار المسح -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnPosRefund"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginTop="4dp"
+        android:text="🔄 مرتجع مبيعات"
+        android:textColor="?attr/colorSecondary"
+        android:textSize="12sp"
+        app:cornerRadius="8dp"
+        app:strokeColor="?attr/colorSecondary" />
+
+    <!-- Status Strip -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -107,7 +121,7 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Manual Barcode/EPC Input / الإدخال اليدوي -->
+    <!-- Manual Input -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -160,7 +174,7 @@
             app:cornerRadius="10dp" />
     </LinearLayout>
 
-    <!-- Cart Container / حاوية قائمة السلة والحالة الفارغة -->
+    <!-- Cart Container -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -176,7 +190,6 @@
             android:paddingBottom="12dp"
             tools:listitem="@layout/item_pos_cart_row" />
 
-        <!-- Dynamic Empty Cart State / مؤشر السلة الفارغة -->
         <LinearLayout
             android:id="@+id/layoutCartEmptyState"
             android:layout_width="wrap_content"
@@ -204,7 +217,7 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- Dynamic Modern Summary Footer / شريط الإجمالي وسداد الفاتورة -->
+    <!-- Summary Footer -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
