@@ -2062,4 +2062,39 @@
     <string name="print_btn">🖨️ طباعة</string>
     <string name="share_btn">📤 مشاركة</string>
     <string name="save_pdf_btn">💾 حفظ PDF</string>
+    
+    
+    <!-- res/values/strings.xml (العربية - الافتراضي) -->
+
+    <!-- MiraSecureGateFragment -->
+    <string name="gate_command_center">🛡️ مركز القيادة الأمنية</string>
+    <string name="gate_ping">📡 Ping: -- ms</string>
+    <string name="gate_system_armed">🟢 النظام مسلح</string>
+    <string name="gate_system_standby">🟡 وضع الاستعداد</string>
+    <string name="gate_system_lockdown">🔴 إغلاق طارئ</string>
+    <string name="gate_live_event">حدث مباشر:</string>
+    <string name="gate_waiting_traffic">في انتظار أول حركة مرور...</string>
+    <string name="gate_total">🚪 البوابات</string>
+    <string name="gate_pass">✅ عبور شرعي</string>
+    <string name="gate_deny">🚨 إنذارات</string>
+    <string name="gate_toggle_scan">🛡️ إيقاف/تفعيل RFID</string>
+    <string name="gate_scan_barcode">📷 مسح باركود</string>
+    <string name="gate_emergency_lockdown">🔒 إغلاق طارئ</string>
+    <string name="gate_unlock">🔓 فتح البوابات</string>
+    <string name="gate_risk_meter">📊 مؤشر المخاطر الأمنية</string>
+    <string name="gate_risk_percentage">نسبة الإنذارات: 0%</string>
+    <string name="gate_filter_all">الكل</string>
+    <string name="gate_filter_alerts">🚨 إنذارات</string>
+    <string name="gate_filter_pass">✅ مقبول</string>
+    <string name="gate_network">📡 شبكة البوابات والأجهزة الميدانية</string>
+    <string name="gate_simulate_allowed">🧪 تجربة (مسموح)</string>
+    <string name="gate_simulate_denied">🧪 تجربة (إنذار)</string>
+    <string name="gate_clear_console">🗑️ مسح السجل</string>
+    <string name="gate_stop_alarm">🔕 إيقاف الإنذار</string>
+    <string name="gate_alert_title">🚨 إنذار: خروج غير مصرح</string>
+    <string name="gate_no_events">لا أحداث</string>
+    <string name="gate_active">🟢 نشطة</string>
+    <string name="gate_inactive">⚪ غير نشطة</string>
+    <string name="gate_alert_status">🔴 إنذار</string>
+
 </resources>
