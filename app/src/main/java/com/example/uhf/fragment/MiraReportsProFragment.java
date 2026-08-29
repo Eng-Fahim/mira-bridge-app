@@ -24,7 +24,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
-import com.example.uhf.adapter.ReportAdapters;  // ✅ إضافة هذا الاستيراد
+import com.example.uhf.adapter.ReportAdapters;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.export.ReportExporter;
 import com.example.uhf.manager.MiraBranchesManager;
@@ -49,7 +49,6 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
-
 
 public class MiraReportsProFragment extends Fragment {
     private static final String TAG = "MiraReportsPro";
@@ -136,10 +135,8 @@ public class MiraReportsProFragment extends Fragment {
                 public void onTabSelected(TabLayout.Tab tab) {
                     filterReportsByCategory(tab.getPosition());
                 }
-                
                 @Override
                 public void onTabUnselected(TabLayout.Tab tab) {}
-                
                 @Override
                 public void onTabReselected(TabLayout.Tab tab) {}
             });
@@ -162,84 +159,81 @@ public class MiraReportsProFragment extends Fragment {
     }
     
     private void buildReportsList() {
-    reportList.clear();
-    
-    if (isArabic) {
-        reportList.add(new ReportModels.ReportItem("📊", "لوحة القيادة", "نظرة شاملة على الأداء", 
-            "dashboard", ReportModels.ReportCategory.GENERAL, false, R.color.icon_dashboard));
-        reportList.add(new ReportModels.ReportItem("💰", "المبيعات", "الفواتير والعملاء", 
-            "sales", ReportModels.ReportCategory.SALES, false, R.color.icon_sales));
-        reportList.add(new ReportModels.ReportItem("📦", "المخزون", "كل القطع وتفاصيلها", 
-            "inventory", ReportModels.ReportCategory.INVENTORY, false, R.color.icon_inventory));
-        reportList.add(new ReportModels.ReportItem("🔄", "التحويلات", "حركة القطع بين الفروع", 
-            "movement", ReportModels.ReportCategory.MOVEMENT, false, R.color.icon_movement));
-        reportList.add(new ReportModels.ReportItem("🏢", "أداء الفروع", "مقارنة شاملة", 
-            "branches", ReportModels.ReportCategory.GENERAL, false, R.color.icon_branches));
-        reportList.add(new ReportModels.ReportItem("🚪", "البوابات", "سجل المرور الأمني", 
-            "gates", ReportModels.ReportCategory.SECURITY, false, R.color.icon_gates));
-        reportList.add(new ReportModels.ReportItem("📋", "الجرد", "الدقة والفروقات", 
-            "audit", ReportModels.ReportCategory.INVENTORY, false, R.color.icon_audit));
-        reportList.add(new ReportModels.ReportItem("💎", "النواقص", "الأكثر مبيعاً", 
-            "reorder", ReportModels.ReportCategory.INVENTORY, false, R.color.icon_reorder));
-        reportList.add(new ReportModels.ReportItem("👥", "المستخدمين", "الموظفين والأدوار", 
-            "users", ReportModels.ReportCategory.GENERAL, false, R.color.icon_users));
-        reportList.add(new ReportModels.ReportItem("💵", "المالية", "القيود المحاسبية", 
-            "financial", ReportModels.ReportCategory.FINANCIAL, false, R.color.icon_financial));
+        reportList.clear();
         
-        // التقارير المتقدمة
-        reportList.add(new ReportModels.ReportItem("⏱️", "تايم لاين", "سجل نشاطات الموظف", 
-            "user_timeline", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
-        reportList.add(new ReportModels.ReportItem("💠", "بصمة القطعة", "سجل حياة القطعة", 
-            "item_passport", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
-        reportList.add(new ReportModels.ReportItem("🛡️", "مؤشر الأمان", "تحليل المرور", 
-            "gate_security_index", ReportModels.ReportCategory.SECURITY, true, R.color.icon_advanced));
-        reportList.add(new ReportModels.ReportItem("📅", "أعمار المخزون", "تحليل الركود", 
-            "inventory_aging", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
-        reportList.add(new ReportModels.ReportItem("⚠️", "الفروقات", "فروقات الجرد", 
-            "audit_discrepancy_detail", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
-    } else {
-        // English
-        reportList.add(new ReportModels.ReportItem("📊", "Dashboard", "Performance overview", 
-            "dashboard", ReportModels.ReportCategory.GENERAL, false, R.color.icon_dashboard));
-        reportList.add(new ReportModels.ReportItem("💰", "Sales", "Invoices & customers", 
-            "sales", ReportModels.ReportCategory.SALES, false, R.color.icon_sales));
-        reportList.add(new ReportModels.ReportItem("📦", "Inventory", "All items & details", 
-            "inventory", ReportModels.ReportCategory.INVENTORY, false, R.color.icon_inventory));
-        reportList.add(new ReportModels.ReportItem("🔄", "Transfers", "Branch movements", 
-            "movement", ReportModels.ReportCategory.MOVEMENT, false, R.color.icon_movement));
-        reportList.add(new ReportModels.ReportItem("🏢", "Branches", "Performance comparison", 
-            "branches", ReportModels.ReportCategory.GENERAL, false, R.color.icon_branches));
-        reportList.add(new ReportModels.ReportItem("🚪", "Gates", "Security gate logs", 
-            "gates", ReportModels.ReportCategory.SECURITY, false, R.color.icon_gates));
-        reportList.add(new ReportModels.ReportItem("📋", "Audit", "Accuracy & discrepancies", 
-            "audit", ReportModels.ReportCategory.INVENTORY, false, R.color.icon_audit));
-        reportList.add(new ReportModels.ReportItem("💎", "Reorder", "Best sellers", 
-            "reorder", ReportModels.ReportCategory.INVENTORY, false, R.color.icon_reorder));
-        reportList.add(new ReportModels.ReportItem("👥", "Users", "Staff & roles", 
-            "users", ReportModels.ReportCategory.GENERAL, false, R.color.icon_users));
-        reportList.add(new ReportModels.ReportItem("💵", "Financial", "Journal entries", 
-            "financial", ReportModels.ReportCategory.FINANCIAL, false, R.color.icon_financial));
+        if (isArabic) {
+            reportList.add(new ReportModels.ReportItem("📊", "لوحة القيادة", "نظرة شاملة على الأداء", 
+                "dashboard", ReportModels.ReportCategory.GENERAL, false, R.color.icon_dashboard));
+            reportList.add(new ReportModels.ReportItem("💰", "المبيعات", "الفواتير والعملاء", 
+                "sales", ReportModels.ReportCategory.SALES, false, R.color.icon_sales));
+            reportList.add(new ReportModels.ReportItem("📦", "المخزون", "كل القطع وتفاصيلها", 
+                "inventory", ReportModels.ReportCategory.INVENTORY, false, R.color.icon_inventory));
+            reportList.add(new ReportModels.ReportItem("🔄", "التحويلات", "حركة القطع بين الفروع", 
+                "movement", ReportModels.ReportCategory.MOVEMENT, false, R.color.icon_movement));
+            reportList.add(new ReportModels.ReportItem("🏢", "أداء الفروع", "مقارنة شاملة", 
+                "branches", ReportModels.ReportCategory.GENERAL, false, R.color.icon_branches));
+            reportList.add(new ReportModels.ReportItem("🚪", "البوابات", "سجل المرور الأمني", 
+                "gates", ReportModels.ReportCategory.SECURITY, false, R.color.icon_gates));
+            reportList.add(new ReportModels.ReportItem("📋", "الجرد", "الدقة والفروقات", 
+                "audit", ReportModels.ReportCategory.INVENTORY, false, R.color.icon_audit));
+            reportList.add(new ReportModels.ReportItem("💎", "النواقص", "الأكثر مبيعاً", 
+                "reorder", ReportModels.ReportCategory.INVENTORY, false, R.color.icon_reorder));
+            reportList.add(new ReportModels.ReportItem("👥", "المستخدمين", "الموظفين والأدوار", 
+                "users", ReportModels.ReportCategory.GENERAL, false, R.color.icon_users));
+            reportList.add(new ReportModels.ReportItem("💵", "المالية", "القيود المحاسبية", 
+                "financial", ReportModels.ReportCategory.FINANCIAL, false, R.color.icon_financial));
+            
+            reportList.add(new ReportModels.ReportItem("⏱️", "تايم لاين", "سجل نشاطات الموظف", 
+                "user_timeline", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
+            reportList.add(new ReportModels.ReportItem("💠", "بصمة القطعة", "سجل حياة القطعة", 
+                "item_passport", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
+            reportList.add(new ReportModels.ReportItem("🛡️", "مؤشر الأمان", "تحليل المرور", 
+                "gate_security_index", ReportModels.ReportCategory.SECURITY, true, R.color.icon_advanced));
+            reportList.add(new ReportModels.ReportItem("📅", "أعمار المخزون", "تحليل الركود", 
+                "inventory_aging", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
+            reportList.add(new ReportModels.ReportItem("⚠️", "الفروقات", "فروقات الجرد", 
+                "audit_discrepancy_detail", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
+        } else {
+            reportList.add(new ReportModels.ReportItem("📊", "Dashboard", "Performance overview", 
+                "dashboard", ReportModels.ReportCategory.GENERAL, false, R.color.icon_dashboard));
+            reportList.add(new ReportModels.ReportItem("💰", "Sales", "Invoices & customers", 
+                "sales", ReportModels.ReportCategory.SALES, false, R.color.icon_sales));
+            reportList.add(new ReportModels.ReportItem("📦", "Inventory", "All items & details", 
+                "inventory", ReportModels.ReportCategory.INVENTORY, false, R.color.icon_inventory));
+            reportList.add(new ReportModels.ReportItem("🔄", "Transfers", "Branch movements", 
+                "movement", ReportModels.ReportCategory.MOVEMENT, false, R.color.icon_movement));
+            reportList.add(new ReportModels.ReportItem("🏢", "Branches", "Performance comparison", 
+                "branches", ReportModels.ReportCategory.GENERAL, false, R.color.icon_branches));
+            reportList.add(new ReportModels.ReportItem("🚪", "Gates", "Security gate logs", 
+                "gates", ReportModels.ReportCategory.SECURITY, false, R.color.icon_gates));
+            reportList.add(new ReportModels.ReportItem("📋", "Audit", "Accuracy & discrepancies", 
+                "audit", ReportModels.ReportCategory.INVENTORY, false, R.color.icon_audit));
+            reportList.add(new ReportModels.ReportItem("💎", "Reorder", "Best sellers", 
+                "reorder", ReportModels.ReportCategory.INVENTORY, false, R.color.icon_reorder));
+            reportList.add(new ReportModels.ReportItem("👥", "Users", "Staff & roles", 
+                "users", ReportModels.ReportCategory.GENERAL, false, R.color.icon_users));
+            reportList.add(new ReportModels.ReportItem("💵", "Financial", "Journal entries", 
+                "financial", ReportModels.ReportCategory.FINANCIAL, false, R.color.icon_financial));
+            
+            reportList.add(new ReportModels.ReportItem("⏱️", "Timeline", "User activity log", 
+                "user_timeline", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
+            reportList.add(new ReportModels.ReportItem("💠", "Passport", "Item lifecycle", 
+                "item_passport", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
+            reportList.add(new ReportModels.ReportItem("🛡️", "Security", "Gate analysis", 
+                "gate_security_index", ReportModels.ReportCategory.SECURITY, true, R.color.icon_advanced));
+            reportList.add(new ReportModels.ReportItem("📅", "Aging", "Stock stagnation", 
+                "inventory_aging", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
+            reportList.add(new ReportModels.ReportItem("⚠️", "Discrepancies", "Audit details", 
+                "audit_discrepancy_detail", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
+        }
         
-        // Advanced
-        reportList.add(new ReportModels.ReportItem("⏱️", "Timeline", "User activity log", 
-            "user_timeline", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
-        reportList.add(new ReportModels.ReportItem("💠", "Passport", "Item lifecycle", 
-            "item_passport", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
-        reportList.add(new ReportModels.ReportItem("🛡️", "Security", "Gate analysis", 
-            "gate_security_index", ReportModels.ReportCategory.SECURITY, true, R.color.icon_advanced));
-        reportList.add(new ReportModels.ReportItem("📅", "Aging", "Stock stagnation", 
-            "inventory_aging", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
-        reportList.add(new ReportModels.ReportItem("⚠️", "Discrepancies", "Audit details", 
-            "audit_discrepancy_detail", ReportModels.ReportCategory.ANALYTICS, true, R.color.icon_advanced));
+        filteredReportList.clear();
+        filteredReportList.addAll(reportList);
+        
+        if (adapter != null) {
+            adapter.notifyDataSetChanged();
+        }
     }
-    
-    filteredReportList.clear();
-    filteredReportList.addAll(reportList);
-    
-    if (adapter != null) {
-        adapter.notifyDataSetChanged();
-    }
-}
     
     private void filterReportsByCategory(int categoryPosition) {
         filteredReportList.clear();
@@ -618,8 +612,6 @@ public class MiraReportsProFragment extends Fragment {
         dialog.show();
     }
     
-    // ==================== Advanced Report Dialogs ====================
-    
     private void showUserTimelineDialog(ReportModels.ReportItem item) {
         reportRepository.fetchUsers().observe(getViewLifecycleOwner(), users -> {
             if (users == null || users.isEmpty()) {
@@ -674,7 +666,6 @@ public class MiraReportsProFragment extends Fragment {
     private void showGateSecurityDialog(ReportModels.ReportItem item) {
         reportRepository.fetchGates(currentBranchId).observe(getViewLifecycleOwner(), gates -> {
             if (gates == null || gates.isEmpty()) {
-                // إذا لا توجد بوابات، اعرض التقرير مباشرة
                 fetchAdvancedReport("gate_security_index", null);
                 return;
             }
@@ -744,253 +735,31 @@ public class MiraReportsProFragment extends Fragment {
         dialog.show();
     }
     
-    // ==================== Adapters ====================
-    
     private RecyclerView.Adapter<?> createAdapterForType(String type, JSONObject data) {
-    // استخراج المصفوفة من البيانات
-    JSONArray itemsArray = extractItemsArray(data);
-    
-    // الحصول على العملة
-    String currency = priceManager != null ? priceManager.getCurrencySymbol() : "";
-    
-    switch (type) {
-        case "sales":
-            return new ReportAdapters.SalesAdapter(itemsArray, isArabic, currency);
-            
-        case "inventory":
-            return new ReportAdapters.InventoryAdapter(itemsArray, isArabic);
-            
-        case "gates":
-            return new ReportAdapters.GatesAdapter(itemsArray, isArabic);
-            
-        case "users":
-            return new ReportAdapters.UsersAdapter(itemsArray, isArabic);
-            
-        case "financial":
-            return new ReportAdapters.FinancialAdapter(itemsArray, isArabic, currency);
-            
-        case "movement":
-            return new ReportAdapters.MovementAdapter(itemsArray, isArabic);
-            
-        default:
-            // للمحاولة العامة - عرض منسق
-            return new GenericAdapter(parseToFormattedGeneric(data));
-    }
-}
-
-/**
- * ✅ استخراج المصفوفة من البيانات
- */
-private JSONArray extractItemsArray(JSONObject data) {
-    if (data == null) return null;
-    
-    String[] keys = {"items", "data", "items_list", "invoices", "sales", 
-                    "inventory", "movements", "transfers", "users", "gate_logs",
-                    "branches", "journal_entries", "reorder_items"};
-    
-    // البحث المباشر
-    for (String key : keys) {
-        JSONArray arr = data.optJSONArray(key);
-        if (arr != null && arr.length() > 0) return arr;
-    }
-    
-    // البحث في كائن data المتداخل
-    JSONObject dataObj = data.optJSONObject("data");
-    if (dataObj != null) {
-        for (String key : keys) {
-            JSONArray arr = dataObj.optJSONArray(key);
-            if (arr != null && arr.length() > 0) return arr;
-        }
-    }
-    
-    return null;
-}
-
-/**
- * ✅ تحويل JSON إلى عناصر منسقة (للحالات العامة)
- */
-private List<ReportModels.GenericItem> parseToFormattedGeneric(JSONObject data) {
-    List<ReportModels.GenericItem> items = new ArrayList<>();
-    if (data == null) return items;
-    
-    JSONArray array = extractItemsArray(data);
-    
-    if (array != null) {
-        for (int i = 0; i < array.length(); i++) {
-            JSONObject obj = array.optJSONObject(i);
-            if (obj != null) {
-                // تنسيق المفاتيح لتكون أكثر قابلية للقراءة
-                Iterator<String> keys = obj.keys();
-                while (keys.hasNext()) {
-                    String key = keys.next();
-                    String value = obj.optString(key, "");
-                    
-                    // تنسيق المفتاح
-                    String formattedKey = formatKeyName(key, isArabic);
-                    String formattedValue = formatValue(value, key, isArabic);
-                    
-                    items.add(new ReportModels.GenericItem(formattedKey, formattedValue));
-                }
-                // فاصل
-                if (i < array.length() - 1) {
-                    items.add(new ReportModels.GenericItem("──────────", ""));
-                }
-            }
-        }
-    }
-    
-    return items;
-}
-
-/**
- * ✅ تنسيق اسم المفتاح
- */
-private String formatKeyName(String key, boolean isArabic) {
-    if (isArabic) {
-        switch (key.toLowerCase()) {
-            case "id": return "المعرف";
-            case "name": return "الاسم";
-            case "title": return "العنوان";
-            case "status": return "الحالة";
-            case "date": return "التاريخ";
-            case "created_at": return "تاريخ الإنشاء";
-            case "updated_at": return "تاريخ التحديث";
-            case "total": return "الإجمالي";
-            case "amount": return "المبلغ";
-            case "count": return "العدد";
-            case "weight": return "الوزن";
-            case "karat": return "العيار";
-            case "price": return "السعر";
-            case "quantity": return "الكمية";
-            case "description": return "الوصف";
-            case "category": return "الفئة";
-            case "branch": return "الفرع";
-            case "user": return "المستخدم";
-            case "role": return "الدور";
+        JSONArray itemsArray = extractItemsArray(data);
+        String currency = priceManager != null ? priceManager.getCurrencySymbol() : "";
+        
+        switch (type) {
+            case "sales":
+                return new ReportAdapters.SalesAdapter(itemsArray, isArabic, currency);
+            case "inventory":
+                return new ReportAdapters.InventoryAdapter(itemsArray, isArabic);
+            case "gates":
+                return new ReportAdapters.GatesAdapter(itemsArray, isArabic);
+            case "users":
+                return new ReportAdapters.UsersAdapter(itemsArray, isArabic);
+            case "financial":
+                return new ReportAdapters.FinancialAdapter(itemsArray, isArabic, currency);
+            case "movement":
+                return new ReportAdapters.MovementAdapter(itemsArray, isArabic);
             default:
-                // تحويل snake_case إلى نص مقروء
-                return key.replace("_", " ").substring(0, 1).toUpperCase() + 
-                       key.replace("_", " ").substring(1);
+                return new GenericAdapter(parseToFormattedGeneric(data));
         }
-    } else {
-        return key.replace("_", " ").substring(0, 1).toUpperCase() + 
-               key.replace("_", " ").substring(1);
-    }
-}
-
-/**
- * ✅ تنسيق القيمة
- */
-private String formatValue(String value, String key, boolean isArabic) {
-    if (value == null || value.isEmpty() || value.equals("null")) {
-        return isArabic ? "غير محدد" : "N/A";
     }
     
-    // تنسيق التواريخ
-    if (key.toLowerCase().contains("date") || key.toLowerCase().contains("time") ||
-        key.toLowerCase().contains("created") || key.toLowerCase().contains("updated")) {
-        return formatDateString(value);
-    }
-    
-    // تنسيق الحالات
-    if (key.toLowerCase().equals("status")) {
-        return formatStatusValue(value, isArabic);
-    }
-    
-    return value;
-}
-
-/**
- * ✅ تنسيق التاريخ
- */
-private String formatDateString(String dateStr) {
-    try {
-        SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
-        SimpleDateFormat outputFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.US);
-        Date date = inputFormat.parse(dateStr);
-        return outputFormat.format(date);
-    } catch (Exception e) {
-        return dateStr;
-    }
-}
-
-/**
- * ✅ تنسيق الحالة
- */
-private String formatStatusValue(String status, boolean isArabic) {
-    if (isArabic) {
-        switch (status.toLowerCase()) {
-            case "active": return "✅ نشط";
-            case "inactive": return "⛔ غير نشط";
-            case "suspended": return "🚫 موقوف";
-            case "approved": return "✅ معتمد";
-            case "rejected": return "❌ مرفوض";
-            case "pending": return "⏳ قيد الانتظار";
-            case "draft": return "📝 مسودة";
-            case "in_stock": return "✅ متاح";
-            case "sold": return "💰 مباع";
-            case "displayed": return "🏪 معروض";
-            default: return status;
-        }
-    } else {
-        return status;
-    }
-}
-    
-    private RecyclerView.Adapter<?> createAdvancedAdapter(String type, JSONObject data) {
-    JSONArray itemsArray = extractItemsArray(data);
-    
-    switch (type) {
-        case "user_timeline":
-            return new GenericAdapter(parseToFormattedGeneric(data));
-        case "item_passport":
-            return new GenericAdapter(parseToFormattedGeneric(data));
-        case "gate_security_index":
-            return new GenericAdapter(parseToFormattedGeneric(data));
-        case "inventory_aging":
-            return new GenericAdapter(parseToFormattedGeneric(data));
-        case "audit_discrepancy_detail":
-            return new GenericAdapter(parseToFormattedGeneric(data));
-        default:
-            return new GenericAdapter(parseToFormattedGeneric(data));
-    }
-}
-    private List<ReportModels.GenericItem> parseToGeneric(JSONObject data) {
-        List<ReportModels.GenericItem> items = new ArrayList<>();
-        if (data == null) return items;
+    private JSONArray extractItemsArray(JSONObject data) {
+        if (data == null) return null;
         
-        JSONArray array = findArray(data);
-        
-        if (array != null) {
-            for (int i = 0; i < array.length(); i++) {
-                JSONObject obj = array.optJSONObject(i);
-                if (obj != null) {
-                    Iterator<String> keys = obj.keys();
-                    while (keys.hasNext()) {
-                        String key = keys.next();
-                        String value = obj.optString(key, "");
-                        items.add(new ReportModels.GenericItem(key, value));
-                    }
-                    if (i < array.length() - 1) {
-                        items.add(new ReportModels.GenericItem("---", "---"));
-                    }
-                }
-            }
-        } else {
-            Iterator<String> keys = data.keys();
-            while (keys.hasNext()) {
-                String key = keys.next();
-                Object value = data.opt(key);
-                if (value != null && !key.equals("success") && !key.equals("timestamp")) {
-                    items.add(new ReportModels.GenericItem(key, value.toString()));
-                }
-            }
-        }
-        
-        return items;
-    }
-    
-    private JSONArray findArray(JSONObject data) {
         String[] keys = {"items", "data", "items_list", "invoices", "sales", 
                         "inventory", "movements", "transfers", "users", "gate_logs",
                         "branches", "journal_entries", "reorder_items"};
@@ -1011,7 +780,117 @@ private String formatStatusValue(String status, boolean isArabic) {
         return null;
     }
     
-    // ==================== Helpers ====================
+    private List<ReportModels.GenericItem> parseToFormattedGeneric(JSONObject data) {
+        List<ReportModels.GenericItem> items = new ArrayList<>();
+        if (data == null) return items;
+        
+        JSONArray array = extractItemsArray(data);
+        
+        if (array != null) {
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject obj = array.optJSONObject(i);
+                if (obj != null) {
+                    Iterator<String> keys = obj.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        String value = obj.optString(key, "");
+                        String formattedKey = formatKeyName(key, isArabic);
+                        String formattedValue = formatValue(value, key, isArabic);
+                        items.add(new ReportModels.GenericItem(formattedKey, formattedValue));
+                    }
+                    if (i < array.length() - 1) {
+                        items.add(new ReportModels.GenericItem("──────────", ""));
+                    }
+                }
+            }
+        }
+        
+        return items;
+    }
+    
+    private String formatKeyName(String key, boolean isArabic) {
+        if (isArabic) {
+            switch (key.toLowerCase()) {
+                case "id": return "المعرف";
+                case "name": return "الاسم";
+                case "title": return "العنوان";
+                case "status": return "الحالة";
+                case "date": return "التاريخ";
+                case "created_at": return "تاريخ الإنشاء";
+                case "updated_at": return "تاريخ التحديث";
+                case "total": return "الإجمالي";
+                case "amount": return "المبلغ";
+                case "count": return "العدد";
+                case "weight": return "الوزن";
+                case "karat": return "العيار";
+                case "price": return "السعر";
+                case "quantity": return "الكمية";
+                case "description": return "الوصف";
+                case "category": return "الفئة";
+                case "branch": return "الفرع";
+                case "user": return "المستخدم";
+                case "role": return "الدور";
+                default:
+                    return key.replace("_", " ").substring(0, 1).toUpperCase() + 
+                           key.replace("_", " ").substring(1);
+            }
+        } else {
+            return key.replace("_", " ").substring(0, 1).toUpperCase() + 
+                   key.replace("_", " ").substring(1);
+        }
+    }
+    
+    private String formatValue(String value, String key, boolean isArabic) {
+        if (value == null || value.isEmpty() || value.equals("null")) {
+            return isArabic ? "غير محدد" : "N/A";
+        }
+        
+        if (key.toLowerCase().contains("date") || key.toLowerCase().contains("time") ||
+            key.toLowerCase().contains("created") || key.toLowerCase().contains("updated")) {
+            return formatDateString(value);
+        }
+        
+        if (key.toLowerCase().equals("status")) {
+            return formatStatusValue(value, isArabic);
+        }
+        
+        return value;
+    }
+    
+    private String formatDateString(String dateStr) {
+        try {
+            SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+            SimpleDateFormat outputFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.US);
+            Date date = inputFormat.parse(dateStr);
+            return outputFormat.format(date);
+        } catch (Exception e) {
+            return dateStr;
+        }
+    }
+    
+    private String formatStatusValue(String status, boolean isArabic) {
+        if (isArabic) {
+            switch (status.toLowerCase()) {
+                case "active": return "✅ نشط";
+                case "inactive": return "⛔ غير نشط";
+                case "suspended": return "🚫 موقوف";
+                case "approved": return "✅ معتمد";
+                case "rejected": return "❌ مرفوض";
+                case "pending": return "⏳ قيد الانتظار";
+                case "draft": return "📝 مسودة";
+                case "in_stock": return "✅ متاح";
+                case "sold": return "💰 مباع";
+                case "displayed": return "🏪 معروض";
+                default: return status;
+            }
+        } else {
+            return status;
+        }
+    }
+    
+    private RecyclerView.Adapter<?> createAdvancedAdapter(String type, JSONObject data) {
+        return new GenericAdapter(parseToFormattedGeneric(data));
+    }
     
     private String getReportTitle(String type) {
         if (isArabic) {
@@ -1055,85 +934,109 @@ private String formatStatusValue(String status, boolean isArabic) {
     
     // ==================== Adapter Classes ====================
     
- class ReportsAdapter extends RecyclerView.Adapter<ReportsAdapter.VH> {
-    final List<ReportModels.ReportItem> list;
-    final OnReportClickListener listener;
-    
-    ReportsAdapter(List<ReportModels.ReportItem> l, OnReportClickListener c) {
-        list = l;
-        listener = c;
-    }
-    
-    @NonNull @Override
-    public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
-        return new VH(LayoutInflater.from(p.getContext())
-            .inflate(R.layout.item_report_card_pro, p, false));
-    }
-    
-    @Override
-    public void onBindViewHolder(@NonNull VH h, int pos) {
-        ReportModels.ReportItem item = list.get(pos);
+    class ReportsAdapter extends RecyclerView.Adapter<ReportsAdapter.VH> {
+        final List<ReportModels.ReportItem> list;
+        final OnReportClickListener listener;
         
-        h.tvIcon.setText(item.icon);
-        h.tvTitle.setText(item.title);
-        h.tvSubtitle.setText(item.subtitle);
-        
-        // ✅ تطبيق اللون المخصص للأيقونة
-        if (item.color != 0 && h.flIconContainer != null) {
-            h.flIconContainer.setBackgroundTintList(
-                android.content.res.ColorStateList.valueOf(
-                    h.itemView.getContext().getColor(item.color)));
+        ReportsAdapter(List<ReportModels.ReportItem> l, OnReportClickListener c) {
+            list = l;
+            listener = c;
         }
         
-        // ✅ إظهار شارة "متقدم"
-        if (h.chipAdvanced != null) {
-            if (item.isAdvanced) {
-                h.chipAdvanced.setVisibility(View.VISIBLE);
-                h.chipAdvanced.setText(isArabic ? "✨ متقدم" : "✨ Advanced");
-            } else {
-                h.chipAdvanced.setVisibility(View.GONE);
+        @NonNull @Override
+        public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
+            return new VH(LayoutInflater.from(p.getContext())
+                .inflate(R.layout.item_report_card_pro, p, false));
+        }
+        
+        @Override
+        public void onBindViewHolder(@NonNull VH h, int pos) {
+            ReportModels.ReportItem item = list.get(pos);
+            
+            h.tvIcon.setText(item.icon);
+            h.tvTitle.setText(item.title);
+            h.tvSubtitle.setText(item.subtitle);
+            
+            if (item.color != 0 && h.flIconContainer != null) {
+                h.flIconContainer.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(
+                        h.itemView.getContext().getColor(item.color)));
+            }
+            
+            if (h.chipAdvanced != null) {
+                if (item.isAdvanced) {
+                    h.chipAdvanced.setVisibility(View.VISIBLE);
+                    h.chipAdvanced.setText(isArabic ? "✨ متقدم" : "✨ Advanced");
+                } else {
+                    h.chipAdvanced.setVisibility(View.GONE);
+                }
+            }
+            
+            h.itemView.setOnClickListener(v -> {
+                v.animate().scaleX(0.96f).scaleY(0.96f).setDuration(100)
+                    .withEndAction(() -> {
+                        v.animate().scaleX(1f).scaleY(1f).setDuration(100).start();
+                    }).start();
+                v.postDelayed(() -> listener.onClick(item), 120);
+            });
+        }
+        
+        @Override
+        public int getItemCount() {
+            return list.size();
+        }
+        
+        class VH extends RecyclerView.ViewHolder {
+            TextView tvIcon, tvTitle, tvSubtitle;
+            FrameLayout flIconContainer;
+            TextView chipAdvanced;
+            
+            VH(View v) {
+                super(v);
+                tvIcon = v.findViewById(R.id.tvReportIcon);
+                tvTitle = v.findViewById(R.id.tvReportTitle);
+                tvSubtitle = v.findViewById(R.id.tvReportSubtitle);
+                flIconContainer = v.findViewById(R.id.flIconContainer);
+                chipAdvanced = v.findViewById(R.id.chipAdvanced);
             }
         }
+    }
+    
+    class GenericAdapter extends RecyclerView.Adapter<GenericAdapter.VH> {
+        final List<ReportModels.GenericItem> items;
         
-        // ✅ تأثير اللمس
-        h.itemView.setOnClickListener(v -> {
-            v.animate()
-                .scaleX(0.96f)
-                .scaleY(0.96f)
-                .setDuration(100)
-                .withEndAction(() -> {
-                    v.animate()
-                        .scaleX(1f)
-                        .scaleY(1f)
-                        .setDuration(100)
-                        .start();
-                })
-                .start();
+        GenericAdapter(List<ReportModels.GenericItem> items) {
+            this.items = items;
+        }
+        
+        @NonNull @Override
+        public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
+            return new VH(LayoutInflater.from(p.getContext())
+                .inflate(R.layout.item_report_generic, p, false));
+        }
+        
+        @Override
+        public void onBindViewHolder(@NonNull VH h, int pos) {
+            ReportModels.GenericItem item = items.get(pos);
+            h.tvKey.setText(item.key);
+            h.tvValue.setText(item.value);
+        }
+        
+        @Override
+        public int getItemCount() {
+            return items.size();
+        }
+        
+        class VH extends RecyclerView.ViewHolder {
+            TextView tvKey, tvValue;
             
-            v.postDelayed(() -> listener.onClick(item), 120);
-        });
-    }
-    
-    @Override
-    public int getItemCount() {
-        return list.size();
-    }
-    
-    class VH extends RecyclerView.ViewHolder {
-        TextView tvIcon, tvTitle, tvSubtitle;
-        FrameLayout flIconContainer;
-        TextView chipAdvanced;
-        
-        VH(View v) {
-            super(v);
-            tvIcon = v.findViewById(R.id.tvReportIcon);
-            tvTitle = v.findViewById(R.id.tvReportTitle);
-            tvSubtitle = v.findViewById(R.id.tvReportSubtitle);
-            flIconContainer = v.findViewById(R.id.flIconContainer);
-            chipAdvanced = v.findViewById(R.id.chipAdvanced);
+            VH(View v) {
+                super(v);
+                tvKey = v.findViewById(R.id.tvKey);
+                tvValue = v.findViewById(R.id.tvValue);
+            }
         }
     }
-}
     
     interface OnReportClickListener {
         void onClick(ReportModels.ReportItem item);
@@ -1148,4 +1051,4 @@ private String formatStatusValue(String status, boolean isArabic) {
         super.onDestroyView();
         mainHandler.removeCallbacksAndMessages(null);
     }
-    }
+}
