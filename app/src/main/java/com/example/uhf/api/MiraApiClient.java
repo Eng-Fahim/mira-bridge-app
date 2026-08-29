@@ -682,30 +682,36 @@ public ApiResponse getSalesHistoryByDateRange(String fromDate, String toDate, in
 }
 
 // ✅ دالة شاملة للفلترة المتقدمة
-public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod, String fromDate, String toDate, int page, int pageSize) {
-    StringBuilder endpoint = new StringBuilder("/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize);
-    
+// ✅ بديل بدون Uri
+public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod, 
+                                            String fromDate, String toDate, 
+                                            int page, int pageSize, int branchId) {
     try {
-        if (search != null && !search.isEmpty()) {
+        StringBuilder endpoint = new StringBuilder("/pos/sales?");
+        endpoint.append("page=").append(page);
+        endpoint.append("&limit=").append(pageSize);
+        
+        if (!search.isEmpty()) {
             endpoint.append("&search=").append(URLEncoder.encode(search, "UTF-8"));
         }
-        
-        if (paymentMethod != null && !paymentMethod.isEmpty() && !paymentMethod.equals("ALL")) {
-            endpoint.append("&payment_method=").append(paymentMethod);
+        if (!paymentMethod.equals("ALL")) {
+            endpoint.append("&payment_method=").append(paymentMethod.toLowerCase());
         }
-        
         if (fromDate != null && !fromDate.isEmpty()) {
             endpoint.append("&from=").append(fromDate);
         }
-        
         if (toDate != null && !toDate.isEmpty()) {
             endpoint.append("&to=").append(toDate);
         }
+        if (branchId > 0) {
+            endpoint.append("&branch_id=").append(branchId);
+        }
+        
+        return getWithAuth(endpoint.toString());
     } catch (Exception e) {
-        Log.e(TAG, "Error building advanced search URL", e);
+        Log.e(TAG, "getSalesHistoryAdvanced error: " + e.getMessage());
+        return null;
     }
-    
-    return getWithAuth(endpoint.toString());
 }
 
     // ===================== 🏷️ ITEM =====================
@@ -1512,4 +1518,4 @@ public ApiResponse getBranchInventoryStats(int branchId) {
         return null;
     }
 }
-            }
+    }
