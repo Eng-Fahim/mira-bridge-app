@@ -987,68 +987,85 @@ private void showAdvancedReportDialog(String type, JSONObject data) {
 // ✅ دالة طباعة التقارير المتقدمة
 private void printAdvancedReport(String type, JSONObject data, RecyclerView rvData) {
     if (getContext() == null) return;
-    
+
     try {
         String direction = isArabic ? "rtl" : "ltr";
         String textAlign = isArabic ? "right" : "left";
-        
+
         StringBuilder html = new StringBuilder();
         html.append("<!DOCTYPE html><html dir='").append(direction).append("'><head><meta charset='utf-8'>")
             .append("<style>")
-            .append("@page { size: A4; margin: 15mm; }")
-            .append("body { font-family: 'Segoe UI', Tahoma, sans-serif; direction: ").append(direction).append("; text-align: ").append(textAlign).append("; padding: 20px; }")
-            .append(".header { text-align: center; border-bottom: 3px solid #1a237e; padding-bottom: 15px; margin-bottom: 20px; }")
-            .append(".org-name { font-size: 22px; font-weight: bold; color: #1a237e; }")
-            .append(".report-title { font-size: 18px; font-weight: bold; margin: 10px 0; }")
-            .append(".report-date { font-size: 12px; color: #777; }")
-            .append("table { width: 100%; border-collapse: collapse; margin-top: 15px; }")
-            .append("th { background: #1a237e; color: white; padding: 8px; font-size: 11px; }")
-            .append("td { padding: 6px; border: 1px solid #ddd; font-size: 10px; }")
-            .append(".footer { margin-top: 30px; text-align: center; font-size: 9px; color: #999; }")
+            .append("@page { size: A4; margin: 12mm; }")
+            .append("body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: ").append(direction)
+            .append("; text-align: ").append(textAlign).append("; padding: 15px; color: #1a1a2e; background-color: #fff; }")
+            .append(".header { text-align: center; border-bottom: 2px dashed #1a237e; padding-bottom: 12px; margin-bottom: 20px; }")
+            .append(".org-name { font-size: 22px; font-weight: bold; color: #1a237e; margin: 0; }")
+            .append(".report-title { font-size: 18px; font-weight: bold; color: #c5a059; margin: 5px 0; }")
+            .append(".passport-card { border: 2px solid #1a237e; border-radius: 8px; padding: 15px; background: #fafafa; margin-bottom: 20px; }")
+            .append("table { width: 100%; border-collapse: collapse; margin-top: 10px; }")
+            .append("th { background: #1a237e; color: white; padding: 8px; font-size: 12px; text-align: center; }")
+            .append("td { padding: 8px; border: 1px solid #e0e0e0; font-size: 11px; text-align: center; }")
+            .append("tr:nth-child(even) { background: #f4f6f9; }")
+            .append(".key-col { font-weight: bold; background: #eaeff5; width: 35%; text-align: start; padding-inline-start: 10px; }")
+            .append(".timeline-item { border-inline-start: 3px solid #c5a059; padding-inline-start: 10px; margin-bottom: 8px; text-align: start; }")
+            .append(".footer { margin-top: 30px; text-align: center; font-size: 10px; color: #888; border-top: 1px solid #ddd; padding-top: 10px; }")
             .append("</style></head><body>");
-        
+
+        // رأس التقرير
         html.append("<div class='header'>")
-            .append("<div class='org-name'>").append(orgProfile != null ? orgProfile.getOrgName() : "MIRA System").append("</div>")
+            .append("<h1 class='org-name'>").append(orgProfile != null ? orgProfile.getOrgName() : "نظام MIRA للمجوهرات").append("</h1>")
             .append("<div class='report-title'>").append(getReportTitle(type)).append("</div>")
-            .append("<div class='report-date'>").append(isArabic ? "تاريخ الطباعة: " : "Print Date: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date())).append("</div>")
+            .append("<div style='font-size: 11px; color: #666;'>").append(isArabic ? "تاريخ التصدير: " : "Exported on: ")
+            .append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date())).append("</div>")
             .append("</div>");
-        
-        // ✅ إضافة البيانات
+
+        // جدول التفاصيل العادية والخط الزمني للقطعة
+        html.append("<div class='passport-card'>");
         html.append("<table><tbody>");
+
         RecyclerView.Adapter<?> adapter = rvData.getAdapter();
         if (adapter instanceof GenericAdapter) {
             List<GenericItem> items = ((GenericAdapter) adapter).items;
             for (GenericItem item : items) {
-                html.append("<tr><td style='width:30%;font-weight:bold;background:#f5f5f5;'>").append(item.key).append("</td>")
-                    .append("<td>").append(item.value.replace("\n", "<br>")).append("</td></tr>");
+                String formattedValue = item.value.replace("\n", "<br>");
+                html.append("<tr>")
+                    .append("<td class='key-col'>").append(item.key).append("</td>")
+                    .append("<td style='text-align: start; padding-inline-start: 10px;'>").append(formattedValue).append("</td>")
+                    .append("</tr>");
             }
         }
+
         html.append("</tbody></table>");
-        html.append("<div class='footer'>").append(isArabic ? "© نظام MIRA - تقرير متقدم" : "© MIRA System - Advanced Report").append("</div>");
-        html.append("</body></html>");
-        
+        html.append("</div>");
+
+        // التذييل
+        html.append("<div class='footer'>")
+            .append(isArabic ? "© نظام MIRA الذكي لتوثيق وتتبع الذهب والمجوهرات (بصمة القطعة الرقمية)" : "© MIRA Smart Jewelry Tracking & Passport System")
+            .append("</div></body></html>");
+
         WebView webView = new WebView(requireContext());
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
                 PrintManager printManager = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
                 if (printManager != null) {
-                    PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter("MIRA_Advanced_" + type);
+                    PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter("MIRA_Item_Passport_" + System.currentTimeMillis());
                     PrintAttributes attributes = new PrintAttributes.Builder()
                             .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
                             .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
                             .build();
-                    printManager.print("MIRA_Advanced_" + type, printAdapter, attributes);
+                    printManager.print("MIRA_Item_Passport", printAdapter, attributes);
                 }
             }
         });
         webView.loadDataWithBaseURL(null, html.toString(), "text/html", "UTF-8", null);
-        
+
     } catch (Exception e) {
         Log.e(TAG, "Advanced print error: " + e.getMessage());
         Toast.makeText(getContext(), "Print error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
     }
 }
+
 
     // ✅ دالة خاصة بتايم لاين المستخدم
     // ✅ دالة محسنة لتايم لاين المستخدم - عرض قائمة المستخدمين
@@ -1296,73 +1313,92 @@ private static class UserInfo {
     }
 
     private List<GenericItem> parseItemPassport(JSONObject data) {
-        List<GenericItem> items = new ArrayList<>();
-        if (data == null) return items;
-        
-        JSONObject itemDetails = data.optJSONObject("item_details");
-        if (itemDetails != null) {
-            items.add(new GenericItem(
-                isArabic ? "📦 عنوان القطعة" : "📦 Item Title",
-                itemDetails.optString("item_title", "-")
-            ));
-            items.add(new GenericItem(
-                isArabic ? "🔢 الرقم التسلسلي" : "🔢 Serial Number",
-                itemDetails.optString("serial_number", "-")
-            ));
-            items.add(new GenericItem(
-                isArabic ? "🏷️ العيار" : "🏷️ Karat",
-                itemDetails.optString("gold_karat", "-")
-            ));
-            items.add(new GenericItem(
-                isArabic ? "⚖️ الوزن" : "⚖️ Weight",
-                itemDetails.optString("gross_weight_grams", "-") + " g"
-            ));
-            items.add(new GenericItem(
-                isArabic ? "📍 الحالة" : "📍 Status",
-                itemDetails.optString("vault_status", "-")
-            ));
-            items.add(new GenericItem(
-                isArabic ? "🏢 الموقع" : "🏢 Location",
-                itemDetails.optString("current_location", "-")
-            ));
-        }
-        
-        JSONArray gateHistory = data.optJSONArray("gate_history");
-        if (gateHistory != null && gateHistory.length() > 0) {
-            items.add(new GenericItem(
-                isArabic ? "🚪 سجل البوابات" : "🚪 Gate History",
-                String.valueOf(gateHistory.length())
-            ));
-            for (int i = 0; i < gateHistory.length(); i++) {
-                JSONObject gate = gateHistory.optJSONObject(i);
-                if (gate != null) {
-                    items.add(new GenericItem(
-                        "بوابة: " + gate.optString("gate_name", "-"),
-                        "التاريخ: " + gate.optString("created_at", "-")
-                    ));
-                }
-            }
-        }
-        
-        JSONArray movements = data.optJSONArray("movements");
-        if (movements != null && movements.length() > 0) {
-            items.add(new GenericItem(
-                isArabic ? "🔄 سجل التحويلات" : "🔄 Transfer History",
-                String.valueOf(movements.length())
-            ));
-            for (int i = 0; i < movements.length(); i++) {
-                JSONObject movement = movements.optJSONObject(i);
-                if (movement != null) {
-                    items.add(new GenericItem(
-                        "من: " + movement.optString("from_b", "-") + " → إلى: " + movement.optString("to_b", "-"),
-                        "التاريخ: " + movement.optString("created_at", "-")
-                    ));
-                }
-            }
-        }
-        
-        return items;
+    List<GenericItem> items = new ArrayList<>();
+    if (data == null) return items;
+
+    JSONObject item = data.optJSONObject("item_details");
+    if (item == null) item = data.optJSONObject("item");
+    if (item == null) item = data;
+
+    // 1. التفاصيل والخصائص الأساسية
+    items.add(new GenericItem(isArabic ? "📦 عنوان القطعة" : "📦 Item Title", item.optString("item_title", item.optString("title", "-"))));
+    items.add(new GenericItem(isArabic ? "🔢 الرقم التسلسلي" : "🔢 Serial Number", item.optString("serial_number", item.optString("serial", "-"))));
+    items.add(new GenericItem(isArabic ? "🏷️ العيار والفئة" : "🏷️ Karat & Category", item.optString("gold_karat", "-") + " | " + item.optString("category_name", "-")));
+    
+    double grossWeight = item.optDouble("gross_weight_grams", item.optDouble("weight", 0.0));
+    double netWeight = item.optDouble("net_weight_grams", grossWeight);
+    items.add(new GenericItem(isArabic ? "⚖️ الوزن (قائم / صافي)" : "⚖️ Weight (Gross/Net)", String.format(Locale.US, "%.3f g / %.3f g", grossWeight, netWeight)));
+
+    // 2. الرموز والترميز الرقمي (RFID / GS1)
+    String epc = item.optString("rfid_epc", item.optString("epc", "-"));
+    String gtin = item.optString("gtin13", item.optString("barcode", "-"));
+    items.add(new GenericItem(isArabic ? "📡 رمز RFID EPC" : "📡 RFID EPC", epc));
+    items.add(new GenericItem(isArabic ? "📊 رمز GS1 / GTIN-13" : "📊 GS1/GTIN-13", gtin));
+
+    // 3. الحالة والموقع الحالي
+    items.add(new GenericItem(isArabic ? "📍 الحالة الحالية" : "📍 Current Status", item.optString("vault_status", item.optString("status", "in_stock"))));
+    items.add(new GenericItem(isArabic ? "🏢 الفرع والموقع" : "🏢 Branch & Location", item.optString("branch_name", "-") + " - " + item.optString("current_location", "المعرض")));
+
+    // 4. السجل المالي والأسعار
+    double laborCost = item.optDouble("labor_cost", 0.0);
+    double price = item.optDouble("selling_price", item.optDouble("price", 0.0));
+    if (price > 0 || laborCost > 0) {
+        items.add(new GenericItem(
+            isArabic ? "💰 التكلفة والسعر" : "💰 Cost & Price",
+            String.format(Locale.US, "%s: %.2f | %s: %.2f", 
+                isArabic ? "الأجورة" : "Labor", laborCost, 
+                isArabic ? "السعر" : "Price", price)
+        ));
     }
+
+    // 5. سجل المرور عبر البوابات الأمنية
+    JSONArray gateHistory = data.optJSONArray("gate_history");
+    if (gateHistory != null && gateHistory.length() > 0) {
+        StringBuilder gatesLog = new StringBuilder();
+        for (int i = 0; i < gateHistory.length(); i++) {
+            JSONObject gate = gateHistory.optJSONObject(i);
+            if (gate != null) {
+                if (i > 0) gatesLog.append("\n---\n");
+                gatesLog.append("🚪 ").append(gate.optString("gate_name", "بوابة"))
+                        .append(" | ").append(gate.optString("status", "مرور مصرح"))
+                        .append("\n📅 ").append(gate.optString("created_at", gate.optString("date", "-")));
+            }
+        }
+        items.add(new GenericItem(isArabic ? "🛡️ سجل المرور عبر البوابات" : "🛡️ Gate Audit Logs", gatesLog.toString()));
+    } else {
+        items.add(new GenericItem(isArabic ? "🛡️ سجل المرور عبر البوابات" : "🛡️ Gate Audit Logs", isArabic ? "لا يوجد سجل حركة بوابات" : "No gate events recorded"));
+    }
+
+    // 6. سجل التحويلات بين الفروع
+    JSONArray movements = data.optJSONArray("movements");
+    if (movements != null && movements.length() > 0) {
+        StringBuilder movLog = new StringBuilder();
+        for (int i = 0; i < movements.length(); i++) {
+            JSONObject mov = movements.optJSONObject(i);
+            if (mov != null) {
+                if (i > 0) movLog.append("\n---\n");
+                movLog.append("🔄 ").append(mov.optString("from_branch", "فرع المصدر"))
+                      .append(" ➔ ").append(mov.optString("to_branch", "الفرع المستلم"))
+                      .append("\n📅 ").append(mov.optString("created_at", "-"));
+            }
+        }
+        items.add(new GenericItem(isArabic ? "🔄 سجل الحركة والتحويلات" : "🔄 Movement History", movLog.toString()));
+    }
+
+    // 7. بيانات البيع والعميل (إن وجدت)
+    JSONObject saleInfo = data.optJSONObject("sale_info");
+    if (saleInfo != null) {
+        items.add(new GenericItem(
+            isArabic ? "🛒 بيانات البيع" : "🛒 Sale Info",
+            String.format(Locale.US, "%s: %s\n%s: %s\n%s: %s",
+                isArabic ? "الفاتورة" : "Invoice", saleInfo.optString("invoice_no", "-"),
+                isArabic ? "العميل" : "Customer", saleInfo.optString("customer_name", "-"),
+                isArabic ? "تاريخ البيع" : "Date", saleInfo.optString("sale_date", "-"))
+        ));
+    }
+
+    return items;
+}
 
     private List<GenericItem> parseGateSecurity(JSONObject data) {
     List<GenericItem> items = new ArrayList<>();
