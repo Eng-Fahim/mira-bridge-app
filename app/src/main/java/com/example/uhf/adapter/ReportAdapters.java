@@ -7,8 +7,9 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.uhf.R;  // ✅ استيراد R
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -19,9 +20,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * ✅ محولات مخصصة لكل نوع تقرير
- */
 public class ReportAdapters {
     
     // ==================== محول المبيعات ====================
@@ -68,17 +66,13 @@ public class ReportAdapters {
                 item.optString("date", item.optString("sale_date", "")));
             
             h.tvInvoiceNo.setText(isArabic ? "فاتورة: " + invoiceNo : "Invoice: " + invoiceNo);
-            h.tvCustomer.setText(isArabic ? "👤 " + customer : "👤 " + customer);
+            h.tvCustomer.setText("👤 " + customer);
             h.tvAmount.setText(String.format(Locale.US, "%,.2f %s", amount, currency));
             h.tvPayment.setText(getPaymentLabel(payment, isArabic));
-            h.tvSeller.setText(isArabic ? "👨‍💼 " + seller : "👨‍💼 " + seller);
+            h.tvSeller.setText("👨‍💼 " + seller);
             h.tvDate.setText(formatDate(date));
             
-            // تلوين حسب طريقة الدفع
-            int color = getPaymentColor(payment);
-            h.tvPayment.setTextColor(color);
-            
-            // تلوين المبلغ
+            h.tvPayment.setTextColor(getPaymentColor(payment));
             h.tvAmount.setTextColor(Color.parseColor("#1a237e"));
         }
         
@@ -146,10 +140,9 @@ public class ReportAdapters {
             h.tvKarat.setText(karat);
             h.tvWeight.setText(String.format(Locale.US, "%.2f g", weight));
             h.tvStatus.setText(getStatusLabel(status, isArabic));
-            h.tvLocation.setText(isArabic ? "📍 " + location : "📍 " + location);
-            h.tvSerial.setText(isArabic ? "🔢 " + serial : "🔢 " + serial);
+            h.tvLocation.setText("📍 " + location);
+            h.tvSerial.setText("🔢 " + serial);
             
-            // تلوين الحالة
             h.tvStatus.setTextColor(getStatusColor(status));
         }
         
@@ -209,11 +202,10 @@ public class ReportAdapters {
                 item.optString("date", item.optString("timestamp", "")));
             String status = item.optString("status", "allowed");
             
-            h.tvGate.setText(isArabic ? "🚪 " + gateName : "🚪 " + gateName);
-            h.tvEpc.setText(isArabic ? "📡 " + epc : "📡 " + epc);
+            h.tvGate.setText("🚪 " + gateName);
+            h.tvEpc.setText("📡 " + epc);
             h.tvDate.setText(formatDate(date));
             
-            // حالة المرور
             if (status.toLowerCase().contains("alert") || status.toLowerCase().contains("denied")) {
                 h.tvStatus.setText(isArabic ? "⚠️ إنذار" : "⚠️ Alert");
                 h.tvStatus.setTextColor(Color.parseColor("#F44336"));
@@ -276,8 +268,8 @@ public class ReportAdapters {
             String status = item.optString("status", 
                 item.optString("is_active", "active"));
             
-            h.tvName.setText(isArabic ? "👤 " + name : "👤 " + name);
-            h.tvRole.setText(isArabic ? "💼 " + role : "💼 " + role);
+            h.tvName.setText("👤 " + name);
+            h.tvRole.setText("💼 " + role);
             
             if (status.toLowerCase().contains("active")) {
                 h.tvStatus.setText(isArabic ? "✅ نشط" : "✅ Active");
@@ -410,11 +402,10 @@ public class ReportAdapters {
             String date = item.optString("created_at", 
                 item.optString("date", ""));
             
-            h.tvFrom.setText(isArabic ? "📤 " + from : "📤 " + from);
-            h.tvTo.setText(isArabic ? "📥 " + to : "📥 " + to);
+            h.tvFrom.setText("📤 " + from);
+            h.tvTo.setText("📥 " + to);
             h.tvDate.setText(formatDate(date));
             
-            // حالة التحويل
             switch (status.toLowerCase()) {
                 case "approved":
                     h.tvStatus.setText(isArabic ? "✅ معتمد" : "✅ Approved");
@@ -453,27 +444,19 @@ public class ReportAdapters {
     
     private static String getPaymentLabel(String payment, boolean isArabic) {
         switch (payment.toLowerCase()) {
-            case "cash":
-                return isArabic ? "💵 نقدي" : "💵 Cash";
-            case "card":
-                return isArabic ? "💳 بطاقة" : "💳 Card";
-            case "transfer":
-                return isArabic ? "🏦 تحويل" : "🏦 Transfer";
-            default:
-                return isArabic ? "💰 " + payment : "💰 " + payment;
+            case "cash": return isArabic ? "💵 نقدي" : "💵 Cash";
+            case "card": return isArabic ? "💳 بطاقة" : "💳 Card";
+            case "transfer": return isArabic ? "🏦 تحويل" : "🏦 Transfer";
+            default: return "💰 " + payment;
         }
     }
     
     private static int getPaymentColor(String payment) {
         switch (payment.toLowerCase()) {
-            case "cash":
-                return Color.parseColor("#4CAF50");
-            case "card":
-                return Color.parseColor("#2196F3");
-            case "transfer":
-                return Color.parseColor("#9C27B0");
-            default:
-                return Color.parseColor("#666666");
+            case "cash": return Color.parseColor("#4CAF50");
+            case "card": return Color.parseColor("#2196F3");
+            case "transfer": return Color.parseColor("#9C27B0");
+            default: return Color.parseColor("#666666");
         }
     }
     
@@ -487,7 +470,7 @@ public class ReportAdapters {
             case "displayed":
                 return isArabic ? "🏪 معروض" : "🏪 Displayed";
             default:
-                return isArabic ? "📦 " + status : "📦 " + status;
+                return "📦 " + status;
         }
     }
     
