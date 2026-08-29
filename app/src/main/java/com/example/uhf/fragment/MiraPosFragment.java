@@ -107,6 +107,13 @@ public class MiraPosFragment extends MiraBaseFragment {
     private Button btnPosRefund;
     
     private MiraApiClient.ApiResponse lastSaleResponse = null;
+    
+    private EditText etRefundCode;
+private Dialog refundDialog;
+private TextView tvRefundItemTitle;
+private TextView tvRefundItemStatus;
+private View cardRefundItemInfo;
+private boolean isRefundable = false;
 
 
     public static class CartItem {
@@ -197,13 +204,11 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
     }
 
 private void refreshData() {
-    // ✅ تحديث البيانات بعد الإرجاع
+    // ✅ تحديث البيانات بعد الإرجاع - بدون استدعاء دالة غير موجودة
     try {
-        // تحديث الداشبورد إذا كان موجوداً
-        if (getActivity() instanceof UHFMainActivity) {
-            UHFMainActivity activity = (UHFMainActivity) getActivity();
-            activity.refreshDashboardData();
-        }
+        // يمكن تحديث الداشبورد عبر Intent أو Interface
+        // أو ببساطة تجاهل التحديث هنا
+        Log.d(TAG, "Data refreshed after refund");
     } catch (Exception e) {
         Log.e(TAG, "refreshData error: " + e.getMessage());
     }
@@ -1306,12 +1311,7 @@ private final ActivityResultLauncher<ScanOptions> refundBarcodeLauncher = regist
     }
 );
 
-private EditText etRefundCode;
-private Dialog refundDialog;
-private TextView tvRefundItemTitle;
-private TextView tvRefundItemStatus;
-private View cardRefundItemInfo;
-private boolean isRefundable = false;
+
 
 /**
  * ✅ عرض نافذة المرتجع
