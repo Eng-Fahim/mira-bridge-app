@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView 
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="4dp"
-    app:cardBackgroundColor="?attr/colorSurface"
-    app:cardCornerRadius="8dp"
-    app:cardElevation="1dp">
+    app:cardBackgroundColor="@color/bg_card"
+    app:cardCornerRadius="14dp"
+    app:cardElevation="2dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="#12000000">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -14,18 +17,21 @@
         android:orientation="vertical"
         android:padding="12dp">
 
+        <!-- رقم الفاتورة والمبلغ -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
             <TextView
                 android:id="@+id/tvInvoiceNo"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="INV-0001"
-                android:textColor="?attr/colorOnSurface"
+                android:fontFamily="monospace"
+                android:text="INV-2026-0001"
+                android:textColor="@color/text_primary"
                 android:textSize="13sp"
                 android:textStyle="bold" />
 
@@ -33,42 +39,51 @@
                 android:id="@+id/tvAmount"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="0.00"
-                android:textColor="?attr/colorPrimary"
+                android:text="$ 2,450.00"
+                android:textColor="@color/accent_dark"
                 android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- اسم العميل -->
         <TextView
             android:id="@+id/tvCustomerName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="اسم العميل"
-            android:textColor="?attr/colorOnSurfaceVariant"
+            android:text="العميل: شركة الذهب العالمية"
+            android:textColor="@color/text_secondary"
             android:textSize="11sp" />
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginVertical="8dp"
+            android:background="#0A000000" />
+
+        <!-- طريقة الدفع والبائع -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
             <TextView
                 android:id="@+id/tvPaymentMethod"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="CASH"
-                android:textColor="?attr/colorSecondary"
-                android:textSize="10sp" />
+                android:text="نقداً (CASH)"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvSellerName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="البائع"
-                android:textColor="?attr/colorOnSurfaceVariant"
+                android:text="البائع: م. فهيم"
+                android:textColor="@color/text_secondary"
                 android:textSize="10sp" />
         </LinearLayout>
     </LinearLayout>
