@@ -1,9 +1,9 @@
 package com.example.uhf.models;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-import java.util.ArrayList;
-import java.util.List;
+import org.json.JSONArray;  // ✅ تأكد من وجود هذا
+import org.json.JSONObject; // ✅ تأكد من وجود هذا
+import java.util.ArrayList; // ✅ تأكد من وجود هذا
+import java.util.List;      // ✅ تأكد من وجود هذا
 
 /**
  * ✅ نماذج البيانات الموحدة لنظام التقارير
