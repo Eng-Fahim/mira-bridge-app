@@ -1,10 +1,10 @@
 package com.example.uhf.model;
 
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
+
 /**
  * ✅ نماذج البيانات الموحدة لنظام التقارير
  */
@@ -97,24 +97,6 @@ public class ReportModels {
             this.branchId = 1;
         }
         
-        public ReportFilters(ReportFilters other) {
-            this.fromDate = other.fromDate;
-            this.toDate = other.toDate;
-            this.searchQuery = other.searchQuery;
-            this.filter1 = other.filter1;
-            this.filter2 = other.filter2;
-            this.filter3 = other.filter3;
-            this.branchId = other.branchId;
-            this.userId = other.userId;
-            this.gateId = other.gateId;
-            this.serialNumber = other.serialNumber;
-            this.gtin13 = other.gtin13;
-            this.sortBy = other.sortBy;
-            this.sortOrder = other.sortOrder;
-            this.page = other.page;
-            this.pageSize = other.pageSize;
-        }
-        
         public String toQueryString() {
             StringBuilder sb = new StringBuilder();
             
@@ -158,7 +140,6 @@ public class ReportModels {
         public boolean success;
         public String errorMessage;
         public JSONObject data;
-        public String rawData;
         public long timestamp;
         public String cacheKey;
         public boolean fromCache;
@@ -192,115 +173,12 @@ public class ReportModels {
     public static class GenericItem {
         public String key;
         public String value;
-        public String icon;
-        public int color;
-        public boolean isHighlighted;
         
         public GenericItem(String key, String value) {
-            this(key, value, null, 0, false);
-        }
-        
-        public GenericItem(String key, String value, String icon, int color, boolean isHighlighted) {
             this.key = key;
             this.value = value;
-            this.icon = icon;
-            this.color = color;
-            this.isHighlighted = isHighlighted;
         }
     }
-    
-    // ==================== 1. نموذج مكافئ الذهب الصافي ====================
-    public static class GoldEquivalentsData {
-        public double pureGold24k;
-        public double standardGold21k;
-        public List<KaratItem> breakdown = new ArrayList<>();
-
-        public static class KaratItem {
-            public String karat;
-            public int count;
-            public double grossWeight;
-            public double eq24k;
-        }
-
-        public static GoldEquivalentsData parse(JSONObject json) {
-            GoldEquivalentsData result = new GoldEquivalentsData();
-            if (json == null) return result;
-
-            JSONObject summary = json.optJSONObject("summary");
-            if (summary != null) {
-                result.pureGold24k = summary.optDouble("total_pure_gold_24k", 0.0);
-                result.standardGold21k = summary.optDouble("total_standard_21k", 0.0);
-            }
-
-            JSONArray array = json.optJSONArray("breakdown_by_karat");
-            if (array != null) {
-                for (int i = 0; i < array.length(); i++) {
-                    JSONObject obj = array.optJSONObject(i);
-                    if (obj != null) {
-                        KaratItem item = new KaratItem();
-                        item.karat = obj.optString("gold_karat", "N/A");
-                        item.count = obj.optInt("items_count", 0);
-                        item.grossWeight = obj.optDouble("gross_weight", 0.0);
-                        item.eq24k = obj.optDouble("weight_24k_eq", 0.0);
-                        result.breakdown.add(item);
-                    }
-                }
-            }
-            return result;
-        }
-    }
-
-    // ==================== 2. محول تقرير أداء البائعين ====================
-    public static List<SalesItem> parseSellerPerformance(JSONArray array) {
-        List<SalesItem> list = new ArrayList<>();
-        if (array == null) return list;
-
-        for (int i = 0; i < array.length(); i++) {
-            JSONObject obj = array.optJSONObject(i);
-            if (obj != null) {
-                String sellerName = obj.optString("seller_name", "غير معروف");
-                int invoices = obj.optInt("total_invoices", 0);
-                double totalSales = obj.optDouble("total_sales_amount", 0.0);
-
-                SalesItem item = new SalesItem(
-                        "فواتير: " + invoices,
-                        "بائع",
-                        totalSales,
-                        "نقدي/شبكة",
-                        sellerName
-                );
-                list.add(item);
-            }
-        }
-        return list;
-    }
-
-    // ==================== 3. محول القطع المفقودة بالجرد ====================
-    public static List<InventoryItem> parseMissingItems(JSONObject json) {
-        List<InventoryItem> list = new ArrayList<>();
-        if (json == null) return list;
-
-        JSONArray array = json.optJSONArray("items");
-        if (array == null) return list;
-
-        for (int i = 0; i < array.length(); i++) {
-            JSONObject obj = array.optJSONObject(i);
-            if (obj != null) {
-                InventoryItem item = new InventoryItem(
-                        obj.optString("item_title", "قطعة مفقودة"),
-                        obj.optString("gold_karat", "21K"),
-                        obj.optDouble("gross_weight_grams", 0.0),
-                        "مفقود بالجرد",
-                        obj.optString("current_location", "الفرع")
-                );
-                item.serialNumber = obj.optString("serial_number", "");
-                list.add(item);
-            }
-        }
-        return list;
-    }
-}
-
     
     public static class SalesItem {
         public String invoiceNo;
@@ -308,8 +186,6 @@ public class ReportModels {
         public double amount;
         public String paymentMethod;
         public String seller;
-        public String date;
-        public String status;
         
         public SalesItem(String invoiceNo, String customer, double amount, 
                         String paymentMethod, String seller) {
@@ -318,25 +194,6 @@ public class ReportModels {
             this.amount = amount;
             this.paymentMethod = paymentMethod;
             this.seller = seller;
-        }
-    }
-    
-    public static class InventoryItem {
-        public String title;
-        public String karat;
-        public double weight;
-        public String status;
-        public String location;
-        public String serialNumber;
-        public double price;
-        
-        public InventoryItem(String title, String karat, double weight, 
-                            String status, String location) {
-            this.title = title;
-            this.karat = karat;
-            this.weight = weight;
-            this.status = status;
-            this.location = location;
         }
     }
     
@@ -357,7 +214,6 @@ public class ReportModels {
         public String name;
         public String username;
         public String role;
-        public String status;
         
         public UserInfo(int id, String name, String username, String role) {
             this.id = id;
@@ -372,7 +228,6 @@ public class ReportModels {
         public String gateId;
         public String name;
         public String location;
-        public String status;
         
         public GateInfo(int id, String gateId, String name, String location) {
             this.id = id;
@@ -381,4 +236,4 @@ public class ReportModels {
             this.location = location;
         }
     }
-                    
+}
