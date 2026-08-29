@@ -23,7 +23,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -79,6 +78,7 @@ public class MiraTransferFragment extends Fragment {
     private final Set<String> activeScanEpcSet = new HashSet<>();
     private TextView activeDialogScannedTv;
     private TextView tvScanCounter;
+    private AlertDialog loadingDialog;
 
     @Nullable
     @Override
@@ -94,11 +94,12 @@ public class MiraTransferFragment extends Fragment {
         isArabic = Locale.getDefault().getLanguage().equals("ar");
         view.setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
         
-        apiClient = MiraApiClient.getInstance(requireContext());
-        branchesManager = MiraBranchesManager.getInstance(requireContext());
-        permissionManager = PermissionManager.getInstance(requireContext());
-        offlineCache = requireContext().getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
-        sessionManager = new SessionManager(requireContext());
+        Context context = requireContext();
+        apiClient = MiraApiClient.getInstance(context);
+        branchesManager = MiraBranchesManager.getInstance(context);
+        permissionManager = PermissionManager.getInstance(context);
+        offlineCache = context.getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
+        sessionManager = new SessionManager(context);
 
         initViews(view);
         setupListeners();
@@ -113,6 +114,21 @@ public class MiraTransferFragment extends Fragment {
         rvTransfers.setAdapter(adapter);
 
         loadTransfers();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        dismissLoadingDialog();
+        mainHandler.removeCallbacksAndMessages(null);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (executor != null && !executor.isShutdown()) {
+            executor.shutdownNow();
+        }
     }
 
     private void applyLanguage() {
@@ -183,9 +199,11 @@ public class MiraTransferFragment extends Fragment {
         }
     }
 
-    // ✅ إعداد وتنسيق الفلاتر ديناميكياً بالألوان والأعداد والتأثيرات
     private void setupFilterChips() {
         if (chipGroupFilters == null) return;
+        
+        Context context = getContext();
+        if (context == null || !isAdded()) return;
         
         chipGroupFilters.removeAllViews();
         
@@ -199,29 +217,20 @@ public class MiraTransferFragment extends Fragment {
             new FilterItem("received", isArabic ? "مستلم" : "Received", counts.get("received"), Color.parseColor("#388E3C"))
         };
 
-        for (int i = 0; i < filters.length; i++) {
-            FilterItem item = filters[i];
-            Chip chip = new Chip(requireContext());
+        for (FilterItem item : filters) {
+            Chip chip = new Chip(context); 
             
             chip.setText(String.format(Locale.getDefault(), "%s (%d)", item.label, item.count));
             chip.setCheckable(true);
             chip.setClickable(true);
             
-            // تطبيق تخصيص الألوان لكل حالة عند الاختيار وعدم الاختيار
             int[][] states = new int[][] {
                 new int[] { android.R.attr.state_checked },
                 new int[] { -android.R.attr.state_checked }
             };
             
-            int[] backgroundColors = new int[] {
-                item.color,
-                Color.parseColor("#F0F4F8")
-            };
-            
-            int[] textColors = new int[] {
-                Color.WHITE,
-                item.color
-            };
+            int[] backgroundColors = new int[] { item.color, Color.parseColor("#F0F4F8") };
+            int[] textColors = new int[] { Color.WHITE, item.color };
 
             chip.setChipBackgroundColor(new ColorStateList(states, backgroundColors));
             chip.setTextColor(new ColorStateList(states, textColors));
@@ -275,7 +284,9 @@ public class MiraTransferFragment extends Fragment {
         
         adapter.notifyDataSetChanged();
         updateEmptyState();
-        rvTransfers.scheduleLayoutAnimation(); // إضافة تأثير حركة عند تصفية العناصر
+        if (rvTransfers != null) {
+            rvTransfers.scheduleLayoutAnimation();
+        }
     }
 
     private void setupListeners() {
@@ -323,6 +334,8 @@ public class MiraTransferFragment extends Fragment {
             MiraApiClient.ApiResponse response = apiClient.getTransfers(branchId, "");
             
             mainHandler.post(() -> {
+                if (!isAdded() || getContext() == null) return;
+
                 allTransferList.clear();
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray transfers = response.data.optJSONArray("transfers");
@@ -369,6 +382,7 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void updateEmptyState() {
+        if (tvEmpty == null || rvTransfers == null) return;
         boolean empty = displayedTransferList.isEmpty();
         tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
         rvTransfers.setVisibility(empty ? View.GONE : View.VISIBLE);
@@ -429,6 +443,7 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void showTransferActions(TransferData t) {
+        if (!isAdded() || getContext() == null) return;
         selectedTransfer = t;
         List<String> options = new ArrayList<>();
         
@@ -487,6 +502,8 @@ public class MiraTransferFragment extends Fragment {
             MiraApiClient.ApiResponse response = apiClient.getTransfer(t.id);
             mainHandler.post(() -> {
                 dismissLoadingDialog();
+                if (!isAdded() || getContext() == null) return;
+
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray items = response.data.optJSONArray("items");
                     if (items == null || items.length() == 0) {
@@ -523,9 +540,8 @@ public class MiraTransferFragment extends Fragment {
         });
     }
 
-    private AlertDialog loadingDialog;
-
     private void showLoadingDialog(String message) {
+        if (!isAdded() || getContext() == null) return;
         try {
             dismissLoadingDialog();
             MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
@@ -544,6 +560,7 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void showTransferDetails(TransferData t) {
+        if (!isAdded() || getContext() == null) return;
         String statusText = getStatusText(t.status);
         String details = isArabic ?
             "📋 رقم التحويل: " + t.transferNumber + "\n" +
@@ -571,6 +588,7 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void showTransferPickerForScan() {
+        if (!isAdded() || getContext() == null) return;
         List<String> titles = new ArrayList<>();
         List<TransferData> activeList = new ArrayList<>();
         for (TransferData t : allTransferList) {
@@ -592,7 +610,7 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void approveTransfer(TransferData t) {
-        if (!canApproveTransfer()) {
+        if (!canApproveTransfer() || !isAdded() || getContext() == null) {
             showAccessDenied();
             return;
         }
@@ -603,6 +621,7 @@ public class MiraTransferFragment extends Fragment {
                 executor.execute(() -> {
                     MiraApiClient.ApiResponse response = apiClient.approveTransfer(t.id);
                     mainHandler.post(() -> {
+                        if (!isAdded() || getContext() == null) return;
                         if (response != null && response.isSuccess) {
                             showSuccessMessage(isArabic ? "تم الاعتماد بنجاح" : "Approved Successfully", isArabic ? "تم اعتماد الشحنة بنجاح." : "Shipment approved successfully.");
                             loadTransfers();
@@ -618,7 +637,7 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void receiveTransfer(TransferData t) {
-        if (!canReceiveTransfer(t)) {
+        if (!canReceiveTransfer(t) || !isAdded() || getContext() == null) {
             showAccessDenied();
             return;
         }
@@ -629,6 +648,7 @@ public class MiraTransferFragment extends Fragment {
                 executor.execute(() -> {
                     MiraApiClient.ApiResponse response = apiClient.receiveTransfer(t.id);
                     mainHandler.post(() -> {
+                        if (!isAdded() || getContext() == null) return;
                         if (response != null && response.isSuccess) {
                             showSuccessMessage(isArabic ? "تم الاستلام بنجاح" : "Received Successfully", isArabic ? "تم استلام الشحنة وتحديث المخزون بنجاح." : "Shipment received and inventory updated.");
                             loadTransfers();
@@ -651,14 +671,17 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void showSuccessMessage(String title, String message) {
+        if (!isAdded() || getContext() == null) return;
         new MaterialAlertDialogBuilder(requireContext()).setTitle("✅ " + title).setMessage(message).setPositiveButton(isArabic ? "حسناً" : "OK", null).show();
     }
 
     private void showErrorMessage(String title, String message) {
+        if (!isAdded() || getContext() == null) return;
         new MaterialAlertDialogBuilder(requireContext()).setTitle("❌ " + title).setMessage(message).setPositiveButton(isArabic ? "حسناً" : "OK", null).show();
     }
 
     private void showUserMessage(String title, String message) {
+        if (!isAdded() || getContext() == null) return;
         new MaterialAlertDialogBuilder(requireContext()).setTitle(title).setMessage(message).setPositiveButton(isArabic ? "حسناً" : "OK", null).show();
     }
 
@@ -674,7 +697,7 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void deleteTransfer(TransferData t) {
-        if (!canDeleteTransfer()) {
+        if (!canDeleteTransfer() || !isAdded() || getContext() == null) {
             showAccessDenied();
             return;
         }
@@ -687,6 +710,7 @@ public class MiraTransferFragment extends Fragment {
                     try { payload.put("status", "cancelled"); } catch (Exception ignored) {}
                     MiraApiClient.ApiResponse response = apiClient.updateTransfer(t.id, payload);
                     mainHandler.post(() -> {
+                        if (!isAdded() || getContext() == null) return;
                         if (response != null && response.isSuccess) {
                             Toast.makeText(getContext(), isArabic ? "✅ تم حذف المسودة" : "✅ Draft deleted", Toast.LENGTH_SHORT).show();
                             loadTransfers();
@@ -701,6 +725,7 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void showNewTransferDialog() {
+        if (!isAdded() || getContext() == null) return;
         View dv = LayoutInflater.from(getContext()).inflate(R.layout.dialog_new_transfer, null);
         TextView tvFromBranch = dv.findViewById(R.id.tvFromBranchName);
         Spinner spTo = dv.findViewById(R.id.spToBranch);
@@ -716,6 +741,8 @@ public class MiraTransferFragment extends Fragment {
         executor.execute(() -> {
             MiraApiClient.ApiResponse response = apiClient.getBranches();
             mainHandler.post(() -> {
+                if (!isAdded() || getContext() == null) return;
+                
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray branches = response.data.optJSONArray("branches");
                     if (branches != null) {
@@ -755,6 +782,7 @@ public class MiraTransferFragment extends Fragment {
                     payload.put("items", new JSONArray());
                     MiraApiClient.ApiResponse response = apiClient.createTransfer(payload);
                     mainHandler.post(() -> {
+                        if (!isAdded() || getContext() == null) return;
                         if (response != null && response.isSuccess) {
                             Toast.makeText(getContext(), isArabic ? "✅ تم إنشاء التحويل بنجاح" : "✅ Transfer created successfully", Toast.LENGTH_SHORT).show();
                             loadTransfers();
@@ -773,6 +801,7 @@ public class MiraTransferFragment extends Fragment {
         if (epc == null || epc.trim().isEmpty()) return;
         final String cleanEpc = epc.trim().toUpperCase();
         mainHandler.post(() -> {
+            if (!isAdded()) return;
             if (activeScanEpcSet.contains(cleanEpc)) return;
             activeScanEpcSet.add(cleanEpc);
             playScanBeepSound();
@@ -789,7 +818,7 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void showScanItemsDialogForTransfer(TransferData t) {
-        if (t == null) return;
+        if (t == null || !isAdded() || getContext() == null) return;
         activeScanEpcSet.clear();
         View dv = LayoutInflater.from(getContext()).inflate(R.layout.dialog_scan_transfer, null);
 
@@ -825,6 +854,7 @@ public class MiraTransferFragment extends Fragment {
                     params.put("branch_id", branchesManager.getActiveBranchId());
                     MiraApiClient.ApiResponse response = apiClient.authorize(epc, "transfer", params);
                     mainHandler.post(() -> {
+                        if (!isAdded() || getContext() == null) return;
                         if (response != null && response.isSuccess && response.data != null) {
                             JSONObject item = response.data.optJSONObject("item");
                             JSONObject decision = response.data.optJSONObject("decision");
@@ -856,6 +886,7 @@ public class MiraTransferFragment extends Fragment {
                     for (String epc : activeScanEpcSet) items.put(epc);
                     MiraApiClient.ApiResponse response = apiClient.addItemsToTransfer(t.id, items);
                     mainHandler.post(() -> {
+                        if (!isAdded() || getContext() == null) return;
                         if (response != null && response.isSuccess) {
                             showSuccessMessage(isArabic ? "تمت الإضافة" : "Items Added", isArabic ? "تم حفظ القطع الممسوحة بنجاح." : "Items saved successfully.");
                             loadTransfers();
@@ -886,7 +917,6 @@ public class MiraTransferFragment extends Fragment {
 
     private String ar(String arabic, String english) { return isArabic ? arabic : english; }
 
-    // فئة مساعدة لبناء بيانات الفلاتر
     static class FilterItem {
         String statusValue;
         String label;
