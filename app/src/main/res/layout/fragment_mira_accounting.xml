@@ -42,14 +42,15 @@
                     android:textSize="16sp"
                     android:textStyle="bold" />
 
+                <!-- ✅ تم تغيير المعرف من tvActiveBranch إلى tvBranchName -->
                 <TextView
-                    android:id="@+id/tvActiveBranch"
+                    android:id="@+id/tvBranchName"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:background="?attr/colorSurfaceVariant"
                     android:paddingHorizontal="10dp"
                     android:paddingVertical="4dp"
-                    android:text="الفرع الرئيسي"
+                    android:text="🏢 الفرع الرئيسي"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="11sp" />
             </LinearLayout>
@@ -146,7 +147,7 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- ✅ 2. TabLayout للتبويبات -->
+    <!-- 2. TabLayout للتبويبات -->
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabAccounting"
         android:layout_width="match_parent"
@@ -284,14 +285,14 @@
         android:textStyle="bold"
         app:cornerRadius="10dp" />
         
-        <com.google.android.material.button.MaterialButton
-    android:id="@+id/btnFinancialReports"
-    style="@style/Widget.Material3.Button.OutlinedButton"
-    android:layout_width="match_parent"
-    android:layout_height="44dp"
-    android:layout_marginTop="4dp"
-    android:text="📊 التقارير المالية"
-    android:textSize="12sp"
-    app:cornerRadius="8dp" />
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnFinancialReports"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginTop="4dp"
+        android:text="📊 التقارير المالية"
+        android:textSize="12sp"
+        app:cornerRadius="8dp" />
 
 </LinearLayout>
