@@ -8,7 +8,7 @@ import androidx.lifecycle.MutableLiveData;
 
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.cache.ReportCacheManager;
-import com.example.uhf.models.ReportModels;
+import com.example.uhf.model.ReportModels;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
