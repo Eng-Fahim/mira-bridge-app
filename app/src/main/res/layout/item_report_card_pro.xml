@@ -5,11 +5,11 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="6dp"
-    app:cardBackgroundColor="@color/bg_card"
+    app:cardBackgroundColor="?attr/colorSurface"
     app:cardCornerRadius="16dp"
     app:cardElevation="2dp"
     app:strokeWidth="1dp"
-    app:strokeColor="#0F1D1D1D"
+    app:strokeColor="?attr/colorOutline"
     app:rippleColor="#22C9A961">
 
     <androidx.constraintlayout.widget.ConstraintLayout
@@ -17,12 +17,12 @@
         android:layout_height="wrap_content"
         android:padding="14dp">
 
-        <!-- مؤشر ملون جانبي للحالة/النوع -->
+        <!-- مؤشر جانبي -->
         <View
             android:id="@+id/viewColorAccent"
             android:layout_width="4dp"
             android:layout_height="0dp"
-            android:background="@drawable/bg_accent_gradient"
+            android:background="?attr/colorPrimary"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -38,30 +38,31 @@
             app:layout_constraintStart_toEndOf="@id/viewColorAccent"
             app:layout_constraintTop_toTopOf="parent">
 
-            <ImageView
-                android:id="@+id/ivReportIcon"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:layout_gravity="center"
-                android:src="@android:drawable/ic_menu_sort_by_size"
-                app:tint="@color/accent_dark" />
+            <TextView
+                android:id="@+id/tvReportIcon"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="📊"
+                android:textSize="20sp" />
         </FrameLayout>
 
-        <!-- تفاصيل التقرير -->
+        <!-- العنوان -->
         <TextView
             android:id="@+id/tvReportTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
             android:layout_marginEnd="8dp"
-            android:text="المبيعات التفصيلي والوزن"
-            android:textColor="@color/text_primary"
+            android:text=""
+            android:textColor="?attr/colorOnSurface"
             android:textSize="14sp"
             android:textStyle="bold"
             app:layout_constraintEnd_toStartOf="@id/ivArrow"
             app:layout_constraintStart_toEndOf="@id/flIconContainer"
             app:layout_constraintTop_toTopOf="@id/flIconContainer" />
 
+        <!-- الوصف -->
         <TextView
             android:id="@+id/tvReportSubtitle"
             android:layout_width="0dp"
@@ -69,8 +70,8 @@
             android:layout_marginStart="12dp"
             android:layout_marginTop="2dp"
             android:layout_marginEnd="8dp"
-            android:text="فواتير + تكلفة الأجور + مكافئ العيار"
-            android:textColor="@color/text_secondary"
+            android:text=""
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="11sp"
             android:maxLines="1"
             android:ellipsize="end"
@@ -78,23 +79,27 @@
             app:layout_constraintStart_toEndOf="@id/flIconContainer"
             app:layout_constraintTop_toBottomOf="@id/tvReportTitle" />
 
-        <!-- شارة النوع/المستوى -->
-        <com.google.android.material.chip.Chip
+        <!-- شارة -->
+        <TextView
             android:id="@+id/chipAdvanced"
-            style="@style/Widget.Material3.Chip.Assist"
             android:layout_width="wrap_content"
-            android:layout_height="24dp"
+            android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
             android:layout_marginTop="4dp"
-            android:text="تحليل حي"
-            android:textColor="@color/accent_dark"
+            android:background="@drawable/bg_badge_rounded"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:text="✨ متقدم"
+            android:textColor="?attr/colorPrimary"
             android:textSize="9sp"
-            app:chipMinHeight="20dp"
-            app:chipPadding="0dp"
+            android:textStyle="bold"
+            android:visibility="gone"
             app:layout_constraintStart_toEndOf="@id/flIconContainer"
             app:layout_constraintTop_toBottomOf="@id/tvReportSubtitle" />
 
-        <!-- سهم الانتقال -->
+        <!-- سهم -->
         <ImageView
             android:id="@+id/ivArrow"
             android:layout_width="24dp"
