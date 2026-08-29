@@ -411,43 +411,58 @@ for (MiraBranchesManager.BranchItem branch : branchList) {
         loadSalesPage(currentPage + 1, false);
     }
     
-    private void loadSalesPage(int page, boolean isRefresh) {
-        if (isLoading && !isRefresh) return;
-        
-        isLoading = true;
-        
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                if (apiClient == null && getContext() != null) {
-                    apiClient = MiraApiClient.getInstance(getContext());
-                }
+   private void loadSalesPage(int page, boolean isRefresh) {
+    if (isLoading && !isRefresh) return;
+    
+    isLoading = true;
+    
+    Executors.newSingleThreadExecutor().execute(() -> {
+        try {
+            if (apiClient == null && getContext() != null) {
+                apiClient = MiraApiClient.getInstance(getContext());
+            }
 
-                if (apiClient == null) {
-                    mainHandler.post(() -> {
-                        hideLoadingState();
-                        isLoading = false;
-                        if (saleList.isEmpty()) {
-                            showEmptyState(isArabic ? "⚠️ خطأ في تهيئة النظام" : "⚠️ System initialization error");
-                        }
-                    });
-                    return;
-                }
+            if (apiClient == null) {
+                mainHandler.post(() -> {
+                    hideLoadingState();
+                    isLoading = false;
+                    if (saleList.isEmpty()) {
+                        showEmptyState(isArabic ? "⚠️ خطأ في تهيئة النظام" : "⚠️ System initialization error");
+                    }
+                });
+                return;
+            }
 
-                MiraApiClient.ApiResponse response;
-                
-                // ✅ استخدام الفلترة المتقدمة مع branch_id
-                if (!searchQuery.isEmpty() || !currentFilter.equals("ALL") || selectedBranchId > 0) {
+            MiraApiClient.ApiResponse response;
+            
+            // ✅✅✅ الحل: إرسال branch_id في جميع الحالات
+            if (!searchQuery.isEmpty() || !currentFilter.equals("ALL") || selectedBranchId > 0) {
+                // ✅ فلترة متقدمة مع branch_id
+                response = apiClient.getSalesHistoryAdvanced(
+                    searchQuery, 
+                    currentFilter, 
+                    null, // fromDate
+                    null, // toDate
+                    page, 
+                    PAGE_SIZE,
+                    selectedBranchId // ✅ إرسال الفرع
+                );
+            } else {
+                // ✅ بدون فلترة - لكن نرسل branch_id إذا كان محدداً
+                if (selectedBranchId > 0) {
                     response = apiClient.getSalesHistoryAdvanced(
-                        searchQuery, 
-                        currentFilter, 
-                        null, // fromDate
-                        null, // toDate
-                        page, 
-                        PAGE_SIZE
+                        "", // بحث فارغ
+                        "ALL", // كل طرق الدفع
+                        null,
+                        null,
+                        page,
+                        PAGE_SIZE,
+                        selectedBranchId // ✅ إرسال الفرع
                     );
                 } else {
                     response = apiClient.getSalesHistoryPaginated(page, PAGE_SIZE);
                 }
+            }
 
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray sales = null;
