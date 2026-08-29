@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/app-auto"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
@@ -32,6 +32,18 @@
         android:textColor="?attr/colorOnSurface"
         android:textSize="18sp"
         android:textStyle="bold" />
+
+    <!-- ✅ صورة القطعة -->
+    <ImageView
+        android:id="@+id/imgSummaryPhoto"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_gravity="center"
+        android:layout_marginTop="12dp"
+        android:scaleType="centerCrop"
+        android:src="@drawable/placeholder_image"
+        android:visibility="gone"
+        android:contentDescription="صورة القطعة" />
 
     <!-- بطاقة موجز البيانات -->
     <com.google.android.material.card.MaterialCardView
@@ -113,6 +125,29 @@
                     android:textColor="?attr/colorOnSurface"
                     android:textStyle="bold"
                     android:textSize="13sp" />
+            </LinearLayout>
+
+            <!-- ✅ السعر الجديد -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="السعر النهائي:"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp" />
+                <TextView
+                    android:id="@+id/tvSummaryPrice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0.00"
+                    android:textColor="?attr/colorPrimary"
+                    android:textStyle="bold"
+                    android:textSize="16sp" />
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
