@@ -2,7 +2,7 @@ package com.example.uhf.fragment;
 
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.TypedValue;
+import android.util.TypedValue;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
