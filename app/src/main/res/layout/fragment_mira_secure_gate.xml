@@ -12,7 +12,7 @@
         android:orientation="vertical"
         android:padding="12dp">
 
-        <!-- 1. شريط ترويسة غرفة التحكم ومؤشر الاتصال -->
+        <!-- 1. Header -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -38,7 +38,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:fontFamily="sans-serif-medium"
-                        android:text="🛡️ MIRA SECURITY COMMAND CENTER"
+                        android:text="@string/gate_command_center"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="15sp"
                         android:textStyle="bold" />
@@ -47,7 +47,7 @@
                         android:id="@+id/tvPingLatency"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="📡 Ping: -- ms"
+                        android:text="@string/gate_ping"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
                 </LinearLayout>
@@ -60,14 +60,14 @@
                     android:layout_centerVertical="true"
                     android:paddingHorizontal="10dp"
                     android:paddingVertical="4dp"
-                    android:text="🟢 SYSTEM ARMED"
+                    android:text="@string/gate_system_armed"
                     android:textColor="?attr/colorPrimary"
                     android:textSize="11sp"
                     android:textStyle="bold" />
             </RelativeLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 2. شريط البث الحي لآخر عملية عبور -->
+        <!-- 2. Live Ticker -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardLiveTicker"
             android:layout_width="match_parent"
@@ -88,7 +88,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="LIVE EVENT:"
+                    android:text="@string/gate_live_event"
                     android:textColor="?attr/colorPrimary"
                     android:textSize="10sp"
                     android:textStyle="bold" />
@@ -101,13 +101,13 @@
                     android:layout_weight="1"
                     android:ellipsize="end"
                     android:singleLine="true"
-                    android:text="في انتظار أول حركة مرور..."
+                    android:text="@string/gate_waiting_traffic"
                     android:textColor="?attr/colorOnSurface"
                     android:textSize="12sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 3. بطاقات مؤشرات الأداء الحية -->
+        <!-- 3. KPI Cards -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -135,7 +135,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="🚪 البوابات"
+                        android:text="@string/gate_total"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
@@ -170,7 +170,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="✅ عبور شرعي"
+                        android:text="@string/gate_pass"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
@@ -205,7 +205,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="🚨 إنذارات"
+                        android:text="@string/gate_deny"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
@@ -221,7 +221,7 @@
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
 
-        <!-- 4. أدوات التحكم والـ LockDown -->
+        <!-- 4. Control Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -234,7 +234,7 @@
                 android:layout_height="44dp"
                 android:layout_marginEnd="3dp"
                 android:layout_weight="1"
-                android:text="🛡️ إيقاف/تفعيل RFID"
+                android:text="@string/gate_toggle_scan"
                 android:textSize="11sp"
                 app:backgroundTint="?attr/colorPrimary"
                 app:cornerRadius="8dp" />
@@ -246,7 +246,7 @@
                 android:layout_height="44dp"
                 android:layout_marginHorizontal="3dp"
                 android:layout_weight="1"
-                android:text="📷 مسح باركود"
+                android:text="@string/gate_scan_barcode"
                 android:textColor="?attr/colorOnSurface"
                 android:textSize="11sp"
                 app:cornerRadius="8dp"
@@ -258,13 +258,13 @@
                 android:layout_height="44dp"
                 android:layout_marginStart="3dp"
                 android:layout_weight="1"
-                android:text="🔒 إغلاق طارئ"
+                android:text="@string/gate_emergency_lockdown"
                 android:textSize="11sp"
                 app:backgroundTint="?attr/colorError"
                 app:cornerRadius="8dp" />
         </LinearLayout>
 
-        <!-- مؤشر المخاطر الأمنية -->
+        <!-- Risk Meter -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -283,7 +283,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="📊 مؤشر المخاطر الأمنية"
+                    android:text="@string/gate_risk_meter"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="11sp"
                     android:textStyle="bold"
@@ -302,14 +302,14 @@
                     android:id="@+id/tvRiskPercentage"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="نسبة الإنذارات: 0%"
+                    android:text="@string/gate_risk_percentage"
                     android:textColor="?attr/colorError"
                     android:textSize="10sp"
                     android:layout_marginTop="4dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- أزرار فلترة السجل -->
+        <!-- Filter Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -322,7 +322,7 @@
                 android:layout_width="0dp"
                 android:layout_height="32dp"
                 android:layout_weight="1"
-                android:text="الكل"
+                android:text="@string/gate_filter_all"
                 android:textSize="10sp"
                 android:textColor="?attr/colorOnSurfaceVariant" />
 
@@ -332,7 +332,7 @@
                 android:layout_width="0dp"
                 android:layout_height="32dp"
                 android:layout_weight="1"
-                android:text="🚨 إنذارات"
+                android:text="@string/gate_filter_alerts"
                 android:textSize="10sp"
                 android:textColor="?attr/colorError" />
 
@@ -342,17 +342,17 @@
                 android:layout_width="0dp"
                 android:layout_height="32dp"
                 android:layout_weight="1"
-                android:text="✅ مقبول"
+                android:text="@string/gate_filter_pass"
                 android:textSize="10sp"
                 android:textColor="?attr/colorPrimary" />
         </LinearLayout>
 
-        <!-- 5. شبكة البوابات الحية -->
+        <!-- Gate Network -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="6dp"
-            android:text="📡 شبكة البوابات والأجهزة الميدانية"
+            android:text="@string/gate_network"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp"
             android:textStyle="bold" />
@@ -364,7 +364,7 @@
             android:layout_weight="1"
             android:layout_marginBottom="8dp" />
 
-        <!-- 6. أدوات المحاكاة السريعة + Console Log -->
+        <!-- Simulation Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -378,7 +378,7 @@
                 android:layout_height="32dp"
                 android:layout_weight="1"
                 android:padding="0dp"
-                android:text="🧪 تجربة (مسموح)"
+                android:text="@string/gate_simulate_allowed"
                 android:textColor="?attr/colorPrimary"
                 android:textSize="10sp" />
 
@@ -389,7 +389,7 @@
                 android:layout_height="32dp"
                 android:layout_weight="1"
                 android:padding="0dp"
-                android:text="🧪 تجربة (إنذار)"
+                android:text="@string/gate_simulate_denied"
                 android:textColor="?attr/colorError"
                 android:textSize="10sp" />
 
@@ -400,11 +400,12 @@
                 android:layout_height="32dp"
                 android:layout_weight="0.8"
                 android:padding="0dp"
-                android:text="🗑️ مسح السجل"
+                android:text="@string/gate_clear_console"
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="10sp" />
         </LinearLayout>
 
+        <!-- Console Log -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="100dp"
@@ -432,7 +433,7 @@
 
     </LinearLayout>
 
-    <!-- Overlay الإنذار -->
+    <!-- Alarm Overlay -->
     <FrameLayout
         android:id="@+id/overlayAlarm"
         android:layout_width="match_parent"
@@ -455,7 +456,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:text="🚨 ALERT: UNAUTHORIZED BREACH"
+                android:text="@string/gate_alert_title"
                 android:textColor="?attr/colorOnError"
                 android:textSize="22sp"
                 android:textStyle="bold" />
@@ -473,7 +474,7 @@
                 android:id="@+id/btnStopAlarm"
                 android:layout_width="220dp"
                 android:layout_height="56dp"
-                android:text="🔕 إيقاف الإنذار"
+                android:text="@string/gate_stop_alarm"
                 android:textColor="?attr/colorOnPrimary"
                 android:textSize="16sp"
                 android:textStyle="bold"
