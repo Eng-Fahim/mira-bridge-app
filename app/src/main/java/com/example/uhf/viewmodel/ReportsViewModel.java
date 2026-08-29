@@ -7,7 +7,7 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Transformations;
 
-import com.example.uhf.models.ReportModels;
+import com.example.uhf.model.ReportModels;
 import com.example.uhf.repository.ReportRepository;
 
 import java.util.List;
