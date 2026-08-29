@@ -9,7 +9,7 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.uhf.adapter.ReportGridAdapter;
-import com.example.uhf.models.ReportModels;
+import com.example.uhf.model.ReportModels;
 
 import java.util.ArrayList;
 import java.util.List;
