@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- خلفية رمادية -->
+    <path
+        android:fillColor="#E0E0E0"
+        android:pathData="M0,0h100v100h-100z" />
+
+    <!-- أيقونة صورة -->
+    <path
+        android:fillColor="#9E9E9E"
+        android:pathData="M20,30h60v40h-60z M25,35h50v30h-50z M30,55l10,-10l8,8l5,-5l12,12h-35z" />
+
+    <!-- دائرة صغيرة -->
+    <path
+        android:fillColor="#9E9E9E"
+        android:pathData="M35,40m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0" />
+</vector>
