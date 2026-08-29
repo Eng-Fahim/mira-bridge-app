@@ -41,7 +41,9 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
@@ -58,10 +60,8 @@ public class MiraAccountingFragment extends Fragment {
     private PermissionManager permissionManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
-    // ✅✅✅ استخدام ExecutorService ثابت - لا يُغلق أبداً
     private static final ExecutorService executor = Executors.newFixedThreadPool(3);
     
-    // ✅ AtomicBoolean للتحقق من حالة الفراغمنت
     private final AtomicBoolean isDestroyed = new AtomicBoolean(false);
 
     private RecyclerView rvAccountingData;
@@ -69,6 +69,7 @@ public class MiraAccountingFragment extends Fragment {
     private TextView tvEmptyData;
     private EditText etSearch;
     private TextView tvTodayRevenue, tvTotalGoldVolume, tvBalanceStatus;
+    private TextView tvBranchName; // ✅ جديد - عرض اسم الفرع
     private TabLayout tabAccounting;
     private MaterialButton btnCreateManualEntry;
     private MaterialButton btnFinancialReports;
@@ -80,23 +81,28 @@ public class MiraAccountingFragment extends Fragment {
     private AccountingAdapter adapter;
 
     private boolean isArabic = true;
+    private int currentBranchId = 0; // ✅ جديد
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_mira_accounting, container, false);
         
-        isDestroyed.set(false); // ✅ إعادة تعيين الحالة
+        isDestroyed.set(false);
         
         apiClient = MiraApiClient.getInstance(requireContext());
         branchesManager = MiraBranchesManager.getInstance(requireContext());
         permissionManager = PermissionManager.getInstance(requireContext());
         isArabic = Locale.getDefault().getLanguage().equals("ar");
+        
+        // ✅ الحصول على الفرع الحالي
+        currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
 
         initViews(view);
         setupRecyclerView();
         setupListeners();
         applyPermissions();
+        updateBranchDisplay(); // ✅ عرض اسم الفرع
         loadData(currentTab);
 
         return view;
@@ -111,6 +117,7 @@ public class MiraAccountingFragment extends Fragment {
         tvTodayRevenue = view.findViewById(R.id.tvTodayRevenue);
         tvTotalGoldVolume = view.findViewById(R.id.tvTotalGoldVolume);
         tvBalanceStatus = view.findViewById(R.id.tvBalanceStatus);
+        tvBranchName = view.findViewById(R.id.tvBranchName); // ✅ جديد
         btnCreateManualEntry = view.findViewById(R.id.btnCreateManualEntry);
         btnFinancialReports = view.findViewById(R.id.btnFinancialReports);
         tabAccounting = view.findViewById(R.id.tabAccounting);
@@ -122,21 +129,28 @@ public class MiraAccountingFragment extends Fragment {
         }
     }
 
+    // ✅ عرض اسم الفرع الحالي
+    private void updateBranchDisplay() {
+        if (tvBranchName != null && branchesManager != null) {
+            String branchName = branchesManager.getActiveBranchDisplayName();
+            tvBranchName.setText("🏢 " + branchName);
+        }
+    }
+
     private void applyPermissions() {
         if (btnCreateManualEntry != null) {
-            if (permissionManager.canEdit("accounting") || permissionManager.isAdmin()) {
-                btnCreateManualEntry.setVisibility(View.VISIBLE);
-            } else {
-                btnCreateManualEntry.setVisibility(View.GONE);
-            }
+            boolean canEdit = permissionManager.canEdit("accounting") || 
+                              permissionManager.isAdmin() || 
+                              permissionManager.isBranchManager();
+            btnCreateManualEntry.setVisibility(canEdit ? View.VISIBLE : View.GONE);
         }
         
         if (btnFinancialReports != null) {
-            if (permissionManager.canView("accounting") || permissionManager.canView("reports")) {
-                btnFinancialReports.setVisibility(View.VISIBLE);
-            } else {
-                btnFinancialReports.setVisibility(View.GONE);
-            }
+            boolean canView = permissionManager.canView("accounting") || 
+                              permissionManager.canView("reports") || 
+                              permissionManager.isAdmin() || 
+                              permissionManager.isBranchManager();
+            btnFinancialReports.setVisibility(canView ? View.VISIBLE : View.GONE);
         }
     }
 
@@ -166,12 +180,18 @@ public class MiraAccountingFragment extends Fragment {
         }
 
         if (btnRefresh != null) {
-            btnRefresh.setOnClickListener(v -> loadData(currentTab));
+            btnRefresh.setOnClickListener(v -> {
+                refreshCurrentBranch(); // ✅ تحديث الفرع
+                loadData(currentTab);
+            });
         }
         
         if (btnCreateManualEntry != null) {
             btnCreateManualEntry.setOnClickListener(v -> {
-                if (permissionManager.canEdit("accounting") || permissionManager.isAdmin()) {
+                boolean canEdit = permissionManager.canEdit("accounting") || 
+                                  permissionManager.isAdmin() || 
+                                  permissionManager.isBranchManager();
+                if (canEdit) {
                     showCreateEntryDialog();
                 } else {
                     showToast(isArabic ? "⛔ غير مصرح لك بإنشاء قيود" : "⛔ Access Denied");
@@ -203,16 +223,21 @@ public class MiraAccountingFragment extends Fragment {
         }
     }
 
-    /**
-     * ✅ تحميل البيانات - مع تنفيذ آمن
-     */
+    // ✅ تحديث الفرع الحالي
+    private void refreshCurrentBranch() {
+        if (branchesManager != null) {
+            currentBranchId = branchesManager.getActiveBranchId();
+            updateBranchDisplay();
+        }
+    }
+
     private void loadData(String tab) {
         if (isDestroyed.get() || !isAdded()) return;
         
-        // ✅ التحقق من الصلاحيات
-        if (!permissionManager.canView("accounting") && !permissionManager.isAdmin() && 
+        if (permissionManager == null || (!permissionManager.canView("accounting") && 
+            !permissionManager.isAdmin() && 
             !permissionManager.isBranchManager() && 
-            !"AUDITOR".equals(new com.example.uhf.tools.SessionManager(requireContext()).getRoleString())) {
+            !"AUDITOR".equals(new com.example.uhf.tools.SessionManager(requireContext()).getRoleString()))) {
             showEmptyState(true);
             if (tvEmptyData != null) {
                 tvEmptyData.setText(isArabic ? "⛔ غير مصرح لك بالوصول" : "⛔ Access Denied");
@@ -221,14 +246,16 @@ public class MiraAccountingFragment extends Fragment {
             return;
         }
         
+        // ✅ تحديث الفرع قبل التحميل
+        refreshCurrentBranch();
+        
         if (pbLoading != null) pbLoading.setVisibility(View.VISIBLE);
         if (tvEmptyData != null) tvEmptyData.setVisibility(View.GONE);
         
-        // ✅✅✅ استخدام executeSafely بدلاً من executor.execute مباشرة
         executeSafely(() -> {
             try {
-                int branchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-                String branchIdStr = String.valueOf(branchId);
+                // ✅ استخدام الفرع الحالي في جميع الطلبات
+                String branchIdStr = String.valueOf(currentBranchId);
                 
                 MiraApiClient.ApiResponse response = null;
                 
@@ -237,6 +264,7 @@ public class MiraAccountingFragment extends Fragment {
                         response = apiClient.getJournalEntries(branchIdStr);
                         break;
                     case "chart":
+                        // دليل الحسابات مشترك بين الفروع
                         response = apiClient.getChartOfAccounts();
                         break;
                     case "trial":
@@ -268,11 +296,7 @@ public class MiraAccountingFragment extends Fragment {
         });
     }
 
-    /**
-     * ✅ تنفيذ آمن مع Fallback
-     */
     private void executeSafely(Runnable task) {
-        // ✅ التحقق من أن الـ Executor يعمل
         if (executor != null && !executor.isShutdown() && !executor.isTerminated()) {
             try {
                 executor.execute(task);
@@ -282,7 +306,6 @@ public class MiraAccountingFragment extends Fragment {
             }
         }
         
-        // ✅ Fallback: استخدام Thread مباشرة
         new Thread(task).start();
     }
 
@@ -292,7 +315,6 @@ public class MiraAccountingFragment extends Fragment {
             JSONArray items = data.optJSONArray("data");
             
             if (items == null) {
-                // ✅ قد يكون في صيغة أخرى
                 JSONObject dataObj = data.optJSONObject("data");
                 if (dataObj != null) {
                     items = dataObj.optJSONArray("entries");
@@ -304,6 +326,10 @@ public class MiraAccountingFragment extends Fragment {
                     JSONObject obj = items.getJSONObject(i);
                     AccountingEntry entry = new AccountingEntry();
                     entry.id = i + 1;
+                    
+                    // ✅ إضافة branch_id للقيود
+                    entry.branchId = obj.optInt("branch_id", 0);
+                    entry.branchName = obj.optString("branch_name", "");
                     
                     if ("journal".equals(tab)) {
                         entry.code = obj.optString("entry_number", obj.optString("reference", "—"));
@@ -407,7 +433,10 @@ public class MiraAccountingFragment extends Fragment {
     private void showCreateEntryDialog() {
         if (getContext() == null || isDestroyed.get()) return;
         
-        if (!permissionManager.canEdit("accounting") && !permissionManager.isAdmin()) {
+        boolean canEdit = permissionManager.canEdit("accounting") || 
+                          permissionManager.isAdmin() || 
+                          permissionManager.isBranchManager();
+        if (!canEdit) {
             showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
             return;
         }
@@ -460,17 +489,18 @@ public class MiraAccountingFragment extends Fragment {
         dialog.show();
     }
 
-    /**
-     * ✅ إنشاء قيد محاسبي - مع تنفيذ آمن
-     */
     private void createJournalEntry(String ref, String desc, double grossWeight, String karat, double cashAmount) {
         executeSafely(() -> {
             try {
+                // ✅ تحديث الفرع قبل الإنشاء
+                refreshCurrentBranch();
+                
                 JSONObject payload = new JSONObject();
                 payload.put("reference", ref);
                 payload.put("description", desc);
-                payload.put("entry_date", new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new java.util.Date()));
+                payload.put("entry_date", new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()));
                 payload.put("source_type", "manual");
+                payload.put("branch_id", currentBranchId); // ✅ إضافة الفرع
                 
                 double karatFactor = getKaratFactor(karat);
                 double net24K = grossWeight * karatFactor;
@@ -535,9 +565,6 @@ public class MiraAccountingFragment extends Fragment {
         }
     }
 
-    /**
-     * ✅ عرض Toast بأمان
-     */
     private void showToast(String message) {
         try {
             if (isAdded() && !isDestroyed.get() && getContext() != null) {
@@ -548,9 +575,6 @@ public class MiraAccountingFragment extends Fragment {
         }
     }
 
-    /**
-     * ✅ تسجيل الأخطاء في Crashlytics
-     */
     private void logNonFatal(String location, Throwable throwable) {
         try {
             Log.e(TAG, location + ": " + throwable.getMessage(), throwable);
@@ -564,12 +588,24 @@ public class MiraAccountingFragment extends Fragment {
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        // ✅ تحديث الفرع عند العودة
+        if (branchesManager != null) {
+            int newBranchId = branchesManager.getActiveBranchId();
+            if (newBranchId != currentBranchId) {
+                currentBranchId = newBranchId;
+                updateBranchDisplay();
+                loadData(currentTab);
+            }
+        }
+    }
+
+    @Override
     public void onDestroyView() {
         super.onDestroyView();
         isDestroyed.set(true);
         mainHandler.removeCallbacksAndMessages(null);
-        
-        // ❌ لا تغلق الـ Executor هنا - إنه ثابت
     }
 
     private static class AccountingEntry {
@@ -580,6 +616,8 @@ public class MiraAccountingFragment extends Fragment {
         double credit;
         double goldDebit;
         double goldCredit;
+        int branchId; // ✅ جديد
+        String branchName; // ✅ جديد
     }
 
     private class AccountingAdapter extends RecyclerView.Adapter<AccountingAdapter.ViewHolder> {
@@ -603,6 +641,12 @@ public class MiraAccountingFragment extends Fragment {
             AccountingEntry entry = items.get(position);
             holder.tvCode.setText(entry.code != null ? entry.code : "—");
             holder.tvDescription.setText(entry.description != null ? entry.description : "—");
+            
+            // ✅ عرض اسم الفرع إذا كان مختلفاً
+            if (entry.branchName != null && !entry.branchName.isEmpty()) {
+                holder.tvDescription.setText(entry.description + " (" + entry.branchName + ")");
+            }
+            
             holder.tvGold.setText(String.format(Locale.US, "%.3f g", entry.goldDebit));
             holder.tvDebit.setText(String.format(Locale.US, "+%,.2f", entry.debit));
             holder.tvCredit.setText(String.format(Locale.US, "-%,.2f", entry.credit));
@@ -626,4 +670,4 @@ public class MiraAccountingFragment extends Fragment {
             }
         }
     }
-}
+                    }
