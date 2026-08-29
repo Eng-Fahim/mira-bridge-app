@@ -1811,4 +1811,35 @@
     <string name="print_btn">🖨️ Print</string>
     <string name="share_btn">📤 Share</string>
     <string name="save_pdf_btn">💾 Save PDF</string>
+<!-- res/values-en/strings.xml (الإنجليزية) -->
+    
+    <string name="gate_command_center">🛡️ SECURITY COMMAND CENTER</string>
+    <string name="gate_ping">📡 Ping: -- ms</string>
+    <string name="gate_system_armed">🟢 SYSTEM ARMED</string>
+    <string name="gate_system_standby">🟡 STANDBY</string>
+    <string name="gate_system_lockdown">🔴 LOCKDOWN</string>
+    <string name="gate_live_event">LIVE EVENT:</string>
+    <string name="gate_waiting_traffic">Waiting for first traffic...</string>
+    <string name="gate_total">🚪 Gates</string>
+    <string name="gate_pass">✅ Legal Pass</string>
+    <string name="gate_deny">🚨 Alerts</string>
+    <string name="gate_toggle_scan">🛡️ Toggle RFID</string>
+    <string name="gate_scan_barcode">📷 Scan Barcode</string>
+    <string name="gate_emergency_lockdown">🔒 Emergency Lockdown</string>
+    <string name="gate_unlock">🔓 Unlock Gates</string>
+    <string name="gate_risk_meter">📊 Security Risk Meter</string>
+    <string name="gate_risk_percentage">Alert Rate: 0%</string>
+    <string name="gate_filter_all">All</string>
+    <string name="gate_filter_alerts">🚨 Alerts</string>
+    <string name="gate_filter_pass">✅ Pass</string>
+    <string name="gate_network">📡 Gate Network & Field Devices</string>
+    <string name="gate_simulate_allowed">🧪 Simulate (Allowed)</string>
+    <string name="gate_simulate_denied">🧪 Simulate (Denied)</string>
+    <string name="gate_clear_console">🗑️ Clear Log</string>
+    <string name="gate_stop_alarm">🔕 Stop Alarm</string>
+    <string name="gate_alert_title">🚨 ALERT: UNAUTHORIZED BREACH</string>
+    <string name="gate_no_events">No events</string>
+    <string name="gate_active">🟢 Active</string>
+    <string name="gate_inactive">⚪ Inactive</string>
+    <string name="gate_alert_status">🔴 Alert</string>
 </resources>
