@@ -1,12 +1,12 @@
 package com.example.uhf.print;
 
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.pdf.PdfDocument;
+import android.os.Bundle;  // ✅ إضافة هذا الاستيراد
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
 import android.print.PageRange;
@@ -182,7 +182,7 @@ public class ReportPrintManager {
             @Override
             public void onLayout(PrintAttributes oldAttributes, PrintAttributes newAttributes,
                                CancellationSignal cancellationSignal,
-                               LayoutResultCallback callback, Bundle extras) {
+                               LayoutResultCallback callback, Bundle extras) {  // ✅ Bundle مستورد الآن
                 callback.onLayoutFinished(new PrintDocumentInfo.Builder(jobName + ".pdf")
                         .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
                         .setPageCount(1)
