@@ -1483,11 +1483,6 @@ private void hideRefundItemInfo() {
  * ✅ تنفيذ عملية الإرجاع
  */
 private void processRefund(String code, String reason) {
-    // ✅ إظهار تحميل
-    if (refundDialog != null && refundDialog.isShowing()) {
-        // يمكن إظهار ProgressBar هنا
-    }
-    
     executor.execute(() -> {
         try {
             JSONObject payload = new JSONObject();
@@ -1505,18 +1500,12 @@ private void processRefund(String code, String reason) {
                         isArabic ? "✅ تم الإرجاع بنجاح" : "✅ Refund successful", 
                         Toast.LENGTH_SHORT).show();
                     
-                    // ✅ إغلاق النافذة
                     if (refundDialog != null && refundDialog.isShowing()) {
                         refundDialog.dismiss();
                     }
                     
-                    // ✅ تحديث البيانات
-                    refreshData();
-                } else {
-                    String message = response != null ? response.message : "Unknown error";
-                    Toast.makeText(getContext(), 
-                        (isArabic ? "❌ فشل الإرجاع: " : "❌ Refund failed: ") + message, 
-                        Toast.LENGTH_LONG).show();
+                    // ✅✅✅ تحديث الداشبورد مباشرة
+                   refreshData();
                 }
             });
         } catch (Exception e) {
@@ -1531,4 +1520,4 @@ private void processRefund(String code, String reason) {
         }
     });
 }
-}
+        }
