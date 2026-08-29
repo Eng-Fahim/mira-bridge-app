@@ -580,7 +580,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                         showToast(isArabic ? "💾 تم الحفظ محلياً (أوفلاين)" : "💾 Saved locally (Offline)");
                     }
 
-                    showEncodingSuccessDialog(finalTitle, finalEpc, String.format(Locale.US, "%.2f", fGrossWeight), finalRetailPrice);
+                    showEncodingSuccessDialog(finalTitle, finalEpc, String.format(Locale.US, "%.2f", fGrossWeight), finalPriceLocal);
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Background execution error: " + e.getMessage());
@@ -892,76 +892,112 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     private void showEncodingSuccessDialog(String title, String epc, String weight, double finalPrice) {
-        if (!isAdded() || getContext() == null) return;
+    if (!isAdded() || getContext() == null) return;
 
-        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(requireContext());
-        View view = getLayoutInflater().inflate(R.layout.dialog_encoding_success, null);
-        bottomSheetDialog.setContentView(view);
+    BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(requireContext());
+    View view = getLayoutInflater().inflate(R.layout.dialog_encoding_success, null);
+    bottomSheetDialog.setContentView(view);
 
-        TextView tvTitle = view.findViewById(R.id.tvSummaryTitle);
-        TextView tvEpc = view.findViewById(R.id.tvSummaryEpc);
-        TextView tvWeight = view.findViewById(R.id.tvSummaryWeight);
+    TextView tvTitle = view.findViewById(R.id.tvSummaryTitle);
+    TextView tvEpc = view.findViewById(R.id.tvSummaryEpc);
+    TextView tvWeight = view.findViewById(R.id.tvSummaryWeight);
+    TextView tvPrice = view.findViewById(R.id.tvSummaryPrice); // ✅ جديد
+    ImageView imgItemPhoto = view.findViewById(R.id.imgSummaryPhoto); // ✅ جديد
 
-        MaterialButton btnViewDigitalIdentity = view.findViewById(R.id.btnViewDigitalIdentity);
-        MaterialButton btnNewEncode = view.findViewById(R.id.btnNewEncode);
-        MaterialButton btnClose = view.findViewById(R.id.btnCloseDialog);
+    MaterialButton btnViewDigitalIdentity = view.findViewById(R.id.btnViewDigitalIdentity);
+    MaterialButton btnNewEncode = view.findViewById(R.id.btnNewEncode);
+    MaterialButton btnClose = view.findViewById(R.id.btnCloseDialog);
 
-        if (tvTitle != null) tvTitle.setText(title);
-        if (tvEpc != null) tvEpc.setText(epc);
-        if (tvWeight != null) tvWeight.setText(weight + (isArabic ? " جرام" : " g"));
-
-        if (btnNewEncode != null) {
-            btnNewEncode.requestFocus();
-            btnNewEncode.setOnClickListener(v -> {
-                bottomSheetDialog.dismiss();
-                resetFormForNextScan();
-            });
+    if (tvTitle != null) tvTitle.setText(title);
+    if (tvEpc != null) tvEpc.setText(epc);
+    if (tvWeight != null) tvWeight.setText(weight + (isArabic ? " جرام" : " g"));
+    
+    // ✅ عرض المبلغ
+    if (tvPrice != null && priceManager != null) {
+        tvPrice.setText(priceManager.formatPriceDefault(finalPrice));
+    }
+    
+    // ✅ عرض الصورة الأولى
+    if (imgItemPhoto != null && !photoPaths.isEmpty()) {
+        File photoFile = new File(photoPaths.get(0));
+        if (photoFile.exists()) {
+            imgItemPhoto.setImageURI(Uri.fromFile(photoFile));
+            imgItemPhoto.setVisibility(View.VISIBLE);
         }
-
-        if (btnViewDigitalIdentity != null) {
-            btnViewDigitalIdentity.setOnClickListener(v -> {
-                bottomSheetDialog.dismiss();
-                showDigitalIdentityDialog(title, epc, weight, finalPrice);
-            });
-        }
-
-        if (btnClose != null) {
-            btnClose.setOnClickListener(v -> {
-                bottomSheetDialog.dismiss();
-                resetFormForNextScan();
-            });
-        }
-
-        bottomSheetDialog.show();
     }
 
-    private void showDigitalIdentityDialog(String title, String epc, String weight, double finalPrice) {
-        if (!isAdded() || getContext() == null) return;
+    // ✅ تمرير البيانات إلى الديجيتال آيد
+    final String firstPhotoPath = !photoPaths.isEmpty() ? photoPaths.get(0) : null;
 
-        BottomSheetDialog identityDialog = new BottomSheetDialog(requireContext());
-        View view = getLayoutInflater().inflate(R.layout.dialog_digital_identity, null);
-        identityDialog.setContentView(view);
-
-        TextView tvIdTitle = view.findViewById(R.id.tvIdTitle);
-        TextView tvEpcCode = view.findViewById(R.id.tvEpcCode);
-        TextView tvIdWeight = view.findViewById(R.id.tvIdWeight);
-        TextView tvIdMetalKarat = view.findViewById(R.id.tvIdMetalKarat);
-        MaterialButton btnClose = view.findViewById(R.id.btnCloseIdentity);
-
-        if (tvIdTitle != null) tvIdTitle.setText(title);
-        if (tvEpcCode != null) tvEpcCode.setText("EPC: " + epc);
-        if (tvIdWeight != null) tvIdWeight.setText(weight + (isArabic ? " جرام" : " g"));
-        if (tvIdMetalKarat != null) tvIdMetalKarat.setText(getSelectedKaratCode());
-
-        if (btnClose != null) {
-            btnClose.setOnClickListener(v -> {
-                identityDialog.dismiss();
-                resetFormForNextScan();
-            });
-        }
-
-        identityDialog.show();
+    if (btnNewEncode != null) {
+        btnNewEncode.requestFocus();
+        btnNewEncode.setOnClickListener(v -> {
+            bottomSheetDialog.dismiss();
+            resetFormForNextScan();
+        });
     }
+
+    if (btnViewDigitalIdentity != null) {
+        btnViewDigitalIdentity.setOnClickListener(v -> {
+            bottomSheetDialog.dismiss();
+            showDigitalIdentityDialog(title, epc, weight, finalPrice, firstPhotoPath);
+        });
+    }
+
+    if (btnClose != null) {
+        btnClose.setOnClickListener(v -> {
+            bottomSheetDialog.dismiss();
+            resetFormForNextScan();
+        });
+    }
+
+    bottomSheetDialog.show();
+}
+
+
+    private void showDigitalIdentityDialog(String title, String epc, String weight, double finalPrice, String photoPath) {
+    if (!isAdded() || getContext() == null) return;
+
+    BottomSheetDialog identityDialog = new BottomSheetDialog(requireContext());
+    View view = getLayoutInflater().inflate(R.layout.dialog_digital_identity, null);
+    identityDialog.setContentView(view);
+
+    TextView tvIdTitle = view.findViewById(R.id.tvIdTitle);
+    TextView tvEpcCode = view.findViewById(R.id.tvEpcCode);
+    TextView tvIdWeight = view.findViewById(R.id.tvIdWeight);
+    TextView tvIdMetalKarat = view.findViewById(R.id.tvIdMetalKarat);
+    TextView tvIdPrice = view.findViewById(R.id.tvIdPrice); // ✅ جديد
+    ImageView imgIdentityPhoto = view.findViewById(R.id.imgIdentityPhoto); // ✅ جديد
+    MaterialButton btnClose = view.findViewById(R.id.btnCloseIdentity);
+
+    if (tvIdTitle != null) tvIdTitle.setText(title);
+    if (tvEpcCode != null) tvEpcCode.setText("EPC: " + epc);
+    if (tvIdWeight != null) tvIdWeight.setText(weight + (isArabic ? " جرام" : " g"));
+    if (tvIdMetalKarat != null) tvIdMetalKarat.setText(getSelectedKaratCode());
+    
+    // ✅ عرض المبلغ
+    if (tvIdPrice != null && priceManager != null) {
+        tvIdPrice.setText(priceManager.formatPriceDefault(finalPrice));
+    }
+    
+    // ✅ عرض الصورة
+    if (imgIdentityPhoto != null && photoPath != null) {
+        File photoFile = new File(photoPath);
+        if (photoFile.exists()) {
+            imgIdentityPhoto.setImageURI(Uri.fromFile(photoFile));
+            imgIdentityPhoto.setVisibility(View.VISIBLE);
+        }
+    }
+
+    if (btnClose != null) {
+        btnClose.setOnClickListener(v -> {
+            identityDialog.dismiss();
+            resetFormForNextScan();
+        });
+    }
+
+    identityDialog.show();
+}
 
     private AlertDialog showProfessionalLoadingDialog(String title, String message) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
@@ -1282,4 +1318,4 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             }
         }
     }
-    }
+                         }
