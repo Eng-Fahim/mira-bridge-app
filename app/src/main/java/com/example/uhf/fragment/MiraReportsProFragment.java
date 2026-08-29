@@ -158,6 +158,47 @@ public class MiraReportsProFragment extends Fragment {
         }
     }
     
+        private void loadReportData(String reportType, String fromDate, String toDate, int branchId) {
+        // استخدام دالة إظهار التحميل المصممة في واجهتك
+        showLoadingContainer(true);
+
+        new Thread(() -> {
+            MiraApiClient apiClient = MiraApiClient.getInstance(getContext());
+            MiraApiClient.ApiResponse response = apiClient.getReportData(reportType, fromDate, toDate, branchId);
+
+            if (getActivity() == null) return;
+
+            getActivity().runOnUiThread(() -> {
+                showLoadingContainer(false);
+                if (response != null && response.isSuccess && response.data != null) {
+                    handleReportSuccess(reportType, response.data);
+                } else {
+                    String errorMsg = (response != null && response.error != null) ? response.error : "فشل جلب البيانات";
+                    Toast.makeText(getContext(), "❌ " + errorMsg, Toast.LENGTH_SHORT).show();
+                }
+            });
+        }).start();
+    }
+
+    private void handleReportSuccess(String reportType, JSONObject data) {
+        lastLoadedData = data;
+        lastLoadedType = reportType;
+
+        RecyclerView.Adapter<?> adapter = createAdapterForType(reportType, data);
+        if (rvReports != null && adapter != null) {
+            rvReports.setAdapter(adapter);
+        }
+    }
+
+    private void showLoadingContainer(boolean show) {
+        if (getView() == null) return;
+        View layoutLoading = getView().findViewById(R.id.swipeRefreshReports);
+        if (layoutLoading instanceof SwipeRefreshLayout) {
+            ((SwipeRefreshLayout) layoutLoading).setRefreshing(show);
+        }
+    }
+
+    
     private void buildReportsList() {
         reportList.clear();
         
