@@ -2,50 +2,41 @@ package com.example.uhf.fragment;
 
 import android.app.DatePickerDialog;
 import android.content.Context;
-import android.content.Intent;
-import android.content.SharedPreferences;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.view.animation.AccelerateDecelerateInterpolator;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.Observer;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
-import android.print.PrintManager;
-import android.print.PrintDocumentAdapter;
-import android.print.PrintAttributes;
-
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.export.ReportExporter;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.PermissionManager;
+import com.example.uhf.models.ReportModels;
+import com.example.uhf.repository.ReportRepository;
 import com.google.android.material.button.MaterialButton;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -53,1178 +44,474 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
+/**
+ * ✅ النسخة المحسنة من Fragment التقارير
+ */
 public class MiraReportsProFragment extends Fragment {
-
     private static final String TAG = "MiraReportsPro";
-    private static final String CACHE_PREFS = "mira_reports_pro_cache";
     
-    // في بداية الكلاس - إضافة متغيرات للأنيميشن
-    private android.animation.ObjectAnimator loadingAnimator;
-    private android.view.animation.Animation fadeInAnimation;
-    private android.view.animation.Animation slideUpAnimation;
+    // المكونات الأساسية
     private RecyclerView rvReports;
     private ReportsAdapter adapter;
-    private final List<ReportItem> reportList = new ArrayList<>();
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final ExecutorService executorService = Executors.newFixedThreadPool(2);
-
+    private final List<ReportModels.ReportItem> reportList = new ArrayList<>();
+    
+    // المديرين
     private MiraOrgProfileManager orgProfile;
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
     private PermissionManager permissionManager;
-    private SharedPreferences offlineCache;
     private MiraPriceManager priceManager;
+    private ReportRepository reportRepository;
+    
+    // الحالة
     private boolean isArabic;
     private int currentBranchId = 1;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
+    // البيانات المحملة
     private JSONObject lastLoadedData = null;
     private String lastLoadedType = "";
     private String lastFromDate = "";
     private String lastToDate = "";
     
-    
-    // في بداية الكلاس
-@Override
-public void onResume() {
-    super.onResume();
-    // ✅ تحديث معرف الفرع عند العودة للـ Fragment
-    if (branchesManager != null) {
-        currentBranchId = branchesManager.getActiveBranchId();
-    }
-}
-
-// دالة لتحديث الفرع
-private void refreshCurrentBranch() {
-    if (branchesManager != null) {
-        currentBranchId = branchesManager.getActiveBranchId();
-        Log.d(TAG, "Updated branch ID: " + currentBranchId);
-    }
-}
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_mira_reports_pro, container, false);
-
-        if (getContext() != null) {
-            orgProfile = MiraOrgProfileManager.getInstance(getContext());
-            apiClient = MiraApiClient.getInstance(getContext());
-            branchesManager = MiraBranchesManager.getInstance(getContext());
-            permissionManager = PermissionManager.getInstance(getContext());
-            priceManager = MiraPriceManager.getInstance(getContext());
-            offlineCache = getContext().getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE);
-        }
-
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
-        currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 1;
-
-        rvReports = view.findViewById(R.id.rvReportsList);
-        rvReports.setLayoutManager(new androidx.recyclerview.widget.GridLayoutManager(getContext(), 2));
-
+        
+        // تهيئة المديرين
+        initializeManagers();
+        
+        // تهيئة الواجهة
+        initializeViews(view);
+        
+        // بناء قائمة التقارير
         buildReportsList();
-        adapter = new ReportsAdapter(reportList, this::openReportDialog);
-        rvReports.setAdapter(adapter);
-
+        
         return view;
     }
-
+    
+    private void initializeManagers() {
+        Context context = getContext();
+        if (context == null) return;
+        
+        orgProfile = MiraOrgProfileManager.getInstance(context);
+        apiClient = MiraApiClient.getInstance(context);
+        branchesManager = MiraBranchesManager.getInstance(context);
+        permissionManager = PermissionManager.getInstance(context);
+        priceManager = MiraPriceManager.getInstance(context);
+        reportRepository = ReportRepository.getInstance(context);
+        
+        isArabic = Locale.getDefault().getLanguage().equals("ar");
+        currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 1;
+    }
+    
+    private void initializeViews(View view) {
+        rvReports = view.findViewById(R.id.rvReportsList);
+        rvReports.setLayoutManager(new GridLayoutManager(getContext(), 2));
+        
+        adapter = new ReportsAdapter(reportList, this::openReportDialog);
+        rvReports.setAdapter(adapter);
+    }
+    
     private void buildReportsList() {
         reportList.clear();
-
+        
         if (isArabic) {
-            reportList.add(new ReportItem("📊", "لوحة القيادة", "ملخص شامل للعمليات", "dashboard"));
-            reportList.add(new ReportItem("💰", "المبيعات التفصيلي", "فواتير + عملاء + طرق دفع", "sales"));
-            reportList.add(new ReportItem("📦", "المخزون التفصيلي", "كل قطعة مع تفاصيلها", "inventory"));
-            reportList.add(new ReportItem("🔄", "التحويلات", "سجل حركة القطع", "movement"));
-            reportList.add(new ReportItem("🏢", "أداء الفروع", "مقارنة شاملة", "branches"));
-            reportList.add(new ReportItem("🚪", "البوابات الأمنية", "سجل المرور", "gates"));
-            reportList.add(new ReportItem("📋", "الجرد والتدقيق", "الدقة والفروقات", "audit"));
-            reportList.add(new ReportItem("💎", "النواقص والطلب", "الأكثر مبيعاً", "reorder"));
-            reportList.add(new ReportItem("👥", "المستخدمين", "الموظفين", "users"));
-            reportList.add(new ReportItem("💵", "الحركة المالية", "القيود المحاسبية", "financial"));
+            // التقارير الأساسية
+            reportList.add(new ReportModels.ReportItem("📊", "لوحة القيادة", "ملخص شامل للعمليات", "dashboard"));
+            reportList.add(new ReportModels.ReportItem("💰", "المبيعات التفصيلي", "فواتير + عملاء + طرق دفع", "sales"));
+            reportList.add(new ReportModels.ReportItem("📦", "المخزون التفصيلي", "كل قطعة مع تفاصيلها", "inventory"));
+            reportList.add(new ReportModels.ReportItem("🔄", "التحويلات", "سجل حركة القطع", "movement"));
+            reportList.add(new ReportModels.ReportItem("🏢", "أداء الفروع", "مقارنة شاملة", "branches"));
+            reportList.add(new ReportModels.ReportItem("🚪", "البوابات الأمنية", "سجل المرور", "gates"));
+            reportList.add(new ReportModels.ReportItem("📋", "الجرد والتدقيق", "الدقة والفروقات", "audit"));
+            reportList.add(new ReportModels.ReportItem("💎", "النواقص والطلب", "الأكثر مبيعاً", "reorder"));
+            reportList.add(new ReportModels.ReportItem("👥", "المستخدمين", "الموظفين", "users"));
+            reportList.add(new ReportModels.ReportItem("💵", "الحركة المالية", "القيود المحاسبية", "financial"));
             
-            // ✅ التقارير المتقدمة الجديدة
-            reportList.add(new ReportItem("⏱️", "تايم لاين المستخدم", "سجل نشاطات الموظف", "user_timeline"));
-            reportList.add(new ReportItem("💠", "بصمة القطعة", "سجل حياة القطعة الكامل", "item_passport"));
-            reportList.add(new ReportItem("🛡️", "مؤشر أمن البوابات", "تحليل المرور والإنذارات", "gate_security_index"));
-            reportList.add(new ReportItem("📅", "أعمار المخزون", "تحليل الركود والتقادم", "inventory_aging"));
-            reportList.add(new ReportItem("⚠️", "تفاصيل الفروقات", "فروقات الجرد التفصيلية", "audit_discrepancy_detail"));
+            // التقارير المتقدمة
+            reportList.add(new ReportModels.ReportItem("⏱️", "تايم لاين المستخدم", "سجل نشاطات الموظف", "user_timeline"));
+            reportList.add(new ReportModels.ReportItem("💠", "بصمة القطعة", "سجل حياة القطعة الكامل", "item_passport"));
+            reportList.add(new ReportModels.ReportItem("🛡️", "مؤشر أمن البوابات", "تحليل المرور والإنذارات", "gate_security_index"));
+            reportList.add(new ReportModels.ReportItem("📅", "أعمار المخزون", "تحليل الركود والتقادم", "inventory_aging"));
+            reportList.add(new ReportModels.ReportItem("⚠️", "تفاصيل الفروقات", "فروقات الجرد التفصيلية", "audit_discrepancy_detail"));
         } else {
-            reportList.add(new ReportItem("📊", "Dashboard", "Summary", "dashboard"));
-            reportList.add(new ReportItem("💰", "Sales", "Invoices + customers", "sales"));
-            reportList.add(new ReportItem("📦", "Inventory", "All items", "inventory"));
-            reportList.add(new ReportItem("🔄", "Transfers", "Movement", "movement"));
-            reportList.add(new ReportItem("🏢", "Branches", "Comparison", "branches"));
-            reportList.add(new ReportItem("🚪", "Gates", "Log", "gates"));
-            reportList.add(new ReportItem("📋", "Audit", "Accuracy", "audit"));
-            reportList.add(new ReportItem("💎", "Reorder", "Best sellers", "reorder"));
-            reportList.add(new ReportItem("👥", "Users", "Staff", "users"));
-            reportList.add(new ReportItem("💵", "Financial", "Journal", "financial"));
+            // English reports
+            reportList.add(new ReportModels.ReportItem("📊", "Dashboard", "Summary", "dashboard"));
+            reportList.add(new ReportModels.ReportItem("💰", "Sales", "Invoices + customers", "sales"));
+            reportList.add(new ReportModels.ReportItem("📦", "Inventory", "All items", "inventory"));
+            reportList.add(new ReportModels.ReportItem("🔄", "Transfers", "Movement", "movement"));
+            reportList.add(new ReportModels.ReportItem("🏢", "Branches", "Comparison", "branches"));
+            reportList.add(new ReportModels.ReportItem("🚪", "Gates", "Log", "gates"));
+            reportList.add(new ReportModels.ReportItem("📋", "Audit", "Accuracy", "audit"));
+            reportList.add(new ReportModels.ReportItem("💎", "Reorder", "Best sellers", "reorder"));
+            reportList.add(new ReportModels.ReportItem("👥", "Users", "Staff", "users"));
+            reportList.add(new ReportModels.ReportItem("💵", "Financial", "Journal", "financial"));
             
-            // ✅ Advanced Reports
-            reportList.add(new ReportItem("⏱️", "User Timeline", "Staff activity log", "user_timeline"));
-            reportList.add(new ReportItem("💠", "Item Passport", "Complete item lifecycle", "item_passport"));
-            reportList.add(new ReportItem("🛡️", "Gate Security Index", "Traffic & alerts analysis", "gate_security_index"));
-            reportList.add(new ReportItem("📅", "Inventory Aging", "Stagnation analysis", "inventory_aging"));
-            reportList.add(new ReportItem("⚠️", "Discrepancy Detail", "Detailed audit discrepancies", "audit_discrepancy_detail"));
+            // Advanced
+            reportList.add(new ReportModels.ReportItem("⏱️", "User Timeline", "Staff activity log", "user_timeline"));
+            reportList.add(new ReportModels.ReportItem("💠", "Item Passport", "Complete item lifecycle", "item_passport"));
+            reportList.add(new ReportModels.ReportItem("🛡️", "Gate Security Index", "Traffic & alerts analysis", "gate_security_index"));
+            reportList.add(new ReportModels.ReportItem("📅", "Inventory Aging", "Stagnation analysis", "inventory_aging"));
+            reportList.add(new ReportModels.ReportItem("⚠️", "Discrepancy Detail", "Detailed audit discrepancies", "audit_discrepancy_detail"));
+        }
+        
+        if (adapter != null) {
+            adapter.notifyDataSetChanged();
         }
     }
-
-    // ==================== Advanced Filter System ====================
-
-private void openReportDialog(ReportItem item) {
-    if (getContext() == null || !isAdded()) return;
-
-    if (permissionManager != null && !permissionManager.canAccessFragment("Reports")) {
-        Toast.makeText(getContext(), isArabic ? "⛔ غير مصرح" : "⛔ Access Denied", Toast.LENGTH_SHORT).show();
-        return;
-    }
-
-    // ✅ التقارير المتقدمة
-    if (item.type.equals("user_timeline")) {
-        showUserTimelineDialog(item);
-        return;
-    }
     
-    if (item.type.equals("item_passport")) {
-        showItemPassportDialog(item);
-        return;
-    }
-    
-    if (item.type.equals("gate_security_index")) {
-        showGateSecurityDialog(item);
-        return;
-    }
-    
-    if (item.type.equals("inventory_aging")) {
-        showInventoryAgingDialog(item);
-        return;
-    }
-    
-    if (item.type.equals("audit_discrepancy_detail")) {
-        showAuditDiscrepancyDialog(item);
-        return;
-    }
-
-    // ✅ التقارير العادية مع فلاتر مخصصة
-    showFilteredReportDialog(item);
-}
-
-
-/**
- * ✅ تأثير ضغط على الأزرار
- */
-private void animateButtonPress(View view) {
-    view.animate()
-        .scaleX(0.95f)
-        .scaleY(0.95f)
-        .setDuration(100)
-        .withEndAction(() -> {
-            view.animate()
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(100)
-                .start();
-        })
-        .start();
-}
-
-/**
- * ✅ شاشة تحميل مخصصة مع أنيميشن
- */
-private void showCustomLoading(View layoutLoading, TextView tvLoadingStatus) {
-    if (layoutLoading == null) return;
-    
-    layoutLoading.setVisibility(View.VISIBLE);
-    layoutLoading.setAlpha(0f);
-    layoutLoading.animate().alpha(1f).setDuration(300).start();
-    
-    if (tvLoadingStatus != null) {
-        tvLoadingStatus.setText(isArabic ? "⏳ جاري تحميل البيانات..." : "⏳ Loading data...");
+    /**
+     * ✅ فتح حوار التقرير
+     */
+    private void openReportDialog(ReportModels.ReportItem item) {
+        if (getContext() == null || !isAdded()) return;
         
-        // ✅ أنيميشن نبض للنص
-        tvLoadingStatus.setAlpha(0.3f);
-        android.animation.ObjectAnimator pulse = android.animation.ObjectAnimator.ofFloat(tvLoadingStatus, "alpha", 0.3f, 1f);
-        pulse.setDuration(800);
-        pulse.setRepeatCount(android.animation.ObjectAnimator.INFINITE);
-        pulse.setRepeatMode(android.animation.ObjectAnimator.REVERSE);
-        pulse.start();
+        // فحص الصلاحيات
+        if (permissionManager != null && !permissionManager.canAccessFragment("Reports")) {
+            Toast.makeText(getContext(), 
+                isArabic ? "⛔ غير مصرح" : "⛔ Access Denied", 
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // التقارير المتقدمة
+        if (item.isAdvanced) {
+            handleAdvancedReport(item);
+            return;
+        }
+        
+        // التقارير العادية
+        showFilteredReportDialog(item);
     }
-}
-
-/**
- * ✅ إخفاء شاشة التحميل مع أنيميشن
- */
-private void hideCustomLoading(View layoutLoading) {
-    if (layoutLoading == null) return;
     
-    layoutLoading.animate()
-        .alpha(0f)
-        .setDuration(300)
-        .withEndAction(() -> layoutLoading.setVisibility(View.GONE))
-        .start();
-}
-// ==================== 1. فلتر المبيعات ====================
-private void showFilteredReportDialog(ReportItem item) {
-    View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
+    /**
+     * ✅ معالجة التقارير المتقدمة
+     */
+    private void handleAdvancedReport(ReportModels.ReportItem item) {
+        switch (item.type) {
+            case "user_timeline":
+                showUserTimelineDialog(item);
+                break;
+            case "item_passport":
+                showItemPassportDialog(item);
+                break;
+            case "gate_security_index":
+                showGateSecurityDialog(item);
+                break;
+            case "inventory_aging":
+                fetchAdvancedReport(item.type, null);
+                break;
+            case "audit_discrepancy_detail":
+                showAuditDiscrepancyDialog(item);
+                break;
+        }
+    }
     
-    TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
-    RecyclerView rvData = dialogView.findViewById(R.id.rvReportData);
-    View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
-    TextView tvLoadingStatus = dialogView.findViewById(R.id.tvLoadingStatus);
-    
-    MaterialButton btnFrom = dialogView.findViewById(R.id.btnReportDateFrom);
-    MaterialButton btnTo = dialogView.findViewById(R.id.btnReportDateTo);
-    MaterialButton btnApply = dialogView.findViewById(R.id.btnReportApplyFilter);
-    MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
-    MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
-    MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
-    MaterialButton btnAdvancedFilter = dialogView.findViewById(R.id.btnAdvancedFilter);
-    
-    final String[] selectedDates = new String[]{getDefaultFromDate(), getDefaultToDate()};
-    final String[] selectedFilters = new String[]{"", "", ""};
-    
-    btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
-    btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
-    
-    tvTitle.setText(item.icon + " " + item.title);
-    rvData.setLayoutManager(new LinearLayoutManager(getContext()));
-    
-    // ✅ إضافة أنيميشن للعناصر
-    tvTitle.setAlpha(0f);
-    tvTitle.setTranslationY(-20f);
-    tvTitle.animate().alpha(1f).translationY(0f).setDuration(500).start();
-    
-    AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
+    /**
+     * ✅ عرض حوار تقرير مع فلاتر
+     */
+    private void showFilteredReportDialog(ReportModels.ReportItem item) {
+        View dialogView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.dialog_mira_report_viewer, null);
+        
+        TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
+        RecyclerView rvData = dialogView.findViewById(R.id.rvReportData);
+        View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
+        TextView tvLoadingStatus = dialogView.findViewById(R.id.tvLoadingStatus);
+        MaterialButton btnFrom = dialogView.findViewById(R.id.btnReportDateFrom);
+        MaterialButton btnTo = dialogView.findViewById(R.id.btnReportDateTo);
+        MaterialButton btnApply = dialogView.findViewById(R.id.btnReportApplyFilter);
+        MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
+        MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
+        MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
+        MaterialButton btnAdvancedFilter = dialogView.findViewById(R.id.btnAdvancedFilter);
+        
+        final String[] selectedDates = new String[]{getDefaultFromDate(), getDefaultToDate()};
+        final String[] selectedFilters = new String[]{"", "", ""};
+        
+        tvTitle.setText(item.icon + " " + item.title);
+        rvData.setLayoutManager(new LinearLayoutManager(getContext()));
+        
+        btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
+        btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
+        
+        AlertDialog dialog = new AlertDialog.Builder(requireContext(), 
+            android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
             .setView(dialogView)
             .create();
-    
-    // ✅ أنيميشن فتح الحوار
-    if (dialog.getWindow() != null) {
-        dialog.getWindow().getAttributes().windowAnimations = R.style.DialogAnimation;
-    }
-    
-    btnFrom.setOnClickListener(v -> {
-        // ✅ تأثير ضغط
-        animateButtonPress(btnFrom);
-        showDatePicker(date -> {
+        
+        // أزرار التاريخ
+        btnFrom.setOnClickListener(v -> showDatePicker(date -> {
             selectedDates[0] = date;
             btnFrom.setText((isArabic ? "من: " : "From: ") + date);
-            // ✅ أنيميشن تحديث النص
-            btnFrom.setAlpha(0f);
-            btnFrom.animate().alpha(1f).setDuration(300).start();
-        });
-    });
-    
-    btnTo.setOnClickListener(v -> {
-        animateButtonPress(btnTo);
-        showDatePicker(date -> {
+        }));
+        
+        btnTo.setOnClickListener(v -> showDatePicker(date -> {
             selectedDates[1] = date;
             btnTo.setText((isArabic ? "إلى: " : "To: ") + date);
-            btnTo.setAlpha(0f);
-            btnTo.animate().alpha(1f).setDuration(300).start();
-        });
-    });
-    
-    if (btnAdvancedFilter != null) {
-    if (item.type.equals("gates")) {
-        // ✅ للبوابات - زر اختيار البوابة
-        btnAdvancedFilter.setText(isArabic ? "🚪 اختر البوابة" : "🚪 Select Gate");
-        btnAdvancedFilter.setOnClickListener(v -> {
-            animateButtonPress(btnAdvancedFilter);
-            showGateSelectionForReport(dialogView, rvData, layoutLoading, tvLoadingStatus, 
-                selectedDates, selectedFilters);
-        });
-    } else {
-        // ✅ للتقارير الأخرى - فلتر متقدم
-        btnAdvancedFilter.setOnClickListener(v -> {
-            animateButtonPress(btnAdvancedFilter);
-            showAdvancedFilterDialog(item.type, selectedFilters, () -> {
-                fetchAndDisplayWithFilters(item.type, rvData, layoutLoading, tvLoadingStatus, 
-                    selectedDates[0], selectedDates[1], selectedFilters);
-            });
-        });
-    }
-}
-    btnApply.setOnClickListener(v -> {
-        animateButtonPress(btnApply);
-        // ✅ أنيميشن تحميل مخصص
-        showCustomLoading(layoutLoading, tvLoadingStatus);
-        fetchAndDisplayWithFilters(item.type, rvData, layoutLoading, tvLoadingStatus, 
-            selectedDates[0], selectedDates[1], selectedFilters);
-    });
-    
-    btnExport.setOnClickListener(v -> {
-        animateButtonPress(btnExport);
-        exportReportToCSV(item.type, selectedDates[0], selectedDates[1]);
-    });
-    
-    btnClose.setOnClickListener(v -> {
-        animateButtonPress(btnClose);
-        // ✅ أنيميشن إغلاق
-        dialogView.animate().alpha(0f).setDuration(200).withEndAction(dialog::dismiss).start();
-    });
-    
-    if (btnPrint != null) {
-        btnPrint.setOnClickListener(v -> {
-            animateButtonPress(btnPrint);
-            printReport(item, rvData, selectedDates, selectedFilters);
-        });
+        }));
+        
+        // الفلتر المتقدم
+        if (btnAdvancedFilter != null) {
+            btnAdvancedFilter.setOnClickListener(v -> 
+                showAdvancedFilterDialog(item.type, selectedFilters, () -> {
+                    loadReportWithFilters(item.type, rvData, layoutLoading, 
+                        tvLoadingStatus, selectedDates, selectedFilters);
+                }));
+        }
+        
+        // تطبيق الفلتر
+        btnApply.setOnClickListener(v -> 
+            loadReportWithFilters(item.type, rvData, layoutLoading, 
+                tvLoadingStatus, selectedDates, selectedFilters));
+        
+        // تصدير CSV
+        btnExport.setOnClickListener(v -> exportReport(item.type, selectedDates));
+        
+        // طباعة
+        if (btnPrint != null) {
+            btnPrint.setOnClickListener(v -> printReport(item, rvData, selectedDates, selectedFilters));
+        }
+        
+        // إغلاق
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+        
+        dialog.show();
+        
+        // تحميل البيانات تلقائياً
+        loadReportWithFilters(item.type, rvData, layoutLoading, 
+            tvLoadingStatus, selectedDates, selectedFilters);
     }
     
-    dialog.show();
-    
-    // ✅ أنيميشن ظهور المحتوى
-    if (dialog.getWindow() != null && dialog.getWindow().getDecorView() != null) {
-        View decorView = dialog.getWindow().getDecorView();
-        decorView.setAlpha(0f);
-        decorView.animate().alpha(1f).setDuration(300).start();
-    }
-    
-    fetchAndDisplayWithFilters(item.type, rvData, layoutLoading, tvLoadingStatus, 
-        selectedDates[0], selectedDates[1], selectedFilters);
-}
-
-
-// دالة اختيار البوابة للتقرير العادي
-private void showGateSelectionForReport(View dialogView, RecyclerView rvData, 
+    /**
+     * ✅ تحميل التقرير مع الفلاتر
+     */
+    private void loadReportWithFilters(String type, RecyclerView rvData, 
                                        View layoutLoading, TextView tvLoadingStatus,
                                        String[] dates, String[] filters) {
-    // ✅ فحص السلامة
-    if (!isAdded() || getContext() == null) return;
-    
-    executorService.execute(() -> {
-        try {
-            refreshCurrentBranch(); // تحديث الفرع
-            String endpoint = "/gates?branch_id=" + currentBranchId;
-            MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint);
-            
-            mainHandler.post(() -> {
-                if (!isAdded() || getContext() == null) return;
-                
-                List<GateInfo> gates = new ArrayList<>();
-                
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONArray gatesArray = response.data.optJSONArray("gates");
-                    if (gatesArray == null) {
-                        JSONObject dataObj = response.data.optJSONObject("data");
-                        if (dataObj != null) {
-                            gatesArray = dataObj.optJSONArray("gates");
-                        }
-                    }
-                    
-                    if (gatesArray != null) {
-                        for (int i = 0; i < gatesArray.length(); i++) {
-                            JSONObject gate = gatesArray.optJSONObject(i);
-                            if (gate != null) {
-                                GateInfo info = new GateInfo();
-                                info.id = gate.optInt("id", 0);
-                                info.gateId = gate.optString("gate_id", "");
-                                info.name = gate.optString("gate_name", "بوابة " + (i+1));
-                                gates.add(info);
-                            }
-                        }
-                    }
-                }
-                
-                String[] options = new String[gates.size() + 1];
-                options[0] = isArabic ? "كل البوابات" : "All Gates";
-                for (int i = 0; i < gates.size(); i++) {
-                    options[i + 1] = gates.get(i).name + " (" + gates.get(i).gateId + ")";
-                }
-                
-                Context context = getContext();
-                if (context == null) return;
-                
-                new AlertDialog.Builder(context)
-                    .setTitle(isArabic ? "اختر البوابة" : "Select Gate")
-                    .setItems(options, (dialog, which) -> {
-                        if (which == 0) {
-                            filters[1] = "";
-                        } else {
-                            filters[1] = gates.get(which - 1).gateId;
-                        }
-                        
-                        showCustomLoading(layoutLoading, tvLoadingStatus);
-                        fetchAndDisplayWithFilters("gates", rvData, layoutLoading, 
-                            tvLoadingStatus, dates[0], dates[1], filters);
-                    })
-                    .show();
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Gate selection error: " + e.getMessage());
+        if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
+        if (tvLoadingStatus != null) {
+            tvLoadingStatus.setText(isArabic ? "⏳ جاري تحميل البيانات..." : "⏳ Loading data...");
         }
-    });
-}
-// ✅ إضافة هذه الدالة
-private Context getContextSafely() {
-    return isAdded() ? getContext() : null;
-}
-
-// ==================== دالة الفلترة المتقدمة ====================
-private void showAdvancedFilterDialog(String reportType, String[] filters, Runnable onApply) {
-    AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-    builder.setTitle(isArabic ? "🔍 فلترة متقدمة" : "🔍 Advanced Filter");
-    
-    View filterView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_advanced_filter, null);
-    
-    EditText etSearch = filterView.findViewById(R.id.etFilterSearch);
-    EditText etFilter1 = filterView.findViewById(R.id.etFilter1);
-    EditText etFilter2 = filterView.findViewById(R.id.etFilter2);
-    TextView tvFilter1Label = filterView.findViewById(R.id.tvFilter1Label);
-    TextView tvFilter2Label = filterView.findViewById(R.id.tvFilter2Label);
-    
-    // ✅ أنيميشن ظهور عناصر الفلتر
-    etSearch.setAlpha(0f);
-    etSearch.setTranslationX(-30f);
-    etSearch.animate().alpha(1f).translationX(0f).setDuration(400).setStartDelay(100).start();
-    
-    etFilter1.setAlpha(0f);
-    etFilter1.setTranslationX(-30f);
-    etFilter1.animate().alpha(1f).translationX(0f).setDuration(400).setStartDelay(200).start();
-    
-    etFilter2.setAlpha(0f);
-    etFilter2.setTranslationX(-30f);
-    etFilter2.animate().alpha(1f).translationX(0f).setDuration(400).setStartDelay(300).start();
-    
-    // تخصيص الفلاتر حسب نوع التقرير
-    switch (reportType) {
-        case "sales":
-            tvFilter1Label.setText(isArabic ? "طريقة الدفع" : "Payment Method");
-            tvFilter2Label.setText(isArabic ? "العميل" : "Customer");
-            etFilter1.setHint(isArabic ? "cash, card, transfer..." : "cash, card, transfer...");
-            etFilter2.setHint(isArabic ? "اسم العميل" : "Customer name");
-            break;
-        case "inventory":
-            tvFilter1Label.setText(isArabic ? "العيار" : "Karat");
-            tvFilter2Label.setText(isArabic ? "الحالة" : "Status");
-            etFilter1.setHint(isArabic ? "21K, 18K..." : "21K, 18K...");
-            etFilter2.setHint(isArabic ? "in_stock, displayed..." : "in_stock, displayed...");
-            break;
-        case "movement":
-            tvFilter1Label.setText(isArabic ? "الحالة" : "Status");
-            tvFilter2Label.setText(isArabic ? "الفرع" : "Branch");
-            etFilter1.setHint(isArabic ? "draft, approved..." : "draft, approved...");
-            etFilter2.setHint(isArabic ? "اسم الفرع" : "Branch name");
-            break;
-        case "gates":
-            tvFilter1Label.setText(isArabic ? "البوابة" : "Gate");
-            tvFilter2Label.setText(isArabic ? "الحالة" : "Status");
-            etFilter1.setHint(isArabic ? "معرف البوابة" : "Gate ID");
-            etFilter2.setHint(isArabic ? "allowed, alert..." : "allowed, alert...");
-            break;
-        case "audit":
-            tvFilter1Label.setText(isArabic ? "الفرع" : "Branch");
-            tvFilter2Label.setText(isArabic ? "الدقة" : "Accuracy");
-            etFilter1.setHint(isArabic ? "معرف الفرع" : "Branch ID");
-            etFilter2.setHint(isArabic ? "≥ 90, ≥ 80..." : "≥ 90, ≥ 80...");
-            break;
-        case "users":
-            tvFilter1Label.setText(isArabic ? "الدور" : "Role");
-            tvFilter2Label.setText(isArabic ? "الحالة" : "Status");
-            etFilter1.setHint(isArabic ? "ADMIN, POS..." : "ADMIN, POS...");
-            etFilter2.setHint(isArabic ? "active, suspended..." : "active, suspended...");
-            break;
+        
+        // بناء الفلاتر
+        ReportModels.ReportFilters reportFilters = new ReportModels.ReportFilters();
+        reportFilters.fromDate = dates[0];
+        reportFilters.toDate = dates[1];
+        reportFilters.branchId = currentBranchId;
+        
+        if (filters != null) {
+            reportFilters.searchQuery = filters[0];
+            reportFilters.filter1 = filters[1];
+            reportFilters.filter2 = filters[2];
+        }
+        
+        // جلب البيانات
+        reportRepository.fetchReport(type, reportFilters).observe(getViewLifecycleOwner(), 
+            result -> {
+                if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+                
+                if (result == null || !result.success || result.data == null) {
+                    String error = result != null ? result.errorMessage : "Unknown error";
+                    Toast.makeText(getContext(), 
+                        isArabic ? "❌ فشل التحميل: " + error : "❌ Failed to load: " + error, 
+                        Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                
+                // تخزين البيانات
+                lastLoadedData = result.data;
+                lastLoadedType = type;
+                lastFromDate = dates[0];
+                lastToDate = dates[1];
+                
+                // إنشاء المحول
+                RecyclerView.Adapter<?> reportAdapter = createAdapterForType(type, result.data);
+                rvData.setAdapter(reportAdapter);
+                
+                Toast.makeText(getContext(), 
+                    isArabic ? "✅ تم تحميل التقرير" : "✅ Report loaded", 
+                    Toast.LENGTH_SHORT).show();
+            });
     }
     
-    // تعبئة القيم الحالية
-    etSearch.setText(filters[0]);
-    etFilter1.setText(filters[1]);
-    etFilter2.setText(filters[2]);
-    
-    builder.setView(filterView);
-    builder.setPositiveButton(isArabic ? "تطبيق" : "Apply", (dialog, which) -> {
-        filters[0] = etSearch.getText().toString().trim();
-        filters[1] = etFilter1.getText().toString().trim();
-        filters[2] = etFilter2.getText().toString().trim();
-        onApply.run();
-    });
-    builder.setNegativeButton(isArabic ? "إلغاء" : "Cancel", null);
-    
-    AlertDialog dialog = builder.create();
-    dialog.show();
-    
-    // ✅ أنيميشن ظهور الحوار
-    if (dialog.getWindow() != null && dialog.getWindow().getDecorView() != null) {
-        View decorView = dialog.getWindow().getDecorView();
-        decorView.setAlpha(0f);
-        decorView.setScaleX(0.9f);
-        decorView.setScaleY(0.9f);
-        decorView.animate()
-            .alpha(1f)
-            .scaleX(1f)
-            .scaleY(1f)
-            .setDuration(300)
-            .setInterpolator(new AccelerateDecelerateInterpolator())
-            .start();
-    }
-}
-
-// ==================== جلب البيانات مع الفلاتر ====================
-private void fetchAndDisplayWithFilters(String type, RecyclerView rvData, View layoutLoading, 
-                                      TextView tvLoadingStatus, String fromDate, String toDate, 
-                                      String[] filters) {
-    // ✅ إظهار تحميل مخصص
-    showCustomLoading(layoutLoading, tvLoadingStatus);
-
-    executorService.execute(() -> {
-        try {
-            StringBuilder endpoint = new StringBuilder("/reports-app?type=").append(type);
-            endpoint.append("&from=").append(fromDate);
-            endpoint.append("&to=").append(toDate);
-            endpoint.append("&branch_id=").append(currentBranchId);
-            
-            if (filters != null && filters.length > 0) {
-                if (!filters[0].isEmpty()) endpoint.append("&search=").append(filters[0]);
-                if (!filters[1].isEmpty()) endpoint.append("&filter1=").append(filters[1]);
-                if (!filters[2].isEmpty()) endpoint.append("&filter2=").append(filters[2]);
-            }
-            
-            MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint.toString());
-
-            mainHandler.post(() -> {
-                // ✅ إخفاء التحميل مع أنيميشن
-                hideCustomLoading(layoutLoading);
-
-                if (response == null || !response.isSuccess) {
+    /**
+     * ✅ جلب تقرير متقدم
+     */
+    private void fetchAdvancedReport(String type, ReportModels.ReportFilters filters) {
+        if (filters == null) {
+            filters = new ReportModels.ReportFilters();
+        }
+        filters.branchId = currentBranchId;
+        
+        reportRepository.fetchAdvancedReport(type, filters).observe(getViewLifecycleOwner(), 
+            result -> {
+                if (result == null || !result.success || result.data == null) {
                     Toast.makeText(getContext(), 
                         isArabic ? "❌ فشل التحميل" : "❌ Failed to load", 
                         Toast.LENGTH_SHORT).show();
                     return;
                 }
-
-                JSONObject data = response.data;
-                String rawBody = response.getBody();
-
-                if (data == null && rawBody != null) {
-                    try {
-                        if (rawBody.trim().startsWith("[")) {
-                            JSONArray rootArray = new JSONArray(rawBody);
-                            data = new JSONObject();
-                            data.put("items_list", rootArray);
-                        } else {
-                            data = new JSONObject(rawBody);
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Parse JSON error", e);
-                    }
-                }
-
-                if (data == null) {
-                    Toast.makeText(getContext(), isArabic ? "لا توجد بيانات" : "No data available", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
-                // ✅ تخزين البيانات للتصدير
-                lastLoadedData = data;
-                lastLoadedType = type;
-                lastFromDate = fromDate;
-                lastToDate = toDate;
-
-                // ✅ تخزين في الكاش
-                String cacheKey = "cache_pro_" + type + "_" + fromDate + "_" + toDate;
-                if (offlineCache != null) {
-                    offlineCache.edit().putString(cacheKey, data.toString()).apply();
-                }
-
-                JSONObject filteredData = applyLocalFilters(type, data, filters);
-                RecyclerView.Adapter<?> reportAdapter = createAdapterForType(type, filteredData);
                 
-                // ✅ أنيميشن ظهور البيانات
-                rvData.setAlpha(0f);
-                rvData.setTranslationY(30f);
-                rvData.setAdapter(reportAdapter);
-                rvData.animate()
-                    .alpha(1f)
-                    .translationY(0f)
-                    .setDuration(500)
-                    .setInterpolator(new AccelerateDecelerateInterpolator())
-                    .start();
-                
-                // ✅ رسالة نجاح
-                Toast.makeText(getContext(), 
-                    isArabic ? "✅ تم تحميل التقرير بنجاح" : "✅ Report loaded successfully", 
-                    Toast.LENGTH_SHORT).show();
+                showAdvancedReportDialog(type, result.data);
             });
-        } catch (Exception e) {
-            Log.e(TAG, "Fetch error: " + e.getMessage());
-            mainHandler.post(() -> {
-                hideCustomLoading(layoutLoading);
-                Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            });
-        }
-    });
-}
-
-// ==================== فلترة محلية ====================
-private JSONObject applyLocalFilters(String type, JSONObject data, String[] filters) {
-    try {
-        if (filters == null || filters.length < 3) return data;
-        
-        String search = filters[0].toLowerCase();
-        String filter1 = filters[1].toLowerCase();
-        String filter2 = filters[2].toLowerCase();
-        
-        if (search.isEmpty() && filter1.isEmpty() && filter2.isEmpty()) {
-            return data;
-        }
-        
-        // البحث في البيانات وتطبيق الفلاتر
-        JSONArray items = data.optJSONArray("items");
-        if (items == null) items = data.optJSONArray("data");
-        if (items == null) items = data.optJSONArray("items_list");
-        
-        if (items != null) {
-            JSONArray filteredItems = new JSONArray();
-            
-            for (int i = 0; i < items.length(); i++) {
-                JSONObject item = items.optJSONObject(i);
-                if (item != null && matchesFilters(item, search, filter1, filter2, type)) {
-                    filteredItems.put(item);
-                }
-            }
-            
-            JSONObject result = new JSONObject();
-            result.put("items", filteredItems);
-            result.put("total_count", filteredItems.length());
-            return result;
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "Local filter error: " + e.getMessage());
     }
     
-    return data;
-}
-
-private boolean matchesFilters(JSONObject item, String search, String filter1, String filter2, String type) {
-    try {
-        // البحث العام
-        if (!search.isEmpty()) {
-            String itemStr = item.toString().toLowerCase();
-            if (!itemStr.contains(search)) {
-                return false;
-            }
-        }
+    /**
+     * ✅ عرض حوار التقرير المتقدم
+     */
+    private void showAdvancedReportDialog(String type, JSONObject data) {
+        View dialogView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.dialog_mira_report_viewer, null);
         
-        // الفلاتر المحددة
-        if (!filter1.isEmpty()) {
-            String value1 = "";
-            switch (type) {
-                case "sales":
-                    value1 = item.optString("payment_method", item.optString("payment", ""));
-                    break;
-                case "inventory":
-                    value1 = item.optString("gold_karat", item.optString("karat", ""));
-                    break;
-                case "movement":
-                    value1 = item.optString("status", "");
-                    break;
-                case "gates":
-                    value1 = item.optString("gate_name", item.optString("gate_id", ""));
-                    break;
-                case "users":
-                    value1 = item.optString("role_name", item.optString("role", ""));
-                    break;
-            }
-            if (!value1.toLowerCase().contains(filter1)) {
-                return false;
-            }
-        }
+        TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
+        RecyclerView rvData = dialogView.findViewById(R.id.rvReportData);
+        View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
+        MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
+        MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
+        MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
         
-        if (!filter2.isEmpty()) {
-            String value2 = "";
-            switch (type) {
-                case "sales":
-                    value2 = item.optString("customer_name", item.optString("customer", ""));
-                    break;
-                case "inventory":
-                    value2 = item.optString("vault_status", item.optString("status", ""));
-                    break;
-                case "movement":
-                    value2 = item.optString("from_branch", item.optString("to_branch", ""));
-                    break;
-                case "gates":
-                    value2 = item.optString("status", "");
-                    break;
-                case "users":
-                    value2 = item.optString("status", "");
-                    break;
-            }
-            if (!value2.toLowerCase().contains(filter2)) {
-                return false;
-            }
-        }
+        if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
         
-        return true;
-    } catch (Exception e) {
-        return true;
-    }
-}
-
-// ==================== طباعة محسنة ====================
-// ==================== طباعة HTML احترافية ====================
-private void printReport(ReportItem item, RecyclerView rvData, String[] dates, String[] filters) {
-    if (getContext() == null) return;
-
-    try {
-        // ✅ إنشاء HTML احترافي
-        StringBuilder html = new StringBuilder();
-        String direction = isArabic ? "rtl" : "ltr";
-        String textAlign = isArabic ? "right" : "left";
+        tvTitle.setText(getReportTitle(type));
+        rvData.setLayoutManager(new LinearLayoutManager(getContext()));
         
-        html.append("<!DOCTYPE html><html dir='").append(direction).append("'><head><meta charset='utf-8'>")
-            .append("<style>")
-            .append("@page { size: A4; margin: 15mm; }")
-            .append("body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: ").append(direction).append("; text-align: ").append(textAlign).append("; margin: 0; padding: 20px; color: #1a1a2e; }")
-            .append(".header { text-align: center; border-bottom: 3px solid #1a237e; padding-bottom: 15px; margin-bottom: 20px; }")
-            .append(".org-name { font-size: 24px; font-weight: bold; color: #1a237e; margin: 0; }")
-            .append(".branch-name { font-size: 16px; color: #555; margin: 5px 0 0 0; }")
-            .append(".report-title { font-size: 20px; font-weight: bold; color: #333; margin: 10px 0 5px 0; }")
-            .append(".report-meta { font-size: 12px; color: #777; margin: 0; }")
-            .append(".filters-box { background: #f5f5f5; border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 15px 0; font-size: 11px; color: #555; }")
-            .append("table { width: 100%; border-collapse: collapse; margin-top: 15px; }")
-            .append("th { background: #1a237e; color: white; padding: 10px; font-size: 12px; text-align: center; }")
-            .append("td { padding: 8px; border: 1px solid #ddd; font-size: 11px; text-align: center; }")
-            .append("tr:nth-child(even) { background: #f9f9f9; }")
-            .append(".footer { margin-top: 30px; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #ccc; padding-top: 10px; }")
-            .append(".logo { text-align: center; margin-bottom: 15px; }")
-            .append(".logo span { font-size: 40px; }")
-            .append("</style></head><body>");
-
-        // ✅ الشعار
-        html.append("<div class='logo'><span>💎</span></div>");
-
-        // ✅ الهيدر
-        html.append("<div class='header'>")
-            .append("<h1 class='org-name'>").append(orgProfile != null ? orgProfile.getOrgName() : "MIRA System").append("</h1>")
-            .append("<p class='branch-name'>").append(branchesManager != null ? branchesManager.getActiveBranchName() : "").append("</p>")
-            .append("<h2 class='report-title'>").append(item.icon).append(" ").append(item.title).append("</h2>")
-            .append("<p class='report-meta'>").append(isArabic ? "تاريخ الإنشاء: " : "Generated: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date())).append("</p>")
-            .append("</div>");
-
-        // ✅ معلومات الفترة والفلاتر
-        html.append("<div class='filters-box'>")
-            .append("<strong>").append(isArabic ? "📅 الفترة: " : "📅 Period: ").append("</strong>")
-            .append(dates[0]).append(" → ").append(dates[1]);
+        RecyclerView.Adapter<?> adapter = createAdvancedAdapter(type, data);
+        rvData.setAdapter(adapter);
         
-        if (filters != null) {
-            if (!filters[0].isEmpty()) html.append("<br><strong>").append(isArabic ? "🔍 بحث: " : "🔍 Search: ").append("</strong>").append(filters[0]);
-            if (!filters[1].isEmpty()) html.append("<br><strong>").append(isArabic ? "فلتر 1: " : "Filter 1: ").append("</strong>").append(filters[1]);
-            if (!filters[2].isEmpty()) html.append("<br><strong>").append(isArabic ? "فلتر 2: " : "Filter 2: ").append("</strong>").append(filters[2]);
-        }
-        html.append("</div>");
-
-        // ✅ جدول البيانات
-        html.append("<table><thead><tr>");
-        
-        // ✅ تحديد أعمدة الجدول حسب نوع التقرير
-        switch (item.type) {
-            case "sales":
-                html.append("<th>#</th><th>").append(isArabic ? "رقم الفاتورة" : "Invoice").append("</th>")
-                    .append("<th>").append(isArabic ? "العميل" : "Customer").append("</th>")
-                    .append("<th>").append(isArabic ? "المبلغ" : "Amount").append("</th>")
-                    .append("<th>").append(isArabic ? "الدفع" : "Payment").append("</th>")
-                    .append("<th>").append(isArabic ? "البائع" : "Seller").append("</th>");
-                break;
-            case "inventory":
-                html.append("<th>#</th><th>").append(isArabic ? "القطعة" : "Item").append("</th>")
-                    .append("<th>").append(isArabic ? "العيار" : "Karat").append("</th>")
-                    .append("<th>").append(isArabic ? "الوزن" : "Weight").append("</th>")
-                    .append("<th>").append(isArabic ? "الحالة" : "Status").append("</th>")
-                    .append("<th>").append(isArabic ? "الموقع" : "Location").append("</th>");
-                break;
-            default:
-                html.append("<th>#</th><th>").append(isArabic ? "البيان" : "Details").append("</th>")
-                    .append("<th>").append(isArabic ? "القيمة" : "Value").append("</th>");
-                break;
-        }
-        html.append("</tr></thead><tbody>");
-
-        // ✅ الحصول على بيانات الـ RecyclerView
-        RecyclerView.Adapter<?> adapter = rvData.getAdapter();
-        int itemCount = adapter != null ? adapter.getItemCount() : 0;
-        
-        for (int i = 0; i < Math.min(itemCount, 50); i++) {
-            html.append("<tr><td>").append(i + 1).append("</td>");
-            
-            // ✅ استخراج بيانات كل صف
-            if (adapter instanceof GenericAdapter) {
-                // GenericAdapter
-                List<GenericItem> items = ((GenericAdapter) adapter).items;
-                if (i < items.size()) {
-                    html.append("<td>").append(items.get(i).key).append("</td>")
-                        .append("<td>").append(items.get(i).value).append("</td>");
-                }
-            } else if (adapter instanceof SalesAdapter) {
-                List<SalesItem> items = ((SalesAdapter) adapter).items;
-                if (i < items.size()) {
-                    SalesItem s = items.get(i);
-                    html.append("<td>").append(s.invoiceNo).append("</td>")
-                        .append("<td>").append(s.customer).append("</td>")
-                        .append("<td>").append(String.format("%.2f", s.amount)).append("</td>")
-                        .append("<td>").append(s.payment).append("</td>")
-                        .append("<td>").append(s.seller).append("</td>");
-                }
-            } else if (adapter instanceof InventoryAdapter) {
-                List<InventoryItem> items = ((InventoryAdapter) adapter).items;
-                if (i < items.size()) {
-                    InventoryItem inv = items.get(i);
-                    html.append("<td>").append(inv.title).append("</td>")
-                        .append("<td>").append(inv.karat).append("</td>")
-                        .append("<td>").append(String.format("%.2f g", inv.weight)).append("</td>")
-                        .append("<td>").append(inv.status).append("</td>")
-                        .append("<td>").append(inv.location).append("</td>");
-                }
-            }
-            html.append("</tr>");
-        }
-        
-        html.append("</tbody></table>");
-        html.append("<div class='footer'>").append(isArabic ? "© نظام MIRA لإدارة المجوهرات - تقرير آلي" : "© MIRA Jewelry Management System - Automated Report").append("</div>");
-        html.append("</body></html>");
-
-        // ✅ إنشاء WebView للطباعة
-        WebView webView = new WebView(requireContext());
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                PrintManager printManager = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
-                if (printManager != null) {
-                    PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter("MIRA_Report_" + item.type);
-                    PrintAttributes attributes = new PrintAttributes.Builder()
-                            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
-                            .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
-                            .build();
-                    printManager.print("MIRA_Report_" + item.type, printAdapter, attributes);
-                }
-            }
-        });
-        webView.loadDataWithBaseURL(null, html.toString(), "text/html", "UTF-8", null);
-
-    } catch (Exception e) {
-        Log.e(TAG, "Print error: " + e.getMessage());
-        Toast.makeText(getContext(), "Print error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-    }
-}
-
-// ==================== تصدير CSV محسن ====================
-
-// ✅ دالة عرض التقارير المتقدمة مع زر الطباعة
-private void showAdvancedReportDialog(String type, JSONObject data) {
-    View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
-    
-    TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
-    RecyclerView rvData = dialogView.findViewById(R.id.rvReportData);
-    View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
-    TextView tvLoadingStatus = dialogView.findViewById(R.id.tvLoadingStatus);
-    MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
-    MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
-    
-    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-    
-    tvTitle.setText(getReportTitle(type));
-    rvData.setLayoutManager(new LinearLayoutManager(getContext()));
-    
-    // ✅ أنيميشن العنوان
-    tvTitle.setAlpha(0f);
-    tvTitle.setTranslationY(-20f);
-    tvTitle.animate().alpha(1f).translationY(0f).setDuration(500).start();
-    
-    RecyclerView.Adapter<?> adapter = createAdvancedAdapter(type, data);
-    
-    // ✅ أنيميشن ظهور البيانات
-    rvData.setAlpha(0f);
-    rvData.setTranslationY(30f);
-    rvData.setAdapter(adapter);
-    rvData.animate()
-        .alpha(1f)
-        .translationY(0f)
-        .setDuration(500)
-        .setInterpolator(new AccelerateDecelerateInterpolator())
-        .start();
-    
-    AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
+        AlertDialog dialog = new AlertDialog.Builder(requireContext(), 
+            android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
             .setView(dialogView)
             .create();
-    
-    MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
-    if (btnClose != null) {
-        btnClose.setOnClickListener(v -> {
-            animateButtonPress(btnClose);
-            dialogView.animate().alpha(0f).setDuration(200).withEndAction(dialog::dismiss).start();
-        });
-    }
-    
-    if (btnPrint != null) {
-        btnPrint.setVisibility(View.VISIBLE);
-        btnPrint.setOnClickListener(v -> {
-            animateButtonPress(btnPrint);
-            printAdvancedReport(type, data, rvData);
-        });
-    }
-    
-    if (btnExport != null) {
-        btnExport.setVisibility(View.VISIBLE);
-        btnExport.setOnClickListener(v -> {
-            animateButtonPress(btnExport);
-            exportAdvancedReport(type, data);
-        });
-    }
-    
-    dialog.show();
-    
-    // ✅ أنيميشن ظهور الحوار
-    if (dialog.getWindow() != null && dialog.getWindow().getDecorView() != null) {
-        View decorView = dialog.getWindow().getDecorView();
-        decorView.setAlpha(0f);
-        decorView.animate().alpha(1f).setDuration(300).start();
-    }
-}
-
-// ✅ دالة طباعة التقارير المتقدمة
-private void printAdvancedReport(String type, JSONObject data, RecyclerView rvData) {
-    if (getContext() == null) return;
-
-    try {
-        String direction = isArabic ? "rtl" : "ltr";
-        String textAlign = isArabic ? "right" : "left";
-
-        StringBuilder html = new StringBuilder();
-        html.append("<!DOCTYPE html><html dir='").append(direction).append("'><head><meta charset='utf-8'>")
-            .append("<style>")
-            .append("@page { size: A4; margin: 12mm; }")
-            .append("body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: ").append(direction)
-            .append("; text-align: ").append(textAlign).append("; padding: 15px; color: #1a1a2e; background-color: #fff; }")
-            .append(".header { text-align: center; border-bottom: 2px dashed #1a237e; padding-bottom: 12px; margin-bottom: 20px; }")
-            .append(".org-name { font-size: 22px; font-weight: bold; color: #1a237e; margin: 0; }")
-            .append(".report-title { font-size: 18px; font-weight: bold; color: #c5a059; margin: 5px 0; }")
-            .append(".passport-card { border: 2px solid #1a237e; border-radius: 8px; padding: 15px; background: #fafafa; margin-bottom: 20px; }")
-            .append("table { width: 100%; border-collapse: collapse; margin-top: 10px; }")
-            .append("th { background: #1a237e; color: white; padding: 8px; font-size: 12px; text-align: center; }")
-            .append("td { padding: 8px; border: 1px solid #e0e0e0; font-size: 11px; text-align: center; }")
-            .append("tr:nth-child(even) { background: #f4f6f9; }")
-            .append(".key-col { font-weight: bold; background: #eaeff5; width: 35%; text-align: start; padding-inline-start: 10px; }")
-            .append(".timeline-item { border-inline-start: 3px solid #c5a059; padding-inline-start: 10px; margin-bottom: 8px; text-align: start; }")
-            .append(".footer { margin-top: 30px; text-align: center; font-size: 10px; color: #888; border-top: 1px solid #ddd; padding-top: 10px; }")
-            .append("</style></head><body>");
-
-        // رأس التقرير
-        html.append("<div class='header'>")
-            .append("<h1 class='org-name'>").append(orgProfile != null ? orgProfile.getOrgName() : "نظام MIRA للمجوهرات").append("</h1>")
-            .append("<div class='report-title'>").append(getReportTitle(type)).append("</div>")
-            .append("<div style='font-size: 11px; color: #666;'>").append(isArabic ? "تاريخ التصدير: " : "Exported on: ")
-            .append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date())).append("</div>")
-            .append("</div>");
-
-        // جدول التفاصيل العادية والخط الزمني للقطعة
-        html.append("<div class='passport-card'>");
-        html.append("<table><tbody>");
-
-        RecyclerView.Adapter<?> adapter = rvData.getAdapter();
-        if (adapter instanceof GenericAdapter) {
-            List<GenericItem> items = ((GenericAdapter) adapter).items;
-            for (GenericItem item : items) {
-                String formattedValue = item.value.replace("\n", "<br>");
-                html.append("<tr>")
-                    .append("<td class='key-col'>").append(item.key).append("</td>")
-                    .append("<td style='text-align: start; padding-inline-start: 10px;'>").append(formattedValue).append("</td>")
-                    .append("</tr>");
-            }
+        
+        if (btnClose != null) btnClose.setOnClickListener(v -> dialog.dismiss());
+        
+        if (btnPrint != null) {
+            btnPrint.setVisibility(View.VISIBLE);
+            btnPrint.setOnClickListener(v -> printAdvancedReport(type, data, rvData));
         }
-
-        html.append("</tbody></table>");
-        html.append("</div>");
-
-        // التذييل
-        html.append("<div class='footer'>")
-            .append(isArabic ? "© نظام MIRA الذكي لتوثيق وتتبع الذهب والمجوهرات (بصمة القطعة الرقمية)" : "© MIRA Smart Jewelry Tracking & Passport System")
-            .append("</div></body></html>");
-
-        WebView webView = new WebView(requireContext());
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                PrintManager printManager = (PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
-                if (printManager != null) {
-                    PrintDocumentAdapter printAdapter = view.createPrintDocumentAdapter("MIRA_Item_Passport_" + System.currentTimeMillis());
-                    PrintAttributes attributes = new PrintAttributes.Builder()
-                            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
-                            .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
-                            .build();
-                    printManager.print("MIRA_Item_Passport", printAdapter, attributes);
+        
+        if (btnExport != null) {
+            btnExport.setVisibility(View.VISIBLE);
+            btnExport.setOnClickListener(v -> {
+                File file = ReportExporter.exportToCSV(requireContext(), data, type, 
+                    getDefaultFromDate(), getDefaultToDate(), isArabic);
+                if (file != null) {
+                    ReportExporter.shareFile(requireContext(), file, "text/csv");
                 }
-            }
-        });
-        webView.loadDataWithBaseURL(null, html.toString(), "text/html", "UTF-8", null);
-
-    } catch (Exception e) {
-        Log.e(TAG, "Advanced print error: " + e.getMessage());
-        Toast.makeText(getContext(), "Print error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            });
+        }
+        
+        dialog.show();
     }
-}
-
-
-    // ✅ دالة خاصة بتايم لاين المستخدم
-    // ✅ دالة محسنة لتايم لاين المستخدم - عرض قائمة المستخدمين
-private void showUserTimelineDialog(ReportItem item) {
-    // تحميل المستخدمين أولاً
-    Toast.makeText(getContext(), isArabic ? "🔄 جاري تحميل المستخدمين..." : "🔄 Loading users...", Toast.LENGTH_SHORT).show();
     
-    executorService.execute(() -> {
-        try {
-            MiraApiClient.ApiResponse response = apiClient.getUsers();
-            
-            mainHandler.post(() -> {
-                if (response == null || !response.isSuccess || response.data == null) {
-                    Toast.makeText(getContext(), 
-                        isArabic ? "❌ فشل تحميل المستخدمين" : "❌ Failed to load users", 
-                        Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                
-                // استخراج قائمة المستخدمين
-                List<UserInfo> users = new ArrayList<>();
-                JSONArray usersArray = response.data.optJSONArray("users");
-                if (usersArray == null) {
-                    JSONObject dataObj = response.data.optJSONObject("data");
-                    if (dataObj != null) {
-                        usersArray = dataObj.optJSONArray("users");
+    /**
+     * ✅ إنشاء محول حسب نوع التقرير
+     */
+    private RecyclerView.Adapter<?> createAdapterForType(String type, JSONObject data) {
+        switch (type) {
+            case "sales":
+                return new GenericAdapter(parseToGeneric(data));
+            case "inventory":
+                return new GenericAdapter(parseToGeneric(data));
+            case "audit":
+                return new GenericAdapter(parseToGeneric(data));
+            case "reorder":
+                return new GenericAdapter(parseToGeneric(data));
+            case "users":
+                return new GenericAdapter(parseToGeneric(data));
+            case "gates":
+                return new GenericAdapter(parseToGeneric(data));
+            case "movement":
+                return new GenericAdapter(parseToGeneric(data));
+            case "branches":
+                return new GenericAdapter(parseToGeneric(data));
+            case "financial":
+                return new GenericAdapter(parseToGeneric(data));
+            default:
+                return new GenericAdapter(parseToGeneric(data));
+        }
+    }
+    
+    /**
+     * ✅ تحويل JSON إلى قائمة GenericItem
+     */
+    private List<ReportModels.GenericItem> parseToGeneric(JSONObject data) {
+        List<ReportModels.GenericItem> items = new ArrayList<>();
+        if (data == null) return items;
+        
+        // البحث عن المصفوفة
+        JSONArray array = findArray(data);
+        
+        if (array != null) {
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject obj = array.optJSONObject(i);
+                if (obj != null) {
+                    Iterator<String> keys = obj.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        String value = obj.optString(key, "");
+                        items.add(new ReportModels.GenericItem(key, value));
+                    }
+                    // فاصل بين العناصر
+                    if (i < array.length() - 1) {
+                        items.add(new ReportModels.GenericItem("---", "---"));
                     }
                 }
-                
-                if (usersArray != null) {
-                    for (int i = 0; i < usersArray.length(); i++) {
-                        JSONObject u = usersArray.optJSONObject(i);
-                        if (u != null) {
-                            UserInfo user = new UserInfo();
-                            user.id = u.optInt("id");
-                            user.name = u.optString("display_name", u.optString("username", "User " + user.id));
-                            user.username = u.optString("username", "");
-                            user.role = u.optString("role", "");
-                            users.add(user);
-                        }
-                    }
-                }
-                
-                if (users.isEmpty()) {
-                    Toast.makeText(getContext(), 
-                        isArabic ? "لا يوجد مستخدمين" : "No users found", 
-                        Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                
-                // عرض قائمة المستخدمين للاختيار
-                String[] userNames = new String[users.size()];
-                for (int i = 0; i < users.size(); i++) {
-                    UserInfo u = users.get(i);
-                    userNames[i] = "👤 " + u.name + " (@" + u.username + ")";
-                }
-                
-                new AlertDialog.Builder(requireContext())
-                    .setTitle(isArabic ? "👥 اختر المستخدم" : "👥 Select User")
-                    .setItems(userNames, (dialog, which) -> {
-                        UserInfo selectedUser = users.get(which);
-                        fetchAdvancedReport(item.type, selectedUser.id, "", "", 0, 
-                            getDefaultFromDate(), getDefaultToDate());
-                    })
-                    .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-                    .show();
-            });
-        } catch (Exception e) {
-            mainHandler.post(() -> {
-                Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            });
-        }
-    });
-}
-
-// ✅ كلاس معلومات المستخدم
-private static class UserInfo {
-    int id;
-    String name;
-    String username;
-    String role;
-}
-
-    // ✅ دالة خاصة ببصمة القطعة
-    private void showItemPassportDialog(ReportItem item) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle(isArabic ? "💠 بصمة القطعة" : "💠 Item Passport");
-        
-        View inputView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_input_serial, null);
-        EditText etSerial = inputView.findViewById(R.id.etSerialNumber);
-        
-        builder.setView(inputView);
-        builder.setPositiveButton(isArabic ? "بحث" : "Search", (dialog, which) -> {
-            String serial = etSerial.getText().toString().trim();
-            if (!serial.isEmpty()) {
-                fetchAdvancedReport(item.type, 0, serial, "", 0, "", "");
-            } else {
-                Toast.makeText(getContext(), isArabic ? "أدخل الرقم التسلسلي" : "Enter serial number", Toast.LENGTH_SHORT).show();
             }
-        });
-        builder.setNegativeButton(isArabic ? "إلغاء" : "Cancel", null);
-        builder.show();
+        } else {
+            // تصدير key-value مباشرة
+            Iterator<String> keys = data.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                Object value = data.opt(key);
+                if (value != null && !key.equals("success") && !key.equals("timestamp")) {
+                    items.add(new ReportModels.GenericItem(key, value.toString()));
+                }
+            }
+        }
+        
+        return items;
     }
-
-    // ✅ دالة جديدة لجلب التقارير المتقدمة
-    private void fetchAdvancedReport(String type, int userId, String serialNumber, 
-                                 String gtin13, int gateId, String fromDate, String toDate) {
-    // ✅ تحديث الفرع الحالي قبل الجلب
-    refreshCurrentBranch();
     
-    executorService.execute(() -> {
-        try {
-            StringBuilder endpoint = new StringBuilder("/reports-analytics?type=").append(type);
-            
-            if (userId > 0) endpoint.append("&user_id=").append(userId);
-            if (!serialNumber.isEmpty()) endpoint.append("&serial_number=").append(serialNumber);
-            if (!gtin13.isEmpty()) endpoint.append("&gtin13=").append(gtin13);
-            if (gateId > 0) endpoint.append("&gate_id=").append(gateId);
-            if (!fromDate.isEmpty()) endpoint.append("&from=").append(fromDate);
-            if (!toDate.isEmpty()) endpoint.append("&to=").append(toDate);
-            
-            // ✅ إضافة معرف الفرع دائماً
-            if (currentBranchId > 0) {
-                endpoint.append("&branch_id=").append(currentBranchId);
-            }
-
-            Log.d(TAG, "Advanced Report URL: " + endpoint.toString());
-            
-            MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint.toString());
-
-            mainHandler.post(() -> {
-                if (response == null || !response.isSuccess) {
-                    Toast.makeText(getContext(), 
-                        isArabic ? "فشل التحميل" : "Failed to load", 
-                        Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
-                JSONObject data = response.data;
-                if (data == null) {
-                    Toast.makeText(getContext(), 
-                        isArabic ? "لا توجد بيانات" : "No data available", 
-                        Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
-                showAdvancedReportDialog(type, data);
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Advanced report error: " + e.getMessage());
-            mainHandler.post(() -> {
-                Toast.makeText(getContext(), "Error: " + e.getMessage(), 
-                    Toast.LENGTH_SHORT).show();
-            });
+    /**
+     * ✅ البحث عن مصفوفة في البيانات
+     */
+    private JSONArray findArray(JSONObject data) {
+        String[] keys = {"items", "data", "items_list", "invoices", "sales", 
+                        "inventory", "movements", "transfers", "users", "gate_logs",
+                        "branches", "journal_entries", "reorder_items"};
+        
+        for (String key : keys) {
+            JSONArray arr = data.optJSONArray(key);
+            if (arr != null && arr.length() > 0) return arr;
         }
-    });
-}
-
-
+        
+        JSONObject dataObj = data.optJSONObject("data");
+        if (dataObj != null) {
+            for (String key : keys) {
+                JSONArray arr = dataObj.optJSONArray(key);
+                if (arr != null && arr.length() > 0) return arr;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * ✅ إنشاء محول متقدم
+     */
+    private RecyclerView.Adapter<?> createAdvancedAdapter(String type, JSONObject data) {
+        List<ReportModels.GenericItem> items = parseToGeneric(data);
+        return new GenericAdapter(items);
+    }
+    
+    // ==================== دوال مساعدة ====================
+    
     private String getReportTitle(String type) {
         if (isArabic) {
             switch (type) {
@@ -1233,7 +520,7 @@ private static class UserInfo {
                 case "gate_security_index": return "🛡️ مؤشر أمن البوابات";
                 case "inventory_aging": return "📅 أعمار المخزون";
                 case "audit_discrepancy_detail": return "⚠️ تفاصيل الفروقات";
-                default: return "📊 تقرير متقدم";
+                default: return "📊 تقرير";
             }
         } else {
             switch (type) {
@@ -1242,1445 +529,21 @@ private static class UserInfo {
                 case "gate_security_index": return "🛡️ Gate Security Index";
                 case "inventory_aging": return "📅 Inventory Aging";
                 case "audit_discrepancy_detail": return "⚠️ Discrepancy Detail";
-                default: return "📊 Advanced Report";
-            }
-        }
-    }
-
-    private RecyclerView.Adapter<?> createAdvancedAdapter(String type, JSONObject data) {
-        JSONObject dataObj = data.optJSONObject("data");
-        if (dataObj == null) dataObj = data;
-        
-        switch (type) {
-            case "user_timeline":
-                return new GenericAdapter(parseUserTimeline(dataObj));
-            case "item_passport":
-                return new GenericAdapter(parseItemPassport(dataObj));
-            case "gate_security_index":
-                return new GenericAdapter(parseGateSecurity(dataObj));
-            case "inventory_aging":
-                return new GenericAdapter(parseInventoryAging(dataObj));
-            case "audit_discrepancy_detail":
-                return new GenericAdapter(parseAuditDiscrepancy(dataObj));
-            default:
-                return new GenericAdapter(parseGeneric(dataObj));
-        }
-    }
-
-    // ==================== Advanced Parsing Functions ====================
-
-    private List<GenericItem> parseUserTimeline(JSONObject data) {
-        List<GenericItem> items = new ArrayList<>();
-        if (data == null) return items;
-        
-        JSONObject userInfo = data.optJSONObject("user_info");
-        if (userInfo != null) {
-            items.add(new GenericItem(
-                isArabic ? "👤 المستخدم" : "👤 User",
-                userInfo.optString("display_name", userInfo.optString("username", "-"))
-            ));
-        }
-        
-        items.add(new GenericItem(
-            isArabic ? "📊 إجمالي الأحداث" : "📊 Total Events",
-            String.valueOf(data.optInt("total_events", 0))
-        ));
-        
-        JSONArray timeline = data.optJSONArray("timeline");
-        if (timeline != null) {
-            for (int i = 0; i < timeline.length(); i++) {
-                JSONObject event = timeline.optJSONObject(i);
-                if (event != null) {
-                    String eventType = event.optString("event_type", "-");
-                    String details = event.optString("details", "-");
-                    String date = event.optString("created_at", "-");
-                    
-                    // ترجمة نوع الحدث
-                    String translatedType = eventType;
-                    if (isArabic) {
-                        switch (eventType) {
-                            case "SALE": translatedType = "💰 عملية بيع"; break;
-                            case "INVENTORY_AUDIT": translatedType = "📋 جرد مخزون"; break;
-                            case "TRANSFER": translatedType = "🔄 تحويل"; break;
-                        }
-                    }
-                    
-                    items.add(new GenericItem(translatedType, details + "\n" + date));
-                }
-            }
-        }
-        return items;
-    }
-
-    private List<GenericItem> parseItemPassport(JSONObject data) {
-    List<GenericItem> items = new ArrayList<>();
-    if (data == null) return items;
-
-    JSONObject item = data.optJSONObject("item_details");
-    if (item == null) item = data.optJSONObject("item");
-    if (item == null) item = data;
-
-    // 1. التفاصيل والخصائص الأساسية
-    items.add(new GenericItem(isArabic ? "📦 عنوان القطعة" : "📦 Item Title", item.optString("item_title", item.optString("title", "-"))));
-    items.add(new GenericItem(isArabic ? "🔢 الرقم التسلسلي" : "🔢 Serial Number", item.optString("serial_number", item.optString("serial", "-"))));
-    items.add(new GenericItem(isArabic ? "🏷️ العيار والفئة" : "🏷️ Karat & Category", item.optString("gold_karat", "-") + " | " + item.optString("category_name", "-")));
-    
-    double grossWeight = item.optDouble("gross_weight_grams", item.optDouble("weight", 0.0));
-    double netWeight = item.optDouble("net_weight_grams", grossWeight);
-    items.add(new GenericItem(isArabic ? "⚖️ الوزن (قائم / صافي)" : "⚖️ Weight (Gross/Net)", String.format(Locale.US, "%.3f g / %.3f g", grossWeight, netWeight)));
-
-    // 2. الرموز والترميز الرقمي (RFID / GS1)
-    String epc = item.optString("rfid_epc", item.optString("epc", "-"));
-    String gtin = item.optString("gtin13", item.optString("barcode", "-"));
-    items.add(new GenericItem(isArabic ? "📡 رمز RFID EPC" : "📡 RFID EPC", epc));
-    items.add(new GenericItem(isArabic ? "📊 رمز GS1 / GTIN-13" : "📊 GS1/GTIN-13", gtin));
-
-    // 3. الحالة والموقع الحالي
-    items.add(new GenericItem(isArabic ? "📍 الحالة الحالية" : "📍 Current Status", item.optString("vault_status", item.optString("status", "in_stock"))));
-    items.add(new GenericItem(isArabic ? "🏢 الفرع والموقع" : "🏢 Branch & Location", item.optString("branch_name", "-") + " - " + item.optString("current_location", "المعرض")));
-
-    // 4. السجل المالي والأسعار
-    double laborCost = item.optDouble("labor_cost", 0.0);
-    double price = item.optDouble("selling_price", item.optDouble("price", 0.0));
-    if (price > 0 || laborCost > 0) {
-        items.add(new GenericItem(
-            isArabic ? "💰 التكلفة والسعر" : "💰 Cost & Price",
-            String.format(Locale.US, "%s: %.2f | %s: %.2f", 
-                isArabic ? "الأجورة" : "Labor", laborCost, 
-                isArabic ? "السعر" : "Price", price)
-        ));
-    }
-
-    // 5. سجل المرور عبر البوابات الأمنية
-    JSONArray gateHistory = data.optJSONArray("gate_history");
-    if (gateHistory != null && gateHistory.length() > 0) {
-        StringBuilder gatesLog = new StringBuilder();
-        for (int i = 0; i < gateHistory.length(); i++) {
-            JSONObject gate = gateHistory.optJSONObject(i);
-            if (gate != null) {
-                if (i > 0) gatesLog.append("\n---\n");
-                gatesLog.append("🚪 ").append(gate.optString("gate_name", "بوابة"))
-                        .append(" | ").append(gate.optString("status", "مرور مصرح"))
-                        .append("\n📅 ").append(gate.optString("created_at", gate.optString("date", "-")));
-            }
-        }
-        items.add(new GenericItem(isArabic ? "🛡️ سجل المرور عبر البوابات" : "🛡️ Gate Audit Logs", gatesLog.toString()));
-    } else {
-        items.add(new GenericItem(isArabic ? "🛡️ سجل المرور عبر البوابات" : "🛡️ Gate Audit Logs", isArabic ? "لا يوجد سجل حركة بوابات" : "No gate events recorded"));
-    }
-
-    // 6. سجل التحويلات بين الفروع
-    JSONArray movements = data.optJSONArray("movements");
-    if (movements != null && movements.length() > 0) {
-        StringBuilder movLog = new StringBuilder();
-        for (int i = 0; i < movements.length(); i++) {
-            JSONObject mov = movements.optJSONObject(i);
-            if (mov != null) {
-                if (i > 0) movLog.append("\n---\n");
-                movLog.append("🔄 ").append(mov.optString("from_branch", "فرع المصدر"))
-                      .append(" ➔ ").append(mov.optString("to_branch", "الفرع المستلم"))
-                      .append("\n📅 ").append(mov.optString("created_at", "-"));
-            }
-        }
-        items.add(new GenericItem(isArabic ? "🔄 سجل الحركة والتحويلات" : "🔄 Movement History", movLog.toString()));
-    }
-
-    // 7. بيانات البيع والعميل (إن وجدت)
-    JSONObject saleInfo = data.optJSONObject("sale_info");
-    if (saleInfo != null) {
-        items.add(new GenericItem(
-            isArabic ? "🛒 بيانات البيع" : "🛒 Sale Info",
-            String.format(Locale.US, "%s: %s\n%s: %s\n%s: %s",
-                isArabic ? "الفاتورة" : "Invoice", saleInfo.optString("invoice_no", "-"),
-                isArabic ? "العميل" : "Customer", saleInfo.optString("customer_name", "-"),
-                isArabic ? "تاريخ البيع" : "Date", saleInfo.optString("sale_date", "-"))
-        ));
-    }
-
-    return items;
-}
-
-    private List<GenericItem> parseGateSecurity(JSONObject data) {
-    List<GenericItem> items = new ArrayList<>();
-    if (data == null) return items;
-    
-    // ✅ إضافة معلومات الفرع
-    if (branchesManager != null) {
-        items.add(new GenericItem(
-            isArabic ? "🏢 الفرع" : "🏢 Branch",
-            branchesManager.getActiveBranchName()
-        ));
-    }
-    
-    // البحث عن مصفوفة بيانات البوابات
-    JSONArray gatesArr = null;
-    Iterator<String> keys = data.keys();
-    while (keys.hasNext()) {
-        String key = keys.next();
-        Object value = data.opt(key);
-        if (value instanceof JSONArray) {
-            JSONArray arr = (JSONArray) value;
-            if (arr.length() > 0) {
-                JSONObject first = arr.optJSONObject(0);
-                if (first != null && (first.has("total_events") || first.has("gate_id"))) {
-                    gatesArr = arr;
-                    break;
-                }
+                default: return "📊 Report";
             }
         }
     }
     
-    if (gatesArr != null) {
-        for (int i = 0; i < gatesArr.length(); i++) {
-            JSONObject gate = gatesArr.optJSONObject(i);
-            if (gate != null) {
-                String gateId = gate.optString("gate_id", gate.optString("gate_name", "-"));
-                int totalEvents = gate.optInt("total_events", 0);
-                int alerts = gate.optInt("alerts", gate.optInt("alert_count", 0));
-                int passed = gate.optInt("passed", gate.optInt("pass_count", 0));
-                
-                // ✅ حساب نسبة الأمان
-                double securityRate = totalEvents > 0 ? 
-                    ((double)(totalEvents - alerts) / totalEvents * 100) : 100.0;
-                
-                items.add(new GenericItem(
-                    (isArabic ? "🚪 بوابة " : "🚪 Gate ") + gateId,
-                    String.format(Locale.US, 
-                        "%s: %d\n%s: %d\n%s: %d\n%s: %.1f%%",
-                        isArabic ? "إجمالي الأحداث" : "Total Events", totalEvents,
-                        isArabic ? "إنذارات" : "Alerts", alerts,
-                        isArabic ? "مسموح" : "Passed", passed,
-                        isArabic ? "معدل الأمان" : "Security Rate", securityRate)
-                ));
-            }
-        }
-    } else {
-        items.add(new GenericItem(
-            isArabic ? "لا توجد بيانات" : "No Data",
-            isArabic ? "لم يتم العثور على بوابات لهذا الفرع" : "No gates found for this branch"
-        ));
-    }
-    
-    return items;
-}
-
-    private List<GenericItem> parseInventoryAging(JSONObject data) {
-        List<GenericItem> items = new ArrayList<>();
-        if (data == null) return items;
-        
-        // البحث عن مصفوفة بيانات الأعمار
-        JSONArray agingArr = null;
-        Iterator<String> keys = data.keys();
-        while (keys.hasNext()) {
-            String key = keys.next();
-            Object value = data.opt(key);
-            if (value instanceof JSONArray) {
-                JSONArray arr = (JSONArray) value;
-                if (arr.length() > 0) {
-                    JSONObject first = arr.optJSONObject(0);
-                    if (first != null && first.has("age_bracket")) {
-                        agingArr = arr;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        if (agingArr != null) {
-            for (int i = 0; i < agingArr.length(); i++) {
-                JSONObject aging = agingArr.optJSONObject(i);
-                if (aging != null) {
-                    String bracket = aging.optString("age_bracket", "-");
-                    int itemsCount = aging.optInt("items_count", 0);
-                    double totalWeight = aging.optDouble("total_weight", 0);
-                    
-                    // ترجمة الفئات العمرية
-                    String translatedBracket = bracket;
-                    if (isArabic) {
-                        switch (bracket) {
-                            case "0-30 Days": translatedBracket = "٠-٣٠ يوم"; break;
-                            case "31-60 Days": translatedBracket = "٣١-٦٠ يوم"; break;
-                            case "61-90 Days": translatedBracket = "٦١-٩٠ يوم"; break;
-                            case "+90 Days (Stagnant)": translatedBracket = "+٩٠ يوم (راكد)"; break;
-                        }
-                    }
-                    
-                    items.add(new GenericItem(
-                        translatedBracket,
-                        String.format(Locale.US, 
-                            "%s: %d\n%s: %.2f g",
-                            isArabic ? "القطع" : "Items", itemsCount,
-                            isArabic ? "الوزن" : "Weight", totalWeight)
-                    ));
-                }
-            }
-        }
-        
-        return items;
-    }
-
-    private List<GenericItem> parseAuditDiscrepancy(JSONObject data) {
-        List<GenericItem> items = new ArrayList<>();
-        if (data == null) return items;
-        
-        // البحث عن مصفوفة بيانات الفروقات
-        JSONArray discArr = null;
-        Iterator<String> keys = data.keys();
-        while (keys.hasNext()) {
-            String key = keys.next();
-            Object value = data.opt(key);
-            if (value instanceof JSONArray) {
-                JSONArray arr = (JSONArray) value;
-                if (arr.length() > 0) {
-                    JSONObject first = arr.optJSONObject(0);
-                    if (first != null && first.has("discrepancy")) {
-                        discArr = arr;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        if (discArr != null) {
-            for (int i = 0; i < discArr.length(); i++) {
-                JSONObject disc = discArr.optJSONObject(i);
-                if (disc != null) {
-                    String sessionId = disc.optString("session_id", "-");
-                    int branchId = disc.optInt("branch_id", 0);
-                    int expectedItems = disc.optInt("expected_items", 0);
-                    int foundItems = disc.optInt("found_items", 0);
-                    int discrepancy = disc.optInt("discrepancy", 0);
-                    
-                    items.add(new GenericItem(
-                        (isArabic ? "📋 جلسة " : "📋 Session ") + sessionId,
-                        String.format(Locale.US,
-                            "%s: %d\n%s: %d\n%s: %d",
-                            isArabic ? "المتوقع" : "Expected", expectedItems,
-                            isArabic ? "الموجود" : "Found", foundItems,
-                            isArabic ? "الفرق" : "Difference", discrepancy)
-                    ));
-                }
-            }
-        }
-        
-        return items;
-    }
-
-    private void fetchAndDisplay(String type, RecyclerView rvData, View layoutLoading, 
-                              TextView tvLoadingStatus, String fromDate, String toDate) {
-        if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
-        if (tvLoadingStatus != null) tvLoadingStatus.setText(isArabic ? "جاري التحميل..." : "Loading...");
-
-        executorService.execute(() -> {
-            try {
-                MiraApiClient.ApiResponse response = apiClient.getReportData(type, fromDate, toDate, currentBranchId);
-
-                mainHandler.post(() -> {
-                    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-
-                    if (response == null || !response.isSuccess) {
-                        Toast.makeText(getContext(), 
-                            isArabic ? "فشل التحميل" : "Failed to load", 
-                            Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-
-                    JSONObject data = response.data;
-                    String rawBody = response.getBody();
-
-                    if (data == null && rawBody != null) {
-                        try {
-                            if (rawBody.trim().startsWith("[")) {
-                                JSONArray rootArray = new JSONArray(rawBody);
-                                data = new JSONObject();
-                                data.put("items_list", rootArray);
-                            } else {
-                                data = new JSONObject(rawBody);
-                            }
-                        } catch (Exception e) {
-                            Log.e(TAG, "Parse JSON error", e);
-                        }
-                    }
-
-                    if (data == null) {
-                        Toast.makeText(getContext(), isArabic ? "لا توجد بيانات" : "No data available", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-
-                    Log.d(TAG, "=== Report: " + type + " ===");
-                    Log.d(TAG, "Data keys: " + data.keys().toString());
-
-                    String cacheKey = "cache_pro_" + type + "_" + fromDate + "_" + toDate;
-                    if (offlineCache != null) {
-                        offlineCache.edit().putString(cacheKey, data.toString()).apply();
-                    }
-
-                    RecyclerView.Adapter<?> reportAdapter = createAdapterForType(type, data);
-                    rvData.setAdapter(reportAdapter);
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "Fetch error: " + e.getMessage());
-                mainHandler.post(() -> {
-                    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-                    Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                });
-            }
-        });
-    }
-
-    private RecyclerView.Adapter<?> createAdapterForType(String type, JSONObject data) {
-        switch (type) {
-            case "sales": {
-                List<SalesItem> sales = parseSales(data);
-                return sales.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new SalesAdapter(sales);
-            }
-            case "inventory": {
-                List<InventoryItem> inv = parseInventory(data);
-                return inv.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new InventoryAdapter(inv);
-            }
-            case "audit": {
-                List<AuditItem> audit = parseAudit(data);
-                return audit.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new AuditAdapter(audit);
-            }
-            case "reorder": {
-                List<ReorderItem> reorder = parseReorder(data);
-                return reorder.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new ReorderAdapter(reorder);
-            }
-            case "users": {
-                List<UsersItem> users = parseUsers(data);
-                return users.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new UsersAdapter(users);
-            }
-            case "gates": {
-                List<GatesItem> gates = parseGates(data);
-                return gates.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new GatesAdapter(gates);
-            }
-            case "movement": {
-                List<MovementItem> movement = parseMovement(data);
-                return movement.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new MovementAdapter(movement);
-            }
-            case "branches": {
-                List<BranchesItem> branches = parseBranches(data);
-                return branches.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new BranchesAdapter(branches);
-            }
-            case "financial": {
-                List<FinancialItem> financial = parseFinancial(data);
-                return financial.isEmpty() ? new GenericAdapter(parseGeneric(data)) : new FinancialAdapter(financial);
-            }
-            default:
-                return new DashboardAdapter(parseDashboard(data));
-        }
-    }
-
-    // ==================== Parsing Functions ====================
-
-    private JSONArray findArrayInData(JSONObject data, String[] possibleKeys, String[] identifyingKeys) {
-        if (data == null) return null;
-        
-        for (String key : possibleKeys) {
-            JSONArray arr = data.optJSONArray(key);
-            if (arr != null && arr.length() > 0) return arr;
-        }
-        
-        Iterator<String> keys = data.keys();
-        while (keys.hasNext()) {
-            String key = keys.next();
-            Object value = data.opt(key);
-            
-            if (value instanceof JSONObject) {
-                JSONArray nestedArr = findArrayInData((JSONObject) value, possibleKeys, identifyingKeys);
-                if (nestedArr != null) return nestedArr;
-            } else if (value instanceof JSONArray) {
-                JSONArray arr = (JSONArray) value;
-                if (arr.length() > 0 && identifyingKeys != null) {
-                    JSONObject firstItem = arr.optJSONObject(0);
-                    if (firstItem != null) {
-                        for (String idKey : identifyingKeys) {
-                            if (firstItem.has(idKey)) return arr;
-                        }
-                    }
-                }
-            }
-        }
-        
-        return null;
-    }
-
-    private List<SalesItem> parseSales(JSONObject data) {
-        List<SalesItem> items = new ArrayList<>();
-        if (data == null) return items;
-
-        JSONArray invoices = findArrayInData(data, 
-            new String[]{"invoices", "sales", "items_list", "data"}, 
-            new String[]{"sale_number", "invoice_no", "final_amount", "customer_name"});
-
-        if (invoices != null) {
-            for (int i = 0; i < invoices.length(); i++) {
-                JSONObject inv = invoices.optJSONObject(i);
-                if (inv != null) {
-                    items.add(new SalesItem(
-                        inv.optString("sale_number", inv.optString("invoice_no", inv.optString("id", "-"))),
-                        inv.optString("customer_name", inv.optString("customer", "-")),
-                        inv.optDouble("final_amount", inv.optDouble("total", inv.optDouble("subtotal", 0))),
-                        inv.optString("payment_method", inv.optString("payment", "-")),
-                        inv.optString("seller_name", inv.optString("seller", "-"))
-                    ));
-                }
-            }
-        }
-        return items;
-    }
-
-    private List<InventoryItem> parseInventory(JSONObject data) {
-        List<InventoryItem> items = new ArrayList<>();
-        if (data == null) return items;
-
-        JSONArray arr = findArrayInData(data, 
-            new String[]{"items", "inventory", "items_list", "data"}, 
-            new String[]{"item_title", "serial_number", "gross_weight_grams", "gold_karat"});
-
-        if (arr != null) {
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.optJSONObject(i);
-                if (obj != null) {
-                    items.add(new InventoryItem(
-                        obj.optString("item_title", obj.optString("title", obj.optString("name", "-"))),
-                        obj.optString("gold_karat", obj.optString("karat", "-")),
-                        obj.optDouble("gross_weight_grams", obj.optDouble("weight", 0)),
-                        obj.optString("vault_status", obj.optString("status", "-")),
-                        obj.optString("current_location", obj.optString("location", "-"))
-                    ));
-                }
-            }
-        }
-        return items;
-    }
-
-    private List<AuditItem> parseAudit(JSONObject data) {
-        List<AuditItem> items = new ArrayList<>();
-        if (data == null) return items;
-
-        JSONObject audit = data.optJSONObject("audit_summary");
-        if (audit == null) audit = data.optJSONObject("audit");
-        if (audit == null) audit = data;
-
-        if (audit.has("accuracy") || audit.has("found") || audit.has("found_items")) {
-            items.add(new AuditItem(
-                audit.optDouble("accuracy", 0),
-                audit.optInt("found_items", audit.optInt("found", 0)),
-                audit.optInt("missing_items", audit.optInt("missing", 0)),
-                audit.optInt("total_sessions", audit.optInt("sessions", 0))
-            ));
-        }
-        return items;
-    }
-
-    private List<ReorderItem> parseReorder(JSONObject data) {
-        List<ReorderItem> items = new ArrayList<>();
-        if (data == null) return items;
-
-        JSONArray arr = findArrayInData(data, 
-            new String[]{"reorder_items", "karat_breakdown", "items", "items_list", "data"}, 
-            new String[]{"gold_karat", "sold_count", "remaining_stock"});
-
-        if (arr != null) {
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.optJSONObject(i);
-                if (obj != null) {
-                    items.add(new ReorderItem(
-                        obj.optString("gold_karat", obj.optString("karat", "-")),
-                        obj.optInt("sold_count", obj.optInt("count", obj.optInt("sold", 0))),
-                        obj.optInt("remaining_stock", obj.optInt("remaining", 0))
-                    ));
-                }
-            }
-        }
-        return items;
-    }
-
-    private List<UsersItem> parseUsers(JSONObject data) {
-        List<UsersItem> items = new ArrayList<>();
-        if (data == null) return items;
-
-        JSONArray arr = findArrayInData(data, 
-            new String[]{"users", "data", "items_list"}, 
-            new String[]{"display_name", "username", "role_name"});
-
-        if (arr != null) {
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.optJSONObject(i);
-                if (obj != null) {
-                    items.add(new UsersItem(
-                        obj.optString("display_name", obj.optString("name", obj.optString("username", "-"))),
-                        obj.optString("role_name", obj.optString("role", "-")),
-                        obj.optString("status", obj.optString("is_active", "Active"))
-                    ));
-                }
-            }
-        }
-        return items;
-    }
-
-    private List<GatesItem> parseGates(JSONObject data) {
-        List<GatesItem> items = new ArrayList<>();
-        if (data == null) return items;
-
-        JSONArray arr = findArrayInData(data, 
-            new String[]{"gate_logs", "logs", "data", "items_list"}, 
-            new String[]{"gate_name", "epc", "tag_epc"});
-
-        if (arr != null) {
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.optJSONObject(i);
-                if (obj != null) {
-                    items.add(new GatesItem(
-                        obj.optString("gate_name", obj.optString("gate", obj.optString("device_id", "-"))),
-                        obj.optString("epc", obj.optString("code", obj.optString("tag_epc", "-"))),
-                        obj.optString("created_at", obj.optString("date", obj.optString("timestamp", "-")))
-                    ));
-                }
-            }
-        }
-        return items;
-    }
-
-    private List<MovementItem> parseMovement(JSONObject data) {
-        List<MovementItem> items = new ArrayList<>();
-        if (data == null) return items;
-
-        JSONArray arr = findArrayInData(data, 
-            new String[]{"movements", "transfers", "data", "items_list"}, 
-            new String[]{"transfer_number", "from_branch", "to_branch"});
-
-        if (arr != null) {
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.optJSONObject(i);
-                if (obj != null) {
-                    items.add(new MovementItem(
-                        obj.optString("from_branch", obj.optString("from", obj.optString("source", "-"))),
-                        obj.optString("to_branch", obj.optString("to", obj.optString("destination", "-"))),
-                        obj.optString("created_at", obj.optString("date", obj.optString("requested_at", "-")))
-                    ));
-                }
-            }
-        }
-        return items;
-    }
-
-    private List<BranchesItem> parseBranches(JSONObject data) {
-        List<BranchesItem> items = new ArrayList<>();
-        if (data == null) return items;
-
-        JSONArray arr = findArrayInData(data, 
-            new String[]{"branches_performance", "branches", "data", "items_list"}, 
-            new String[]{"branch_name", "items_count"});
-
-        if (arr != null) {
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.optJSONObject(i);
-                if (obj != null) {
-                    items.add(new BranchesItem(
-                        obj.optString("branch_name", obj.optString("name", "-")),
-                        obj.optInt("items_count", obj.optInt("count", 0))
-                    ));
-                }
-            }
-        }
-        return items;
-    }
-
-    private List<FinancialItem> parseFinancial(JSONObject data) {
-        List<FinancialItem> items = new ArrayList<>();
-        if (data == null) return items;
-
-        JSONArray arr = findArrayInData(data, 
-            new String[]{"journal_entries", "entries", "financial", "data", "items_list"}, 
-            new String[]{"description", "amount", "credit"});
-
-        if (arr != null) {
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject obj = arr.optJSONObject(i);
-                if (obj != null) {
-                    items.add(new FinancialItem(
-                        obj.optString("description", obj.optString("details", obj.optString("note", "-"))),
-                        obj.optDouble("amount", obj.optDouble("total", obj.optDouble("credit", 0)))
-                    ));
-                }
-            }
-        }
-        return items;
-    }
-
-    private List<GenericItem> parseGeneric(JSONObject data) {
-        List<GenericItem> items = new ArrayList<>();
-        if (data == null) return items;
-
-        JSONObject innerData = data.optJSONObject("data");
-        if (innerData != null) data = innerData;
-
-        Iterator<String> keys = data.keys();
-        while (keys.hasNext()) {
-            String key = keys.next();
-            Object value = data.opt(key);
-            if (value != null && !key.equals("success") && !key.equals("timestamp") && !key.equals("type")) {
-                items.add(new GenericItem(key, value.toString()));
-            }
-        }
-        return items;
-    }
-
-    private List<DashboardItem> parseDashboard(JSONObject data) {
-        List<DashboardItem> items = new ArrayList<>();
-        if (data == null) return items;
-
-        JSONObject inv = data.optJSONObject("inventory");
-        if (inv == null) inv = data.optJSONObject("summary");
-        
-        if (inv != null) {
-            items.add(new DashboardItem(
-                isArabic ? "📦 إجمالي القطع" : "📦 Total Items",
-                String.valueOf(inv.optInt("total_items", 0))
-            ));
-            items.add(new DashboardItem(
-                isArabic ? "⚖️ الوزن الكلي" : "⚖️ Total Weight",
-                String.format(Locale.US, "%.1f g", inv.optDouble("total_weight", 0))
-            ));
-            items.add(new DashboardItem(
-                isArabic ? "✅ المتاح" : "✅ Available",
-                String.valueOf(inv.optInt("available_count", 0))
-            ));
-            items.add(new DashboardItem(
-                isArabic ? "💰 المباع" : "💰 Sold",
-                String.valueOf(inv.optInt("sold_count", 0))
-            ));
-        }
-
-        JSONObject sales = data.optJSONObject("sales");
-        if (sales != null) {
-            items.add(new DashboardItem(
-                isArabic ? "🧾 عدد الفواتير" : "🧾 Invoices",
-                String.valueOf(sales.optInt("invoices_count", 0))
-            ));
-            items.add(new DashboardItem(
-                isArabic ? "💵 الإيرادات" : "💵 Revenue",
-                String.format(Locale.US, "%,.2f", sales.optDouble("total_revenue", 0))
-            ));
-        }
-
-        return items;
-    }
-
-    // ==================== Data Classes ====================
-
-    static class SalesItem { String invoiceNo, customer, payment, seller; double amount;
-        SalesItem(String i, String c, double a, String p, String s) { invoiceNo=i; customer=c; amount=a; payment=p; seller=s; } }
-    static class InventoryItem { String title, karat, status, location; double weight;
-        InventoryItem(String t, String k, double w, String s, String l) { title=t; karat=k; weight=w; status=s; location=l; } }
-    static class AuditItem { double accuracy; int found, missing, sessions;
-        AuditItem(double a, int f, int m, int s) { accuracy=a; found=f; missing=m; sessions=s; } }
-    static class ReorderItem { String karat; int sold, remaining;
-        ReorderItem(String k, int s, int r) { karat=k; sold=s; remaining=r; } }
-    static class UsersItem { String name, role, status;
-        UsersItem(String n, String r, String s) { name=n; role=r; status=s; } }
-    static class GatesItem { String gateName, epc, date;
-        GatesItem(String g, String e, String d) { gateName=g; epc=e; date=d; } }
-    static class MovementItem { String from, to, date;
-        MovementItem(String f, String t, String d) { from=f; to=t; date=d; } }
-    static class BranchesItem { String name; int items;
-        BranchesItem(String n, int i) { name=n; items=i; } }
-    static class FinancialItem { String description; double amount;
-        FinancialItem(String d, double a) { description=d; amount=a; } }
-    static class GenericItem { String key, value;
-        GenericItem(String k, String v) { key=k; value=v; } }
-    static class DashboardItem { String label, value;
-        DashboardItem(String l, String v) { label = l; value = v; } }
-
-    // ==================== Adapters ====================
-
-    class SalesAdapter extends RecyclerView.Adapter<SalesAdapter.VH> {
-        private final List<SalesItem> items;
-        SalesAdapter(List<SalesItem> items) { this.items = items; }
-        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
-            return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_report_sales, p, false)); }
-        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
-            SalesItem i = items.get(pos);
-            h.tvInvoice.setText(i.invoiceNo);
-            h.tvCustomer.setText(i.customer);
-            h.tvAmount.setText(priceManager != null ? priceManager.formatPriceDefault(i.amount) : String.valueOf(i.amount));
-            h.tvPayment.setText(i.payment);
-            h.tvSeller.setText(i.seller);
-        }
-        @Override public int getItemCount() { return items.size(); }
-        class VH extends RecyclerView.ViewHolder {
-            TextView tvInvoice, tvCustomer, tvAmount, tvPayment, tvSeller;
-            VH(View v) { super(v);
-                tvInvoice = v.findViewById(R.id.tvInvoiceNo);
-                tvCustomer = v.findViewById(R.id.tvCustomerName);
-                tvAmount = v.findViewById(R.id.tvAmount);
-                tvPayment = v.findViewById(R.id.tvPaymentMethod);
-                tvSeller = v.findViewById(R.id.tvSellerName);
-            }
-        }
-    }
-
-    class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.VH> {
-        private final List<InventoryItem> items;
-        InventoryAdapter(List<InventoryItem> items) { this.items = items; }
-        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
-            return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_report_inventory, p, false)); }
-        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
-            InventoryItem i = items.get(pos);
-            h.tvTitle.setText(i.title);
-            h.tvKarat.setText(i.karat);
-            h.tvWeight.setText(String.format(Locale.US, "%.2f g", i.weight));
-            h.tvStatus.setText(i.status);
-            h.tvLocation.setText(i.location);
-        }
-        @Override public int getItemCount() { return items.size(); }
-        class VH extends RecyclerView.ViewHolder {
-            TextView tvTitle, tvKarat, tvWeight, tvStatus, tvLocation;
-            VH(View v) { super(v);
-                tvTitle = v.findViewById(R.id.tvItemTitle);
-                tvKarat = v.findViewById(R.id.tvKarat);
-                tvWeight = v.findViewById(R.id.tvWeight);
-                tvStatus = v.findViewById(R.id.tvStatus);
-                tvLocation = v.findViewById(R.id.tvLocation);
-            }
-        }
-    }
-
-    class AuditAdapter extends RecyclerView.Adapter<AuditAdapter.VH> {
-        private final List<AuditItem> items;
-        AuditAdapter(List<AuditItem> items) { this.items = items; }
-        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
-            return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_report_audit, p, false)); }
-        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
-            AuditItem i = items.get(pos);
-            h.tvAccuracy.setText(String.format(Locale.US, "%.1f%%", i.accuracy));
-            h.tvFound.setText(String.valueOf(i.found));
-            h.tvMissing.setText(String.valueOf(i.missing));
-            h.tvSessions.setText(String.valueOf(i.sessions));
-        }
-        @Override public int getItemCount() { return items.size(); }
-        class VH extends RecyclerView.ViewHolder {
-            TextView tvAccuracy, tvFound, tvMissing, tvSessions;
-            VH(View v) { super(v);
-                tvAccuracy = v.findViewById(R.id.tvAccuracy);
-                tvFound = v.findViewById(R.id.tvFound);
-                tvMissing = v.findViewById(R.id.tvMissing);
-                tvSessions = v.findViewById(R.id.tvSessions);
-            }
-        }
-    }
-
-    class ReorderAdapter extends RecyclerView.Adapter<ReorderAdapter.VH> {
-        private final List<ReorderItem> items;
-        ReorderAdapter(List<ReorderItem> items) { this.items = items; }
-        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
-            return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_report_reorder, p, false)); }
-        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
-            ReorderItem i = items.get(pos);
-            h.tvKarat.setText(i.karat);
-            h.tvSold.setText(String.valueOf(i.sold));
-            h.tvRemaining.setText(String.valueOf(i.remaining));
-        }
-        @Override public int getItemCount() { return items.size(); }
-        class VH extends RecyclerView.ViewHolder {
-            TextView tvKarat, tvSold, tvRemaining;
-            VH(View v) { super(v);
-                tvKarat = v.findViewById(R.id.tvKarat);
-                tvSold = v.findViewById(R.id.tvSold);
-                tvRemaining = v.findViewById(R.id.tvRemaining);
-            }
-        }
-    }
-
-    class UsersAdapter extends RecyclerView.Adapter<UsersAdapter.VH> {
-        private final List<UsersItem> items;
-        UsersAdapter(List<UsersItem> items) { this.items = items; }
-        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
-            return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_report_users, p, false)); }
-        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
-            UsersItem i = items.get(pos);
-            h.tvName.setText(i.name);
-            h.tvRole.setText(i.role);
-            h.tvStatus.setText(i.status);
-        }
-        @Override public int getItemCount() { return items.size(); }
-        class VH extends RecyclerView.ViewHolder {
-            TextView tvName, tvRole, tvStatus;
-            VH(View v) { super(v);
-                tvName = v.findViewById(R.id.tvName);
-                tvRole = v.findViewById(R.id.tvRole);
-                tvStatus = v.findViewById(R.id.tvStatus);
-            }
-        }
-    }
-
-    class GatesAdapter extends RecyclerView.Adapter<GatesAdapter.VH> {
-        private final List<GatesItem> items;
-        GatesAdapter(List<GatesItem> items) { this.items = items; }
-        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
-            return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_report_gates, p, false)); }
-        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
-            GatesItem i = items.get(pos);
-            h.tvGate.setText(i.gateName);
-            h.tvEpc.setText(i.epc);
-            h.tvDate.setText(i.date);
-        }
-        @Override public int getItemCount() { return items.size(); }
-        class VH extends RecyclerView.ViewHolder {
-            TextView tvGate, tvEpc, tvDate;
-            VH(View v) { super(v);
-                tvGate = v.findViewById(R.id.tvGateName);
-                tvEpc = v.findViewById(R.id.tvEpc);
-                tvDate = v.findViewById(R.id.tvDate);
-            }
-        }
-    }
-
-    class MovementAdapter extends RecyclerView.Adapter<MovementAdapter.VH> {
-        private final List<MovementItem> items;
-        MovementAdapter(List<MovementItem> items) { this.items = items; }
-        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
-            return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_report_movement, p, false)); }
-        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
-            MovementItem i = items.get(pos);
-            h.tvFrom.setText(i.from);
-            h.tvTo.setText(i.to);
-            h.tvDate.setText(i.date);
-        }
-        @Override public int getItemCount() { return items.size(); }
-        class VH extends RecyclerView.ViewHolder {
-            TextView tvFrom, tvTo, tvDate;
-            VH(View v) { super(v);
-                tvFrom = v.findViewById(R.id.tvFrom);
-                tvTo = v.findViewById(R.id.tvTo);
-                tvDate = v.findViewById(R.id.tvDate);
-            }
-        }
-    }
-
-    class BranchesAdapter extends RecyclerView.Adapter<BranchesAdapter.VH> {
-        private final List<BranchesItem> items;
-        BranchesAdapter(List<BranchesItem> items) { this.items = items; }
-        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
-            return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_report_branches, p, false)); }
-        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
-            BranchesItem i = items.get(pos);
-            h.tvName.setText(i.name);
-            h.tvItems.setText(String.valueOf(i.items));
-        }
-        @Override public int getItemCount() { return items.size(); }
-        class VH extends RecyclerView.ViewHolder {
-            TextView tvName, tvItems;
-            VH(View v) { super(v);
-                tvName = v.findViewById(R.id.tvBranchName);
-                tvItems = v.findViewById(R.id.tvItemsCount);
-            }
-        }
-    }
-
-    class FinancialAdapter extends RecyclerView.Adapter<FinancialAdapter.VH> {
-        private final List<FinancialItem> items;
-        FinancialAdapter(List<FinancialItem> items) { this.items = items; }
-        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
-            return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_report_financial, p, false)); }
-        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
-            FinancialItem i = items.get(pos);
-            h.tvDescription.setText(i.description);
-            h.tvAmount.setText(String.format(Locale.US, "%,.2f", i.amount));
-        }
-        @Override public int getItemCount() { return items.size(); }
-        class VH extends RecyclerView.ViewHolder {
-            TextView tvDescription, tvAmount;
-            VH(View v) { super(v);
-                tvDescription = v.findViewById(R.id.tvDescription);
-                tvAmount = v.findViewById(R.id.tvAmount);
-            }
-        }
-    }
-
-    class GenericAdapter extends RecyclerView.Adapter<GenericAdapter.VH> {
-        private final List<GenericItem> items;
-        GenericAdapter(List<GenericItem> items) { this.items = items; }
-        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
-            return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_report_generic, p, false)); }
-        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
-            GenericItem i = items.get(pos);
-            h.tvKey.setText(i.key);
-            h.tvValue.setText(i.value);
-        }
-        @Override public int getItemCount() { return items.size(); }
-        class VH extends RecyclerView.ViewHolder {
-            TextView tvKey, tvValue;
-            VH(View v) { super(v);
-                tvKey = v.findViewById(R.id.tvKey);
-                tvValue = v.findViewById(R.id.tvValue);
-            }
-        }
-    }
-
-    class DashboardAdapter extends RecyclerView.Adapter<DashboardAdapter.VH> {
-        private final List<DashboardItem> items;
-        DashboardAdapter(List<DashboardItem> items) { this.items = items; }
-        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
-            return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_report_generic, p, false)); }
-        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
-            DashboardItem item = items.get(pos);
-            h.tvKey.setText(item.label);
-            h.tvValue.setText(item.value);
-        }
-        @Override public int getItemCount() { return items.size(); }
-        class VH extends RecyclerView.ViewHolder {
-            TextView tvKey, tvValue;
-            VH(View v) { super(v);
-                tvKey = v.findViewById(R.id.tvKey);
-                tvValue = v.findViewById(R.id.tvValue);
-            }
-        }
-    }
-
-    // ==================== Export CSV & Helpers ====================
-
-    private void printRecyclerView(RecyclerView rvData, String title) {
-        if (getContext() == null || rvData == null) return;
-
-        try {
-            int width = rvData.getWidth();
-            int height = rvData.getHeight();
-
-            if (width <= 0 || height <= 0) {
-                width = 1080;
-                height = 1920;
-            }
-
-            android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888);
-            android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
-            canvas.drawColor(android.graphics.Color.WHITE);
-            rvData.draw(canvas);
-
-            android.print.PrintManager printManager = (android.print.PrintManager) requireContext().getSystemService(Context.PRINT_SERVICE);
-            android.print.PrintAttributes attributes = new android.print.PrintAttributes.Builder()
-                    .setMediaSize(android.print.PrintAttributes.MediaSize.ISO_A4)
-                    .setResolution(new android.print.PrintAttributes.Resolution("pdf", "pdf", 600, 600))
-                    .setMinMargins(android.print.PrintAttributes.Margins.NO_MARGINS)
-                    .build();
-
-            printManager.print(title, new android.print.PrintDocumentAdapter() {
-                @Override
-                public void onLayout(android.print.PrintAttributes oldAttributes, android.print.PrintAttributes newAttributes,
-                                   android.os.CancellationSignal cancellationSignal,
-                                   LayoutResultCallback callback, android.os.Bundle extras) {
-                    callback.onLayoutFinished(new android.print.PrintDocumentInfo.Builder("report.pdf")
-                            .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
-                            .build(), true);
-                }
-
-                @Override
-                public void onWrite(android.print.PageRange[] pages, android.os.ParcelFileDescriptor destination,
-                                  android.os.CancellationSignal cancellationSignal, WriteResultCallback callback) {
-                    try {
-                        android.graphics.pdf.PdfDocument pdfDocument = new android.graphics.pdf.PdfDocument();
-
-                        android.graphics.pdf.PdfDocument.PageInfo pageInfo = new android.graphics.pdf.PdfDocument.PageInfo.Builder(
-                                bitmap.getWidth(), bitmap.getHeight(), 1).create();
-
-                        android.graphics.pdf.PdfDocument.Page page = pdfDocument.startPage(pageInfo);
-                        page.getCanvas().drawBitmap(bitmap, 0, 0, null);
-                        pdfDocument.finishPage(page);
-
-                        pdfDocument.writeTo(new FileOutputStream(destination.getFileDescriptor()));
-                        pdfDocument.close();
-
-                        callback.onWriteFinished(new android.print.PageRange[]{android.print.PageRange.ALL_PAGES});
-                    } catch (Exception e) {
-                        callback.onWriteFailed(e.getMessage());
-                    }
-                }
-            }, attributes);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Print error: " + e.getMessage());
-            Toast.makeText(getContext(), "Print error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void exportReportToCSV(String type, String from, String to) {
-    if (!isAdded() || getContext() == null) return;
-    
-    try {
-        // ✅ استخدام البيانات المخزنة مباشرة
-        JSONObject data = lastLoadedData;
-        
-        // إذا لم توجد بيانات مخزنة، حاول من الكاش
-        if (data == null) {
-            String cacheKey = "cache_pro_" + type + "_" + from + "_" + to;
-            String cached = offlineCache != null ? offlineCache.getString(cacheKey, null) : null;
-            if (cached != null) {
-                try {
-                    data = new JSONObject(cached);
-                } catch (Exception e) {
-                    Log.e(TAG, "Error parsing cached data", e);
-                }
-            }
-        }
-        
-        // إذا لم توجد بيانات نهائياً
-        if (data == null) {
-            Toast.makeText(getContext(), 
-                isArabic ? "⚠️ لا توجد بيانات للتصدير - قم بتحميل التقرير أولاً" : 
-                "⚠️ No data to export - Load the report first", 
-                Toast.LENGTH_LONG).show();
-            return;
-        }
-        
-        // ✅ إنشاء CSV
-        StringBuilder csv = new StringBuilder();
-        csv.append('\uFEFF'); // BOM للعربية
-        
-        // هيدر
-        if (orgProfile != null) {
-            csv.append(isArabic ? "اسم الجهة" : "Organization").append(",")
-               .append(orgProfile.getOrgName()).append("\n");
-        }
-        csv.append(isArabic ? "نوع التقرير" : "Report Type").append(",").append(type).append("\n");
-        csv.append(isArabic ? "الفترة من" : "From").append(",").append(from).append("\n");
-        csv.append(isArabic ? "الفترة إلى" : "To").append(",").append(to).append("\n");
-        csv.append(isArabic ? "تاريخ التصدير" : "Export Date").append(",")
-           .append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()))
-           .append("\n\n");
-        
-        // ✅ استخراج البيانات من JSON
-        JSONArray items = null;
-        
-        // البحث عن المصفوفة في أماكن مختلفة
-        String[] possibleKeys = {"items", "data", "items_list", "invoices", "movements", 
-                                  "users", "gate_logs", "branches_performance", "journal_entries",
-                                  "reorder_items", "timeline", "gate_history"};
-        
-        for (String key : possibleKeys) {
-            items = data.optJSONArray(key);
-            if (items != null && items.length() > 0) break;
-        }
-        
-        // البحث في كائن data المتداخل
-        if (items == null) {
-            JSONObject dataObj = data.optJSONObject("data");
-            if (dataObj != null) {
-                for (String key : possibleKeys) {
-                    items = dataObj.optJSONArray(key);
-                    if (items != null && items.length() > 0) break;
-                }
-            }
-        }
-        
-        if (items != null && items.length() > 0) {
-            // استخراج الأعمدة من أول عنصر
-            JSONObject firstItem = items.optJSONObject(0);
-            if (firstItem != null) {
-                Iterator<String> keys = firstItem.keys();
-                List<String> columns = new ArrayList<>();
-                while (keys.hasNext()) {
-                    columns.add(keys.next());
-                }
-                
-                // كتابة رؤوس الأعمدة
-                for (int i = 0; i < columns.size(); i++) {
-                    if (i > 0) csv.append(",");
-                    csv.append(columns.get(i));
-                }
-                csv.append("\n");
-                
-                // كتابة البيانات
-                for (int i = 0; i < items.length(); i++) {
-                    JSONObject item = items.optJSONObject(i);
-                    if (item != null) {
-                        for (int j = 0; j < columns.size(); j++) {
-                            if (j > 0) csv.append(",");
-                            String value = item.optString(columns.get(j), "");
-                            value = value.replace(",", "،").replace("\n", " ").replace("\r", " ");
-                            csv.append("\"").append(value).append("\"");
-                        }
-                        csv.append("\n");
-                    }
-                }
-            }
-        } else {
-            // إذا لم توجد مصفوفة، نصدر البيانات كـ key-value
-            csv.append(isArabic ? "المفتاح" : "Key").append(",")
-               .append(isArabic ? "القيمة" : "Value").append("\n");
-            
-            Iterator<String> keys = data.keys();
-            while (keys.hasNext()) {
-                String key = keys.next();
-                Object value = data.opt(key);
-                if (value != null && !key.equals("success") && !key.equals("timestamp") && !key.equals("type")) {
-                    csv.append("\"").append(key).append("\",\"").append(value.toString().replace("\"", "'")).append("\"\n");
-                }
-            }
-        }
-        
-        // حفظ الملف
-        File exportDir = new File(requireContext().getCacheDir(), "exports");
-        if (!exportDir.exists()) exportDir.mkdirs();
-        
-        File file = new File(exportDir, "MIRA_Report_" + type + "_" + System.currentTimeMillis() + ".csv");
-        FileOutputStream fos = new FileOutputStream(file);
-        fos.write(csv.toString().getBytes("UTF-8"));
-        fos.close();
-        
-        // مشاركة الملف
-        Uri uri = FileProvider.getUriForFile(requireContext(), 
-            requireContext().getPackageName() + ".fileprovider", file);
-        Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.setType("text/csv");
-        intent.putExtra(Intent.EXTRA_STREAM, uri);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(intent, isArabic ? "مشاركة التقرير" : "Share Report"));
-        
-        Toast.makeText(getContext(), 
-            isArabic ? "✅ تم تصدير التقرير بنجاح" : "✅ Report exported successfully", 
-            Toast.LENGTH_SHORT).show();
-        
-    } catch (Exception e) {
-        Log.e(TAG, "Export error: " + e.getMessage());
-        Toast.makeText(getContext(), 
-            isArabic ? "❌ فشل التصدير: " : "❌ Export failed: " + e.getMessage(), 
-            Toast.LENGTH_LONG).show();
-    }
-}
-
-// ✅ دالة تصدير التقارير المتقدمة
-private void exportAdvancedReport(String type, JSONObject data) {
-    if (!isAdded() || getContext() == null || data == null) return;
-    
-    try {
-        StringBuilder csv = new StringBuilder();
-        csv.append('\uFEFF');
-        
-        csv.append(isArabic ? "نوع التقرير" : "Report Type").append(",").append(type).append("\n");
-        csv.append(isArabic ? "تاريخ التصدير" : "Export Date").append(",")
-           .append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()))
-           .append("\n\n");
-        
-        // استخراج data المتداخل
-        JSONObject dataObj = data.optJSONObject("data");
-        if (dataObj == null) dataObj = data;
-        
-        // تصدير كـ key-value
-        csv.append(isArabic ? "المفتاح" : "Key").append(",")
-           .append(isArabic ? "القيمة" : "Value").append("\n");
-        
-        Iterator<String> keys = dataObj.keys();
-        while (keys.hasNext()) {
-            String key = keys.next();
-            Object value = dataObj.opt(key);
-            if (value != null) {
-                String valueStr = value.toString().replace(",", "،").replace("\n", " ").replace("\"", "'");
-                csv.append("\"").append(key).append("\",\"").append(valueStr).append("\"\n");
-            }
-        }
-        
-        File exportDir = new File(requireContext().getCacheDir(), "exports");
-        if (!exportDir.exists()) exportDir.mkdirs();
-        
-        File file = new File(exportDir, "MIRA_Advanced_" + type + "_" + System.currentTimeMillis() + ".csv");
-        FileOutputStream fos = new FileOutputStream(file);
-        fos.write(csv.toString().getBytes("UTF-8"));
-        fos.close();
-        
-        Uri uri = FileProvider.getUriForFile(requireContext(), 
-            requireContext().getPackageName() + ".fileprovider", file);
-        Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.setType("text/csv");
-        intent.putExtra(Intent.EXTRA_STREAM, uri);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(intent, isArabic ? "مشاركة التقرير" : "Share Report"));
-        
-    } catch (Exception e) {
-        Log.e(TAG, "Advanced export error: " + e.getMessage());
-        Toast.makeText(getContext(), "Export error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-    }
-}
-// ✅ دالة خاصة بمؤشر أمن البوابات
-private void showGateSecurityDialog(ReportItem item) {
-    // ✅ أولاً تحميل بوابات الفرع الحالي
-    executorService.execute(() -> {
-        try {
-            // جلب بوابات الفرع الحالي
-            String endpoint = "/gates?branch_id=" + currentBranchId;
-            MiraApiClient.ApiResponse gatesResponse = apiClient.getWithAuth(endpoint);
-            
-            mainHandler.post(() -> {
-                List<GateInfo> gates = new ArrayList<>();
-                
-                if (gatesResponse != null && gatesResponse.isSuccess && gatesResponse.data != null) {
-                    JSONArray gatesArray = gatesResponse.data.optJSONArray("gates");
-                    if (gatesArray == null) {
-                        JSONObject dataObj = gatesResponse.data.optJSONObject("data");
-                        if (dataObj != null) {
-                            gatesArray = dataObj.optJSONArray("gates");
-                        }
-                    }
-                    
-                    if (gatesArray != null) {
-                        for (int i = 0; i < gatesArray.length(); i++) {
-                            JSONObject gate = gatesArray.optJSONObject(i);
-                            if (gate != null) {
-                                GateInfo info = new GateInfo();
-                                info.id = gate.optInt("id", 0);
-                                info.gateId = gate.optString("gate_id", "");
-                                info.name = gate.optString("gate_name", gate.optString("name", "بوابة " + (i+1)));
-                                info.location = gate.optString("gate_location", gate.optString("location", ""));
-                                gates.add(info);
-                            }
-                        }
-                    }
-                }
-                
-                // ✅ إضافة خيار "كل البوابات"
-                if (!gates.isEmpty()) {
-                    showGateSelectionDialog(gates, item);
-                } else {
-                    // إذا لا توجد بوابات محددة، اعرض إدخال يدوي
-                    showManualGateInput(item);
-                }
-            });
-        } catch (Exception e) {
-            mainHandler.post(() -> showManualGateInput(item));
-        }
-    });
-}
-
-private void showGateSelectionDialog(List<GateInfo> gates, ReportItem item) {
-    // إضافة خيار "كل البوابات"
-    String[] options = new String[gates.size() + 1];
-    options[0] = isArabic ? "🚪 كل البوابات" : "🚪 All Gates";
-    
-    for (int i = 0; i < gates.size(); i++) {
-        GateInfo g = gates.get(i);
-        options[i + 1] = "🚪 " + g.name + " (" + g.gateId + ")" + 
-                        (g.location.isEmpty() ? "" : " - " + g.location);
-    }
-    
-    new AlertDialog.Builder(requireContext())
-        .setTitle(isArabic ? "🛡️ اختر البوابة" : "🛡️ Select Gate")
-        .setItems(options, (dialog, which) -> {
-            if (which == 0) {
-                // كل البوابات
-                fetchAdvancedReport(item.type, 0, "", "", 0, 
-                    getDefaultFromDate(), getDefaultToDate());
-            } else {
-                GateInfo selectedGate = gates.get(which - 1);
-                fetchAdvancedReport(item.type, 0, "", "", selectedGate.id, 
-                    getDefaultFromDate(), getDefaultToDate());
-            }
-        })
-        .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-        .show();
-}
-
-private void showManualGateInput(ReportItem item) {
-    AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-    builder.setTitle(isArabic ? "🛡️ مؤشر أمن البوابات" : "🛡️ Gate Security Index");
-    
-    View inputView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_input_user_id, null);
-    EditText etGateId = inputView.findViewById(R.id.etUserId);
-    etGateId.setHint(isArabic ? "أدخل معرف البوابة (اختياري)" : "Enter gate ID (optional)");
-    
-    builder.setView(inputView);
-    builder.setPositiveButton(isArabic ? "عرض" : "Show", (dialog, which) -> {
-        String gateIdStr = etGateId.getText().toString().trim();
-        int gateId = 0;
-        if (!gateIdStr.isEmpty()) {
-            try {
-                gateId = Integer.parseInt(gateIdStr);
-            } catch (NumberFormatException e) {
-                // تجاهل
-            }
-        }
-        fetchAdvancedReport(item.type, 0, "", "", gateId, 
-            getDefaultFromDate(), getDefaultToDate());
-    });
-    builder.setNegativeButton(isArabic ? "إلغاء" : "Cancel", null);
-    builder.show();
-}
-
-// ✅ كلاس معلومات البوابة
-private static class GateInfo {
-    int id;
-    String gateId;
-    String name;
-    String location;
-}
-
-// ✅ دالة خاصة بأعمار المخزون
-private void showInventoryAgingDialog(ReportItem item) {
-    // هذا التقرير لا يحتاج مدخلات إضافية، فقط الفرع الحالي
-    fetchAdvancedReport(item.type, 0, "", "", 0, "", "");
-}
-
-// ✅ دالة خاصة بتفاصيل الفروقات
-private void showAuditDiscrepancyDialog(ReportItem item) {
-    // عرض Dialog لاختيار التاريخ
-    View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_mira_report_viewer, null);
-    
-    TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
-    RecyclerView rvData = dialogView.findViewById(R.id.rvReportData);
-    View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
-    TextView tvLoadingStatus = dialogView.findViewById(R.id.tvLoadingStatus);
-    
-    MaterialButton btnFrom = dialogView.findViewById(R.id.btnReportDateFrom);
-    MaterialButton btnTo = dialogView.findViewById(R.id.btnReportDateTo);
-    MaterialButton btnApply = dialogView.findViewById(R.id.btnReportApplyFilter);
-    MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
-    
-    final String[] selectedDates = new String[]{getDefaultFromDate(), getDefaultToDate()};
-    
-    if (btnFrom != null) btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
-    if (btnTo != null) btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
-    
-    if (tvTitle != null) tvTitle.setText(item.icon + " " + item.title);
-    if (rvData != null) rvData.setLayoutManager(new LinearLayoutManager(getContext()));
-    
-    AlertDialog dialog = new AlertDialog.Builder(requireContext(), android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
-            .setView(dialogView)
-            .create();
-    
-    if (btnFrom != null) {
-        btnFrom.setOnClickListener(v -> showDatePicker(date -> {
-            selectedDates[0] = date;
-            btnFrom.setText((isArabic ? "من: " : "From: ") + date);
-        }));
-    }
-    
-    if (btnTo != null) {
-        btnTo.setOnClickListener(v -> showDatePicker(date -> {
-            selectedDates[1] = date;
-            btnTo.setText((isArabic ? "إلى: " : "To: ") + date);
-        }));
-    }
-    
-    if (btnApply != null) {
-        btnApply.setOnClickListener(v -> {
-            fetchAdvancedReport(item.type, 0, "", "", 0, selectedDates[0], selectedDates[1]);
-            dialog.dismiss();
-        });
-    }
-    
-    if (btnClose != null) {
-        btnClose.setOnClickListener(v -> dialog.dismiss());
-    }
-    
-    dialog.show();
-}
-    private String getDefaultFromDate() { return getCalculatedDate(-30); }
-    private String getDefaultToDate() { return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()); }
-    private String getCalculatedDate(int days) {
+    private String getDefaultFromDate() {
         Calendar c = Calendar.getInstance();
-        c.add(Calendar.DAY_OF_MONTH, days);
+        c.add(Calendar.DAY_OF_MONTH, -30);
         return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.getTime());
     }
+    
+    private String getDefaultToDate() {
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+    }
+    
     private void showDatePicker(DatePickerCallback cb) {
         if (!isAdded() || getContext() == null) return;
         Calendar c = Calendar.getInstance();
@@ -2688,120 +551,98 @@ private void showAuditDiscrepancyDialog(ReportItem item) {
             cb.onDate(String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d)), 
             c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show();
     }
-
-    static class ReportItem { String icon, title, subtitle, type;
-        ReportItem(String i, String t, String s, String ty) { icon=i; title=t; subtitle=s; type=ty; } }
-
+    
+    // ==================== Adapter ====================
+    
     class ReportsAdapter extends RecyclerView.Adapter<ReportsAdapter.VH> {
-    final List<ReportItem> list; 
-    final OnReportClickListener listener;
-    private int lastPosition = -1;
-    
-    ReportsAdapter(List<ReportItem> l, OnReportClickListener c) { 
-        list = l; 
-        listener = c; 
-    }
-    
-    @NonNull @Override 
-    public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
-        return new VH(LayoutInflater.from(p.getContext()).inflate(R.layout.item_report_card_pro, p, false)); 
-    }
-    
-    @Override 
-    public void onBindViewHolder(@NonNull VH h, int pos) {
-        ReportItem item = list.get(pos);
-        h.tvIcon.setText(item.icon); 
-        h.tvTitle.setText(item.title); 
-        h.tvSubtitle.setText(item.subtitle);
+        final List<ReportModels.ReportItem> list;
+        final OnReportClickListener listener;
         
-        // ✅ أنيميشن ظهور البطاقات
-        setAnimation(h.itemView, pos);
+        ReportsAdapter(List<ReportModels.ReportItem> l, OnReportClickListener c) {
+            list = l;
+            listener = c;
+        }
         
-        h.itemView.setOnClickListener(v -> {
-            // ✅ تأثير ضغط على البطاقة
-            v.animate()
-                .scaleX(0.95f)
-                .scaleY(0.95f)
-                .setDuration(100)
-                .withEndAction(() -> {
-                    v.animate()
-                        .scaleX(1f)
-                        .scaleY(1f)
-                        .setDuration(100)
-                        .start();
-                })
-                .start();
+        @NonNull @Override
+        public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
+            return new VH(LayoutInflater.from(p.getContext())
+                .inflate(R.layout.item_report_card_pro, p, false));
+        }
+        
+        @Override
+        public void onBindViewHolder(@NonNull VH h, int pos) {
+            ReportModels.ReportItem item = list.get(pos);
+            h.tvIcon.setText(item.icon);
+            h.tvTitle.setText(item.title);
+            h.tvSubtitle.setText(item.subtitle);
             
-            // ✅ تأخير بسيط قبل الفتح
-            v.postDelayed(() -> listener.onClick(item), 150);
-        });
-    }
-    
-    /**
-     * ✅ أنيميشن ظهور البطاقات
-     */
-    private void setAnimation(View viewToAnimate, int position) {
-        if (position > lastPosition) {
-            viewToAnimate.setAlpha(0f);
-            viewToAnimate.setTranslationY(50f);
-            viewToAnimate.animate()
-                .alpha(1f)
-                .translationY(0f)
-                .setDuration(400)
-                .setStartDelay(position * 50) // ✅ تأخير تدريجي
-                .setInterpolator(new AccelerateDecelerateInterpolator())
-                .start();
-            lastPosition = position;
+            h.itemView.setOnClickListener(v -> listener.onClick(item));
         }
-    }
-    
-    @Override 
-    public void onViewDetachedFromWindow(@NonNull VH holder) {
-        super.onViewDetachedFromWindow(holder);
-        holder.itemView.clearAnimation();
-    }
-    
-    @Override 
-    public int getItemCount() { 
-        return list.size(); 
-    }
-    
-    class VH extends RecyclerView.ViewHolder {
-        TextView tvIcon, tvTitle, tvSubtitle;
-        VH(View v) { 
-            super(v); 
-            tvIcon = v.findViewById(R.id.tvReportIcon); 
-            tvTitle = v.findViewById(R.id.tvReportTitle); 
-            tvSubtitle = v.findViewById(R.id.tvReportSubtitle); 
+        
+        @Override
+        public int getItemCount() {
+            return list.size();
         }
-    }
-}
-
-    interface OnReportClickListener { void onClick(ReportItem item); }
-    interface DatePickerCallback { void onDate(String date); }
-
-    @Override
-public void onDestroyView() {
-    super.onDestroyView();
-    
-    // ✅ إزالة callbacks
-    mainHandler.removeCallbacksAndMessages(null);
-    
-    // ✅ إغلاق executor بشكل آمن
-    if (executorService != null && !executorService.isShutdown()) {
-        executorService.shutdown();
-        try {
-            if (!executorService.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS)) {
-                executorService.shutdownNow();
+        
+        class VH extends RecyclerView.ViewHolder {
+            TextView tvIcon, tvTitle, tvSubtitle;
+            
+            VH(View v) {
+                super(v);
+                tvIcon = v.findViewById(R.id.tvReportIcon);
+                tvTitle = v.findViewById(R.id.tvReportTitle);
+                tvSubtitle = v.findViewById(R.id.tvReportSubtitle);
             }
-        } catch (InterruptedException e) {
-            executorService.shutdownNow();
-            Thread.currentThread().interrupt();
         }
     }
     
-    // ✅ تنظيف المراجع
-    rvReports = null;
-    adapter = null;
+    class GenericAdapter extends RecyclerView.Adapter<GenericAdapter.VH> {
+        final List<ReportModels.GenericItem> items;
+        
+        GenericAdapter(List<ReportModels.GenericItem> items) {
+            this.items = items;
+        }
+        
+        @NonNull @Override
+        public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
+            return new VH(LayoutInflater.from(p.getContext())
+                .inflate(R.layout.item_report_generic, p, false));
+        }
+        
+        @Override
+        public void onBindViewHolder(@NonNull VH h, int pos) {
+            ReportModels.GenericItem item = items.get(pos);
+            h.tvKey.setText(item.key);
+            h.tvValue.setText(item.value);
+        }
+        
+        @Override
+        public int getItemCount() {
+            return items.size();
+        }
+        
+        class VH extends RecyclerView.ViewHolder {
+            TextView tvKey, tvValue;
+            
+            VH(View v) {
+                super(v);
+                tvKey = v.findViewById(R.id.tvKey);
+                tvValue = v.findViewById(R.id.tvValue);
+            }
+        }
+    }
+    
+    interface OnReportClickListener {
+        void onClick(ReportModels.ReportItem item);
+    }
+    
+    interface DatePickerCallback {
+        void onDate(String date);
+    }
+    
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        mainHandler.removeCallbacksAndMessages(null);
+    }
 }
-                    }
