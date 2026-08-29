@@ -1,7 +1,6 @@
 package com.example.uhf.repository;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.util.Log;
 
 import androidx.lifecycle.LiveData;
@@ -14,6 +13,8 @@ import com.example.uhf.models.ReportModels;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.ArrayList;  // ✅ إضافة هذا
+import java.util.List;       // ✅ إضافة هذا
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
