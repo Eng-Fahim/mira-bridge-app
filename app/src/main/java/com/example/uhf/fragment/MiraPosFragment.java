@@ -27,6 +27,19 @@ import androidx.fragment.app.FragmentManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+
+import android.app.Dialog;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.WindowManager;
+import android.os.Handler;
+import android.os.Looper;
+
+import androidx.activity.result.ActivityResultLauncher;
+import com.journeyapps.barcodescanner.ScanContract;
+import com.journeyapps.barcodescanner.ScanOptions;
+import com.google.android.material.button.MaterialButton;
+
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
@@ -67,6 +80,9 @@ public class MiraPosFragment extends MiraBaseFragment {
     private AlertDialog searchLoadingDialog;
     
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private MiraApiClient apiClient;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
 
     private MiraPriceManager priceManager;
     private MiraBranchesManager branchesManager;
@@ -165,6 +181,7 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
                 });
             }
             
+            apiClient = MiraApiClient.getInstance(ctx);
             bindViews(view);
             setupRecyclerView();
             setupListeners();
@@ -177,6 +194,18 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
         }
     }
 
+private void refreshData() {
+    // ✅ تحديث البيانات بعد الإرجاع
+    try {
+        // تحديث الداشبورد إذا كان موجوداً
+        if (getActivity() instanceof UHFMainActivity) {
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+            activity.refreshDashboardData();
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "refreshData error: " + e.getMessage());
+    }
+}
     private void applyPermissions() {
         try {
             boolean canUsePos = permissionManager.canView("pos") || permissionManager.isPosOperator() || permissionManager.isManager();
@@ -1251,4 +1280,241 @@ private void showReceipt(MiraApiClient.ApiResponse response) {
             }
         }
     }
+    
+    // ==================== في MiraPOSFragment أو أي Fragment للمبيعات ====================
+
+private final ActivityResultLauncher<ScanOptions> refundBarcodeLauncher = registerForActivityResult(
+    new ScanContract(),
+    result -> {
+        if (result.getContents() != null && isAdded()) {
+            if (etRefundCode != null) {
+                etRefundCode.setText(result.getContents().trim());
+                // ✅ البحث عن القطعة تلقائياً
+                searchItemForRefund(result.getContents().trim());
+            }
+        }
+    }
+);
+
+private EditText etRefundCode;
+private Dialog refundDialog;
+private TextView tvRefundItemTitle;
+private TextView tvRefundItemStatus;
+private View cardRefundItemInfo;
+private boolean isRefundable = false;
+
+/**
+ * ✅ عرض نافذة المرتجع
+ */
+private void showRefundDialog() {
+    if (!isAdded() || getContext() == null) return;
+    
+    refundDialog = new Dialog(requireContext());
+    refundDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+    refundDialog.setContentView(R.layout.dialog_refund);
+    
+    if (refundDialog.getWindow() != null) {
+        refundDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        refundDialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT);
+    }
+    
+    etRefundCode = refundDialog.findViewById(R.id.etRefundScanCode);
+    EditText etReason = refundDialog.findViewById(R.id.etRefundReason);
+    tvRefundItemTitle = refundDialog.findViewById(R.id.tvRefundItemTitle);
+    tvRefundItemStatus = refundDialog.findViewById(R.id.tvRefundItemStatus);
+    cardRefundItemInfo = refundDialog.findViewById(R.id.cardRefundItemInfo);
+    MaterialButton btnScanBarcode = refundDialog.findViewById(R.id.btnRefundScanBarcode);
+    MaterialButton btnCancel = refundDialog.findViewById(R.id.btnRefundCancel);
+    MaterialButton btnConfirm = refundDialog.findViewById(R.id.btnRefundConfirm);
+    
+    // ✅ مسح باركود
+    if (btnScanBarcode != null) {
+        btnScanBarcode.setOnClickListener(v -> {
+            ScanOptions options = new ScanOptions();
+            options.setPrompt(isArabic ? "📷 وجه الكاميرا نحو باركود القطعة" : "📷 Aim camera at item barcode");
+            options.setBeepEnabled(false);
+            options.setOrientationLocked(true);
+            refundBarcodeLauncher.launch(options);
+        });
+    }
+    
+    // ✅ البحث عند تغيير النص
+    if (etRefundCode != null) {
+        etRefundCode.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (s.length() >= 4) {
+                    searchItemForRefund(s.toString().trim());
+                } else {
+                    hideRefundItemInfo();
+                }
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
+    }
+    
+    // ✅ إلغاء
+    if (btnCancel != null) {
+        btnCancel.setOnClickListener(v -> refundDialog.dismiss());
+    }
+    
+    // ✅ تأكيد الإرجاع
+    if (btnConfirm != null) {
+        btnConfirm.setOnClickListener(v -> {
+            String code = etRefundCode != null ? etRefundCode.getText().toString().trim() : "";
+            String reason = etReason != null ? etReason.getText().toString().trim() : "";
+            
+            if (code.isEmpty()) {
+                Toast.makeText(getContext(), 
+                    isArabic ? "⚠️ أدخل رمز القطعة" : "⚠️ Enter item code", 
+                    Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
+            if (!isRefundable) {
+                Toast.makeText(getContext(), 
+                    isArabic ? "⚠️ لا يمكن إرجاع هذه القطعة" : "⚠️ This item cannot be refunded", 
+                    Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
+            processRefund(code, reason.isEmpty() ? (isArabic ? "مرتجع مبيعات" : "Sales Refund") : reason);
+        });
+    }
+    
+    refundDialog.show();
 }
+
+/**
+ * ✅ البحث عن القطعة للتحقق من إمكانية الإرجاع
+ */
+private void searchItemForRefund(String code) {
+    executor.execute(() -> {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("epc", code);
+            payload.put("serial_no", code);
+            payload.put("context", "refund_check");
+            
+            MiraApiClient.ApiResponse response = apiClient.postWithAuth("/pos/search-item", payload);
+            
+            mainHandler.post(() -> {
+                if (!isAdded() || refundDialog == null || !refundDialog.isShowing()) return;
+                
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONObject item = response.data.optJSONObject("item");
+                    if (item != null) {
+                        String title = item.optString("title", "");
+                        String status = item.optString("status", "");
+                        boolean isSellable = item.optBoolean("is_sellable", false);
+                        
+                        // ✅ يمكن الإرجاع إذا كانت sold أو exited
+                        isRefundable = "sold".equals(status) || "exited".equals(status);
+                        
+                        showRefundItemInfo(title, status, isRefundable);
+                    }
+                } else {
+                    hideRefundItemInfo();
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "searchItemForRefund error: " + e.getMessage());
+            mainHandler.post(this::hideRefundItemInfo);
+        }
+    });
+}
+
+/**
+ * ✅ عرض معلومات القطعة
+ */
+private void showRefundItemInfo(String title, String status, boolean refundable) {
+    if (cardRefundItemInfo != null) {
+        cardRefundItemInfo.setVisibility(View.VISIBLE);
+        cardRefundItemInfo.setAlpha(0f);
+        cardRefundItemInfo.animate().alpha(1f).setDuration(300).start();
+    }
+    
+    if (tvRefundItemTitle != null) {
+        tvRefundItemTitle.setText(title);
+    }
+    
+    if (tvRefundItemStatus != null) {
+        String statusText;
+        int color;
+        
+        if (refundable) {
+            statusText = isArabic ? "✅ قابل للإرجاع" : "✅ Refundable";
+            color = Color.parseColor("#2ECC71");
+        } else {
+            statusText = isArabic ? "❌ غير قابل للإرجاع" : "❌ Not refundable";
+            color = Color.parseColor("#E74C3C");
+        }
+        
+        tvRefundItemStatus.setText(statusText + " (" + status + ")");
+        tvRefundItemStatus.setTextColor(color);
+    }
+}
+
+/**
+ * ✅ إخفاء معلومات القطعة
+ */
+private void hideRefundItemInfo() {
+    isRefundable = false;
+    if (cardRefundItemInfo != null) {
+        cardRefundItemInfo.setVisibility(View.GONE);
+    }
+}
+
+/**
+ * ✅ تنفيذ عملية الإرجاع
+ */
+private void processRefund(String code, String reason) {
+    // ✅ إظهار تحميل
+    if (refundDialog != null && refundDialog.isShowing()) {
+        // يمكن إظهار ProgressBar هنا
+    }
+    
+    executor.execute(() -> {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("epc", code);
+            payload.put("serial_no", code);
+            payload.put("reason", reason);
+            
+            MiraApiClient.ApiResponse response = apiClient.postWithAuth("/pos/refund", payload);
+            
+            mainHandler.post(() -> {
+                if (!isAdded()) return;
+                
+                if (response != null && response.isSuccess) {
+                    Toast.makeText(getContext(), 
+                        isArabic ? "✅ تم الإرجاع بنجاح" : "✅ Refund successful", 
+                        Toast.LENGTH_SHORT).show();
+                    
+                    // ✅ إغلاق النافذة
+                    if (refundDialog != null && refundDialog.isShowing()) {
+                        refundDialog.dismiss();
+                    }
+                    
+                    // ✅ تحديث البيانات
+                    refreshData();
+                } else {
+                    String message = response != null ? response.message : "Unknown error";
+                    Toast.makeText(getContext(), 
+                        (isArabic ? "❌ فشل الإرجاع: " : "❌ Refund failed: ") + message, 
+                        Toast.LENGTH_LONG).show();
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "processRefund error: " + e.getMessage());
+            mainHandler.post(() -> {
+                if (isAdded()) {
+                    Toast.makeText(getContext(), 
+                        isArabic ? "❌ خطأ في الإرجاع" : "❌ Refund error", 
+                        Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+    });
+}
+                              }
