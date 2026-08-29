@@ -16,7 +16,6 @@
     <color name="action_sheet_text_secondary">#A0A5B5</color>
     <color name="action_sheet_divider">#383E4D</color>
 
-
     <color name="lfile_colorPrimary">#92B4F4</color>
     <color name="white">#FFFFFF</color>
     <color name="white1">#eeeeee</color>
@@ -61,11 +60,10 @@
     <color name="deep_gray">#ff3f3f3f</color>
     <color name="text_gray">#ff999999</color>
 
-
     <color name="status_draft">#757575</color>
-<color name="status_pending">#F57C00</color>
-<color name="status_in_transit">#0288D1</color>
-<color name="status_completed">#388E3C</color>
+    <color name="status_pending">#F57C00</color>
+    <color name="status_in_transit">#0288D1</color>
+    <color name="status_completed">#388E3C</color>
 
     <color name="red_qian">#cf9191</color>
 
@@ -99,9 +97,9 @@
     <color name="viewfinder_frame">#ff000000</color>
     <color name="viewfinder_laser">#ffff0000</color>
     <color name="viewfinder_mask">#60000000</color>
-<color name="primary">#1A237E</color>
-<color name="on_surface_variant">#44474E</color>
-<color name="outline">#CBD5E1</color>
+    <color name="primary">#1A237E</color>
+    <color name="on_surface_variant">#44474E</color>
+    <color name="outline">#CBD5E1</color>
     <!--zxing end-->
 
     <string-array name="colors" translatable="false">
@@ -124,72 +122,70 @@
         <item>#888888</item>
     </string-array>
 
-<!-- ========== ألوان جديدة للداشبورد - الوضع الفاتح ========== -->
+    <!-- ========== ألوان جديدة للداشبورد - الوضع الفاتح ========== -->
 
-<!-- ألوان النصوص الرئيسية (تظهر داكنة على الخلفية الفاتحة) -->
-<color name="primary_text">#FF1A1A1A</color>
-<color name="primary_text_variant">#FF2C2C2C</color>
+    <!-- ألوان النصوص الرئيسية (تظهر داكنة على الخلفية الفاتحة) -->
+    <color name="primary_text">#FF1A1A1A</color>
+    <color name="primary_text_variant">#FF2C2C2C</color>
 
-<!-- ألوان النصوص الثانوية -->
-<color name="text_secondary">#FF6B7280</color>
-<color name="text_secondary_variant">#FF9CA3AF</color>
+    <!-- ألوان النصوص الثانوية -->
+    <color name="text_secondary">#FF6B7280</color>
+    <color name="text_secondary_variant">#FF9CA3AF</color>
 
-<!-- ألوان الخلفيات -->
-<color name="background_dark">#FFF5F5F5</color>
-<color name="background_card">#FFFFFFFF</color>
-<color name="background_card_variant">#FFF8F9FA</color>
+    <!-- ألوان الخلفيات -->
+    <color name="background_dark">#FFF5F5F5</color>
+    <color name="background_card">#FFFFFFFF</color>
+    <color name="background_card_variant">#FFF8F9FA</color>
 
-<!-- ألوان التمييز والتأثيرات -->
-<color name="accent_color">#FF1A237E</color>
-<color name="accent_color_variant">#FF283593</color>
+    <!-- ألوان التمييز والتأثيرات -->
+    <color name="accent_color">#FF1A237E</color>
+    <color name="accent_color_variant">#FF283593</color>
 
-<!-- ألوان Shimmer Loading للوضع الفاتح -->
-<color name="shimmer_color">#FFE0E0E0</color>
-<color name="shimmer_highlight">#FFF0F0F0</color>
+    <!-- ألوان Shimmer Loading للوضع الفاتح -->
+    <color name="shimmer_color">#FFE0E0E0</color>
+    <color name="shimmer_highlight">#FFF0F0F0</color>
 
-<!-- ألوان الكروت والعناصر -->
-<color name="card_background">#FFFFFFFF</color>
-<color name="card_stroke">#FFE5E7EB</color>
+    <!-- ألوان الكروت والعناصر -->
+    <color name="card_background">#FFFFFFFF</color>
+    <color name="card_stroke">#FFE5E7EB</color>
 
-<!-- ألوان الحالات -->
-<color name="status_online">#FF16A34A</color>
-<color name="status_offline">#FFDC2626</color>
-<color name="status_updating">#FFF59E0B</color>
+    <!-- ألوان الحالات -->
+    <color name="status_online">#FF16A34A</color>
+    <color name="status_offline">#FFDC2626</color>
+    <color name="status_updating">#FFF59E0B</color>
 
-<!-- ألوان العيارات -->
-<color name="karat_text">#FF1A1A1A</color>
-<color name="karat_text_empty">#FF9CA3AF</color>
+    <!-- ألوان العيارات -->
+    <color name="karat_text">#FF1A1A1A</color>
+    <color name="karat_text_empty">#FF9CA3AF</color>
 
-<!-- ألوان إضافية للثيم -->
-<color name="colorBackground">#FFF5F5F5</color>
-<color name="colorPrimary">#FF1A237E</color>
-<color name="colorOnPrimary">#FFFFFFFF</color>
-<color name="colorSurface">#FFFFFFFF</color>
-<color name="colorSurfaceVariant">#FFF1F5F9</color>
-<color name="colorOnSurface">#FF1E293B</color>
-<color name="colorOnSurfaceVariant">#FF64748B</color>
-<color name="colorOutline">#FFE2E8F0</color>
-<color name="colorOutlineVariant">#FF94A3B8</color>
-<color name="colorWhite">#FFFFFFFF</color>
+    <!-- ألوان إضافية للثيم -->
+    <color name="colorBackground">#FFF5F5F5</color>
+    <color name="colorPrimary">#FF1A237E</color>
+    <color name="colorOnPrimary">#FFFFFFFF</color>
+    <color name="colorSurface">#FFFFFFFF</color>
+    <color name="colorSurfaceVariant">#FFF1F5F9</color>
+    <color name="colorOnSurface">#FF1E293B</color>
+    <color name="colorOnSurfaceVariant">#FF64748B</color>
+    <color name="colorOutline">#FFE2E8F0</color>
+    <color name="colorOutlineVariant">#FF94A3B8</color>
+    <color name="colorWhite">#FFFFFFFF</color>
 
+    <color name="gate_pass_green">#2E7D32</color>
+    <color name="gate_deny_red">#C62828</color>
+    <color name="gate_sim_green">#10B981</color>
+    <color name="gate_sim_red">#EF4444</color>
+    <color name="gate_console_bg">#000000</color>
+    <color name="gate_console_text">#00FF66</color>
+    <color name="gate_alarm_bg">#D32F2F</color>
+    <color name="gate_alarm_title_yellow">#FFFF00</color>
 
+    <!-- ألوان التقارير والمؤشرات -->
+    <color name="report_profit_green">#2E7D32</color>
+    <color name="report_loss_red">#C62828</color>
+    <color name="report_gold_amber">#FF8F00</color>
+    <color name="report_neutral_gray">#757575</color>
 
-<color name="gate_pass_green">#2E7D32</color>
-<color name="gate_deny_red">#C62828</color>
-<color name="gate_sim_green">#10B981</color>
-<color name="gate_sim_red">#EF4444</color>
-<color name="gate_console_bg">#000000</color>
-<color name="gate_console_text">#00FF66</color>
-<color name="gate_alarm_bg">#D32F2F</color>
-<color name="gate_alarm_title_yellow">#FFFF00</color>
-
-<!-- ألوان التقارير والمؤشرات -->
-<color name="report_profit_green">#2E7D32</color>
-<color name="report_loss_red">#C62828</color>
-<color name="report_gold_amber">#FF8F00</color>
-<color name="report_neutral_gray">#757575</color>
-
-    <!-- ألوان التقارير -->
+    <!-- ========== ألوان التقارير ========== -->
     <color name="report_primary">#1a237e</color>
     <color name="report_primary_dark">#0d1652</color>
     <color name="report_accent">#c5a059</color>
@@ -202,7 +198,7 @@
     <color name="report_error">#F44336</color>
     <color name="report_info">#2196F3</color>
     
-    <!-- ألوان الرسوم البيانية -->
+    <!-- ========== ألوان الرسوم البيانية ========== -->
     <color name="chart_blue">#2196F3</color>
     <color name="chart_green">#4CAF50</color>
     <color name="chart_orange">#FF9800</color>
@@ -214,5 +210,17 @@
     <color name="chart_brown">#795548</color>
     <color name="chart_cyan">#00BCD4</color>
 
+    <!-- ========== ألوان أيقونات التقارير ========== -->
+    <color name="icon_dashboard">#5C6BC0</color>
+    <color name="icon_sales">#26A69A</color>
+    <color name="icon_inventory">#FF7043</color>
+    <color name="icon_movement">#42A5F5</color>
+    <color name="icon_branches">#AB47BC</color>
+    <color name="icon_gates">#EF5350</color>
+    <color name="icon_audit">#66BB6A</color>
+    <color name="icon_reorder">#FFA726</color>
+    <color name="icon_users">#7E57C2</color>
+    <color name="icon_financial">#26C6DA</color>
+    <color name="icon_advanced">#C9A961</color>
 
 </resources>
