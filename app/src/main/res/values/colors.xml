@@ -222,5 +222,13 @@
     <color name="icon_users">#7E57C2</color>
     <color name="icon_financial">#26C6DA</color>
     <color name="icon_advanced">#C9A961</color>
-
+<!-- ========== ألوان التصميم الجديد ========== -->
+    <color name="bg_main">#F8F6F2</color>
+    <color name="bg_card">#FFFFFF</color>
+    <color name="text_primary">#1B1B2F</color>
+    <color name="text_light">#FFFFFF</color>
+    <color name="text_muted">#9E9EAD</color>
+    <color name="accent">#C9A961</color>
+    <color name="accent_light">#E5C87E</color>
+    <color name="accent_dark">#A8893F</color>
 </resources>
