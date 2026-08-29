@@ -71,6 +71,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        
+        <!-- ✅ ReportsActivity (تم إغلاق الوسم بشكل صحيح) -->
+        <activity 
+            android:name=".ReportsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
 
         <!-- ✅ MainActivity -->
         <activity
