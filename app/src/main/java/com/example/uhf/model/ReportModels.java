@@ -1,10 +1,10 @@
 package com.example.uhf.models;
 
-import org.json.JSONArray;  // ✅ تأكد من وجود هذا
-import org.json.JSONObject; // ✅ تأكد من وجود هذا
-import java.util.ArrayList; // ✅ تأكد من وجود هذا
-import java.util.List;      // ✅ تأكد من وجود هذا
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+import java.util.ArrayList;
+import java.util.List;
 /**
  * ✅ نماذج البيانات الموحدة لنظام التقارير
  */
@@ -209,6 +209,99 @@ public class ReportModels {
         }
     }
     
+    // ==================== 1. نموذج مكافئ الذهب الصافي ====================
+    public static class GoldEquivalentsData {
+        public double pureGold24k;
+        public double standardGold21k;
+        public List<KaratItem> breakdown = new ArrayList<>();
+
+        public static class KaratItem {
+            public String karat;
+            public int count;
+            public double grossWeight;
+            public double eq24k;
+        }
+
+        public static GoldEquivalentsData parse(JSONObject json) {
+            GoldEquivalentsData result = new GoldEquivalentsData();
+            if (json == null) return result;
+
+            JSONObject summary = json.optJSONObject("summary");
+            if (summary != null) {
+                result.pureGold24k = summary.optDouble("total_pure_gold_24k", 0.0);
+                result.standardGold21k = summary.optDouble("total_standard_21k", 0.0);
+            }
+
+            JSONArray array = json.optJSONArray("breakdown_by_karat");
+            if (array != null) {
+                for (int i = 0; i < array.length(); i++) {
+                    JSONObject obj = array.optJSONObject(i);
+                    if (obj != null) {
+                        KaratItem item = new KaratItem();
+                        item.karat = obj.optString("gold_karat", "N/A");
+                        item.count = obj.optInt("items_count", 0);
+                        item.grossWeight = obj.optDouble("gross_weight", 0.0);
+                        item.eq24k = obj.optDouble("weight_24k_eq", 0.0);
+                        result.breakdown.add(item);
+                    }
+                }
+            }
+            return result;
+        }
+    }
+
+    // ==================== 2. محول تقرير أداء البائعين ====================
+    public static List<SalesItem> parseSellerPerformance(JSONArray array) {
+        List<SalesItem> list = new ArrayList<>();
+        if (array == null) return list;
+
+        for (int i = 0; i < array.length(); i++) {
+            JSONObject obj = array.optJSONObject(i);
+            if (obj != null) {
+                String sellerName = obj.optString("seller_name", "غير معروف");
+                int invoices = obj.optInt("total_invoices", 0);
+                double totalSales = obj.optDouble("total_sales_amount", 0.0);
+
+                SalesItem item = new SalesItem(
+                        "فواتير: " + invoices,
+                        "بائع",
+                        totalSales,
+                        "نقدي/شبكة",
+                        sellerName
+                );
+                list.add(item);
+            }
+        }
+        return list;
+    }
+
+    // ==================== 3. محول القطع المفقودة بالجرد ====================
+    public static List<InventoryItem> parseMissingItems(JSONObject json) {
+        List<InventoryItem> list = new ArrayList<>();
+        if (json == null) return list;
+
+        JSONArray array = json.optJSONArray("items");
+        if (array == null) return list;
+
+        for (int i = 0; i < array.length(); i++) {
+            JSONObject obj = array.optJSONObject(i);
+            if (obj != null) {
+                InventoryItem item = new InventoryItem(
+                        obj.optString("item_title", "قطعة مفقودة"),
+                        obj.optString("gold_karat", "21K"),
+                        obj.optDouble("gross_weight_grams", 0.0),
+                        "مفقود بالجرد",
+                        obj.optString("current_location", "الفرع")
+                );
+                item.serialNumber = obj.optString("serial_number", "");
+                list.add(item);
+            }
+        }
+        return list;
+    }
+}
+
+    
     public static class SalesItem {
         public String invoiceNo;
         public String customer;
@@ -288,4 +381,4 @@ public class ReportModels {
             this.location = location;
         }
     }
-}
+                    }
