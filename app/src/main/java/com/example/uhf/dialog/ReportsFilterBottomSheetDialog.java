@@ -8,7 +8,7 @@ import android.widget.Button;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 import com.google.android.material.textfield.TextInputEditText;
 import com.example.uhf.R;
-import com.example.uhf.models.ReportModels;
+import com.example.uhf.model.ReportModels;
 
 public class ReportsFilterBottomSheetDialog extends BottomSheetDialogFragment {
 
