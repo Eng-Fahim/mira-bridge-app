@@ -55,7 +55,6 @@
                         android:textSize="10sp" />
                 </LinearLayout>
 
-                <!-- زر عرض الطلبات المعلقة -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnViewPending"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -69,7 +68,6 @@
                     app:icon="@android:drawable/ic_menu_upload"
                     app:iconTint="#D97706" />
 
-                <!-- حقل EPC -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilEpc"
                     android:layout_width="match_parent"
@@ -90,7 +88,6 @@
                         android:maxLines="1" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- زر المسح الفعلي الـ RFID -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnScanRfid"
                     android:layout_width="match_parent"
@@ -152,7 +149,6 @@
                 android:text="@string/necklace" />
         </com.google.android.material.chip.ChipGroup>
 
-        <!-- العنوان والتسمية -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -167,7 +163,6 @@
                 android:maxLines="2" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- الاقتراحات السريعة -->
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -182,7 +177,6 @@
                 app:chipSpacingHorizontal="4dp" />
         </HorizontalScrollView>
 
-        <!-- مواصفات المعدن -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -193,7 +187,6 @@
             android:layout_marginTop="20dp"
             android:layout_marginBottom="8dp"/>
 
-        <!-- العيار -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -240,7 +233,6 @@
                 android:text="14K" />
         </com.google.android.material.chip.ChipGroup>
 
-        <!-- الوزن والقيمة -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -302,7 +294,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- تفاصيل الأحجار -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -313,9 +304,14 @@
             android:layout_marginTop="20dp"
             android:layout_marginBottom="8dp"/>
 
+        <!-- ✅ حاوية الأحجار - قابلة للنقر بالكامل -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/layoutStonesContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
             app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="10dp"
             app:cardElevation="1dp">
@@ -327,13 +323,28 @@
                 android:gravity="center_vertical"
                 android:padding="12dp">
 
-                <TextView
+                <LinearLayout
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:text="@string/has_stones"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="13sp" />
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/has_stones"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="اضغط للتفعيل أو الإلغاء"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="9sp"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/tvSummaryPrice"
@@ -347,7 +358,9 @@
                 <com.google.android.material.switchmaterial.SwitchMaterial
                     android:id="@+id/switchHasStones"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content"
+                    android:clickable="false"
+                    android:focusable="false" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -423,7 +436,6 @@
             </com.google.android.material.textfield.TextInputLayout>
         </LinearLayout>
 
-        <!-- الصور والاعتماد النهائي -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -456,7 +468,6 @@
             android:layout_gravity="center"
             android:layout_marginTop="4dp" />
 
-        <!-- معاينة الصور -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvPhotosPreview"
             android:layout_width="match_parent"
@@ -480,7 +491,6 @@
             app:icon="@android:drawable/ic_menu_save"
             app:iconTint="?attr/colorOnPrimary" />
 
-        <!-- عدّاد المزامنة المعلقة -->
         <TextView
             android:id="@+id/tvPendingSyncCount"
             android:layout_width="match_parent"
