@@ -1405,6 +1405,7 @@ private void searchItemForRefund(String code) {
             payload.put("epc", code);
             payload.put("serial_no", code);
             payload.put("context", "refund_check");
+            payload.put("branch_id", getActiveBranchId()); // ✅ أضف الفرع
             
             MiraApiClient.ApiResponse response = apiClient.postWithAuth("/pos/search-item", payload);
             
@@ -1416,15 +1417,18 @@ private void searchItemForRefund(String code) {
                     if (item != null) {
                         String title = item.optString("title", "");
                         String status = item.optString("status", "");
-                        boolean isSellable = item.optBoolean("is_sellable", false);
                         
-                        // ✅ يمكن الإرجاع إذا كانت sold أو exited
-                        isRefundable = "sold".equals(status) || "exited".equals(status);
+                        // ✅ استخدام is_refundable من السيرفر
+                        isRefundable = item.optBoolean("is_refundable", 
+                            "sold".equals(status) || "exited".equals(status));
                         
                         showRefundItemInfo(title, status, isRefundable);
                     }
                 } else {
                     hideRefundItemInfo();
+                    // ✅ عرض رسالة الخطأ
+                    String msg = response != null ? response.message : "Unknown error";
+                    Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
                 }
             });
         } catch (Exception e) {
