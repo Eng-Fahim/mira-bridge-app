@@ -1,63 +1,98 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView 
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
-    app:cardCornerRadius="12dp"
-    app:cardElevation="2dp"
-    app:cardBackgroundColor="?attr/colorSurface"
+    android:layout_margin="4dp"
     android:clickable="true"
     android:focusable="true"
-    android:foreground="?attr/selectableItemBackground">
+    android:foreground="?attr/selectableItemBackground"
+    app:cardBackgroundColor="#FFFFFF"
+    app:cardCornerRadius="14dp"
+    app:cardElevation="2dp"
+    app:strokeColor="#E6C687"
+    app:strokeWidth="1dp">
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="14dp"
-        android:gravity="center_vertical">
+        android:padding="12dp">
 
+        <!-- الشريط الذهبي الجانبي -->
+        <View
+            android:id="@+id/accentBar"
+            android:layout_width="4dp"
+            android:layout_height="0dp"
+            android:background="#D4AF37"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- حاوية الأيقونة المتجهية -->
+        <FrameLayout
+            android:id="@+id/iconContainer"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_icon_gold_circle"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/accentBar"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ImageView
+                android:id="@+id/ivReportIcon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:contentDescription="Icon"
+                app:tint="#8C6D23" />
+        </FrameLayout>
+
+        <!-- العنوان الرئيسي (مع منع انكسار الحروف) -->
         <TextView
-            android:id="@+id/tvReportIcon"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:gravity="center"
-            android:text="📊"
-            android:textSize="24sp"
-            android:background="?attr/colorSurfaceVariant"
-            android:layout_marginEnd="12dp" />
-
-        <LinearLayout
+            android:id="@+id/tvReportTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:layout_marginEnd="6dp"
+            android:layout_marginStart="6dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:text="عنوان التقرير"
+            android:textColor="#1E232A"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toStartOf="@id/iconContainer"
+            app:layout_constraintStart_toEndOf="@id/ivArrow"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <TextView
-                android:id="@+id/tvReportTitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="عنوان التقرير"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvReportSubtitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="وصف التقرير"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="12sp"
-                android:layout_marginTop="2dp" />
-        </LinearLayout>
-
+        <!-- الوصف الفرعي -->
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/tvReportSubtitle"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="→"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="22sp" />
-    </LinearLayout>
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:text="وصف التقرير"
+            android:textColor="#7A869A"
+            android:textSize="11sp"
+            app:layout_constraintEnd_toEndOf="@id/tvReportTitle"
+            app:layout_constraintStart_toStartOf="@id/tvReportTitle"
+            app:layout_constraintTop_toBottomOf="@id/tvReportTitle" />
+
+        <!-- سهم الانتقال -->
+        <ImageView
+            android:id="@+id/ivArrow"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:src="@drawable/ic_arrow_left"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:tint="#C5A059" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>
