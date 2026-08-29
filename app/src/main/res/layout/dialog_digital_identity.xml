@@ -12,6 +12,18 @@
         android:orientation="vertical"
         android:padding="20dp">
 
+        <!-- ✅ صورة القطعة -->
+        <ImageView
+            android:id="@+id/imgIdentityPhoto"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:layout_gravity="center"
+            android:scaleType="centerCrop"
+            android:src="@drawable/placeholder_image"
+            android:visibility="gone"
+            android:contentDescription="صورة القطعة"
+            android:layout_marginBottom="16dp" />
+
         <!-- هيدر البطاقة الرقمية -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
@@ -57,7 +69,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- تفاصيل الأكواد والـ QR -->
+        <!-- تفاصيل الأكواد -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -125,14 +137,15 @@
                 <TextView android:id="@+id/tvIdWeight" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="4.520 جرام" android:textStyle="bold" android:textColor="?attr/colorOnSurface"/>
             </LinearLayout>
 
-            <!-- ✅ العنصر الجديد: السعر -->
+            <!-- ✅ السعر -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingVertical="4dp"
-                android:background="?attr/colorSurfaceVariant">
+                android:paddingVertical="8dp"
+                android:background="?attr/colorSurfaceVariant"
+                android:paddingHorizontal="8dp">
                 <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="السعر التقديري:" android:textColor="?attr/colorOnSurfaceVariant"/>
-                <TextView android:id="@+id/tvIdPrice" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0.00" android:textStyle="bold" android:textColor="?attr/colorPrimary" android:textSize="16sp"/>
+                <TextView android:id="@+id/tvIdPrice" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0.00" android:textStyle="bold" android:textColor="?attr/colorPrimary" android:textSize="18sp"/>
             </LinearLayout>
 
             <LinearLayout
