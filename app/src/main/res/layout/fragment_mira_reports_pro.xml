@@ -6,141 +6,125 @@
     android:layout_height="match_parent"
     android:background="@color/bg_main">
 
-    <!-- الهيدر -->
+    <!-- الهيدر المطور بتصميم زجاجي متدرج -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@drawable/bg_gradient_dark"
-        app:elevation="0dp">
+        app:elevation="4dp">
 
-        <!-- الجزء العلوي -->
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingStart="20dp"
             android:paddingEnd="20dp"
-            android:paddingTop="24dp"
-            android:paddingBottom="16dp">
+            android:paddingTop="20dp"
+            android:paddingBottom="12dp">
 
-            <!-- شعار -->
-            <TextView
-                android:id="@+id/tvLogo"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="@drawable/bg_accent_gradient"
-                android:gravity="center"
-                android:text="💎"
-                android:textSize="24sp"
+            <!-- شعار الهوية/الأيقونة الرئيسية -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cvLogo"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="#33D4AF65"
+                app:cardBackgroundColor="#1A2A38"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
+                app:layout_constraintTop_toTopOf="parent">
 
-            <!-- العنوان -->
-            <TextView
-                android:id="@+id/tvReportsTitle"
-                android:layout_width="wrap_content"
+                <ImageView
+                    android:id="@+id/ivLogo"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:src="@android:drawable/ic_menu_compass"
+                    app:tint="@color/accent_light" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- العنوان الفرعي والرئيسي -->
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
-                android:text="التقارير"
-                android:textColor="@color/text_light"
-                android:textSize="22sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.5"
-                app:layout_constraintStart_toEndOf="@id/tvLogo"
-                app:layout_constraintTop_toTopOf="@id/tvLogo" />
+                android:orientation="vertical"
+                app:layout_constraintBottom_toBottomOf="@id/cvLogo"
+                app:layout_constraintEnd_toStartOf="@id/btnFilterReports"
+                app:layout_constraintStart_toEndOf="@id/cvLogo"
+                app:layout_constraintTop_toTopOf="@id/cvLogo">
 
-            <!-- معلومات الفرع -->
-            <TextView
-                android:id="@+id/tvBranchInfo"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_marginTop="2dp"
-                android:text="الفرع الرئيسي"
-                android:textColor="@color/accent_light"
-                android:textSize="12sp"
-                app:layout_constraintStart_toEndOf="@id/tvLogo"
-                app:layout_constraintTop_toBottomOf="@id/tvReportsTitle" />
+                <TextView
+                    android:id="@+id/tvReportsTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="مركز التقارير والتحليلات"
+                    android:textColor="@color/text_light"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
 
-            <!-- زر البحث -->
+                <TextView
+                    android:id="@+id/tvBranchInfo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="الفرع الرئيسي • تحديث مباشر"
+                    android:textColor="#B0BEC5"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- أزرار الإجراءات العلوي -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSearchReports"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:backgroundTint="#22FFFFFF"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:text="🔍"
-                android:textSize="18sp"
-                app:cornerRadius="22dp"
+                style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                app:icon="@android:drawable/ic_menu_search"
+                app:iconTint="@color/text_light"
+                app:backgroundTint="#26FFFFFF"
+                app:cornerRadius="12dp"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="@id/tvLogo" />
+                app:layout_constraintTop_toTopOf="@id/cvLogo" />
 
-            <!-- زر الفلترة -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnFilterReports"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:layout_marginEnd="8dp"
-                android:backgroundTint="#22FFFFFF"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:text="⚙️"
-                android:textSize="18sp"
-                app:cornerRadius="22dp"
+                app:icon="@android:drawable/ic_menu_preferences"
+                app:iconTint="@color/text_light"
+                app:backgroundTint="#26FFFFFF"
+                app:cornerRadius="12dp"
                 app:layout_constraintEnd_toStartOf="@id/btnSearchReports"
-                app:layout_constraintTop_toTopOf="@id/tvLogo" />
+                app:layout_constraintTop_toTopOf="@id/cvLogo" />
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
-        <!-- تبويبات -->
+        <!-- تبويبات متطورة -->
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/tabReportCategories"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="42dp"
             android:background="@android:color/transparent"
             app:tabIndicatorColor="@color/accent"
             app:tabIndicatorHeight="3dp"
             app:tabSelectedTextColor="@color/accent_light"
             app:tabTextColor="#80FFFFFF"
             app:tabMode="scrollable"
-            app:tabRippleColor="#22FFFFFF"
+            app:tabRippleColor="#22C9A961"
             app:tabTextAppearance="@style/TabTextStyle">
 
-            <com.google.android.material.tabs.TabItem
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="الكل" />
-
-            <com.google.android.material.tabs.TabItem
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="المبيعات" />
-
-            <com.google.android.material.tabs.TabItem
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="المخزون" />
-
-            <com.google.android.material.tabs.TabItem
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="الأمان" />
-
-            <com.google.android.material.tabs.TabItem
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="المالية" />
-
-            <com.google.android.material.tabs.TabItem
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="التحليلات" />
-
+            <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الكل" />
+            <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="المبيعات" />
+            <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="المخزون والذهب" />
+            <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الأمان والجودة" />
+            <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="المالية" />
+            <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="التحليلات" />
         </com.google.android.material.tabs.TabLayout>
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- المحتوى -->
+    <!-- قائمة التقارير -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefreshReports"
         android:layout_width="match_parent"
@@ -152,27 +136,27 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
+            android:paddingHorizontal="10dp"
             android:paddingTop="12dp"
-            android:paddingBottom="88dp"
-            android:scrollbars="none" />
+            android:paddingBottom="90dp" />
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-    <!-- زر التصدير العائم -->
+    <!-- زر التصدير العائم التفاعلي -->
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:id="@+id/fabQuickExport"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="20dp"
-        android:text="📄 تصدير"
-        android:textColor="@color/text_light"
-        android:textSize="14sp"
+        android:text="تصدير شامل"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
         android:textStyle="bold"
+        app:icon="@android:drawable/ic_menu_share"
+        app:iconTint="#FFFFFF"
         app:backgroundTint="@color/accent_dark"
-        app:cornerRadius="24dp"
-        app:elevation="8dp" />
+        app:cornerRadius="20dp"
+        app:elevation="6dp" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
