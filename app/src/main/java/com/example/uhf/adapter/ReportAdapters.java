@@ -44,7 +44,7 @@ public class ReportAdapters {
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_report_sales, parent, false);  // ✅ الملف القديم
+                .inflate(R.layout.item_report_sales, parent, false);
             return new VH(view);
         }
         
@@ -111,7 +111,7 @@ public class ReportAdapters {
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_report_inventory, parent, false);  // ✅ الملف القديم
+                .inflate(R.layout.item_report_inventory, parent, false);
             return new VH(view);
         }
         
@@ -178,7 +178,7 @@ public class ReportAdapters {
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_report_gates, parent, false);  // ✅ الملف القديم
+                .inflate(R.layout.item_report_gates, parent, false);
             return new VH(view);
         }
         
@@ -235,7 +235,7 @@ public class ReportAdapters {
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_report_users, parent, false);  // ✅ الملف القديم
+                .inflate(R.layout.item_report_users, parent, false);
             return new VH(view);
         }
         
@@ -279,7 +279,7 @@ public class ReportAdapters {
         }
     }
     
-    // ==================== محول المالية - يستخدم الملف القديم ====================
+    // ==================== محول المالية ====================
     public static class FinancialAdapter extends RecyclerView.Adapter<FinancialAdapter.VH> {
         private final List<JSONObject> items;
         private final boolean isArabic;
@@ -301,7 +301,7 @@ public class ReportAdapters {
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_report_financial, parent, false);  // ✅ الملف القديم
+                .inflate(R.layout.item_report_financial, parent, false);
             return new VH(view);
         }
         
@@ -314,7 +314,6 @@ public class ReportAdapters {
             double amount = item.optDouble("amount", 
                 item.optDouble("total", item.optDouble("credit", 0)));
             
-            // ✅ استخدام المعرفات الموجودة في الملف القديم
             h.tvDescription.setText(description);
             h.tvAmount.setText(String.format(Locale.US, "%,.2f %s", amount, currency));
             h.tvAmount.setTextColor(Color.parseColor("#1a237e"));
@@ -326,7 +325,7 @@ public class ReportAdapters {
         }
         
         class VH extends RecyclerView.ViewHolder {
-            TextView tvDescription, tvAmount;  // ✅ المعرفات الصحيحة
+            TextView tvDescription, tvAmount;
             
             VH(View v) {
                 super(v);
@@ -356,7 +355,7 @@ public class ReportAdapters {
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_report_movement, parent, false);  // ✅ الملف القديم
+                .inflate(R.layout.item_report_movement, parent, false);
             return new VH(view);
         }
         
@@ -404,11 +403,7 @@ public class ReportAdapters {
         }
     }
     
-    private static int getStatusLabel(String status, boolean isArabic) {
-        return 0; // Placeholder
-    }
-    
-    private static String getStatusLabelString(String status, boolean isArabic) {
+    private static String getStatusLabel(String status, boolean isArabic) {
         switch (status.toLowerCase()) {
             case "in_stock":
             case "available":
