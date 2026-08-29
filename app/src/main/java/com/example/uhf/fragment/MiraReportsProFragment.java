@@ -17,10 +17,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
-import androidx.lifecycle.Observer;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
@@ -30,8 +30,11 @@ import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.models.ReportModels;
+import com.example.uhf.print.ReportPrintManager;
 import com.example.uhf.repository.ReportRepository;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
+import com.google.android.material.tabs.TabLayout;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -45,18 +48,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * ✅ النسخة المحسنة من Fragment التقارير
- */
 public class MiraReportsProFragment extends Fragment {
     private static final String TAG = "MiraReportsPro";
     
-    // المكونات الأساسية
     private RecyclerView rvReports;
     private ReportsAdapter adapter;
     private final List<ReportModels.ReportItem> reportList = new ArrayList<>();
+    private final List<ReportModels.ReportItem> filteredReportList = new ArrayList<>();
     
-    // المديرين
     private MiraOrgProfileManager orgProfile;
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
@@ -64,12 +63,10 @@ public class MiraReportsProFragment extends Fragment {
     private MiraPriceManager priceManager;
     private ReportRepository reportRepository;
     
-    // الحالة
     private boolean isArabic;
     private int currentBranchId = 1;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
-    // البيانات المحملة
     private JSONObject lastLoadedData = null;
     private String lastLoadedType = "";
     private String lastFromDate = "";
@@ -81,16 +78,20 @@ public class MiraReportsProFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_mira_reports_pro, container, false);
         
-        // تهيئة المديرين
         initializeManagers();
-        
-        // تهيئة الواجهة
         initializeViews(view);
-        
-        // بناء قائمة التقارير
+        initializeEnhancedViews(view);
         buildReportsList();
         
         return view;
+    }
+    
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (branchesManager != null) {
+            currentBranchId = branchesManager.getActiveBranchId();
+        }
     }
     
     private void initializeManagers() {
@@ -112,51 +113,110 @@ public class MiraReportsProFragment extends Fragment {
         rvReports = view.findViewById(R.id.rvReportsList);
         rvReports.setLayoutManager(new GridLayoutManager(getContext(), 2));
         
-        adapter = new ReportsAdapter(reportList, this::openReportDialog);
+        adapter = new ReportsAdapter(filteredReportList, this::openReportDialog);
         rvReports.setAdapter(adapter);
+    }
+    
+    private void initializeEnhancedViews(View view) {
+        SwipeRefreshLayout swipeRefresh = view.findViewById(R.id.swipeRefreshReports);
+        if (swipeRefresh != null) {
+            swipeRefresh.setOnRefreshListener(() -> {
+                buildReportsList();
+                swipeRefresh.setRefreshing(false);
+            });
+        }
+        
+        TabLayout tabCategories = view.findViewById(R.id.tabReportCategories);
+        if (tabCategories != null) {
+            tabCategories.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+                @Override
+                public void onTabSelected(TabLayout.Tab tab) {
+                    filterReportsByCategory(tab.getPosition());
+                }
+                
+                @Override
+                public void onTabUnselected(TabLayout.Tab tab) {}
+                
+                @Override
+                public void onTabReselected(TabLayout.Tab tab) {}
+            });
+        }
+        
+        MaterialButton btnSearch = view.findViewById(R.id.btnSearchReports);
+        if (btnSearch != null) {
+            btnSearch.setOnClickListener(v -> showSearchDialog());
+        }
+        
+        ExtendedFloatingActionButton fabExport = view.findViewById(R.id.fabQuickExport);
+        if (fabExport != null) {
+            fabExport.setOnClickListener(v -> showQuickExportDialog());
+        }
+        
+        TextView tvBranchInfo = view.findViewById(R.id.tvBranchInfo);
+        if (tvBranchInfo != null && branchesManager != null) {
+            tvBranchInfo.setText(branchesManager.getActiveBranchName());
+        }
     }
     
     private void buildReportsList() {
         reportList.clear();
         
         if (isArabic) {
-            // التقارير الأساسية
-            reportList.add(new ReportModels.ReportItem("📊", "لوحة القيادة", "ملخص شامل للعمليات", "dashboard"));
-            reportList.add(new ReportModels.ReportItem("💰", "المبيعات التفصيلي", "فواتير + عملاء + طرق دفع", "sales"));
-            reportList.add(new ReportModels.ReportItem("📦", "المخزون التفصيلي", "كل قطعة مع تفاصيلها", "inventory"));
-            reportList.add(new ReportModels.ReportItem("🔄", "التحويلات", "سجل حركة القطع", "movement"));
-            reportList.add(new ReportModels.ReportItem("🏢", "أداء الفروع", "مقارنة شاملة", "branches"));
-            reportList.add(new ReportModels.ReportItem("🚪", "البوابات الأمنية", "سجل المرور", "gates"));
-            reportList.add(new ReportModels.ReportItem("📋", "الجرد والتدقيق", "الدقة والفروقات", "audit"));
-            reportList.add(new ReportModels.ReportItem("💎", "النواقص والطلب", "الأكثر مبيعاً", "reorder"));
-            reportList.add(new ReportModels.ReportItem("👥", "المستخدمين", "الموظفين", "users"));
-            reportList.add(new ReportModels.ReportItem("💵", "الحركة المالية", "القيود المحاسبية", "financial"));
+            reportList.add(new ReportModels.ReportItem("📊", "لوحة القيادة", "ملخص شامل للعمليات", "dashboard", ReportModels.ReportCategory.GENERAL, false, 0));
+            reportList.add(new ReportModels.ReportItem("💰", "المبيعات التفصيلي", "فواتير + عملاء + طرق دفع", "sales", ReportModels.ReportCategory.SALES, false, 0));
+            reportList.add(new ReportModels.ReportItem("📦", "المخزون التفصيلي", "كل قطعة مع تفاصيلها", "inventory", ReportModels.ReportCategory.INVENTORY, false, 0));
+            reportList.add(new ReportModels.ReportItem("🔄", "التحويلات", "سجل حركة القطع", "movement", ReportModels.ReportCategory.MOVEMENT, false, 0));
+            reportList.add(new ReportModels.ReportItem("🏢", "أداء الفروع", "مقارنة شاملة", "branches", ReportModels.ReportCategory.GENERAL, false, 0));
+            reportList.add(new ReportModels.ReportItem("🚪", "البوابات الأمنية", "سجل المرور", "gates", ReportModels.ReportCategory.SECURITY, false, 0));
+            reportList.add(new ReportModels.ReportItem("📋", "الجرد والتدقيق", "الدقة والفروقات", "audit", ReportModels.ReportCategory.INVENTORY, false, 0));
+            reportList.add(new ReportModels.ReportItem("💎", "النواقص والطلب", "الأكثر مبيعاً", "reorder", ReportModels.ReportCategory.INVENTORY, false, 0));
+            reportList.add(new ReportModels.ReportItem("👥", "المستخدمين", "الموظفين", "users", ReportModels.ReportCategory.GENERAL, false, 0));
+            reportList.add(new ReportModels.ReportItem("💵", "الحركة المالية", "القيود المحاسبية", "financial", ReportModels.ReportCategory.FINANCIAL, false, 0));
             
-            // التقارير المتقدمة
-            reportList.add(new ReportModels.ReportItem("⏱️", "تايم لاين المستخدم", "سجل نشاطات الموظف", "user_timeline"));
-            reportList.add(new ReportModels.ReportItem("💠", "بصمة القطعة", "سجل حياة القطعة الكامل", "item_passport"));
-            reportList.add(new ReportModels.ReportItem("🛡️", "مؤشر أمن البوابات", "تحليل المرور والإنذارات", "gate_security_index"));
-            reportList.add(new ReportModels.ReportItem("📅", "أعمار المخزون", "تحليل الركود والتقادم", "inventory_aging"));
-            reportList.add(new ReportModels.ReportItem("⚠️", "تفاصيل الفروقات", "فروقات الجرد التفصيلية", "audit_discrepancy_detail"));
+            reportList.add(new ReportModels.ReportItem("⏱️", "تايم لاين المستخدم", "سجل نشاطات الموظف", "user_timeline", ReportModels.ReportCategory.ANALYTICS, true, 0));
+            reportList.add(new ReportModels.ReportItem("💠", "بصمة القطعة", "سجل حياة القطعة الكامل", "item_passport", ReportModels.ReportCategory.ANALYTICS, true, 0));
+            reportList.add(new ReportModels.ReportItem("🛡️", "مؤشر أمن البوابات", "تحليل المرور والإنذارات", "gate_security_index", ReportModels.ReportCategory.SECURITY, true, 0));
+            reportList.add(new ReportModels.ReportItem("📅", "أعمار المخزون", "تحليل الركود والتقادم", "inventory_aging", ReportModels.ReportCategory.ANALYTICS, true, 0));
+            reportList.add(new ReportModels.ReportItem("⚠️", "تفاصيل الفروقات", "فروقات الجرد التفصيلية", "audit_discrepancy_detail", ReportModels.ReportCategory.ANALYTICS, true, 0));
         } else {
-            // English reports
-            reportList.add(new ReportModels.ReportItem("📊", "Dashboard", "Summary", "dashboard"));
-            reportList.add(new ReportModels.ReportItem("💰", "Sales", "Invoices + customers", "sales"));
-            reportList.add(new ReportModels.ReportItem("📦", "Inventory", "All items", "inventory"));
-            reportList.add(new ReportModels.ReportItem("🔄", "Transfers", "Movement", "movement"));
-            reportList.add(new ReportModels.ReportItem("🏢", "Branches", "Comparison", "branches"));
-            reportList.add(new ReportModels.ReportItem("🚪", "Gates", "Log", "gates"));
-            reportList.add(new ReportModels.ReportItem("📋", "Audit", "Accuracy", "audit"));
-            reportList.add(new ReportModels.ReportItem("💎", "Reorder", "Best sellers", "reorder"));
-            reportList.add(new ReportModels.ReportItem("👥", "Users", "Staff", "users"));
-            reportList.add(new ReportModels.ReportItem("💵", "Financial", "Journal", "financial"));
+            reportList.add(new ReportModels.ReportItem("📊", "Dashboard", "Summary", "dashboard", ReportModels.ReportCategory.GENERAL, false, 0));
+            reportList.add(new ReportModels.ReportItem("💰", "Sales", "Invoices + customers", "sales", ReportModels.ReportCategory.SALES, false, 0));
+            reportList.add(new ReportModels.ReportItem("📦", "Inventory", "All items", "inventory", ReportModels.ReportCategory.INVENTORY, false, 0));
+            reportList.add(new ReportModels.ReportItem("🔄", "Transfers", "Movement", "movement", ReportModels.ReportCategory.MOVEMENT, false, 0));
+            reportList.add(new ReportModels.ReportItem("🏢", "Branches", "Comparison", "branches", ReportModels.ReportCategory.GENERAL, false, 0));
+            reportList.add(new ReportModels.ReportItem("🚪", "Gates", "Log", "gates", ReportModels.ReportCategory.SECURITY, false, 0));
+            reportList.add(new ReportModels.ReportItem("📋", "Audit", "Accuracy", "audit", ReportModels.ReportCategory.INVENTORY, false, 0));
+            reportList.add(new ReportModels.ReportItem("💎", "Reorder", "Best sellers", "reorder", ReportModels.ReportCategory.INVENTORY, false, 0));
+            reportList.add(new ReportModels.ReportItem("👥", "Users", "Staff", "users", ReportModels.ReportCategory.GENERAL, false, 0));
+            reportList.add(new ReportModels.ReportItem("💵", "Financial", "Journal", "financial", ReportModels.ReportCategory.FINANCIAL, false, 0));
             
-            // Advanced
-            reportList.add(new ReportModels.ReportItem("⏱️", "User Timeline", "Staff activity log", "user_timeline"));
-            reportList.add(new ReportModels.ReportItem("💠", "Item Passport", "Complete item lifecycle", "item_passport"));
-            reportList.add(new ReportModels.ReportItem("🛡️", "Gate Security Index", "Traffic & alerts analysis", "gate_security_index"));
-            reportList.add(new ReportModels.ReportItem("📅", "Inventory Aging", "Stagnation analysis", "inventory_aging"));
-            reportList.add(new ReportModels.ReportItem("⚠️", "Discrepancy Detail", "Detailed audit discrepancies", "audit_discrepancy_detail"));
+            reportList.add(new ReportModels.ReportItem("⏱️", "User Timeline", "Staff activity log", "user_timeline", ReportModels.ReportCategory.ANALYTICS, true, 0));
+            reportList.add(new ReportModels.ReportItem("💠", "Item Passport", "Complete item lifecycle", "item_passport", ReportModels.ReportCategory.ANALYTICS, true, 0));
+            reportList.add(new ReportModels.ReportItem("🛡️", "Gate Security Index", "Traffic & alerts analysis", "gate_security_index", ReportModels.ReportCategory.SECURITY, true, 0));
+            reportList.add(new ReportModels.ReportItem("📅", "Inventory Aging", "Stagnation analysis", "inventory_aging", ReportModels.ReportCategory.ANALYTICS, true, 0));
+            reportList.add(new ReportModels.ReportItem("⚠️", "Discrepancy Detail", "Detailed audit discrepancies", "audit_discrepancy_detail", ReportModels.ReportCategory.ANALYTICS, true, 0));
+        }
+        
+        filteredReportList.clear();
+        filteredReportList.addAll(reportList);
+        
+        if (adapter != null) {
+            adapter.notifyDataSetChanged();
+        }
+    }
+    
+    private void filterReportsByCategory(int categoryPosition) {
+        filteredReportList.clear();
+        
+        if (categoryPosition == 0) {
+            filteredReportList.addAll(reportList);
+        } else {
+            ReportModels.ReportCategory targetCategory = ReportModels.ReportCategory.values()[categoryPosition - 1];
+            for (ReportModels.ReportItem item : reportList) {
+                if (item.category == targetCategory) {
+                    filteredReportList.add(item);
+                }
+            }
         }
         
         if (adapter != null) {
@@ -164,13 +224,110 @@ public class MiraReportsProFragment extends Fragment {
         }
     }
     
-    /**
-     * ✅ فتح حوار التقرير
-     */
+    private void showSearchDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle(isArabic ? "🔍 بحث في التقارير" : "🔍 Search Reports");
+        
+        View searchView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.dialog_search_reports, null);
+        EditText etSearch = searchView.findViewById(R.id.etSearchReports);
+        
+        builder.setView(searchView);
+        builder.setPositiveButton(isArabic ? "بحث" : "Search", (dialog, which) -> {
+            String query = etSearch.getText().toString().trim();
+            if (!query.isEmpty()) {
+                searchReports(query);
+            }
+        });
+        builder.setNegativeButton(isArabic ? "إلغاء" : "Cancel", null);
+        builder.show();
+    }
+    
+    private void searchReports(String query) {
+        filteredReportList.clear();
+        String lowerQuery = query.toLowerCase();
+        
+        for (ReportModels.ReportItem item : reportList) {
+            if (item.title.toLowerCase().contains(lowerQuery) ||
+                item.subtitle.toLowerCase().contains(lowerQuery) ||
+                item.type.toLowerCase().contains(lowerQuery)) {
+                filteredReportList.add(item);
+            }
+        }
+        
+        if (adapter != null) {
+            adapter.notifyDataSetChanged();
+        }
+        
+        Toast.makeText(getContext(), 
+            isArabic ? "✅ تم العثور على " + filteredReportList.size() + " تقرير" : 
+            "✅ Found " + filteredReportList.size() + " reports", 
+            Toast.LENGTH_SHORT).show();
+    }
+    
+    private void showQuickExportDialog() {
+        if (lastLoadedData == null) {
+            Toast.makeText(getContext(), 
+                isArabic ? "⚠️ لا توجد بيانات للتصدير" : "⚠️ No data to export", 
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        String[] options = {
+            isArabic ? "📄 تصدير CSV" : "📄 Export CSV",
+            isArabic ? "📑 تصدير PDF" : "📑 Export PDF",
+            isArabic ? "🖨️ طباعة" : "🖨️ Print"
+        };
+        
+        new AlertDialog.Builder(requireContext())
+            .setTitle(isArabic ? "تصدير سريع" : "Quick Export")
+            .setItems(options, (dialog, which) -> {
+                switch (which) {
+                    case 0: exportToCSV(); break;
+                    case 1: exportToPDF(); break;
+                    case 2: printLastReport(); break;
+                }
+            })
+            .show();
+    }
+    
+    private void exportToCSV() {
+        if (lastLoadedData == null) return;
+        
+        File file = ReportExporter.exportToCSV(requireContext(), lastLoadedData, 
+            lastLoadedType, lastFromDate, lastToDate, isArabic);
+        
+        if (file != null) {
+            ReportExporter.shareFile(requireContext(), file, "text/csv");
+        }
+    }
+    
+    private void exportToPDF() {
+        if (lastLoadedData == null) return;
+        
+        File file = ReportExporter.exportToPDF(requireContext(), lastLoadedData, 
+            lastLoadedType, lastFromDate, lastToDate, isArabic);
+        
+        if (file != null) {
+            ReportExporter.shareFile(requireContext(), file, "application/pdf");
+        }
+    }
+    
+    private void printLastReport() {
+        if (lastLoadedData == null) return;
+        
+        String html = ReportPrintManager.generateReportHtml(lastLoadedData, lastLoadedType,
+            orgProfile != null ? orgProfile.getOrgName() : null,
+            branchesManager != null ? branchesManager.getActiveBranchName() : null,
+            lastFromDate, lastToDate, isArabic);
+        
+        ReportPrintManager.printHtmlReport(requireContext(), html, 
+            "MIRA_Report_" + lastLoadedType);
+    }
+    
     private void openReportDialog(ReportModels.ReportItem item) {
         if (getContext() == null || !isAdded()) return;
         
-        // فحص الصلاحيات
         if (permissionManager != null && !permissionManager.canAccessFragment("Reports")) {
             Toast.makeText(getContext(), 
                 isArabic ? "⛔ غير مصرح" : "⛔ Access Denied", 
@@ -178,19 +335,13 @@ public class MiraReportsProFragment extends Fragment {
             return;
         }
         
-        // التقارير المتقدمة
         if (item.isAdvanced) {
             handleAdvancedReport(item);
-            return;
+        } else {
+            showFilteredReportDialog(item);
         }
-        
-        // التقارير العادية
-        showFilteredReportDialog(item);
     }
     
-    /**
-     * ✅ معالجة التقارير المتقدمة
-     */
     private void handleAdvancedReport(ReportModels.ReportItem item) {
         switch (item.type) {
             case "user_timeline":
@@ -211,9 +362,6 @@ public class MiraReportsProFragment extends Fragment {
         }
     }
     
-    /**
-     * ✅ عرض حوار تقرير مع فلاتر
-     */
     private void showFilteredReportDialog(ReportModels.ReportItem item) {
         View dialogView = LayoutInflater.from(requireContext())
             .inflate(R.layout.dialog_mira_report_viewer, null);
@@ -244,7 +392,6 @@ public class MiraReportsProFragment extends Fragment {
             .setView(dialogView)
             .create();
         
-        // أزرار التاريخ
         btnFrom.setOnClickListener(v -> showDatePicker(date -> {
             selectedDates[0] = date;
             btnFrom.setText((isArabic ? "من: " : "From: ") + date);
@@ -255,41 +402,72 @@ public class MiraReportsProFragment extends Fragment {
             btnTo.setText((isArabic ? "إلى: " : "To: ") + date);
         }));
         
-        // الفلتر المتقدم
         if (btnAdvancedFilter != null) {
             btnAdvancedFilter.setOnClickListener(v -> 
-                showAdvancedFilterDialog(item.type, selectedFilters, () -> {
+                showAdvancedFilterDialog(selectedFilters, () -> {
                     loadReportWithFilters(item.type, rvData, layoutLoading, 
                         tvLoadingStatus, selectedDates, selectedFilters);
                 }));
         }
         
-        // تطبيق الفلتر
         btnApply.setOnClickListener(v -> 
             loadReportWithFilters(item.type, rvData, layoutLoading, 
                 tvLoadingStatus, selectedDates, selectedFilters));
         
-        // تصدير CSV
-        btnExport.setOnClickListener(v -> exportReport(item.type, selectedDates));
+        btnExport.setOnClickListener(v -> {
+            File file = ReportExporter.exportToCSV(requireContext(), lastLoadedData, 
+                item.type, selectedDates[0], selectedDates[1], isArabic);
+            if (file != null) {
+                ReportExporter.shareFile(requireContext(), file, "text/csv");
+            }
+        });
         
-        // طباعة
         if (btnPrint != null) {
-            btnPrint.setOnClickListener(v -> printReport(item, rvData, selectedDates, selectedFilters));
+            btnPrint.setOnClickListener(v -> {
+                String html = ReportPrintManager.generateReportHtml(lastLoadedData, item.type,
+                    orgProfile != null ? orgProfile.getOrgName() : null,
+                    branchesManager != null ? branchesManager.getActiveBranchName() : null,
+                    selectedDates[0], selectedDates[1], isArabic);
+                ReportPrintManager.printHtmlReport(requireContext(), html, 
+                    "MIRA_Report_" + item.type);
+            });
         }
         
-        // إغلاق
         btnClose.setOnClickListener(v -> dialog.dismiss());
         
         dialog.show();
         
-        // تحميل البيانات تلقائياً
         loadReportWithFilters(item.type, rvData, layoutLoading, 
             tvLoadingStatus, selectedDates, selectedFilters);
     }
     
-    /**
-     * ✅ تحميل التقرير مع الفلاتر
-     */
+    private void showAdvancedFilterDialog(String[] filters, Runnable onApply) {
+        View filterView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.dialog_advanced_filter, null);
+        
+        EditText etSearch = filterView.findViewById(R.id.etFilterSearch);
+        EditText etFilter1 = filterView.findViewById(R.id.etFilter1);
+        EditText etFilter2 = filterView.findViewById(R.id.etFilter2);
+        
+        etSearch.setText(filters[0]);
+        etFilter1.setText(filters[1]);
+        etFilter2.setText(filters[2]);
+        
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+            .setTitle(isArabic ? "🔍 فلترة متقدمة" : "🔍 Advanced Filter")
+            .setView(filterView)
+            .setPositiveButton(isArabic ? "تطبيق" : "Apply", (d, which) -> {
+                filters[0] = etSearch.getText().toString().trim();
+                filters[1] = etFilter1.getText().toString().trim();
+                filters[2] = etFilter2.getText().toString().trim();
+                onApply.run();
+            })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+            .create();
+        
+        dialog.show();
+    }
+    
     private void loadReportWithFilters(String type, RecyclerView rvData, 
                                        View layoutLoading, TextView tvLoadingStatus,
                                        String[] dates, String[] filters) {
@@ -298,7 +476,6 @@ public class MiraReportsProFragment extends Fragment {
             tvLoadingStatus.setText(isArabic ? "⏳ جاري تحميل البيانات..." : "⏳ Loading data...");
         }
         
-        // بناء الفلاتر
         ReportModels.ReportFilters reportFilters = new ReportModels.ReportFilters();
         reportFilters.fromDate = dates[0];
         reportFilters.toDate = dates[1];
@@ -310,7 +487,6 @@ public class MiraReportsProFragment extends Fragment {
             reportFilters.filter2 = filters[2];
         }
         
-        // جلب البيانات
         reportRepository.fetchReport(type, reportFilters).observe(getViewLifecycleOwner(), 
             result -> {
                 if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
@@ -323,25 +499,16 @@ public class MiraReportsProFragment extends Fragment {
                     return;
                 }
                 
-                // تخزين البيانات
                 lastLoadedData = result.data;
                 lastLoadedType = type;
                 lastFromDate = dates[0];
                 lastToDate = dates[1];
                 
-                // إنشاء المحول
                 RecyclerView.Adapter<?> reportAdapter = createAdapterForType(type, result.data);
                 rvData.setAdapter(reportAdapter);
-                
-                Toast.makeText(getContext(), 
-                    isArabic ? "✅ تم تحميل التقرير" : "✅ Report loaded", 
-                    Toast.LENGTH_SHORT).show();
             });
     }
     
-    /**
-     * ✅ جلب تقرير متقدم
-     */
     private void fetchAdvancedReport(String type, ReportModels.ReportFilters filters) {
         if (filters == null) {
             filters = new ReportModels.ReportFilters();
@@ -357,13 +524,12 @@ public class MiraReportsProFragment extends Fragment {
                     return;
                 }
                 
+                lastLoadedData = result.data;
+                lastLoadedType = type;
                 showAdvancedReportDialog(type, result.data);
             });
     }
     
-    /**
-     * ✅ عرض حوار التقرير المتقدم
-     */
     private void showAdvancedReportDialog(String type, JSONObject data) {
         View dialogView = LayoutInflater.from(requireContext())
             .inflate(R.layout.dialog_mira_report_viewer, null);
@@ -392,7 +558,14 @@ public class MiraReportsProFragment extends Fragment {
         
         if (btnPrint != null) {
             btnPrint.setVisibility(View.VISIBLE);
-            btnPrint.setOnClickListener(v -> printAdvancedReport(type, data, rvData));
+            btnPrint.setOnClickListener(v -> {
+                String html = ReportPrintManager.generateReportHtml(data, type,
+                    orgProfile != null ? orgProfile.getOrgName() : null,
+                    branchesManager != null ? branchesManager.getActiveBranchName() : null,
+                    getDefaultFromDate(), getDefaultToDate(), isArabic);
+                ReportPrintManager.printHtmlReport(requireContext(), html, 
+                    "MIRA_Report_" + type);
+            });
         }
         
         if (btnExport != null) {
@@ -409,42 +582,146 @@ public class MiraReportsProFragment extends Fragment {
         dialog.show();
     }
     
-    /**
-     * ✅ إنشاء محول حسب نوع التقرير
-     */
-    private RecyclerView.Adapter<?> createAdapterForType(String type, JSONObject data) {
-        switch (type) {
-            case "sales":
-                return new GenericAdapter(parseToGeneric(data));
-            case "inventory":
-                return new GenericAdapter(parseToGeneric(data));
-            case "audit":
-                return new GenericAdapter(parseToGeneric(data));
-            case "reorder":
-                return new GenericAdapter(parseToGeneric(data));
-            case "users":
-                return new GenericAdapter(parseToGeneric(data));
-            case "gates":
-                return new GenericAdapter(parseToGeneric(data));
-            case "movement":
-                return new GenericAdapter(parseToGeneric(data));
-            case "branches":
-                return new GenericAdapter(parseToGeneric(data));
-            case "financial":
-                return new GenericAdapter(parseToGeneric(data));
-            default:
-                return new GenericAdapter(parseToGeneric(data));
-        }
+    // ==================== Advanced Report Dialogs ====================
+    
+    private void showUserTimelineDialog(ReportModels.ReportItem item) {
+        reportRepository.fetchUsers().observe(getViewLifecycleOwner(), users -> {
+            if (users == null || users.isEmpty()) {
+                Toast.makeText(getContext(), 
+                    isArabic ? "لا يوجد مستخدمين" : "No users found", 
+                    Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
+            String[] userNames = new String[users.size()];
+            for (int i = 0; i < users.size(); i++) {
+                ReportModels.UserInfo user = users.get(i);
+                userNames[i] = "👤 " + user.name + " (@" + user.username + ")";
+            }
+            
+            new AlertDialog.Builder(requireContext())
+                .setTitle(isArabic ? "👥 اختر المستخدم" : "👥 Select User")
+                .setItems(userNames, (dialog, which) -> {
+                    ReportModels.UserInfo selectedUser = users.get(which);
+                    ReportModels.ReportFilters filters = new ReportModels.ReportFilters();
+                    filters.userId = selectedUser.id;
+                    filters.fromDate = getDefaultFromDate();
+                    filters.toDate = getDefaultToDate();
+                    fetchAdvancedReport("user_timeline", filters);
+                })
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                .show();
+        });
     }
     
-    /**
-     * ✅ تحويل JSON إلى قائمة GenericItem
-     */
+    private void showItemPassportDialog(ReportModels.ReportItem item) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle(isArabic ? "💠 بصمة القطعة" : "💠 Item Passport");
+        
+        View inputView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.dialog_input_serial, null);
+        EditText etSerial = inputView.findViewById(R.id.etSerialNumber);
+        
+        builder.setView(inputView);
+        builder.setPositiveButton(isArabic ? "بحث" : "Search", (dialog, which) -> {
+            String serial = etSerial.getText().toString().trim();
+            if (!serial.isEmpty()) {
+                ReportModels.ReportFilters filters = new ReportModels.ReportFilters();
+                filters.serialNumber = serial;
+                fetchAdvancedReport("item_passport", filters);
+            }
+        });
+        builder.setNegativeButton(isArabic ? "إلغاء" : "Cancel", null);
+        builder.show();
+    }
+    
+    private void showGateSecurityDialog(ReportModels.ReportItem item) {
+        reportRepository.fetchGates(currentBranchId).observe(getViewLifecycleOwner(), gates -> {
+            if (gates == null || gates.isEmpty()) {
+                // إذا لا توجد بوابات، اعرض التقرير مباشرة
+                fetchAdvancedReport("gate_security_index", null);
+                return;
+            }
+            
+            String[] options = new String[gates.size() + 1];
+            options[0] = isArabic ? "🚪 كل البوابات" : "🚪 All Gates";
+            
+            for (int i = 0; i < gates.size(); i++) {
+                ReportModels.GateInfo gate = gates.get(i);
+                options[i + 1] = "🚪 " + gate.name + " (" + gate.gateId + ")";
+            }
+            
+            new AlertDialog.Builder(requireContext())
+                .setTitle(isArabic ? "🛡️ اختر البوابة" : "🛡️ Select Gate")
+                .setItems(options, (dialog, which) -> {
+                    ReportModels.ReportFilters filters = new ReportModels.ReportFilters();
+                    if (which > 0) {
+                        filters.gateId = gates.get(which - 1).id;
+                    }
+                    fetchAdvancedReport("gate_security_index", filters);
+                })
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                .show();
+        });
+    }
+    
+    private void showAuditDiscrepancyDialog(ReportModels.ReportItem item) {
+        View dialogView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.dialog_mira_report_viewer, null);
+        
+        TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
+        MaterialButton btnFrom = dialogView.findViewById(R.id.btnReportDateFrom);
+        MaterialButton btnTo = dialogView.findViewById(R.id.btnReportDateTo);
+        MaterialButton btnApply = dialogView.findViewById(R.id.btnReportApplyFilter);
+        MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
+        
+        final String[] selectedDates = new String[]{getDefaultFromDate(), getDefaultToDate()};
+        
+        tvTitle.setText(item.icon + " " + item.title);
+        btnFrom.setText((isArabic ? "من: " : "From: ") + selectedDates[0]);
+        btnTo.setText((isArabic ? "إلى: " : "To: ") + selectedDates[1]);
+        
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+            .setView(dialogView)
+            .create();
+        
+        btnFrom.setOnClickListener(v -> showDatePicker(date -> {
+            selectedDates[0] = date;
+            btnFrom.setText((isArabic ? "من: " : "From: ") + date);
+        }));
+        
+        btnTo.setOnClickListener(v -> showDatePicker(date -> {
+            selectedDates[1] = date;
+            btnTo.setText((isArabic ? "إلى: " : "To: ") + date);
+        }));
+        
+        btnApply.setOnClickListener(v -> {
+            ReportModels.ReportFilters filters = new ReportModels.ReportFilters();
+            filters.fromDate = selectedDates[0];
+            filters.toDate = selectedDates[1];
+            fetchAdvancedReport("audit_discrepancy_detail", filters);
+            dialog.dismiss();
+        });
+        
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+        
+        dialog.show();
+    }
+    
+    // ==================== Adapters ====================
+    
+    private RecyclerView.Adapter<?> createAdapterForType(String type, JSONObject data) {
+        return new GenericAdapter(parseToGeneric(data));
+    }
+    
+    private RecyclerView.Adapter<?> createAdvancedAdapter(String type, JSONObject data) {
+        return new GenericAdapter(parseToGeneric(data));
+    }
+    
     private List<ReportModels.GenericItem> parseToGeneric(JSONObject data) {
         List<ReportModels.GenericItem> items = new ArrayList<>();
         if (data == null) return items;
         
-        // البحث عن المصفوفة
         JSONArray array = findArray(data);
         
         if (array != null) {
@@ -457,14 +734,12 @@ public class MiraReportsProFragment extends Fragment {
                         String value = obj.optString(key, "");
                         items.add(new ReportModels.GenericItem(key, value));
                     }
-                    // فاصل بين العناصر
                     if (i < array.length() - 1) {
                         items.add(new ReportModels.GenericItem("---", "---"));
                     }
                 }
             }
         } else {
-            // تصدير key-value مباشرة
             Iterator<String> keys = data.keys();
             while (keys.hasNext()) {
                 String key = keys.next();
@@ -478,9 +753,6 @@ public class MiraReportsProFragment extends Fragment {
         return items;
     }
     
-    /**
-     * ✅ البحث عن مصفوفة في البيانات
-     */
     private JSONArray findArray(JSONObject data) {
         String[] keys = {"items", "data", "items_list", "invoices", "sales", 
                         "inventory", "movements", "transfers", "users", "gate_logs",
@@ -502,15 +774,7 @@ public class MiraReportsProFragment extends Fragment {
         return null;
     }
     
-    /**
-     * ✅ إنشاء محول متقدم
-     */
-    private RecyclerView.Adapter<?> createAdvancedAdapter(String type, JSONObject data) {
-        List<ReportModels.GenericItem> items = parseToGeneric(data);
-        return new GenericAdapter(items);
-    }
-    
-    // ==================== دوال مساعدة ====================
+    // ==================== Helpers ====================
     
     private String getReportTitle(String type) {
         if (isArabic) {
@@ -552,7 +816,7 @@ public class MiraReportsProFragment extends Fragment {
             c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show();
     }
     
-    // ==================== Adapter ====================
+    // ==================== Adapter Classes ====================
     
     class ReportsAdapter extends RecyclerView.Adapter<ReportsAdapter.VH> {
         final List<ReportModels.ReportItem> list;
