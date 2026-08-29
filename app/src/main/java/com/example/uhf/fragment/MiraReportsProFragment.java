@@ -31,7 +31,7 @@ import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.PermissionManager;
-import com.example.uhf.models.ReportModels;
+import com.example.uhf.model.ReportModels;
 import com.example.uhf.print.ReportPrintManager;
 import com.example.uhf.repository.ReportRepository;
 import com.google.android.material.button.MaterialButton;
