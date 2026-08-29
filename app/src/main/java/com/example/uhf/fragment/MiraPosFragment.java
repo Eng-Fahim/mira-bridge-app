@@ -104,6 +104,8 @@ public class MiraPosFragment extends MiraBaseFragment {
     private boolean isRFIDModeActive = false;
     private boolean isArabic;
     
+    private Button btnPosRefund;
+    
     private MiraApiClient.ApiResponse lastSaleResponse = null;
 
 
@@ -215,6 +217,10 @@ private void refreshData() {
             if (btnOpenScanner != null) btnOpenScanner.setEnabled(canUsePos);
             if (btnPosRFIDMode != null) btnPosRFIDMode.setEnabled(canUsePos);
             if (etManualEpc != null) etManualEpc.setEnabled(canUsePos);
+            if (btnPosRefund != null) {
+               boolean canRefund = permissionManager.canEdit("pos") || permissionManager.isAdmin() || permissionManager.isManager();
+               btnPosRefund.setVisibility(canRefund ? View.VISIBLE : View.GONE);
+               }
             
             if (!canUsePos && tvCartStatus != null) {
                 tvCartStatus.setText(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
@@ -347,6 +353,7 @@ private void refreshData() {
         btnPosRFIDMode = view.findViewById(R.id.btnPosRFIDMode);
         rvCartItems = view.findViewById(R.id.rvPosCartItems);
         layoutCartEmptyState = view.findViewById(R.id.layoutCartEmptyState);
+        btnPosRefund = view.findViewById(R.id.btnPosRefund);
         
         applyLanguage();
     }
@@ -414,6 +421,9 @@ private void refreshData() {
                     UIHelper.hideKeyboard(getActivity());
                     processCheckoutAndStockUpdate();
                 });
+            }
+            if (btnPosRefund != null) {
+            btnPosRefund.setOnClickListener(v -> showRefundDialog());
             }
             
             if (btnOpenScanner != null) {
@@ -1517,4 +1527,4 @@ private void processRefund(String code, String reason) {
         }
     });
 }
-                              }
+}
