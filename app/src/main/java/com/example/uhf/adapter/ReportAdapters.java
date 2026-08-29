@@ -44,7 +44,7 @@ public class ReportAdapters {
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_report_sales_custom, parent, false);
+                .inflate(R.layout.item_report_sales, parent, false);
             return new VH(view);
         }
         
@@ -116,7 +116,7 @@ public class ReportAdapters {
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_report_inventory_custom, parent, false);
+                .inflate(R.layout.item_report_inventory, parent, false);
             return new VH(view);
         }
         
@@ -186,7 +186,7 @@ public class ReportAdapters {
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_report_gates_custom, parent, false);
+                .inflate(R.layout.item_report_gates, parent, false);
             return new VH(view);
         }
         
@@ -253,7 +253,7 @@ public class ReportAdapters {
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_report_users_custom, parent, false);
+                .inflate(R.layout.item_report_users, parent, false);
             return new VH(view);
         }
         
@@ -319,7 +319,7 @@ public class ReportAdapters {
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_report_financial_custom, parent, false);
+                .inflate(R.layout.item_report_financial, parent, false);
             return new VH(view);
         }
         
@@ -386,7 +386,7 @@ public class ReportAdapters {
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_report_movement_custom, parent, false);
+                .inflate(R.layout.item_report_movement, parent, false);
             return new VH(view);
         }
         
