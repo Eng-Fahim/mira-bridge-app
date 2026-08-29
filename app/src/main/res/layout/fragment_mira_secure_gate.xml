@@ -4,7 +4,7 @@
     android:id="@+id/rootGateLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0F172A">
+    android:background="?android:attr/colorBackground">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -17,9 +17,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            app:cardBackgroundColor="#1E293B"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="12dp"
-            app:strokeColor="#334155"
+            app:strokeColor="?attr/colorOutline"
             app:strokeWidth="1dp">
 
             <RelativeLayout
@@ -39,7 +39,7 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="sans-serif-medium"
                         android:text="🛡️ MIRA SECURITY COMMAND CENTER"
-                        android:textColor="#F8FAFC"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -47,8 +47,8 @@
                         android:id="@+id/tvPingLatency"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="📡 Ping: -- ms | Server: Connecting..."
-                        android:textColor="#94A3B8"
+                        android:text="📡 Ping: -- ms"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
                 </LinearLayout>
 
@@ -61,21 +61,21 @@
                     android:paddingHorizontal="10dp"
                     android:paddingVertical="4dp"
                     android:text="🟢 SYSTEM ARMED"
-                    android:textColor="#4ADE80"
+                    android:textColor="?attr/colorPrimary"
                     android:textSize="11sp"
                     android:textStyle="bold" />
             </RelativeLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 2. شريط البث الحي لآخر عملية عبور (Live Event Ticker) -->
+        <!-- 2. شريط البث الحي لآخر عملية عبور -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardLiveTicker"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="10dp"
-            app:cardBackgroundColor="#0F172A"
+            app:cardBackgroundColor="?attr/colorSurfaceVariant"
             app:cardCornerRadius="8dp"
-            app:strokeColor="#334155"
+            app:strokeColor="?attr/colorOutline"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -89,7 +89,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="LIVE EVENT:"
-                    android:textColor="#38BDF8"
+                    android:textColor="?attr/colorPrimary"
                     android:textSize="10sp"
                     android:textStyle="bold" />
 
@@ -102,12 +102,12 @@
                     android:ellipsize="end"
                     android:singleLine="true"
                     android:text="في انتظار أول حركة مرور..."
-                    android:textColor="#E2E8F0"
+                    android:textColor="?attr/colorOnSurface"
                     android:textSize="12sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 3. بطاقات مؤشرات الأداء الحية (KPI Cards) -->
+        <!-- 3. بطاقات مؤشرات الأداء الحية -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -120,9 +120,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="#1E293B"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="10dp"
-                app:strokeColor="#334155"
+                app:strokeColor="?attr/colorOutline"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -136,7 +136,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="🚪 البوابات"
-                        android:textColor="#94A3B8"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
                     <TextView
@@ -144,7 +144,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        android:textColor="#F8FAFC"
+                        android:textColor="?attr/colorOnSurface"
                         android:textSize="18sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -155,9 +155,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="2dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="#1E293B"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="10dp"
-                app:strokeColor="#15803D"
+                app:strokeColor="?attr/colorPrimary"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -171,7 +171,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="✅ عبور شرعي"
-                        android:textColor="#86EFAC"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
                     <TextView
@@ -179,7 +179,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        android:textColor="#22C55E"
+                        android:textColor="?attr/colorPrimary"
                         android:textSize="18sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -190,9 +190,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
-                app:cardBackgroundColor="#1E293B"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="10dp"
-                app:strokeColor="#B91C1C"
+                app:strokeColor="?attr/colorError"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -206,7 +206,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="🚨 إنذارات"
-                        android:textColor="#FCA5A5"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="11sp" />
 
                     <TextView
@@ -214,7 +214,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        android:textColor="#EF4444"
+                        android:textColor="?attr/colorError"
                         android:textSize="18sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -236,7 +236,7 @@
                 android:layout_weight="1"
                 android:text="🛡️ إيقاف/تفعيل RFID"
                 android:textSize="11sp"
-                app:backgroundTint="#0EA5E9"
+                app:backgroundTint="?attr/colorPrimary"
                 app:cornerRadius="8dp" />
 
             <com.google.android.material.button.MaterialButton
@@ -247,10 +247,10 @@
                 android:layout_marginHorizontal="3dp"
                 android:layout_weight="1"
                 android:text="📷 مسح باركود"
-                android:textColor="#CBD5E1"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="11sp"
                 app:cornerRadius="8dp"
-                app:strokeColor="#475569" />
+                app:strokeColor="?attr/colorOutline" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnEmergencyLockdown"
@@ -260,95 +260,100 @@
                 android:layout_weight="1"
                 android:text="🔒 إغلاق طارئ"
                 android:textSize="11sp"
-                app:backgroundTint="#DC2626"
+                app:backgroundTint="?attr/colorError"
                 app:cornerRadius="8dp" />
         </LinearLayout>
-<!-- ✅ مؤشر المخاطر الأمنية -->
-<com.google.android.material.card.MaterialCardView
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
-    app:cardBackgroundColor="#1E293B"
-    app:cardCornerRadius="10dp"
-    app:strokeColor="#334155"
-    app:strokeWidth="1dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="10dp">
-
-        <TextView
+        <!-- مؤشر المخاطر الأمنية -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="📊 مؤشر المخاطر الأمنية"
-            android:textColor="#94A3B8"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="6dp" />
+            android:layout_marginBottom="8dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="10dp"
+            app:strokeColor="?attr/colorOutline"
+            app:strokeWidth="1dp">
 
-        <ProgressBar
-            android:id="@+id/pbRiskMeter"
-            style="?android:attr/progressBarStyleHorizontal"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="10dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="📊 مؤشر المخاطر الأمنية"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="6dp" />
+
+                <ProgressBar
+                    android:id="@+id/pbRiskMeter"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="12dp"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressTint="?attr/colorError" />
+
+                <TextView
+                    android:id="@+id/tvRiskPercentage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="نسبة الإنذارات: 0%"
+                    android:textColor="?attr/colorError"
+                    android:textSize="10sp"
+                    android:layout_marginTop="4dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- أزرار فلترة السجل -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="12dp"
-            android:max="100"
-            android:progress="0"
-            android:progressTint="#EF4444" />
-
-        <TextView
-            android:id="@+id/tvRiskPercentage"
-            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="نسبة الإنذارات: 0%"
-            android:textColor="#F87171"
-            android:textSize="10sp"
-            android:layout_marginTop="4dp" />
-    </LinearLayout>
-</com.google.android.material.card.MaterialCardView>
+            android:orientation="horizontal"
+            android:layout_marginBottom="4dp">
 
-<!-- ✅ أزرار فلترة السجل -->
-<LinearLayout
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:layout_marginBottom="4dp">
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnFilterAll"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="1"
+                android:text="الكل"
+                android:textSize="10sp"
+                android:textColor="?attr/colorOnSurfaceVariant" />
 
-    <Button
-        android:id="@+id/btnFilterAll"
-        android:layout_width="0dp"
-        android:layout_height="28dp"
-        android:layout_weight="1"
-        android:text="الكل"
-        android:textSize="9sp"
-        android:backgroundTint="#475569" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnFilterAlerts"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="1"
+                android:text="🚨 إنذارات"
+                android:textSize="10sp"
+                android:textColor="?attr/colorError" />
 
-    <Button
-        android:id="@+id/btnFilterAlerts"
-        android:layout_width="0dp"
-        android:layout_height="28dp"
-        android:layout_weight="1"
-        android:text="🚨 إنذارات"
-        android:textSize="9sp"
-        android:backgroundTint="#DC2626" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnFilterPass"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="1"
+                android:text="✅ مقبول"
+                android:textSize="10sp"
+                android:textColor="?attr/colorPrimary" />
+        </LinearLayout>
 
-    <Button
-        android:id="@+id/btnFilterPass"
-        android:layout_width="0dp"
-        android:layout_height="28dp"
-        android:layout_weight="1"
-        android:text="✅ مقبول"
-        android:textSize="9sp"
-        android:backgroundTint="#16A34A" />
-</LinearLayout>
-        <!-- 5. شبكة البوابات الحية (Visual Gate Monitor) -->
+        <!-- 5. شبكة البوابات الحية -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="6dp"
             android:text="📡 شبكة البوابات والأجهزة الميدانية"
-            android:textColor="#64748B"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -374,7 +379,7 @@
                 android:layout_weight="1"
                 android:padding="0dp"
                 android:text="🧪 تجربة (مسموح)"
-                android:textColor="#4ADE80"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="10sp" />
 
             <com.google.android.material.button.MaterialButton
@@ -385,7 +390,7 @@
                 android:layout_weight="1"
                 android:padding="0dp"
                 android:text="🧪 تجربة (إنذار)"
-                android:textColor="#F87171"
+                android:textColor="?attr/colorError"
                 android:textSize="10sp" />
 
             <com.google.android.material.button.MaterialButton
@@ -396,16 +401,16 @@
                 android:layout_weight="0.8"
                 android:padding="0dp"
                 android:text="🗑️ مسح السجل"
-                android:textColor="#94A3B8"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="10sp" />
         </LinearLayout>
 
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="100dp"
-            app:cardBackgroundColor="#020617"
+            app:cardBackgroundColor="?attr/colorSurfaceVariant"
             app:cardCornerRadius="8dp"
-            app:strokeColor="#1E293B"
+            app:strokeColor="?attr/colorOutline"
             app:strokeWidth="1dp">
 
             <ScrollView
@@ -420,19 +425,19 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="monospace"
                     android:text="[SYSTEM] MIRA Security Gateway Command Center Initialized...\n"
-                    android:textColor="#38BDF8"
+                    android:textColor="?attr/colorPrimary"
                     android:textSize="10sp" />
             </ScrollView>
         </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>
 
-    <!-- Overlay الإنذار بحركة تنبيه ومؤثر بصري قوي -->
+    <!-- Overlay الإنذار -->
     <FrameLayout
         android:id="@+id/overlayAlarm"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#E67F1D1D"
+        android:background="?attr/colorErrorContainer"
         android:clickable="true"
         android:focusable="true"
         android:visibility="gone">
@@ -451,7 +456,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
                 android:text="🚨 ALERT: UNAUTHORIZED BREACH"
-                android:textColor="#FFFFFF"
+                android:textColor="?attr/colorOnError"
                 android:textSize="22sp"
                 android:textStyle="bold" />
 
@@ -461,7 +466,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="24dp"
                 android:gravity="center"
-                android:textColor="#FECACA"
+                android:textColor="?attr/colorOnError"
                 android:textSize="15sp" />
 
             <com.google.android.material.button.MaterialButton
@@ -469,10 +474,10 @@
                 android:layout_width="220dp"
                 android:layout_height="56dp"
                 android:text="🔕 إيقاف الإنذار"
-                android:textColor="#7F1D1D"
+                android:textColor="?attr/colorOnPrimary"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                app:backgroundTint="#FFFFFF"
+                app:backgroundTint="?attr/colorPrimary"
                 app:cornerRadius="28dp" />
         </LinearLayout>
     </FrameLayout>
