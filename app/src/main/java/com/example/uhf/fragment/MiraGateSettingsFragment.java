@@ -795,7 +795,7 @@ private void showEditGateDialog(int position) {
             existingGate.branchName = branchName;
             
             // ✅ حفظ محلياً
-            settings.updateGate(existingGate);
+            settings.updateGate(existingGate.gateId, existingGate);
             settings.saveGateSettings(existingGate.gateId, 
                 existingGate.soundPass, existingGate.soundDeny, existingGate.soundAlarm,
                 vibration, flash, existingGate.alarmDuration, rfidPower);
@@ -841,7 +841,7 @@ private void updateGateOnServer(MiraGatesSettings.GateDevice gate) {
             payload.put("sound_alarm", gate.soundAlarm);
             payload.put("alarm_duration", gate.alarmDuration);
 
-            MiraApiClient.ApiResponse response = client.updateGate(gate.gateId, payload);
+            MiraApiClient.ApiResponse response = client.postWithAuth("/gates/update", payload);
 
             mainHandler.post(() -> {
                 if (isAdded()) {
