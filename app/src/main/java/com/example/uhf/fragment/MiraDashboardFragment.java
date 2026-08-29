@@ -12,6 +12,8 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import android.widget.ProgressBar;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
@@ -47,6 +49,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MiraDashboardFragment extends Fragment implements SharedPreferences.OnSharedPreferenceChangeListener {
+     
+      private TextView tvOrgName; 
+     private View loadingOverlay;
+     private ProgressBar pbGoldLoading;
+     private boolean isGoldLoading = false;
+     private final AtomicBoolean isGoldRefreshing = new AtomicBoolean(false);
 
     private static final String TAG = "MiraDashboardFragment";
     private static final String OFFLINE_PREFS_BASE = "dashboard_cache_branch_";
@@ -203,6 +211,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
 
     private void initViews(View v) {
         try {
+            tvOrgName = v.findViewById(R.id.tvOrgName);
             tvGreeting = v.findViewById(R.id.tvGreeting);
             tvDate = v.findViewById(R.id.tvDate);
             tvLocation = v.findViewById(R.id.tvLocation);
@@ -227,6 +236,16 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             tvGoldChange = v.findViewById(R.id.tvGoldChange);
             btnRefreshGold = v.findViewById(R.id.btnRefreshGold);
             cardGoldPrices = v.findViewById(R.id.cardGoldPrices);
+            loadingOverlay = v.findViewById(R.id.loadingOverlay);
+        pbGoldLoading = v.findViewById(R.id.pbGoldLoading);
+  
+        if (btnRefreshGold != null) {
+            btnRefreshGold.setOnClickListener(v2 -> {
+                if (!isGoldRefreshing.get()) {
+                    fetchLiveGoldPrices(true);
+                }
+            });
+        }
 
             if (cardGoldPrices != null && permissionManager != null && !permissionManager.canAccessFragment("GoldRates")) {
                 cardGoldPrices.setVisibility(View.GONE);
@@ -244,15 +263,15 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 swipeRefresh.setOnRefreshListener(this::refreshAllData);
             }
 
-            if (btnRefreshGold != null) {
-                btnRefreshGold.setOnClickListener(v2 -> fetchLiveGoldPrices(true));
-            }
+            
         } catch (Exception e) {
             logNonFatal("initViews", e);
         }
     }
 
-    private void updateHeader() {
+    
+// ==================== 5. تحسين updateHeader لمنع التداخل ====================
+private void updateHeader() {
         try {
             if (tvDate != null) {
                 SimpleDateFormat formatter = isArabic ? dateFormatsAr.get() : dateFormatsEn.get();
@@ -261,15 +280,23 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                 }
             }
             
+            // ✅ اسم الجهة في tvOrgName
+            if (tvOrgName != null && orgProfile != null) {
+                String orgName = orgProfile.getDisplayName();
+                if (orgName == null || orgName.isEmpty()) orgName = "MIRA";
+                tvOrgName.setText(orgName);
+            }
+            
+            // ✅ الترحيب بالمستخدم في tvGreeting
             if (tvGreeting != null && sessionManager != null) {
                 String name = sessionManager.getDisplayName();
                 if (name == null || name.isEmpty()) name = sessionManager.getUsername();
                 if (name == null) name = isArabic ? "المستخدم" : "User";
                 
-                String orgName = orgProfile != null ? orgProfile.getDisplayName() : "MIRA";
-                tvGreeting.setText(isArabic ? orgName + " - مرحباً، " + name : orgName + " - Welcome, " + name);
+                tvGreeting.setText(isArabic ? "مرحباً، " + name : "Welcome, " + name);
             }
             
+            // ✅ الموقع/الفرع
             if (tvLocation != null && branchesManager != null) {
                 tvLocation.setText("📍 " + branchesManager.getActiveBranchDisplayName());
             }
@@ -277,6 +304,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             logNonFatal("updateHeader", e);
         }
     }
+
 
     private void setupQuickAccessGrid() {
         try {
@@ -372,73 +400,126 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     private void fetchLiveGoldPrices(boolean forceRefresh) {
-        try {
-            if (apiClient == null) return;
-            
-            long now = System.currentTimeMillis();
-            if (!forceRefresh && (now - lastGoldFetchTime) < GOLD_CACHE_VALIDITY_MS) {
-                displayGoldPricesFromCache();
-                return;
-            }
-            
-            cancelFuture(goldPriceFuture);
-            
-            goldPriceFuture = sharedExecutor.submit(() -> {
-                try {
-                    List<ApiProvider> providers = apiClient.getActiveProviders();
-                    ApiProvider activeProvider = null;
-                    
-                    if (providers != null) {
-                        for (ApiProvider provider : providers) {
-                            if (provider.isActive() && provider.getApiKey() != null && !provider.getApiKey().isEmpty()) {
-                                activeProvider = provider;
-                                break;
-                            }
-                        }
-                        if (activeProvider == null && !providers.isEmpty()) {
-                            activeProvider = providers.get(0);
-                        }
-                    }
-                    
-                    if (activeProvider == null) {
-                        mainHandler.post(() -> {
-                            if (isAdded()) displayGoldPricesFromCache();
-                        });
-                        return;
-                    }
-                    
-                    MiraApiClient.ApiResponse response = apiClient.fetchGoldPriceWithProvider(activeProvider.getId());
-                    GoldPriceData priceData = parseGoldPriceData(response);
-                    
-                    mainHandler.post(() -> {
-                        try {
-                            lastGoldFetchTime = System.currentTimeMillis();
-                            if (!isAdded()) return;
-                            if (priceData != null) {
-                                displayGoldPrices(priceData);
-                            } else {
-                                displayGoldPricesFromCache();
-                            }
-                        } catch (Exception e) {
-                            logNonFatal("fetchLiveGoldPrices.post", e);
-                        }
-                    });
-                } catch (Exception e) {
-                    logNonFatal("fetchLiveGoldPrices.thread", e);
-                    mainHandler.post(() -> {
-                        try {
-                            if (isAdded()) displayGoldPricesFromCache();
-                        } catch (Exception e2) {
-                            logNonFatal("fetchLiveGoldPrices.post.error", e2);
-                        }
-                    });
-                }
-            });
-        } catch (Exception e) {
-            logNonFatal("fetchLiveGoldPrices", e);
+    try {
+        if (apiClient == null || isGoldRefreshing.get()) return;
+        
+        long now = System.currentTimeMillis();
+        if (!forceRefresh && (now - lastGoldFetchTime) < GOLD_CACHE_VALIDITY_MS) {
+            displayGoldPricesFromCache();
+            return;
         }
+        
+        // ✅ منع الضغط المتكرر
+        isGoldRefreshing.set(true);
+        isGoldLoading = true;
+        
+        // ✅ إظهار مؤشر التحميل على الزر
+        showGoldLoadingState(true);
+        
+        cancelFuture(goldPriceFuture);
+        
+        goldPriceFuture = sharedExecutor.submit(() -> {
+            try {
+                List<ApiProvider> providers = apiClient.getActiveProviders();
+                ApiProvider activeProvider = null;
+                
+                if (providers != null) {
+                    for (ApiProvider provider : providers) {
+                        if (provider.isActive() && provider.getApiKey() != null && !provider.getApiKey().isEmpty()) {
+                            activeProvider = provider;
+                            break;
+                        }
+                    }
+                    if (activeProvider == null && !providers.isEmpty()) {
+                        activeProvider = providers.get(0);
+                    }
+                }
+                
+                if (activeProvider == null) {
+                    mainHandler.post(() -> {
+                        isGoldRefreshing.set(false);
+                        showGoldLoadingState(false);
+                        if (isAdded()) displayGoldPricesFromCache();
+                    });
+                    return;
+                }
+                
+                MiraApiClient.ApiResponse response = apiClient.fetchGoldPriceWithProvider(activeProvider.getId());
+                GoldPriceData priceData = parseGoldPriceData(response);
+                
+                mainHandler.post(() -> {
+                    try {
+                        lastGoldFetchTime = System.currentTimeMillis();
+                        isGoldRefreshing.set(false);
+                        showGoldLoadingState(false);
+                        
+                        if (!isAdded()) return;
+                        
+                        if (priceData != null) {
+                            displayGoldPrices(priceData);
+                            // ✅ رسالة نجاح
+                            Toast.makeText(getContext(), 
+                                isArabic ? "✅ تم تحديث أسعار الذهب" : "✅ Gold prices updated", 
+                                Toast.LENGTH_SHORT).show();
+                        } else {
+                            displayGoldPricesFromCache();
+                            Toast.makeText(getContext(), 
+                                isArabic ? "⚠️ تعذر التحديث - عرض الكاش" : "⚠️ Update failed - showing cache", 
+                                Toast.LENGTH_SHORT).show();
+                        }
+                    } catch (Exception e) {
+                        logNonFatal("fetchLiveGoldPrices.post", e);
+                        isGoldRefreshing.set(false);
+                        showGoldLoadingState(false);
+                    }
+                });
+            } catch (Exception e) {
+                logNonFatal("fetchLiveGoldPrices.thread", e);
+                mainHandler.post(() -> {
+                    try {
+                        isGoldRefreshing.set(false);
+                        showGoldLoadingState(false);
+                        if (isAdded()) displayGoldPricesFromCache();
+                    } catch (Exception e2) {
+                        logNonFatal("fetchLiveGoldPrices.post.error", e2);
+                    }
+                });
+            }
+        });
+    } catch (Exception e) {
+        logNonFatal("fetchLiveGoldPrices", e);
+        isGoldRefreshing.set(false);
+        showGoldLoadingState(false);
     }
+}
 
+private void showGoldLoadingState(boolean isLoading) {
+    try {
+        if (btnRefreshGold == null) return;
+        
+        if (isLoading) {
+            // ✅ تعطيل الزر
+            btnRefreshGold.setEnabled(false);
+            btnRefreshGold.setAlpha(0.4f);
+            
+            // ✅ إظهار ProgressBar
+            if (pbGoldLoading != null) {
+                pbGoldLoading.setVisibility(View.VISIBLE);
+            }
+        } else {
+            // ✅ إعادة تفعيل الزر
+            btnRefreshGold.setEnabled(true);
+            btnRefreshGold.setAlpha(1f);
+            
+            // ✅ إخفاء ProgressBar
+            if (pbGoldLoading != null) {
+                pbGoldLoading.setVisibility(View.GONE);
+            }
+        }
+    } catch (Exception e) {
+        logNonFatal("showGoldLoadingState", e);
+    }
+}
     private GoldPriceData parseGoldPriceData(MiraApiClient.ApiResponse response) {
         try {
             if (response == null || !response.isSuccess || response.data == null) return null;
@@ -1012,13 +1093,39 @@ private void logNonFatal(String location, Throwable throwable) {
 }
 
     private void showShimmer(boolean show) {
-        try {
-            if (shimmerLayout != null) shimmerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
-            if (swipeRefresh != null) swipeRefresh.setVisibility(show ? View.GONE : View.VISIBLE);
-        } catch (Exception e) {
-            logNonFatal("showShimmer", e);
+    try {
+        if (shimmerLayout != null) {
+            shimmerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
+            // ✅ أنيميشن ظهور/اختفاء
+            if (show) {
+                shimmerLayout.setAlpha(0f);
+                shimmerLayout.animate().alpha(1f).setDuration(300).start();
+            } else {
+                shimmerLayout.animate().alpha(0f).setDuration(300)
+                    .withEndAction(() -> shimmerLayout.setVisibility(View.GONE))
+                    .start();
+            }
         }
+        
+        // ✅ إظهار/إخفاء Loading Overlay
+        if (loadingOverlay != null) {
+            if (show) {
+                loadingOverlay.setVisibility(View.VISIBLE);
+                loadingOverlay.setAlpha(0f);
+                loadingOverlay.animate().alpha(1f).setDuration(300).start();
+            } else {
+                loadingOverlay.animate().alpha(0f).setDuration(300)
+                    .withEndAction(() -> loadingOverlay.setVisibility(View.GONE))
+                    .start();
+            }
+        }
+        
+        if (swipeRefresh != null) swipeRefresh.setVisibility(show ? View.GONE : View.VISIBLE);
+    } catch (Exception e) {
+        logNonFatal("showShimmer", e);
     }
+}
+
 
     private void initBranchCache(int branchId) {
         try {
@@ -1279,4 +1386,4 @@ private void logNonFatal(String location, Throwable throwable) {
             logNonFatal("cancelFuture", e);
         }
     }
-            }
+                }
