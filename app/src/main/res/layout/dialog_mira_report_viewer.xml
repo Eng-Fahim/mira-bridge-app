@@ -1,222 +1,219 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="?android:attr/colorBackground">
+    android:background="@color/report_background">
 
-    <!-- ✅ الهيدر مع تحسينات -->
-    <LinearLayout
-        android:id="@+id/headerContainer"
+    <!-- شريط علوي -->
+    <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorPrimary"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:padding="16dp"
-        android:elevation="4dp">
+        android:background="@color/report_primary"
+        app:elevation="4dp">
 
-        <TextView
-            android:id="@+id/tvReportDialogTitle"
-            android:layout_width="0dp"
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="تقرير"
-            android:textColor="?attr/colorOnPrimary"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:padding="16dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnReportClose"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="✕"
-            android:textColor="?attr/colorOnPrimary"
-            android:textSize="18sp"
-            app:iconPadding="0dp"
-            app:iconSize="20dp" />
-    </LinearLayout>
+            <!-- عنوان التقرير -->
+            <TextView
+                android:id="@+id/tvReportDialogTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:text="تقرير المبيعات"
+                android:textColor="@android:color/white"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                app:layout_constraintEnd_toStartOf="@id/btnReportClose"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- ✅ نطاق التاريخ مع تحسينات -->
-    <LinearLayout
-        android:id="@+id/dateRangeContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="12dp"
-        android:background="?attr/colorSurface">
+            <!-- زر إغلاق -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnReportClose"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:backgroundTint="@android:color/transparent"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:icon="@drawable/ic_close"
+                app:iconTint="@android:color/white"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnReportDateFrom"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="6dp"
-            android:text="من: 2026-08-01"
-            android:textSize="12sp"
-            app:icon="@android:drawable/ic_menu_my_calendar"
-            app:iconSize="16dp"
-            app:iconPadding="4dp"
-            app:cornerRadius="12dp" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnReportDateTo"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:layout_marginStart="6dp"
-            android:text="إلى: 2026-08-25"
-            android:textSize="12sp"
-            app:icon="@android:drawable/ic_menu_my_calendar"
-            app:iconSize="16dp"
-            app:iconPadding="4dp"
-            app:cornerRadius="12dp" />
-    </LinearLayout>
-
-    <!-- ✅ فلاتر سريعة مع تحسينات -->
-    <LinearLayout
-        android:id="@+id/quickFiltersContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingHorizontal="12dp"
-        android:paddingBottom="8dp"
-        android:background="?attr/colorSurface">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnQuickToday"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:text="اليوم"
-            android:textSize="11sp"
-            app:cornerRadius="8dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnQuickWeek"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:text="أسبوع"
-            android:textSize="11sp"
-            app:cornerRadius="8dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnQuickMonth"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:text="شهر"
-            android:textSize="11sp"
-            app:cornerRadius="8dp" />
-    </LinearLayout>
-
-    <!-- ✅ زر الفلترة المتقدمة -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnAdvancedFilter"
-        style="@style/Widget.Material3.Button.TextButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="12dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="8dp"
-        android:text="🔍 فلترة متقدمة"
-        android:textSize="12sp"
-        app:icon="@android:drawable/ic_menu_search"
-        app:iconPadding="8dp"
-        app:cornerRadius="8dp" />
-
-    <!-- ✅ حاوية التحميل المحسنة -->
-    <FrameLayout
-        android:id="@+id/layoutLoadingContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:visibility="gone"
-        android:padding="24dp">
-
+        <!-- شريط الفلاتر -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="8dp">
+
+            <!-- من تاريخ -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnReportDateFrom"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="من: 2024-01-01"
+                android:textSize="12sp"
+                app:icon="@drawable/ic_calendar"
+                app:iconSize="16dp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+            <!-- إلى تاريخ -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnReportDateTo"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="إلى: 2024-01-31"
+                android:textSize="12sp"
+                app:icon="@drawable/ic_calendar"
+                app:iconSize="16dp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+        </LinearLayout>
+
+        <!-- أزرار الإجراءات -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="8dp">
+
+            <!-- تطبيق -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnReportApplyFilter"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="تطبيق"
+                app:icon="@drawable/ic_check"
+                app:backgroundTint="@color/report_success" />
+
+            <!-- فلتر متقدم -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAdvancedFilter"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="فلتر متقدم"
+                app:icon="@drawable/ic_filter"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+            <!-- تصدير -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnReportExport"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="تصدير"
+                app:icon="@drawable/ic_export"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+            <!-- طباعة -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnReportPrint"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="طباعة"
+                app:icon="@drawable/ic_print"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+        </LinearLayout>
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- حاوية التحميل -->
+    <FrameLayout
+        android:id="@+id/layoutLoadingContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CCFFFFFF"
+        android:visibility="gone"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
             android:orientation="vertical"
             android:gravity="center">
 
-            <ProgressBar
-                android:id="@+id/pbLoading"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:indeterminateTint="?attr/colorPrimary" />
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                app:indicatorColor="@color/report_primary"
+                app:indicatorSize="50dp"
+                app:trackThickness="4dp" />
 
             <TextView
                 android:id="@+id/tvLoadingStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:text="⏳ جاري تحميل البيانات..."
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+                android:layout_marginTop="16dp"
+                android:text="جاري تحميل البيانات..."
+                android:textColor="@color/report_text_primary"
+                android:textSize="14sp" />
+
         </LinearLayout>
+
     </FrameLayout>
 
-    <!-- ✅ قائمة البيانات -->
+    <!-- قائمة البيانات -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvReportData"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:padding="12dp"
+        android:layout_height="match_parent"
         android:clipToPadding="false"
-        android:scrollbars="vertical" />
+        android:padding="8dp"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
-    <!-- ✅ الأزرار السفلية مع تحسينات -->
+    <!-- رسالة فارغة -->
     <LinearLayout
-        android:id="@+id/bottomButtonsContainer"
+        android:id="@+id/layoutEmptyState"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="12dp"
-        android:background="?attr/colorSurface"
-        android:elevation="8dp">
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnReportExport"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="6dp"
-            android:text="📤 تصدير"
-            android:textSize="12sp"
-            app:cornerRadius="12dp" />
+        <TextView
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:background="@drawable/bg_empty_circle"
+            android:gravity="center"
+            android:text="📊"
+            android:textSize="48sp" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnReportPrint"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:layout_marginHorizontal="6dp"
-            android:text="🖨️ طباعة"
-            android:textSize="12sp"
-            app:cornerRadius="12dp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="لا توجد بيانات"
+            android:textColor="@color/report_text_secondary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnReportApplyFilter"
-            style="@style/Widget.Material3.Button"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:layout_marginStart="6dp"
-            android:text="✅ تطبيق"
-            android:textSize="12sp"
-            app:cornerRadius="12dp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="قم بتغيير الفلاتر أو الفترة الزمنية"
+            android:textColor="@color/report_text_secondary"
+            android:textSize="12sp" />
+
     </LinearLayout>
 
-</LinearLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
