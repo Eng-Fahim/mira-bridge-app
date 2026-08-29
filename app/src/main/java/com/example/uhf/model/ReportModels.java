@@ -5,9 +5,6 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * ✅ نماذج البيانات الموحدة لنظام التقارير
- */
 public class ReportModels {
     
     // ==================== نموذج التقرير الأساسي ====================
@@ -95,6 +92,25 @@ public class ReportModels {
             this.pageSize = 50;
             this.sortOrder = "DESC";
             this.branchId = 1;
+        }
+        
+        // ✅✅✅ هذا هو الـ constructor المطلوب
+        public ReportFilters(ReportFilters other) {
+            this.fromDate = other.fromDate;
+            this.toDate = other.toDate;
+            this.searchQuery = other.searchQuery;
+            this.filter1 = other.filter1;
+            this.filter2 = other.filter2;
+            this.filter3 = other.filter3;
+            this.branchId = other.branchId;
+            this.userId = other.userId;
+            this.gateId = other.gateId;
+            this.serialNumber = other.serialNumber;
+            this.gtin13 = other.gtin13;
+            this.sortBy = other.sortBy;
+            this.sortOrder = other.sortOrder;
+            this.page = other.page;
+            this.pageSize = other.pageSize;
         }
         
         public String toQueryString() {
