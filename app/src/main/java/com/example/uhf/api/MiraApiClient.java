@@ -717,9 +717,9 @@ public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod,
     // ===================== 🏷️ ITEM =====================
 
     public ApiResponse getItemDetail(String code) {
-        return get("/item/" + code);
+        return getWithAuth("/item/" + code); 
     }
-
+   
     public ApiResponse uploadItemImage(int itemId, File imageFile, boolean isPrimary, String altText) {
         HttpURLConnection conn = null;
         try {
