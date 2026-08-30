@@ -130,6 +130,21 @@
         </LinearLayout>
 
     </com.google.android.material.appbar.AppBarLayout>
+    
+    <!-- قبل RecyclerView - صورة الرسم البياني -->
+<ScrollView
+    android:id="@+id/scrollChart"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:visibility="gone"
+    app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+    <ImageView
+        android:id="@+id/ivChart"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true" />
+</ScrollView>
 
     <!-- البيانات -->
     <androidx.recyclerview.widget.RecyclerView
