@@ -8,25 +8,26 @@
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground"
-    app:cardBackgroundColor="?attr/colorSurface"
-    app:cardCornerRadius="14dp"
-    app:cardElevation="2dp"
-    app:strokeColor="?attr/colorOutline"
-    app:strokeWidth="0.5dp"
-    app:rippleColor="?attr/colorPrimaryContainer">
+    app:cardBackgroundColor="#FFFFFF"
+    app:cardCornerRadius="18dp"
+    app:cardElevation="3dp"
+    app:strokeColor="#E8D5B5"
+    app:strokeWidth="1dp"
+    app:rippleColor="#22C9A961">
 
+    <!-- تخطيط عمودي -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:gravity="center"
-        android:padding="14dp">
+        android:padding="16dp">
 
-        <!-- ✅ حاوية الأيقونة -->
+        <!-- حاوية الأيقونة بتدرج ذهبي -->
         <FrameLayout
             android:id="@+id/flIconContainer"
-            android:layout_width="50dp"
-            android:layout_height="50dp"
+            android:layout_width="54dp"
+            android:layout_height="54dp"
             android:background="@drawable/bg_icon_circle">
 
             <TextView
@@ -35,52 +36,61 @@
                 android:layout_height="match_parent"
                 android:gravity="center"
                 android:text="📊"
-                android:textSize="24sp" />
+                android:textSize="26sp" />
         </FrameLayout>
 
-        <!-- ✅ العنوان -->
+        <!-- العنوان -->
         <TextView
             android:id="@+id/tvReportTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:text=""
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="13sp"
+            android:textColor="#1B1B2F"
+            android:textSize="14sp"
             android:textStyle="bold"
             android:gravity="center"
             android:maxLines="2"
             android:ellipsize="end"
-            android:minLines="2" />
+            android:minLines="2"
+            android:letterSpacing="0.3" />
 
-        <!-- ✅ الوصف -->
+        <!-- الوصف -->
         <TextView
             android:id="@+id/tvReportSubtitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="4dp"
             android:text=""
-            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textColor="#8E8E9A"
             android:textSize="10sp"
             android:gravity="center"
             android:maxLines="1"
             android:ellipsize="end" />
 
-        <!-- ✅ شارة متقدم -->
+        <!-- شارة متقدم -->
         <TextView
             android:id="@+id/chipAdvanced"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
             android:background="@drawable/bg_badge_rounded"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:paddingTop="2dp"
-            android:paddingBottom="2dp"
-            android:text="✨"
-            android:textColor="@android:color/white"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:text="✨ متقدم"
+            android:textColor="#FFFFFF"
             android:textSize="8sp"
+            android:textStyle="bold"
             android:visibility="gone" />
+
+        <!-- خط فاصل ذهبي صغير أسفل البطاقة -->
+        <View
+            android:layout_width="30dp"
+            android:layout_height="2dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_accent_gradient" />
 
     </LinearLayout>
 
