@@ -823,33 +823,78 @@ public class MiraReportsProFragment extends Fragment {
     }
     
     private List<ReportModels.GenericItem> parseToFormattedGeneric(JSONObject data) {
-        List<ReportModels.GenericItem> items = new ArrayList<>();
-        if (data == null) return items;
-        
-        JSONArray array = extractItemsArray(data);
-        
-        if (array != null) {
-            for (int i = 0; i < array.length(); i++) {
-                JSONObject obj = array.optJSONObject(i);
+    List<ReportModels.GenericItem> items = new ArrayList<>();
+    if (data == null) return items;
+    
+    // ✅ أولاً: البحث عن المصفوفات المعروفة
+    String[] arrayKeys = {
+        "items", "invoices", "sales", "movements", "transfers", 
+        "users", "gate_logs", "branches_performance", "journal_entries",
+        "reorder_items", "timeline", "gate_history", "breakdown_by_karat"
+    };
+    
+    for (String key : arrayKeys) {
+        JSONArray arr = data.optJSONArray(key);
+        if (arr != null && arr.length() > 0) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject obj = arr.optJSONObject(i);
                 if (obj != null) {
                     Iterator<String> keys = obj.keys();
                     while (keys.hasNext()) {
-                        String key = keys.next();
-                        String value = obj.optString(key, "");
-                        String formattedKey = formatKeyName(key, isArabic);
-                        String formattedValue = formatValue(value, key, isArabic);
+                        String itemKey = keys.next();
+                        String value = obj.optString(itemKey, "");
+                        String formattedKey = formatKeyName(itemKey, isArabic);
+                        String formattedValue = formatValue(value, itemKey, isArabic);
                         items.add(new ReportModels.GenericItem(formattedKey, formattedValue));
                     }
-                    if (i < array.length() - 1) {
+                    if (i < arr.length() - 1) {
                         items.add(new ReportModels.GenericItem("──────────", ""));
                     }
                 }
             }
+            return items; // ✅ وجدنا المصفوفة
         }
-        
+    }
+    
+    // ✅ ثانياً: البحث عن الكائنات المعروفة
+    String[] objectKeys = {"audit_summary", "inventory", "sales", "summary", "item_details", "user_info"};
+    boolean foundObject = false;
+    
+    for (String key : objectKeys) {
+        JSONObject obj = data.optJSONObject(key);
+        if (obj != null) {
+            Iterator<String> keys = obj.keys();
+            while (keys.hasNext()) {
+                String itemKey = keys.next();
+                String value = obj.optString(itemKey, "");
+                String formattedKey = formatKeyName(itemKey, isArabic);
+                String formattedValue = formatValue(value, itemKey, isArabic);
+                items.add(new ReportModels.GenericItem(formattedKey, formattedValue));
+            }
+            foundObject = true;
+            items.add(new ReportModels.GenericItem("──────────", ""));
+        }
+    }
+    
+    if (foundObject) {
         return items;
     }
     
+    // ✅ ثالثاً: عرض جميع المفاتيح المتبقية
+    Iterator<String> keys = data.keys();
+    while (keys.hasNext()) {
+        String key = keys.next();
+        Object value = data.opt(key);
+        if (value != null && !key.equals("success") && !key.equals("timestamp") && !key.equals("type") && !key.equals("branch_id") && !key.equals("filters_applied")) {
+            items.add(new ReportModels.GenericItem(
+                formatKeyName(key, isArabic), 
+                value.toString()
+            ));
+        }
+    }
+    
+    return items;
+}
     private String formatKeyName(String key, boolean isArabic) {
         if (isArabic) {
             switch (key.toLowerCase()) {
@@ -883,21 +928,53 @@ public class MiraReportsProFragment extends Fragment {
     }
     
     private String formatValue(String value, String key, boolean isArabic) {
-        if (value == null || value.isEmpty() || value.equals("null")) {
-            return isArabic ? "غير محدد" : "N/A";
-        }
-        
-        if (key.toLowerCase().contains("date") || key.toLowerCase().contains("time") ||
-            key.toLowerCase().contains("created") || key.toLowerCase().contains("updated")) {
-            return formatDateString(value);
-        }
-        
-        if (key.toLowerCase().equals("status")) {
-            return formatStatusValue(value, isArabic);
-        }
-        
-        return value;
+    if (value == null || value.isEmpty() || value.equals("null")) {
+        return isArabic ? "غير محدد" : "N/A";
     }
+    
+    String lowerKey = key.toLowerCase();
+    
+    // ✅ تنسيق الأرقام المالية
+    if (lowerKey.contains("amount") || lowerKey.contains("revenue") ||
+        lowerKey.contains("total") || lowerKey.contains("price") ||
+        lowerKey.contains("cost") || lowerKey.contains("avg") ||
+        lowerKey.contains("value")) {
+        try {
+            double num = Double.parseDouble(value);
+            return String.format(Locale.US, "%,.2f", num);
+        } catch (Exception e) {}
+    }
+    
+    // ✅ تنسيق النسب المئوية
+    if (lowerKey.contains("accuracy") || lowerKey.contains("rate")) {
+        try {
+            double num = Double.parseDouble(value);
+            return String.format(Locale.US, "%.2f%%", num);
+        } catch (Exception e) {}
+    }
+    
+    // ✅ تنسيق الأوزان
+    if (lowerKey.contains("weight")) {
+        try {
+            double num = Double.parseDouble(value);
+            return String.format(Locale.US, "%.3f g", num);
+        } catch (Exception e) {}
+    }
+    
+    // ✅ تنسيق التواريخ
+    if (lowerKey.contains("date") || lowerKey.contains("time") ||
+        lowerKey.contains("created") || lowerKey.contains("updated") ||
+        lowerKey.contains("seen")) {
+        return formatDateString(value);
+    }
+    
+    // ✅ تنسيق الحالات
+    if (lowerKey.equals("status") || lowerKey.equals("vault_status")) {
+        return formatStatusValue(value, isArabic);
+    }
+    
+    return value;
+}
     
     private String formatDateString(String dateStr) {
         try {
