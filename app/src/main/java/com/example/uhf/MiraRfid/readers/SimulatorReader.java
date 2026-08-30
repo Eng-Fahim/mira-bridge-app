@@ -21,10 +21,6 @@ import java.util.concurrent.Executors;
 
 /**
  * قارئ محاكي متقدم - يحاكي القارئ الحقيقي بالكامل
- * - يجلب الوسوم من قاعدة البيانات
- * - يطبق الإعدادات الديناميكية
- * - يحاكي RSSI واقعياً
- * - معالج ضد أخطاء NullPointerException أثناء الـ Thread Handling
  */
 public class SimulatorReader implements MiraIRFIDReader {
     
@@ -59,6 +55,15 @@ public class SimulatorReader implements MiraIRFIDReader {
     // API للجلب من قاعدة البيانات
     private MiraApiClient apiClient;
     private MiraBranchesManager branchesManager;
+    
+    // ✅ متغيرات المحاكاة الواقعية
+    private String currentEpc = "3008ABCDEF0123456789ABCD";
+    private String lastWrittenEpc = "";
+    private String simulatedTid = "";
+    private boolean isTagLocked = false;
+    private String filterData = "";
+    private int filterBank = -1;
+    private boolean filterActive = false;
     
     public SimulatorReader(Context context) {
         this.context = context != null ? context.getApplicationContext() : null;
@@ -99,9 +104,6 @@ public class SimulatorReader implements MiraIRFIDReader {
             .apply();
     }
     
-    /**
-     * وسوم احتياطية إذا فشل الجلب من قاعدة البيانات
-     */
     private void initFallbackTags() {
         fallbackTags.clear();
         fallbackTags.add("E28068940000501A2B3C4D5E6F");
@@ -116,9 +118,6 @@ public class SimulatorReader implements MiraIRFIDReader {
         fallbackTags.add("E28068940000501A2B3C4D5E78");
     }
     
-    /**
-     * جلب الوسوم من قاعدة البيانات
-     */
     private void fetchTagsFromDatabase() {
         databaseTags.clear();
         
@@ -129,7 +128,6 @@ public class SimulatorReader implements MiraIRFIDReader {
                 
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray items = response.data.optJSONArray("items");
-                    
                     if (items == null) {
                         JSONObject dataObj = response.data.optJSONObject("data");
                         if (dataObj != null) {
@@ -143,12 +141,10 @@ public class SimulatorReader implements MiraIRFIDReader {
                             String epc = obj.optString("gtin13", 
                                 obj.optString("serial_number", 
                                 obj.optString("epc", ""))).trim();
-                            
                             if (!epc.isEmpty()) {
                                 databaseTags.add(epc.toUpperCase());
                             }
                         }
-                        
                         Log.i(TAG, "✅ Loaded " + databaseTags.size() + " tags from database");
                     }
                 }
@@ -157,24 +153,34 @@ public class SimulatorReader implements MiraIRFIDReader {
             Log.e(TAG, "Error fetching tags from database", e);
         }
         
-        // إذا فشل الجلب، استخدم الوسوم الاحتياطية
         if (databaseTags.isEmpty()) {
             databaseTags.addAll(fallbackTags);
             Log.w(TAG, "⚠️ Using fallback tags: " + databaseTags.size() + " tags");
         }
     }
     
+    /**
+     * ✅ توليد TID واقعي
+     */
+    private String generateRealisticTid() {
+        StringBuilder tid = new StringBuilder("E280");
+        String hexChars = "0123456789ABCDEF";
+        for (int i = 0; i < 16; i++) {
+            tid.append(hexChars.charAt(random.nextInt(16)));
+        }
+        return tid.toString();
+    }
+    
     @Override
     public boolean initialize() {
-        Log.i(TAG, "✅ Simulator initialized");
+        simulatedTid = generateRealisticTid();
+        Log.i(TAG, "✅ Simulator initialized with TID: " + simulatedTid);
         return true;
     }
     
     @Override
     public boolean connect() {
         isConnected = true;
-        
-        // جلب الوسوم من قاعدة البيانات عند الاتصال
         fetchTagsFromDatabase();
         
         mainHandler.post(() -> {
@@ -211,34 +217,17 @@ public class SimulatorReader implements MiraIRFIDReader {
     
     @Override
     public boolean startScan() {
-        if (!isConnected) {
-            connect();
-        }
-        
+        if (!isConnected) connect();
         isScanning = true;
+        
         mainHandler.post(() -> {
-            if (listener != null) {
-                listener.onScanStarted();
-            }
+            if (listener != null) listener.onScanStarted();
         });
         
         scanExecutor.execute(this::simulationLoop);
-        
-        Log.i(TAG, "📡 Simulation started:");
-        Log.i(TAG, "  - Power: " + powerDbm + " dBm");
-        Log.i(TAG, "  - RSSI Threshold: " + rssiThreshold);
-        Log.i(TAG, "  - Scan Interval: " + scanIntervalMs + "ms");
-        Log.i(TAG, "  - Session: S" + session);
-        Log.i(TAG, "  - Target: " + (target == 0 ? "A" : "B"));
-        Log.i(TAG, "  - Q Value: " + qValue);
-        Log.i(TAG, "  - Tags available: " + databaseTags.size());
-        
         return true;
     }
     
-    /**
-     * حلقة المحاكاة الواقعية
-     */
     private void simulationLoop() {
         int index = 0;
         int consecutiveMisses = 0;
@@ -246,30 +235,22 @@ public class SimulatorReader implements MiraIRFIDReader {
         while (isScanning) {
             try {
                 if (databaseTags.isEmpty()) {
-                    // لا توجد وسوم - انتظر
                     Thread.sleep(1000);
                     continue;
                 }
                 
-                // اختيار وسم
                 String epc = databaseTags.get(index % databaseTags.size());
-                
-                // محاكاة RSSI واقعية
                 int rssi = simulateRssi();
                 
-                // تطبيق عتبة RSSI
                 if (rssi >= rssiThreshold) {
                     consecutiveMisses = 0;
                     final String finalEpc = epc;
                     final int finalRssi = rssi;
                     mainHandler.post(() -> {
-                        if (listener != null) {
-                            listener.onTagRead(finalEpc, finalRssi);
-                        }
+                        if (listener != null) listener.onTagRead(finalEpc, finalRssi);
                     });
                 } else {
                     consecutiveMisses++;
-                    // إذا فشل القراءة عدة مرات، تخطى هذا الوسم
                     if (consecutiveMisses > 3) {
                         consecutiveMisses = 0;
                         index++;
@@ -277,59 +258,32 @@ public class SimulatorReader implements MiraIRFIDReader {
                 }
                 
                 index++;
-                
-                // محاكاة تداخل الإشارات - أحياناً يقرأ نفس الوسم مرتين
-                if (random.nextInt(100) < 15) { // 15% احتمال تكرار
-                    // لا تزيد index لقراءة نفس الوسم مرة أخرى
-                } else {
+                if (random.nextInt(100) >= 15) {
                     index++;
                 }
                 
-                // النوم حسب فترة المسح مع بعض العشوائية
                 long actualDelay = scanIntervalMs + random.nextInt(50) - 25;
                 Thread.sleep(Math.max(50, actualDelay));
                 
             } catch (InterruptedException e) {
-                Log.d(TAG, "Simulation loop interrupted");
                 break;
             } catch (Exception e) {
                 if (isScanning) {
                     mainHandler.post(() -> {
-                        if (listener != null) {
-                            listener.onError(e.getMessage());
-                        }
+                        if (listener != null) listener.onError(e.getMessage());
                     });
                 }
-                Log.e(TAG, "Simulation loop error", e);
                 break;
             }
         }
     }
     
-    /**
-     * محاكاة RSSI واقعية بناءً على:
-     * - قوة الإرسال
-     * - المسافة (عشوائية)
-     * - التداخل (عشوائي)
-     * - Q Value (كلما زاد Q، زادت الدقة لكن قل المدى)
-     */
     private int simulateRssi() {
-        // القوة الأساسية تعتمد على powerDbm
-        int baseRssi = -95 + (powerDbm - 10) * 2; // 10dBm → -95, 30dBm → -55
-        
-        // تأثير Q Value على المدى
-        int qPenalty = qValue * 2; // Q=0 → 0, Q=15 → -30
-        
-        // المسافة العشوائية (0-5 متر)
-        int distancePenalty = random.nextInt(30); // 0 إلى -30
-        
-        // التداخل العشوائي
-        int interference = random.nextInt(20) - 10; // -10 إلى +10
-        
-        // الحساب النهائي
+        int baseRssi = -95 + (powerDbm - 10) * 2;
+        int qPenalty = qValue * 2;
+        int distancePenalty = random.nextInt(30);
+        int interference = random.nextInt(20) - 10;
         int rssi = baseRssi - qPenalty - distancePenalty + interference;
-        
-        // تحديد النطاق
         return Math.max(-100, Math.min(-30, rssi));
     }
     
@@ -337,9 +291,7 @@ public class SimulatorReader implements MiraIRFIDReader {
     public void stopScan() {
         isScanning = false;
         mainHandler.post(() -> {
-            if (listener != null) {
-                listener.onScanStopped();
-            }
+            if (listener != null) listener.onScanStopped();
         });
     }
     
@@ -352,24 +304,20 @@ public class SimulatorReader implements MiraIRFIDReader {
     public void setPower(int powerDbm) {
         this.powerDbm = Math.max(10, Math.min(30, powerDbm));
         saveSettings();
-        Log.d(TAG, "Simulator power set to: " + this.powerDbm + " dBm");
     }
     
     @Override
     public void setRssiThreshold(int threshold) {
         this.rssiThreshold = Math.max(-100, Math.min(-30, threshold));
         saveSettings();
-        Log.d(TAG, "Simulator RSSI threshold set to: " + this.rssiThreshold);
     }
     
     @Override
     public void setScanInterval(int intervalMs) {
         this.scanIntervalMs = Math.max(50, Math.min(1000, intervalMs));
         saveSettings();
-        Log.d(TAG, "Simulator scan interval set to: " + this.scanIntervalMs + "ms");
     }
     
-    // Getters
     public int getPowerDbm() { return powerDbm; }
     public int getRssiThreshold() { return rssiThreshold; }
     public int getScanIntervalMs() { return scanIntervalMs; }
@@ -413,65 +361,105 @@ public class SimulatorReader implements MiraIRFIDReader {
         this.listener = listener;
     }
     
-    // عمليات القراءة والكتابة - محاكاة
+    // ==================== ✅ عمليات القراءة/الكتابة المحسنة ====================
+    
     @Override
     public boolean writeData(String pwdStr, int bank, int ptr, String data) {
-        Log.d(TAG, "Simulator writeData: bank=" + bank + ", ptr=" + ptr);
+        if (isTagLocked) {
+            Log.w(TAG, "❌ الشريحة مقفلة - لا يمكن الكتابة");
+            return false;
+        }
+        
+        if (filterActive && filterBank == bank && !data.startsWith(filterData)) {
+            Log.w(TAG, "❌ الشريحة لا تطابق الفلتر");
+            return false;
+        }
+        
+        if (data != null && !data.isEmpty()) {
+            currentEpc = data;
+            lastWrittenEpc = data;
+            Log.d(TAG, "✅ Simulator writeData: bank=" + bank + ", data=" + data);
+        }
         return true;
     }
     
     @Override
     public String readData(String pwdStr, int bank, int ptr, int len) {
-        return "00000000";
-    }
-    
-    @Override
-    public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
-        return true;
-    }
-    
-    @Override
-    public boolean setFilter(int bank, int ptr, String filterData) {
-        return true;
-    }
-    
-    @Override
-    public void clearFilter() {
-        Log.d(TAG, "Simulator clearFilter");
+        switch (bank) {
+            case 1: return currentEpc;
+            case 2: return simulatedTid;
+            default: return "00000000";
+        }
     }
     
     @Override
     public boolean writeEpc(String newEpc, String accessPassword) {
-        return true;
-    }
-    
-    @Override
-    public boolean writeUserMemory(int address, String data, String accessPassword) {
+        if (isTagLocked) {
+            Log.w(TAG, "❌ الشريحة مقفلة");
+            return false;
+        }
+        if (newEpc != null && !newEpc.isEmpty()) {
+            currentEpc = newEpc;
+            lastWrittenEpc = newEpc;
+            Log.d(TAG, "✅ Simulator writeEpc: " + newEpc);
+        }
         return true;
     }
     
     @Override
     public String readTid() {
-        return "E28068940000501A2B3C4D5E6F";
+        return simulatedTid;
     }
     
     @Override
-    public String readUserMemory(int address, int length) {
-        return "00000000";
+    public boolean setTagLockState(String pwdStr, int bank, boolean shouldLock) {
+        isTagLocked = shouldLock;
+        Log.d(TAG, (shouldLock ? "🔒" : "🔓") + " Tag " + (shouldLock ? "locked" : "unlocked"));
+        return true;
     }
     
     @Override
     public boolean lockTag(String accessPassword) {
+        isTagLocked = true;
         return true;
     }
     
     @Override
     public boolean unlockTag(String accessPassword) {
+        isTagLocked = false;
         return true;
     }
     
     @Override
     public boolean killTag(String accessPassword) {
+        currentEpc = "";
         return true;
+    }
+    
+    @Override
+    public boolean setFilter(int bank, int ptr, String filterData) {
+        this.filterBank = bank;
+        this.filterData = filterData;
+        this.filterActive = true;
+        Log.d(TAG, "✅ Filter set: bank=" + bank + ", data=" + filterData);
+        return true;
+    }
+    
+    @Override
+    public void clearFilter() {
+        this.filterActive = false;
+        this.filterData = "";
+        Log.d(TAG, "✅ Filter cleared");
+    }
+    
+    @Override
+    public boolean writeUserMemory(int address, String data, String accessPassword) {
+        if (isTagLocked) return false;
+        return true;
+    }
+    
+    @Override
+    public String readUserMemory(int address, int length) {
+        return "00000000";
     }
 }
