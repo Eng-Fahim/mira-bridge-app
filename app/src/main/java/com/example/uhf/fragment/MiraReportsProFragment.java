@@ -915,20 +915,23 @@ private Bitmap createFinancialBarChart(JSONObject data) {
                 rvData.setAdapter(reportAdapter);
                 
                 // ✅ عرض الرسم البياني
- if (dialogView != null) {
-        Bitmap chart = createChartForReport(type, result.data);
-        ImageView ivChart = dialogView.findViewById(R.id.ivChart);
-        View scrollChart = dialogView.findViewById(R.id.scrollChart);
-        if (ivChart != null && scrollChart != null) {
-            if (chart != null) {
-                ivChart.setImageBitmap(chart);
-                scrollChart.setVisibility(View.VISIBLE);
-            } else {
-                scrollChart.setVisibility(View.GONE);
+            // ✅ عرض الرسم البياني
+            if (dialogView != null) {
+                Bitmap chart = createChartForReport(type, result.data);
+                ImageView ivChart = dialogView.findViewById(R.id.ivChart);
+                View scrollChart = dialogView.findViewById(R.id.scrollChart);
+                if (ivChart != null && scrollChart != null) {
+                    if (chart != null) {
+                        ivChart.setImageBitmap(chart);
+                        scrollChart.setVisibility(View.VISIBLE);
+                    } else {
+                        scrollChart.setVisibility(View.GONE);
+                    }
+                }
             }
-        }
-    }
-}
+        });  
+}  
+
     
     private void fetchAdvancedReport(String type, ReportModels.ReportFilters filters) {
         if (filters == null) {
