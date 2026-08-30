@@ -13,11 +13,14 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.content.Intent;  // ✅ أضف هذا
+import android.net.Uri;  // ✅ أضف هذا
 
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.widget.ImageView;
 import com.example.uhf.charts.ReportChartGenerator;
+import androidx.core.content.FileProvider;  // ✅ أضف هذا
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -47,6 +50,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
