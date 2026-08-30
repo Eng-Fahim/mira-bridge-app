@@ -209,70 +209,57 @@ public class MiraRfidService {
      * ✅ البحث عن قطعة في MIRA باستخدام MiraApiClient
      */
     public JSONObject searchInMira(String identifier, String identifierType) {
-        try {
-            Log.d(TAG, "🔍 البحث في MIRA: " + identifier + " (type: " + identifierType + ")");
+    try {
+        Log.d(TAG, "🔍 البحث في MIRA: " + identifier);
+        
+        MiraApiClient apiClient = MiraApiClient.getInstance(context);
+        MiraApiClient.ApiResponse response = apiClient.getItemDetail(identifier);
+        
+        if (response != null && response.isSuccess && response.data != null) {
+            // ✅ السيرفر يرجع: {"success": true, "item": {...}}
+            JSONObject item = response.data.optJSONObject("item");
             
-            // ✅ استخدام MiraApiClient - نفس الإعدادات والمفاتيح
-            MiraApiClient apiClient = MiraApiClient.getInstance(context);
-            MiraApiClient.ApiResponse response = apiClient.getItemDetail(identifier);
-            
-            // ✅ تسجيل النتيجة للتشخيص
-            if (response != null) {
-                Log.d(TAG, "Response Code: " + response.code);
-                Log.d(TAG, "Response Success: " + response.isSuccess);
-                Log.d(TAG, "Response Error: " + response.error);
-                Log.d(TAG, "Response Body: " + response.getBody());
-            } else {
-                Log.e(TAG, "Response is NULL!");
-            }
-            
-            if (response != null && response.isSuccess && response.data != null) {
+            if (item != null) {
                 JSONObject result = new JSONObject();
-                
-                // ✅ استخراج بيانات القطعة
-                JSONObject item = response.data.optJSONObject("item");
-                if (item == null) item = response.data.optJSONObject("data");
-                if (item == null) item = response.data;
-                
                 result.put("item", item);
                 
-                // ✅ Barcode
+                // ✅ Barcode من item مباشرة
                 JSONObject barcode = new JSONObject();
-                barcode.put("gtin", item.optString("gtin13", item.optString("gtin", item.optString("barcode", ""))));
-                barcode.put("serial_no", item.optString("serial_number", item.optString("serial", "")));
+                barcode.put("gtin", item.optString("gtin", ""));
+                barcode.put("serial_no", item.optString("serial", ""));
                 result.put("barcode", barcode);
                 
                 // ✅ Stock
                 JSONObject stock = new JSONObject();
-                stock.put("branch_name", item.optString("branch_name", ""));
-                stock.put("status", item.optString("vault_status", item.optString("status", "available")));
+                stock.put("status", item.optString("status", "available"));
+                stock.put("branch_name", item.optString("location", ""));
                 result.put("stock", stock);
                 
                 // ✅ Location
                 JSONObject location = new JSONObject();
-                location.put("zone_name", item.optString("current_location", item.optString("location", "")));
+                location.put("zone_name", item.optString("location", ""));
                 result.put("location", location);
                 
-                Log.d(TAG, "✅ تم العثور على القطعة: " + item.optString("title", identifier));
+                Log.d(TAG, "✅ تم العثور على القطعة: " + item.optString("title", ""));
                 return result;
             }
-            
-            Log.e(TAG, "❌ القطعة غير موجودة أو خطأ في API");
-            
-            // ✅ في وضع المحاكاة - إرجاع بيانات تجريبية
-            if (isSimulationMode) {
-                return createSimulatedSearchResult(identifier);
-            }
-            return null;
-            
-        } catch (Exception e) {
-            Log.e(TAG, "searchInMira error: " + e.getMessage(), e);
-            if (isSimulationMode) {
-                return createSimulatedSearchResult(identifier);
-            }
-            return null;
         }
+        
+        Log.e(TAG, "❌ القطعة غير موجودة - Response: " + (response != null ? response.getBody() : "null"));
+        
+        if (isSimulationMode) {
+            return createSimulatedSearchResult(identifier);
+        }
+        return null;
+        
+    } catch (Exception e) {
+        Log.e(TAG, "searchInMira error: " + e.getMessage());
+        if (isSimulationMode) {
+            return createSimulatedSearchResult(identifier);
+        }
+        return null;
     }
+}
     
     private JSONObject createSimulatedSearchResult(String identifier) {
         try {
