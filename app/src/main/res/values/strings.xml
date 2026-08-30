@@ -237,6 +237,10 @@
 <string name="white_gold">⚪ ذهب أبيض</string>
 <string name="rose_gold">🔴 ذهب وردي</string>
 <string name="karat">العيار:</string>
+<string name="weight">الوزن</string>
+<string name="device">الجهاز</string>
+<string name="date">التاريخ</string>
+<string name="status">الحالة</string>
 <string name="gross_weight_label">الوزن القائم (جرام)</string>
 <string name="estimated_gold_value">القيمة التقديرية للذهب الخام:</string>
 <string name="stones_title">الأحجار والتطعيم</string>
