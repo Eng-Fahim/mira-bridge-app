@@ -395,6 +395,7 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
             Toast.makeText(mContext, "ابحث عن القطعة في MIRA أولاً", Toast.LENGTH_SHORT).show();
             return;
         }
+        rfidService.resetForNewTag();
 
         final AlertDialog loadingDialog = showProfessionalLoadingDialog("🔄 جاري البرمجة...", "قراءة TID، كتابة EPC، التحقق والتسجيل");
         showProgress(true);
@@ -819,4 +820,4 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         }
         super.onDestroyView();
     }
-                                                                }
+}
