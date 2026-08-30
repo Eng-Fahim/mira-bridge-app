@@ -156,54 +156,36 @@ public class MiraRfidService {
     }
     
     public boolean registerRfidBinding(String miraId, String epc, String tid) {
-        currentState = OperationState.REGISTERING;
-        try {
-            MiraSettingsManager settingsManager = MiraSettingsManager.getInstance(context);
-            String apiUrl = settingsManager.getString("mira_api_url", "https://ams.ibreg.org/wp-json/mira-gate/v1/register_rfid");
-            String apiKey = settingsManager.getString("mira_api_key", "mira_gate_test071234567890abcdefghijklmnop");
-            
-            URL url = new URL(apiUrl);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-            conn.setConnectTimeout(10000);
-            conn.setReadTimeout(10000);
-            conn.setDoOutput(true);
-            
-            JSONObject payload = new JSONObject();
-            payload.put("mira_id", miraId);
-            payload.put("epc", epc);
-            payload.put("tid", tid);
-            payload.put("gate_id", "handheld_c72");
-            payload.put("action", "register_rfid_binding");
-            payload.put("device_type", isSimulationMode ? "simulator" : "chainway_c72");
-            
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(payload.toString().getBytes("utf-8"));
-            }
-            
-            int responseCode = conn.getResponseCode();
-            if (responseCode >= 200 && responseCode < 300) {
-                currentState = OperationState.COMPLETED;
-                return true;
-            }
-            
-            if (isSimulationMode) {
-                currentState = OperationState.COMPLETED;
-                return true;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "registerRfidBinding error: " + e.getMessage());
-            if (isSimulationMode) {
-                currentState = OperationState.COMPLETED;
-                return true;
-            }
-        }
-        
-        currentState = OperationState.FAILED;
-        return false;
+    currentState = OperationState.REGISTERING;
+    
+    // ✅ في وضع المحاكاة - نجاح وهمي
+    if (isSimulationMode) {
+        Log.d(TAG, "🔄 محاكاة تسجيل الربط: " + miraId + " → " + epc);
+        currentState = OperationState.COMPLETED;
+        return true;
     }
+    
+    // ✅ مع جهاز حقيقي - استخدم MiraApiClient
+    try {
+        MiraApiClient apiClient = MiraApiClient.getInstance(context);
+        JSONObject payload = new JSONObject();
+        payload.put("mira_id", miraId);
+        payload.put("epc", epc);
+        payload.put("tid", tid);
+        
+        MiraApiClient.ApiResponse response = apiClient.postWithAuth("/rfid/binding", payload);
+        
+        if (response != null && response.isSuccess) {
+            currentState = OperationState.COMPLETED;
+            return true;
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "registerRfidBinding error: " + e.getMessage());
+    }
+    
+    currentState = OperationState.FAILED;
+    return false;
+}
     
     /**
      * ✅ البحث عن قطعة في MIRA باستخدام MiraApiClient
