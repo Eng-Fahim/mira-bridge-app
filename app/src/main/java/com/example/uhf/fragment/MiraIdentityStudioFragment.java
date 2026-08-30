@@ -663,8 +663,9 @@ private void toggleStonesDetails(boolean show) {
         showToast("❌ " + e.getMessage());
     }
 }
+
 /**
- * ✅ برمجة الشريحة تلقائياً بعد حفظ القطعة
+ * ✅ برمجة الشريحة تلقائياً بعد حفظ القطعة - مع القفل النهائي
  */
 private void programTagAutomatically(int itemId, String miraId, String title) {
     try {
@@ -676,7 +677,7 @@ private void programTagAutomatically(int itemId, String miraId, String title) {
         // ✅ إعادة تهيئة للشريحة الجديدة
         rfidService.resetForNewTag();
         
-        // ✅ قراءة TID من الشريحة
+        // ✅ 1. قراءة TID من الشريحة
         String tid = rfidService.readTid("00000000");
         Log.d(TAG, "TID: " + tid);
         
@@ -686,37 +687,58 @@ private void programTagAutomatically(int itemId, String miraId, String title) {
             return;
         }
         
-        // ✅ توليد EPC من معرف القطعة
+        // ✅ 2. توليد EPC من معرف القطعة
         String generatedEpc = rfidService.generateEpcFromMiraId(miraId);
         Log.d(TAG, "Generated EPC: " + generatedEpc);
         
-        // ✅ كتابة EPC على الشريحة
+        // ✅ 3. كتابة EPC على الشريحة
         boolean writeSuccess = rfidService.writeEpc(generatedEpc, "00000000");
         Log.d(TAG, "Write: " + writeSuccess);
         
-        // ✅ التحقق من الكتابة
+        // ✅ 4. التحقق من الكتابة
         boolean verifySuccess = writeSuccess && rfidService.verifyWrite(generatedEpc, "00000000");
         Log.d(TAG, "Verify: " + verifySuccess);
         
-        // ✅ تسجيل الربط في قاعدة البيانات
+        // ✅ 5. تسجيل الربط في قاعدة البيانات
+        boolean registered = false;
         if (verifySuccess) {
-            boolean registered = rfidService.registerRfidBinding(miraId, generatedEpc, tid);
+            registered = rfidService.registerRfidBinding(miraId, generatedEpc, tid);
             Log.d(TAG, "Register: " + registered);
-            
-            final boolean success = registered;
-            final String finalEpc = generatedEpc;
-            final String finalTid = tid;
-            
-            safeRun(() -> {
-                if (success) {
-                    showToast(isArabic ? "✅ تم برمجة الشريحة وربطها بالقطعة بنجاح!" : "✅ RFID programmed and bound successfully!");
-                } else {
-                    showToast(isArabic ? "⚠️ تم حفظ القطعة ولكن فشل تسجيل الربط" : "⚠️ Item saved but binding failed");
-                }
-            });
-        } else {
-            safeRun(() -> showToast(isArabic ? "⚠️ تم حفظ القطعة ولكن فشلت برمجة الشريحة" : "⚠️ Item saved but RFID programming failed"));
         }
+        
+        // ✅✅✅ 6. قفل الشريحة تلقائياً بعد النجاح
+        boolean locked = false;
+        if (verifySuccess && registered) {
+            locked = rfidService.setTagLockState("00000000", 1, true);
+            Log.d(TAG, "Lock: " + locked);
+        }
+        
+        // ✅ النتيجة النهائية
+        final boolean finalWrite = writeSuccess;
+        final boolean finalVerify = verifySuccess;
+        final boolean finalRegistered = registered;
+        final boolean finalLocked = locked;
+        final String finalEpc = generatedEpc;
+        final String finalTid = tid;
+        
+        safeRun(() -> {
+            if (finalWrite && finalVerify && finalRegistered && finalLocked) {
+                // ✅ نجاح كامل
+                showToast(isArabic ? 
+                    "✅ تم برمجة الشريحة وقفلها وربطها بالقطعة بنجاح!\nEPC: " + finalEpc + "\nTID: " + finalTid : 
+                    "✅ RFID programmed, locked, and bound!\nEPC: " + finalEpc + "\nTID: " + finalTid);
+            } else if (finalWrite && finalVerify && finalRegistered) {
+                // ⚠️ نجاح جزئي - القفل فشل
+                showToast(isArabic ? 
+                    "⚠️ تم البرمجة والربط ولكن فشل قفل الشريحة" : 
+                    "⚠️ Programmed and bound but lock failed");
+            } else {
+                // ❌ فشل
+                showToast(isArabic ? 
+                    "⚠️ فشلت برمجة الشريحة (كتابة: " + (finalWrite ? "✅" : "❌") + " | تحقق: " + (finalVerify ? "✅" : "❌") + " | تسجيل: " + (finalRegistered ? "✅" : "❌") + ")" : 
+                    "⚠️ RFID programming failed (Write: " + (finalWrite ? "✅" : "❌") + " | Verify: " + (finalVerify ? "✅" : "❌") + " | Register: " + (finalRegistered ? "✅" : "❌") + ")");
+            }
+        });
         
     } catch (Exception e) {
         Log.e(TAG, "programTagAutomatically error: " + e.getMessage(), e);
