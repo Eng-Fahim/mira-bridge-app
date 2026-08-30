@@ -39,7 +39,7 @@ public class ReportRepository {
     }
     
     /**
-     * ✅ جلب تقرير - يستخدم getReportData التي كانت تعمل في الكود القديم
+     * ✅ جلب التقارير العادية - يستخدم /reports-app
      */
     public LiveData<ReportModels.ReportResult> fetchReport(String type, 
                                                            ReportModels.ReportFilters filters) {
@@ -47,9 +47,24 @@ public class ReportRepository {
         
         executorService.execute(() -> {
             try {
-                // ✅ استخدام نفس الدالة التي كانت تعمل في الكود القديم
+                Log.d(TAG, "=== Fetching Report ===");
+                Log.d(TAG, "Type: " + type);
+                Log.d(TAG, "Branch: " + filters.branchId);
+                Log.d(TAG, "From: " + filters.fromDate);
+                Log.d(TAG, "To: " + filters.toDate);
+                
+                // ✅ استخدام getReportData لجميع التقارير العادية
                 MiraApiClient.ApiResponse response = apiClient.getReportData(
                     type, filters.fromDate, filters.toDate, filters.branchId);
+                
+                if (response != null) {
+                    Log.d(TAG, "Response Code: " + response.code);
+                    Log.d(TAG, "Response Success: " + response.isSuccess);
+                    Log.d(TAG, "Response Error: " + response.error);
+                    Log.d(TAG, "Response Body: " + response.getBody());
+                } else {
+                    Log.d(TAG, "Response is NULL!");
+                }
                 
                 if (response == null || !response.isSuccess) {
                     String errorMsg = response != null ? 
@@ -60,7 +75,7 @@ public class ReportRepository {
                 
                 JSONObject data = response.data;
                 
-                // إذا البيانات فارغة، حاول من raw body
+                // ✅ إذا البيانات فارغة، حاول من raw body
                 if (data == null && response.getBody() != null) {
                     try {
                         String rawBody = response.getBody();
@@ -68,7 +83,7 @@ public class ReportRepository {
                             JSONArray rootArray = new JSONArray(rawBody);
                             data = new JSONObject();
                             data.put("items_list", rootArray);
-                        } else {
+                        } else if (rawBody.trim().startsWith("{")) {
                             data = new JSONObject(rawBody);
                         }
                     } catch (Exception e) {
@@ -81,7 +96,14 @@ public class ReportRepository {
                     return;
                 }
                 
-                resultLiveData.postValue(ReportModels.ReportResult.success(data));
+                // ✅ استخراج data من الاستجابة
+                // السيرفر يرجع: {"success": true, "data": {...}, "type": "...", "branch_id": X}
+                JSONObject innerData = data.optJSONObject("data");
+                if (innerData == null) {
+                    innerData = data; // استخدم البيانات كما هي
+                }
+                
+                resultLiveData.postValue(ReportModels.ReportResult.success(innerData));
                 
             } catch (Exception e) {
                 Log.e(TAG, "Error: " + e.getMessage(), e);
@@ -93,7 +115,7 @@ public class ReportRepository {
     }
     
     /**
-     * ✅ جلب تقرير متقدم - يستخدم /reports-analytics مثل الكود القديم
+     * ✅ جلب التقارير المتقدمة - يستخدم /reports-analytics
      */
     public LiveData<ReportModels.ReportResult> fetchAdvancedReport(String type, 
                                                                     ReportModels.ReportFilters filters) {
@@ -101,7 +123,6 @@ public class ReportRepository {
         
         executorService.execute(() -> {
             try {
-                // ✅ بناء الرابط مثل الكود القديم
                 StringBuilder endpoint = new StringBuilder("/reports-analytics?type=").append(type);
                 
                 if (filters.userId > 0) endpoint.append("&user_id=").append(filters.userId);
@@ -121,6 +142,11 @@ public class ReportRepository {
                 
                 MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint.toString());
                 
+                if (response != null) {
+                    Log.d(TAG, "Advanced Response Code: " + response.code);
+                    Log.d(TAG, "Advanced Response Body: " + response.getBody());
+                }
+                
                 if (response == null || !response.isSuccess) {
                     resultLiveData.postValue(ReportModels.ReportResult.error("Failed to load"));
                     return;
@@ -132,7 +158,13 @@ public class ReportRepository {
                     return;
                 }
                 
-                resultLiveData.postValue(ReportModels.ReportResult.success(data));
+                // ✅ استخراج data من الاستجابة
+                JSONObject innerData = data.optJSONObject("data");
+                if (innerData == null) {
+                    innerData = data;
+                }
+                
+                resultLiveData.postValue(ReportModels.ReportResult.success(innerData));
                 
             } catch (Exception e) {
                 Log.e(TAG, "Error: " + e.getMessage(), e);
@@ -198,7 +230,6 @@ public class ReportRepository {
             try {
                 List<ReportModels.GateInfo> gates = new ArrayList<>();
                 
-                // ✅ نفس الرابط الذي كان يعمل في الكود القديم
                 String endpoint = "/gates?branch_id=" + branchId;
                 MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint);
                 
