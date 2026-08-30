@@ -17,9 +17,6 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/**
- * ✅ مستودع التقارير - يستخدم الدوال الصحيحة من MiraApiClient
- */
 public class ReportRepository {
     private static final String TAG = "ReportRepository";
     private static ReportRepository instance;
@@ -42,7 +39,7 @@ public class ReportRepository {
     }
     
     /**
-     * ✅ جلب تقرير باستخدام الدوال الصحيحة من MiraApiClient
+     * ✅ جلب تقرير - يستخدم getReportData التي كانت تعمل في الكود القديم
      */
     public LiveData<ReportModels.ReportResult> fetchReport(String type, 
                                                            ReportModels.ReportFilters filters) {
@@ -50,67 +47,41 @@ public class ReportRepository {
         
         executorService.execute(() -> {
             try {
-                MiraApiClient.ApiResponse response = null;
+                // ✅ استخدام نفس الدالة التي كانت تعمل في الكود القديم
+                MiraApiClient.ApiResponse response = apiClient.getReportData(
+                    type, filters.fromDate, filters.toDate, filters.branchId);
                 
-                // ✅ استخدام الدوال الصحيحة لكل نوع تقرير
-                switch (type) {
-                    case "dashboard":
-                        response = apiClient.getDashboardFull(filters.branchId);
-                        break;
-                        
-                    case "sales":
-                        response = apiClient.getSalesHistoryByDateRange(
-                            filters.fromDate, filters.toDate, 1, 100);
-                        break;
-                        
-                    case "inventory":
-                        response = apiClient.getInventorySessionsList();
-                        break;
-                        
-                    case "movement":
-                        response = apiClient.getTransfers(filters.branchId, "");
-                        break;
-                        
-                    case "branches":
-                        response = apiClient.getBranches();
-                        break;
-                        
-                    case "gates":
-                        response = apiClient.getGatesByBranch(filters.branchId);
-                        break;
-                        
-                    case "audit":
-                        response = apiClient.getInventoryReports(filters.branchId, 1, 100);
-                        break;
-                        
-                    case "users":
-                        response = apiClient.getUsers();
-                        break;
-                        
-                    case "financial":
-                        response = apiClient.getJournalEntries(String.valueOf(filters.branchId));
-                        break;
-                        
-                    case "reorder":
-                        response = apiClient.getReportData("reorder", 
-                            filters.fromDate, filters.toDate, filters.branchId);
-                        break;
-                        
-                    default:
-                        // ✅ للتقارير غير المعروفة - استخدم getReportData
-                        response = apiClient.getReportData(type, 
-                            filters.fromDate, filters.toDate, filters.branchId);
-                        break;
-                }
-                
-                if (response == null || !response.isSuccess || response.data == null) {
+                if (response == null || !response.isSuccess) {
                     String errorMsg = response != null ? 
                         (response.error != null ? response.error : "Network error") : "Network error";
                     resultLiveData.postValue(ReportModels.ReportResult.error(errorMsg));
                     return;
                 }
                 
-                resultLiveData.postValue(ReportModels.ReportResult.success(response.data));
+                JSONObject data = response.data;
+                
+                // إذا البيانات فارغة، حاول من raw body
+                if (data == null && response.getBody() != null) {
+                    try {
+                        String rawBody = response.getBody();
+                        if (rawBody.trim().startsWith("[")) {
+                            JSONArray rootArray = new JSONArray(rawBody);
+                            data = new JSONObject();
+                            data.put("items_list", rootArray);
+                        } else {
+                            data = new JSONObject(rawBody);
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Parse error: " + e.getMessage());
+                    }
+                }
+                
+                if (data == null) {
+                    resultLiveData.postValue(ReportModels.ReportResult.error("No data available"));
+                    return;
+                }
+                
+                resultLiveData.postValue(ReportModels.ReportResult.success(data));
                 
             } catch (Exception e) {
                 Log.e(TAG, "Error: " + e.getMessage(), e);
@@ -122,7 +93,7 @@ public class ReportRepository {
     }
     
     /**
-     * ✅ جلب تقرير متقدم
+     * ✅ جلب تقرير متقدم - يستخدم /reports-analytics مثل الكود القديم
      */
     public LiveData<ReportModels.ReportResult> fetchAdvancedReport(String type, 
                                                                     ReportModels.ReportFilters filters) {
@@ -130,44 +101,38 @@ public class ReportRepository {
         
         executorService.execute(() -> {
             try {
-                MiraApiClient.ApiResponse response = null;
+                // ✅ بناء الرابط مثل الكود القديم
+                StringBuilder endpoint = new StringBuilder("/reports-analytics?type=").append(type);
                 
-                switch (type) {
-                    case "user_timeline":
-                        response = apiClient.getUserActivityLogs(filters.userId, 100);
-                        break;
-                        
-                    case "item_passport":
-                        response = apiClient.getItemDetail(filters.serialNumber);
-                        break;
-                        
-                    case "gate_security_index":
-                        response = apiClient.getGatesStats();
-                        break;
-                        
-                    case "inventory_aging":
-                        response = apiClient.getReportData("inventory_aging", 
-                            filters.fromDate, filters.toDate, filters.branchId);
-                        break;
-                        
-                    case "audit_discrepancy_detail":
-                        response = apiClient.getInventoryReports(filters.branchId, 1, 100);
-                        break;
-                        
-                    default:
-                        response = apiClient.getReportData(type, 
-                            filters.fromDate, filters.toDate, filters.branchId);
-                        break;
-                }
+                if (filters.userId > 0) endpoint.append("&user_id=").append(filters.userId);
+                if (filters.serialNumber != null && !filters.serialNumber.isEmpty()) 
+                    endpoint.append("&serial_number=").append(filters.serialNumber);
+                if (filters.gtin13 != null && !filters.gtin13.isEmpty()) 
+                    endpoint.append("&gtin13=").append(filters.gtin13);
+                if (filters.gateId > 0) endpoint.append("&gate_id=").append(filters.gateId);
+                if (filters.fromDate != null && !filters.fromDate.isEmpty()) 
+                    endpoint.append("&from=").append(filters.fromDate);
+                if (filters.toDate != null && !filters.toDate.isEmpty()) 
+                    endpoint.append("&to=").append(filters.toDate);
+                if (filters.branchId > 0) 
+                    endpoint.append("&branch_id=").append(filters.branchId);
                 
-                if (response == null || !response.isSuccess || response.data == null) {
-                    String errorMsg = response != null ? 
-                        (response.error != null ? response.error : "Failed to load") : "Failed to load";
-                    resultLiveData.postValue(ReportModels.ReportResult.error(errorMsg));
+                Log.d(TAG, "Advanced Report URL: " + endpoint);
+                
+                MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint.toString());
+                
+                if (response == null || !response.isSuccess) {
+                    resultLiveData.postValue(ReportModels.ReportResult.error("Failed to load"));
                     return;
                 }
                 
-                resultLiveData.postValue(ReportModels.ReportResult.success(response.data));
+                JSONObject data = response.data;
+                if (data == null) {
+                    resultLiveData.postValue(ReportModels.ReportResult.error("No data available"));
+                    return;
+                }
+                
+                resultLiveData.postValue(ReportModels.ReportResult.success(data));
                 
             } catch (Exception e) {
                 Log.e(TAG, "Error: " + e.getMessage(), e);
@@ -215,7 +180,7 @@ public class ReportRepository {
                 usersLiveData.postValue(users);
                 
             } catch (Exception e) {
-                Log.e(TAG, "Error fetching users: " + e.getMessage(), e);
+                Log.e(TAG, "Error: " + e.getMessage(), e);
                 usersLiveData.postValue(new ArrayList<>());
             }
         });
@@ -233,7 +198,10 @@ public class ReportRepository {
             try {
                 List<ReportModels.GateInfo> gates = new ArrayList<>();
                 
-                MiraApiClient.ApiResponse response = apiClient.getGatesByBranch(branchId);
+                // ✅ نفس الرابط الذي كان يعمل في الكود القديم
+                String endpoint = "/gates?branch_id=" + branchId;
+                MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint);
+                
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray gatesArray = response.data.optJSONArray("gates");
                     if (gatesArray == null) {
@@ -259,7 +227,7 @@ public class ReportRepository {
                 gatesLiveData.postValue(gates);
                 
             } catch (Exception e) {
-                Log.e(TAG, "Error fetching gates: " + e.getMessage(), e);
+                Log.e(TAG, "Error: " + e.getMessage(), e);
                 gatesLiveData.postValue(new ArrayList<>());
             }
         });
