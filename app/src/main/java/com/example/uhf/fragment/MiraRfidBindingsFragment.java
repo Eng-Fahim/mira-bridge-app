@@ -61,7 +61,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_rfid_bindings, container, false);
+        return inflater.inflate(R.layout.fragment_mira_rfid_bindings, container, false);
     }
     
     @Override
