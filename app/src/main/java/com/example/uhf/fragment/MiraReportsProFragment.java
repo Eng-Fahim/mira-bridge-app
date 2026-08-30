@@ -14,6 +14,11 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.widget.ImageView;
+import com.example.uhf.charts.ReportChartGenerator;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
@@ -433,6 +438,337 @@ public class MiraReportsProFragment extends Fragment {
         }
     }
     
+    /**
+ * ✅ إنشاء رسم بياني حسب نوع التقرير
+ */
+private Bitmap createChartForReport(String type, JSONObject data) {
+    if (data == null) return null;
+    
+    switch (type) {
+        case "dashboard":
+            return createKaratBarChart(data);
+        case "sales":
+            return createPaymentPieChart(data);
+        case "inventory":
+            return createKaratBarChart(data);
+        case "branches":
+            return createBranchesBarChart(data);
+        case "gates":
+            return createGatesPieChart(data);
+        case "audit":
+            return createAuditPieChart(data);
+        case "users":
+            return createUsersBarChart(data);
+        case "reorder":
+            return createKaratBarChart(data);
+        case "financial":
+            return createFinancialBarChart(data);
+        default:
+            return null;
+    }
+}
+
+/**
+ * ✅ رسم شريطي للعيارات
+ */
+private Bitmap createKaratBarChart(JSONObject data) {
+    try {
+        List<ReportChartGenerator.ChartData> chartData = new ArrayList<>();
+        
+        // محاولة من karat_breakdown
+        JSONArray karatBreakdown = data.optJSONArray("karat_breakdown");
+        if (karatBreakdown == null) {
+            karatBreakdown = data.optJSONArray("breakdown_by_karat");
+        }
+        if (karatBreakdown == null) {
+            karatBreakdown = data.optJSONArray("reorder_items");
+        }
+        
+        if (karatBreakdown != null && karatBreakdown.length() > 0) {
+            int[] colors = {Color.parseColor("#C9A961"), Color.parseColor("#E5C87E"), 
+                           Color.parseColor("#A8893F"), Color.parseColor("#8C6D23"),
+                           Color.parseColor("#6B8E23")};
+            for (int i = 0; i < karatBreakdown.length(); i++) {
+                JSONObject obj = karatBreakdown.optJSONObject(i);
+                if (obj != null) {
+                    String label = obj.optString("gold_karat", obj.optString("karat", "K"));
+                    float value = (float) obj.optDouble("weight", 
+                        obj.optDouble("gross_weight", obj.optDouble("count", 
+                        obj.optDouble("remaining_stock", 0))));
+                    chartData.add(new ReportChartGenerator.ChartData(
+                        label, value, colors[i % colors.length]));
+                }
+            }
+        }
+        
+        // محاولة من items
+        if (chartData.isEmpty()) {
+            JSONArray items = extractItemsArray(data);
+            if (items != null) {
+                java.util.Map<String, Float> karatMap = new java.util.HashMap<>();
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject item = items.optJSONObject(i);
+                    if (item != null) {
+                        String karat = item.optString("gold_karat", item.optString("karat", "غير محدد"));
+                        float weight = (float) item.optDouble("gross_weight_grams", 
+                            item.optDouble("weight", 0));
+                        karatMap.merge(karat, weight, Float::sum);
+                    }
+                }
+                
+                int[] colors = {Color.parseColor("#C9A961"), Color.parseColor("#E5C87E"), 
+                               Color.parseColor("#A8893F"), Color.parseColor("#8C6D23")};
+                int idx = 0;
+                for (java.util.Map.Entry<String, Float> entry : karatMap.entrySet()) {
+                    chartData.add(new ReportChartGenerator.ChartData(
+                        entry.getKey(), entry.getValue(), colors[idx % colors.length]));
+                    idx++;
+                }
+            }
+        }
+        
+        if (!chartData.isEmpty()) {
+            return ReportChartGenerator.generateBarChart(chartData,
+                isArabic ? "الوزن حسب العيار" : "Weight by Karat",
+                800, 500, isArabic);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Karat chart error: " + e.getMessage());
+    }
+    return null;
+}
+
+/**
+ * ✅ رسم دائري لطرق الدفع
+ */
+private Bitmap createPaymentPieChart(JSONObject data) {
+    try {
+        JSONArray paymentBreakdown = data.optJSONArray("payment_breakdown");
+        
+        if (paymentBreakdown != null && paymentBreakdown.length() > 0) {
+            List<ReportChartGenerator.ChartData> chartData = new ArrayList<>();
+            int[] colors = {Color.parseColor("#4CAF50"), Color.parseColor("#2196F3"), 
+                           Color.parseColor("#9C27B0"), Color.parseColor("#FF9800")};
+            
+            for (int i = 0; i < paymentBreakdown.length(); i++) {
+                JSONObject payment = paymentBreakdown.optJSONObject(i);
+                if (payment != null) {
+                    String method = payment.optString("payment_method", "CASH");
+                    float total = (float) payment.optDouble("total", 0);
+                    String label = method;
+                    if (isArabic) {
+                        switch (method.toLowerCase()) {
+                            case "cash": label = "نقدي"; break;
+                            case "card": label = "بطاقة"; break;
+                            case "transfer": label = "تحويل"; break;
+                        }
+                    }
+                    chartData.add(new ReportChartGenerator.ChartData(
+                        label, total, colors[i % colors.length]));
+                }
+            }
+            
+            if (!chartData.isEmpty()) {
+                return ReportChartGenerator.generatePieChart(chartData,
+                    isArabic ? "طرق الدفع" : "Payment Methods",
+                    800, 600, isArabic);
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Payment chart error: " + e.getMessage());
+    }
+    return null;
+}
+
+/**
+ * ✅ رسم دائري للجرد
+ */
+private Bitmap createAuditPieChart(JSONObject data) {
+    try {
+        JSONObject auditSummary = data.optJSONObject("audit_summary");
+        
+        if (auditSummary != null) {
+            int found = auditSummary.optInt("found_items", 0);
+            int missing = auditSummary.optInt("missing_items", 0);
+            
+            if (found > 0 || missing > 0) {
+                List<ReportChartGenerator.ChartData> chartData = new ArrayList<>();
+                chartData.add(new ReportChartGenerator.ChartData(
+                    isArabic ? "موجود" : "Found", found, Color.parseColor("#4CAF50")));
+                chartData.add(new ReportChartGenerator.ChartData(
+                    isArabic ? "مفقود" : "Missing", missing, Color.parseColor("#F44336")));
+                
+                return ReportChartGenerator.generatePieChart(chartData,
+                    isArabic ? "نتيجة الجرد" : "Audit Result",
+                    800, 600, isArabic);
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Audit chart error: " + e.getMessage());
+    }
+    return null;
+}
+
+/**
+ * ✅ رسم شريطي للفروع
+ */
+private Bitmap createBranchesBarChart(JSONObject data) {
+    try {
+        JSONArray branches = data.optJSONArray("branches_performance");
+        if (branches == null) branches = data.optJSONArray("branches");
+        
+        if (branches != null && branches.length() > 0) {
+            List<ReportChartGenerator.ChartData> chartData = new ArrayList<>();
+            int[] colors = {Color.parseColor("#5C6BC0"), Color.parseColor("#26A69A"), 
+                           Color.parseColor("#FF7043"), Color.parseColor("#AB47BC")};
+            
+            for (int i = 0; i < branches.length(); i++) {
+                JSONObject branch = branches.optJSONObject(i);
+                if (branch != null) {
+                    String name = branch.optString("branch_name", 
+                        branch.optString("branch_name_ar", "فرع " + (i+1)));
+                    int count = branch.optInt("items_count", branch.optInt("count", 0));
+                    
+                    if (name.length() > 12) name = name.substring(0, 12) + "...";
+                    
+                    chartData.add(new ReportChartGenerator.ChartData(
+                        name, count, colors[i % colors.length]));
+                }
+            }
+            
+            if (!chartData.isEmpty()) {
+                return ReportChartGenerator.generateBarChart(chartData,
+                    isArabic ? "القطع حسب الفرع" : "Items by Branch",
+                    800, 500, isArabic);
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Branches chart error: " + e.getMessage());
+    }
+    return null;
+}
+
+/**
+ * ✅ رسم دائري للبوابات
+ */
+private Bitmap createGatesPieChart(JSONObject data) {
+    try {
+        JSONArray gateLogs = data.optJSONArray("gate_logs");
+        if (gateLogs == null) gateLogs = data.optJSONArray("gates");
+        
+        if (gateLogs != null && gateLogs.length() > 0) {
+            int allowed = 0, alerts = 0;
+            
+            for (int i = 0; i < gateLogs.length(); i++) {
+                JSONObject log = gateLogs.optJSONObject(i);
+                if (log != null) {
+                    int isAllowed = log.optInt("allowed", 1);
+                    if (isAllowed == 1) allowed++;
+                    else alerts++;
+                }
+            }
+            
+            List<ReportChartGenerator.ChartData> chartData = new ArrayList<>();
+            chartData.add(new ReportChartGenerator.ChartData(
+                isArabic ? "مسموح" : "Allowed", allowed, Color.parseColor("#4CAF50")));
+            chartData.add(new ReportChartGenerator.ChartData(
+                isArabic ? "إنذار" : "Alert", alerts, Color.parseColor("#F44336")));
+            
+            return ReportChartGenerator.generatePieChart(chartData,
+                isArabic ? "حركة البوابات" : "Gate Activity",
+                800, 600, isArabic);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Gates chart error: " + e.getMessage());
+    }
+    return null;
+}
+
+/**
+ * ✅ رسم شريطي للمستخدمين
+ */
+private Bitmap createUsersBarChart(JSONObject data) {
+    try {
+        JSONArray users = data.optJSONArray("users");
+        if (users == null) users = data.optJSONArray("data");
+        
+        if (users != null && users.length() > 0) {
+            java.util.Map<String, Integer> roleMap = new java.util.HashMap<>();
+            
+            for (int i = 0; i < users.length(); i++) {
+                JSONObject user = users.optJSONObject(i);
+                if (user != null) {
+                    String role = user.optString("role_name", user.optString("role", "غير محدد"));
+                    roleMap.merge(role, 1, Integer::sum);
+                }
+            }
+            
+            List<ReportChartGenerator.ChartData> chartData = new ArrayList<>();
+            int[] colors = {Color.parseColor("#7E57C2"), Color.parseColor("#26A69A"), 
+                           Color.parseColor("#FF7043"), Color.parseColor("#42A5F5")};
+            int idx = 0;
+            for (java.util.Map.Entry<String, Integer> entry : roleMap.entrySet()) {
+                chartData.add(new ReportChartGenerator.ChartData(
+                    entry.getKey(), entry.getValue(), colors[idx % colors.length]));
+                idx++;
+            }
+            
+            if (!chartData.isEmpty()) {
+                return ReportChartGenerator.generateBarChart(chartData,
+                    isArabic ? "المستخدمين حسب الدور" : "Users by Role",
+                    800, 500, isArabic);
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Users chart error: " + e.getMessage());
+    }
+    return null;
+}
+
+/**
+ * ✅ رسم شريطي للمالية
+ */
+private Bitmap createFinancialBarChart(JSONObject data) {
+    try {
+        JSONArray entries = data.optJSONArray("journal_entries");
+        if (entries == null) entries = data.optJSONArray("entries");
+        
+        if (entries != null && entries.length() > 0) {
+            // تجميع حسب النوع
+            java.util.Map<String, Float> typeMap = new java.util.HashMap<>();
+            
+            for (int i = 0; i < entries.length(); i++) {
+                JSONObject entry = entries.optJSONObject(i);
+                if (entry != null) {
+                    String type = entry.optString("entry_type", entry.optString("type", "أخرى"));
+                    float amount = (float) entry.optDouble("amount", 
+                        entry.optDouble("debit", entry.optDouble("credit", 0)));
+                    typeMap.merge(type, amount, Float::sum);
+                }
+            }
+            
+            List<ReportChartGenerator.ChartData> chartData = new ArrayList<>();
+            int[] colors = {Color.parseColor("#26C6DA"), Color.parseColor("#4CAF50"), 
+                           Color.parseColor("#F44336"), Color.parseColor("#FF9800")};
+            int idx = 0;
+            for (java.util.Map.Entry<String, Float> entry : typeMap.entrySet()) {
+                chartData.add(new ReportChartGenerator.ChartData(
+                    entry.getKey(), entry.getValue(), colors[idx % colors.length]));
+                idx++;
+            }
+            
+            if (!chartData.isEmpty()) {
+                return ReportChartGenerator.generateBarChart(chartData,
+                    isArabic ? "الحركات المالية" : "Financial Movements",
+                    800, 500, isArabic);
+            }
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Financial chart error: " + e.getMessage());
+    }
+    return null;
+}
+    
     private void showFilteredReportDialog(ReportModels.ReportItem item) {
         View dialogView = LayoutInflater.from(requireContext())
             .inflate(R.layout.dialog_mira_report_viewer, null);
@@ -477,13 +813,13 @@ public class MiraReportsProFragment extends Fragment {
             btnAdvancedFilter.setOnClickListener(v -> 
                 showAdvancedFilterDialog(selectedFilters, () -> {
                     loadReportWithFilters(item.type, rvData, layoutLoading, 
-                        tvLoadingStatus, selectedDates, selectedFilters);
+    tvLoadingStatus, selectedDates, selectedFilters, dialogView);
                 }));
         }
         
         btnApply.setOnClickListener(v -> 
-            loadReportWithFilters(item.type, rvData, layoutLoading, 
-                tvLoadingStatus, selectedDates, selectedFilters));
+    loadReportWithFilters(item.type, rvData, layoutLoading, 
+        tvLoadingStatus, selectedDates, selectedFilters, dialogView));
         
         btnExport.setOnClickListener(v -> {
             File file = ReportExporter.exportToCSV(requireContext(), lastLoadedData, 
@@ -509,7 +845,7 @@ public class MiraReportsProFragment extends Fragment {
         dialog.show();
         
         loadReportWithFilters(item.type, rvData, layoutLoading, 
-            tvLoadingStatus, selectedDates, selectedFilters);
+    tvLoadingStatus, selectedDates, selectedFilters, dialogView);
     }
     
     private void showAdvancedFilterDialog(String[] filters, Runnable onApply) {
@@ -540,8 +876,8 @@ public class MiraReportsProFragment extends Fragment {
     }
     
     private void loadReportWithFilters(String type, RecyclerView rvData, 
-                                       View layoutLoading, TextView tvLoadingStatus,
-                                       String[] dates, String[] filters) {
+                                   View layoutLoading, TextView tvLoadingStatus,
+                                   String[] dates, String[] filters, View dialogView) {
         if (layoutLoading != null) layoutLoading.setVisibility(View.VISIBLE);
         if (tvLoadingStatus != null) {
             tvLoadingStatus.setText(isArabic ? "⏳ جاري تحميل البيانات..." : "⏳ Loading data...");
@@ -577,8 +913,22 @@ public class MiraReportsProFragment extends Fragment {
                 
                 RecyclerView.Adapter<?> reportAdapter = createAdapterForType(type, result.data);
                 rvData.setAdapter(reportAdapter);
-            });
+                
+                // ✅ عرض الرسم البياني
+ if (dialogView != null) {
+        Bitmap chart = createChartForReport(type, result.data);
+        ImageView ivChart = dialogView.findViewById(R.id.ivChart);
+        View scrollChart = dialogView.findViewById(R.id.scrollChart);
+        if (ivChart != null && scrollChart != null) {
+            if (chart != null) {
+                ivChart.setImageBitmap(chart);
+                scrollChart.setVisibility(View.VISIBLE);
+            } else {
+                scrollChart.setVisibility(View.GONE);
+            }
+        }
     }
+}
     
     private void fetchAdvancedReport(String type, ReportModels.ReportFilters filters) {
         if (filters == null) {
