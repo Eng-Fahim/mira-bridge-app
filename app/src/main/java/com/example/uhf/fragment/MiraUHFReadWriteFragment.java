@@ -391,87 +391,86 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
 
     // ============ البرمجة الكاملة ============
     private void programTagFromMira() {
-        if (currentMiraId.isEmpty() && currentGtin.isEmpty()) {
-            Toast.makeText(mContext, "ابحث عن القطعة في MIRA أولاً", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        rfidService.resetForNewTag();
-
-        final AlertDialog loadingDialog = showProfessionalLoadingDialog("🔄 جاري البرمجة...", "قراءة TID، كتابة EPC، التحقق والتسجيل");
-        showProgress(true);
-        setButtonsEnabled(false);
-        logOperation("🚀 بدء البرمجة الكاملة للقطعة: " + (currentMiraId.isEmpty() ? currentGtin : currentMiraId));
-
-        new Thread(() -> {
-            try {
-                applyFilterToHardware();
-                generateEpcFromMira();
-
-                String pwdStr = getAccessPassword();
-                logOperation("قراءة TID...");
-                String tidData = rfidService.readTid(pwdStr);
-
-                if (TextUtils.isEmpty(tidData)) {
-                    throw new Exception("تعذر قراءة TID الشريحة، تأكد من محاذاة الشريحة مع الهوائي");
-                }
-                logOperation("✅ TID: " + tidData);
-
-                String newEpc = EtData.getText().toString().trim();
-                logOperation("كتابة EPC: " + newEpc);
-                boolean writeSuccess = rfidService.writeEpc(newEpc, pwdStr);
-                
-                boolean verifySuccess = false;
-                if (writeSuccess) {
-                    Thread.sleep(150);
-                    logOperation("التحقق من الكتابة...");
-                    verifySuccess = rfidService.verifyWrite(newEpc, pwdStr);
-                    logOperation("نتيجة التحقق: " + (verifySuccess ? "✅ نجح" : "❌ فشل"));
-                }
-
-                final String miraId = currentMiraId.isEmpty() ? currentGtin : currentMiraId;
-                boolean registered = false;
-
-                if (writeSuccess && verifySuccess) {
-                    logOperation("تسجيل الربط في MIRA...");
-                    registered = rfidService.registerRfidBinding(miraId, newEpc, tidData);
-                    logOperation("نتيجة التسجيل: " + (registered ? "✅ نجح" : "❌ فشل"));
-                }
-
-                final boolean fWrite = writeSuccess;
-                final boolean fVerify = verifySuccess;
-                final boolean fReg = registered;
-                final String fEpc = newEpc;
-                final String fTid = tidData;
-
-                safeRun(() -> {
-                    dismissDialog(loadingDialog);
-                    showProgress(false);
-                    setButtonsEnabled(true);
-
-                    if (fWrite && fVerify && fReg) {
-                        tvProgrammerStatus.setText("✅ تمت البرمجة والتسجيل بنجاح\nMIRA ID: " + miraId + "\nEPC: " + fEpc + "\nTID: " + fTid);
-                        tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
-                        logOperation("✅✅✅ البرمجة الكاملة نجحت بنسبة 100%");
-                        mContext.playSound(1);
-                    } else {
-                        tvProgrammerStatus.setText("⚠️ فشلت البرمجة الكاملة:\nكتابة: " + (fWrite ? "✅" : "❌") + " | تحقق: " + (fVerify ? "✅" : "❌") + " | تسجيل: " + (fReg ? "✅" : "❌"));
-                        tvProgrammerStatus.setTextColor(Color.parseColor("#FF9800"));
-                        logOperation("⚠️ فشل جزئي: كتابة=" + (fWrite ? "✅" : "❌") + " تحقق=" + (fVerify ? "✅" : "❌") + " تسجيل=" + (fReg ? "✅" : "❌"));
-                        mContext.playSound(2);
-                        showRetryDialog("⚠️ فشل البرمجة", "تعذر استكمال الربط، أعد المحاولة", this::programTagFromMira);
-                    }
-                });
-            } catch (Exception e) {
-                safeRun(() -> {
-                    dismissDialog(loadingDialog);
-                    showProgress(false);
-                    setButtonsEnabled(true);
-                    logOperation("❌ خطأ: " + e.getMessage());
-                    showRetryDialog("❌ خطأ أثناء البرمجة", e.getMessage(), this::programTagFromMira);
-                });
-            }
-        }).start();
+    if (currentMiraId.isEmpty() && currentGtin.isEmpty()) {
+        Toast.makeText(mContext, "ابحث عن القطعة في MIRA أولاً", Toast.LENGTH_SHORT).show();
+        return;
     }
+    
+    rfidService.resetForNewTag();
+    
+    // ✅ 1. اقرأ القيم من UI قبل الخيط
+    final String pwdStr = getAccessPassword();
+    generateEpcFromMira();
+    final String newEpc = EtData != null ? EtData.getText().toString().trim() : "";
+    
+    final AlertDialog loadingDialog = showProfessionalLoadingDialog("🔄 جاري البرمجة...", "...");
+    showProgress(true);
+    setButtonsEnabled(false);
+    logOperation("🚀 بدء البرمجة: " + newEpc);
+    
+    new Thread(() -> {
+        try {
+            applyFilterToHardware();
+            
+            String tidData = rfidService.readTid(pwdStr);
+            
+            if (TextUtils.isEmpty(tidData)) {
+                throw new Exception("تعذر قراءة TID");
+            }
+            
+            boolean writeSuccess = rfidService.writeEpc(newEpc, pwdStr);
+            
+            boolean verifySuccess = false;
+            if (writeSuccess) {
+                Thread.sleep(150);
+                verifySuccess = rfidService.verifyWrite(newEpc, pwdStr);
+            }
+            
+            final String miraId = currentMiraId.isEmpty() ? currentGtin : currentMiraId;
+            boolean registered = false;
+            
+            if (writeSuccess && verifySuccess) {
+                registered = rfidService.registerRfidBinding(miraId, newEpc, tidData);
+            }
+            
+            final boolean fWrite = writeSuccess;
+            final boolean fVerify = verifySuccess;
+            final boolean fReg = registered;
+            final String fTid = tidData;
+            
+            // ✅ 2. كل تحديثات UI داخل safeRun
+            safeRun(() -> {
+                dismissDialog(loadingDialog);
+                showProgress(false);
+                setButtonsEnabled(true);
+                
+                logOperation("✅ TID: " + fTid);
+                logOperation("كتابة: " + (fWrite ? "✅" : "❌"));
+                logOperation("تحقق: " + (fVerify ? "✅" : "❌"));
+                logOperation("تسجيل: " + (fReg ? "✅" : "❌"));
+                
+                if (fWrite && fVerify && fReg) {
+                    tvProgrammerStatus.setText("✅ تمت البرمجة بنجاح\nEPC: " + newEpc + "\nTID: " + fTid);
+                    tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
+                    mContext.playSound(1);
+                } else {
+                    tvProgrammerStatus.setText("⚠️ فشل جزئي");
+                    tvProgrammerStatus.setTextColor(Color.parseColor("#FF9800"));
+                    mContext.playSound(2);
+                }
+            });
+            
+        } catch (Exception e) {
+            safeRun(() -> {
+                dismissDialog(loadingDialog);
+                showProgress(false);
+                setButtonsEnabled(true);
+                logOperation("❌ خطأ: " + e.getMessage());
+                showRetryDialog("❌ خطأ", e.getMessage(), this::programTagFromMira);
+            });
+        }
+    }).start();
+}
 
     // ============ عمليات القراءة والكتابة ============
     private void read() {
@@ -820,4 +819,4 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         }
         super.onDestroyView();
     }
-}
+                                     }
