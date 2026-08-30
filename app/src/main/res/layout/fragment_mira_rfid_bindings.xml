@@ -4,13 +4,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorBackground">
+    android:background="@color/report_background">
 
     <!-- الهيدر -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorPrimary"
+        android:background="@color/report_primary"
         app:elevation="4dp">
 
         <androidx.constraintlayout.widget.ConstraintLayout
@@ -26,7 +26,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/rfid_bindings_title"
-                android:textColor="?attr/colorOnPrimary"
+                android:textColor="@android:color/white"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 app:layout_constraintStart_toStartOf="parent"
@@ -38,8 +38,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text=""
-                android:textColor="?attr/colorOnPrimary"
-                android:alpha="0.8"
+                android:textColor="@color/report_accent"
                 android:textSize="11sp"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/tvTitle" />
@@ -49,8 +48,7 @@
                 android:id="@+id/btnSearch"
                 android:layout_width="42dp"
                 android:layout_height="42dp"
-                android:backgroundTint="?attr/colorOnPrimary"
-                android:backgroundTintAlpha="0.1"
+                android:backgroundTint="#22FFFFFF"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:text="🔍"
@@ -66,10 +64,10 @@
             android:id="@+id/tabFilter"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="?attr/colorPrimary"
-            app:tabIndicatorColor="?attr/colorOnPrimary"
-            app:tabSelectedTextColor="?attr/colorOnPrimary"
-            app:tabTextColor="?attr/colorOnPrimary"
+            android:background="@color/report_primary"
+            app:tabIndicatorColor="@android:color/white"
+            app:tabSelectedTextColor="@android:color/white"
+            app:tabTextColor="#B3FFFFFF"
             app:tabMode="scrollable">
 
             <com.google.android.material.tabs.TabItem
@@ -120,8 +118,8 @@
         android:layout_gravity="bottom|end"
         android:layout_margin="20dp"
         android:text="@string/rfid_export"
-        android:textColor="?attr/colorOnPrimary"
-        app:backgroundTint="?attr/colorPrimary"
+        android:textColor="@android:color/white"
+        app:backgroundTint="@color/report_accent"
         app:cornerRadius="24dp" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
