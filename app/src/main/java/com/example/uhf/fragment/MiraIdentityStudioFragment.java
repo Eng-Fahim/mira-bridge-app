@@ -644,9 +644,8 @@ private void toggleStonesDetails(boolean show) {
                         showToast(isArabic ? "💾 تم الحفظ محلياً (أوفلاين)" : "💾 Saved locally (Offline)");
                     }
                     
-                    if (apiSuccess && serverItemId > 0) {
-                     // ✅ برمجة الشريحة تلقائياً
-                    programTagAutomatically(serverItemId, finalEpc, finalTitle);
+                    if (success && finalServerItemId > 0) {
+                    programTagAutomatically(finalServerItemId, finalEpc, finalTitle);
                     }
                     showEncodingSuccessDialog(finalTitle, finalEpc, String.format(Locale.US, "%.2f", fGrossWeight), finalPriceLocal);
                 });
