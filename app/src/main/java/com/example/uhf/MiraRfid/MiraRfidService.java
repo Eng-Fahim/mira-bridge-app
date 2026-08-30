@@ -8,7 +8,7 @@ import com.example.uhf.MiraRfid.readers.SimulatorReader;
 import com.example.uhf.manager.MiraSettingsManager;
 
 import org.json.JSONObject;
-
+import com.example.uhf.api.MiraApiClient; 
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -205,40 +205,68 @@ public class MiraRfidService {
         return false;
     }
     
+    /**
+     * ✅ البحث عن قطعة في MIRA باستخدام MiraApiClient
+     */
     public JSONObject searchInMira(String identifier, String identifierType) {
         try {
-            MiraSettingsManager settingsManager = MiraSettingsManager.getInstance(context);
-            String apiUrl = settingsManager.getString("mira_api_url", "https://ams.ibreg.org/wp-json/mira-gate/v1/authorize");
-            String apiKey = settingsManager.getString("mira_api_key", "mira_gate_test071234567890abcdefghijklmnop");
+            Log.d(TAG, "🔍 البحث في MIRA: " + identifier + " (type: " + identifierType + ")");
             
-            URL url = new URL(apiUrl);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("X-MIRA-API-Key", apiKey);
-            conn.setConnectTimeout(10000);
-            conn.setReadTimeout(10000);
-            conn.setDoOutput(true);
+            // ✅ استخدام MiraApiClient - نفس الإعدادات والمفاتيح
+            MiraApiClient apiClient = MiraApiClient.getInstance(context);
+            MiraApiClient.ApiResponse response = apiClient.getItemDetail(identifier);
             
-            JSONObject payload = new JSONObject();
-            payload.put("identifier", identifier);
-            payload.put("identifier_type", identifierType);
-            payload.put("gate_id", "handheld_c72");
-            
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(payload.toString().getBytes("utf-8"));
+            // ✅ تسجيل النتيجة للتشخيص
+            if (response != null) {
+                Log.d(TAG, "Response Code: " + response.code);
+                Log.d(TAG, "Response Success: " + response.isSuccess);
+                Log.d(TAG, "Response Error: " + response.error);
+                Log.d(TAG, "Response Body: " + response.getBody());
+            } else {
+                Log.e(TAG, "Response is NULL!");
             }
             
-            int responseCode = conn.getResponseCode();
-            InputStream is = (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is, "utf-8"));
-            StringBuilder response = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) response.append(line);
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONObject result = new JSONObject();
+                
+                // ✅ استخراج بيانات القطعة
+                JSONObject item = response.data.optJSONObject("item");
+                if (item == null) item = response.data.optJSONObject("data");
+                if (item == null) item = response.data;
+                
+                result.put("item", item);
+                
+                // ✅ Barcode
+                JSONObject barcode = new JSONObject();
+                barcode.put("gtin", item.optString("gtin13", item.optString("gtin", item.optString("barcode", ""))));
+                barcode.put("serial_no", item.optString("serial_number", item.optString("serial", "")));
+                result.put("barcode", barcode);
+                
+                // ✅ Stock
+                JSONObject stock = new JSONObject();
+                stock.put("branch_name", item.optString("branch_name", ""));
+                stock.put("status", item.optString("vault_status", item.optString("status", "available")));
+                result.put("stock", stock);
+                
+                // ✅ Location
+                JSONObject location = new JSONObject();
+                location.put("zone_name", item.optString("current_location", item.optString("location", "")));
+                result.put("location", location);
+                
+                Log.d(TAG, "✅ تم العثور على القطعة: " + item.optString("title", identifier));
+                return result;
+            }
             
-            return new JSONObject(response.toString());
+            Log.e(TAG, "❌ القطعة غير موجودة أو خطأ في API");
+            
+            // ✅ في وضع المحاكاة - إرجاع بيانات تجريبية
+            if (isSimulationMode) {
+                return createSimulatedSearchResult(identifier);
+            }
+            return null;
+            
         } catch (Exception e) {
-            Log.e(TAG, "searchInMira error: " + e.getMessage());
+            Log.e(TAG, "searchInMira error: " + e.getMessage(), e);
             if (isSimulationMode) {
                 return createSimulatedSearchResult(identifier);
             }
