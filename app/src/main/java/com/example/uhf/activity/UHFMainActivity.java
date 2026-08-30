@@ -789,7 +789,9 @@ private void updateToolbarTitle() {
                     loadFragment(new MiraGateSettingsFragment(), "GateSettings");
                 } else if (selected.contains("Server") || selected.contains("سيرفر")) {
                     loadFragment(new MiraServerConfigFragment(), "ServerConfig");
-                } else {
+                } else if (selected.contains("Bindings") || selected.contains("شرائح")) {
+                     loadFragment(new MiraRfidBindingsFragment(), "RfidBindings");
+                     } else {
                     Toast.makeText(this, isArabic ? "الأجهزة متصلة" : "Devices connected", Toast.LENGTH_SHORT).show();
                 }
             })
