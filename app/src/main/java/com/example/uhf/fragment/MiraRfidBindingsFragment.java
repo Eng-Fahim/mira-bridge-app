@@ -1,7 +1,6 @@
 package com.example.uhf.fragment;
 
 import android.app.AlertDialog;
-import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -14,6 +13,7 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.content.Context;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -33,13 +33,14 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Executors;
 
+/**
+ * ✅ إدارة الشرائح المبرمجة - متوافقة مع الثيمات واللغات
+ */
 public class MiraRfidBindingsFragment extends MiraBaseFragment {
     
     private static final String TAG = "MiraRfidBindings";
@@ -52,6 +53,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
     private TextView tvCount;
+    private TextView tvTitle;
     private String currentFilter = "";
     private String currentSearch = "";
     
@@ -59,19 +61,23 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_mira_rfid_bindings, container, false);
+        return inflater.inflate(R.layout.fragment_rfid_bindings, container, false);
     }
     
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         
-        apiClient = MiraApiClient.getInstance(getContext());
-        permissionManager = PermissionManager.getInstance(getContext());
+        Context context = getContext();
+        if (context == null) return;
+        
+        apiClient = MiraApiClient.getInstance(context);
+        permissionManager = PermissionManager.getInstance(context);
         
         tvCount = view.findViewById(R.id.tvCount);
+        tvTitle = view.findViewById(R.id.tvTitle);
         rvBindings = view.findViewById(R.id.rvBindings);
-        rvBindings.setLayoutManager(new LinearLayoutManager(getContext()));
+        rvBindings.setLayoutManager(new LinearLayoutManager(context));
         
         adapter = new BindingsAdapter(bindingList, this::showBindingDetails);
         rvBindings.setAdapter(adapter);
@@ -108,12 +114,19 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         
         ExtendedFloatingActionButton fabExport = view.findViewById(R.id.fabExport);
         if (fabExport != null) {
+            // ✅ إخفاء التصدير إذا لم يكن لديه صلاحية
+            boolean canExport = permissionManager != null && 
+                (permissionManager.isManager() || permissionManager.canEdit("rfid"));
+            fabExport.setVisibility(canExport ? View.VISIBLE : View.GONE);
             fabExport.setOnClickListener(v -> exportToCSV());
         }
         
         loadBindings();
     }
     
+    /**
+     * ✅ تحميل قائمة الشرائح
+     */
     private void loadBindings() {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
@@ -143,12 +156,10 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
                         adapter.notifyDataSetChanged();
                         
                         if (tvCount != null) {
-                            tvCount.setText(isArabic ? "الإجمالي: " + total : "Total: " + total);
+                            tvCount.setText(getString(R.string.rfid_bindings_total, total));
                         }
                     } else {
-                        Toast.makeText(getContext(), 
-                            isArabic ? "❌ فشل التحميل" : "❌ Failed to load", 
-                            Toast.LENGTH_SHORT).show();
+                        showToast(getString(R.string.rfid_load_failed));
                     }
                 });
             } catch (Exception e) {
@@ -157,25 +168,34 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         });
     }
     
+    /**
+     * ✅ حوار البحث
+     */
     private void showSearchDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle(isArabic ? "🔍 بحث" : "🔍 Search");
+        Context context = getContext();
+        if (context == null) return;
         
-        EditText etSearch = new EditText(requireContext());
-        etSearch.setHint(isArabic ? "MIRA ID / EPC / TID / العنوان" : "MIRA ID / EPC / TID / Title");
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        builder.setTitle(R.string.rfid_search_hint);
+        
+        EditText etSearch = new EditText(context);
+        etSearch.setHint(R.string.rfid_search_hint);
         etSearch.setPadding(40, 20, 40, 20);
         builder.setView(etSearch);
         
-        builder.setPositiveButton(isArabic ? "بحث" : "Search", (dialog, which) -> {
+        builder.setPositiveButton(android.R.string.search_go, (dialog, which) -> {
             currentSearch = etSearch.getText().toString().trim();
             loadBindings();
         });
-        builder.setNegativeButton(isArabic ? "إلغاء" : "Cancel", null);
+        builder.setNegativeButton(android.R.string.cancel, null);
         builder.show();
     }
     
+    /**
+     * ✅ عرض تفاصيل الشريحة
+     */
     private void showBindingDetails(JSONObject binding) {
-        if (binding == null) return;
+        if (binding == null || getContext() == null) return;
         
         String title = binding.optString("item_title", "-");
         String miraId = binding.optString("mira_id", "-");
@@ -187,67 +207,79 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         String deviceType = binding.optString("device_type", "-");
         String date = binding.optString("registered_at", "-");
         
-        String statusLabel = status;
-        if (isArabic) {
-            switch (status) {
-                case "active": statusLabel = "✅ نشطة"; break;
-                case "locked": statusLabel = "🔒 مقفلة"; break;
-                case "inactive": statusLabel = "⛔ غير نشطة"; break;
-            }
-        }
+        String statusLabel = getStatusLabel(status);
         
         boolean canManage = permissionManager != null && 
             (permissionManager.isManager() || permissionManager.canEdit("rfid"));
         
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         builder.setTitle(title);
         
         StringBuilder message = new StringBuilder();
-        message.append(isArabic ? "🔑 MIRA ID: " : "🔑 MIRA ID: ").append(miraId).append("\n");
-        message.append(isArabic ? "📡 EPC: " : "📡 EPC: ").append(epc).append("\n");
-        message.append(isArabic ? "🏷️ TID: " : "🏷️ TID: ").append(tid).append("\n");
-        message.append(isArabic ? "💎 العيار: " : "💎 Karat: ").append(karat).append("\n");
-        message.append(isArabic ? "⚖️ الوزن: " : "⚖️ Weight: ").append(weight).append("g\n");
-        message.append(isArabic ? "📱 الجهاز: " : "📱 Device: ").append(deviceType).append("\n");
-        message.append(isArabic ? "📅 التاريخ: " : "📅 Date: ").append(date).append("\n");
-        message.append(isArabic ? "📊 الحالة: " : "📊 Status: ").append(statusLabel);
+        message.append("🔑 MIRA ID: ").append(miraId).append("\n");
+        message.append("📡 EPC: ").append(epc).append("\n");
+        message.append("🏷️ TID: ").append(tid).append("\n");
+        message.append("💎 ").append(getString(R.string.karat)).append(": ").append(karat).append("\n");
+        message.append("⚖️ ").append(getString(R.string.weight)).append(": ").append(String.format(Locale.US, "%.2fg", weight)).append("\n");
+        message.append("📱 ").append(getString(R.string.device)).append(": ").append(deviceType).append("\n");
+        message.append("📅 ").append(getString(R.string.date)).append(": ").append(date).append("\n");
+        message.append("📊 ").append(getString(R.string.status)).append(": ").append(statusLabel);
         
         builder.setMessage(message.toString());
         
         if (canManage) {
-            builder.setPositiveButton(isArabic ? "إدارة" : "Manage", (dialog, which) -> {
+            builder.setPositiveButton(R.string.rfid_manage, (dialog, which) -> {
                 showManageOptions(binding);
             });
         }
         
-        builder.setNegativeButton(isArabic ? "إغلاق" : "Close", null);
+        builder.setNegativeButton(android.R.string.cancel, null);
         builder.show();
     }
     
+    /**
+     * ✅ خيارات الإدارة
+     */
     private void showManageOptions(JSONObject binding) {
         int bindingId = binding.optInt("id", 0);
-        String currentStatus = binding.optString("status", "active");
         
-        String[] options;
-        if (isArabic) {
-            options = new String[]{"🔒 قفل الشريحة", "🔓 فك القفل", "⛔ تعطيل", "❌ حذف الربط"};
-        } else {
-            options = new String[]{"🔒 Lock", "🔓 Unlock", "⛔ Deactivate", "❌ Delete Binding"};
-        }
+        String[] options = new String[]{
+            getString(R.string.rfid_lock),
+            getString(R.string.rfid_unlock),
+            getString(R.string.rfid_deactivate),
+            getString(R.string.rfid_delete)
+        };
         
-        new AlertDialog.Builder(requireContext())
-            .setTitle(isArabic ? "إدارة الشريحة" : "Manage Binding")
+        new AlertDialog.Builder(getContext())
+            .setTitle(R.string.rfid_manage)
             .setItems(options, (dialog, which) -> {
                 switch (which) {
                     case 0: updateBindingStatus(bindingId, "locked"); break;
                     case 1: updateBindingStatus(bindingId, "active"); break;
                     case 2: updateBindingStatus(bindingId, "inactive"); break;
-                    case 3: deleteBinding(bindingId); break;
+                    case 3: confirmDelete(bindingId); break;
                 }
             })
             .show();
     }
     
+    /**
+     * ✅ تأكيد الحذف
+     */
+    private void confirmDelete(int bindingId) {
+        new AlertDialog.Builder(getContext())
+            .setTitle(android.R.string.dialog_alert_title)
+            .setMessage(R.string.rfid_confirm_delete)
+            .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                updateBindingStatus(bindingId, "deleted");
+            })
+            .setNegativeButton(android.R.string.cancel, null)
+            .show();
+    }
+    
+    /**
+     * ✅ تحديث حالة الشريحة
+     */
     private void updateBindingStatus(int bindingId, String status) {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
@@ -255,14 +287,14 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
                 payload.put("binding_id", bindingId);
                 payload.put("status", status);
                 
-                MiraApiClient.ApiResponse response = apiClient.postWithAuth("/unlink_rfid", payload);
+                MiraApiClient.ApiResponse response = apiClient.postWithAuth("/update-binding-status", payload);
                 
                 mainHandler.post(() -> {
                     if (response != null && response.isSuccess) {
-                        Toast.makeText(getContext(), 
-                            isArabic ? "✅ تم التحديث" : "✅ Updated", 
-                            Toast.LENGTH_SHORT).show();
+                        showToast(getString(R.string.rfid_updated));
                         loadBindings();
+                    } else {
+                        showToast(getString(R.string.rfid_load_failed));
                     }
                 });
             } catch (Exception e) {
@@ -271,19 +303,11 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         });
     }
     
-    private void deleteBinding(int bindingId) {
-        new AlertDialog.Builder(requireContext())
-            .setTitle(isArabic ? "⚠️ تأكيد الحذف" : "⚠️ Confirm Delete")
-            .setMessage(isArabic ? "هل أنت متأكد من حذف هذا الربط؟" : "Are you sure to delete this binding?")
-            .setPositiveButton(isArabic ? "حذف" : "Delete", (dialog, which) -> {
-                updateBindingStatus(bindingId, "deleted");
-            })
-            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-            .show();
-    }
-    
+    /**
+     * ✅ تصدير CSV
+     */
     private void exportToCSV() {
-        if (bindingList.isEmpty()) return;
+        if (bindingList.isEmpty() || getContext() == null) return;
         
         try {
             StringBuilder csv = new StringBuilder();
@@ -302,7 +326,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
                 csv.append(binding.optString("registered_at", "")).append("\n");
             }
             
-            File exportDir = new File(requireContext().getCacheDir(), "exports");
+            File exportDir = new File(getContext().getCacheDir(), "exports");
             if (!exportDir.exists()) exportDir.mkdirs();
             
             File file = new File(exportDir, "MIRA_RFID_Bindings_" + System.currentTimeMillis() + ".csv");
@@ -310,8 +334,8 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
             fos.write(csv.toString().getBytes("UTF-8"));
             fos.close();
             
-            Uri uri = FileProvider.getUriForFile(requireContext(),
-                requireContext().getPackageName() + ".fileprovider", file);
+            Uri uri = FileProvider.getUriForFile(getContext(),
+                getContext().getPackageName() + ".fileprovider", file);
             Intent intent = new Intent(Intent.ACTION_SEND);
             intent.setType("text/csv");
             intent.putExtra(Intent.EXTRA_STREAM, uri);
@@ -320,6 +344,24 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
             
         } catch (Exception e) {
             Log.e(TAG, "exportToCSV error: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * ✅ ترجمة الحالة
+     */
+    private String getStatusLabel(String status) {
+        switch (status) {
+            case "active": return getString(R.string.rfid_status_active);
+            case "locked": return getString(R.string.rfid_status_locked);
+            case "inactive": return getString(R.string.rfid_status_inactive);
+            default: return status;
+        }
+    }
+    
+    private void showToast(String msg) {
+        if (getContext() != null && isAdded()) {
+            Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
         }
     }
     
@@ -356,19 +398,10 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
             String date = binding.optString("registered_at", "-");
             
             h.tvItemTitle.setText(title);
-            h.tvDetails.setText(miraId + " | " + karat + " | " + String.format("%.2fg", weight));
+            h.tvDetails.setText(miraId + " | " + karat + " | " + String.format(Locale.US, "%.2fg", weight));
             h.tvEpcTid.setText("EPC: " + epc + "\nTID: " + tid);
             h.tvDate.setText(date);
-            
-            String statusLabel = status;
-            if (isArabic) {
-                switch (status) {
-                    case "active": statusLabel = "✅ نشطة"; break;
-                    case "locked": statusLabel = "🔒 مقفلة"; break;
-                    case "inactive": statusLabel = "⛔ غير نشطة"; break;
-                }
-            }
-            h.tvStatus.setText(statusLabel);
+            h.tvStatus.setText(getStatusLabel(status));
             
             h.itemView.setOnClickListener(v -> listener.onClick(binding));
         }
