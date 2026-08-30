@@ -7,19 +7,18 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.example.uhf.api.MiraApiClient;
-import com.example.uhf.cache.ReportCacheManager;
 import com.example.uhf.model.ReportModels;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.ArrayList;  // ✅ إضافة هذا
-import java.util.List;       // ✅ إضافة هذا
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * ✅ مستودع التقارير - يتعامل مع جلب وتخزين البيانات
+ * ✅ مستودع التقارير - يستخدم الدوال الصحيحة من MiraApiClient
  */
 public class ReportRepository {
     private static final String TAG = "ReportRepository";
@@ -27,13 +26,11 @@ public class ReportRepository {
     
     private final Context context;
     private final MiraApiClient apiClient;
-    private final ReportCacheManager cacheManager;
     private final ExecutorService executorService;
     
     private ReportRepository(Context context) {
         this.context = context.getApplicationContext();
         this.apiClient = MiraApiClient.getInstance(context);
-        this.cacheManager = new ReportCacheManager(context);
         this.executorService = Executors.newFixedThreadPool(3);
     }
     
@@ -45,7 +42,7 @@ public class ReportRepository {
     }
     
     /**
-     * ✅ جلب تقرير مع دعم التخزين المؤقت
+     * ✅ جلب تقرير باستخدام الدوال الصحيحة من MiraApiClient
      */
     public LiveData<ReportModels.ReportResult> fetchReport(String type, 
                                                            ReportModels.ReportFilters filters) {
@@ -53,49 +50,70 @@ public class ReportRepository {
         
         executorService.execute(() -> {
             try {
-                // 1. إنشاء مفتاح الكاش
-                String cacheKey = generateCacheKey(type, filters);
+                MiraApiClient.ApiResponse response = null;
                 
-                // 2. محاولة التحميل من الكاش
-                ReportModels.ReportResult cachedResult = cacheManager.getCachedReport(cacheKey);
-                if (cachedResult != null) {
-                    resultLiveData.postValue(cachedResult);
-                    
-                    // إذا كان الكاش حديث (أقل من 5 دقائق)، لا نكمل
-                    if (System.currentTimeMillis() - cachedResult.timestamp < 5 * 60 * 1000) {
-                        return;
-                    }
+                // ✅ استخدام الدوال الصحيحة لكل نوع تقرير
+                switch (type) {
+                    case "dashboard":
+                        response = apiClient.getDashboardFull(filters.branchId);
+                        break;
+                        
+                    case "sales":
+                        response = apiClient.getSalesHistoryByDateRange(
+                            filters.fromDate, filters.toDate, 1, 100);
+                        break;
+                        
+                    case "inventory":
+                        response = apiClient.getInventorySessionsList();
+                        break;
+                        
+                    case "movement":
+                        response = apiClient.getTransfers(filters.branchId, "");
+                        break;
+                        
+                    case "branches":
+                        response = apiClient.getBranches();
+                        break;
+                        
+                    case "gates":
+                        response = apiClient.getGatesByBranch(filters.branchId);
+                        break;
+                        
+                    case "audit":
+                        response = apiClient.getInventoryReports(filters.branchId, 1, 100);
+                        break;
+                        
+                    case "users":
+                        response = apiClient.getUsers();
+                        break;
+                        
+                    case "financial":
+                        response = apiClient.getJournalEntries(String.valueOf(filters.branchId));
+                        break;
+                        
+                    case "reorder":
+                        response = apiClient.getReportData("reorder", 
+                            filters.fromDate, filters.toDate, filters.branchId);
+                        break;
+                        
+                    default:
+                        // ✅ للتقارير غير المعروفة - استخدم getReportData
+                        response = apiClient.getReportData(type, 
+                            filters.fromDate, filters.toDate, filters.branchId);
+                        break;
                 }
                 
-                // 3. بناء الرابط
-                String endpoint = buildEndpoint(type, filters);
-                Log.d(TAG, "Fetching report: " + endpoint);
-                
-                // 4. جلب البيانات من الخادم
-                MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint);
-                
-                if (response == null || !response.isSuccess) {
-                    String errorMsg = response != null ? response.message : "Network error";
+                if (response == null || !response.isSuccess || response.data == null) {
+                    String errorMsg = response != null ? 
+                        (response.error != null ? response.error : "Network error") : "Network error";
                     resultLiveData.postValue(ReportModels.ReportResult.error(errorMsg));
                     return;
                 }
                 
-                // 5. تحليل البيانات
-                JSONObject data = parseResponseData(response);
-                if (data == null) {
-                    resultLiveData.postValue(ReportModels.ReportResult.error("No data available"));
-                    return;
-                }
-                
-                // 6. حفظ في الكاش
-                ReportModels.ReportResult result = ReportModels.ReportResult.success(data);
-                cacheManager.cacheReport(cacheKey, data);
-                
-                // 7. إرسال النتيجة
-                resultLiveData.postValue(result);
+                resultLiveData.postValue(ReportModels.ReportResult.success(response.data));
                 
             } catch (Exception e) {
-                Log.e(TAG, "Error fetching report: " + e.getMessage(), e);
+                Log.e(TAG, "Error: " + e.getMessage(), e);
                 resultLiveData.postValue(ReportModels.ReportResult.error(e.getMessage()));
             }
         });
@@ -112,44 +130,47 @@ public class ReportRepository {
         
         executorService.execute(() -> {
             try {
-                String cacheKey = "advanced_" + generateCacheKey(type, filters);
+                MiraApiClient.ApiResponse response = null;
                 
-                // محاولة الكاش
-                ReportModels.ReportResult cached = cacheManager.getCachedReport(cacheKey);
-                if (cached != null) {
-                    resultLiveData.postValue(cached);
+                switch (type) {
+                    case "user_timeline":
+                        response = apiClient.getUserActivityLogs(filters.userId, 100);
+                        break;
+                        
+                    case "item_passport":
+                        response = apiClient.getItemDetail(filters.serialNumber);
+                        break;
+                        
+                    case "gate_security_index":
+                        response = apiClient.getGatesStats();
+                        break;
+                        
+                    case "inventory_aging":
+                        response = apiClient.getReportData("inventory_aging", 
+                            filters.fromDate, filters.toDate, filters.branchId);
+                        break;
+                        
+                    case "audit_discrepancy_detail":
+                        response = apiClient.getInventoryReports(filters.branchId, 1, 100);
+                        break;
+                        
+                    default:
+                        response = apiClient.getReportData(type, 
+                            filters.fromDate, filters.toDate, filters.branchId);
+                        break;
+                }
+                
+                if (response == null || !response.isSuccess || response.data == null) {
+                    String errorMsg = response != null ? 
+                        (response.error != null ? response.error : "Failed to load") : "Failed to load";
+                    resultLiveData.postValue(ReportModels.ReportResult.error(errorMsg));
                     return;
                 }
                 
-                // بناء الرابط
-                StringBuilder endpoint = new StringBuilder("/reports-analytics?type=").append(type);
-                String queryString = filters.toQueryString();
-                if (!queryString.isEmpty()) {
-                    endpoint.append("&").append(queryString);
-                }
-                
-                Log.d(TAG, "Fetching advanced report: " + endpoint);
-                
-                // جلب البيانات
-                MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint.toString());
-                
-                if (response == null || !response.isSuccess) {
-                    resultLiveData.postValue(ReportModels.ReportResult.error("Failed to load"));
-                    return;
-                }
-                
-                JSONObject data = parseResponseData(response);
-                if (data == null) {
-                    resultLiveData.postValue(ReportModels.ReportResult.error("No data available"));
-                    return;
-                }
-                
-                ReportModels.ReportResult result = ReportModels.ReportResult.success(data);
-                cacheManager.cacheReport(cacheKey, data);
-                resultLiveData.postValue(result);
+                resultLiveData.postValue(ReportModels.ReportResult.success(response.data));
                 
             } catch (Exception e) {
-                Log.e(TAG, "Error fetching advanced report: " + e.getMessage(), e);
+                Log.e(TAG, "Error: " + e.getMessage(), e);
                 resultLiveData.postValue(ReportModels.ReportResult.error(e.getMessage()));
             }
         });
@@ -171,10 +192,7 @@ public class ReportRepository {
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray usersArray = response.data.optJSONArray("users");
                     if (usersArray == null) {
-                        JSONObject dataObj = response.data.optJSONObject("data");
-                        if (dataObj != null) {
-                            usersArray = dataObj.optJSONArray("users");
-                        }
+                        usersArray = response.data.optJSONArray("data");
                     }
                     
                     if (usersArray != null) {
@@ -183,10 +201,11 @@ public class ReportRepository {
                             if (userObj != null) {
                                 int id = userObj.optInt("id");
                                 String name = userObj.optString("display_name", 
-                                    userObj.optString("username", "User " + id));
+                                    userObj.optString("name", 
+                                        userObj.optString("username", "User " + id)));
                                 String username = userObj.optString("username", "");
-                                String role = userObj.optString("role", "");
-                                
+                                String role = userObj.optString("role_name", 
+                                    userObj.optString("role", ""));
                                 users.add(new ReportModels.UserInfo(id, name, username, role));
                             }
                         }
@@ -214,16 +233,11 @@ public class ReportRepository {
             try {
                 List<ReportModels.GateInfo> gates = new ArrayList<>();
                 
-                String endpoint = "/gates?branch_id=" + branchId;
-                MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint);
-                
+                MiraApiClient.ApiResponse response = apiClient.getGatesByBranch(branchId);
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray gatesArray = response.data.optJSONArray("gates");
                     if (gatesArray == null) {
-                        JSONObject dataObj = response.data.optJSONObject("data");
-                        if (dataObj != null) {
-                            gatesArray = dataObj.optJSONArray("gates");
-                        }
+                        gatesArray = response.data.optJSONArray("data");
                     }
                     
                     if (gatesArray != null) {
@@ -236,7 +250,6 @@ public class ReportRepository {
                                     gateObj.optString("name", "Gate " + (i + 1)));
                                 String location = gateObj.optString("gate_location", 
                                     gateObj.optString("location", ""));
-                                
                                 gates.add(new ReportModels.GateInfo(id, gateId, name, location));
                             }
                         }
@@ -254,64 +267,6 @@ public class ReportRepository {
         return gatesLiveData;
     }
     
-    /**
-     * ✅ بناء رابط API
-     */
-    private String buildEndpoint(String type, ReportModels.ReportFilters filters) {
-        StringBuilder endpoint = new StringBuilder("/reports-app?type=").append(type);
-        
-        String queryString = filters.toQueryString();
-        if (!queryString.isEmpty()) {
-            endpoint.append("&").append(queryString);
-        }
-        
-        return endpoint.toString();
-    }
-    
-    /**
-     * ✅ تحليل بيانات الاستجابة
-     */
-    private JSONObject parseResponseData(MiraApiClient.ApiResponse response) {
-        JSONObject data = response.data;
-        
-        if (data == null && response.getBody() != null) {
-            try {
-                String rawBody = response.getBody();
-                if (rawBody.trim().startsWith("[")) {
-                    JSONArray rootArray = new JSONArray(rawBody);
-                    data = new JSONObject();
-                    data.put("items", rootArray);
-                } else {
-                    data = new JSONObject(rawBody);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error parsing response: " + e.getMessage());
-            }
-        }
-        
-        return data;
-    }
-    
-    /**
-     * ✅ إنشاء مفتاح الكاش
-     */
-    private String generateCacheKey(String type, ReportModels.ReportFilters filters) {
-        StringBuilder sb = new StringBuilder(type);
-        sb.append("_").append(filters.branchId);
-        sb.append("_").append(filters.fromDate != null ? filters.fromDate : "any");
-        sb.append("_").append(filters.toDate != null ? filters.toDate : "any");
-        sb.append("_").append(filters.searchQuery != null ? filters.searchQuery : "");
-        sb.append("_").append(filters.filter1 != null ? filters.filter1 : "");
-        sb.append("_").append(filters.filter2 != null ? filters.filter2 : "");
-        sb.append("_").append(filters.userId > 0 ? filters.userId : 0);
-        sb.append("_").append(filters.gateId > 0 ? filters.gateId : 0);
-        
-        return sb.toString().replaceAll("[^a-zA-Z0-9_]", "_");
-    }
-    
-    /**
-     * ✅ تنظيف الموارد
-     */
     public void cleanup() {
         if (executorService != null && !executorService.isShutdown()) {
             executorService.shutdown();
