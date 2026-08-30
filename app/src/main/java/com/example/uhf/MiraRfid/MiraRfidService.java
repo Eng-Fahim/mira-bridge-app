@@ -7,6 +7,7 @@ import com.example.uhf.MiraRfid.readers.ChainwayReader;
 import com.example.uhf.MiraRfid.readers.SimulatorReader;
 import com.example.uhf.manager.MiraSettingsManager;
 
+import org.json.JSONArray;   // ✅ هذا مفقود
 import org.json.JSONObject;
 import com.example.uhf.api.MiraApiClient;
 
