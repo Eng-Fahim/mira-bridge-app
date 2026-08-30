@@ -952,57 +952,165 @@ private Bitmap createFinancialBarChart(JSONObject data) {
     }
     
     private void showAdvancedReportDialog(String type, JSONObject data) {
-        View dialogView = LayoutInflater.from(requireContext())
-            .inflate(R.layout.dialog_mira_report_viewer, null);
-        
-        TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
-        RecyclerView rvData = dialogView.findViewById(R.id.rvReportData);
-        View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
-        MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
-        MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
-        MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
-        
-        if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
-        
-        tvTitle.setText(getReportTitle(type));
-        rvData.setLayoutManager(new LinearLayoutManager(getContext()));
-        
-        RecyclerView.Adapter<?> adapter = createAdvancedAdapter(type, data);
-        rvData.setAdapter(adapter);
-        
-        AlertDialog dialog = new AlertDialog.Builder(requireContext(), 
-            android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
-            .setView(dialogView)
-            .create();
-        
-        if (btnClose != null) btnClose.setOnClickListener(v -> dialog.dismiss());
-        
-        if (btnPrint != null) {
-            btnPrint.setVisibility(View.VISIBLE);
-            btnPrint.setOnClickListener(v -> {
-                String html = ReportPrintManager.generateReportHtml(data, type,
-                    orgProfile != null ? orgProfile.getOrgName() : null,
-                    branchesManager != null ? branchesManager.getActiveBranchName() : null,
-                    getDefaultFromDate(), getDefaultToDate(), isArabic);
-                ReportPrintManager.printHtmlReport(requireContext(), html, 
-                    "MIRA_Report_" + type);
-            });
-        }
-        
-        if (btnExport != null) {
-            btnExport.setVisibility(View.VISIBLE);
-            btnExport.setOnClickListener(v -> {
-                File file = ReportExporter.exportToCSV(requireContext(), data, type, 
-                    getDefaultFromDate(), getDefaultToDate(), isArabic);
-                if (file != null) {
-                    ReportExporter.shareFile(requireContext(), file, "text/csv");
-                }
-            });
-        }
-        
-        dialog.show();
+    View dialogView = LayoutInflater.from(requireContext())
+        .inflate(R.layout.dialog_mira_report_viewer, null);
+    
+    TextView tvTitle = dialogView.findViewById(R.id.tvReportDialogTitle);
+    RecyclerView rvData = dialogView.findViewById(R.id.rvReportData);
+    View layoutLoading = dialogView.findViewById(R.id.layoutLoadingContainer);
+    MaterialButton btnPrint = dialogView.findViewById(R.id.btnReportPrint);
+    MaterialButton btnExport = dialogView.findViewById(R.id.btnReportExport);
+    MaterialButton btnClose = dialogView.findViewById(R.id.btnReportClose);
+    
+    if (layoutLoading != null) layoutLoading.setVisibility(View.GONE);
+    
+    tvTitle.setText(getReportTitle(type));
+    rvData.setLayoutManager(new LinearLayoutManager(getContext()));
+    
+    // ✅ تنسيق البيانات أولاً
+    List<ReportModels.GenericItem> formattedItems = parseToFormattedGeneric(data);
+    
+    RecyclerView.Adapter<?> adapter = new GenericAdapter(formattedItems);
+    rvData.setAdapter(adapter);
+    
+    AlertDialog dialog = new AlertDialog.Builder(requireContext(), 
+        android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
+        .setView(dialogView)
+        .create();
+    
+    if (btnClose != null) btnClose.setOnClickListener(v -> dialog.dismiss());
+    
+    if (btnPrint != null) {
+        btnPrint.setVisibility(View.VISIBLE);
+        btnPrint.setOnClickListener(v -> {
+            // ✅ استخدام البيانات المنسقة للطباعة
+            String html = generateFormattedHtml(type, formattedItems);
+            ReportPrintManager.printHtmlReport(requireContext(), html, 
+                "MIRA_Report_" + type);
+        });
     }
     
+    if (btnExport != null) {
+        btnExport.setVisibility(View.VISIBLE);
+        btnExport.setOnClickListener(v -> {
+            // ✅ استخدام البيانات المنسقة للتصدير
+            exportFormattedAdvancedReport(type, formattedItems);
+        });
+    }
+    
+    dialog.show();
+}
+
+/**
+ * ✅ إنشاء HTML منسق من البيانات المعالجة
+ */
+private String generateFormattedHtml(String type, List<ReportModels.GenericItem> items) {
+    String direction = isArabic ? "rtl" : "ltr";
+    String textAlign = isArabic ? "right" : "left";
+    
+    StringBuilder html = new StringBuilder();
+    html.append("<!DOCTYPE html><html dir='").append(direction).append("'><head><meta charset='utf-8'>")
+        .append("<style>")
+        .append("@page { size: A4; margin: 15mm; }")
+        .append("body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: ").append(direction)
+        .append("; text-align: ").append(textAlign).append("; margin: 0; padding: 20px; color: #1a1a2e; }")
+        .append(".header { text-align: center; border-bottom: 3px solid #1a237e; padding-bottom: 15px; margin-bottom: 20px; }")
+        .append(".org-name { font-size: 22px; font-weight: bold; color: #1a237e; margin: 0; }")
+        .append(".report-title { font-size: 18px; font-weight: bold; color: #c5a059; margin: 10px 0 5px 0; }")
+        .append(".report-meta { font-size: 12px; color: #777; margin: 0; }")
+        .append("table { width: 100%; border-collapse: collapse; margin-top: 15px; }")
+        .append("th { background: #1a237e; color: white; padding: 10px; font-size: 12px; text-align: center; }")
+        .append("td { padding: 8px; border: 1px solid #ddd; font-size: 11px; text-align: right; }")
+        .append("tr:nth-child(even) { background: #f9f9f9; }")
+        .append(".key-col { font-weight: bold; background: #f0f0f0; width: 35%; }")
+        .append(".footer { margin-top: 30px; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #ccc; padding-top: 10px; }")
+        .append("</style></head><body>");
+    
+    // الهيدر
+    html.append("<div class='header'>")
+        .append("<h1 class='org-name'>").append(orgProfile != null ? orgProfile.getOrgName() : "MIRA System").append("</h1>")
+        .append("<div class='report-title'>").append(getReportTitle(type)).append("</div>")
+        .append("<p class='report-meta'>").append(isArabic ? "تاريخ الإنشاء: " : "Generated: ")
+        .append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()))
+        .append("</p>")
+        .append("</div>");
+    
+    // جدول البيانات
+    html.append("<table><thead><tr>")
+        .append("<th>").append(isArabic ? "البيان" : "Item").append("</th>")
+        .append("<th>").append(isArabic ? "القيمة" : "Value").append("</th>")
+        .append("</tr></thead><tbody>");
+    
+    for (ReportModels.GenericItem item : items) {
+        if (item.key.equals("──────────")) {
+            html.append("<tr><td colspan='2' style='background:#f0f0f0;height:2px;padding:0;'></td></tr>");
+        } else {
+            String value = item.value != null ? item.value.replace("\n", "<br>").replace("\"", "'") : "";
+            html.append("<tr>")
+                .append("<td class='key-col'>").append(item.key).append("</td>")
+                .append("<td>").append(value).append("</td>")
+                .append("</tr>");
+        }
+    }
+    
+    html.append("</tbody></table>");
+    
+    // التذييل
+    html.append("<div class='footer'>")
+        .append(isArabic ? "© نظام MIRA لإدارة المجوهرات - تقرير آلي" : "© MIRA Jewelry Management System - Automated Report")
+        .append("</div>");
+    
+    html.append("</body></html>");
+    
+    return html.toString();
+}
+
+/**
+ * ✅ تصدير البيانات المنسقة
+ */
+private void exportFormattedAdvancedReport(String type, List<ReportModels.GenericItem> items) {
+    if (!isAdded() || getContext() == null) return;
+    
+    try {
+        StringBuilder csv = new StringBuilder();
+        csv.append('\uFEFF');
+        
+        csv.append(isArabic ? "نوع التقرير" : "Report Type").append(",").append(type).append("\n");
+        csv.append(isArabic ? "تاريخ التصدير" : "Export Date").append(",")
+           .append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()))
+           .append("\n\n");
+        
+        csv.append(isArabic ? "البيان" : "Item").append(",")
+           .append(isArabic ? "القيمة" : "Value").append("\n");
+        
+        for (ReportModels.GenericItem item : items) {
+            if (!item.key.equals("──────────")) {
+                csv.append("\"").append(item.key.replace("\"", "'")).append("\",")
+                   .append("\"").append(item.value.replace("\"", "'").replace("\n", " ")).append("\"\n");
+            }
+        }
+        
+        File exportDir = new File(requireContext().getCacheDir(), "exports");
+        if (!exportDir.exists()) exportDir.mkdirs();
+        
+        File file = new File(exportDir, "MIRA_Advanced_" + type + "_" + System.currentTimeMillis() + ".csv");
+        FileOutputStream fos = new FileOutputStream(file);
+        fos.write(csv.toString().getBytes("UTF-8"));
+        fos.close();
+        
+        Uri uri = FileProvider.getUriForFile(requireContext(), 
+            requireContext().getPackageName() + ".fileprovider", file);
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("text/csv");
+        intent.putExtra(Intent.EXTRA_STREAM, uri);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(Intent.createChooser(intent, isArabic ? "مشاركة التقرير" : "Share Report"));
+        
+    } catch (Exception e) {
+        Log.e(TAG, "Export error: " + e.getMessage());
+        Toast.makeText(getContext(), "Export error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+    }
+}
     private void showUserTimelineDialog(ReportModels.ReportItem item) {
         reportRepository.fetchUsers().observe(getViewLifecycleOwner(), users -> {
             if (users == null || users.isEmpty()) {
