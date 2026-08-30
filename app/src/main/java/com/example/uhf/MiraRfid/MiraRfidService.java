@@ -360,4 +360,127 @@ public void resetForNewTag() {
             default: return "";
         }
     }
+    
+    // =========================================================================
+// 🟢 إدارة مخزون الشرائح من SunlandRFID
+// =========================================================================
+
+/**
+ * ✅ التحقق من أن الشريحة معتمدة (في القائمة البيضاء)
+ */
+public boolean verifyTagAllowed(String tid) {
+    try {
+        Log.d(TAG, "🔍 التحقق من الشريحة: " + tid);
+        
+        MiraApiClient apiClient = MiraApiClient.getInstance(context);
+        MiraApiClient.ApiResponse response = apiClient.getWithAuth("/rfid-inventory/verify?tid=" + tid);
+        
+        if (response != null && response.isSuccess && response.data != null) {
+            boolean approved = response.data.optBoolean("approved", false);
+            Log.d(TAG, "Tag approved: " + approved);
+            return approved;
+        }
+        
+        // ✅ في وضع المحاكاة - السماح للاختبار
+        if (isSimulationMode) {
+            Log.w(TAG, "⚠️ وضع المحاكاة - السماح بالشريحة");
+            return true;
+        }
+        
+        return false;
+    } catch (Exception e) {
+        Log.e(TAG, "verifyTagAllowed error: " + e.getMessage());
+        return isSimulationMode;
+    }
+}
+
+/**
+ * ✅ تحديث حالة الشريحة بعد البرمجة
+ */
+public boolean markTagProgrammed(String tid, String miraId, String epc) {
+    try {
+        Log.d(TAG, "📝 تحديث حالة الشريحة: " + tid + " → " + miraId);
+        
+        MiraApiClient apiClient = MiraApiClient.getInstance(context);
+        
+        JSONObject payload = new JSONObject();
+        payload.put("tid", tid);
+        payload.put("mira_id", miraId);
+        payload.put("epc", epc);
+        
+        MiraApiClient.ApiResponse response = apiClient.postWithAuth("/rfid-inventory/programmed", payload);
+        
+        if (response != null && response.isSuccess) {
+            Log.d(TAG, "✅ تم تحديث حالة الشريحة");
+            return true;
+        }
+        
+        if (isSimulationMode) {
+            return true;
+        }
+        
+        return false;
+    } catch (Exception e) {
+        Log.e(TAG, "markTagProgrammed error: " + e.getMessage());
+        return isSimulationMode;
+    }
+}
+
+/**
+ * ✅ استيراد دفعة شرائح من SunlandRFID
+ */
+public boolean importBatch(String batchNumber, JSONArray tags) {
+    try {
+        Log.d(TAG, "📦 استيراد دفعة: " + batchNumber + " (" + tags.length() + " شريحة)");
+        
+        MiraApiClient apiClient = MiraApiClient.getInstance(context);
+        
+        JSONObject payload = new JSONObject();
+        payload.put("batch_number", batchNumber);
+        payload.put("tags", tags);
+        
+        MiraApiClient.ApiResponse response = apiClient.postWithAuth("/rfid-inventory/import", payload);
+        
+        if (response != null && response.isSuccess) {
+            int imported = response.data != null ? response.data.optInt("imported", 0) : 0;
+            Log.d(TAG, "✅ تم استيراد " + imported + " شريحة");
+            return true;
+        }
+        
+        return false;
+    } catch (Exception e) {
+        Log.e(TAG, "importBatch error: " + e.getMessage());
+        return false;
+    }
+}
+
+/**
+ * ✅ جلب إحصائيات مخزون الشرائح
+ */
+public JSONObject getRfidInventoryStats() {
+    try {
+        MiraApiClient apiClient = MiraApiClient.getInstance(context);
+        MiraApiClient.ApiResponse response = apiClient.getWithAuth("/rfid-inventory/stats");
+        
+        if (response != null && response.isSuccess && response.data != null) {
+            return response.data;
+        }
+        
+        // ✅ إحصائيات محاكاة
+        if (isSimulationMode) {
+            JSONObject stats = new JSONObject();
+            stats.put("total", 100);
+            stats.put("available", 80);
+            stats.put("programmed", 15);
+            stats.put("defective", 3);
+            stats.put("lost", 2);
+            return stats;
+        }
+        
+        return null;
+    } catch (Exception e) {
+        Log.e(TAG, "getRfidInventoryStats error: " + e.getMessage());
+        return null;
+    }
+}
 }
