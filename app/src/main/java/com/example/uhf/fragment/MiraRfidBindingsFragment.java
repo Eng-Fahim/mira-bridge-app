@@ -1,6 +1,7 @@
 package com.example.uhf.fragment;
 
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -13,7 +14,6 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.content.Context;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -39,7 +39,7 @@ import java.util.Locale;
 import java.util.concurrent.Executors;
 
 /**
- * ✅ إدارة الشرائح المبرمجة - متوافقة مع الثيمات واللغات
+ * ✅ إدارة الشرائح المبرمجة - متوافقة مع الثيمات واللغات ومحمية من التحرير والتنقل (Detached Exception Guarded)
  */
 public class MiraRfidBindingsFragment extends MiraBaseFragment {
     
@@ -114,7 +114,6 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         
         ExtendedFloatingActionButton fabExport = view.findViewById(R.id.fabExport);
         if (fabExport != null) {
-            // ✅ إخفاء التصدير إذا لم يكن لديه صلاحية
             boolean canExport = permissionManager != null && 
                 (permissionManager.isManager() || permissionManager.canEdit("rfid"));
             fabExport.setVisibility(canExport ? View.VISIBLE : View.GONE);
@@ -125,7 +124,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
     }
     
     /**
-     * ✅ تحميل قائمة الشرائح
+     * ✅ تحميل قائمة الشرائح (مع شرط أمان الحماية isAdded)
      */
     private void loadBindings() {
         Executors.newSingleThreadExecutor().execute(() -> {
@@ -142,6 +141,11 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
                 MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint.toString());
                 
                 mainHandler.post(() -> {
+                    // 🛡️ تحقق من أن الـ Fragment ما زالت مقترنة بالشاشة قبل الوصول للموارد
+                    if (!isAdded() || getContext() == null) {
+                        return;
+                    }
+
                     if (response != null && response.isSuccess && response.data != null) {
                         JSONArray bindings = response.data.optJSONArray("bindings");
                         int total = response.data.optInt("total", 0);
@@ -173,7 +177,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
      */
     private void showSearchDialog() {
         Context context = getContext();
-        if (context == null) return;
+        if (!isAdded() || context == null) return;
         
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle(R.string.rfid_search_hint);
@@ -195,7 +199,8 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
      * ✅ عرض تفاصيل الشريحة
      */
     private void showBindingDetails(JSONObject binding) {
-        if (binding == null || getContext() == null) return;
+        Context context = getContext();
+        if (binding == null || !isAdded() || context == null) return;
         
         String title = binding.optString("item_title", "-");
         String miraId = binding.optString("mira_id", "-");
@@ -212,7 +217,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         boolean canManage = permissionManager != null && 
             (permissionManager.isManager() || permissionManager.canEdit("rfid"));
         
-        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle(title);
         
         StringBuilder message = new StringBuilder();
@@ -241,6 +246,9 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
      * ✅ خيارات الإدارة
      */
     private void showManageOptions(JSONObject binding) {
+        Context context = getContext();
+        if (!isAdded() || context == null) return;
+        
         int bindingId = binding.optInt("id", 0);
         
         String[] options = new String[]{
@@ -250,7 +258,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
             getString(R.string.rfid_delete)
         };
         
-        new AlertDialog.Builder(getContext())
+        new AlertDialog.Builder(context)
             .setTitle(R.string.rfid_manage)
             .setItems(options, (dialog, which) -> {
                 switch (which) {
@@ -267,7 +275,10 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
      * ✅ تأكيد الحذف
      */
     private void confirmDelete(int bindingId) {
-        new AlertDialog.Builder(getContext())
+        Context context = getContext();
+        if (!isAdded() || context == null) return;
+
+        new AlertDialog.Builder(context)
             .setTitle(android.R.string.dialog_alert_title)
             .setMessage(R.string.rfid_confirm_delete)
             .setPositiveButton(android.R.string.ok, (dialog, which) -> {
@@ -278,7 +289,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
     }
     
     /**
-     * ✅ تحديث حالة الشريحة
+     * ✅ تحديث حالة الشريحة (مع شرط أمان الحماية isAdded)
      */
     private void updateBindingStatus(int bindingId, String status) {
         Executors.newSingleThreadExecutor().execute(() -> {
@@ -290,6 +301,11 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
                 MiraApiClient.ApiResponse response = apiClient.postWithAuth("/update-binding-status", payload);
                 
                 mainHandler.post(() -> {
+                    // 🛡️ تحقق من وجود الفراغمنت قبل طلب الموارد وتحديث الواجهة
+                    if (!isAdded() || getContext() == null) {
+                        return;
+                    }
+
                     if (response != null && response.isSuccess) {
                         showToast(getString(R.string.rfid_updated));
                         loadBindings();
@@ -307,7 +323,8 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
      * ✅ تصدير CSV
      */
     private void exportToCSV() {
-        if (bindingList.isEmpty() || getContext() == null) return;
+        Context context = getContext();
+        if (bindingList.isEmpty() || !isAdded() || context == null) return;
         
         try {
             StringBuilder csv = new StringBuilder();
@@ -326,7 +343,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
                 csv.append(binding.optString("registered_at", "")).append("\n");
             }
             
-            File exportDir = new File(getContext().getCacheDir(), "exports");
+            File exportDir = new File(context.getCacheDir(), "exports");
             if (!exportDir.exists()) exportDir.mkdirs();
             
             File file = new File(exportDir, "MIRA_RFID_Bindings_" + System.currentTimeMillis() + ".csv");
@@ -334,8 +351,8 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
             fos.write(csv.toString().getBytes("UTF-8"));
             fos.close();
             
-            Uri uri = FileProvider.getUriForFile(getContext(),
-                getContext().getPackageName() + ".fileprovider", file);
+            Uri uri = FileProvider.getUriForFile(context,
+                context.getPackageName() + ".fileprovider", file);
             Intent intent = new Intent(Intent.ACTION_SEND);
             intent.setType("text/csv");
             intent.putExtra(Intent.EXTRA_STREAM, uri);
@@ -351,6 +368,8 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
      * ✅ ترجمة الحالة
      */
     private String getStatusLabel(String status) {
+        if (!isAdded()) return status;
+
         switch (status) {
             case "active": return getString(R.string.rfid_status_active);
             case "locked": return getString(R.string.rfid_status_locked);
@@ -360,7 +379,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
     }
     
     private void showToast(String msg) {
-        if (getContext() != null && isAdded()) {
+        if (isAdded() && getContext() != null) {
             Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
         }
     }
