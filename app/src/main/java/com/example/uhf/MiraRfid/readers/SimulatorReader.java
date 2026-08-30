@@ -104,6 +104,17 @@ public class SimulatorReader implements MiraIRFIDReader {
             .apply();
     }
     
+    // أضف دالة جديدة
+public void resetForNewTag() {
+    simulatedTid = generateRealisticTid();
+    currentEpc = "";
+    lastWrittenEpc = "";
+    isTagLocked = false;
+    filterActive = false;
+    filterData = "";
+    Log.d(TAG, "🔄 Simulator reset for new tag - new TID: " + simulatedTid);
+}
+    
     private void initFallbackTags() {
         fallbackTags.clear();
         fallbackTags.add("E28068940000501A2B3C4D5E6F");
