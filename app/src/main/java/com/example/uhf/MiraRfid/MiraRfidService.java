@@ -97,6 +97,16 @@ public class MiraRfidService {
             activeReader.clearFilter();
         }
     }
+    /**
+ * ✅ إعادة تهيئة المحاكي لشريحة جديدة
+ */
+public void resetForNewTag() {
+    if (activeReader instanceof SimulatorReader) {
+        ((SimulatorReader) activeReader).resetForNewTag();
+        Log.d(TAG, "✅ تم إعادة تهيئة المحاكي لشريحة جديدة");
+    }
+}
+    
 
     // =========================================================================
     // 🟢 العمليات المتقدمة
