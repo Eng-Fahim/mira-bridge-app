@@ -4,13 +4,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_main">
+    android:background="?attr/colorBackground">
 
-    <!-- شريط علوي مرن -->
+    <!-- شريط علوي -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/bg_card"
+        android:background="?attr/colorSurface"
         app:elevation="2dp">
 
         <androidx.constraintlayout.widget.ConstraintLayout
@@ -24,7 +24,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:text="نتائج التقرير المالي والجرام"
-                android:textColor="@color/text_primary"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 app:layout_constraintBottom_toBottomOf="parent"
@@ -38,13 +38,13 @@
                 android:layout_width="36dp"
                 android:layout_height="36dp"
                 app:icon="@android:drawable/ic_menu_close_clear_cancel"
-                app:iconTint="@color/text_primary"
+                app:iconTint="?attr/colorOnSurface"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
-        <!-- لوحة التحكم بالفلاتر والتاريخ -->
+        <!-- الفلاتر -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -77,17 +77,17 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnReportApplyFilter"
-                android:layout_width=" wrap_content"
+                android:layout_width="wrap_content"
                 android:layout_height="38dp"
                 android:layout_marginStart="6dp"
                 android:text="تحديث"
-                android:textColor="#FFFFFF"
+                android:textColor="?attr/colorOnPrimary"
                 android:textSize="11sp"
-                app:backgroundTint="@color/accent_dark"
+                app:backgroundTint="?attr/colorPrimary"
                 app:cornerRadius="8dp" />
         </LinearLayout>
 
-        <!-- أزرار الإجراءات السريعة (تصدير - طباعة) -->
+        <!-- أزرار الإجراءات -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -131,7 +131,7 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- منطقة البيانات والـ Recycler -->
+    <!-- البيانات -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvReportData"
         android:layout_width="match_parent"
@@ -140,12 +140,13 @@
         android:padding="8dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
-    <!-- مؤشر التحميل -->
+    <!-- التحميل -->
     <FrameLayout
         android:id="@+id/layoutLoadingContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#80000000"
+        android:background="?attr/colorSurface"
+        android:alpha="0.8"
         android:visibility="gone"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
@@ -155,7 +156,7 @@
             android:layout_gravity="center"
             app:cardCornerRadius="16dp"
             app:cardElevation="6dp"
-            app:cardBackgroundColor="@color/bg_card">
+            app:cardBackgroundColor="?attr/colorSurface">
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -168,7 +169,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:indeterminate="true"
-                    app:indicatorColor="@color/accent_dark" />
+                    app:indicatorColor="?attr/colorPrimary" />
 
                 <TextView
                     android:id="@+id/tvLoadingStatus"
@@ -176,7 +177,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:text="جاري تحليل البيانات وإعداد الجدول..."
-                    android:textColor="@color/text_primary"
+                    android:textColor="?attr/colorOnSurface"
                     android:textSize="13sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -196,14 +197,14 @@
             android:layout_width="80dp"
             android:layout_height="80dp"
             android:src="@android:drawable/ic_menu_info_details"
-            app:tint="#B0BEC5" />
+            app:tint="?attr/colorOnSurfaceVariant" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:text="لا توجد بيانات متاحة لهذا التقرير"
-            android:textColor="@color/text_primary"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="15sp"
             android:textStyle="bold" />
 
@@ -212,7 +213,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:text="يرجى مراجعة نطاق التاريخ أو خيارات الفلترة"
-            android:textColor="@color/text_secondary"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp" />
 
     </LinearLayout>
