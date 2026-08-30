@@ -2124,4 +2124,5 @@
     <string name="rfid_load_failed">فشل التحميل</string>
     <string name="rfid_updated">تم التحديث بنجاح</string>
     <string name="rfid_details">تفاصيل الشريحة</string>
+    <string name="quick_action_rfid_bindings">إدارة الشرائح</string>
 </resources>
