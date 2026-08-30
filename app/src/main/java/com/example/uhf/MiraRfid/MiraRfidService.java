@@ -161,7 +161,6 @@ public class MiraRfidService {
     try {
         Log.d(TAG, "📡 تسجيل الربط في MIRA: " + miraId + " → " + epc);
         
-        // ✅ استخدام MiraApiClient دائماً - حتى في المحاكاة
         MiraApiClient apiClient = MiraApiClient.getInstance(context);
         
         JSONObject payload = new JSONObject();
@@ -169,12 +168,11 @@ public class MiraRfidService {
         payload.put("epc", epc);
         payload.put("tid", tid);
         payload.put("gate_id", "handheld_c72");
-        payload.put("action", "register_rfid_binding");
         payload.put("device_type", isSimulationMode ? "simulator" : "chainway_c72");
-        payload.put("simulation", isSimulationMode);
+        payload.put("operation_type", "register");
         
-        // ✅ محاولة الإرسال الفعلي للسيرفر
-        MiraApiClient.ApiResponse response = apiClient.postWithAuth("/rfid/binding", payload);
+        // ✅ الـ endpoint الصحيح
+        MiraApiClient.ApiResponse response = apiClient.postWithAuth("/register_rfid", payload);
         
         if (response != null) {
             Log.d(TAG, "Response Code: " + response.code);
@@ -188,19 +186,15 @@ public class MiraRfidService {
             return true;
         }
         
-        // ✅ في وضع المحاكاة - إذا فشل الاتصال، نجاح وهمي للاختبار
         if (isSimulationMode) {
-            Log.w(TAG, "⚠️ فشل الاتصال بالسيرفر - نجاح وهمي للمحاكاة");
+            Log.w(TAG, "⚠️ فشل الاتصال - نجاح وهمي للمحاكاة");
             currentState = OperationState.COMPLETED;
             return true;
         }
         
     } catch (Exception e) {
         Log.e(TAG, "registerRfidBinding error: " + e.getMessage(), e);
-        
-        // ✅ في وضع المحاكاة - نجاح وهمي عند أي خطأ
         if (isSimulationMode) {
-            Log.w(TAG, "⚠️ خطأ في الاتصال - نجاح وهمي للمحاكاة");
             currentState = OperationState.COMPLETED;
             return true;
         }
@@ -218,17 +212,18 @@ public class MiraRfidService {
         Log.d(TAG, "🔍 البحث في MIRA: " + identifier);
         
         MiraApiClient apiClient = MiraApiClient.getInstance(context);
-        MiraApiClient.ApiResponse response = apiClient.getItemDetail(identifier);
         
-        // ✅ تسجيل عملية البحث في السيرفر
-        try {
-            JSONObject searchLog = new JSONObject();
-            searchLog.put("identifier", identifier);
-            searchLog.put("identifier_type", identifierType);
-            searchLog.put("device_type", isSimulationMode ? "simulator" : "chainway_c72");
-            apiClient.postWithAuth("/rfid/search-log", searchLog);
-        } catch (Exception logError) {
-            Log.w(TAG, "فشل تسجيل البحث: " + logError.getMessage());
+        // ✅ استخدام /authorize - الـ endpoint الصحيح للبحث
+        JSONObject searchPayload = new JSONObject();
+        searchPayload.put("identifier", identifier);
+        searchPayload.put("identifier_type", identifierType);
+        searchPayload.put("gate_id", "handheld_c72");
+        
+        MiraApiClient.ApiResponse response = apiClient.postWithAuth("/authorize", searchPayload);
+        
+        if (response != null) {
+            Log.d(TAG, "Response Code: " + response.code);
+            Log.d(TAG, "Response Body: " + response.getBody());
         }
         
         if (response != null && response.isSuccess && response.data != null) {
@@ -237,22 +232,14 @@ public class MiraRfidService {
             if (item != null) {
                 JSONObject result = new JSONObject();
                 result.put("item", item);
+                result.put("barcode", response.data.optJSONObject("barcode") != null ? 
+                    response.data.optJSONObject("barcode") : new JSONObject());
+                result.put("stock", response.data.optJSONObject("stock") != null ? 
+                    response.data.optJSONObject("stock") : new JSONObject());
+                result.put("location", response.data.optJSONObject("location") != null ? 
+                    response.data.optJSONObject("location") : new JSONObject());
                 
-                JSONObject barcode = new JSONObject();
-                barcode.put("gtin", item.optString("gtin", ""));
-                barcode.put("serial_no", item.optString("serial", ""));
-                result.put("barcode", barcode);
-                
-                JSONObject stock = new JSONObject();
-                stock.put("status", item.optString("status", "available"));
-                stock.put("branch_name", item.optString("location", ""));
-                result.put("stock", stock);
-                
-                JSONObject location = new JSONObject();
-                location.put("zone_name", item.optString("location", ""));
-                result.put("location", location);
-                
-                Log.d(TAG, "✅ تم العثور على القطعة: " + item.optString("title", ""));
+                Log.d(TAG, "✅ تم العثور على القطعة");
                 return result;
             }
         }
@@ -323,4 +310,4 @@ public class MiraRfidService {
             default: return "";
         }
     }
-                    }
+}
