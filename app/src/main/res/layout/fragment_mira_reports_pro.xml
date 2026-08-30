@@ -4,13 +4,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_main">
+    android:background="?attr/colorBackground">
 
-    <!-- الهيدر المطور بتصميم زجاجي متدرج -->
+    <!-- الهيدر -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/bg_gradient_dark"
+        android:background="?attr/colorPrimary"
         app:elevation="4dp">
 
         <androidx.constraintlayout.widget.ConstraintLayout
@@ -21,7 +21,7 @@
             android:paddingTop="20dp"
             android:paddingBottom="12dp">
 
-            <!-- شعار الهوية/الأيقونة الرئيسية -->
+            <!-- شعار -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cvLogo"
                 android:layout_width="44dp"
@@ -29,8 +29,8 @@
                 app:cardCornerRadius="12dp"
                 app:cardElevation="0dp"
                 app:strokeWidth="1dp"
-                app:strokeColor="#33D4AF65"
-                app:cardBackgroundColor="#1A2A38"
+                app:strokeColor="?attr/colorOutline"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent">
 
@@ -40,10 +40,10 @@
                     android:layout_height="24dp"
                     android:layout_gravity="center"
                     android:src="@android:drawable/ic_menu_compass"
-                    app:tint="@color/accent_light" />
+                    app:tint="?attr/colorOnPrimary" />
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- العنوان الفرعي والرئيسي -->
+            <!-- العنوان -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -59,7 +59,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="مركز التقارير والتحليلات"
-                    android:textColor="@color/text_light"
+                    android:textColor="?attr/colorOnPrimary"
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
@@ -68,63 +68,65 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="الفرع الرئيسي • تحديث مباشر"
-                    android:textColor="#B0BEC5"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:alpha="0.7"
                     android:textSize="11sp" />
             </LinearLayout>
 
-            <!-- أزرار الإجراءات العلوي -->
+            <!-- أزرار -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSearchReports"
-                style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 app:icon="@android:drawable/ic_menu_search"
-                app:iconTint="@color/text_light"
-                app:backgroundTint="#26FFFFFF"
+                app:iconTint="?attr/colorOnPrimary"
+                app:backgroundTint="?attr/colorOnPrimary"
+                app:backgroundTintAlpha="0.1"
                 app:cornerRadius="12dp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toTopOf="@id/cvLogo" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnFilterReports"
-                style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:layout_marginEnd="8dp"
                 app:icon="@android:drawable/ic_menu_preferences"
-                app:iconTint="@color/text_light"
-                app:backgroundTint="#26FFFFFF"
+                app:iconTint="?attr/colorOnPrimary"
+                app:backgroundTint="?attr/colorOnPrimary"
+                app:backgroundTintAlpha="0.1"
                 app:cornerRadius="12dp"
                 app:layout_constraintEnd_toStartOf="@id/btnSearchReports"
                 app:layout_constraintTop_toTopOf="@id/cvLogo" />
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
-        <!-- تبويبات متطورة -->
+        <!-- تبويبات -->
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/tabReportCategories"
             android:layout_width="match_parent"
             android:layout_height="42dp"
             android:background="@android:color/transparent"
-            app:tabIndicatorColor="@color/accent"
+            app:tabIndicatorColor="?attr/colorOnPrimary"
             app:tabIndicatorHeight="3dp"
-            app:tabSelectedTextColor="@color/accent_light"
-            app:tabTextColor="#80FFFFFF"
+            app:tabSelectedTextColor="?attr/colorOnPrimary"
+            app:tabTextColor="?attr/colorOnPrimary"
+            app:tabTextAlpha="0.7"
             app:tabMode="scrollable"
-            app:tabRippleColor="#22C9A961"
+            app:tabRippleColor="?attr/colorOnPrimary"
             app:tabTextAppearance="@style/TabTextStyle">
 
             <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الكل" />
             <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="المبيعات" />
-            <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="المخزون والذهب" />
-            <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الأمان والجودة" />
+            <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="المخزون" />
+            <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="الأمان" />
             <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="المالية" />
             <com.google.android.material.tabs.TabItem android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="التحليلات" />
         </com.google.android.material.tabs.TabLayout>
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- قائمة التقارير -->
+    <!-- المحتوى -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefreshReports"
         android:layout_width="match_parent"
@@ -142,7 +144,7 @@
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-    <!-- زر التصدير العائم التفاعلي -->
+    <!-- زر تصدير -->
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:id="@+id/fabQuickExport"
         android:layout_width="wrap_content"
@@ -150,12 +152,12 @@
         android:layout_gravity="bottom|end"
         android:layout_margin="20dp"
         android:text="تصدير شامل"
-        android:textColor="#FFFFFF"
+        android:textColor="?attr/colorOnPrimary"
         android:textSize="13sp"
         android:textStyle="bold"
         app:icon="@android:drawable/ic_menu_share"
-        app:iconTint="#FFFFFF"
-        app:backgroundTint="@color/accent_dark"
+        app:iconTint="?attr/colorOnPrimary"
+        app:backgroundTint="?attr/colorPrimary"
         app:cornerRadius="20dp"
         app:elevation="6dp" />
 
