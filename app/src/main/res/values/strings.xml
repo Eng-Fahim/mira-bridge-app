@@ -2097,4 +2097,27 @@
     <string name="gate_inactive">⚪ غير نشطة</string>
     <string name="gate_alert_status">🔴 إنذار</string>
 
+
+ 
+    <!-- إدارة الشرائح -->
+    <string name="rfid_bindings_title">إدارة الشرائح المبرمجة</string>
+    <string name="rfid_bindings_total">الإجمالي: %d</string>
+    <string name="rfid_tab_all">الكل</string>
+    <string name="rfid_tab_active">نشطة</string>
+    <string name="rfid_tab_locked">مقفلة</string>
+    <string name="rfid_tab_inactive">غير نشطة</string>
+    <string name="rfid_search_hint">MIRA ID / EPC / TID / العنوان</string>
+    <string name="rfid_export">تصدير</string>
+    <string name="rfid_status_active">✅ نشطة</string>
+    <string name="rfid_status_locked">🔒 مقفلة</string>
+    <string name="rfid_status_inactive">⛔ غير نشطة</string>
+    <string name="rfid_manage">إدارة</string>
+    <string name="rfid_lock">قفل الشريحة</string>
+    <string name="rfid_unlock">فك القفل</string>
+    <string name="rfid_deactivate">تعطيل</string>
+    <string name="rfid_delete">حذف الربط</string>
+    <string name="rfid_confirm_delete">هل أنت متأكد من حذف هذا الربط؟</string>
+    <string name="rfid_load_failed">فشل التحميل</string>
+    <string name="rfid_updated">تم التحديث بنجاح</string>
+    <string name="rfid_details">تفاصيل الشريحة</string>
 </resources>
