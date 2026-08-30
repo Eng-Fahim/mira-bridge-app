@@ -62,6 +62,8 @@ import com.example.uhf.fragment.UsersManagementFragment;
 import com.example.uhf.fragment.MiraUHFReadWriteFragment;
 import com.example.uhf.manager.MiraBranchesManager;
 
+import com.example.uhf.fragment.MiraRfidBindingsFragment;
+
 import com.example.uhf.fragment.MiraBranchesManagementFragment;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.MiraLanguageHelper;
@@ -562,6 +564,11 @@ private void updateToolbarTitle() {
                     });
                 }
             }
+            // ✅ زر جديد لإدارة الشرائح
+            applyQuickActionButton(view, R.id.btnRfidBindings, dialog, 
+            allowedActions.contains("rfid") && quickAccess.isActionEnabled("rfid"),
+            new 
+                MiraRfidBindingsFragment(), "RfidBindings");
             
             applyQuickActionButton(view, R.id.btnIdentityStudio, dialog, 
                 allowedActions.contains("identity") && quickAccess.isActionEnabled("identity"),
@@ -696,6 +703,7 @@ private void updateToolbarTitle() {
         switch (tag) {
             case "Dashboard": return new MiraDashboardFragment();
             case "Branches": return new MiraBranchesManagementFragment();
+            case "RfidBindings": return new MiraRfidBindingsFragment();
             case "Scan": return new MiraInventoryProFragment();
             case "POS": return new MiraPosFragment();
             case "Transfers": return new MiraTransferFragment();
@@ -761,6 +769,9 @@ private void updateToolbarTitle() {
         
         if (pm.canViewServerConfig()) {
             optionsList.add(isArabic ? "🌐 إعدادات السيرفر" : "🌐 Server Config");
+        }
+        if (pm.isAdmin() || pm.isManager() || pm.isInventoryManager()) {
+        optionsList.add(isArabic ? "📋 إدارة الشرائح المبرمجة" : "📋 RFID Bindings");
         }
         
         optionsList.add(isArabic ? "اختبار التوصيل" : "Connection Test");
