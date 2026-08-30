@@ -28,6 +28,9 @@ import com.rscja.deviceapi.RFIDWithUHFUART;
 
 import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 import java.util.Random;
 
 public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.OnClickListener {
@@ -48,6 +51,8 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
     private Button btnProgrammerSearch;
     private LinearLayout layoutProgrammerItem, layoutAdvancedSettings;
     private TextView tvProgrammerStatus, tvProgrammerItemTitle, tvProgrammerItemDetails, tvCurrentTid;
+    private TextView tvDeviceStatus, tvOperationLog;
+    private ProgressBar pbWriteProgress;
 
     private String currentMiraId = "";
     private String currentGtin = "";
@@ -72,15 +77,6 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         displayDeviceStatus();
     }
 
-    private void displayDeviceStatus() {
-        String deviceName = rfidService.getDeviceName();
-        String mode = rfidService.isSimulationMode() ? " (وضع المحاكاة)" : " (جهاز حقيقي)";
-        tvProgrammerStatus.setText("📡 " + deviceName + mode);
-        tvProgrammerStatus.setTextColor(
-            rfidService.isSimulationMode() ? Color.parseColor("#FF9800") : Color.parseColor("#4CAF50")
-        );
-    }
-
     private void initViews() {
         View v = getView();
         if (v == null) return;
@@ -92,6 +88,9 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         tvProgrammerItemTitle = v.findViewById(R.id.tvProgrammerItemTitle);
         tvProgrammerItemDetails = v.findViewById(R.id.tvProgrammerItemDetails);
         tvCurrentTid = v.findViewById(R.id.tvCurrentTid);
+        tvDeviceStatus = v.findViewById(R.id.tvDeviceStatus);
+        tvOperationLog = v.findViewById(R.id.tvOperationLog);
+        pbWriteProgress = v.findViewById(R.id.pbWriteProgress);
 
         SpinnerBank = v.findViewById(R.id.SpinnerBank);
         EtPtr = v.findViewById(R.id.EtPtr);
@@ -111,12 +110,10 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         BtWrite = v.findViewById(R.id.BtWrite);
         BtReadTid = v.findViewById(R.id.BtReadTid);
         BtLock = v.findViewById(R.id.BtLock);
+        
+        // ✅ زر فتح القفل - إضافة ديناميكية
         int unlockResId = v.getResources().getIdentifier("BtUnlock", "id", v.getContext().getPackageName());
-        if (unlockResId != 0) {
-        BtUnlock = v.findViewById(unlockResId);
-        } else {
-        BtUnlock = null;
-        }
+        BtUnlock = unlockResId != 0 ? v.findViewById(unlockResId) : null;
 
         BtGenerateEpc = v.findViewById(R.id.BtGenerateEpc);
         BtProgramTag = v.findViewById(R.id.BtProgramTag);
@@ -127,6 +124,52 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         if (EtAccessPwd != null) EtAccessPwd.setText("00000000");
         if (EtPtr != null) EtPtr.setText("32");
         if (EtLen != null) EtLen.setText("6");
+
+        // ✅ تهيئة سجل العمليات
+        if (tvOperationLog != null) tvOperationLog.setText("—");
+    }
+
+    /**
+     * ✅ عرض حالة الجهاز
+     */
+    private void displayDeviceStatus() {
+        String deviceName = rfidService.getDeviceName();
+        String mode = rfidService.isSimulationMode() ? " (وضع المحاكاة)" : " (جهاز حقيقي)";
+        
+        if (tvProgrammerStatus != null) {
+            tvProgrammerStatus.setText("📡 " + deviceName + mode);
+            tvProgrammerStatus.setTextColor(
+                rfidService.isSimulationMode() ? Color.parseColor("#FF9800") : Color.parseColor("#4CAF50")
+            );
+        }
+        
+        if (tvDeviceStatus != null) {
+            tvDeviceStatus.setText("📡 " + deviceName + mode);
+            tvDeviceStatus.setTextColor(
+                rfidService.isSimulationMode() ? Color.parseColor("#FF9800") : Color.parseColor("#4CAF50")
+            );
+        }
+        
+        logOperation("تم تهيئة الجهاز: " + deviceName + mode);
+    }
+
+    /**
+     * ✅ تسجيل العمليات
+     */
+    private void logOperation(String message) {
+        if (tvOperationLog == null) return;
+        String timestamp = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
+        String current = tvOperationLog.getText().toString();
+        if (current.equals("—")) current = "";
+        String newLog = "[" + timestamp + "] " + message;
+        tvOperationLog.setText(newLog + (current.isEmpty() ? "" : "\n" + current));
+    }
+
+    /**
+     * ✅ إظهار/إخفاء شريط التقدم
+     */
+    private void showProgress(boolean show) {
+        if (pbWriteProgress != null) pbWriteProgress.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 
     private void setupListeners() {
@@ -143,9 +186,11 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         if (BtUnlock != null) BtUnlock.setOnClickListener(v -> lockTag(false));
         if (BtGenerateEpc != null) BtGenerateEpc.setOnClickListener(v -> generateEpcFromMira());
         if (BtProgramTag != null) BtProgramTag.setOnClickListener(v -> programTagFromMira());
+        
         if (cbAdvancedMode != null) {
             cbAdvancedMode.setOnCheckedChangeListener((btn, isChecked) -> toggleAdvancedMode(isChecked));
         }
+        
         if (rbEPC_filter != null) rbEPC_filter.setOnClickListener(this);
         if (rbTID_filter != null) rbTID_filter.setOnClickListener(this);
         if (rbUser_filter != null) rbUser_filter.setOnClickListener(this);
@@ -170,9 +215,11 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
                         cb_filter.setChecked(false);
                     } else {
                         applyFilterToHardware();
+                        logOperation("تم تفعيل الفلتر: " + data);
                     }
                 } else {
                     rfidService.clearFilter();
+                    logOperation("تم إلغاء الفلتر");
                 }
             });
         }
@@ -199,6 +246,7 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         if (BtLock != null) BtLock.setVisibility(isAdvanced ? View.VISIBLE : View.GONE);
         if (BtUnlock != null) BtUnlock.setVisibility(isAdvanced ? View.VISIBLE : View.GONE);
         if (BtGenerateEpc != null) BtGenerateEpc.setVisibility(isAdvanced ? View.VISIBLE : View.GONE);
+        logOperation(isAdvanced ? "تم تفعيل الوضع المتقدم" : "تم إغلاق الوضع المتقدم");
     }
 
     private void applyFilterToHardware() {
@@ -206,7 +254,8 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
             String filterData = etData_filter.getText().toString().trim();
             int ptr = parseInteger(etPtr_filter.getText().toString().trim(), 32);
             int bank = getFilterBank();
-            rfidService.setFilter(bank, ptr, filterData);
+            boolean success = rfidService.setFilter(bank, ptr, filterData);
+            logOperation("تطبيق فلتر: bank=" + bank + " ptr=" + ptr + " data=" + filterData + " → " + (success ? "✅" : "❌"));
         } else {
             rfidService.clearFilter();
         }
@@ -215,7 +264,9 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
     // ============ البحث في MIRA ============
     private void searchMiraItem(String code) {
         final AlertDialog loadingDialog = showProfessionalLoadingDialog("🔍 جاري البحث...", "البحث في قاعدة بيانات MIRA");
+        showProgress(true);
         setButtonsEnabled(false);
+        logOperation("بحث في MIRA: " + code);
 
         new Thread(() -> {
             try {
@@ -224,6 +275,7 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
 
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
+                    showProgress(false);
                     setButtonsEnabled(true);
 
                     if (json != null) {
@@ -256,12 +308,14 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
                                 tvProgrammerStatus.setText("✅ تم العثور على القطعة");
                                 tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
                             }
+                            logOperation("✅ تم العثور على القطعة: " + currentMiraId + " GTIN: " + currentGtin);
                             mContext.playSound(1);
                         } else {
                             if (tvProgrammerStatus != null) {
                                 tvProgrammerStatus.setText("❌ القطعة غير موجودة في MIRA");
                                 tvProgrammerStatus.setTextColor(Color.RED);
                             }
+                            logOperation("❌ القطعة غير موجودة: " + code);
                             mContext.playSound(2);
                         }
                     } else {
@@ -269,13 +323,16 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
                             tvProgrammerStatus.setText("❌ خطأ في الاتصال");
                             tvProgrammerStatus.setTextColor(Color.RED);
                         }
+                        logOperation("❌ خطأ في الاتصال بالسيرفر");
                         showRetryDialog("❌ فشل البحث", "تعذر الاتصال بالسيرفر", () -> searchMiraItem(code));
                     }
                 });
             } catch (Exception e) {
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
+                    showProgress(false);
                     setButtonsEnabled(true);
+                    logOperation("❌ خطأ: " + e.getMessage());
                     showRetryDialog("❌ خطأ", e.getMessage(), () -> searchMiraItem(code));
                 });
             }
@@ -289,13 +346,14 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         return "epc";
     }
 
-    // ============ توليد EPC القياسي ============
+    // ============ توليد EPC ============
     private void generateEpcFromMira() {
         if (currentMiraId.isEmpty() && currentGtin.isEmpty()) {
             generateRandomEpc();
+            logOperation("توليد EPC عشوائي (لا توجد بيانات MIRA)");
             return;
         }
-        StringBuilder epc = new StringBuilder("3008"); // EPC Header + Filter Bit
+        StringBuilder epc = new StringBuilder("3008");
         if (!currentGtin.isEmpty()) {
             String cleanGtin = currentGtin.replaceAll("[^0-9]", "");
             if (cleanGtin.length() >= 12) {
@@ -313,9 +371,10 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         if (EtData != null) EtData.setText(finalEpc);
         if (EtLen != null) EtLen.setText("6");
         if (tvProgrammerStatus != null) {
-            tvProgrammerStatus.setText("🎯 تم توليد EPC متوافق من MIRA");
+            tvProgrammerStatus.setText("🎯 تم توليد EPC: " + finalEpc);
             tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
         }
+        logOperation("✅ تم توليد EPC: " + finalEpc);
     }
 
     private void generateRandomEpc() {
@@ -327,10 +386,7 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         }
         if (EtData != null) EtData.setText(epc.toString());
         if (EtLen != null) EtLen.setText("6");
-        if (tvProgrammerStatus != null) {
-            tvProgrammerStatus.setText("🎲 تم توليد EPC عشوائي");
-            tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
-        }
+        logOperation("تم توليد EPC عشوائي: " + epc.toString());
     }
 
     // ============ البرمجة الكاملة ============
@@ -341,7 +397,9 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         }
 
         final AlertDialog loadingDialog = showProfessionalLoadingDialog("🔄 جاري البرمجة...", "قراءة TID، كتابة EPC، التحقق والتسجيل");
+        showProgress(true);
         setButtonsEnabled(false);
+        logOperation("🚀 بدء البرمجة الكاملة للقطعة: " + (currentMiraId.isEmpty() ? currentGtin : currentMiraId));
 
         new Thread(() -> {
             try {
@@ -349,26 +407,33 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
                 generateEpcFromMira();
 
                 String pwdStr = getAccessPassword();
+                logOperation("قراءة TID...");
                 String tidData = rfidService.readTid(pwdStr);
 
                 if (TextUtils.isEmpty(tidData)) {
                     throw new Exception("تعذر قراءة TID الشريحة، تأكد من محاذاة الشريحة مع الهوائي");
                 }
+                logOperation("✅ TID: " + tidData);
 
                 String newEpc = EtData.getText().toString().trim();
+                logOperation("كتابة EPC: " + newEpc);
                 boolean writeSuccess = rfidService.writeEpc(newEpc, pwdStr);
+                
                 boolean verifySuccess = false;
-
                 if (writeSuccess) {
                     Thread.sleep(150);
+                    logOperation("التحقق من الكتابة...");
                     verifySuccess = rfidService.verifyWrite(newEpc, pwdStr);
+                    logOperation("نتيجة التحقق: " + (verifySuccess ? "✅ نجح" : "❌ فشل"));
                 }
 
                 final String miraId = currentMiraId.isEmpty() ? currentGtin : currentMiraId;
                 boolean registered = false;
 
                 if (writeSuccess && verifySuccess) {
+                    logOperation("تسجيل الربط في MIRA...");
                     registered = rfidService.registerRfidBinding(miraId, newEpc, tidData);
+                    logOperation("نتيجة التسجيل: " + (registered ? "✅ نجح" : "❌ فشل"));
                 }
 
                 final boolean fWrite = writeSuccess;
@@ -379,15 +444,18 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
 
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
+                    showProgress(false);
                     setButtonsEnabled(true);
 
                     if (fWrite && fVerify && fReg) {
                         tvProgrammerStatus.setText("✅ تمت البرمجة والتسجيل بنجاح\nMIRA ID: " + miraId + "\nEPC: " + fEpc + "\nTID: " + fTid);
                         tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
+                        logOperation("✅✅✅ البرمجة الكاملة نجحت بنسبة 100%");
                         mContext.playSound(1);
                     } else {
                         tvProgrammerStatus.setText("⚠️ فشلت البرمجة الكاملة:\nكتابة: " + (fWrite ? "✅" : "❌") + " | تحقق: " + (fVerify ? "✅" : "❌") + " | تسجيل: " + (fReg ? "✅" : "❌"));
                         tvProgrammerStatus.setTextColor(Color.parseColor("#FF9800"));
+                        logOperation("⚠️ فشل جزئي: كتابة=" + (fWrite ? "✅" : "❌") + " تحقق=" + (fVerify ? "✅" : "❌") + " تسجيل=" + (fReg ? "✅" : "❌"));
                         mContext.playSound(2);
                         showRetryDialog("⚠️ فشل البرمجة", "تعذر استكمال الربط، أعد المحاولة", this::programTagFromMira);
                     }
@@ -395,16 +463,21 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
             } catch (Exception e) {
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
+                    showProgress(false);
                     setButtonsEnabled(true);
+                    logOperation("❌ خطأ: " + e.getMessage());
                     showRetryDialog("❌ خطأ أثناء البرمجة", e.getMessage(), this::programTagFromMira);
                 });
             }
         }).start();
     }
 
-    // ============ عمليات Q/R/W الأساسية ============
+    // ============ عمليات القراءة والكتابة ============
     private void read() {
         final AlertDialog loadingDialog = showProfessionalLoadingDialog("🔍 جاري القراءة...", "قراءة الشريحة RFID");
+        showProgress(true);
+        logOperation("بدء القراءة...");
+
         new Thread(() -> {
             try {
                 applyFilterToHardware();
@@ -417,20 +490,25 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
 
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
+                    showProgress(false);
                     if (!TextUtils.isEmpty(data)) {
                         EtData.setText(data);
-                        tvProgrammerStatus.setText("✅ قراءة ناجحة" + (rfidService.isSimulationMode() ? " (محاكاة)" : ""));
+                        tvProgrammerStatus.setText("✅ قراءة ناجحة: " + data);
                         tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
+                        logOperation("✅ قراءة: bank=" + bank + " ptr=" + ptr + " len=" + len + " → " + data);
                         mContext.playSound(1);
                     } else {
                         tvProgrammerStatus.setText("❌ فشل القراءة");
                         tvProgrammerStatus.setTextColor(Color.RED);
+                        logOperation("❌ فشل القراءة");
                         mContext.playSound(2);
                     }
                 });
             } catch (Exception e) {
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
+                    showProgress(false);
+                    logOperation("❌ خطأ: " + e.getMessage());
                     showRetryDialog("❌ خطأ", e.getMessage(), this::read);
                 });
             }
@@ -439,12 +517,14 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
 
     private void write() {
         final AlertDialog loadingDialog = showProfessionalLoadingDialog("✍️ جاري الكتابة...", "كتابة البيانات على الشريحة");
+        showProgress(true);
         setButtonsEnabled(false);
+        String data = EtData != null ? EtData.getText().toString().trim() : "";
+        logOperation("بدء الكتابة: " + data);
 
         new Thread(() -> {
             try {
                 applyFilterToHardware();
-                String data = EtData.getText().toString().trim();
                 String pwdStr = getAccessPassword();
                 int bank = getSelectedBank();
                 int ptr = parseInteger(EtPtr.getText().toString().trim(), 32);
@@ -453,14 +533,17 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
 
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
+                    showProgress(false);
                     setButtonsEnabled(true);
                     if (success) {
                         tvProgrammerStatus.setText("✅ كتابة ناجحة");
                         tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
+                        logOperation("✅ كتابة ناجحة: " + data);
                         mContext.playSound(1);
                     } else {
                         tvProgrammerStatus.setText("❌ فشل الكتابة");
                         tvProgrammerStatus.setTextColor(Color.RED);
+                        logOperation("❌ فشل الكتابة");
                         mContext.playSound(2);
                         showRetryDialog("❌ فشل", "تعذر الكتابة على الشريحة", this::write);
                     }
@@ -468,7 +551,9 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
             } catch (Exception e) {
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
+                    showProgress(false);
                     setButtonsEnabled(true);
+                    logOperation("❌ خطأ: " + e.getMessage());
                     showRetryDialog("❌ خطأ", e.getMessage(), this::write);
                 });
             }
@@ -477,12 +562,14 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
 
     private void writeAndVerify() {
         final AlertDialog loadingDialog = showProfessionalLoadingDialog("✍️ كتابة مع تحقق...", "كتابة ثم مطابقة البيانات");
+        showProgress(true);
         setButtonsEnabled(false);
+        String data = EtData != null ? EtData.getText().toString().trim() : "";
+        logOperation("بدء كتابة مع تحقق: " + data);
 
         new Thread(() -> {
             try {
                 applyFilterToHardware();
-                String data = EtData.getText().toString().trim();
                 String pwdStr = getAccessPassword();
                 int bank = getSelectedBank();
                 int ptr = parseInteger(EtPtr.getText().toString().trim(), 32);
@@ -494,14 +581,17 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
 
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
+                    showProgress(false);
                     setButtonsEnabled(true);
                     if (writeSuccess && verifySuccess) {
                         tvProgrammerStatus.setText("✅ كتابة وتحقق ناجح بنسبة 100%");
                         tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
+                        logOperation("✅ كتابة وتحقق ناجح: " + data);
                         mContext.playSound(1);
                     } else {
                         tvProgrammerStatus.setText("⚠️ فشل التحقق (كتابة: " + (writeSuccess ? "✅" : "❌") + " | مطابقة: " + (verifySuccess ? "✅" : "❌") + ")");
                         tvProgrammerStatus.setTextColor(Color.parseColor("#FF9800"));
+                        logOperation("⚠️ فشل التحقق: كتابة=" + (writeSuccess ? "✅" : "❌") + " مطابقة=" + (verifySuccess ? "✅" : "❌"));
                         mContext.playSound(2);
                         showRetryDialog("⚠️ فشل", "البيانات المكتوبة لا تطابق المقروءة", this::writeAndVerify);
                     }
@@ -509,7 +599,9 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
             } catch (Exception e) {
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
+                    showProgress(false);
                     setButtonsEnabled(true);
+                    logOperation("❌ خطأ: " + e.getMessage());
                     showRetryDialog("❌ خطأ", e.getMessage(), this::writeAndVerify);
                 });
             }
@@ -518,6 +610,9 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
 
     private void readTid() {
         final AlertDialog loadingDialog = showProfessionalLoadingDialog("📋 جاري قراءة TID...", "قراءة المعرف الفريد للمصنع");
+        showProgress(true);
+        logOperation("بدء قراءة TID...");
+
         new Thread(() -> {
             try {
                 applyFilterToHardware();
@@ -526,6 +621,7 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
 
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
+                    showProgress(false);
                     if (!TextUtils.isEmpty(tid)) {
                         if (tvCurrentTid != null) {
                             tvCurrentTid.setText("TID: " + tid);
@@ -533,62 +629,68 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
                         }
                         tvProgrammerStatus.setText("✅ TID: " + tid);
                         tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
+                        logOperation("✅ TID: " + tid);
                         mContext.playSound(1);
                     } else {
                         tvProgrammerStatus.setText("❌ فشل قراءة TID");
                         tvProgrammerStatus.setTextColor(Color.RED);
+                        logOperation("❌ فشل قراءة TID");
                         mContext.playSound(2);
                     }
                 });
             } catch (Exception e) {
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
+                    showProgress(false);
+                    logOperation("❌ خطأ: " + e.getMessage());
                     showRetryDialog("❌ خطأ", e.getMessage(), this::readTid);
                 });
             }
         }).start();
     }
 
-    // ============ قفل وفتح الشريحة (Lock / Unlock) ============
     private void lockTag(boolean shouldLock) {
         String actionName = shouldLock ? "🔒 جاري قفل الشريحة..." : "🔓 جاري فتح قفل الشريحة...";
-        final AlertDialog loadingDialog = showProfessionalLoadingDialog(actionName, "تعديل صلاحيات الوصول لمنطقة EPC/Bank");
-
+        final AlertDialog loadingDialog = showProfessionalLoadingDialog(actionName, "تعديل صلاحيات الوصول");
+        showProgress(true);
         setButtonsEnabled(false);
+        logOperation(shouldLock ? "🔒 بدء قفل الشريحة" : "🔓 بدء فتح الشريحة");
 
         new Thread(() -> {
             try {
                 applyFilterToHardware();
                 String pwdStr = getAccessPassword();
                 int bank = getSelectedBank();
-
                 boolean success = rfidService.setTagLockState(pwdStr, bank, shouldLock);
 
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
+                    showProgress(false);
                     setButtonsEnabled(true);
                     if (success) {
                         tvProgrammerStatus.setText(shouldLock ? "✅ تم قفل الشريحة بنجاح" : "✅ تم فتح قفل الشريحة بنجاح");
                         tvProgrammerStatus.setTextColor(Color.parseColor("#4CAF50"));
+                        logOperation(shouldLock ? "✅ تم القفل" : "✅ تم الفتح");
                         mContext.playSound(1);
                     } else {
                         tvProgrammerStatus.setText(shouldLock ? "❌ فشلت عملية القفل" : "❌ فشلت عملية الفتح");
                         tvProgrammerStatus.setTextColor(Color.RED);
+                        logOperation(shouldLock ? "❌ فشل القفل" : "❌ فشل الفتح");
                         mContext.playSound(2);
-                        showRetryDialog("❌ فشل", "تأكد من كلمة السر Access Password", () -> lockTag(shouldLock));
                     }
                 });
             } catch (Exception e) {
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
+                    showProgress(false);
                     setButtonsEnabled(true);
-                    showRetryDialog("❌ خطأ", e.getMessage(), () -> lockTag(shouldLock));
+                    logOperation("❌ خطأ: " + e.getMessage());
                 });
             }
         }).start();
     }
 
-    // ============ الدوال المساعدة ============
+    // ============ دوال مساعدة ============
     private String getAccessPassword() {
         String pwd = EtAccessPwd != null ? EtAccessPwd.getText().toString().trim() : "";
         return TextUtils.isEmpty(pwd) ? "00000000" : pwd;
@@ -613,11 +715,7 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
     }
 
     private int parseInteger(String val, int def) {
-        try {
-            return Integer.parseInt(val);
-        } catch (Exception e) {
-            return def;
-        }
+        try { return Integer.parseInt(val); } catch (Exception e) { return def; }
     }
 
     public void myOnKeyDwon() {
@@ -721,4 +819,4 @@ public class MiraUHFReadWriteFragment extends KeyDwonFragment implements View.On
         }
         super.onDestroyView();
     }
-}
+                                                                }
