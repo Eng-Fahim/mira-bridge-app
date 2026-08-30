@@ -60,6 +60,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Executors;
 
+
+import com.example.uhf.MiraRfid.MiraRfidService;
+import com.example.uhf.MiraRfid.readers.SimulatorReader;
+import android.graphics.Color;
+
 public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     private static final String TAG = "MiraIdentityStudio";
@@ -638,7 +643,11 @@ private void toggleStonesDetails(boolean show) {
                         updatePendingSyncBadge();
                         showToast(isArabic ? "💾 تم الحفظ محلياً (أوفلاين)" : "💾 Saved locally (Offline)");
                     }
-
+                    
+                    if (apiSuccess && serverItemId > 0) {
+                     // ✅ برمجة الشريحة تلقائياً
+                    programTagAutomatically(serverItemId, finalEpc, finalTitle);
+                    }
                     showEncodingSuccessDialog(finalTitle, finalEpc, String.format(Locale.US, "%.2f", fGrossWeight), finalPriceLocal);
                 });
             } catch (Exception e) {
@@ -655,7 +664,66 @@ private void toggleStonesDetails(boolean show) {
         showToast("❌ " + e.getMessage());
     }
 }
-
+/**
+ * ✅ برمجة الشريحة تلقائياً بعد حفظ القطعة
+ */
+private void programTagAutomatically(int itemId, String miraId, String title) {
+    try {
+        Log.d(TAG, "🔧 بدء البرمجة التلقائية للشريحة...");
+        
+        // ✅ الحصول على خدمة RFID
+        MiraRfidService rfidService = MiraRfidService.getInstance(getContext());
+        
+        // ✅ إعادة تهيئة للشريحة الجديدة
+        rfidService.resetForNewTag();
+        
+        // ✅ قراءة TID من الشريحة
+        String tid = rfidService.readTid("00000000");
+        Log.d(TAG, "TID: " + tid);
+        
+        if (tid == null || tid.isEmpty()) {
+            Log.e(TAG, "❌ فشل قراءة TID");
+            safeRun(() -> showToast(isArabic ? "⚠️ تم حفظ القطعة ولكن تعذر قراءة الشريحة" : "⚠️ Item saved but RFID read failed"));
+            return;
+        }
+        
+        // ✅ توليد EPC من معرف القطعة
+        String generatedEpc = rfidService.generateEpcFromMiraId(miraId);
+        Log.d(TAG, "Generated EPC: " + generatedEpc);
+        
+        // ✅ كتابة EPC على الشريحة
+        boolean writeSuccess = rfidService.writeEpc(generatedEpc, "00000000");
+        Log.d(TAG, "Write: " + writeSuccess);
+        
+        // ✅ التحقق من الكتابة
+        boolean verifySuccess = writeSuccess && rfidService.verifyWrite(generatedEpc, "00000000");
+        Log.d(TAG, "Verify: " + verifySuccess);
+        
+        // ✅ تسجيل الربط في قاعدة البيانات
+        if (verifySuccess) {
+            boolean registered = rfidService.registerRfidBinding(miraId, generatedEpc, tid);
+            Log.d(TAG, "Register: " + registered);
+            
+            final boolean success = registered;
+            final String finalEpc = generatedEpc;
+            final String finalTid = tid;
+            
+            safeRun(() -> {
+                if (success) {
+                    showToast(isArabic ? "✅ تم برمجة الشريحة وربطها بالقطعة بنجاح!" : "✅ RFID programmed and bound successfully!");
+                } else {
+                    showToast(isArabic ? "⚠️ تم حفظ القطعة ولكن فشل تسجيل الربط" : "⚠️ Item saved but binding failed");
+                }
+            });
+        } else {
+            safeRun(() -> showToast(isArabic ? "⚠️ تم حفظ القطعة ولكن فشلت برمجة الشريحة" : "⚠️ Item saved but RFID programming failed"));
+        }
+        
+    } catch (Exception e) {
+        Log.e(TAG, "programTagAutomatically error: " + e.getMessage(), e);
+        safeRun(() -> showToast(isArabic ? "⚠️ تم حفظ القطعة ولكن خطأ في البرمجة" : "⚠️ Item saved but programming error"));
+    }
+}
     private void showPendingItemsDialog() {
         if (offlineCache == null || !isAdded()) return;
 
