@@ -8,13 +8,7 @@ import com.example.uhf.MiraRfid.readers.SimulatorReader;
 import com.example.uhf.manager.MiraSettingsManager;
 
 import org.json.JSONObject;
-import com.example.uhf.api.MiraApiClient; 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import com.example.uhf.api.MiraApiClient;
 
 /**
  * خدمة RFID موحدة لربط القارئات وواجهات التطبيق
@@ -75,7 +69,7 @@ public class MiraRfidService {
     public String getLastReadTid() { return lastReadTid; }
 
     // =========================================================================
-    // 🛠️ دوال الوصول للذاكرة والفلترة المباشرة المرفوعة للـ Fragment
+    // 🛠️ دوال الوصول للذاكرة والفلترة
     // =========================================================================
 
     public boolean writeData(String pwdStr, int bank, int ptr, String data) {
@@ -105,7 +99,7 @@ public class MiraRfidService {
     }
 
     // =========================================================================
-    // 🟢 العمليات المتقدمة لربط واجهة المستخدم بالشبكة
+    // 🟢 العمليات المتقدمة
     // =========================================================================
     
     public String readEpc(String accessPassword) {
@@ -155,124 +149,131 @@ public class MiraRfidService {
         return false;
     }
     
-    public boolean registerRfidBinding(String miraId, String epc, String tid) {
-    currentState = OperationState.REGISTERING;
-    
-    try {
-        Log.d(TAG, "📡 تسجيل الربط في MIRA: " + miraId + " → " + epc);
-        
-        MiraApiClient apiClient = MiraApiClient.getInstance(context);
-        
-        JSONObject payload = new JSONObject();
-        payload.put("mira_id", miraId);
-        payload.put("epc", epc);
-        payload.put("tid", tid);
-        payload.put("gate_id", "handheld_c72");
-        payload.put("device_type", isSimulationMode ? "simulator" : "chainway_c72");
-        payload.put("operation_type", "register");
-        
-        // ✅ الـ endpoint الصحيح
-        MiraApiClient.ApiResponse response = apiClient.postWithAuth("/register_rfid", payload);
-        
-        if (response != null) {
-            Log.d(TAG, "Response Code: " + response.code);
-            Log.d(TAG, "Response Success: " + response.isSuccess);
-            Log.d(TAG, "Response Body: " + response.getBody());
-        }
-        
-        if (response != null && response.isSuccess) {
-            currentState = OperationState.COMPLETED;
-            Log.d(TAG, "✅ تم التسجيل في قاعدة البيانات بنجاح");
-            return true;
-        }
-        
-        if (isSimulationMode) {
-            Log.w(TAG, "⚠️ فشل الاتصال - نجاح وهمي للمحاكاة");
-            currentState = OperationState.COMPLETED;
-            return true;
-        }
-        
-    } catch (Exception e) {
-        Log.e(TAG, "registerRfidBinding error: " + e.getMessage(), e);
-        if (isSimulationMode) {
-            currentState = OperationState.COMPLETED;
-            return true;
-        }
-    }
-    
-    currentState = OperationState.FAILED;
-    return false;
-}
-    
     /**
-     * ✅ البحث عن قطعة في MIRA باستخدام MiraApiClient
+     * ✅ تسجيل ربط RFID في قاعدة البيانات
      */
-    public JSONObject searchInMira(String identifier, String identifierType) {
-    try {
-        Log.d(TAG, "🔍 البحث في MIRA: " + identifier);
+    public boolean registerRfidBinding(String miraId, String epc, String tid) {
+        currentState = OperationState.REGISTERING;
         
-        MiraApiClient apiClient = MiraApiClient.getInstance(context);
-        
-        // ✅ استخدام /authorize - الـ endpoint الصحيح للبحث
-        JSONObject searchPayload = new JSONObject();
-        searchPayload.put("identifier", identifier);
-        searchPayload.put("identifier_type", identifierType);
-        searchPayload.put("gate_id", "handheld_c72");
-        
-        MiraApiClient.ApiResponse response = apiClient.postWithAuth("/authorize", searchPayload);
-        
-        if (response != null) {
-            Log.d(TAG, "Response Code: " + response.code);
-            Log.d(TAG, "Response Body: " + response.getBody());
-        }
-        
-        if (response != null && response.isSuccess && response.data != null) {
-            JSONObject item = response.data.optJSONObject("item");
+        try {
+            Log.d(TAG, "📡 تسجيل الربط في MIRA: " + miraId + " → " + epc);
             
-            if (item != null) {
-                JSONObject result = new JSONObject();
-                result.put("item", item);
-                result.put("barcode", response.data.optJSONObject("barcode") != null ? 
-                    response.data.optJSONObject("barcode") : new JSONObject());
-                result.put("stock", response.data.optJSONObject("stock") != null ? 
-                    response.data.optJSONObject("stock") : new JSONObject());
-                result.put("location", response.data.optJSONObject("location") != null ? 
-                    response.data.optJSONObject("location") : new JSONObject());
-                
-                Log.d(TAG, "✅ تم العثور على القطعة");
-                return result;
+            MiraApiClient apiClient = MiraApiClient.getInstance(context);
+            
+            JSONObject payload = new JSONObject();
+            payload.put("mira_id", miraId);
+            payload.put("epc", epc);
+            payload.put("tid", tid);
+            payload.put("gate_id", "handheld_c72");
+            payload.put("device_type", isSimulationMode ? "simulator" : "chainway_c72");
+            payload.put("operation_type", "register");
+            
+            MiraApiClient.ApiResponse response = apiClient.postWithAuth("/register_rfid", payload);
+            
+            if (response != null) {
+                Log.d(TAG, "Response Code: " + response.code);
+                Log.d(TAG, "Response Success: " + response.isSuccess);
+                Log.d(TAG, "Response Body: " + response.getBody());
+            }
+            
+            if (response != null && response.isSuccess) {
+                currentState = OperationState.COMPLETED;
+                Log.d(TAG, "✅ تم التسجيل في قاعدة البيانات بنجاح");
+                return true;
+            }
+            
+            if (isSimulationMode) {
+                Log.w(TAG, "⚠️ فشل الاتصال - نجاح وهمي للمحاكاة");
+                currentState = OperationState.COMPLETED;
+                return true;
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "registerRfidBinding error: " + e.getMessage(), e);
+            if (isSimulationMode) {
+                currentState = OperationState.COMPLETED;
+                return true;
             }
         }
         
-        if (isSimulationMode) {
-            return createSimulatedSearchResult(identifier);
-        }
-        return null;
-        
-    } catch (Exception e) {
-        Log.e(TAG, "searchInMira error: " + e.getMessage());
-        if (isSimulationMode) {
-            return createSimulatedSearchResult(identifier);
-        }
-        return null;
+        currentState = OperationState.FAILED;
+        return false;
     }
-}
     
+    /**
+     * ✅ البحث عن قطعة في MIRA
+     */
+    public JSONObject searchInMira(String identifier, String identifierType) {
+        try {
+            Log.d(TAG, "🔍 البحث في MIRA: " + identifier);
+            
+            MiraApiClient apiClient = MiraApiClient.getInstance(context);
+            
+            JSONObject searchPayload = new JSONObject();
+            searchPayload.put("identifier", identifier);
+            searchPayload.put("identifier_type", identifierType);
+            searchPayload.put("gate_id", "handheld_c72");
+            
+            MiraApiClient.ApiResponse response = apiClient.postWithAuth("/authorize", searchPayload);
+            
+            if (response != null) {
+                Log.d(TAG, "Response Code: " + response.code);
+                Log.d(TAG, "Response Body: " + response.getBody());
+            }
+            
+            if (response != null && response.isSuccess && response.data != null) {
+                JSONObject item = response.data.optJSONObject("item");
+                
+                if (item != null) {
+                    JSONObject result = new JSONObject();
+                    result.put("item", item);
+                    result.put("barcode", response.data.optJSONObject("barcode") != null ? 
+                        response.data.optJSONObject("barcode") : new JSONObject());
+                    result.put("stock", response.data.optJSONObject("stock") != null ? 
+                        response.data.optJSONObject("stock") : new JSONObject());
+                    result.put("location", response.data.optJSONObject("location") != null ? 
+                        response.data.optJSONObject("location") : new JSONObject());
+                    
+                    Log.d(TAG, "✅ تم العثور على القطعة");
+                    return result;
+                }
+            }
+            
+            if (isSimulationMode) {
+                return createSimulatedSearchResult(identifier);
+            }
+            return null;
+            
+        } catch (Exception e) {
+            Log.e(TAG, "searchInMira error: " + e.getMessage());
+            if (isSimulationMode) {
+                return createSimulatedSearchResult(identifier);
+            }
+            return null;
+        }
+    }
+    
+    /**
+     * ✅ إنشاء نتيجة بحث محاكاة - مع قيم فريدة لكل قطعة
+     */
     private JSONObject createSimulatedSearchResult(String identifier) {
         try {
             JSONObject result = new JSONObject();
             JSONObject item = new JSONObject();
+            
+            // ✅ استخدام identifier الفعلي
             item.put("title", "قطعة تجريبية - " + identifier);
             item.put("serial", identifier);
             item.put("karat", "21K");
             item.put("weight", "5.24");
             item.put("category", "Rings");
             item.put("status", "available");
-            item.put("mira_id", "MIRA-JWL-001001");
+            item.put("mira_id", identifier);  // ✅ المعرف الفعلي
             
             JSONObject barcode = new JSONObject();
-            barcode.put("gtin", "0701234567895");
-            barcode.put("serial_no", "MIRA-JWL-001001");
+            String gtin = generateGtinFromIdentifier(identifier);
+            barcode.put("gtin", gtin);
+            barcode.put("serial_no", identifier);  // ✅ المعرف الفعلي
             
             JSONObject stock = new JSONObject();
             stock.put("status", "متوفر");
@@ -287,10 +288,49 @@ public class MiraRfidService {
             result.put("stock", stock);
             result.put("location", location);
             
+            Log.d(TAG, "✅ تم إنشاء بيانات محاكاة لـ: " + identifier);
             return result;
         } catch (Exception e) {
+            Log.e(TAG, "createSimulatedSearchResult error: " + e.getMessage());
             return new JSONObject();
         }
+    }
+    
+    /**
+     * ✅ توليد GTIN فريد من المعرف
+     */
+    private String generateGtinFromIdentifier(String identifier) {
+        String numbers = identifier.replaceAll("[^0-9]", "");
+        
+        if (numbers.isEmpty()) {
+            numbers = String.valueOf(System.currentTimeMillis()).substring(5);
+        }
+        
+        while (numbers.length() < 12) {
+            numbers = "0" + numbers;
+        }
+        numbers = numbers.substring(0, 12);
+        
+        return numbers;
+    }
+    
+    /**
+     * ✅ توليد EPC فريد من معرف القطعة
+     */
+    public String generateEpcFromMiraId(String miraId) {
+        StringBuilder epc = new StringBuilder("3008");
+        String cleanId = miraId.replaceAll("[^0-9A-Fa-f]", "");
+        
+        while (cleanId.length() < 12) {
+            cleanId = "0" + cleanId;
+        }
+        epc.append(cleanId.substring(0, 12));
+        
+        while (epc.length() < 24) {
+            epc.append("0");
+        }
+        
+        return epc.substring(0, 24).toUpperCase();
     }
     
     public String getDeviceName() {
