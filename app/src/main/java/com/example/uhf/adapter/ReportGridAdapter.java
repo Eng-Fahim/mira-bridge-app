@@ -13,6 +13,7 @@ import com.example.uhf.R;
 import com.example.uhf.model.ReportModels;
 
 import java.util.List;
+import java.util.Locale;  // ✅ أضف هذا الاستيراد
 
 public class ReportGridAdapter extends RecyclerView.Adapter<ReportGridAdapter.VH> {
     
@@ -24,6 +25,13 @@ public class ReportGridAdapter extends RecyclerView.Adapter<ReportGridAdapter.VH
         void onClick(ReportModels.ReportItem item);
     }
     
+    // ✅✅✅ أضف هذا الـ constructor بمعاملين
+    public ReportGridAdapter(List<ReportModels.ReportItem> items, 
+                             OnReportClickListener listener) {
+        this(items, listener, Locale.getDefault().getLanguage().equals("ar"));
+    }
+    
+    // ✅ الـ constructor الأصلي بثلاثة معاملات
     public ReportGridAdapter(List<ReportModels.ReportItem> items, 
                              OnReportClickListener listener, 
                              boolean isArabic) {
@@ -44,19 +52,16 @@ public class ReportGridAdapter extends RecyclerView.Adapter<ReportGridAdapter.VH
     public void onBindViewHolder(@NonNull VH h, int pos) {
         ReportModels.ReportItem item = items.get(pos);
         
-        // ✅ استخدام tvReportIcon بدلاً من ivReportIcon
         h.tvIcon.setText(item.icon);
         h.tvTitle.setText(item.title);
         h.tvSubtitle.setText(item.subtitle);
         
-        // تطبيق اللون
         if (item.color != 0 && h.flIconContainer != null) {
             h.flIconContainer.setBackgroundTintList(
                 android.content.res.ColorStateList.valueOf(
                     h.itemView.getContext().getColor(item.color)));
         }
         
-        // شارة متقدم
         if (h.chipAdvanced != null) {
             if (item.isAdvanced) {
                 h.chipAdvanced.setVisibility(View.VISIBLE);
@@ -66,7 +71,6 @@ public class ReportGridAdapter extends RecyclerView.Adapter<ReportGridAdapter.VH
             }
         }
         
-        // النقر
         h.itemView.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onClick(item);
@@ -80,7 +84,7 @@ public class ReportGridAdapter extends RecyclerView.Adapter<ReportGridAdapter.VH
     }
     
     class VH extends RecyclerView.ViewHolder {
-        TextView tvIcon;      // ✅ TextView بدلاً من ImageView
+        TextView tvIcon;
         TextView tvTitle;
         TextView tvSubtitle;
         FrameLayout flIconContainer;
@@ -88,7 +92,7 @@ public class ReportGridAdapter extends RecyclerView.Adapter<ReportGridAdapter.VH
         
         VH(View v) {
             super(v);
-            tvIcon = v.findViewById(R.id.tvReportIcon);        // ✅ صحيح
+            tvIcon = v.findViewById(R.id.tvReportIcon);
             tvTitle = v.findViewById(R.id.tvReportTitle);
             tvSubtitle = v.findViewById(R.id.tvReportSubtitle);
             flIconContainer = v.findViewById(R.id.flIconContainer);
