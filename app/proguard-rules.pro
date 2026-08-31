@@ -16,19 +16,89 @@
 #   public *;
 #}
 
+# ==================== قواعد عامة ====================
+-keepattributes SourceFile,LineNumberTable
+-keepattributes *Annotation*
+-keepattributes Signature
+-keepattributes Exceptions
+
+# ==================== مكتبات الجهاز ====================
 -dontwarn com.imagealgorithmlab.**
 -dontwarn com.hsm.**
 -dontwarn com.rscja.deviceapi.**
 -keep class com.hsm.** {*; }
 -keep class com.rscja.deviceapi.** {*; }
 
+# ==================== ملفات البيانات ====================
 #导出数据jar
 -keep class common.** { *; }
 -keep class jxl.** { *; }
 -keep class aavax.**{*;}
--keep class com.**{*;}
--keep class org.**{*;}
 -keep class schemaorg_apache_xmlbeans.system.**{*;}
 -keep interface org.**{*;}
+
+# ==================== Firebase ====================
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+
+# ==================== الأمان والتشفير ====================
+-keep class androidx.security.crypto.** { *; }
+-keep class com.google.crypto.tink.** { *; }
+
+# ==================== المصادقة البيومترية ====================
 -keep class androidx.biometric.** { *; }
 -dontwarn androidx.biometric.**
+
+# ==================== الشبكة Retrofit ====================
+-dontwarn retrofit2.**
+-keep class retrofit2.** { *; }
+-keepclasseswithmembers class * {
+    @retrofit2.http.* <methods>;
+}
+
+# ==================== OkHttp ====================
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keep class okhttp3.** { *; }
+-keep class okio.** { *; }
+
+# ==================== Gson ====================
+-keep class com.google.gson.** { *; }
+-keepclassmembers class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+
+# ==================== Room Database ====================
+-keep class * extends androidx.room.RoomDatabase
+-dontwarn androidx.room.paging.**
+
+# ==================== CameraX ====================
+-keep class androidx.camera.** { *; }
+
+# ==================== MPAndroidChart ====================
+-keep class com.github.mikephil.charting.** { *; }
+
+# ==================== Glide ====================
+-keep public class * implements com.bumptech.glide.module.GlideModule
+-keep class * extends com.bumptech.glide.module.AppGlideModule {
+    <init>(...);
+}
+-keep public enum com.bumptech.glide.load.ImageHeaderParser$** {
+    **[] $VALUES;
+    public *;
+}
+
+# ==================== ZXing ====================
+-keep class com.journeyapps.barcodescanner.** { *; }
+-keep class com.google.zxing.** { *; }
+
+# ==================== ML Kit ====================
+-keep class com.google.mlkit.** { *; }
+
+# ==================== حماية البيانات الحساسة ====================
+# منع تسريب البيانات في السجلات للإنتاج
+-assumenosideeffects class android.util.Log {
+    public static *** d(...);
+    public static *** v(...);
+    public static *** i(...);
+}
