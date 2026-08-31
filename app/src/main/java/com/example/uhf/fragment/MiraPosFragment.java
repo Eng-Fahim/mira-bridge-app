@@ -1089,44 +1089,55 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
                 payment.put("payment_method", data.paymentMethod);
                 payload.put("payment", payment);
                 
-                // ✅✅✅ حفظ البيع محلياً قبل الإرسال
+                // ✅✅✅ حفظ البيع محلياً أولاً
                 final String localSaleId = saveSaleLocally(payload, data);
                 
-                // ✅ إرسال إلى السيرفر
-                MiraApiClient.ApiResponse response = client.checkout(payload);
+                // ✅ محاولة الإرسال للسيرفر
+                MiraApiClient.ApiResponse response = null;
+                boolean isNetworkError = false;
+                String errorMsg = "";
                 
-                // ✅ حفظ الاستجابة للفاتورة
-                lastSaleResponse = response;
+                try {
+                    response = client.checkout(payload);
+                    
+                    if (response != null) {
+                        isNetworkError = response.isNetworkError;
+                        errorMsg = response.error != null ? response.error : 
+                                  (response.message != null ? response.message : "Unknown error");
+                    }
+                } catch (Exception e) {
+                    // ✅ فشل الاتصال
+                    isNetworkError = true;
+                    errorMsg = e.getMessage();
+                }
                 
-                final boolean isNetworkError = response != null && response.isNetworkError;
-                final boolean isSuccess = response != null && response.isSuccess;
-                final String errorMsg = response != null && response.error != null ? response.error : 
-                                       (response != null && response.message != null ? response.message : "Unknown error");
+                final boolean finalIsNetworkError = isNetworkError;
+                final boolean finalIsSuccess = response != null && response.isSuccess;
+                final String finalErrorMsg = errorMsg;
+                final MiraApiClient.ApiResponse finalResponse = response;
                 
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
                     setButtonsEnabled(true);
                     
-                    if (isSuccess) {
+                    if (finalIsSuccess) {
                         // ✅ نجاح - إزالة من المحلي
                         removeSaleFromLocal(localSaleId);
                         playAlertSound(1);
                         clearCart();
+                        showReceipt(finalResponse);
                         
-                        // ✅ عرض الفاتورة
-                        showReceipt(response);
-                        
-                    } else if (isNetworkError) {
-                        // ❌ فشل اتصال - البيع محفوظ محلياً
+                    } else if (finalIsNetworkError || finalResponse == null) {
+                        // ✅✅✅ أوفلاين - البيع محفوظ محلياً - لا نعرض خطأ!
                         playAlertSound(1);
                         clearCart();
                         showOfflineSaleSuccess(localSaleId, data);
                         
                     } else {
-                        // ❌ خطأ من السيرفر - لكن البيع محفوظ محلياً
+                        // ❌ خطأ من السيرفر (ليس أوفلاين) - إعادة محاولة
                         showRetryDialog(
                             isArabic ? "❌ فشل البيع" : "❌ Sale Failed",
-                            errorMsg,
+                            finalErrorMsg,
                             () -> retrySale(localSaleId, payload)
                         );
                     }
