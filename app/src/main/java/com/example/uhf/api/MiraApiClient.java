@@ -1468,7 +1468,10 @@ public ApiResponse getBranchInventoryStats(int branchId) {
     public final int code;
     public final JSONObject data;
     public final String error;
-    public String message; // ✅ إضافة متغير message
+    public String message; 
+    public int statusCode;
+    public boolean isNetworkError;
+    public String errorCode;
     public final boolean isSuccess;
     private String rawBody;
 
@@ -1518,4 +1521,4 @@ public ApiResponse getBranchInventoryStats(int branchId) {
         return null;
     }
 }
-    }
+                             }
