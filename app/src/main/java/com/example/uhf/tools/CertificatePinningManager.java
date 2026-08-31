@@ -13,16 +13,33 @@ import javax.net.ssl.X509TrustManager;
 
 /**
  * CertificatePinningManager - إدارة تثبيت الشهادات
+ * 
+ * الوضع الحالي: DEBUG MODE
+ * - يعرض بصمة الشهادة الفعلية
+ * - لا يمنع أي اتصال
+ * 
+ * بعد الحصول على البصمة:
+ * 1. انسخ القيمة
+ * 2. ضعها في EXPECTED_PIN
+ * 3. احذف PinListener من LoginActivity
  */
 public class CertificatePinningManager {
 
     private static final String TAG = "CertificatePinningManager";
     
-    // ✅ بصمة الشهادة الفعلية (SHA-256)
-    // يجب استبدال هذه القيمة بالبصمة الحقيقية لشهادة الخادم
-    private static final String EXPECTED_PIN = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"; // ← استبدل
+    // ✅ فارغة حالياً - سنضع البصمة الحقيقية هنا لاحقاً
+    private static final String EXPECTED_PIN = "";
     
     private static SSLContext sslContext;
+    private static String lastActualPin = null;
+    
+    // ✅ مستمع لعرض البصمة
+    public interface PinListener {
+        void onPinCaptured(String pin);
+    }
+    
+    private static PinListener pinListener;
+    private static boolean pinShown = false; // لمنع التكرار
 
     /**
      * تطبيق Certificate Pinning على اتصال HttpsURLConnection
@@ -31,11 +48,6 @@ public class CertificatePinningManager {
         try {
             SSLContext context = getPinnedSSLContext();
             connection.setSSLSocketFactory(context.getSocketFactory());
-            connection.setHostnameVerifier((hostname, session) -> {
-                // ✅ التحقق من اسم المضيف
-                return "sa.mirabarcode.com".equals(hostname) || 
-                       hostname.endsWith(".mirabarcode.com");
-            });
         } catch (Exception e) {
             Log.e(TAG, "Error applying certificate pinning", e);
         }
@@ -64,8 +76,22 @@ public class CertificatePinningManager {
                         throw new CertificateException("No certificate chain");
                     }
                     
-                    // ✅ التحقق من بصمة الشهادة
+                    // ✅ الحصول على البصمة الفعلية
                     String actualPin = getPin(chain[0]);
+                    lastActualPin = actualPin;
+                    
+                    // ✅ DEBUG: عرض البصمة مرة واحدة فقط
+                    if (!pinShown && pinListener != null) {
+                        pinShown = true;
+                        pinListener.onPinCaptured(actualPin);
+                    }
+                    
+                    // ✅ إذا كانت القيمة فارغة، تخطى الفحص (وضع التطوير)
+                    if (EXPECTED_PIN == null || EXPECTED_PIN.isEmpty()) {
+                        return;
+                    }
+                    
+                    // ✅ التحقق من بصمة الشهادة (وضع الإنتاج)
                     if (!EXPECTED_PIN.equals(actualPin)) {
                         throw new CertificateException(
                             "Certificate pin mismatch! Expected: " + EXPECTED_PIN + 
@@ -110,14 +136,17 @@ public class CertificatePinningManager {
     }
 
     /**
-     * دالة مساعدة للحصول على البصمة الفعلية للشهادة
-     * استخدمها مرة واحدة للتطوير فقط
+     * الحصول على آخر بصمة تم التقاطها
      */
-    public static String getCertificatePinForDebug(X509Certificate certificate) {
-        try {
-            return getPin(certificate);
-        } catch (Exception e) {
-            return null;
-        }
+    public static String getLastActualPin() {
+        return lastActualPin;
+    }
+
+    /**
+     * تعيين مستمع لالتقاط البصمة
+     */
+    public static void setPinListener(PinListener listener) {
+        pinListener = listener;
+        pinShown = false;
     }
 }
