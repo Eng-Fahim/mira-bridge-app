@@ -37,6 +37,7 @@ import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.example.uhf.R;
+import com.example.uhf.manager.SessionMonitorManager;  
 import com.example.uhf.manager.PermissionManager;  
 import com.example.uhf.fragment.MiraQuickAccessSettingsFragment;
 import com.example.uhf.fragment.MiraServerConfigFragment;
@@ -207,6 +208,8 @@ private void updateToolbarTitle() {
                 navigateToLogin();
                 return;
             }
+            // في onCreate بعد التحقق من الجلسة
+            SessionMonitorManager.getInstance(this).startMonitoring(this);
 
             branchesManager = MiraBranchesManager.getInstance(this);
             if (branchesManager != null) {
@@ -1126,6 +1129,8 @@ private void updateToolbarTitle() {
             if (orgProfileManager != null && profileListener != null) {
                 orgProfileManager.removeListener(profileListener);
             }
+            // في onDestroy
+            SessionMonitorManager.getInstance(this).stopMonitoring();
         } catch (Exception e) {
             Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
         }
