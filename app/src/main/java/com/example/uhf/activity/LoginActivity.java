@@ -154,25 +154,6 @@ public class LoginActivity extends AppCompatActivity {
         
         // ✅ 8. باقي التهيئة
         orgProfileManager = MiraOrgProfileManager.getInstance(this);
-        // ✅ التقاط وعرض بصمة الشهادة (للتطوير فقط)
-com.example.uhf.tools.CertificatePinningManager.setPinListener(pin -> {
-    runOnUiThread(() -> {
-        // ✅ عرض البصمة في Toast
-        Toast.makeText(this, 
-            "🔐 بصمة الشهادة:\n" + pin, 
-            Toast.LENGTH_LONG).show();
-        
-        // ✅ نسخ البصمة للحافظة
-        android.content.ClipboardManager cm = 
-            (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        cm.setPrimaryClip(android.content.ClipData.newPlainText("cert_pin", pin));
-        
-        Toast.makeText(this, 
-            "✅ تم نسخ البصمة للحافظة!", 
-            Toast.LENGTH_SHORT).show();
-    });
-});
-
         
         initViews();
         disableAutofill();
@@ -1194,4 +1175,4 @@ private void navigateToMainWithAnimation() {
         
         mainHandler.removeCallbacksAndMessages(null);
     }
-}
+    }
