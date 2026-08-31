@@ -173,7 +173,6 @@ public class MiraApiClient {
     public ApiResponse getWithAuth(String endpoint) {
     HttpURLConnection conn = null;
     try {
-        // ✅ إزالة الـ / من بداية الـ endpoint
         String cleanEndpoint = endpoint;
         if (cleanEndpoint.startsWith("/")) {
             cleanEndpoint = cleanEndpoint.substring(1);
@@ -183,31 +182,45 @@ public class MiraApiClient {
         Log.d(TAG, "GET Auth Request: " + fullUrl);
         
         URL url = new URL(fullUrl);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            applyStandardHeaders(conn, true);
-
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
-            return buildResponse(conn);
-        } catch (java.net.UnknownHostException e) {
-            Log.e(TAG, "❌ Host not found: " + e.getMessage());
-            return new ApiResponse(-1, null, "الخادم غير موجود - تحقق من الرابط");
-        } catch (java.net.ConnectException e) {
-            Log.e(TAG, "❌ Connection failed: " + e.getMessage());
-            return new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
-        } catch (Exception e) {
-            Log.e(TAG, "GET Auth Error [" + endpoint + "]: " + e.getMessage());
-            return new ApiResponse(-1, null, e.getMessage());
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
+        conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        applyStandardHeaders(conn, true);
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(15000);
+        return buildResponse(conn);
+        
+    } catch (java.net.UnknownHostException e) {
+        Log.e(TAG, "❌ Host not found: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
+        response.isNetworkError = true; // ✅✅✅
+        return response;
+        
+    } catch (java.net.ConnectException e) {
+        Log.e(TAG, "❌ Connection failed: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
+        response.isNetworkError = true; // ✅✅✅
+        return response;
+        
+    } catch (java.net.SocketTimeoutException e) {
+        Log.e(TAG, "❌ Timeout: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
+        response.isNetworkError = true; // ✅✅✅
+        return response;
+        
+    } catch (Exception e) {
+        Log.e(TAG, "GET Auth Error [" + endpoint + "]: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true; // ✅✅✅
+        return response;
+        
+    } finally {
+        if (conn != null) conn.disconnect();
     }
+}
 
     public ApiResponse postWithAuth(String endpoint, JSONObject payload) {
     HttpURLConnection conn = null;
     try {
-        // ✅ إزالة الـ / من بداية الـ endpoint
         String cleanEndpoint = endpoint;
         if (cleanEndpoint.startsWith("/")) {
             cleanEndpoint = cleanEndpoint.substring(1);
@@ -217,34 +230,49 @@ public class MiraApiClient {
         Log.d(TAG, "POST Auth Request: " + fullUrl);
         
         URL url = new URL(fullUrl);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            applyStandardHeaders(conn, true);
+        conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        applyStandardHeaders(conn, true);
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(15000);
+        conn.setDoOutput(true);
 
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
-            conn.setDoOutput(true);
-
-            if (payload != null) {
-                byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(input, 0, input.length);
-                }
+        if (payload != null) {
+            byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(input, 0, input.length);
             }
-            return buildResponse(conn);
-        } catch (java.net.UnknownHostException e) {
-            Log.e(TAG, "❌ Host not found: " + e.getMessage());
-            return new ApiResponse(-1, null, "الخادم غير موجود - تحقق من الرابط");
-        } catch (java.net.ConnectException e) {
-            Log.e(TAG, "❌ Connection failed: " + e.getMessage());
-            return new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
-        } catch (Exception e) {
-            Log.e(TAG, "POST Auth Error [" + endpoint + "]: " + e.getMessage());
-            return new ApiResponse(-1, null, e.getMessage());
-        } finally {
-            if (conn != null) conn.disconnect();
         }
+        return buildResponse(conn);
+        
+    } catch (java.net.UnknownHostException e) {
+        Log.e(TAG, "❌ Host not found: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
+        response.isNetworkError = true; // ✅✅✅
+        return response;
+        
+    } catch (java.net.ConnectException e) {
+        Log.e(TAG, "❌ Connection failed: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
+        response.isNetworkError = true; // ✅✅✅
+        return response;
+        
+    } catch (java.net.SocketTimeoutException e) {
+        Log.e(TAG, "❌ Timeout: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
+        response.isNetworkError = true; // ✅✅✅
+        return response;
+        
+    } catch (Exception e) {
+        Log.e(TAG, "POST Auth Error [" + endpoint + "]: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true; // ✅✅✅
+        return response;
+        
+    } finally {
+        if (conn != null) conn.disconnect();
     }
+}
 
     private ApiResponse post(String endpoint, JSONObject payload) {
     HttpURLConnection conn = null;
@@ -274,24 +302,37 @@ public class MiraApiClient {
                 }
             }
             return buildResponse(conn);
-        } catch (java.net.UnknownHostException e) {
-            Log.e(TAG, "❌ Host not found: " + e.getMessage());
-            return new ApiResponse(-1, null, "الخادم غير موجود - تحقق من الرابط");
-        } catch (java.net.ConnectException e) {
-            Log.e(TAG, "❌ Connection failed: " + e.getMessage());
-            return new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
-        } catch (Exception e) {
-            Log.e(TAG, "POST Error [" + endpoint + "]: " + e.getMessage());
-            return new ApiResponse(-1, null, e.getMessage());
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
+         } catch (java.net.UnknownHostException e) {
+        Log.e(TAG, "❌ Host not found: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
+        response.isNetworkError = true; // ✅✅✅ مهم!
+        return response;
+        
+    } catch (java.net.ConnectException e) {
+        Log.e(TAG, "❌ Connection failed: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
+        response.isNetworkError = true; // ✅✅✅ مهم!
+        return response;
+        
+    } catch (java.net.SocketTimeoutException e) {
+        Log.e(TAG, "❌ Timeout: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
+        response.isNetworkError = true; // ✅✅✅ مهم!
+        return response;
+        
+    } catch (Exception e) {
+        Log.e(TAG, "POST Auth Error: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true; // ✅✅✅ مهم!
+        return response;
+    } finally {
+        if (conn != null) conn.disconnect();
     }
+}
 
     private ApiResponse get(String endpoint) {
     HttpURLConnection conn = null;
     try {
-        // ✅ إزالة الـ / من بداية الـ endpoint
         String cleanEndpoint = endpoint;
         if (cleanEndpoint.startsWith("/")) {
             cleanEndpoint = cleanEndpoint.substring(1);
@@ -301,26 +342,35 @@ public class MiraApiClient {
         Log.d(TAG, "GET Request: " + fullUrl);
         
         URL url = new URL(fullUrl);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            applyStandardHeaders(conn, false);
-
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
-            return buildResponse(conn);
-        } catch (java.net.UnknownHostException e) {
-            Log.e(TAG, "❌ Host not found: " + e.getMessage());
-            return new ApiResponse(-1, null, "الخادم غير موجود - تحقق من الرابط");
-        } catch (java.net.ConnectException e) {
-            Log.e(TAG, "❌ Connection failed: " + e.getMessage());
-            return new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
-        } catch (Exception e) {
-            Log.e(TAG, "GET Error [" + endpoint + "]: " + e.getMessage());
-            return new ApiResponse(-1, null, e.getMessage());
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
+        conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        applyStandardHeaders(conn, false);
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(15000);
+        return buildResponse(conn);
+        
+    } catch (java.net.UnknownHostException e) {
+        Log.e(TAG, "❌ Host not found: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
+        response.isNetworkError = true; // ✅✅✅
+        return response;
+        
+    } catch (java.net.ConnectException e) {
+        Log.e(TAG, "❌ Connection failed: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
+        response.isNetworkError = true; // ✅✅✅
+        return response;
+        
+    } catch (Exception e) {
+        Log.e(TAG, "GET Error [" + endpoint + "]: " + e.getMessage());
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true; // ✅✅✅
+        return response;
+        
+    } finally {
+        if (conn != null) conn.disconnect();
     }
+}
 
     private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
     int responseCode = conn.getResponseCode();
