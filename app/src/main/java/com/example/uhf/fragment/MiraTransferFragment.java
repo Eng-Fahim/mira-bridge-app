@@ -145,13 +145,13 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void applyPermissions() {
-        SecureSessionManager.RoleRole userRole = sessionManager != null ? SecureSessionManager.RolegetUserRole() : SecureSessionManager.RoleRole.BRANCH_MANAGER;
+        SecureSessionManager.Role userRole = sessionManager != null ? sessionManager.getUserRole() : SecureSessionManager.Role.BRANCH_MANAGER;
         
-        boolean isTopLevel = userRole == SecureSessionManager.RoleRole.SYSTEM_ADMIN || 
-                             userRole == SecureSessionManager.RoleRole.ORG_ADMIN;
+        boolean isTopLevel = userRole == SecureSessionManager.Role.SYSTEM_ADMIN || 
+                             userRole == SecureSessionManager.Role.ORG_ADMIN;
         
         boolean canCreate = isTopLevel || 
-                           userRole == SecureSessionManager.RoleRole.BRANCH_MANAGER || 
+                           userRole == SecureSessionManager.Role.BRANCH_MANAGER || 
                            permissionManager.canEdit("transfers");
 
         if (btnNewTransfer != null) {
@@ -178,8 +178,8 @@ public class MiraTransferFragment extends Fragment {
 
     private boolean canReceiveTransfer(TransferData t) {
         int userBranchId = branchesManager.getActiveBranchId();
-        SecureSessionManager.RoleRole userRole = sessionManager != null ? SecureSessionManager.RolegetUserRole() : SecureSessionManager.RoleRole.BRANCH_MANAGER;
-        return (userRole == SecureSessionManager.RoleRole.SYSTEM_ADMIN || userRole == SecureSessionManager.RoleRole.ORG_ADMIN) || (t.toBranchId == userBranchId);
+        SecureSessionManager.Role userRole = sessionManager != null ? sessionManager.getUserRole() : SecureSessionManager.Role.BRANCH_MANAGER;
+        return (userRole == SecureSessionManager.Role.SYSTEM_ADMIN || userRole == SecureSessionManager.Role.ORG_ADMIN) || (t.toBranchId == userBranchId);
     }
 
     private boolean canDeleteTransfer() {
@@ -329,8 +329,8 @@ public class MiraTransferFragment extends Fragment {
     private void loadTransfers() {
         executor.execute(() -> {
             int branchId = branchesManager.getActiveBranchId();
-            SecureSessionManager.RoleRole userRole = sessionManager != null ? SecureSessionManager.RolegetUserRole() : SecureSessionManager.RoleRole.BRANCH_MANAGER;
-            boolean isTopLevel = userRole == SecureSessionManager.RoleRole.SYSTEM_ADMIN || userRole == SecureSessionManager.RoleRole.ORG_ADMIN;
+            SecureSessionManager.Role userRole = sessionManager != null ? sessionManager.getUserRole() : SecureSessionManager.Role.BRANCH_MANAGER;
+            boolean isTopLevel = userRole == SecureSessionManager.Role.SYSTEM_ADMIN || userRole == SecureSessionManager.Role.ORG_ADMIN;
             
             MiraApiClient.ApiResponse response = apiClient.getTransfers(branchId, "");
             
@@ -1032,4 +1032,4 @@ public class MiraTransferFragment extends Fragment {
             }
         }
     }
-                                                 }
+}
