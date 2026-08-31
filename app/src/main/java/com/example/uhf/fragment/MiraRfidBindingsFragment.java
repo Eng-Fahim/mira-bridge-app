@@ -38,9 +38,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Executors;
 
-/**
- * ✅ إدارة الشرائح المبرمجة - متوافقة مع الثيمات واللغات ومحمية من التحرير والتنقل (Detached Exception Guarded)
- */
 public class MiraRfidBindingsFragment extends MiraBaseFragment {
     
     private static final String TAG = "MiraRfidBindings";
@@ -50,12 +47,15 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
     private MiraApiClient apiClient;
     private PermissionManager permissionManager;
     private final List<JSONObject> bindingList = new ArrayList<>();
+    private final List<JSONObject> availableTagList = new ArrayList<>(); // ✅ جديد: الشرائح المتاحة
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
     private TextView tvCount;
     private TextView tvTitle;
+    private TextView tvAvailableCount; // ✅ جديد: عدد الشرائح المتاحة
     private String currentFilter = "";
     private String currentSearch = "";
+    private boolean showingAvailableTags = false; // ✅ جديد: هل نعرض المتاحة أم المبرمجة
     
     @Nullable
     @Override
@@ -76,6 +76,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         
         tvCount = view.findViewById(R.id.tvCount);
         tvTitle = view.findViewById(R.id.tvTitle);
+        tvAvailableCount = view.findViewById(R.id.tvAvailableCount); // ✅ جديد
         rvBindings = view.findViewById(R.id.rvBindings);
         rvBindings.setLayoutManager(new LinearLayoutManager(context));
         
@@ -86,24 +87,55 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         if (swipeRefresh != null) {
             swipeRefresh.setOnRefreshListener(() -> {
                 loadBindings();
+                loadAvailableTags(); // ✅ تحميل الشرائح المتاحة أيضاً
                 swipeRefresh.setRefreshing(false);
             });
         }
         
+        // ✅ زر تبديل العرض: مبرمجة / متاحة
         TabLayout tabFilter = view.findViewById(R.id.tabFilter);
         if (tabFilter != null) {
             tabFilter.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
                 @Override public void onTabSelected(TabLayout.Tab tab) {
                     switch (tab.getPosition()) {
-                        case 0: currentFilter = ""; break;
-                        case 1: currentFilter = "active"; break;
-                        case 2: currentFilter = "locked"; break;
-                        case 3: currentFilter = "inactive"; break;
+                        case 0: 
+                            currentFilter = ""; 
+                            showingAvailableTags = false;
+                            break;
+                        case 1: 
+                            currentFilter = "active"; 
+                            showingAvailableTags = false;
+                            break;
+                        case 2: 
+                            currentFilter = "locked"; 
+                            showingAvailableTags = false;
+                            break;
+                        case 3: 
+                            currentFilter = "inactive"; 
+                            showingAvailableTags = false;
+                            break;
+                        case 4: // ✅ تبويب جديد للشرائح المتاحة
+                            showingAvailableTags = true;
+                            break;
                     }
-                    loadBindings();
+                    
+                    if (showingAvailableTags) {
+                        loadAvailableTags();
+                    } else {
+                        loadBindings();
+                    }
                 }
                 @Override public void onTabUnselected(TabLayout.Tab tab) {}
                 @Override public void onTabReselected(TabLayout.Tab tab) {}
+            });
+        }
+        
+        // ✅ زر عرض الشرائح المتاحة
+        View btnAvailableTags = view.findViewById(R.id.btnAvailableTags);
+        if (btnAvailableTags != null) {
+            btnAvailableTags.setOnClickListener(v -> {
+                showingAvailableTags = true;
+                loadAvailableTags();
             });
         }
         
@@ -121,12 +153,82 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         }
         
         loadBindings();
+        loadAvailableTags(); // ✅ تحميل الشرائح المتاحة عند البدء
     }
     
     /**
-     * ✅ تحميل قائمة الشرائح (مع شرط أمان الحماية isAdded)
+     * ✅ تحميل الشرائح المتاحة من المخزون
+     */
+    private void loadAvailableTags() {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getWithAuth("/rfid/available");
+                
+                mainHandler.post(() -> {
+                    if (!isAdded() || getContext() == null) {
+                        return;
+                    }
+                    
+                    if (response != null && response.isSuccess && response.data != null) {
+                        JSONArray availableTags = response.data.optJSONArray("available_tags");
+                        int count = response.data.optInt("count", 0);
+                        
+                        availableTagList.clear();
+                        if (availableTags != null) {
+                            for (int i = 0; i < availableTags.length(); i++) {
+                                availableTagList.add(availableTags.optJSONObject(i));
+                            }
+                        }
+                        
+                        // ✅ تحديث عدد الشرائح المتاحة
+                        if (tvAvailableCount != null) {
+                            tvAvailableCount.setText(
+                                isArabic() ? 
+                                "📦 الشرائح المتاحة: " + count : 
+                                "📦 Available Tags: " + count
+                            );
+                            tvAvailableCount.setVisibility(View.VISIBLE);
+                        }
+                        
+                        // ✅ إذا كنا في وضع عرض المتاحة، نعرضها
+                        if (showingAvailableTags) {
+                            showAvailableTags();
+                        }
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "loadAvailableTags error: " + e.getMessage());
+            }
+        });
+    }
+    
+    /**
+     * ✅ عرض الشرائح المتاحة
+     */
+    private void showAvailableTags() {
+        if (tvCount != null) {
+            tvCount.setText(
+                isArabic() ? 
+                "إجمالي الشرائح المتاحة: " + availableTagList.size() : 
+                "Total Available: " + availableTagList.size()
+            );
+        }
+        
+        if (tvTitle != null) {
+            tvTitle.setText(isArabic() ? "الشرائح المتاحة" : "Available Tags");
+        }
+        
+        // ✅ استخدام Adapter مختلف أو نفس الـ Adapter مع بيانات مختلفة
+        AvailableTagsAdapter availableAdapter = new AvailableTagsAdapter(availableTagList);
+        rvBindings.setAdapter(availableAdapter);
+    }
+    
+    /**
+     * ✅ تحميل قائمة الشرائح المبرمجة
      */
     private void loadBindings() {
+        showingAvailableTags = false;
+        
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 StringBuilder endpoint = new StringBuilder("/rfid-bindings-list?page=1&per_page=100");
@@ -141,11 +243,10 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
                 MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint.toString());
                 
                 mainHandler.post(() -> {
-                    // 🛡️ تحقق من أن الـ Fragment ما زالت مقترنة بالشاشة قبل الوصول للموارد
                     if (!isAdded() || getContext() == null) {
                         return;
                     }
-
+                    
                     if (response != null && response.isSuccess && response.data != null) {
                         JSONArray bindings = response.data.optJSONArray("bindings");
                         int total = response.data.optInt("total", 0);
@@ -157,10 +258,19 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
                             }
                         }
                         
-                        adapter.notifyDataSetChanged();
+                        adapter = new BindingsAdapter(bindingList, this::showBindingDetails);
+                        rvBindings.setAdapter(adapter);
                         
                         if (tvCount != null) {
-                            tvCount.setText(getString(R.string.rfid_bindings_total, total));
+                            tvCount.setText(
+                                isArabic() ? 
+                                "إجمالي الشرائح المبرمجة: " + total : 
+                                "Total Programmed: " + total
+                            );
+                        }
+                        
+                        if (tvTitle != null) {
+                            tvTitle.setText(isArabic() ? "الشرائح المبرمجة" : "Programmed Tags");
                         }
                     } else {
                         showToast(getString(R.string.rfid_load_failed));
@@ -446,5 +556,58 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
     
     interface OnBindingClickListener {
         void onClick(JSONObject binding);
+    }
+    
+     
+    /**
+     * ✅ Adapter للشرائح المتاحة
+     */
+    private class AvailableTagsAdapter extends RecyclerView.Adapter<AvailableTagsAdapter.VH> {
+        private final List<JSONObject> items;
+        
+        AvailableTagsAdapter(List<JSONObject> items) {
+            this.items = items;
+        }
+        
+        @NonNull
+        @Override
+        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_available_tag_card, parent, false);
+            return new VH(view);
+        }
+        
+        @Override
+        public void onBindViewHolder(@NonNull VH h, int pos) {
+            JSONObject tag = items.get(pos);
+            
+            h.tvTid.setText(tag.optString("tid", "-"));
+            h.tvGtin.setText("GTIN: " + tag.optString("gtin13", "-"));
+            h.tvSerial.setText("Serial: " + tag.optString("serial_number", "-"));
+            h.tvBatch.setText("Batch: " + tag.optString("batch_number", "-"));
+            h.tvImportedAt.setText("Imported: " + tag.optString("imported_at", "-"));
+        }
+        
+        @Override
+        public int getItemCount() {
+            return items.size();
+        }
+        
+        class VH extends RecyclerView.ViewHolder {
+            TextView tvTid, tvGtin, tvSerial, tvBatch, tvImportedAt;
+            
+            VH(View v) {
+                super(v);
+                tvTid = v.findViewById(R.id.tvTid);
+                tvGtin = v.findViewById(R.id.tvGtin);
+                tvSerial = v.findViewById(R.id.tvSerial);
+                tvBatch = v.findViewById(R.id.tvBatch);
+                tvImportedAt = v.findViewById(R.id.tvImportedAt);
+            }
+        }
+    }
+    
+    private boolean isArabic() {
+        return Locale.getDefault().getLanguage().equals("ar");
     }
 }
