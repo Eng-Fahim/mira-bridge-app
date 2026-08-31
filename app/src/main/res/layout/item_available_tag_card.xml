@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView ...>
+    <LinearLayout ...>
+        <TextView android:id="@+id/tvTid" ... />
+        <TextView android:id="@+id/tvGtin" ... />
+        <TextView android:id="@+id/tvSerial" ... />
+        <TextView android:id="@+id/tvBatch" ... />
+        <TextView android:id="@+id/tvImportedAt" ... />
+    </LinearLayout>
+</androidx.cardview.widget.CardView>
