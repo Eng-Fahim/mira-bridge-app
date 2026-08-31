@@ -269,8 +269,9 @@ private void refreshData() {
             });
         }
         
-        // ✅ مزامنة المبيعات المعلقة
-        syncPendingSales();
+       // ✅ بدلاً من syncPendingSales() التلقائية
+        // نعرض إشعار للمستخدم
+        checkAndPromptPendingSales();
         
     } catch (Exception e) {
         Log.e(TAG, "onResume error: " + e.getMessage());
@@ -1726,6 +1727,165 @@ private void showRefundDialog() {
     }
     
     refundDialog.show();
+}
+
+/**
+ * ✅ عند عودة الاتصال - عرض إشعار للمزامنة
+ */
+private void checkAndPromptPendingSales() {
+    try {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        
+        SharedPreferences prefs = ctx.getSharedPreferences("pos_offline_sales", Context.MODE_PRIVATE);
+        String existingJson = prefs.getString("pending_sales", "[]");
+        JSONArray arr = new JSONArray(existingJson);
+        
+        if (arr.length() > 0) {
+            // ✅ عرض إشعار للمستخدم
+            showSyncPromptDialog(arr.length());
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "checkPendingSales error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ عرض نافذة المزامنة
+ */
+private void showSyncPromptDialog(int pendingCount) {
+    try {
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return;
+        
+        String message = isArabic ? 
+            "لديك " + pendingCount + " عملية بيع معلقة لم تتم مزامنتها بعد.\n\n" +
+            "هل تريد مزامنتها الآن مع السيرفر؟"
+            :
+            "You have " + pendingCount + " pending sales that haven't been synced yet.\n\n" +
+            "Do you want to sync them now?";
+        
+        new AlertDialog.Builder(ctx)
+            .setTitle(isArabic ? "🔄 مزامنة المبيعات" : "🔄 Sync Sales")
+            .setMessage(message)
+            .setPositiveButton(isArabic ? "✅ مزامنة الآن" : "✅ Sync Now", (dialog, which) -> {
+                dialog.dismiss();
+                syncPendingSales(); // ✅ مزامنة يدوية
+            })
+            .setNegativeButton(isArabic ? "⏳ لاحقاً" : "⏳ Later", (dialog, which) -> {
+                dialog.dismiss();
+                // ✅ تبقى معلقة - سيسأل مرة أخرى لاحقاً
+            })
+            .setCancelable(false)
+            .show();
+    } catch (Exception e) {
+        Log.e(TAG, "showSyncPromptDialog error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ مزامنة المبيعات المعلقة - يدوية مع تأكيد
+ */
+private void syncPendingSales() {
+    try {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        
+        SharedPreferences prefs = ctx.getSharedPreferences("pos_offline_sales", Context.MODE_PRIVATE);
+        String existingJson = prefs.getString("pending_sales", "[]");
+        JSONArray arr = new JSONArray(existingJson);
+        
+        if (arr.length() == 0) {
+            updatePendingSalesBadge(0);
+            showToast(isArabic ? "✅ لا توجد مبيعات معلقة" : "✅ No pending sales");
+            return;
+        }
+        
+        // ✅ عرض loading
+        final AlertDialog loadingDialog = showProfessionalLoadingDialog();
+        
+        new Thread(() -> {
+            int synced = 0;
+            int failed = 0;
+            JSONArray remaining = new JSONArray();
+            
+            for (int i = 0; i < arr.length(); i++) {
+                try {
+                    JSONObject sale = arr.optJSONObject(i);
+                    if (sale == null) continue;
+                    
+                    JSONObject payload = sale.optJSONObject("payload");
+                    if (payload == null) continue;
+                    
+                    MiraApiClient client = MiraApiClient.getInstance(ctx);
+                    MiraApiClient.ApiResponse response = client.checkout(payload);
+                    
+                    if (response != null && response.isSuccess) {
+                        synced++;
+                        Log.d(TAG, "✅ Synced sale: " + sale.optString("sale_id"));
+                    } else {
+                        failed++;
+                        remaining.put(sale);
+                        Log.e(TAG, "❌ Failed to sync: " + sale.optString("sale_id"));
+                    }
+                } catch (Exception e) {
+                    failed++;
+                    remaining.put(arr.optJSONObject(i));
+                    Log.e(TAG, "❌ Exception syncing sale: " + e.getMessage());
+                }
+            }
+            
+            // ✅ حفظ المتبقي
+            prefs.edit().putString("pending_sales", remaining.toString()).apply();
+            
+            final int finalSynced = synced;
+            final int finalFailed = failed;
+            final int finalRemaining = remaining.length();
+            
+            safeRun(() -> {
+                if (loadingDialog != null) dismissDialog(loadingDialog);
+                updatePendingSalesBadge(finalRemaining);
+                
+                // ✅ عرض النتيجة
+                String resultMessage;
+                if (finalSynced > 0 && finalFailed == 0) {
+                    resultMessage = isArabic ? 
+                        "✅ تمت مزامنة جميع المبيعات بنجاح!\n\n" +
+                        "عدد المبيعات: " + finalSynced
+                        :
+                        "✅ All sales synced successfully!\n\n" +
+                        "Synced: " + finalSynced;
+                } else if (finalSynced > 0 && finalFailed > 0) {
+                    resultMessage = isArabic ? 
+                        "⚠️ تمت مزامنة بعض المبيعات:\n\n" +
+                        "✅ ناجح: " + finalSynced + "\n" +
+                        "❌ فشل: " + finalFailed + "\n" +
+                        "📦 متبقي: " + finalRemaining
+                        :
+                        "⚠️ Partial sync:\n\n" +
+                        "✅ Success: " + finalSynced + "\n" +
+                        "❌ Failed: " + finalFailed + "\n" +
+                        "📦 Remaining: " + finalRemaining;
+                } else {
+                    resultMessage = isArabic ? 
+                        "❌ فشلت جميع المبيعات في المزامنة\n\n" +
+                        "يرجى التحقق من الاتصال والمحاولة مرة أخرى"
+                        :
+                        "❌ All sales failed to sync\n\n" +
+                        "Please check connection and try again";
+                }
+                
+                showSuccessMessage(
+                    finalSynced > 0 ? "✅ المزامنة" : "❌ المزامنة",
+                    resultMessage,
+                    finalSynced > 0
+                );
+            });
+        }).start();
+        
+    } catch (Exception e) {
+        Log.e(TAG, "syncPendingSales error: " + e.getMessage());
+    }
 }
 
 /**
