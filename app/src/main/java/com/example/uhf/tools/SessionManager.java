@@ -45,6 +45,16 @@ public class SessionManager {
         return secureManager.getAuthToken();
     }
 
+    // ✅ إضافة فحص صلاحية التوكن
+    public boolean hasValidToken() {
+        return secureManager.hasValidToken();
+    }
+
+    // ✅ إضافة فحص الحاجة للتجديد
+    public boolean needsTokenRefresh() {
+        return secureManager.needsTokenRefresh();
+    }
+
     // ==================== الأدوار ====================
     
     public SecureSessionManager.Role getUserRole() {
