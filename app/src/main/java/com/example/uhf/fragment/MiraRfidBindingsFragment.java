@@ -38,6 +38,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Executors;
 
+/**
+ * ✅ إدارة الشرائح المبرمجة والمتاحة
+ * - تحترم الثيمات من MiraBaseFragment
+ * - تدعم العربية والإنجليزية
+ * - مع Logging شامل للتشخيص
+ */
 public class MiraRfidBindingsFragment extends MiraBaseFragment {
     
     private static final String TAG = "MiraRfidBindings";
@@ -47,15 +53,15 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
     private MiraApiClient apiClient;
     private PermissionManager permissionManager;
     private final List<JSONObject> bindingList = new ArrayList<>();
-    private final List<JSONObject> availableTagList = new ArrayList<>(); // ✅ جديد: الشرائح المتاحة
+    private final List<JSONObject> availableTagList = new ArrayList<>();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     
     private TextView tvCount;
     private TextView tvTitle;
-    private TextView tvAvailableCount; // ✅ جديد: عدد الشرائح المتاحة
+    private TextView tvAvailableCount;
     private String currentFilter = "";
     private String currentSearch = "";
-    private boolean showingAvailableTags = false; // ✅ جديد: هل نعرض المتاحة أم المبرمجة
+    private boolean showingAvailableTags = false;
     
     @Nullable
     @Override
@@ -71,58 +77,74 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         Context context = getContext();
         if (context == null) return;
         
+        Log.d(TAG, "🟢 onViewCreated started");
+        
         apiClient = MiraApiClient.getInstance(context);
         permissionManager = PermissionManager.getInstance(context);
         
+        // ✅ تهيئة العناصر
         tvCount = view.findViewById(R.id.tvCount);
         tvTitle = view.findViewById(R.id.tvTitle);
-        tvAvailableCount = view.findViewById(R.id.tvAvailableCount); // ✅ جديد
+        tvAvailableCount = view.findViewById(R.id.tvAvailableCount);
         rvBindings = view.findViewById(R.id.rvBindings);
         rvBindings.setLayoutManager(new LinearLayoutManager(context));
         
         adapter = new BindingsAdapter(bindingList, this::showBindingDetails);
         rvBindings.setAdapter(adapter);
         
+        // ✅ تطبيق الثيم
+        applyTheme(view);
+        
+        // ✅ SwipeRefresh
         SwipeRefreshLayout swipeRefresh = view.findViewById(R.id.swipeRefresh);
         if (swipeRefresh != null) {
+            swipeRefresh.setColorSchemeResources(R.color.report_primary, R.color.report_accent);
             swipeRefresh.setOnRefreshListener(() -> {
+                Log.d(TAG, "🔄 Swipe refresh triggered");
                 loadBindings();
-                loadAvailableTags(); // ✅ تحميل الشرائح المتاحة أيضاً
+                loadAvailableTags();
                 swipeRefresh.setRefreshing(false);
             });
         }
         
-        // ✅ زر تبديل العرض: مبرمجة / متاحة
+        // ✅ التبويبات
         TabLayout tabFilter = view.findViewById(R.id.tabFilter);
         if (tabFilter != null) {
+            tabFilter.setTabTextColors(
+                getResources().getColor(R.color.report_text_secondary),
+                getResources().getColor(R.color.report_text_primary)
+            );
+            tabFilter.setSelectedTabIndicatorColor(getResources().getColor(R.color.report_accent));
+            
             tabFilter.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
                 @Override public void onTabSelected(TabLayout.Tab tab) {
+                    Log.d(TAG, "Tab selected: " + tab.getPosition());
+                    
                     switch (tab.getPosition()) {
                         case 0: 
                             currentFilter = ""; 
                             showingAvailableTags = false;
+                            loadBindings();
                             break;
                         case 1: 
                             currentFilter = "active"; 
                             showingAvailableTags = false;
+                            loadBindings();
                             break;
                         case 2: 
                             currentFilter = "locked"; 
                             showingAvailableTags = false;
+                            loadBindings();
                             break;
                         case 3: 
                             currentFilter = "inactive"; 
                             showingAvailableTags = false;
+                            loadBindings();
                             break;
-                        case 4: // ✅ تبويب جديد للشرائح المتاحة
+                        case 4:
                             showingAvailableTags = true;
+                            loadAvailableTags();
                             break;
-                    }
-                    
-                    if (showingAvailableTags) {
-                        loadAvailableTags();
-                    } else {
-                        loadBindings();
                     }
                 }
                 @Override public void onTabUnselected(TabLayout.Tab tab) {}
@@ -134,16 +156,19 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         View btnAvailableTags = view.findViewById(R.id.btnAvailableTags);
         if (btnAvailableTags != null) {
             btnAvailableTags.setOnClickListener(v -> {
+                Log.d(TAG, "🟡 btnAvailableTags clicked");
                 showingAvailableTags = true;
                 loadAvailableTags();
             });
         }
         
+        // ✅ زر البحث
         View btnSearch = view.findViewById(R.id.btnSearch);
         if (btnSearch != null) {
             btnSearch.setOnClickListener(v -> showSearchDialog());
         }
         
+        // ✅ زر التصدير
         ExtendedFloatingActionButton fabExport = view.findViewById(R.id.fabExport);
         if (fabExport != null) {
             boolean canExport = permissionManager != null && 
@@ -152,60 +177,116 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
             fabExport.setOnClickListener(v -> exportToCSV());
         }
         
+        // ✅ تحميل البيانات
         loadBindings();
-        loadAvailableTags(); // ✅ تحميل الشرائح المتاحة عند البدء
+        loadAvailableTags();
+        
+        Log.d(TAG, "🟢 onViewCreated completed");
     }
     
     /**
-     * ✅ تحميل الشرائح المتاحة من المخزون
+     * ✅ تطبيق الثيم على العناصر
+     */
+    private void applyTheme(View view) {
+        try {
+            Context context = getContext();
+            if (context == null) return;
+            
+            // ✅ تطبيق ألوان الثيم
+            if (tvTitle != null) {
+                tvTitle.setTextColor(context.getColor(R.color.report_text_primary));
+            }
+            if (tvCount != null) {
+                tvCount.setTextColor(context.getColor(R.color.report_text_secondary));
+            }
+            if (tvAvailableCount != null) {
+                tvAvailableCount.setTextColor(context.getColor(R.color.report_accent));
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "applyTheme error: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * ✅ تحميل الشرائح المتاحة مع Logging
      */
     private void loadAvailableTags() {
+        Log.d(TAG, "🔄 === loadAvailableTags START ===");
+        
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 MiraApiClient.ApiResponse response = apiClient.getWithAuth("/rfid/available");
                 
+                Log.d(TAG, "📊 Response: " + (response != null ? "NOT NULL" : "NULL"));
+                
+                if (response != null) {
+                    Log.d(TAG, "📊 Code: " + response.code);
+                    Log.d(TAG, "📊 isSuccess: " + response.isSuccess);
+                    Log.d(TAG, "📊 Body: " + response.getBody());
+                }
+                
                 mainHandler.post(() -> {
                     if (!isAdded() || getContext() == null) {
+                        Log.w(TAG, "⚠️ Fragment detached - skipping UI update");
                         return;
                     }
                     
                     if (response != null && response.isSuccess && response.data != null) {
-                        JSONArray availableTags = response.data.optJSONArray("available_tags");
+                        int totalAvailable = response.data.optInt("total_available", 0);
                         int count = response.data.optInt("count", 0);
                         
+                        Log.d(TAG, "📊 total_available: " + totalAvailable);
+                        Log.d(TAG, "📊 count: " + count);
+                        
+                        JSONArray availableTags = response.data.optJSONArray("available_tags");
+                        
                         availableTagList.clear();
-                        if (availableTags != null) {
+                        if (availableTags != null && availableTags.length() > 0) {
                             for (int i = 0; i < availableTags.length(); i++) {
-                                availableTagList.add(availableTags.optJSONObject(i));
+                                JSONObject tag = availableTags.optJSONObject(i);
+                                if (tag != null) {
+                                    availableTagList.add(tag);
+                                }
                             }
+                            Log.d(TAG, "📊 Loaded " + availableTagList.size() + " available tags");
+                        } else {
+                            Log.w(TAG, "⚠️ available_tags is null or empty");
                         }
                         
-                        // ✅ تحديث عدد الشرائح المتاحة
+                        // ✅ تحديث العداد
                         if (tvAvailableCount != null) {
-                            tvAvailableCount.setText(
-                                isArabic() ? 
-                                "📦 الشرائح المتاحة: " + count : 
-                                "📦 Available Tags: " + count
-                            );
+                            String text = isArabic() ? 
+                                "📦 الشرائح المتاحة: " + totalAvailable : 
+                                "📦 Available Tags: " + totalAvailable;
+                            tvAvailableCount.setText(text);
                             tvAvailableCount.setVisibility(View.VISIBLE);
+                            Log.d(TAG, "📊 Updated tvAvailableCount: " + text);
                         }
                         
-                        // ✅ إذا كنا في وضع عرض المتاحة، نعرضها
+                        // ✅ عرض إذا كنا في وضع المتاحة
                         if (showingAvailableTags) {
                             showAvailableTags();
                         }
+                    } else {
+                        Log.e(TAG, "❌ Failed to load available tags");
+                        Log.e(TAG, "❌ isSuccess: " + (response != null ? response.isSuccess : "null"));
+                        Log.e(TAG, "❌ error: " + (response != null && response.error != null ? response.error : "null"));
                     }
                 });
             } catch (Exception e) {
-                Log.e(TAG, "loadAvailableTags error: " + e.getMessage());
+                Log.e(TAG, "❌ loadAvailableTags exception: " + e.getMessage(), e);
             }
         });
+        
+        Log.d(TAG, "🔄 === loadAvailableTags END ===");
     }
     
     /**
      * ✅ عرض الشرائح المتاحة
      */
     private void showAvailableTags() {
+        Log.d(TAG, "📦 showAvailableTags - count: " + availableTagList.size());
+        
         if (tvCount != null) {
             tvCount.setText(
                 isArabic() ? 
@@ -218,7 +299,6 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
             tvTitle.setText(isArabic() ? "الشرائح المتاحة" : "Available Tags");
         }
         
-        // ✅ استخدام Adapter مختلف أو نفس الـ Adapter مع بيانات مختلفة
         AvailableTagsAdapter availableAdapter = new AvailableTagsAdapter(availableTagList);
         rvBindings.setAdapter(availableAdapter);
     }
@@ -228,6 +308,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
      */
     private void loadBindings() {
         showingAvailableTags = false;
+        Log.d(TAG, "🔄 === loadBindings START ===");
         
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
@@ -239,6 +320,8 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
                 if (!currentSearch.isEmpty()) {
                     endpoint.append("&search=").append(currentSearch);
                 }
+                
+                Log.d(TAG, "📡 Endpoint: " + endpoint.toString());
                 
                 MiraApiClient.ApiResponse response = apiClient.getWithAuth(endpoint.toString());
                 
@@ -258,6 +341,8 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
                             }
                         }
                         
+                        Log.d(TAG, "📊 Loaded " + bindingList.size() + " bindings, total: " + total);
+                        
                         adapter = new BindingsAdapter(bindingList, this::showBindingDetails);
                         rvBindings.setAdapter(adapter);
                         
@@ -273,11 +358,12 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
                             tvTitle.setText(isArabic() ? "الشرائح المبرمجة" : "Programmed Tags");
                         }
                     } else {
+                        Log.e(TAG, "❌ Failed to load bindings");
                         showToast(getString(R.string.rfid_load_failed));
                     }
                 });
             } catch (Exception e) {
-                Log.e(TAG, "loadBindings error: " + e.getMessage());
+                Log.e(TAG, "loadBindings error: " + e.getMessage(), e);
             }
         });
     }
@@ -399,7 +485,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
     }
     
     /**
-     * ✅ تحديث حالة الشريحة (مع شرط أمان الحماية isAdded)
+     * ✅ تحديث حالة الشريحة
      */
     private void updateBindingStatus(int bindingId, String status) {
         Executors.newSingleThreadExecutor().execute(() -> {
@@ -411,7 +497,6 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
                 MiraApiClient.ApiResponse response = apiClient.postWithAuth("/update-binding-status", payload);
                 
                 mainHandler.post(() -> {
-                    // 🛡️ تحقق من وجود الفراغمنت قبل طلب الموارد وتحديث الواجهة
                     if (!isAdded() || getContext() == null) {
                         return;
                     }
@@ -494,7 +579,7 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         }
     }
     
-    // ==================== Adapter ====================
+    // ==================== Adapters ====================
     
     private class BindingsAdapter extends RecyclerView.Adapter<BindingsAdapter.VH> {
         private final List<JSONObject> items;
@@ -558,10 +643,6 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
         void onClick(JSONObject binding);
     }
     
-     
-    /**
-     * ✅ Adapter للشرائح المتاحة
-     */
     private class AvailableTagsAdapter extends RecyclerView.Adapter<AvailableTagsAdapter.VH> {
         private final List<JSONObject> items;
         
