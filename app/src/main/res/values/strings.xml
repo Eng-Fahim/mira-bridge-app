@@ -2125,4 +2125,11 @@
     <string name="rfid_updated">تم التحديث بنجاح</string>
     <string name="rfid_details">تفاصيل الشريحة</string>
     <string name="quick_action_rfid_bindings">إدارة الشرائح</string>
+    
+    <!-- RFID Bindings -->
+<string name="rfid_available_tags">📦 الشرائح المتاحة</string>
+<string name="rfid_available_count">📦 الشرائح المتاحة: %d</string>
+<string name="rfid_total_available">إجمالي المتاحة: %d</string>
+<string name="rfid_total_programmed">إجمالي المبرمجة: %d</string>
+<string name="rfid_tab_available">📦 المتاحة</string>
 </resources>
