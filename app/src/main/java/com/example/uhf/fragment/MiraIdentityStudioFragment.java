@@ -814,14 +814,14 @@ private String extractErrorMessage(MiraApiClient.ApiResponse response) {
         return isArabic ? "❌ خطأ غير معروف" : "❌ Unknown error";
     }
     
-    // محاولة استخراج رسالة الخطأ من data
+    // ✅ التحقق من وجود data
     if (response.data != null) {
         try {
+            // ✅ استخراج كائن error من data
             JSONObject errorObj = response.data.optJSONObject("error");
             if (errorObj != null) {
                 String message = errorObj.optString("message", "");
                 String messageEn = errorObj.optString("message_en", "");
-                String code = errorObj.optString("code", "");
                 
                 // اختيار الرسالة المناسبة حسب اللغة
                 String displayMessage = isArabic ? message : messageEn;
@@ -846,17 +846,19 @@ private String extractErrorMessage(MiraApiClient.ApiResponse response) {
         }
     }
     
-    // استخدام الرسالة الافتراضية
+    // ✅ استخدام الرسالة الافتراضية
     if (response.message != null && !response.message.isEmpty()) {
         return response.message;
+    }
+    
+    // ✅ استخدام error كملاذ أخير
+    if (response.error != null && !response.error.isEmpty()) {
+        return response.error;
     }
     
     return isArabic ? "❌ فشل العملية" : "❌ Operation failed";
 }
 
-/**
- * ✅ عرض رسالة نجاح
- */
 private void showSuccessDialog(String message) {
     try {
         new AlertDialog.Builder(requireContext())
@@ -872,7 +874,6 @@ private void showSuccessDialog(String message) {
         showToast(message);
     }
 }
-
 /**
  * ✅ عرض رسالة خطأ
  */
