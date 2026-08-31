@@ -1,12 +1,13 @@
 package com.example.uhf.activity;
 
+
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
-import android.view.animation.AlphaAnimation;
-import android.view.animation.Animation;
-import android.view.animation.AnimationSet;
-import android.view.animation.ScaleAnimation;
+import android.os.Looper;
+import android.view.View;
+import android.view.animation.FastOutSlowInInterpolator;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -14,65 +15,99 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.uhf.R;
 
+@SuppressLint("CustomSplashScreen")
 public class SplashActivity extends AppCompatActivity {
 
-    private static final int SPLASH_DURATION = 3000; // 3 ثواني
+    private static final long SPLASH_DURATION = 2800; // 2.8 ثانية
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Runnable navigateRunnable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.splash_screen);
 
-        animateLogo();
-        animateAppName();
-        navigateToNextScreen();
+        executeCinematicAnimation();
+        scheduleNavigation();
     }
 
-    private void animateLogo() {
+    private void executeCinematicAnimation() {
         ImageView ivLogo = findViewById(R.id.ivLogo);
-        
-        AnimationSet animationSet = new AnimationSet(true);
-        
-        // تكبير الشعار
-        ScaleAnimation scaleAnimation = new ScaleAnimation(
-            0.3f, 1.0f, 0.3f, 1.0f,
-            Animation.RELATIVE_TO_SELF, 0.5f,
-            Animation.RELATIVE_TO_SELF, 0.5f
-        );
-        scaleAnimation.setDuration(1500);
-        scaleAnimation.setFillAfter(true);
-        
-        // ظهور تدريجي
-        AlphaAnimation alphaAnimation = new AlphaAnimation(0.0f, 1.0f);
-        alphaAnimation.setDuration(2000);
-        alphaAnimation.setFillAfter(true);
-        
-        animationSet.addAnimation(scaleAnimation);
-        animationSet.addAnimation(alphaAnimation);
-        
-        ivLogo.startAnimation(animationSet);
-    }
-
-    private void animateAppName() {
+        View vGlow = findViewById(R.id.vGlow);
         TextView tvAppName = findViewById(R.id.tvAppName);
-        
-        AlphaAnimation alphaAnimation = new AlphaAnimation(0.0f, 1.0f);
-        alphaAnimation.setDuration(2000);
-        alphaAnimation.setStartOffset(500);
-        alphaAnimation.setFillAfter(true);
-        
-        tvAppName.startAnimation(alphaAnimation);
+        View divider = findViewById(R.id.divider);
+        TextView tvTagline = findViewById(R.id.tvTagline);
+
+        // إعداد الموضع الأولي للتحريك التدريجي
+        ivLogo.setScaleX(0.5f);
+        ivLogo.setScaleY(0.5f);
+        tvAppName.setTranslationY(40f);
+        tvTagline.setTranslationY(30f);
+        divider.setScaleX(0f);
+
+        FastOutSlowInInterpolator interpolator = new FastOutSlowInInterpolator();
+
+        // 1. دخول وتكبير الشعار + ظهور التوهج
+        ivLogo.animate()
+                .alpha(1.0f)
+                .scaleX(1.0f)
+                .scaleY(1.0f)
+                .setDuration(1200)
+                .setInterpolator(interpolator)
+                .start();
+
+        vGlow.animate()
+                .alpha(1.0f)
+                .setDuration(1500)
+                .setStartDelay(300)
+                .start();
+
+        // 2. انزلاق وتلاشي اسم التطبيق
+        tvAppName.animate()
+                .alpha(1.0f)
+                .translationY(0f)
+                .setDuration(1000)
+                .setStartDelay(400)
+                .setInterpolator(interpolator)
+                .start();
+
+        // 3. تمدد الخط الفاصل الذهبي
+        divider.animate()
+                .alpha(1.0f)
+                .scaleX(1.0f)
+                .setDuration(800)
+                .setStartDelay(700)
+                .setInterpolator(interpolator)
+                .start();
+
+        // 4. ظهور الشعار الفرعي
+        tvTagline.animate()
+                .alpha(1.0f)
+                .translationY(0f)
+                .setDuration(900)
+                .setStartDelay(850)
+                .setInterpolator(interpolator)
+                .start();
     }
 
-    private void navigateToNextScreen() {
-        new Handler().postDelayed(() -> {
-            // الانتقال للشاشة الرئيسية أو تسجيل الدخول
-            Intent intent = new Intent(SplashActivity.this, LoginActivity.class);
-            startActivity(intent);
-            finish();
-            
-            // تأثير الانتقال
-            overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
-        }, SPLASH_DURATION);
+    private void scheduleNavigation() {
+        navigateRunnable = () -> {
+            if (!isFinishing() && !isDestroyed()) {
+                Intent intent = new Intent(SplashActivity.this, LoginActivity.class);
+                startActivity(intent);
+                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+                finish();
+            }
+        };
+        mainHandler.postDelayed(navigateRunnable, SPLASH_DURATION);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // إزالة الكولباك لمنع memory leaks في حال أغلق المستخدم التطبيق بسرعة
+        if (navigateRunnable != null) {
+            mainHandler.removeCallbacks(navigateRunnable);
+        }
     }
 }
