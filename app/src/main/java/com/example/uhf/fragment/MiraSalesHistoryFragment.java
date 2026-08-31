@@ -35,6 +35,7 @@ import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SessionManager;
+import com.example.uhf.tools.SecureSessionManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
@@ -184,12 +185,13 @@ private void loadSalesOffline() {
      * - BRANCH_MANAGER وما دون: يرون فرعهم فقط
      */
     private void setupBranchFilter() {
-        SessionManager.Role userRole = sessionManager.getUserRole();
+        
+        SecureSessionManager.Role userRole = sessionManager.getUserRole();
         int userBranchId = branchesManager.getActiveBranchId();
         
         // ✅ تحديد الصلاحيات حسب الدور
-        boolean canViewAllBranches = userRole == SessionManager.Role.SYSTEM_ADMIN || 
-                                     userRole == SessionManager.Role.ORG_ADMIN;
+        boolean canViewAllBranches = userRole == SecureSessionManager.Role.SYSTEM_ADMIN || 
+                                     userRole == SecureSessionManager.Role.ORG_ADMIN;
         
         if (canViewAllBranches) {
             // ✅ الإدارة العليا - يمكنهم اختيار الفرع أو الكل
