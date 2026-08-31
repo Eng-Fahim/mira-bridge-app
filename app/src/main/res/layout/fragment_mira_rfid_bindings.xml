@@ -43,6 +43,20 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/tvTitle" />
 
+            <!-- ✅ عدد الشرائح المتاحة - موضوع بشكل صحيح -->
+            <TextView
+                android:id="@+id/tvAvailableCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="📦 الشرائح المتاحة: 0"
+                android:textColor="#FFD700"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tvCount" />
+
             <!-- زر البحث -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSearch"
@@ -59,6 +73,20 @@
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
+        <!-- ✅ زر عرض الشرائح المتاحة - تحت الهيدر مباشرة -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnAvailableTags"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp"
+            android:text="📦 عرض الشرائح المتاحة"
+            android:textColor="@android:color/white"
+            android:backgroundTint="#FFD700"
+            app:cornerRadius="8dp" />
+
         <!-- تبويبات -->
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/tabFilter"
@@ -74,18 +102,27 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/rfid_tab_all" />
+                
             <com.google.android.material.tabs.TabItem
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/rfid_tab_active" />
+                
             <com.google.android.material.tabs.TabItem
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/rfid_tab_locked" />
+                
             <com.google.android.material.tabs.TabItem
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/rfid_tab_inactive" />
+                
+            <!-- ✅ تبويب الشرائح المتاحة -->
+            <com.google.android.material.tabs.TabItem
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📦 المتاحة" />
 
         </com.google.android.material.tabs.TabLayout>
 
