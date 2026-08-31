@@ -15,7 +15,7 @@
     <string name="quick_action_radar">رادار التتبع</string>
     <string name="quick_action_gate">مراقبة البوابات</string>
     <string name="quick_action_reports">التقارير</string>
-    <string name="quick_action_accounting">المحاسبة</string>
+    <string name="quick_action_accounting">المالية</string>
     <string name="quick_action_transfers">التحويلات</string>
     <string name="quick_action_admin_hub">الخيارات الإدارية</string>
     <string name="quick_action_sales_history">سجل المبيعات</string>
@@ -36,7 +36,7 @@
     <string name="nav_home">Home</string>
     <string name="nav_profile">Profile</string>
 <string name="nav_gate">البوابات</string>
-<string name="nav_accounting">المحاسبة</string>
+<string name="nav_accounting">المالية</string>
 <string name="nav_settings">الإعدادات</string>
 <string name="nav_close">إغلاق</string>
 <string name="nav_actions">المرئيات والإجراءات</string>
