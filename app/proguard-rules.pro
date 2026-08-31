@@ -37,6 +37,23 @@
 -keep class schemaorg_apache_xmlbeans.system.**{*;}
 -keep interface org.**{*;}
 
+# ==================== حل مشكلة مكتبات XML/Office ====================
+# تجاهل تحذيرات المكتبات القديمة
+-dontwarn org.apache.xmlbeans.**
+-dontwarn org.openxmlformats.**
+-dontwarn org.w3.x2000.**
+-dontwarn schemaorg_apache_xmlbeans.**
+-dontwarn org.apache.poi.**
+-dontwarn com.microsoft.schemas.**
+-dontwarn javax.xml.crypto.**
+-dontwarn javax.xml.crypto.dsig.**
+
+# الاحتفاظ بكلاسات XMLBeans
+-keep class org.apache.xmlbeans.** { *; }
+-keep class org.openxmlformats.** { *; }
+-keep class org.w3.x2000.** { *; }
+-keep class schemaorg_apache_xmlbeans.** { *; }
+
 # ==================== Firebase ====================
 -keep class com.google.firebase.** { *; }
 -keep class com.google.android.gms.** { *; }
