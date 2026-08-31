@@ -633,11 +633,12 @@ private void finalizeItemIdentity() {
     try {
         if (binding == null) return;
 
+        // ✅ EPC اختياري - نأخذه لكن لا نتحقق منه
         String epc = binding.etEpc.getText() != null ? binding.etEpc.getText().toString().trim() : "";
         String title = binding.etTitle.getText() != null ? binding.etTitle.getText().toString().trim() : "";
         String weightStr = binding.etGrossWeight.getText() != null ? binding.etGrossWeight.getText().toString().trim() : "";
 
-        // التحقق من صحة البيانات
+        // ✅ التحقق فقط من العنوان والوزن
         if (!validateInputData(epc, title, weightStr)) {
             return;
         }
@@ -705,8 +706,10 @@ private void finalizeItemIdentity() {
         
         executorService.execute(() -> {
             try {
+                // ✅ بناء payload - EPC يمكن أن يكون فارغاً
                 JSONObject payload = buildPayload(
-                    finalEpc, finalTitle, selectedKarat, fGrossWeight, netGoldWeight,
+                    finalEpc, // ✅ قد يكون فارغاً - السيرفر سيتعامل معه
+                    finalTitle, selectedKarat, fGrossWeight, netGoldWeight,
                     fStoneWeightCarats, fStoneCount, fStoneValue, fStoneType,
                     details, selectedKaratNum, finalPriceUSD, finalPriceLocal,
                     localCurrency, exchangeRate, selectedCategory, location,
@@ -894,104 +897,106 @@ private void showErrorDialog(String message) {
     /**
      * التحقق من صحة البيانات المدخلة
      */
-    private boolean validateInputData(String epc, String title, String weightStr) {
-        if (epc.isEmpty()) {
-            showValidationError(isArabic ? "يرجى مسح RFID أولاً" : "Please scan RFID first");
-            return false;
-        }
-        if (!isValidEPC(epc)) {
-            showValidationError(isArabic ? "❌ رمز RFID غير صالح!\nيجب أن يكون EPC قياسي أو GTIN-13." : "❌ Invalid RFID code!\nMust be EPC or GTIN-13.");
-            return false;
-        }
-        if (title.isEmpty()) {
-            showValidationError(isArabic ? "يرجى كتابة عنوان القطعة" : "Please enter item title");
-            return false;
-        }
-        if (title.length() < 3) {
-            showValidationError(isArabic ? "العنوان قصير جداً" : "Title is too short");
-            return false;
-        }
-        if (weightStr.isEmpty()) {
-            showValidationError(isArabic ? "يرجى تحديد وزن القطعة" : "Please specify item weight");
-            return false;
-        }
-        
-        try {
-            double weight = Double.parseDouble(weightStr);
-            if (weight <= 0) {
-                showValidationError(isArabic ? "يجب أن يكون الوزن أكبر من صفر" : "Weight must be greater than zero");
-                return false;
-            }
-            if (weight > 10000) {
-                showValidationError(isArabic ? "الوزن كبير جداً" : "Weight is too large");
-                return false;
-            }
-        } catch (NumberFormatException e) {
-            showValidationError(isArabic ? "صيغة الوزن غير صحيحة" : "Invalid weight format");
-            return false;
-        }
-        
-        return true;
+    /**
+ * ✅ التحقق من البيانات - بدون EPC إلزامي
+ */
+private boolean validateInputData(String epc, String title, String weightStr) {
+    // ✅ EPC اختياري الآن - السيرفر سيستخدم الشريحة المتاحة
+    // لا نتحقق من EPC بعد الآن
+    
+    if (title.isEmpty()) {
+        showValidationError(isArabic ? "يرجى كتابة عنوان القطعة" : "Please enter item title");
+        return false;
     }
+    if (title.length() < 3) {
+        showValidationError(isArabic ? "العنوان قصير جداً" : "Title is too short");
+        return false;
+    }
+    if (weightStr.isEmpty()) {
+        showValidationError(isArabic ? "يرجى تحديد وزن القطعة" : "Please specify item weight");
+        return false;
+    }
+    
+    try {
+        double weight = Double.parseDouble(weightStr);
+        if (weight <= 0) {
+            showValidationError(isArabic ? "يجب أن يكون الوزن أكبر من صفر" : "Weight must be greater than zero");
+            return false;
+        }
+        if (weight > 10000) {
+            showValidationError(isArabic ? "الوزن كبير جداً" : "Weight is too large");
+            return false;
+        }
+    } catch (NumberFormatException e) {
+        showValidationError(isArabic ? "صيغة الوزن غير صحيحة" : "Invalid weight format");
+        return false;
+    }
+    
+    return true;
+}
 
     /**
      * بناء JSON payload للإرسال
      */
     private JSONObject buildPayload(
-            String epc, String title, String karat, double grossWeight, double netWeight,
-            double stoneWeightCarats, int stoneCount, double stoneValue, String stoneType,
-            MiraPriceManager.PricingDetails details, int karatNum, double priceUSD,
-            double priceLocal, String currency, double exchangeRate, String category,
-            String location, int branchId, int userId, String tid, boolean isSim,
-            List<String> photoPathsList) throws Exception {
-        
-        JSONObject payload = new JSONObject();
+        String epc, String title, String karat, double grossWeight, double netWeight,
+        double stoneWeightCarats, int stoneCount, double stoneValue, String stoneType,
+        MiraPriceManager.PricingDetails details, int karatNum, double priceUSD,
+        double priceLocal, String currency, double exchangeRate, String category,
+        String location, int branchId, int userId, String tid, boolean isSim,
+        List<String> photoPathsList) throws Exception {
+    
+    JSONObject payload = new JSONObject();
+    
+    // ✅ EPC اختياري - إذا كان فارغاً، السيرفر سيستخدم GTIN من الشريحة
+    if (epc != null && !epc.isEmpty()) {
         payload.put("epc", epc);
-        payload.put("title", title);
-        payload.put("purity_code", karat);
-        payload.put("gross_weight", grossWeight);
-        payload.put("net_weight", netWeight);
-        payload.put("stone_weight", stoneWeightCarats);
-        payload.put("stone_count", stoneCount);
-        payload.put("stone_value", stoneValue);
-        payload.put("stone_type", stoneType);
-        
-        // القيم المالية
-        payload.put("gold_price_per_gram", details.gramPrice);
-        payload.put("gold_value", details.baseGoldCost);
-        payload.put("making_per_gram", priceManager.getMakingCharge(karatNum));
-        payload.put("making_charge", details.totalMakingCost);
-        payload.put("total_cost", details.baseGoldCost + details.totalMakingCost);
-        payload.put("profit_margin", priceManager.getProfitMargin(karatNum));
-        payload.put("profit_amount", details.profitAmount);
-        
-        // الأسعار والعملة
-        payload.put("retail_price_usd", priceUSD);
-        payload.put("retail_price", priceUSD);
-        payload.put("retail_price_local", priceLocal);
-        payload.put("currency", "USD");
-        payload.put("local_currency", currency);
-        payload.put("exchange_rate", exchangeRate);
-        payload.put("currency_symbol", priceManager.getCurrencySymbol(currency));
-        
-        payload.put("category", category);
-        payload.put("location", location);
-        payload.put("branch_id", branchId);
-        payload.put("user_id", userId);
-        payload.put("tid", tid);
-        payload.put("program_rfid", !tid.isEmpty());
-        payload.put("device_type", isSim ? "simulator" : "chainway_c72");
-        
-        if (!photoPathsList.isEmpty()) {
-            JSONArray imagesArray = new JSONArray();
-            for (String path : photoPathsList) {
-                imagesArray.put(path);
-            }
-            payload.put("image_paths", imagesArray);
-        }
-        
-        return payload;
     }
+    
+    payload.put("title", title);
+    payload.put("purity_code", karat);
+    payload.put("gross_weight", grossWeight);
+    payload.put("net_weight", netWeight);
+    payload.put("stone_weight", stoneWeightCarats);
+    payload.put("stone_count", stoneCount);
+    payload.put("stone_value", stoneValue);
+    payload.put("stone_type", stoneType);
+    
+    // القيم المالية
+    payload.put("gold_price_per_gram", details.gramPrice);
+    payload.put("gold_value", details.baseGoldCost);
+    payload.put("making_per_gram", priceManager.getMakingCharge(karatNum));
+    payload.put("making_charge", details.totalMakingCost);
+    payload.put("total_cost", details.baseGoldCost + details.totalMakingCost);
+    payload.put("profit_margin", priceManager.getProfitMargin(karatNum));
+    payload.put("profit_amount", details.profitAmount);
+    
+    // الأسعار والعملة
+    payload.put("retail_price_usd", priceUSD);
+    payload.put("retail_price", priceUSD);
+    payload.put("retail_price_local", priceLocal);
+    payload.put("currency", "USD");
+    payload.put("local_currency", currency);
+    payload.put("exchange_rate", exchangeRate);
+    payload.put("currency_symbol", priceManager.getCurrencySymbol(currency));
+    
+    payload.put("category", category);
+    payload.put("location", location);
+    payload.put("branch_id", branchId);
+    payload.put("user_id", userId);
+    
+    // ✅ لا نرسل tid أو program_rfid - السيرفر سيبحث تلقائياً
+    
+    if (!photoPathsList.isEmpty()) {
+        JSONArray imagesArray = new JSONArray();
+        for (String path : photoPathsList) {
+            imagesArray.put(path);
+        }
+        payload.put("image_paths", imagesArray);
+    }
+    
+    return payload;
+}
 
     private void showPendingItemsDialog() {
         if (offlineCache == null || !isAdded()) return;
