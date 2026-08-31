@@ -16,6 +16,7 @@ import android.text.TextWatcher;
 import android.util.Base64;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.AnimationUtils;
 import android.widget.ImageView;
@@ -47,6 +48,7 @@ import com.google.android.material.textview.MaterialTextView;
 
 import org.json.JSONObject;
 
+import java.io.File;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -68,7 +70,7 @@ public class LoginActivity extends AppCompatActivity {
     private static final String TAG = "LoginActivity";
     private static final String DEFAULT_SERVER_URL = "https://sa.mirabarcode.com/wp-json";
     private static final int MAX_LOGIN_ATTEMPTS = 5;
-    private static final long LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 دقائق
+    private static final long LOCKOUT_DURATION_MS = 5 * 60 * 1000;
     private static final String ENCRYPTION_ALGORITHM = "AES";
     private static final String ENCRYPTION_KEY = "MIRA_LOGIN_ENCRYPTION_KEY_v1";
 
@@ -101,49 +103,102 @@ public class LoginActivity extends AppCompatActivity {
 
     private boolean isArabic = true;
 
-   @Override
-protected void onCreate(Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
-    
-    isDestroyed.set(false);
-    
-    // ✅ 1. أولاً: تهيئة الواجهة
-    setContentView(R.layout.activity_login);
-    
-    // ✅ 2. ثانياً: تهيئة SessionManager (لا يحتاج تشفير)
-    sessionManager = new SessionManager(this);
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        
+        // ✅ 1. منع التقاط الشاشة
+        getWindow().setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE
+        );
+        
+        isDestroyed.set(false);
+        
+        // ✅ 2. تهيئة الواجهة
+        setContentView(R.layout.activity_login);
+        
+        // ✅ 3. تهيئة SessionManager
+        sessionManager = new SessionManager(this);
 
-    // ✅ 3. التحقق من تسجيل الدخول
-    if (sessionManager.isLoggedIn()) {
-        navigateToMain();
-        return;
+        // ✅ 4. التحقق من تسجيل الدخول مع فحص التوكن
+        if (sessionManager.isLoggedIn()) {
+            if (sessionManager.hasValidToken()) {
+                navigateToMain();
+                return;
+            } else {
+                sessionManager.logoutUser();
+                Toast.makeText(this, 
+                    isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : 
+                    "Session expired - Please sign in again", 
+                    Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        // ✅ 5. فحص Root
+        if (isDeviceRooted()) {
+            Toast.makeText(this, 
+                isArabic ? "⚠️ تحذير: تم اكتشاف صلاحيات Root" : 
+                "⚠️ Warning: Root access detected", 
+                Toast.LENGTH_LONG).show();
+        }
+
+        // ✅ 6. اللغة
+        String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
+        isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
+
+        // ✅ 7. تهيئة التشفير
+        initializeEncryption();
+        
+        // ✅ 8. باقي التهيئة
+        orgProfileManager = MiraOrgProfileManager.getInstance(this);
+        
+        initViews();
+        disableAutofill();
+        setupBiometric();
+        setupServerConfigToggle();
+        animateEntrance();
+        setupTextWatchers();
+        updateUiLanguage(isArabic);
+        setupProfileListener();
+        updateBiometricButtonState();
+        restoreLastUsername();
+        checkLockoutStatus();
+        
+        // ✅ 9. تحميل البيانات من السحابة
+        loadOrgProfileFromCloud();
     }
 
-    // ✅ 4. اللغة
-    String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
-    isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
-
-    // ✅ 5. تهيئة التشفير بعد الواجهة
-    initializeEncryption();
-    
-    // ✅ 6. باقي التهيئة
-    orgProfileManager = MiraOrgProfileManager.getInstance(this);
-    
-    initViews();
-    disableAutofill();
-    setupBiometric();
-    setupServerConfigToggle();
-    animateEntrance();
-    setupTextWatchers();
-    updateUiLanguage(isArabic);
-    setupProfileListener();
-    updateBiometricButtonState();
-    restoreLastUsername();
-    checkLockoutStatus();
-    
-    // ✅ 7. تحميل البيانات من السحابة - بعد كل شيء
-    loadOrgProfileFromCloud();
-}
+    /**
+     * ✅ فحص Root Detection
+     */
+    private boolean isDeviceRooted() {
+        String[] rootPaths = {
+            "/system/app/Superuser.apk",
+            "/sbin/su",
+            "/system/bin/su",
+            "/system/xbin/su",
+            "/data/local/xbin/su",
+            "/data/local/bin/su",
+            "/system/sd/xbin/su",
+            "/system/bin/failsafe/su",
+            "/data/local/su",
+            "/su/bin/su"
+        };
+        
+        for (String path : rootPaths) {
+            if (new File(path).exists()) {
+                return true;
+            }
+        }
+        
+        String buildTags = Build.TAGS;
+        if (buildTags != null && buildTags.contains("test-keys")) {
+            return true;
+        }
+        
+        return false;
+    }
 
     /**
      * تهيئة التشفير الآمن باستخدام EncryptedSharedPreferences
@@ -1118,4 +1173,4 @@ private void navigateToMainWithAnimation() {
         
         mainHandler.removeCallbacksAndMessages(null);
     }
-            }
+    }
