@@ -6,6 +6,7 @@ import android.util.Log;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraServerConfig;
 import com.example.uhf.model.ApiProvider;
+import com.example.uhf.tools.CertificatePinningManager;  // ✅ أضف هذا
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -24,6 +25,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+
+import javax.net.ssl.HttpsURLConnection;  // ✅ أضف هذا
 
 public class MiraApiClient {
 
@@ -182,7 +185,14 @@ public class MiraApiClient {
         Log.d(TAG, "GET Auth Request: " + fullUrl);
         
         URL url = new URL(fullUrl);
-        conn = (HttpURLConnection) url.openConnection();
+        
+        if (url.getProtocol().equals("https")) {
+    HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+    CertificatePinningManager.applyPinning(httpsConn);
+    conn = httpsConn;
+} else {
+    conn = (HttpURLConnection) url.openConnection();
+}
         conn.setRequestMethod("GET");
         applyStandardHeaders(conn, true);
         conn.setConnectTimeout(15000);
@@ -230,7 +240,13 @@ public class MiraApiClient {
         Log.d(TAG, "POST Auth Request: " + fullUrl);
         
         URL url = new URL(fullUrl);
-        conn = (HttpURLConnection) url.openConnection();
+        if (url.getProtocol().equals("https")) {
+    HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+    CertificatePinningManager.applyPinning(httpsConn);
+    conn = httpsConn;
+} else {
+    conn = (HttpURLConnection) url.openConnection();
+}
         conn.setRequestMethod("POST");
         applyStandardHeaders(conn, true);
         conn.setConnectTimeout(15000);
@@ -287,7 +303,13 @@ public class MiraApiClient {
         Log.d(TAG, "POST Request: " + fullUrl);
         
         URL url = new URL(fullUrl);
-            conn = (HttpURLConnection) url.openConnection();
+            if (url.getProtocol().equals("https")) {
+    HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+    CertificatePinningManager.applyPinning(httpsConn);
+    conn = httpsConn;
+} else {
+    conn = (HttpURLConnection) url.openConnection();
+}
             conn.setRequestMethod("POST");
             applyStandardHeaders(conn, false);
 
@@ -342,7 +364,13 @@ public class MiraApiClient {
         Log.d(TAG, "GET Request: " + fullUrl);
         
         URL url = new URL(fullUrl);
-        conn = (HttpURLConnection) url.openConnection();
+        if (url.getProtocol().equals("https")) {
+    HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+    CertificatePinningManager.applyPinning(httpsConn);
+    conn = httpsConn;
+} else {
+    conn = (HttpURLConnection) url.openConnection();
+}
         conn.setRequestMethod("GET");
         applyStandardHeaders(conn, false);
         conn.setConnectTimeout(15000);
@@ -630,7 +658,13 @@ public ApiResponse changePassword(String currentPassword, String newPassword) {
         }
 
         URL url = new URL(cleanUrl + "/ping");
-        conn = (HttpURLConnection) url.openConnection();
+        if (url.getProtocol().equals("https")) {
+    HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+    CertificatePinningManager.applyPinning(httpsConn);
+    conn = httpsConn;
+} else {
+    conn = (HttpURLConnection) url.openConnection();
+}
         conn.setRequestMethod("GET");
         applyStandardHeaders(conn, true);
 
@@ -775,7 +809,13 @@ public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod,
         try {
             String fullUrl = apiUrl + "/items/" + itemId + "/images";
             URL url = new URL(fullUrl);
-            conn = (HttpURLConnection) url.openConnection();
+            if (url.getProtocol().equals("https")) {
+    HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+    CertificatePinningManager.applyPinning(httpsConn);
+    conn = httpsConn;
+} else {
+    conn = (HttpURLConnection) url.openConnection();
+}
             conn.setRequestMethod("POST");
             applyStandardHeaders(conn, true);
 
@@ -1571,4 +1611,4 @@ public ApiResponse getBranchInventoryStats(int branchId) {
         return null;
     }
 }
-                             }
+            }
