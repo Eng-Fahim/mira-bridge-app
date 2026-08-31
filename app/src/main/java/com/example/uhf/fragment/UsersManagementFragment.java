@@ -34,6 +34,7 @@ import com.example.uhf.R;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.tools.SessionManager;
+import com.example.uhf.tools.SecureSessionManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -65,7 +66,8 @@ public class UsersManagementFragment extends Fragment {
     private final List<UserData> userList = new ArrayList<>();
     private final List<UserData> filteredList = new ArrayList<>();
     private boolean isArabic;
-    private SessionManager.Role currentUserRole;
+    
+    private SecureSessionManager.Role currentUserRole;
 
     // ==================== Constants ====================
     private static final String[] ROLES = {
@@ -210,16 +212,16 @@ public class UsersManagementFragment extends Fragment {
     // ==================== Permission Logic ====================
 
     private boolean canManageUsers() {
-        return currentUserRole == SessionManager.Role.SYSTEM_ADMIN
-            || currentUserRole == SessionManager.Role.ORG_ADMIN
-            || currentUserRole == SessionManager.Role.BRANCH_MANAGER;
+        return currentUserRole == SecureSessionManager.Role.SYSTEM_ADMIN
+            || currentUserRole == SecureSessionManager.Role.ORG_ADMIN
+            || currentUserRole == SecureSessionManager.Role.BRANCH_MANAGER;
     }
 
     private boolean canDeleteUser(String targetRole) {
-        if (currentUserRole == SessionManager.Role.SYSTEM_ADMIN) return true;
-        if (currentUserRole == SessionManager.Role.ORG_ADMIN && !"SYSTEM_ADMIN".equals(targetRole))
+        if (currentUserRole == SecureSessionManager.Role.SYSTEM_ADMIN) return true;
+        if (currentUserRole == SecureSessionManager.Role.ORG_ADMIN && !"SYSTEM_ADMIN".equals(targetRole))
             return true;
-        if (currentUserRole == SessionManager.Role.BRANCH_MANAGER) {
+        if (currentUserRole == SecureSessionManager.Role.BRANCH_MANAGER) {
             String[] allowed = {"INVENTORY_MGR", "POS_OPERATOR", "SECURITY", "GATE_SECURITY"};
             for (String a : allowed) {
                 if (a.equals(targetRole)) return true;
@@ -233,14 +235,14 @@ public class UsersManagementFragment extends Fragment {
     }
 
     private String[] getAllowedRoles() {
-        if (currentUserRole == SessionManager.Role.SYSTEM_ADMIN) {
+        if (currentUserRole == SecureSessionManager.Role.SYSTEM_ADMIN) {
             return ROLES;
         }
-        if (currentUserRole == SessionManager.Role.ORG_ADMIN) {
+        if (currentUserRole == SecureSessionManager.Role.ORG_ADMIN) {
             return new String[]{"ORG_ADMIN", "BRANCH_MANAGER", "INVENTORY_MGR",
                 "POS_OPERATOR", "SECURITY", "GATE_SECURITY", "AUDITOR"};
         }
-        if (currentUserRole == SessionManager.Role.BRANCH_MANAGER) {
+        if (currentUserRole == SecureSessionManager.Role.BRANCH_MANAGER) {
             return new String[]{"INVENTORY_MGR", "POS_OPERATOR", "SECURITY", "GATE_SECURITY"};
         }
         return new String[]{};
@@ -363,10 +365,10 @@ public class UsersManagementFragment extends Fragment {
                 }
 
                 boolean shouldShow = false;
-                if (currentUserRole == SessionManager.Role.SYSTEM_ADMIN
-                    || currentUserRole == SessionManager.Role.ORG_ADMIN) {
+                if (currentUserRole == SecureSessionManager.Role.SYSTEM_ADMIN
+                    || currentUserRole == SecureSessionManager.Role.ORG_ADMIN) {
                     shouldShow = true;
-                } else if (currentUserRole == SessionManager.Role.BRANCH_MANAGER) {
+                } else if (currentUserRole == SecureSessionManager.Role.BRANCH_MANAGER) {
                     if (user.branchId == currentBranchId) {
                         shouldShow = true;
                     }
