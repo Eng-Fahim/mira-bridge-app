@@ -53,6 +53,10 @@ import com.example.uhf.MiraRfid.MiraIRFIDReader;
 import com.example.uhf.MiraRfid.RFIDManager;
 import com.example.uhf.fragment.MiraReceiptFragment;
 
+// ✅ أضف هذه الاستيرادات في أعلى الملف
+import com.example.uhf.manager.MiraLocalItemCache;
+import com.example.uhf.manager.MiraItemSyncManager;
+
 
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.textfield.TextInputLayout;
@@ -234,7 +238,8 @@ private void refreshData() {
             Log.e(TAG, "applyPermissions error: " + e.getMessage());
         }
     }
-
+    
+    
     @Override
     public void onResume() {
         super.onResume();
@@ -246,11 +251,32 @@ private void refreshData() {
             if (tvCartStatus != null && cartList.isEmpty()) {
                 tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
             }
-            syncPendingSales();
-        } catch (Exception e) {
-            Log.e(TAG, "onResume error: " + e.getMessage());
+            // ✅ مزامنة القطع إذا مر أكثر من ساعة
+        MiraItemSyncManager syncManager = MiraItemSyncManager.getInstance(requireContext());
+        long lastSync = MiraLocalItemCache.getInstance(requireContext()).getLastSyncTime();
+        
+        if (System.currentTimeMillis() - lastSync > 3600000) { // ساعة
+            syncManager.syncAllItems(new MiraItemSyncManager.SyncCallback() {
+                @Override
+                public void onSyncComplete(int itemCount) {
+                    Log.d(TAG, "✅ Synced " + itemCount + " items for offline use");
+                }
+                
+                @Override
+                public void onSyncError(String error) {
+                    Log.e(TAG, "Sync error: " + error);
+                }
+            });
         }
+        
+        // ✅ مزامنة المبيعات المعلقة
+        syncPendingSales();
+        
+    } catch (Exception e) {
+        Log.e(TAG, "onResume error: " + e.getMessage());
     }
+}
+
 
     @Override
     public void onPause() {
@@ -642,55 +668,130 @@ private void refreshData() {
         }
     }
 
-    private void processRingEpc(final String code, final String source) {
-        if (code == null || code.trim().isEmpty() || !isAdded()) return;
-        final String cleanCode = code.trim();
+    /**
+ * ✅ البحث عن قطعة - يدعم الأوفلاين
+ */
+private void processRingEpc(final String code, final String source) {
+    if (code == null || code.trim().isEmpty() || !isAdded()) return;
+    final String cleanCode = code.trim();
+    
+    synchronized (pendingEpcs) {
+        if (pendingEpcs.contains(cleanCode)) return;
+        pendingEpcs.add(cleanCode);
+    }
+    
+    playAlertSound(1);
+    
+    safeRun(() -> {
+        showSearchLoadingDialog(cleanCode);
+        if (tvCartStatus != null) tvCartStatus.setText(isArabic ? "🔍 جاري البحث..." : "🔍 Searching...");
+    });
+    
+    // ✅ استخدام MiraItemSyncManager للبحث مع دعم الأوفلاين
+    new Thread(() -> {
+        try {
+            Context context = getContext();
+            if (context == null) return;
+            
+            MiraItemSyncManager syncManager = MiraItemSyncManager.getInstance(context);
+            
+            syncManager.findItem(cleanCode, new MiraItemSyncManager.ItemLookupCallback() {
+                @Override
+                public void onItemFound(JSONObject item, boolean fromServer) {
+                    safeRun(() -> {
+                        dismissSearchLoadingDialog();
+                        
+                        if (!fromServer) {
+                            // ✅ تم العثور عليه في الكاش المحلي
+                            showToast(isArabic ? "📦 تم العثور عليه محلياً" : "📦 Found locally");
+                        }
+                        
+                        parseItemResponse(cleanCode, item);
+                    });
+                }
+                
+                @Override
+                public void onItemNotFound() {
+                    safeRun(() -> {
+                        dismissSearchLoadingDialog();
+                        handleItemNotFound(cleanCode);
+                    });
+                }
+            });
+        } catch (Exception e) {
+            safeRun(() -> {
+                dismissSearchLoadingDialog();
+                handleItemNotFound(cleanCode);
+            });
+        } finally {
+            synchronized (pendingEpcs) {
+                pendingEpcs.remove(cleanCode);
+            }
+        }
+    }).start();
+}
+
+/**
+ * ✅ تحليل استجابة القطعة - معدلة للعمل مع JSONObject مباشرة
+ */
+private void parseItemResponse(String code, JSONObject data) {
+    try {
+        JSONObject item;
         
-        synchronized (pendingEpcs) {
-            if (pendingEpcs.contains(cleanCode)) return;
-            pendingEpcs.add(cleanCode);
+        // ✅ إذا كان data يحتوي على "item" داخله
+        if (data.has("item")) {
+            item = data.optJSONObject("item");
+        } else {
+            item = data;
         }
         
-        playAlertSound(1);
+        if (item == null) {
+            handleItemNotFound(code);
+            return;
+        }
+        
+        String vaultStatus = item.optString("status", item.optString("vault_status", "")).toLowerCase();
+        boolean isAvailable = !vaultStatus.equals("sold") && !vaultStatus.equals("reserved");
+        String title = item.optString("title", item.optString("item_title", isArabic ? "قطعة" : "Item"));
+        String karat = item.optString("karat", item.optString("gold_karat", "21K"));
+        double weight = item.optDouble("weight", item.optDouble("gross_weight", item.optDouble("gross_weight_grams", 0)));
+        double price = item.optDouble("retail_price", item.optDouble("retail_price_usd", item.optDouble("price", 0)));
+        
+        if (price <= 0 && weight > 0 && priceManager != null) {
+            price = priceManager.calculateGoldPrice(getKaratNumber(karat), weight);
+        }
+        
+        CartItem cartItem = new CartItem(code, title, karat, weight, liveScaleWeight, price, isAvailable, vaultStatus.toUpperCase());
+        cartItem.serialNo = item.optString("serial", item.optString("serial_number", code));
+        cartItem.gtin = item.optString("gtin", item.optString("gtin13", ""));
+        cartItem.location = item.optString("location", item.optString("current_location", ""));
+        cartItem.itemId = item.optInt("id", item.optInt("item_id", 0));
+        
+        final double finalPrice = price;
         
         safeRun(() -> {
-            try {
-                showSearchLoadingDialog(cleanCode);
-                if (tvCartStatus != null) tvCartStatus.setText(isArabic ? "🔍 جاري البحث..." : "🔍 Searching...");
-            } catch (Exception e) {}
-        });
-        
-        new Thread(() -> {
-            try {
-                Context context = getContext();
-                if (context == null) return;
-                MiraApiClient client = MiraApiClient.getInstance(context);
-                JSONObject extraParams = new JSONObject();
-                extraParams.put("source", source);
-                extraParams.put("branch_id", getActiveBranchId());
-                if (liveScaleWeight > 0) extraParams.put("scale_weight", liveScaleWeight);
-                
-                Thread.sleep(300);
-                MiraApiClient.ApiResponse response = client.authorize(cleanCode, "pos_sale", extraParams);
-                
-                safeRun(() -> dismissSearchLoadingDialog());
-                
-                if (response != null && response.isSuccess && response.data != null
-                        && response.data.optJSONObject("item") != null) {
-                    parseItemResponse(cleanCode, response.data);
-                } else {
-                    handleItemNotFound(cleanCode);
-                }
-            } catch (Exception e) {
-                safeRun(() -> dismissSearchLoadingDialog());
-                handleItemNotFound(cleanCode);
-            } finally {
-                synchronized (pendingEpcs) {
-                    pendingEpcs.remove(cleanCode);
-                }
+            if (!isAvailable) {
+                showSuccessMessage(
+                    isArabic ? "❌ قطعة غير متاحة" : "❌ Item Unavailable",
+                    isArabic ? "حالة القطعة: " + vaultStatus : "Item status: " + vaultStatus,
+                    false
+                );
+                updateCartSummary();
+                return;
             }
-        }).start();
+            
+            scannedEpcs.add(code);
+            cartList.add(0, cartItem);
+            if (cartAdapter != null) cartAdapter.notifyItemInserted(0);
+            if (rvCartItems != null) rvCartItems.scrollToPosition(0);
+            
+            updateCartSummary();
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "Parse error: " + e.getMessage());
+        handleItemNotFound(code);
     }
+}
 
     private void showSearchLoadingDialog(String code) {
         try {
@@ -816,57 +917,7 @@ private void refreshData() {
         }
     }
 
-    private void parseItemResponse(String code, JSONObject data) {
-        try {
-            JSONObject item = data.optJSONObject("item");
-            if (item == null) {
-                handleItemNotFound(code);
-                return;
-            }
-            
-            JSONObject barcode = item.optJSONObject("barcode");
-            String vaultStatus = item.optString("status", "").toLowerCase();
-            boolean isAvailable = !vaultStatus.equals("sold") && !vaultStatus.equals("reserved");
-            String title = item.optString("title", isArabic ? "قطعة" : "Item");
-            String karat = item.optString("karat", "21K");
-            double weight = item.optDouble("weight", item.optDouble("gross_weight", 0));
-            double price = item.optDouble("dynamic_retail_price", item.optDouble("retail_price", item.optDouble("price", 0)));
-            if (price <= 0 && weight > 0) {
-                price = priceManager.calculateGoldPrice(getKaratNumber(karat), weight);
-            }
-            
-            CartItem cartItem = new CartItem(code, title, karat, weight, liveScaleWeight, price, isAvailable, vaultStatus.toUpperCase());
-            cartItem.serialNo = item.optString("serial", code);
-            cartItem.gtin = (barcode != null) ? barcode.optString("gtin13", "") : item.optString("gtin", "");
-            cartItem.location = item.optString("location", "");
-            cartItem.itemId = item.optInt("id", 0);
-            
-            final double finalPrice = price;
-            final String finalTitle = title;
-            
-            safeRun(() -> {
-                if (!isAvailable) {
-                    showSuccessMessage(
-                        isArabic ? "❌ قطعة غير متاحة" : "❌ Item Unavailable",
-                        isArabic ? "حالة القطعة: " + vaultStatus : "Item status: " + vaultStatus,
-                        false
-                    );
-                    updateCartSummary();
-                    return;
-                }
-                
-                scannedEpcs.add(code);
-                cartList.add(0, cartItem);
-                if (cartAdapter != null) cartAdapter.notifyItemInserted(0);
-                if (rvCartItems != null) rvCartItems.scrollToPosition(0);
-                
-                updateCartSummary();
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Parse error: " + e.getMessage());
-            handleItemNotFound(code);
-        }
-    }
+    
 
     private void handleItemNotFound(String code) {
         safeRun(() -> {
@@ -984,7 +1035,10 @@ private void refreshData() {
         }
     }
 
-    private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
+    /**
+ * ✅✅✅ تنفيذ البيع - مع دعم كامل للأوفلاين
+ */
+private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
     try {
         if (!isAdded()) return;
         
@@ -1000,6 +1054,7 @@ private void refreshData() {
                 MiraApiClient client = MiraApiClient.getInstance(ctx);
                 SessionManager sessionManager = new SessionManager(ctx);
                 
+                // ✅ بناء payload
                 JSONObject payload = new JSONObject();
                 payload.put("action", "COMPLETE_POS_SALE");
                 payload.put("gate_id", client.getGateId());
@@ -1034,37 +1089,58 @@ private void refreshData() {
                 payment.put("payment_method", data.paymentMethod);
                 payload.put("payment", payment);
                 
+                // ✅✅✅ حفظ البيع محلياً قبل الإرسال
+                final String localSaleId = saveSaleLocally(payload, data);
+                
+                // ✅ إرسال إلى السيرفر
                 MiraApiClient.ApiResponse response = client.checkout(payload);
                 
-                // ✅✅✅ حفظ الاستجابة لاستخدامها في الفاتورة
+                // ✅ حفظ الاستجابة للفاتورة
                 lastSaleResponse = response;
                 
-                // ✅ حفظ عدد القطع قبل المسح
-                final int soldItemCount = cartList.size();
+                final boolean isNetworkError = response != null && response.isNetworkError;
+                final boolean isSuccess = response != null && response.isSuccess;
+                final String errorMsg = response != null && response.error != null ? response.error : 
+                                       (response != null && response.message != null ? response.message : "Unknown error");
                 
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
                     setButtonsEnabled(true);
                     
-                    if (response != null && response.isSuccess) {
+                    if (isSuccess) {
+                        // ✅ نجاح - إزالة من المحلي
+                        removeSaleFromLocal(localSaleId);
                         playAlertSound(1);
                         clearCart();
                         
-                        // ✅✅✅ عرض الفاتورة مباشرة
+                        // ✅ عرض الفاتورة
                         showReceipt(response);
+                        
+                    } else if (isNetworkError) {
+                        // ❌ فشل اتصال - البيع محفوظ محلياً
+                        playAlertSound(1);
+                        clearCart();
+                        showOfflineSaleSuccess(localSaleId, data);
+                        
                     } else {
-                        String errorMsg = response != null && response.error != null ? response.error : "Unknown error";
-                        if (errorMsg == null || errorMsg.isEmpty()) {
-                            errorMsg = response != null && response.message != null ? response.message : "Unknown error";
-                        }
-                        showRetryDialog(isArabic ? "❌ فشل البيع" : "❌ Sale Failed", errorMsg, () -> executeCheckout(data));
+                        // ❌ خطأ من السيرفر - لكن البيع محفوظ محلياً
+                        showRetryDialog(
+                            isArabic ? "❌ فشل البيع" : "❌ Sale Failed",
+                            errorMsg,
+                            () -> retrySale(localSaleId, payload)
+                        );
                     }
                 });
             } catch (Exception e) {
+                Log.e(TAG, "executeCheckout error: " + e.getMessage(), e);
                 safeRun(() -> {
                     dismissDialog(loadingDialog);
                     setButtonsEnabled(true);
-                    showRetryDialog(isArabic ? "❌ خطأ" : "❌ Error", e.getMessage(), null);
+                    showRetryDialog(
+                        isArabic ? "❌ خطأ" : "❌ Error",
+                        e.getMessage(),
+                        null
+                    );
                 });
             }
         }).start();
@@ -1073,6 +1149,258 @@ private void refreshData() {
     }
 }
 
+// ==================== الدوال المساعدة ====================
+
+/**
+ * ✅✅✅ حفظ البيع محلياً
+ */
+private String saveSaleLocally(JSONObject payload, POSCheckoutDialog.POSCheckoutData data) {
+    try {
+        Context ctx = getContext();
+        if (ctx == null) return "";
+        
+        String saleId = "SALE_" + System.currentTimeMillis();
+        
+        JSONObject localSale = new JSONObject();
+        localSale.put("sale_id", saleId);
+        localSale.put("payload", payload);
+        localSale.put("customer_name", data.customerName);
+        localSale.put("payment_method", data.paymentMethod);
+        localSale.put("final_amount", data.finalAmount);
+        localSale.put("item_count", cartList.size());
+        localSale.put("created_at", System.currentTimeMillis());
+        localSale.put("status", "pending");
+        
+        SharedPreferences prefs = ctx.getSharedPreferences("pos_offline_sales", Context.MODE_PRIVATE);
+        String existingJson = prefs.getString("pending_sales", "[]");
+        JSONArray arr = new JSONArray(existingJson);
+        
+        // إزالة أي عملية قديمة بنفس الـ ID
+        for (int i = 0; i < arr.length(); i++) {
+            if (arr.optJSONObject(i).optString("sale_id").equals(saleId)) {
+                arr.remove(i);
+                break;
+            }
+        }
+        
+        arr.put(localSale);
+        prefs.edit().putString("pending_sales", arr.toString()).apply();
+        
+        Log.d(TAG, "💾 Sale saved locally: " + saleId);
+        
+        // ✅ تحديث العداد
+        updatePendingSalesBadge(arr.length());
+        
+        return saleId;
+    } catch (Exception e) {
+        Log.e(TAG, "saveSaleLocally error: " + e.getMessage());
+        return "";
+    }
+}
+
+/**
+ * ✅✅✅ إزالة البيع من المحلي
+ */
+private void removeSaleFromLocal(String saleId) {
+    try {
+        Context ctx = getContext();
+        if (ctx == null || saleId == null || saleId.isEmpty()) return;
+        
+        SharedPreferences prefs = ctx.getSharedPreferences("pos_offline_sales", Context.MODE_PRIVATE);
+        String existingJson = prefs.getString("pending_sales", "[]");
+        JSONArray arr = new JSONArray(existingJson);
+        JSONArray newArr = new JSONArray();
+        
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject sale = arr.optJSONObject(i);
+            if (sale != null && !sale.optString("sale_id").equals(saleId)) {
+                newArr.put(sale);
+            }
+        }
+        
+        prefs.edit().putString("pending_sales", newArr.toString()).apply();
+        updatePendingSalesBadge(newArr.length());
+        
+        Log.d(TAG, "✅ Sale removed from local: " + saleId);
+    } catch (Exception e) {
+        Log.e(TAG, "removeSaleFromLocal error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅✅✅ عرض نجاح البيع الأوفلاين
+ */
+private void showOfflineSaleSuccess(String saleId, POSCheckoutDialog.POSCheckoutData data) {
+    try {
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return;
+        
+        String message = isArabic ? 
+            "✅ تم البيع وحفظه محلياً!\n\n" +
+            "🔑 رقم العملية: " + saleId + "\n" +
+            "💰 المبلغ: " + priceManager.formatPriceDefault(data.finalAmount) + "\n" +
+            "👤 العميل: " + data.customerName + "\n" +
+            "💳 الدفع: " + data.paymentMethod + "\n\n" +
+            "📡 سيتم المزامنة تلقائياً عند عودة الاتصال"
+            :
+            "✅ Sale saved locally!\n\n" +
+            "🔑 Sale ID: " + saleId + "\n" +
+            "💰 Amount: " + priceManager.formatPriceDefault(data.finalAmount) + "\n" +
+            "👤 Customer: " + data.customerName + "\n" +
+            "💳 Payment: " + data.paymentMethod + "\n\n" +
+            "📡 Will sync automatically when connection returns";
+        
+        showSuccessMessage(
+            isArabic ? "✅ تم البيع (أوفلاين)" : "✅ Sale Completed (Offline)",
+            message,
+            true
+        );
+    } catch (Exception e) {
+        Log.e(TAG, "showOfflineSaleSuccess error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅✅✅ إعادة محاولة البيع
+ */
+private void retrySale(String saleId, JSONObject payload) {
+    if (!isAdded()) return;
+    
+    final AlertDialog loadingDialog = showProfessionalLoadingDialog();
+    if (loadingDialog == null) return;
+    
+    new Thread(() -> {
+        try {
+            Context ctx = getContext();
+            if (ctx == null) return;
+            MiraApiClient client = MiraApiClient.getInstance(ctx);
+            
+            MiraApiClient.ApiResponse response = client.checkout(payload);
+            
+            safeRun(() -> {
+                dismissDialog(loadingDialog);
+                
+                if (response != null && response.isSuccess) {
+                    // ✅ نجاح - إزالة من المحلي
+                    removeSaleFromLocal(saleId);
+                    playAlertSound(1);
+                    showReceipt(response);
+                } else {
+                    String errorMsg = response != null && response.error != null ? response.error : "Unknown error";
+                    showRetryDialog(
+                        isArabic ? "❌ فشل البيع" : "❌ Sale Failed",
+                        errorMsg,
+                        () -> retrySale(saleId, payload)
+                    );
+                }
+            });
+        } catch (Exception e) {
+            safeRun(() -> {
+                dismissDialog(loadingDialog);
+                showRetryDialog(
+                    isArabic ? "❌ خطأ" : "❌ Error",
+                    e.getMessage(),
+                    () -> retrySale(saleId, payload)
+                );
+            });
+        }
+    }).start();
+}
+
+/**
+ * ✅✅✅ مزامنة المبيعات المعلقة
+ */
+private void syncPendingSales() {
+    try {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        
+        SharedPreferences prefs = ctx.getSharedPreferences("pos_offline_sales", Context.MODE_PRIVATE);
+        String existingJson = prefs.getString("pending_sales", "[]");
+        JSONArray arr = new JSONArray(existingJson);
+        
+        if (arr.length() == 0) {
+            updatePendingSalesBadge(0);
+            return;
+        }
+        
+        Log.d(TAG, "🔄 Syncing " + arr.length() + " pending sales...");
+        
+        new Thread(() -> {
+            int synced = 0;
+            JSONArray remaining = new JSONArray();
+            
+            for (int i = 0; i < arr.length(); i++) {
+                try {
+                    JSONObject sale = arr.optJSONObject(i);
+                    if (sale == null) continue;
+                    
+                    JSONObject payload = sale.optJSONObject("payload");
+                    if (payload == null) continue;
+                    
+                    MiraApiClient client = MiraApiClient.getInstance(ctx);
+                    MiraApiClient.ApiResponse response = client.checkout(payload);
+                    
+                    if (response != null && response.isSuccess) {
+                        synced++;
+                        Log.d(TAG, "✅ Synced sale: " + sale.optString("sale_id"));
+                    } else {
+                        remaining.put(sale);
+                    }
+                } catch (Exception e) {
+                    remaining.put(arr.optJSONObject(i));
+                }
+            }
+            
+            prefs.edit().putString("pending_sales", remaining.toString()).apply();
+            
+            final int finalSynced = synced;
+            final int finalRemaining = remaining.length();
+            
+            safeRun(() -> {
+                updatePendingSalesBadge(finalRemaining);
+                
+                if (finalSynced > 0) {
+                    String msg = isArabic ? 
+                        "✅ تمت مزامنة " + finalSynced + " عملية بيع" : 
+                        "✅ Synced " + finalSynced + " sales";
+                    showToast(msg);
+                }
+            });
+        }).start();
+        
+    } catch (Exception e) {
+        Log.e(TAG, "syncPendingSales error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅✅✅ تحديث عداد المبيعات المعلقة
+ */
+private void updatePendingSalesBadge(int count) {
+    try {
+        safeRun(() -> {
+            if (tvCartStatus != null) {
+                if (count > 0) {
+                    String pendingText = isArabic ? 
+                        "⚠️ " + count + " عملية بيع معلقة" : 
+                        "⚠️ " + count + " pending sales";
+                    tvCartStatus.setText(pendingText);
+                    tvCartStatus.setTextColor(Color.parseColor("#F39C12"));
+                } else {
+                    tvCartStatus.setTextColor(Color.parseColor("#2ECC71"));
+                    if (cartList.isEmpty()) {
+                        tvCartStatus.setText(isArabic ? getString(R.string.pos_ready_scan) : "Ready to scan...");
+                    } else {
+                        tvCartStatus.setText(isArabic ? "✓ جاهز للبيع" : "✓ Ready for sale");
+                    }
+                }
+            }
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "updatePendingSalesBadge error: " + e.getMessage());
+    }
+}
     private AlertDialog showProfessionalLoadingDialog() {
         try {
             Context ctx = getContext();
@@ -1219,13 +1547,7 @@ private void showReceipt(MiraApiClient.ApiResponse response) {
         } catch (Exception ignored) {}
     }
 
-    private void syncPendingSales() {
-        try {
-            if (getContext() == null) return;
-            // المزامنة تتم في الخلفية
-        } catch (Exception ignored) {}
-    }
-
+    
     private static class CartAdapter extends RecyclerView.Adapter<CartAdapter.ViewHolder> {
         interface OnRemoveListener {
             void onRemove(int position);
