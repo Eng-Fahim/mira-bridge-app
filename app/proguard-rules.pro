@@ -62,6 +62,26 @@
 -keep class androidx.security.crypto.** { *; }
 -keep class com.google.crypto.tink.** { *; }
 
+# ==================== حل نهائي لمشاكل Tink ====================
+# تجاهل كل التحذيرات المتعلقة بالمكتبات الخارجية
+-dontwarn android.os.SystemProperties
+
+# تجاهل مكتبات Google API (غير مستخدمة فعلياً)
+-dontwarn com.google.api.client.**
+-dontwarn com.google.api.client.http.**
+-dontwarn com.google.api.client.http.javanet.**
+
+# تجاهل مكتبات التوقيع الرقمي
+-dontwarn org.etsi.uri.x01903.**
+-dontwarn org.etsi.uri.x01903.v13.**
+
+# تجاهل Joda Time
+-dontwarn org.joda.time.**
+
+# تجاهل Tink KeysDownloader (لا نستخدمه)
+-dontwarn com.google.crypto.tink.util.KeysDownloader
+-dontwarn com.google.crypto.tink.util.KeysDownloader$Builder
+
 # ==================== المصادقة البيومترية ====================
 -keep class androidx.biometric.** { *; }
 -dontwarn androidx.biometric.**
