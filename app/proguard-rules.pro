@@ -17,12 +17,13 @@
 
 # ==================== ملفات البيانات والتصدير ====================
 -keep class common.** { *; }
--keep class jxl.** { *; }
+# ❌ تم حذف jxl نهائياً
+# -keep class jxl.** { *; }
 -keep class aavax.** { *; }
 -keep class schemaorg_apache_xmlbeans.system.** { *; }
 -keep interface org.** { *; }
 
-# ==================== مكتبات XML/Office ====================
+# ==================== مكتبات XML/Office (Apache POI 5.2.5) ====================
 -dontwarn org.apache.xmlbeans.**
 -dontwarn org.openxmlformats.**
 -dontwarn org.w3.x2000.**
@@ -37,6 +38,13 @@
 -keep class org.openxmlformats.** { *; }
 -keep class org.w3.x2000.** { *; }
 -keep class schemaorg_apache_xmlbeans.** { *; }
+
+# ==================== Apache POI 5.2.5 ====================
+-keep class org.apache.poi.** { *; }
+-keep class org.apache.poi.ss.usermodel.** { *; }
+-keep class org.apache.poi.xssf.usermodel.** { *; }
+-keep class org.apache.poi.hssf.usermodel.** { *; }
+-dontwarn org.apache.poi.**
 
 # ==================== Firebase ====================
 -keep class com.google.firebase.** { *; }
