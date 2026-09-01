@@ -180,93 +180,93 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
     
     @Override
-protected void attachBaseContext(Context newBase) {
-    String savedLang = MiraLanguageHelper.getSavedLanguage(newBase);
-    super.attachBaseContext(MiraLanguageHelper.applyLanguage(newBase, savedLang));
-}
-
- @Override
-protected void onCreate(Bundle savedInstanceState) {
-    // 1. التهيئة الأساسية للـ Lifecycle (اللغة مُطبقة مسبقاً عبر attachBaseContext)
-    super.onCreate(savedInstanceState);
-
-    try {
-        // 2. التحقق من الجلسة أولاً
-        sessionManager = new SessionManager(this);
-        if (!sessionManager.isLoggedIn()) {
-            navigateToLogin();
-            return;
-        }
-
-        // 3. ضبط الوضع الليلي
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-
-        // 4. ربط التخطيط
-        setContentView(R.layout.activity_main);
-
-        // 5. تهيئة الخدمات والمدراء
-        ToastUtil.init(getApplicationContext());
-        initializeLanguageState();
-
-        MemoryManager.getInstance().registerActivity(this);
-        registerComponentCallbacks(MemoryManager.getInstance());
-        SessionMonitorManager.getInstance(this).startMonitoring(this);
-
-        branchesManager = MiraBranchesManager.getInstance(this);
-        if (branchesManager != null) {
-            lastActiveBranchId = branchesManager.getActiveBranchId();
-        }
-
-        // 6. تهيئة عناصر UI
-        loadingOverlay = findViewById(R.id.loading_overlay);
-        fragmentManager = getSupportFragmentManager();
-
-        setupOrgProfileListener();
-        updateBottomNavLanguage();
-
-        MaterialToolbar toolbar = findViewById(R.id.toolbar);
-        if (toolbar != null) {
-            setSupportActionBar(toolbar);
-            updateToolbarTitle();
-        }
-
-        View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
-        if (btnHardwareStatus != null) {
-            btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
-        }
-
-        // 7. الأذونات والعتاد
-        checkReadWritePermission();
-
-        safeExecute(this::initSound, "Sound Init Error");
-        safeExecute(this::initUHF, "UHF Hardware Init Error");
-        safeExecute(this::configureReaderForDevice, "Reader Configuration Error");
-
-        setupQuickNav();
-
-        // 8. إدارة التنقل والـ Fragments
-        if (savedInstanceState == null) {
-            currentFragmentTag = getSavedFragmentTag();
-            loadFragmentByTag(currentFragmentTag);
-        } else {
-            currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
-            currentFragment = fragmentManager.findFragmentByTag(currentFragmentTag);
-            if (currentFragment == null) {
-                loadFragmentByTag(currentFragmentTag);
-            }
-        }
-
-    } catch (Exception e) {
-        Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
+    protected void attachBaseContext(Context newBase) {
+        String savedLang = MiraLanguageHelper.getSavedLanguage(newBase);
+        MiraLanguageHelper.applyLanguage(newBase, savedLang);
+        super.attachBaseContext(newBase);
     }
-}
-
 
     @Override
-protected void onResume() {
-    super.onResume();
-    // ✅ لا شيء هنا - التحميل يتم في onCreate فقط
-}
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        try {
+            // 1. التحقق من الجلسة أولاً
+            sessionManager = new SessionManager(this);
+            if (!sessionManager.isLoggedIn()) {
+                navigateToLogin();
+                return;
+            }
+
+            // 2. ضبط الوضع الليلي
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+
+            // 3. ربط التخطيط
+            setContentView(R.layout.activity_main);
+
+            // 4. تهيئة الخدمات والمدراء
+            ToastUtil.init(getApplicationContext());
+            initializeLanguageState();
+
+            MemoryManager.getInstance().registerActivity(this);
+            registerComponentCallbacks(MemoryManager.getInstance());
+            SessionMonitorManager.getInstance(this).startMonitoring(this);
+
+            branchesManager = MiraBranchesManager.getInstance(this);
+            if (branchesManager != null) {
+                lastActiveBranchId = branchesManager.getActiveBranchId();
+            }
+
+            // 5. تهيئة عناصر UI
+            loadingOverlay = findViewById(R.id.loading_overlay);
+            fragmentManager = getSupportFragmentManager();
+
+            setupOrgProfileListener();
+            updateBottomNavLanguage();
+
+            MaterialToolbar toolbar = findViewById(R.id.toolbar);
+            if (toolbar != null) {
+                setSupportActionBar(toolbar);
+                updateToolbarTitle();
+            }
+
+            View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
+            if (btnHardwareStatus != null) {
+                btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
+            }
+
+            // 6. الأذونات والعتاد
+            checkReadWritePermission();
+
+            safeExecute(this::initSound, "Sound Init Error");
+            safeExecute(this::initUHF, "UHF Hardware Init Error");
+            safeExecute(this::configureReaderForDevice, "Reader Configuration Error");
+
+            setupQuickNav();
+
+            // 7. إدارة التنقل والـ Fragments
+            if (savedInstanceState == null) {
+                currentFragmentTag = "Dashboard"; 
+                loadFragmentByTag(currentFragmentTag);
+            } else {
+                currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
+                currentFragment = fragmentManager.findFragmentByTag(currentFragmentTag);
+                if (currentFragment == null) {
+                    loadFragmentByTag(currentFragmentTag);
+                }
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        updateToolbarTitle();
+    }
+
     private void initializeLanguageState() {
         try {
             isArabic = getResources().getConfiguration().locale.getLanguage().equals("ar");
@@ -612,54 +612,47 @@ protected void onResume() {
 
     // ==================== FRAGMENT MANAGEMENT ====================
 
-    // ==================== FRAGMENT MANAGEMENT ====================
-
-public void loadFragment(Fragment fragment, String tag) {
-    loadFragment(fragment, tag, true);
-}
-
-public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-    if (isFinishing() || isDestroyed() || fragment == null) return;
-
-    try {
-        PermissionManager pm = PermissionManager.getInstance(this);
-
-        if (!pm.canAccessFragment(tag)) {
-            showPermissionDenied();
-            return;
-        }
-
-        // ✅ منع استبدال واجهة بـ الواجهة نفسها المفتوحة حالياً
-        if (tag.equals(currentFragmentTag) && currentFragment != null && currentFragment.isAdded()) {
-            return;
-        }
-
-        showLoading();
-        currentFragment = fragment;
-        currentFragmentTag = tag;
-        saveFragmentTagToPrefs(tag);
-
-        FragmentTransaction transaction = fragmentManager.beginTransaction();
-        
-        // ✅ إلغاء الأنيميشن لمنع الوميض
-        transaction.setCustomAnimations(0, 0, 0, 0);
-        
-        transaction.replace(R.id.fragment_container, fragment, tag);
-
-        if (addToBackStack) {
-            transaction.addToBackStack(tag);
-        }
-
-        transaction.commitAllowingStateLoss();
-
-        mainHandler.postDelayed(this::hideLoading, 150);
-
-    } catch (Exception e) {
-        Log.e(TAG, "Error switching fragment: " + e.getMessage());
-        hideLoading();
+    public void loadFragment(Fragment fragment, String tag) {
+        loadFragment(fragment, tag, true);
     }
-}
 
+    public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
+        if (isFinishing() || isDestroyed() || fragment == null) return;
+
+        try {
+            PermissionManager pm = PermissionManager.getInstance(this);
+
+            if (!pm.canAccessFragment(tag)) {
+                showPermissionDenied();
+                return;
+            }
+
+            if (tag.equals(currentFragmentTag) && currentFragment != null && currentFragment.isAdded()) {
+                return;
+            }
+
+            showLoading();
+            currentFragment = fragment;
+            currentFragmentTag = tag;
+            saveFragmentTagToPrefs(tag);
+
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.setCustomAnimations(0, 0, 0, 0);
+            transaction.replace(R.id.fragment_container, fragment, tag);
+
+            if (addToBackStack) {
+                transaction.addToBackStack(tag);
+            }
+
+            transaction.commitAllowingStateLoss();
+
+            mainHandler.postDelayed(this::hideLoading, 150);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error switching fragment: " + e.getMessage());
+            hideLoading();
+        }
+    }
 
     private void loadFragmentByTag(String tag) {
         try {
@@ -674,10 +667,14 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
             currentFragmentTag = tag;
             saveFragmentTagToPrefs(tag);
 
-           FragmentTransaction transaction = fragmentManager.beginTransaction();
-           // ✅ إلغاء الأنيميشن لمنع الوميض
-           transaction.setCustomAnimations(0, 0, 0, 0);
-           transaction.replace(R.id.fragment_container, fragment, tag);
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.setCustomAnimations(0, 0, 0, 0);
+            transaction.replace(R.id.fragment_container, fragment, tag);
+            transaction.commitAllowingStateLoss();
+
+            // ⚡ إجبار النظام على رسم الواجهة فوراً
+            fragmentManager.executePendingTransactions();
+
         } catch (Exception e) {
             Log.e(TAG, "Load fragment by tag error: " + e.getMessage(), e);
             try {
