@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout 
+<androidx.constraintlayout.motion.widget.MotionLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/motionLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:attr/colorBackground">
+    android:background="?android:attr/colorBackground"
+    app:layoutDescription="@xml/dashboard_scene">
 
     <!-- ==================== SHIMMER LOADING ==================== -->
     <LinearLayout
@@ -49,6 +51,8 @@
         android:gravity="center"
         android:background="?android:attr/colorBackground"
         android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true"
         android:alpha="0.95">
 
         <ProgressBar
@@ -69,12 +73,17 @@
     <!-- ==================== MAIN CONTENT ==================== -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="visible"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
         tools:visibility="visible">
 
         <androidx.core.widget.NestedScrollView
+            android:id="@+id/nestedScroll"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
@@ -89,6 +98,7 @@
 
                 <!-- ==================== 1. HEADER ==================== -->
                 <RelativeLayout
+                    android:id="@+id/headerSection"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="12dp">
@@ -137,8 +147,9 @@
                         tools:text="🟢 متصل" />
                 </RelativeLayout>
 
-                <!-- ==================== 2. DYNAMIC USER GREETING (FIXED OVERLAP) ==================== -->
+                <!-- ==================== 2. GREETING CARD ==================== -->
                 <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/greetingCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="12dp"
@@ -153,53 +164,6 @@
                         android:layout_height="wrap_content"
                         android:padding="14dp">
 
-                        <!-- ✅ اسم الجهة (سطر مستقل) -->
-                        <TextView
-                            android:id="@+id/tvOrgName"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="12dp"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:textColor="?attr/colorPrimary"
-                            android:textSize="13sp"
-                            android:textStyle="bold"
-                            app:layout_constraintEnd_toStartOf="@id/tcLiveTime"
-                            app:layout_constraintStart_toStartOf="parent"
-                            app:layout_constraintTop_toTopOf="parent"
-                            tools:text="البوعاني للمجوهرات" />
-
-                        <!-- ✅ الترحيب بالمستخدم (سطر مستقل) -->
-                        <TextView
-                            android:id="@+id/tvGreeting"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="14sp"
-                            app:layout_constraintEnd_toEndOf="@id/tvOrgName"
-                            app:layout_constraintStart_toStartOf="parent"
-                            app:layout_constraintTop_toBottomOf="@id/tvOrgName"
-                            tools:text="مرحباً، سلمان" />
-
-                        <!-- ✅ الموقع/الفرع -->
-                        <TextView
-                            android:id="@+id/tvLocation"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="11sp"
-                            app:layout_constraintEnd_toEndOf="@id/tvGreeting"
-                            app:layout_constraintStart_toStartOf="parent"
-                            app:layout_constraintTop_toBottomOf="@id/tvGreeting"
-                            tools:text="📍 فرع حده" />
-
-                        <!-- ✅ الساعة الحية -->
                         <TextClock
                             android:id="@+id/tcLiveTime"
                             android:layout_width="wrap_content"
@@ -212,7 +176,54 @@
                             app:layout_constraintEnd_toEndOf="parent"
                             app:layout_constraintTop_toTopOf="parent" />
 
-                        <!-- ✅ التاريخ -->
+                        <TextView
+                            android:id="@+id/tvOrgName"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="8dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="?attr/colorPrimary"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            app:layout_constrainedWidth="true"
+                            app:layout_constraintEnd_toStartOf="@id/tcLiveTime"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toTopOf="parent"
+                            tools:text="البوعاني للمجوهرات" />
+
+                        <TextView
+                            android:id="@+id/tvGreeting"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:layout_marginEnd="8dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="14sp"
+                            app:layout_constrainedWidth="true"
+                            app:layout_constraintEnd_toStartOf="@id/tcLiveTime"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toBottomOf="@id/tvOrgName"
+                            tools:text="مرحباً، سلمان" />
+
+                        <TextView
+                            android:id="@+id/tvLocation"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:layout_marginEnd="8dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="11sp"
+                            app:layout_constrainedWidth="true"
+                            app:layout_constraintEnd_toStartOf="@id/tcLiveTime"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toBottomOf="@id/tvGreeting"
+                            tools:text="📍 فرع حده" />
+
                         <TextView
                             android:id="@+id/tvDate"
                             android:layout_width="wrap_content"
@@ -229,10 +240,12 @@
 
                 <!-- ==================== 3. INVENTORY METRICS ==================== -->
                 <LinearLayout
+                    android:id="@+id/inventoryMetrics"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="12dp"
                     android:orientation="horizontal"
+                    android:baselineAligned="false"
                     android:weightSum="3">
 
                     <com.google.android.material.card.MaterialCardView
@@ -380,7 +393,6 @@
                                 android:textSize="14sp"
                                 android:textStyle="bold" />
 
-                            <!-- ✅ زر التحديث مع مؤشر تحميل -->
                             <FrameLayout
                                 android:layout_width="36dp"
                                 android:layout_height="36dp"
@@ -392,7 +404,7 @@
                                     android:layout_width="36dp"
                                     android:layout_height="36dp"
                                     android:background="?attr/selectableItemBackgroundBorderless"
-                                    android:contentDescription="Refresh"
+                                    android:contentDescription="تحديث أسعار الذهب"
                                     android:src="@android:drawable/ic_popup_sync"
                                     app:tint="?attr/colorPrimary" />
 
@@ -525,8 +537,9 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- ==================== 5. QUICK ACCESS RECYCLERVIEW ==================== -->
+                <!-- ==================== 5. QUICK ACCESS ==================== -->
                 <TextView
+                    android:id="@+id/quickAccessTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="6dp"
@@ -546,6 +559,7 @@
 
                 <!-- ==================== 6. SALES SUMMARY ==================== -->
                 <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/salesSummaryCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="12dp"
@@ -560,6 +574,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:paddingVertical="10dp"
+                        android:baselineAligned="false"
                         android:weightSum="3">
 
                         <LinearLayout
@@ -651,6 +666,7 @@
 
                 <!-- ==================== 7. FIELD OPERATIONS ==================== -->
                 <TextView
+                    android:id="@+id/fieldOpsTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="6dp"
@@ -660,9 +676,11 @@
                     android:textStyle="bold" />
 
                 <LinearLayout
+                    android:id="@+id/fieldOps"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
+                    android:baselineAligned="false"
                     android:weightSum="2">
 
                     <com.google.android.material.card.MaterialCardView
@@ -689,6 +707,7 @@
                             <ImageView
                                 android:layout_width="24dp"
                                 android:layout_height="24dp"
+                                android:importantForAccessibility="no"
                                 android:src="@drawable/ic_security"
                                 app:tint="?attr/colorPrimary" />
 
@@ -727,6 +746,7 @@
                             <ImageView
                                 android:layout_width="24dp"
                                 android:layout_height="24dp"
+                                android:importantForAccessibility="no"
                                 android:src="@drawable/ic_search"
                                 app:tint="?attr/colorPrimary" />
 
@@ -745,4 +765,4 @@
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
-</FrameLayout>
+</androidx.constraintlayout.motion.widget.MotionLayout>
