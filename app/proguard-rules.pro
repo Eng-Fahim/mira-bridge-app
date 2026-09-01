@@ -166,7 +166,8 @@
 -dontwarn javax.annotation.**
 
 # ==================== حل مشكلة R8 ====================
--dontcompress
+# ❌ احذف هذا السطر: -dontcompress
+
 -dontwarn org.apache.poi.**
 -dontwarn org.openxmlformats.**
 -dontwarn org.apache.xmlbeans.**
