@@ -182,28 +182,26 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     @Override
 protected void attachBaseContext(Context newBase) {
     String savedLang = MiraLanguageHelper.getSavedLanguage(newBase);
-    super.attachBaseContext(MiraLanguageHelper.setLocale(newBase, savedLang));
+    super.attachBaseContext(MiraLanguageHelper.applyLanguage(newBase, savedLang));
 }
 
-    @Override
+ @Override
 protected void onCreate(Bundle savedInstanceState) {
-    // 1. التهيئة الأساسية للـ Lifecycle
+    // 1. التهيئة الأساسية للـ Lifecycle (اللغة مُطبقة مسبقاً عبر attachBaseContext)
     super.onCreate(savedInstanceState);
 
     try {
-        // 2. التحقق من الجلسة أولاً وقبل كل شيء
+        // 2. التحقق من الجلسة أولاً
         sessionManager = new SessionManager(this);
         if (!sessionManager.isLoggedIn()) {
             navigateToLogin();
-            return; // الخروج الفوري قبل استهلاك الموارد
+            return;
         }
 
-        // 3. ضبط الوضع الليلي واللغة قبل رسم الواجهة (setContentView)
+        // 3. ضبط الوضع الليلي
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-        String savedLang = MiraLanguageHelper.getSavedLanguage(this);
-        MiraLanguageHelper.applyLanguage(this, savedLang);
 
-        // 4. ربط التخطيط بعد ضبط اللغة
+        // 4. ربط التخطيط
         setContentView(R.layout.activity_main);
 
         // 5. تهيئة الخدمات والمدراء
@@ -262,6 +260,7 @@ protected void onCreate(Bundle savedInstanceState) {
         Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
     }
 }
+
 
     @Override
 protected void onResume() {
@@ -613,10 +612,6 @@ protected void onResume() {
 
     // ==================== FRAGMENT MANAGEMENT ====================
 
-    public void loadFragment(Fragment fragment, String tag) {
-        loadFragment(fragment, tag, true);
-    }
-
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
     if (isFinishing() || isDestroyed() || fragment == null) return;
 
@@ -628,19 +623,18 @@ protected void onResume() {
             return;
         }
 
-        // ✅ منع استبدال واجهة بـ الواجهة نفسها المفتوحة حالياً
+        // ✅ منع تكرار نفس الواجهة
         if (tag.equals(currentFragmentTag) && currentFragment != null && currentFragment.isAdded()) {
             return;
         }
 
-        showLoading();
         currentFragment = fragment;
         currentFragmentTag = tag;
         saveFragmentTagToPrefs(tag);
 
         FragmentTransaction transaction = fragmentManager.beginTransaction();
         
-        // ✅ إلغاء الأنيميشن لمنع الوميض
+        // ✅ إلغاء الانيميشن لمنع التعارض والوميض
         transaction.setCustomAnimations(0, 0, 0, 0);
         
         transaction.replace(R.id.fragment_container, fragment, tag);
@@ -651,13 +645,11 @@ protected void onResume() {
 
         transaction.commitAllowingStateLoss();
 
-        mainHandler.postDelayed(this::hideLoading, 150);
-
     } catch (Exception e) {
         Log.e(TAG, "Error switching fragment: " + e.getMessage());
-        hideLoading();
     }
 }
+
 
     private void loadFragmentByTag(String tag) {
         try {
@@ -1145,4 +1137,4 @@ protected void onResume() {
             }
         }
     }
-                  }
+}
