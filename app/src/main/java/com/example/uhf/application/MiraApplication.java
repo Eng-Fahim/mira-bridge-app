@@ -1,17 +1,21 @@
 package com.example.uhf.application;
 
-import android.app.Application;
+import android.content.Context;
 import android.util.Log;
 
+import androidx.multidex.MultiDex;
 import androidx.room.Room;
 
+import com.example.uhf.AppContext;
 import com.example.uhf.database.InventoryDatabase;
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 /**
  * MiraApplication - الفئة الرئيسية للتطبيق
- * تدير دورة حياة قاعدة البيانات Singleton
+ * ترث من AppContext وتدير قاعدة البيانات Singleton
  */
-public class MiraApplication extends Application {
+public class MiraApplication extends AppContext {
     
     private static final String TAG = "MiraApplication";
     private static final String DATABASE_NAME = "inventory_database";
@@ -20,9 +24,18 @@ public class MiraApplication extends Application {
     private InventoryDatabase inventoryDatabase;
     
     @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(base);
+        MultiDex.install(this);
+    }
+    
+    @Override
     public void onCreate() {
         super.onCreate();
         instance = this;
+        
+        // تهيئة Firebase
+        initFirebase();
         
         // تهيئة قاعدة البيانات مرة واحدة فقط
         initializeDatabase();
@@ -31,18 +44,40 @@ public class MiraApplication extends Application {
     }
     
     /**
+     * تهيئة Firebase services
+     */
+    private void initFirebase() {
+        try {
+            FirebaseApp.initializeApp(this);
+            
+            // تعطيل Crashlytics في وضع التصحيح
+            if (BuildConfig.DEBUG) {
+                FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(false);
+            } else {
+                FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(true);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Firebase initialization failed: " + e.getMessage());
+        }
+    }
+    
+    /**
      * تهيئة قاعدة البيانات Singleton
      */
     private void initializeDatabase() {
-        inventoryDatabase = Room.databaseBuilder(
-            getApplicationContext(),
-            InventoryDatabase.class,
-            DATABASE_NAME
-        )
-        .fallbackToDestructiveMigration()
-        .build();
-        
-        Log.d(TAG, "Database initialized successfully");
+        try {
+            inventoryDatabase = Room.databaseBuilder(
+                getApplicationContext(),
+                InventoryDatabase.class,
+                DATABASE_NAME
+            )
+            .fallbackToDestructiveMigration()
+            .build();
+            
+            Log.d(TAG, "Database initialized successfully");
+        } catch (Exception e) {
+            Log.e(TAG, "Database initialization failed: " + e.getMessage());
+        }
     }
     
     /**
@@ -78,5 +113,14 @@ public class MiraApplication extends Application {
                 Log.e(TAG, "Error closing database", e);
             }
         }
+    }
+    
+    /**
+     * تنظيف الموارد عند انخفاض الذاكرة
+     */
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        System.gc();
     }
 }
