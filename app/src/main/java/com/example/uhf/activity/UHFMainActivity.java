@@ -178,6 +178,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Toolbar Update Error: " + e.getMessage());
         }
     }
+    
+    @Override
+protected void attachBaseContext(Context newBase) {
+    String savedLang = MiraLanguageHelper.getSavedLanguage(newBase);
+    super.attachBaseContext(MiraLanguageHelper.setLocale(newBase, savedLang));
+}
 
     @Override
 protected void onCreate(Bundle savedInstanceState) {
@@ -258,19 +264,10 @@ protected void onCreate(Bundle savedInstanceState) {
 }
 
     @Override
-    protected void onResume() {
-        super.onResume();
-        try {
-            // ✅ عدم إجبار إعادة التحميل إذا كانت الـ Fragment موجودة ومضافة
-            Fragment activeFrag = fragmentManager.findFragmentById(R.id.fragment_container);
-            if (activeFrag == null || !activeFrag.isAdded()) {
-                loadFragmentByTag(currentFragmentTag);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "onResume error: " + e.getMessage());
-        }
-    }
-
+protected void onResume() {
+    super.onResume();
+    // ✅ لا شيء هنا - التحميل يتم في onCreate فقط
+}
     private void initializeLanguageState() {
         try {
             isArabic = getResources().getConfiguration().locale.getLanguage().equals("ar");
@@ -621,42 +618,46 @@ protected void onCreate(Bundle savedInstanceState) {
     }
 
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-        if (isFinishing() || isDestroyed() || fragment == null) return;
+    if (isFinishing() || isDestroyed() || fragment == null) return;
 
-        try {
-            PermissionManager pm = PermissionManager.getInstance(this);
+    try {
+        PermissionManager pm = PermissionManager.getInstance(this);
 
-            if (!pm.canAccessFragment(tag)) {
-                showPermissionDenied();
-                return;
-            }
-
-            // ✅ منع استبدال واجهة بـ الواجهة نفسها المفتوحة حالياً
-            if (tag.equals(currentFragmentTag) && currentFragment != null && currentFragment.isAdded()) {
-                return;
-            }
-
-            showLoading();
-            currentFragment = fragment;
-            currentFragmentTag = tag;
-            saveFragmentTagToPrefs(tag);
-
-            FragmentTransaction transaction = fragmentManager.beginTransaction()
-                    .replace(R.id.fragment_container, fragment, tag);
-
-            if (addToBackStack) {
-                transaction.addToBackStack(tag);
-            }
-
-            transaction.commitAllowingStateLoss();
-
-            mainHandler.postDelayed(this::hideLoading, 150);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error switching fragment: " + e.getMessage());
-            hideLoading();
+        if (!pm.canAccessFragment(tag)) {
+            showPermissionDenied();
+            return;
         }
+
+        // ✅ منع استبدال واجهة بـ الواجهة نفسها المفتوحة حالياً
+        if (tag.equals(currentFragmentTag) && currentFragment != null && currentFragment.isAdded()) {
+            return;
+        }
+
+        showLoading();
+        currentFragment = fragment;
+        currentFragmentTag = tag;
+        saveFragmentTagToPrefs(tag);
+
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        
+        // ✅ إلغاء الأنيميشن لمنع الوميض
+        transaction.setCustomAnimations(0, 0, 0, 0);
+        
+        transaction.replace(R.id.fragment_container, fragment, tag);
+
+        if (addToBackStack) {
+            transaction.addToBackStack(tag);
+        }
+
+        transaction.commitAllowingStateLoss();
+
+        mainHandler.postDelayed(this::hideLoading, 150);
+
+    } catch (Exception e) {
+        Log.e(TAG, "Error switching fragment: " + e.getMessage());
+        hideLoading();
     }
+}
 
     private void loadFragmentByTag(String tag) {
         try {
@@ -671,10 +672,10 @@ protected void onCreate(Bundle savedInstanceState) {
             currentFragmentTag = tag;
             saveFragmentTagToPrefs(tag);
 
-            FragmentTransaction transaction = fragmentManager.beginTransaction()
-                    .replace(R.id.fragment_container, fragment, tag);
-
-            transaction.commitAllowingStateLoss();
+           FragmentTransaction transaction = fragmentManager.beginTransaction();
+           // ✅ إلغاء الأنيميشن لمنع الوميض
+           transaction.setCustomAnimations(0, 0, 0, 0);
+           transaction.replace(R.id.fragment_container, fragment, tag);
         } catch (Exception e) {
             Log.e(TAG, "Load fragment by tag error: " + e.getMessage(), e);
             try {
@@ -1144,4 +1145,4 @@ protected void onCreate(Bundle savedInstanceState) {
             }
         }
     }
-}
+                  }
