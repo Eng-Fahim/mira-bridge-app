@@ -35,7 +35,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
-
+import android.view.animation.AccelerateDecelerateInterpolator;
 import com.example.uhf.R;
 import com.example.uhf.manager.SessionMonitorManager;  
 import com.example.uhf.manager.PermissionManager;  
@@ -198,7 +198,11 @@ private void updateToolbarTitle() {
 protected void onCreate(Bundle savedInstanceState) {
     // ✅ أولاً: تحميل الواجهة
     setContentView(R.layout.activity_main);
-    
+    // ✅ عرض شاشة النجاح
+String welcomeName = getIntent().getStringExtra("welcome_name");
+if (welcomeName != null && !welcomeName.isEmpty()) {
+    showWelcomeOverlay(welcomeName);
+}
     // ✅ ثانياً: استدعاء super
     super.onCreate(savedInstanceState);
     
@@ -1137,7 +1141,36 @@ protected void onCreate(Bundle savedInstanceState) {
             finish();
         } catch (Exception ignored) {}
     }
-
+/**
+ * ✅ عرض شاشة الترحيب
+ */
+private void showWelcomeOverlay(String displayName) {
+    View successOverlay = findViewById(R.id.successOverlayMain);
+    TextView tvSuccessMessage = findViewById(R.id.tvSuccessMessageMain);
+    
+    if (successOverlay != null && tvSuccessMessage != null) {
+        tvSuccessMessage.setText((isArabic ? "أهلاً بك " : "Welcome ") + displayName + " 👋");
+        
+        successOverlay.setVisibility(View.VISIBLE);
+        successOverlay.setAlpha(0f);
+        successOverlay.animate()
+            .alpha(1f)
+            .setDuration(400)
+            .setInterpolator(new AccelerateDecelerateInterpolator())
+            .start();
+        
+        // ✅ إخفاء تلقائي بعد 1.5 ثانية
+        mainHandler.postDelayed(() -> {
+            if (!isFinishing() && !isDestroyed()) {
+                successOverlay.animate()
+                    .alpha(0f)
+                    .setDuration(300)
+                    .withEndAction(() -> successOverlay.setVisibility(View.GONE))
+                    .start();
+            }
+        }, 1500);
+    }
+}
     @Override
     protected void onDestroy() {
         try {
@@ -1201,4 +1234,4 @@ MemoryManager.getInstance().forceCleanup();
             }
         }
     }
-}
+        }
