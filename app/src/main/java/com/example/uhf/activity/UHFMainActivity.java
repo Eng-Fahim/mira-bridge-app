@@ -612,7 +612,13 @@ protected void onResume() {
 
     // ==================== FRAGMENT MANAGEMENT ====================
 
-    public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
+    // ==================== FRAGMENT MANAGEMENT ====================
+
+public void loadFragment(Fragment fragment, String tag) {
+    loadFragment(fragment, tag, true);
+}
+
+public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
     if (isFinishing() || isDestroyed() || fragment == null) return;
 
     try {
@@ -623,18 +629,19 @@ protected void onResume() {
             return;
         }
 
-        // ✅ منع تكرار نفس الواجهة
+        // ✅ منع استبدال واجهة بـ الواجهة نفسها المفتوحة حالياً
         if (tag.equals(currentFragmentTag) && currentFragment != null && currentFragment.isAdded()) {
             return;
         }
 
+        showLoading();
         currentFragment = fragment;
         currentFragmentTag = tag;
         saveFragmentTagToPrefs(tag);
 
         FragmentTransaction transaction = fragmentManager.beginTransaction();
         
-        // ✅ إلغاء الانيميشن لمنع التعارض والوميض
+        // ✅ إلغاء الأنيميشن لمنع الوميض
         transaction.setCustomAnimations(0, 0, 0, 0);
         
         transaction.replace(R.id.fragment_container, fragment, tag);
@@ -645,8 +652,11 @@ protected void onResume() {
 
         transaction.commitAllowingStateLoss();
 
+        mainHandler.postDelayed(this::hideLoading, 150);
+
     } catch (Exception e) {
         Log.e(TAG, "Error switching fragment: " + e.getMessage());
+        hideLoading();
     }
 }
 
