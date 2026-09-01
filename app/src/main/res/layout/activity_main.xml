@@ -136,4 +136,41 @@
         </com.google.android.material.card.MaterialCardView>
     </FrameLayout>
 
+    <!-- ✅ شاشة النجاح - فوق كل شيء -->
+    <LinearLayout
+        android:id="@+id/successOverlayMain"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="?attr/colorSurface"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:alpha="0.0"
+        android:elevation="20dp"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:src="@drawable/ic_check_circle"
+            app:tint="?attr/colorPrimary" />
+
+        <TextView
+            android:id="@+id/tvSuccessMessageMain"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="تم تسجيل الدخول بنجاح"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <ProgressBar
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginTop="24dp"
+            android:indeterminateTint="?attr/colorPrimary" />
+    </LinearLayout>
+
 </RelativeLayout>
