@@ -1,15 +1,17 @@
 package com.example.uhf.tools;
 
 import android.annotation.SuppressLint;
-import android.inputmethodservice.Keyboard;
 import android.os.Build;
 import android.os.Environment;
-import android.text.TextUtils;
 import android.util.Log;
 import android.util.Xml;
 
 import com.example.uhf.AppContext;
 
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlSerializer;
 
@@ -29,16 +31,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-
-import jxl.Cell;
-import jxl.Workbook;
-import jxl.write.Label;
-import jxl.write.WritableSheet;
-import jxl.write.WritableWorkbook;
-import jxl.write.WriteException;
-import jxl.write.biff.RowsExceededException;
 
 /**
  * Created by Administrator on 2017-5-22.
@@ -93,7 +86,6 @@ public class FileUtils {
             FileInputStream fis = new FileInputStream(path);
 
             // 获得pull解析器对象
-
             XmlPullParser parser = Xml.newPullParser();
             // 指定解析的文件和编码格式
             parser.setInput(fis, "utf-8");
@@ -140,80 +132,63 @@ public class FileUtils {
         saveXmlList(list);
     }
 
+    /**
+     * كتابة ملف Excel باستخدام Apache POI
+     */
     public static void writeFile(String fileName, List<String> data, boolean append) {
-        /*int index = fileName.lastIndexOf(File.separator);
-        Log.e("TEST", "index = " + index);
-        if (index != -1) {
-            File filePath = new File(fileName.substring(0, index));
-            Log.e("TEST", "filePath = " + filePath);
-            if (!filePath.exists()) {
-                filePath.mkdirs();
-            }
-        }
-
-        File file = new File(fileName);
+        Log.e("TEST", "进入写入文件路径");
+        Workbook workbook = null;
+        FileOutputStream fileOut = null;
+        
         try {
-            boolean created = file.createNewFile();
+            // إنشاء مصنف Excel جديد
+            workbook = new XSSFWorkbook();
+            Sheet sheet = workbook.createSheet("Sheet1");
+            
+            // كتابة العناوين في الصف الأول
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("EPC Data");
+            headerRow.createCell(1).setCellValue("TID Data");
+            headerRow.createCell(2).setCellValue("USER Data");
+            
+            // كتابة البيانات
+            for (int i = 0; i < data.size(); i++) {
+                int rowIndex = (i / 3) + 1;  // +1 لتجاوز صف العناوين
+                int colIndex = i % 3;
+                
+                Row row = sheet.getRow(rowIndex);
+                if (row == null) {
+                    row = sheet.createRow(rowIndex);
+                }
+                row.createCell(colIndex).setCellValue(data.get(i));
+            }
+            
+            // ضبط عرض الأعمدة
+            sheet.setColumnWidth(0, 20 * 256);
+            sheet.setColumnWidth(1, 20 * 256);
+            sheet.setColumnWidth(2, 20 * 256);
+            
+            // حفظ الملف
+            fileOut = new FileOutputStream(new File(fileName));
+            workbook.write(fileOut);
+            
+            Log.e("TEST", "تم كتابة ملف Excel بنجاح");
+            
         } catch (IOException e) {
             e.printStackTrace();
-        }
-        if (!file.exists()) {
-            try {
-                file.createNewFile();
-                Runtime runtime = Runtime.getRuntime();
-                runtime.exec("chmod 0666 " + file);
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
-        }
-        FileOutputStream fileOutputStream = null;
-        try {
-            Log.e("TEST", "文件路径");
-            // Log.e("TEST", "data.size() = " + data.size());
-            fileOutputStream = new FileOutputStream(file, append);
-            *//*String epc = "epc data\t";
-            String tid = "tid data\t";
-            String user = "user data\t";
-            fileOutputStream.write(epc.getBytes());*//*
-            Log.e("TEST", "data.size() = " + data.size());
-            for (int i = 0; i < data.size(); i++) {
-                String datas = data.get(i);
-                Label label1 = new Label(i%3, i/3 + 1, data.get(i));
-                fileOutputStream.write(label1.getBytes());
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(TAG, "خطأ في كتابة ملف Excel: " + e.getMessage());
         } finally {
             try {
-                fileOutputStream.flush();
-                fileOutputStream.close();
-            } catch (Exception e) {
-            }
-        }*/
-        Log.e("TEST", "进入写入文件路径");
-        try {
-            WritableWorkbook workbook = Workbook.createWorkbook(new File(fileName));
-            WritableSheet sheet = workbook.createSheet("Sheet1", 0);
-            for (int i = 0; i < data.size(); i++) {
-                if (i == 0) {
-                    Label label = new Label(0, 0, "EPC Data");
-                    sheet.addCell(label);
-                    Label label1 = new Label(1, 0, "TID Data");
-                    sheet.addCell(label1);
-                    Label label2 = new Label(2, 0, "USER Data");
-                    sheet.addCell(label2);
+                if (fileOut != null) {
+                    fileOut.flush();
+                    fileOut.close();
                 }
-                Label label = new Label(i%3, i/3+1, data.get(i));
-                sheet.addCell(label);
+                if (workbook != null) {
+                    workbook.close();
+                }
+            } catch (IOException e) {
+                Log.e(TAG, "خطأ في إغلاق الملف: " + e.getMessage());
             }
-            workbook.write();
-            workbook.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (RowsExceededException e) {
-            e.printStackTrace();
-        } catch (WriteException e) {
-            e.printStackTrace();
         }
     }
 
@@ -281,9 +256,6 @@ public class FileUtils {
                             return o1.getName().compareTo(o2.getName());
                         }
                     });
-//                    for (int k=0;k<fileList.size();k++) {
-//                        LogUtils.d(TAG, "files.name="+fileList.get(k).getName());
-//                    }
                     int c = files.length - 20;
                     for (int k = 0; k < c; k++) {
                         Log.i(TAG, "删除文件 files.name=" + fileList.get(k).getName());
