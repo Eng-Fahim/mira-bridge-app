@@ -19,6 +19,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;  // ✅ أضف هذا
 
 import com.example.uhf.BuildConfig;
 import com.example.uhf.R;
@@ -39,8 +40,9 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     private static final String TAG = "BaseTabFragmentActivity";
     
     public RFIDWithUHFUART mReader;
-    public KeyDwonFragment currentFragment = null;
+    public Fragment currentFragment = null;  // ✅ تغير من KeyDwonFragment إلى Fragment
     public int TidLen = 6;
+
     
     private static final int MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE = 1;
     private static final int RFID_INIT_TIMEOUT_MS = 10000; // 10 ثواني
