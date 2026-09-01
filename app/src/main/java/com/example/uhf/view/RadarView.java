@@ -11,7 +11,8 @@ import android.widget.ImageView;
 import androidx.constraintlayout.widget.ConstraintLayout;
 
 import com.example.uhf.R;
-import com.lidroid.xutils.util.LogUtils;
+// ❌ حذف استيراد xUtils
+// import com.lidroid.xutils.util.LogUtils;
 import com.rscja.deviceapi.entity.RadarLocationEntity;
 
 import java.util.List;
@@ -21,6 +22,8 @@ import java.util.List;
  * 宽高始终相等且取宽高中的最小值
  */
 public class RadarView extends ConstraintLayout {
+
+    private static final String TAG = "RadarView"; // ✅ إضافة TAG للتصحيح
 
     private RadarBackgroundView radarBackgroundView;
     private RadarPanelView radarPanelView;
@@ -47,6 +50,7 @@ public class RadarView extends ConstraintLayout {
     public void setBorderColor(int color) {
         this.radarBorderColor = color;
         invalidate();
+        Log.d(TAG, "setBorderColor: " + color); // ✅ استخدام Log بدلاً من LogUtils
     }
 
     // ✅ داخل الكلاس
@@ -59,31 +63,38 @@ public class RadarView extends ConstraintLayout {
             throw new IllegalArgumentException("Use @RADAR_DIRECTION constants only!");
         }
         this.radarBackgroundView.setDirection(direction);
+        Log.d(TAG, "setDirection: " + direction); // ✅ استخدام Log
     }
 
     public void setStartAngle(RadarBackgroundView.StartAngle startAngle) {
         this.radarBackgroundView.setStartAngle(startAngle);
         this.radarBackgroundView.invalidate();
+        Log.d(TAG, "setStartAngle: " + startAngle); // ✅ استخدام Log
     }
 
     public void startRadar() {
         this.radarBackgroundView.start();
+        Log.d(TAG, "startRadar"); // ✅ استخدام Log
     }
 
     public void stopRadar() {
         this.radarBackgroundView.stop();
+        Log.d(TAG, "stopRadar"); // ✅ استخدام Log
     }
 
     public void bindingData(List<RadarLocationEntity> TagList, String targetTag) {
         this.radarPanelView.bindingData(TagList, targetTag);
+        Log.d(TAG, "bindingData: " + (TagList != null ? TagList.size() : 0) + " items"); // ✅ استخدام Log
     }
 
     public void clearPanel() {
         this.radarPanelView.clearPanel();
+        Log.d(TAG, "clearPanel"); // ✅ استخدام Log
     }
 
     public void setRotation(int angle) {
         this.radarBackgroundView.setRotation(angle);
         this.radarPanelView.setRotation(angle);
+        Log.d(TAG, "setRotation: " + angle); // ✅ استخدام Log
     }
 }
