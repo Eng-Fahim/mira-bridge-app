@@ -52,7 +52,7 @@
     <!-- ==================== التطبيق ==================== -->
     <application
         android:allowBackup="true"
-        android:name="com.example.uhf.AppContext"
+        android:name="com.example.uhf.application.MiraApplication"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
