@@ -355,17 +355,19 @@ protected void onDestroy() {
         return false;
     }
 
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (isScanKey(keyCode)) {
-            if (event.getRepeatCount() == 0 && currentFragment != null) {
-                currentFragment.myOnKeyDwon();
+   @Override
+public boolean onKeyDown(int keyCode, KeyEvent event) {
+    if (isScanKey(keyCode)) {
+        if (event.getRepeatCount() == 0 && currentFragment != null) {
+            // ✅ تحقق من النوع أولاً
+            if (currentFragment instanceof KeyDwonFragment) {
+                ((KeyDwonFragment) currentFragment).myOnKeyDwon();
             }
-            return true;
         }
-        return super.onKeyDown(keyCode, event);
+        return true;
     }
-
+    return super.onKeyDown(keyCode, event);
+}
     // ==================== MENU ====================
 
     @Override
