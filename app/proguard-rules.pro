@@ -164,3 +164,18 @@
 -dontwarn java.nio.file.**
 -dontwarn sun.misc.**
 -dontwarn javax.annotation.**
+
+# ==================== حل مشكلة R8 ====================
+-dontcompress
+-dontwarn org.apache.poi.**
+-dontwarn org.openxmlformats.**
+-dontwarn org.apache.xmlbeans.**
+
+-keep class org.apache.poi.** { *; }
+-keep class org.openxmlformats.** { *; }
+-keep class org.apache.xmlbeans.** { *; }
+
+# تجاهل أخطاء الموارد
+-keepclassmembers class * {
+    *** *();
+}
