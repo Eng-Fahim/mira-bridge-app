@@ -28,7 +28,10 @@ android {
         }
         
         resConfigs "en", "ar"
-        // ✅ تم حذف ndk.abiFilters
+        
+        ndk {
+            abiFilters "arm64-v8a"
+        }
     }
 
     signingConfigs {
@@ -99,15 +102,6 @@ android {
             excludes += ['/META-INF/versions/**']
         }
     }
-    
-    splits {
-        abi {
-            enable true
-            reset()
-            include "armeabi-v7a", "arm64-v8a"
-            universalApk false
-        }
-    }
 }
 
 dependencies {
@@ -165,4 +159,17 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
     androidTestImplementation 'androidx.test:runner:1.6.2'
     androidTestImplementation 'androidx.test:rules:1.6.1'
+}
+
+// ==================== تخصيص اسم ملف APK ====================
+android.applicationVariants.all { variant ->
+    variant.outputs.all { output ->
+        def versionName = variant.versionName
+        def buildType = variant.buildType.name
+        
+        // ✅ اسم مخصص للملف
+        def apkName = "MIRA_ID_Smart_Jewelry_Tag_v${versionName}_${buildType}.apk"
+        
+        output.outputFileName = apkName
+    }
 }
