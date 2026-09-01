@@ -49,12 +49,12 @@ android {
     }
 
     buildTypes {
-        release {
-            signingConfig signingConfigs.release
-            
-            // تفعيل التصغير والتحسين
-            minifyEnabled true
-            shrinkResources true
+    release {
+        signingConfig signingConfigs.release
+        
+        // تعطيل التصغير مؤقتاً لحل مشكلة R8
+        minifyEnabled false
+        shrinkResources false
             
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             
