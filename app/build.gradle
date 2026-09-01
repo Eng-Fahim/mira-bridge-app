@@ -28,6 +28,10 @@ android {
         }
         
         resConfigs "en", "ar"
+        
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a"
+        }
     }
 
     signingConfigs {
@@ -49,8 +53,8 @@ android {
         release {
             signingConfig signingConfigs.release
             
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled false
+            shrinkResources false
             
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             
@@ -58,18 +62,6 @@ android {
             
             zipAlignEnabled true
             debuggable false
-            jniDebuggable false
-            renderscriptDebuggable false
-            
-            packagingOptions {
-                exclude 'META-INF/DEPENDENCIES'
-                exclude 'META-INF/LICENSE'
-                exclude 'META-INF/LICENSE.txt'
-                exclude 'META-INF/NOTICE'
-                exclude 'META-INF/NOTICE.txt'
-                exclude 'META-INF/INDEX.LIST'
-                exclude 'META-INF/*.kotlin_module'
-            }
         }
         
         debug {
@@ -80,9 +72,6 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             
             buildConfigField "boolean", "ENABLE_LOGGING", "true"
-            
-            ext.alwaysUpdateBuildId = false
-            ext.enableCrashlytics = false
         }
     }
 
@@ -101,7 +90,6 @@ android {
         checkReleaseBuilds false
         abortOnError false
         warningsAsErrors false
-        disable 'TypographyFractions', 'TypographyQuotes'
     }
     
     packagingOptions {
@@ -111,7 +99,16 @@ android {
             excludes += ['/META-INF/LICENSE*']
             excludes += ['/META-INF/NOTICE*']
             excludes += ['/META-INF/INDEX.LIST']
-            merges += ['/META-INF/services/*']
+            excludes += ['/META-INF/versions/**']
+        }
+    }
+    
+    splits {
+        abi {
+            enable true
+            reset()
+            include "armeabi-v7a", "arm64-v8a"
+            universalApk false
         }
     }
 }
@@ -171,33 +168,4 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
     androidTestImplementation 'androidx.test:runner:1.6.2'
     androidTestImplementation 'androidx.test:rules:1.6.1'
-}
-
-configurations.all {
-    resolutionStrategy {
-        force 'androidx.core:core:1.13.1'
-        force 'androidx.appcompat:appcompat:1.7.0'
-        force 'com.google.code.gson:gson:2.11.0'
-        force 'com.squareup.okhttp3:okhttp:4.12.0'
-    }
-}
-
-task printApkSize {
-    doLast {
-        def apkDir = file("${buildDir}/outputs/apk/release")
-        if (apkDir.exists()) {
-            apkDir.eachFile { file ->
-                if (file.name.endsWith('.apk')) {
-                    println "📦 APK: ${file.name}"
-                    println "📊 Size: ${(file.size() / (1024 * 1024)).round(2)} MB"
-                }
-            }
-        }
-    }
-}
-
-tasks.whenTaskAdded { task ->
-    if (task.name == 'assembleRelease') {
-        task.finalizedBy printApkSize
-    }
 }
