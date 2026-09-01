@@ -7,6 +7,7 @@ import androidx.multidex.MultiDex;
 import androidx.room.Room;
 
 import com.example.uhf.AppContext;
+import com.example.uhf.BuildConfig;  // ⬅️ أضف هذا السطر
 import com.example.uhf.database.InventoryDatabase;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
@@ -104,7 +105,6 @@ public class MiraApplication extends AppContext {
     public void onTerminate() {
         super.onTerminate();
         
-        // إغلاق قاعدة البيانات عند إنهاء التطبيق
         if (inventoryDatabase != null) {
             try {
                 inventoryDatabase.close();
