@@ -68,6 +68,7 @@ import com.example.uhf.fragment.MiraRfidBindingsFragment;
 import com.example.uhf.fragment.MiraBranchesManagementFragment;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.tools.MiraLanguageHelper;
+import com.example.uhf.tools.MemoryManager;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.ToastUtil;
 import com.google.android.material.appbar.MaterialToolbar;
@@ -208,6 +209,9 @@ private void updateToolbarTitle() {
                 navigateToLogin();
                 return;
             }
+            // ✅ تسجيل النشاط في MemoryManager
+            MemoryManager.getInstance().registerActivity(this);
+            registerComponentCallbacks(MemoryManager.getInstance());
             // في onCreate بعد التحقق من الجلسة
             SessionMonitorManager.getInstance(this).startMonitoring(this);
 
@@ -1134,6 +1138,10 @@ private void updateToolbarTitle() {
         } catch (Exception e) {
             Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
         }
+        // ✅ إلغاء التسجيل والتنظيف
+MemoryManager.getInstance().unregisterActivity(this);
+unregisterComponentCallbacks(MemoryManager.getInstance());
+MemoryManager.getInstance().forceCleanup();
         super.onDestroy();
     }
 
