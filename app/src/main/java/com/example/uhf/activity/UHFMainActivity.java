@@ -248,13 +248,12 @@ private void updateToolbarTitle() {
 
             // 🟢 إصلاح التحميل المزدوج والواجهة الفارغة
             if (savedInstanceState == null) {
-                currentFragmentTag = getSavedFragmentTag();
-                View container = findViewById(R.id.fragment_container);
-                if (container != null) {
-                    container.post(() -> loadFragmentByTag(currentFragmentTag));
-                } else {
-                    loadFragmentByTag(currentFragmentTag);
-                }
+    currentFragmentTag = getSavedFragmentTag();
+    mainHandler.postDelayed(() -> {
+        if (!isFinishing() && !isDestroyed()) {
+            loadFragmentByTag(currentFragmentTag);
+        }
+    }, 500); // ✅ 500ms تأخير
             } else {
                 currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
                 currentFragment = fragmentManager.findFragmentByTag(currentFragmentTag);
@@ -678,31 +677,52 @@ private void updateToolbarTitle() {
     }
 
     private void loadFragmentByTag(String tag) {
-        try {
-            PermissionManager pm = PermissionManager.getInstance(this);
-            if (!pm.canAccessFragment(tag)) {
-                tag = "Dashboard";
-            }
+    try {
+        // ✅ تشخيص
+        Toast.makeText(this, "Loading: " + tag, Toast.LENGTH_SHORT).show();
+        
+        PermissionManager pm = PermissionManager.getInstance(this);
+        
+        if ("Dashboard".equals(tag) && !pm.canAccessFragment(tag)) {
+            Log.w(TAG, "⚠️ Dashboard permission denied - forcing load");
+            Fragment fragment = new MiraDashboardFragment();
+            currentFragment = fragment;
+            currentFragmentTag = "Dashboard";
             
-            Fragment fragment = createFragmentByTag(tag);
-            if (fragment != null) {
-                currentFragment = fragment;
-                currentFragmentTag = tag;
-                
-                FragmentTransaction transaction = fragmentManager.beginTransaction()
-                        .replace(R.id.fragment_container, fragment, tag);
-                
-                transaction.commitAllowingStateLoss();
-            } else {
-                loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Load fragment by tag error: " + e.getMessage(), e);
-            try {
-                loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-            } catch (Exception ignored) {}
+            FragmentTransaction transaction = fragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container, fragment, "Dashboard");
+            transaction.commitAllowingStateLoss();
+            
+            Toast.makeText(this, "✅ Dashboard forced", Toast.LENGTH_SHORT).show();
+            return;
         }
+        
+        if (!pm.canAccessFragment(tag)) {
+            tag = "Dashboard";
+        }
+        
+        Fragment fragment = createFragmentByTag(tag);
+        if (fragment != null) {
+            currentFragment = fragment;
+            currentFragmentTag = tag;
+            
+            FragmentTransaction transaction = fragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container, fragment, tag);
+            transaction.commitAllowingStateLoss();
+            
+            Toast.makeText(this, "✅ Fragment: " + tag, Toast.LENGTH_SHORT).show();
+        } else {
+            Log.e(TAG, "❌ Failed to create fragment: " + tag);
+            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Load fragment by tag error: " + e.getMessage(), e);
+        Toast.makeText(this, "❌ Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        try {
+            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+        } catch (Exception ignored) {}
     }
+}
 
     private Fragment createFragmentByTag(String tag) {
         if (tag == null) return new MiraDashboardFragment();
@@ -1181,4 +1201,4 @@ MemoryManager.getInstance().forceCleanup();
             }
         }
     }
-    }
+}
