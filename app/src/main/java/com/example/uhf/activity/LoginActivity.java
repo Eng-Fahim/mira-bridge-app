@@ -40,6 +40,7 @@ import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.manager.MiraServerConfig;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SessionManager;
+import com.example.uhf.tools.MemoryManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.textfield.TextInputEditText;
@@ -116,6 +117,9 @@ public class LoginActivity extends AppCompatActivity {
         );
         
         isDestroyed.set(false);
+        // ✅ تسجيل النشاط في MemoryManager
+        MemoryManager.getInstance().registerActivity(this);
+        registerComponentCallbacks(MemoryManager.getInstance());
         
         // ✅ 2. تهيئة الواجهة
         setContentView(R.layout.activity_login);
@@ -1166,6 +1170,10 @@ private void navigateToMainWithAnimation() {
 
     @Override
     protected void onDestroy() {
+    // ✅ إلغاء التسجيل والتنظيف
+MemoryManager.getInstance().unregisterActivity(this);
+unregisterComponentCallbacks(MemoryManager.getInstance());
+MemoryManager.getInstance().forceCleanup();
         super.onDestroy();
         isDestroyed.set(true);
         
