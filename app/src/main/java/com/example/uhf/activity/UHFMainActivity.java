@@ -193,79 +193,79 @@ private void updateToolbarTitle() {
         Log.e(TAG, "Toolbar Update Error: " + e.getMessage());
     }
 }
+
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        try {
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-            String savedLang = MiraLanguageHelper.getSavedLanguage(this);
-            MiraLanguageHelper.applyLanguage(this, savedLang);
-            super.onCreate(savedInstanceState);
+protected void onCreate(Bundle savedInstanceState) {
+    // ✅ أولاً: تحميل الواجهة
+    setContentView(R.layout.activity_main);
+    
+    // ✅ ثانياً: استدعاء super
+    super.onCreate(savedInstanceState);
+    
+    // ✅ ثالثاً: باقي الكود
+    try {
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        String savedLang = MiraLanguageHelper.getSavedLanguage(this);
+        MiraLanguageHelper.applyLanguage(this, savedLang);
 
-            ToastUtil.init(getApplicationContext());
-            initializeLanguageState();
+        ToastUtil.init(getApplicationContext());
+        initializeLanguageState();
 
-            sessionManager = new SessionManager(this);
-            if (!sessionManager.isLoggedIn()) {
-                navigateToLogin();
-                return;
-            }
-            // ✅ تسجيل النشاط في MemoryManager
-            MemoryManager.getInstance().registerActivity(this);
-            registerComponentCallbacks(MemoryManager.getInstance());
-            // في onCreate بعد التحقق من الجلسة
-            SessionMonitorManager.getInstance(this).startMonitoring(this);
+        sessionManager = new SessionManager(this);
+        if (!sessionManager.isLoggedIn()) {
+            navigateToLogin();
+            return;
+        }
+        
+        MemoryManager.getInstance().registerActivity(this);
+        registerComponentCallbacks(MemoryManager.getInstance());
+        SessionMonitorManager.getInstance(this).startMonitoring(this);
 
-            branchesManager = MiraBranchesManager.getInstance(this);
-            if (branchesManager != null) {
-                lastActiveBranchId = branchesManager.getActiveBranchId();
-            }
+        branchesManager = MiraBranchesManager.getInstance(this);
+        if (branchesManager != null) {
+            lastActiveBranchId = branchesManager.getActiveBranchId();
+        }
 
-            setContentView(R.layout.activity_main);
-            loadingOverlay = findViewById(R.id.loading_overlay);
-            fragmentManager = getSupportFragmentManager();
+        loadingOverlay = findViewById(R.id.loading_overlay);
+        fragmentManager = getSupportFragmentManager();
 
-            setupOrgProfileListener();
-            updateBottomNavLanguage();
+        setupOrgProfileListener();
+        updateBottomNavLanguage();
 
-            MaterialToolbar toolbar = findViewById(R.id.toolbar);
-            if (toolbar != null) {
-                setSupportActionBar(toolbar);
-                updateToolbarTitle();
-            }
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            setSupportActionBar(toolbar);
+            updateToolbarTitle();
+        }
 
-            View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
-            if (btnHardwareStatus != null) {
-                btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
-            }
+        View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
+        if (btnHardwareStatus != null) {
+            btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
+        }
 
-            checkReadWritePermission();
+        checkReadWritePermission();
 
-            safeExecute(this::initSound, "Sound Init Error");
-            safeExecute(this::initUHF, "UHF Hardware Init Error");
-            safeExecute(this::configureReaderForDevice, "Reader Configuration Error");
+        safeExecute(this::initSound, "Sound Init Error");
+        safeExecute(this::initUHF, "UHF Hardware Init Error");
+        safeExecute(this::configureReaderForDevice, "Reader Configuration Error");
 
-            setupQuickNav();
+        setupQuickNav();
 
-            // 🟢 إصلاح التحميل المزدوج والواجهة الفارغة
-            if (savedInstanceState == null) {
-    currentFragmentTag = getSavedFragmentTag();
-    mainHandler.postDelayed(() -> {
-        if (!isFinishing() && !isDestroyed()) {
+        if (savedInstanceState == null) {
+            currentFragmentTag = getSavedFragmentTag();
             loadFragmentByTag(currentFragmentTag);
-        }
-    }, 500); // ✅ 500ms تأخير
-            } else {
-                currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
-                currentFragment = fragmentManager.findFragmentByTag(currentFragmentTag);
-                if (currentFragment == null) {
-                    loadFragmentByTag(currentFragmentTag);
-                }
+        } else {
+            currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
+            currentFragment = fragmentManager.findFragmentByTag(currentFragmentTag);
+            if (currentFragment == null) {
+                loadFragmentByTag(currentFragmentTag);
             }
-
-        } catch (Exception e) {
-            Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
         }
+
+    } catch (Exception e) {
+        Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
     }
+}
 
     @Override
     protected void onResume() {
