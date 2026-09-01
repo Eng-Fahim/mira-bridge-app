@@ -97,7 +97,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private FrameLayout loadingOverlay;
     private FragmentManager fragmentManager;
-    public Fragment currentFragment;
+    
     private MiraPosFragment activePOSFragment = null;
     private MiraIdentityStudioFragment activeEncodingFragment;
     private OnRfidScannedListener activeRfidListener;
