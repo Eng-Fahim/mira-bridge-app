@@ -82,7 +82,7 @@ protected void onDestroy() {
     shutdownExecutorSafely();
     freeReaderSafely();
     
-    // ❌ احذف هذا السطر - يزيل مهام UHFMainActivity
+    // ❌ احذف هذا السطر
     // mainHandler.removeCallbacksAndMessages(null);
     
     MemoryManager.getInstance().unregisterActivity(this);
