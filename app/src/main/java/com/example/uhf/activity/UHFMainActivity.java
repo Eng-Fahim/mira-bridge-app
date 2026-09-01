@@ -199,10 +199,7 @@ protected void onCreate(Bundle savedInstanceState) {
     // ✅ أولاً: تحميل الواجهة
     setContentView(R.layout.activity_main);
     // ✅ عرض شاشة النجاح
-String welcomeName = getIntent().getStringExtra("welcome_name");
-if (welcomeName != null && !welcomeName.isEmpty()) {
-    showWelcomeOverlay(welcomeName);
-}
+
     // ✅ ثانياً: استدعاء super
     super.onCreate(savedInstanceState);
     
@@ -1149,7 +1146,7 @@ if (welcomeName != null && !welcomeName.isEmpty()) {
 /**
  * ✅ عرض شاشة الترحيب
  */
-private void showWelcomeOverlay(String displayName) {
+/*private void showWelcomeOverlay(String displayName) {
     View successOverlay = findViewById(R.id.successOverlayMain);
     TextView tvSuccessMessage = findViewById(R.id.tvSuccessMessageMain);
     
@@ -1176,6 +1173,7 @@ private void showWelcomeOverlay(String displayName) {
         }, 1500);
     }
 }
+*/
     @Override
     protected void onDestroy() {
         try {
