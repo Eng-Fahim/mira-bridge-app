@@ -150,7 +150,9 @@ dependencies {
     // implementation files('libs/jxl.jar')
     
     // ==================== Excel (Apache POI الحديث) ====================
+    // ==================== Excel (Apache POI الحديث) ====================
     implementation 'org.apache.poi:poi:5.2.5'
+    implementation 'org.apache.poi:poi-ooxml:5.2.5'
     
     // ==================== الشبكة ====================
     implementation 'com.squareup.retrofit2:retrofit:2.11.0'
