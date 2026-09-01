@@ -863,7 +863,7 @@ public class LoginActivity extends AppCompatActivity {
         });
     }
 
-    private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
+   private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
     playTone(true);
 
     String token = response.optString("token", "");
@@ -917,12 +917,13 @@ public class LoginActivity extends AppCompatActivity {
     bm.setActiveBranch(branchId, branchName, branchCode, "", "");
     bm.setUserBranchLocked(true);
 
-    // ✅ انتقل مباشرة - بدون شاشة النجاح وبدون تأخير
-    Toast.makeText(this, 
-        (isArabic ? "أهلاً بك " : "Welcome ") + displayName + " 👋", 
-        Toast.LENGTH_SHORT).show();
-    
-    navigateToMain();
+    // ✅ انتقل مباشرة مع تمرير اسم المستخدم
+    Intent intent = new Intent(this, UHFMainActivity.class);
+    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+    intent.putExtra("fresh_start", true);
+    intent.putExtra("welcome_name", displayName);
+    startActivity(intent);
+    finish();
 }
 
 /**
@@ -1171,4 +1172,4 @@ MemoryManager.getInstance().forceCleanup();
         
         mainHandler.removeCallbacksAndMessages(null);
     }
-}
+                                       }
