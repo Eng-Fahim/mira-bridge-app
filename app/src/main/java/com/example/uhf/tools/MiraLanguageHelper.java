@@ -3,6 +3,8 @@ package com.example.uhf.tools;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.content.res.Resources;
+import android.os.Build;
 import android.view.View;
 
 import androidx.appcompat.app.AppCompatDelegate;
@@ -39,24 +41,36 @@ public class MiraLanguageHelper {
     }
 
     /**
-     * تطبيق اللغة على التطبيق
+     * تطبيق اللغة وتحديث Context (إرجاع Context جديد لـ attachBaseContext)
      */
-    public static void applyLanguage(Context context, String languageCode) {
+    public static Context applyLanguage(Context context, String languageCode) {
         saveLanguage(context, languageCode);
-        
+
         Locale locale = new Locale(languageCode);
         Locale.setDefault(locale);
-        
-        Configuration config = new Configuration(context.getResources().getConfiguration());
-        config.setLocale(locale);
-        config.setLayoutDirection(locale);
-        
-        context.getResources().updateConfiguration(config, context.getResources().getDisplayMetrics());
-        
+
+        Resources resources = context.getResources();
+        Configuration config = new Configuration(resources.getConfiguration());
+
         // تطبيق على AppCompatDelegate
-        AppCompatDelegate.setApplicationLocales(
-            LocaleListCompat.forLanguageTags(languageCode)
-        );
+        try {
+            AppCompatDelegate.setApplicationLocales(
+                LocaleListCompat.forLanguageTags(languageCode)
+            );
+        } catch (Exception ignored) {}
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            config.setLocale(locale);
+            config.setLayoutDirection(locale);
+            return context.createConfigurationContext(config);
+        } else {
+            config.locale = locale;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                config.setLayoutDirection(locale);
+            }
+            resources.updateConfiguration(config, resources.getDisplayMetrics());
+            return context;
+        }
     }
 
     /**
