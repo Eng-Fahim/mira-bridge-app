@@ -3,7 +3,9 @@
 
     <color name="brand_primary">#9E8033</color>
     <color name="brand_primary_dark">#7A6123</color>
-    
+     <!-- ألوان الحالة المتصلة والمنفصلة -->
+    <color name="status_online_green">#4CAF50</color>
+    <color name="status_offline_red">#F44336</color>
     <!-- خلفية القائمة السفلية وخلفية الحاويات -->
     <color name="nav_bar_background">#FFFFFF</color>
     <color name="nav_item_selected">#9E8033</color>
