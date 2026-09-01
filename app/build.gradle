@@ -1,6 +1,5 @@
 plugins {
     id 'com.android.application'
-    // إضافة إضافات خدمات جوجل وكراشليتكس
     id 'com.google.gms.google-services'
     id 'com.google.firebase.crashlytics'
 }
@@ -19,6 +18,7 @@ android {
         // دعم التطبيقات الكبيرة
         multiDexEnabled true
         
+        // إعدادات البناء
         buildConfigField "boolean", "Test", "false"
         buildConfigField "boolean", "ENABLE_LOGGING", "false"
         buildConfigField "String", "DEFAULT_SERVER_URL", '"https://sa.mirabarcode.com/wp-json"'
@@ -28,6 +28,9 @@ android {
         vectorDrawables {
             useSupportLibrary true
         }
+        
+        // دعم الشاشات المختلفة
+        resConfigs "en", "ar"
     }
 
     signingConfigs {
@@ -46,20 +49,49 @@ android {
     }
 
     buildTypes {
-    release {
-        signingConfig signingConfigs.release
-        minifyEnabled false
-        shrinkResources false
-        proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        buildConfigField "boolean", "ENABLE_LOGGING", "false"
+        release {
+            signingConfig signingConfigs.release
+            
+            // تفعيل التصغير والتحسين
+            minifyEnabled true
+            shrinkResources true
+            
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            
+            buildConfigField "boolean", "ENABLE_LOGGING", "false"
+            
+            // تحسينات إضافية
+            zipAlignEnabled true
+            debuggable false
+            jniDebuggable false
+            renderscriptDebuggable false
+            
+            // إزالة الملفات غير الضرورية
+            packagingOptions {
+                exclude 'META-INF/DEPENDENCIES'
+                exclude 'META-INF/LICENSE'
+                exclude 'META-INF/LICENSE.txt'
+                exclude 'META-INF/NOTICE'
+                exclude 'META-INF/NOTICE.txt'
+                exclude 'META-INF/INDEX.LIST'
+                exclude 'META-INF/*.kotlin_module'
+            }
+        }
+        
+        debug {
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+            shrinkResources false
+            
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            
+            buildConfigField "boolean", "ENABLE_LOGGING", "true"
+            
+            // تسريع البناء للتطوير
+            ext.alwaysUpdateBuildId = false
+            ext.enableCrashlytics = false
+        }
     }
-    debug {
-        signingConfig signingConfigs.debug
-        minifyEnabled false
-        proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-        buildConfigField "boolean", "ENABLE_LOGGING", "true"
-    }
-}
 
     buildFeatures {
         viewBinding true
@@ -69,68 +101,134 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
     }
 
     lintOptions {
         checkReleaseBuilds false
         abortOnError false
+        warningsAsErrors false
+        disable 'TypographyFractions', 'TypographyQuotes'
     }
     
     packagingOptions {
         resources {
             excludes += ['/META-INF/{AL2.0,LGPL2.1}']
+            excludes += ['/META-INF/DEPENDENCIES']
+            excludes += ['/META-INF/LICENSE*']
+            excludes += ['/META-INF/NOTICE*']
+            excludes += ['/META-INF/INDEX.LIST']
+            merges += ['/META-INF/services/*']
         }
+    }
+    
+    // تحسينات البناء
+    dexOptions {
+        javaMaxHeapSize "4g"
+        preDexLibraries true
+        maxProcessCount 8
     }
 }
 
 dependencies {
-    // Firebase BoM لإدارة إصدارات المكونات تلقائياً
-    implementation platform('com.google.firebase:firebase-bom:32.8.0')
+    // ==================== Firebase ====================
+    implementation platform('com.google.firebase:firebase-bom:33.1.0')
     implementation 'com.google.firebase:firebase-crashlytics'
     implementation 'com.google.firebase:firebase-analytics'
-
-    implementation 'androidx.biometric:biometric:1.1.0'
-    implementation fileTree(dir: 'libs', include: ['*.*'])
-    implementation files('libs/jxl.jar')
-    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    
+    // ==================== AndroidX الأساسية ====================
+    implementation 'androidx.core:core:1.13.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-    testImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
-    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
-    implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
-    implementation 'com.google.mlkit:barcode-scanning:17.2.0'
-
-    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
-    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
-    implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    implementation 'androidx.gridlayout:gridlayout:1.0.0'
+    implementation 'androidx.preference:preference:1.2.1'
+    implementation 'androidx.multidex:multidex:2.0.1'
+    
+    // ==================== المصادقة البيومترية ====================
+    implementation 'androidx.biometric:biometric:1.1.0'
+    
+    // ==================== مكتبات الجهاز ====================
+    implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+    implementation files('libs/jxl.jar')
+    
+    // ==================== الشبكة ====================
+    implementation 'com.squareup.retrofit2:retrofit:2.11.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.11.0'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+    implementation 'com.google.code.gson:gson:2.11.0'
     
+    // ==================== CameraX ====================
     def camerax_version = "1.3.4"
     implementation "androidx.camera:camera-core:${camerax_version}"
     implementation "androidx.camera:camera-camera2:${camerax_version}"
     implementation "androidx.camera:camera-lifecycle:${camerax_version}"
     implementation "androidx.camera:camera-view:${camerax_version}"
-    implementation 'androidx.gridlayout:gridlayout:1.0.0'
-    implementation 'androidx.preference:preference:1.2.1'
     
-    // التشفير الآمن
-    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+    // ==================== QR Code / Barcode ====================
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+    implementation 'com.google.mlkit:barcode-scanning:17.3.0'
     
+    // ==================== الرسوم البيانية ====================
+    implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
+    
+    // ==================== تحميل الصور ====================
     implementation 'com.github.bumptech.glide:glide:4.16.0'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
     
-    // Room Database
+    // ==================== قاعدة البيانات ====================
     implementation "androidx.room:room-runtime:2.6.1"
     annotationProcessor "androidx.room:room-compiler:2.6.1"
     
-    // Coroutines للتحول المستقبلي
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    // ==================== الأمان ====================
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
     
-    // اختبارات إضافية
-    androidTestImplementation 'androidx.test:runner:1.6.1'
+    // ==================== Coroutines ====================
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
+    
+    // ==================== Desugaring ====================
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+    
+    // ==================== الاختبارات ====================
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
     androidTestImplementation 'androidx.test:rules:1.6.1'
+}
+
+// ==================== إعدادات إضافية ====================
+configurations.all {
+    resolutionStrategy {
+        // إجبار استخدام إصدارات محددة لتجنب التعارض
+        force 'androidx.core:core:1.13.1'
+        force 'androidx.appcompat:appcompat:1.7.0'
+        force 'com.google.code.gson:gson:2.11.0'
+        force 'com.squareup.okhttp3:okhttp:4.12.0'
+    }
+}
+
+// ==================== مهام مخصصة ====================
+// مهمة لطباعة حجم APK بعد البناء
+task printApkSize {
+    doLast {
+        def apkDir = file("${buildDir}/outputs/apk/release")
+        if (apkDir.exists()) {
+            apkDir.eachFile { file ->
+                if (file.name.endsWith('.apk')) {
+                    println "📦 APK: ${file.name}"
+                    println "📊 Size: ${(file.size() / (1024 * 1024)).round(2)} MB"
+                }
+            }
+        }
+    }
+}
+
+// ربط مهمة طباعة الحجم بعد البناء
+tasks.whenTaskAdded { task ->
+    if (task.name == 'assembleRelease') {
+        task.finalizedBy printApkSize
+    }
 }
