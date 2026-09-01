@@ -49,12 +49,13 @@
             </LinearLayout>
         </com.google.android.material.appbar.MaterialToolbar>
 
-        <!-- حاوية المحتوى -->
+        <!-- حاوية المحتوى - مع layerType software لمنع الوميض -->
         <FrameLayout
             android:id="@+id/fragment_container"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:layerType="software" />
 
         <!-- الشريط السفلي -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
@@ -136,7 +137,7 @@
         </com.google.android.material.card.MaterialCardView>
     </FrameLayout>
 
-    <!-- ✅ شاشة النجاح - فوق كل شيء -->
+    <!-- شاشة النجاح -->
     <LinearLayout
         android:id="@+id/successOverlayMain"
         android:layout_width="match_parent"
