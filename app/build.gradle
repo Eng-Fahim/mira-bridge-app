@@ -121,13 +121,6 @@ android {
             merges += ['/META-INF/services/*']
         }
     }
-    
-    // تحسينات البناء
-    dexOptions {
-        javaMaxHeapSize "4g"
-        preDexLibraries true
-        maxProcessCount 8
-    }
 }
 
 dependencies {
@@ -150,8 +143,14 @@ dependencies {
     implementation 'androidx.biometric:biometric:1.1.0'
     
     // ==================== مكتبات الجهاز ====================
-    implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
-    implementation files('libs/jxl.jar')
+    // ✅ فقط ملفات AAR (مكتبة RFID)
+    implementation fileTree(dir: 'libs', include: ['*.aar'])
+    
+    // ❌ تم حذف jxl.jar نهائياً
+    // implementation files('libs/jxl.jar')
+    
+    // ==================== Excel (Apache POI الحديث) ====================
+    implementation 'org.apache.poi:poi:5.2.5'
     
     // ==================== الشبكة ====================
     implementation 'com.squareup.retrofit2:retrofit:2.11.0'
