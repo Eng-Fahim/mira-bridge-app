@@ -15,10 +15,8 @@ android {
         versionCode 3
         versionName "1.4.7"
         
-        // دعم التطبيقات الكبيرة
         multiDexEnabled true
         
-        // إعدادات البناء
         buildConfigField "boolean", "Test", "false"
         buildConfigField "boolean", "ENABLE_LOGGING", "false"
         buildConfigField "String", "DEFAULT_SERVER_URL", '"https://sa.mirabarcode.com/wp-json"'
@@ -29,7 +27,6 @@ android {
             useSupportLibrary true
         }
         
-        // دعم الشاشات المختلفة
         resConfigs "en", "ar"
     }
 
@@ -49,24 +46,21 @@ android {
     }
 
     buildTypes {
-    release {
-        signingConfig signingConfigs.release
-        
-        // تعطيل التصغير مؤقتاً لحل مشكلة R8
-        minifyEnabled false
-        shrinkResources false
+        release {
+            signingConfig signingConfigs.release
+            
+            minifyEnabled true
+            shrinkResources true
             
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             
             buildConfigField "boolean", "ENABLE_LOGGING", "false"
             
-            // تحسينات إضافية
             zipAlignEnabled true
             debuggable false
             jniDebuggable false
             renderscriptDebuggable false
             
-            // إزالة الملفات غير الضرورية
             packagingOptions {
                 exclude 'META-INF/DEPENDENCIES'
                 exclude 'META-INF/LICENSE'
@@ -87,7 +81,6 @@ android {
             
             buildConfigField "boolean", "ENABLE_LOGGING", "true"
             
-            // تسريع البناء للتطوير
             ext.alwaysUpdateBuildId = false
             ext.enableCrashlytics = false
         }
@@ -124,12 +117,10 @@ android {
 }
 
 dependencies {
-    // ==================== Firebase ====================
     implementation platform('com.google.firebase:firebase-bom:33.1.0')
     implementation 'com.google.firebase:firebase-crashlytics'
     implementation 'com.google.firebase:firebase-analytics'
     
-    // ==================== AndroidX الأساسية ====================
     implementation 'androidx.core:core:1.13.1'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'com.google.android.material:material:1.12.0'
@@ -139,60 +130,42 @@ dependencies {
     implementation 'androidx.preference:preference:1.2.1'
     implementation 'androidx.multidex:multidex:2.0.1'
     
-    // ==================== المصادقة البيومترية ====================
     implementation 'androidx.biometric:biometric:1.1.0'
     
-    // ==================== مكتبات الجهاز ====================
-    // ✅ فقط ملفات AAR (مكتبة RFID)
     implementation fileTree(dir: 'libs', include: ['*.aar'])
     
-    // ❌ تم حذف jxl.jar نهائياً
-    // implementation files('libs/jxl.jar')
-    
-    // ==================== Excel (Apache POI الحديث) ====================
-    // ==================== Excel (Apache POI الحديث) ====================
     implementation 'org.apache.poi:poi:5.2.5'
     implementation 'org.apache.poi:poi-ooxml:5.2.5'
     
-    // ==================== الشبكة ====================
     implementation 'com.squareup.retrofit2:retrofit:2.11.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.11.0'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
     implementation 'com.google.code.gson:gson:2.11.0'
     
-    // ==================== CameraX ====================
     def camerax_version = "1.3.4"
     implementation "androidx.camera:camera-core:${camerax_version}"
     implementation "androidx.camera:camera-camera2:${camerax_version}"
     implementation "androidx.camera:camera-lifecycle:${camerax_version}"
     implementation "androidx.camera:camera-view:${camerax_version}"
     
-    // ==================== QR Code / Barcode ====================
     implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
     implementation 'com.google.mlkit:barcode-scanning:17.3.0'
     
-    // ==================== الرسوم البيانية ====================
     implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
     
-    // ==================== تحميل الصور ====================
     implementation 'com.github.bumptech.glide:glide:4.16.0'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
     
-    // ==================== قاعدة البيانات ====================
     implementation "androidx.room:room-runtime:2.6.1"
     annotationProcessor "androidx.room:room-compiler:2.6.1"
     
-    // ==================== الأمان ====================
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
     
-    // ==================== Coroutines ====================
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
     
-    // ==================== Desugaring ====================
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
     
-    // ==================== الاختبارات ====================
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
@@ -200,10 +173,8 @@ dependencies {
     androidTestImplementation 'androidx.test:rules:1.6.1'
 }
 
-// ==================== إعدادات إضافية ====================
 configurations.all {
     resolutionStrategy {
-        // إجبار استخدام إصدارات محددة لتجنب التعارض
         force 'androidx.core:core:1.13.1'
         force 'androidx.appcompat:appcompat:1.7.0'
         force 'com.google.code.gson:gson:2.11.0'
@@ -211,8 +182,6 @@ configurations.all {
     }
 }
 
-// ==================== مهام مخصصة ====================
-// مهمة لطباعة حجم APK بعد البناء
 task printApkSize {
     doLast {
         def apkDir = file("${buildDir}/outputs/apk/release")
@@ -227,7 +196,6 @@ task printApkSize {
     }
 }
 
-// ربط مهمة طباعة الحجم بعد البناء
 tasks.whenTaskAdded { task ->
     if (task.name == 'assembleRelease') {
         task.finalizedBy printApkSize
