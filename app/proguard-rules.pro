@@ -139,20 +139,3 @@
     public static *** v(...);
     public static *** i(...);
 }
-
-# ==================== الحفاظ على الخطوط ====================
-# ✅ منع حذف ملفات الخطوط
--keep class androidx.core.content.res.ResourcesCompat { *; }
--keep class androidx.core.content.res.FontResourcesParserCompat { *; }
--dontwarn androidx.core.content.res.**
-
-# ✅ الحفاظ على Typeface
--keep class androidx.core.graphics.TypefaceCompat { *; }
--keep class androidx.core.graphics.TypefaceCompatBaseImpl { *; }
--keep class androidx.core.graphics.TypefaceApi26Impl { *; }
-
-# ✅ الحفاظ على ملفات الموارد (الخطوط)
--keepresources string/**
-
-# ✅ بديل: تعطيل حذف الموارد غير المستخدمة
-# إذا استمرت المشكلة، اجعل shrinkResources false في build.gradle
