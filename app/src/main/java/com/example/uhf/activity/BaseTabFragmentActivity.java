@@ -75,27 +75,21 @@ protected void onCreate(Bundle savedInstanceState) {
     }
 
     @Override
-    protected void onDestroy() {
-        isDestroyed.set(true);
-        
-        // ✅ إلغاء الحوار إذا كان معروضاً
-        dismissInitDialogSafely();
-        
-        // ✅ إيقاف ExecutorService
-        shutdownExecutorSafely();
-        
-        // ✅ تحرير القارئ
-        freeReaderSafely();
-        
-        // ✅ إزالة جميع المهام المؤجلة
-        mainHandler.removeCallbacksAndMessages(null);
-        MemoryManager.getInstance().unregisterActivity(this);
-    unregisterComponentCallbacks(MemoryManager.getInstance());
+protected void onDestroy() {
+    isDestroyed.set(true);
     
-    // ✅ تنظيف شامل
+    dismissInitDialogSafely();
+    shutdownExecutorSafely();
+    freeReaderSafely();
+    
+    // ❌ احذف هذا السطر - يزيل مهام UHFMainActivity
+    // mainHandler.removeCallbacksAndMessages(null);
+    
+    MemoryManager.getInstance().unregisterActivity(this);
+    unregisterComponentCallbacks(MemoryManager.getInstance());
     MemoryManager.getInstance().forceCleanup();
-        super.onDestroy();
-    }
+    super.onDestroy();
+}
 
     // ==================== PERMISSIONS ====================
 
