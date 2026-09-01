@@ -1,46 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
-    <!-- النسخ الاحتياطي السحابي -->
     <cloud-backup>
-        <!-- تضمين الإعدادات -->
         <include domain="sharedpref" path="."/>
-        
-        <!-- تضمين قاعدة البيانات -->
         <include domain="database" path="."/>
-        
-        <!-- تضمين الملفات المهمة -->
         <include domain="file" path="."/>
-        
-        <!-- تضمين التقارير والمستندات -->
-        <include domain="external" path="Documents/"/>
-        <include domain="external" path="Pictures/"/>
-        
-        <!-- استثناء الكاش والملفات المؤقتة -->
-        <exclude domain="file" path="cache"/>
-        <exclude domain="file" path="code_cache"/>
-        <exclude domain="external" path="exports/"/>
-        <exclude domain="cache" path="."/>
     </cloud-backup>
-    
-    <!-- نقل البيانات بين الأجهزة -->
     <device-transfer>
-        <!-- تضمين الإعدادات -->
         <include domain="sharedpref" path="."/>
-        
-        <!-- تضمين قاعدة البيانات -->
         <include domain="database" path="."/>
-        
-        <!-- تضمين الملفات المهمة -->
         <include domain="file" path="."/>
-        
-        <!-- تضمين التقارير والمستندات -->
-        <include domain="external" path="Documents/"/>
-        <include domain="external" path="Pictures/"/>
-        
-        <!-- استثناء الكاش والملفات المؤقتة -->
-        <exclude domain="file" path="cache"/>
-        <exclude domain="file" path="code_cache"/>
-        <exclude domain="external" path="exports/"/>
-        <exclude domain="cache" path="."/>
     </device-transfer>
 </data-extraction-rules>
