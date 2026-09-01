@@ -875,7 +875,6 @@ public class LoginActivity extends AppCompatActivity {
     String branchCode = response.optString("branch_code", "");
     String serverUrl = getText(etServerUrl);
     
-    // ✅ إذا كان الرابط فارغاً، استخدم المحفوظ
     if (serverUrl.isEmpty()) {
         serverUrl = sessionManager.getServerUrl();
     }
@@ -905,12 +904,9 @@ public class LoginActivity extends AppCompatActivity {
     sessionManager.createLoginSession(username, roleStr, token, serverUrl);
     sessionManager.setDisplayName(displayName);
     sessionManager.setUserId(userId);
-
-    // حفظ بيانات البصمة
     sessionManager.saveBiometricUser(username, roleStr, displayName, userId, token);
     sessionManager.saveBiometricBranch(branchId, branchName);
     
-    // التحقق من إعداد البصمة من السيرفر
     boolean biometricEnabled = true;
     if (response.data != null) {
         biometricEnabled = response.data.optBoolean("biometric_enabled", true);
@@ -921,20 +917,12 @@ public class LoginActivity extends AppCompatActivity {
     bm.setActiveBranch(branchId, branchName, branchCode, "", "");
     bm.setUserBranchLocked(true);
 
-    // ✅ عرض شاشة النجاح أولاً
-    showSuccessOverlay(displayName);
+    // ✅ انتقل مباشرة - بدون شاشة النجاح وبدون تأخير
+    Toast.makeText(this, 
+        (isArabic ? "أهلاً بك " : "Welcome ") + displayName + " 👋", 
+        Toast.LENGTH_SHORT).show();
     
-    // ✅ استعادة البيانات في الخلفية
-    restoreAllDataAfterLogin(() -> {
-        if (isActivityAlive()) {
-            // ✅ تأخير أطول للسماح للمستخدم برؤية شاشة النجاح
-            mainHandler.postDelayed(() -> {
-                if (isActivityAlive()) {
-                    navigateToMainWithAnimation();
-                }
-            }, 1500); // 1.5 ثانية
-        }
-    });
+    navigateToMain();
 }
 
 /**
@@ -1183,4 +1171,4 @@ MemoryManager.getInstance().forceCleanup();
         
         mainHandler.removeCallbacksAndMessages(null);
     }
-    }
+}
