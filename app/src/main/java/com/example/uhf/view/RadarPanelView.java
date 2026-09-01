@@ -13,7 +13,8 @@ import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.constraintlayout.widget.ConstraintSet;
 
-import com.lidroid.xutils.util.LogUtils;
+// ❌ حذف استيراد xUtils
+// import com.lidroid.xutils.util.LogUtils;
 import com.rscja.deviceapi.entity.RadarLocationEntity;
 import com.rscja.team.qcom.deviceapi.F;
 
@@ -150,6 +151,7 @@ public class RadarPanelView extends View {
         this.pointList = pointList;
         this.targetEpc = targetEpc;
         this.invalidate();
+        Log.d(TAG, "bindingData: " + (pointList != null ? pointList.size() : 0) + " items"); // ✅ استخدام Log
     }
 
     /**
@@ -158,6 +160,7 @@ public class RadarPanelView extends View {
     public void clearPanel() {
         if (pointList != null) pointList.clear();
         this.invalidate();
+        Log.d(TAG, "clearPanel"); // ✅ استخدام Log
     }
 
 }
