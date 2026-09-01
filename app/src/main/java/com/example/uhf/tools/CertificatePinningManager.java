@@ -28,8 +28,8 @@ public class CertificatePinningManager {
     private static final String TAG = "CertificatePinningManager";
     
     // ✅ فارغة حالياً - سنضع البصمة الحقيقية هنا لاحقاً
-    //private static final String EXPECTED_PIN = "47EC725A7A6CACD61033571097E315760FCB8B0796A8658F2AA74E4123AA8799";
-    private static final String EXPECTED_PIN = "47EC725A7A6CACD640D43971097E315760FCB8B0796A8658F2AA74E4123AA8799";
+    private static final String EXPECTED_PIN = "47EC725A7A6CACD61033571097E315760FCB8B0796A8658F2AA74E4123AA8799";
+    //private static final String EXPECTED_PIN = "47EC725A7A6CACD640D43971097E315760FCB8B0796A8658F2AA74E4123AA8799";
     private static SSLContext sslContext;
     private static String lastActualPin = null;
     
