@@ -256,9 +256,14 @@ if (welcomeName != null && !welcomeName.isEmpty()) {
         setupQuickNav();
 
         if (savedInstanceState == null) {
-            currentFragmentTag = getSavedFragmentTag();
+    currentFragmentTag = getSavedFragmentTag();
+    // ✅ تأخير 300ms للسماح للبيانات بالاكتمال
+    mainHandler.postDelayed(() -> {
+        if (!isFinishing() && !isDestroyed()) {
             loadFragmentByTag(currentFragmentTag);
-        } else {
+        }
+    }, 300);
+} else {
             currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
             currentFragment = fragmentManager.findFragmentByTag(currentFragmentTag);
             if (currentFragment == null) {
@@ -683,7 +688,7 @@ if (welcomeName != null && !welcomeName.isEmpty()) {
     private void loadFragmentByTag(String tag) {
     try {
         // ✅ تشخيص
-        Toast.makeText(this, "Loading: " + tag, Toast.LENGTH_SHORT).show();
+        
         
         PermissionManager pm = PermissionManager.getInstance(this);
         
@@ -714,7 +719,7 @@ if (welcomeName != null && !welcomeName.isEmpty()) {
                     .replace(R.id.fragment_container, fragment, tag);
             transaction.commitAllowingStateLoss();
             
-            Toast.makeText(this, "✅ Fragment: " + tag, Toast.LENGTH_SHORT).show();
+            
         } else {
             Log.e(TAG, "❌ Failed to create fragment: " + tag);
             loadFragment(new MiraDashboardFragment(), "Dashboard", false);
@@ -1234,4 +1239,4 @@ MemoryManager.getInstance().forceCleanup();
             }
         }
     }
-        }
+                                                          }
