@@ -25,6 +25,8 @@ import com.example.uhf.R;
 import com.example.uhf.fragment.KeyDwonFragment;
 import com.example.uhf.tools.DeviceDetector;
 import com.example.uhf.tools.UIHelper;
+
+import com.example.uhf.tools.MemoryManager;
 import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.utility.StringUtility;
 
@@ -56,10 +58,16 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     };
 
     // ==================== LIFECYCLE ====================
-
+    
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    
+    // ✅ تسجيل النشاط في MemoryManager
+    MemoryManager.getInstance().registerActivity(this);
+    
+    // ✅ تسجيل لاستقبال إشعارات الذاكرة
+    registerComponentCallbacks(MemoryManager.getInstance());
         isDestroyed.set(false);
         
         // ✅ طلب إذن القراءة من التخزين الخارجي
@@ -81,7 +89,11 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
         
         // ✅ إزالة جميع المهام المؤجلة
         mainHandler.removeCallbacksAndMessages(null);
-        
+        MemoryManager.getInstance().unregisterActivity(this);
+    unregisterComponentCallbacks(MemoryManager.getInstance());
+    
+    // ✅ تنظيف شامل
+    MemoryManager.getInstance().forceCleanup();
         super.onDestroy();
     }
 
