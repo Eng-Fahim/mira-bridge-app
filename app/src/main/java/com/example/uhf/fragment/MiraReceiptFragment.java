@@ -27,6 +27,7 @@ import androidx.core.content.FileProvider;
 import androidx.fragment.app.DialogFragment;
 
 import com.example.uhf.R;
+import com.example.uhf.manager.MiraBranchesManager;  // ✅ أضف هذا السطر
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraPriceManager;
 import com.example.uhf.tools.ArabicNumberToWords;
