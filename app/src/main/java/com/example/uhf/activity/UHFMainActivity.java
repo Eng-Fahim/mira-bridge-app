@@ -209,10 +209,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             ToastUtil.init(getApplicationContext());
             initializeLanguageState();
 
-            MemoryManager.getInstance().registerActivity(this);
-            registerComponentCallbacks(MemoryManager.getInstance());
             SessionMonitorManager.getInstance(this).startMonitoring(this);
-
             branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
             if (branchesManager != null) {
                 lastActiveBranchId = branchesManager.getActiveBranchId();
@@ -1159,9 +1156,7 @@ protected void onDestroy() {
     } catch (Exception e) {
         Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
     }
-    MemoryManager.getInstance().unregisterActivity(this);
-    unregisterComponentCallbacks(MemoryManager.getInstance());
-    // ✅ تم حذف forceCleanup() لمنع مسح البيانات المهمة
+        // ✅ BaseTabFragmentActivity.onDestroy() سيقوم بإلغاء التسجيل
     super.onDestroy();
 }
 
