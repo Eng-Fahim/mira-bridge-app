@@ -7,7 +7,7 @@ import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraServerConfig;
 import com.example.uhf.model.ApiProvider;
 import com.example.uhf.tools.CertificatePinningManager;  // ✅ أضف هذا
-
+import com.example.uhf.tools.SessionManager;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -39,6 +39,7 @@ public class MiraApiClient {
 
     private final Context context;
     private final MiraServerConfig serverConfig;
+    private final SessionManager sessionManager;
 
     // ✅ قيم ديناميكية تتحدث بعد تسجيل الدخول
     private String baseUrl;
@@ -56,25 +57,31 @@ public class MiraApiClient {
     }
 
     private MiraApiClient(Context context) {
-        this.context = context;
-        this.serverConfig = MiraServerConfig.getInstance(context);
-        
-        // ✅ التحقق من وجود عنوان الخادم واستخدام الافتراضي إذا لم يوجد
-        String savedBaseUrl = serverConfig.getBaseUrl();
+    this.context = context;
+    this.serverConfig = MiraServerConfig.getInstance(context);
+    this.sessionManager = new SessionManager(context);
+    
+    // ✅ قراءة baseUrl من SessionManager أولاً
+    String savedBaseUrl = sessionManager.getServerUrl();
+    if (savedBaseUrl == null || savedBaseUrl.isEmpty()) {
+        // ✅ Fallback إلى serverConfig إذا لم يوجد في SessionManager
+        savedBaseUrl = serverConfig.getBaseUrl();
         if (savedBaseUrl == null || savedBaseUrl.isEmpty()) {
-            baseUrl = DEFAULT_BASE_URL;
-            serverConfig.setBaseUrl(DEFAULT_BASE_URL);
-        } else {
-            baseUrl = savedBaseUrl;
+            savedBaseUrl = DEFAULT_BASE_URL;
         }
-        
-        refreshCredentials();
+        // حفظ في كلا المكانين
+        sessionManager.setServerUrl(savedBaseUrl);
+        serverConfig.setBaseUrl(savedBaseUrl);
     }
+    baseUrl = savedBaseUrl;
+    
+    refreshCredentials();
+}
 
     /**
      * ✅ تحديث القيم من MiraServerConfig
      */
-    private void refreshCredentials() {
+        private void refreshCredentials() {
     // تنظيف الـ baseUrl
     String cleanBaseUrl = baseUrl;
     if (!cleanBaseUrl.endsWith("/")) {
@@ -84,8 +91,17 @@ public class MiraApiClient {
     // بناء الرابط الصحيح
     this.apiUrl = cleanBaseUrl + API_PREFIX + "/";
     
-    this.apiKey = serverConfig.getApiKey();
-    this.gateId = serverConfig.getGateId();
+    // ✅ قراءة من SessionManager كمصدر رئيسي
+    this.apiKey = sessionManager.getApiKey();
+    this.gateId = sessionManager.getGateId();
+    
+    // ✅ Fallback إلى serverConfig إذا كانت SessionManager فارغة
+    if (this.apiKey.isEmpty()) {
+        this.apiKey = serverConfig.getApiKey();
+    }
+    if (this.gateId.isEmpty()) {
+        this.gateId = serverConfig.getGateId();
+    }
     
     Log.d(TAG, "Credentials: URL=" + apiUrl + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "SET") + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId));
 }
@@ -101,28 +117,29 @@ public class MiraApiClient {
      * ✅ دالة لإعادة تهيئة عنوان الخادم
      */
     public boolean reinitializeWithServer(String newServerUrl) {
-        try {
-            // تنظيف الرابط
-            String cleanUrl = newServerUrl.trim();
-            if (!cleanUrl.endsWith("/")) {
-                cleanUrl += "/";
-            }
-            
-            // حفظ الرابط الجديد
-            serverConfig.setBaseUrl(cleanUrl);
-            
-            // إعادة تهيئة الإعدادات
-            baseUrl = cleanUrl;
-            refreshCredentials();
-            
-            // اختبار الاتصال
-            return pingApi();
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Reinitialize error: " + e.getMessage());
-            return false;
+    try {
+        // تنظيف الرابط
+        String cleanUrl = newServerUrl.trim();
+        if (!cleanUrl.endsWith("/")) {
+            cleanUrl += "/";
         }
+        
+        // ✅ حفظ الرابط في كلا المكانين
+        sessionManager.setServerUrl(cleanUrl);
+        serverConfig.setBaseUrl(cleanUrl);
+        
+        // إعادة تهيئة الإعدادات
+        baseUrl = cleanUrl;
+        refreshCredentials();
+        
+        // اختبار الاتصال
+        return pingApi();
+        
+    } catch (Exception e) {
+        Log.e(TAG, "Reinitialize error: " + e.getMessage());
+        return false;
     }
+}
 
     private String getEffectiveApiKey() {
         if (apiKey == null || apiKey.isEmpty()) {
@@ -139,10 +156,16 @@ public class MiraApiClient {
         }
         return gateId;
     }
-
-    private String getAuthToken() {
-        return serverConfig.getAuthToken();
+private String getAuthToken() {
+    // ✅ قراءة من SessionManager أولاً
+    String token = sessionManager.getAuthToken();
+    if (token == null || token.isEmpty()) {
+        // ✅ Fallback إلى serverConfig
+        token = serverConfig.getAuthToken();
     }
+    return token;
+}
+    
 
     public boolean hasValidCredentials() {
         return !getEffectiveApiKey().isEmpty() && !getEffectiveGateId().isEmpty();
@@ -456,47 +479,45 @@ public class MiraApiClient {
             Log.e(TAG, "Error building login payload: " + e.getMessage());
         }
 
-        ApiResponse response = post("/auth/login", payload);
+            ApiResponse response = post("/auth/login", payload);
 
-        if (response.isSuccess && response.data != null) {
-            String newApiKey = response.data.optString("api_key", "");
-            String newGateId = response.data.optString("gate_id", "");
-            String authToken = response.data.optString("token", "");
+    if (response.isSuccess && response.data != null) {
+        String newApiKey = response.data.optString("api_key", "");
+        String newGateId = response.data.optString("gate_id", "");
+        String authToken = response.data.optString("token", "");
 
-            if (!newApiKey.isEmpty()) {
-                String effectiveGateId = !newGateId.isEmpty() ? newGateId :
-                        (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
+        if (!newApiKey.isEmpty()) {
+            String effectiveGateId = !newGateId.isEmpty() ? newGateId :
+                    (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
 
-                serverConfig.saveSession(newApiKey, effectiveGateId, authToken);
+            // ✅ حفظ في SessionManager فقط (مصدر واحد)
+            sessionManager.saveApiKey(newApiKey);
+            sessionManager.saveGateId(effectiveGateId);
 
-                com.example.uhf.tools.SessionManager sessionManager =
-                        new com.example.uhf.tools.SessionManager(context);
-                sessionManager.saveApiKey(newApiKey);
-                sessionManager.saveGateId(effectiveGateId);
+            refreshCredentials();
+            Log.d(TAG, "✅ API Key saved to SessionManager");
+        } else if (!authToken.isEmpty()) {
+            String currentApiKey = getEffectiveApiKey();
+            String currentGateId = getEffectiveGateId();
 
-                refreshCredentials();
-                Log.d(TAG, "✅ API Key saved to BOTH places");
-            } else if (!authToken.isEmpty()) {
-                String currentApiKey = getEffectiveApiKey();
-                String currentGateId = getEffectiveGateId();
+            String effectiveGateId = !currentGateId.isEmpty() ? currentGateId :
+                    (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
 
-                String effectiveGateId = !currentGateId.isEmpty() ? currentGateId :
-                        (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
-
-                serverConfig.saveSession(
-                        !currentApiKey.isEmpty() ? currentApiKey : "",
-                        effectiveGateId,
-                        authToken
-                );
-                refreshCredentials();
-                Log.d(TAG, "✅ Using existing API Key with gate_id: " + effectiveGateId);
+            // ✅ حفظ في SessionManager فقط
+            if (!currentApiKey.isEmpty()) {
+                sessionManager.saveApiKey(currentApiKey);
             }
-        } else {
-            Log.e(TAG, "❌ Login failed: " + (response.error != null ? response.error : "Unknown error"));
-        }
+            sessionManager.saveGateId(effectiveGateId);
 
-        return response;
+            refreshCredentials();
+            Log.d(TAG, "✅ Using existing API Key with gate_id: " + effectiveGateId);
+        }
+    } else {
+        Log.e(TAG, "❌ Login failed: " + (response.error != null ? response.error : "Unknown error"));
     }
+
+    return response;
+}
 
     public ApiResponse reconnectDevice(String username, String password, String gateId) {
         try {
@@ -512,9 +533,15 @@ public class MiraApiClient {
                 String authToken = response.data.optString("token", "");
 
                 if (!newApiKey.isEmpty() || !authToken.isEmpty()) {
-                    serverConfig.saveSession(newApiKey, newGateId, authToken);
-                    refreshCredentials();
-                }
+    // ✅ حفظ في SessionManager
+    if (!newApiKey.isEmpty()) {
+        sessionManager.saveApiKey(newApiKey);
+    }
+    if (newGateId != null && !newGateId.isEmpty()) {
+        sessionManager.saveGateId(newGateId);
+    }
+    refreshCredentials();
+}
             }
             return response;
         } catch (Exception e) {
