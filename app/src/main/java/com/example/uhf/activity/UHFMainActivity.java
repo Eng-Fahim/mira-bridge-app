@@ -135,7 +135,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         if (isProfileListenerSetup) return;
         isProfileListenerSetup = true;
 
-        orgProfileManager = MiraOrgProfileManager.getInstance(this);
+        orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
         profileListener = this::updateAppTitle;
         orgProfileManager.addListener(profileListener);
         updateAppTitle();
@@ -192,7 +192,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         try {
             // 1. التحقق من الجلسة أولاً
-            sessionManager = new SessionManager(this);
+            
+            sessionManager = new SessionManager(getApplicationContext());
             if (!sessionManager.isLoggedIn()) {
                 navigateToLogin();
                 return;
@@ -212,7 +213,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             registerComponentCallbacks(MemoryManager.getInstance());
             SessionMonitorManager.getInstance(this).startMonitoring(this);
 
-            branchesManager = MiraBranchesManager.getInstance(this);
+            branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
             if (branchesManager != null) {
                 lastActiveBranchId = branchesManager.getActiveBranchId();
             }
@@ -244,6 +245,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             setupQuickNav();
 
+// ✅ تحميل البيانات الأساسية بعد تسجيل الدخول
+loadEssentialData();
+
+
             // 7. إدارة التنقل والـ Fragments
             if (savedInstanceState == null) {
                 currentFragmentTag = "Dashboard"; 
@@ -260,6 +265,58 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
         }
     }
+    
+    /**
+ * ✅ تحميل البيانات الأساسية بعد تسجيل الدخول
+ * هذه الدالة تحل مشكلة "اختفاء المحتويات" و"عدم عمل التنقلات"
+ */
+private void loadEssentialData() {
+    java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+    executor.execute(() -> {
+        try {
+            com.example.uhf.api.MiraApiClient apiClient = 
+                com.example.uhf.api.MiraApiClient.getInstance(getApplicationContext());
+            
+            // ✅ 1. تحميل الملف الشخصي للمنظمة
+            com.example.uhf.api.MiraApiClient.ApiResponse profileResponse = apiClient.getOrgProfile();
+            if (profileResponse != null && profileResponse.isSuccess && profileResponse.data != null) {
+                org.json.JSONObject org = profileResponse.data.optJSONObject("organization");
+                if (org != null) {
+                    MiraOrgProfileManager.getInstance(getApplicationContext()).saveFromServer(org);
+                    runOnUiThread(this::updateToolbarTitle);
+                }
+            }
+            
+            // ✅ 2. تحميل الفروع
+            com.example.uhf.api.MiraApiClient.ApiResponse branchesResponse = apiClient.getBranches();
+            if (branchesResponse != null && branchesResponse.isSuccess && branchesResponse.data != null) {
+                MiraBranchesManager.getInstance(getApplicationContext()).saveBranchesFromServer(branchesResponse.data);
+                runOnUiThread(this::updateToolbarTitle);
+            }
+            
+            // ✅ 3. تحميل أسعار الذهب والعملات
+            com.example.uhf.api.MiraApiClient.ApiResponse goldResponse = apiClient.getGoldCurrencySettings();
+            if (goldResponse != null && goldResponse.isSuccess && goldResponse.data != null) {
+                org.json.JSONObject data = goldResponse.data.optJSONObject("data");
+                if (data == null) data = goldResponse.data;
+                org.json.JSONObject goldData = data.optJSONObject("gold");
+                org.json.JSONObject currencyData = data.optJSONObject("currency");
+                if (goldData != null) {
+                    com.example.uhf.manager.MiraPriceManager.getInstance(getApplicationContext()).saveGoldSettings(goldData);
+                }
+                if (currencyData != null) {
+                    com.example.uhf.manager.MiraPriceManager.getInstance(getApplicationContext()).saveCurrencySettings(currencyData);
+                }
+            }
+            
+            Log.d(TAG, "✅ Essential data loaded successfully");
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading essential data: " + e.getMessage());
+        }
+    });
+    executor.shutdown();
+}
 
     @Override
     public void onResume() {
@@ -314,7 +371,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.main_menu, menu);
-        PermissionManager pm = PermissionManager.getInstance(this);
+        PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
         applyToolbarMenuPermissions(menu, pm);
         return true;
     }
@@ -436,7 +493,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
             FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
 
-            PermissionManager pm = PermissionManager.getInstance(this);
+            PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
 
             if (fabActionCenter != null) {
                 boolean hasQuickActions = pm.getAllowedQuickActions().size() > 0;
@@ -528,8 +585,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             View view = getLayoutInflater().inflate(R.layout.dialog_quick_action_grid, null);
             dialog.setContentView(view);
 
-            PermissionManager pm = PermissionManager.getInstance(this);
-            MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(this);
+            PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
+MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
 
             List<String> allowedActions = pm.getAllowedQuickActions();
 
@@ -620,7 +677,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         if (isFinishing() || isDestroyed() || fragment == null) return;
 
         try {
-            PermissionManager pm = PermissionManager.getInstance(this);
+            PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
 
             if (!pm.canAccessFragment(tag)) {
                 showPermissionDenied();
@@ -656,7 +713,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private void loadFragmentByTag(String tag) {
         try {
-            PermissionManager pm = PermissionManager.getInstance(this);
+            PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
 
             if (!pm.canAccessFragment(tag)) {
                 tag = "Dashboard";
@@ -728,7 +785,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void showHardwareOptionsDialog() {
-        PermissionManager pm = PermissionManager.getInstance(this);
+        PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
         List<String> optionsList = new ArrayList<>();
 
         if (pm.isAdmin() || pm.isInventoryManager()) {
@@ -890,7 +947,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 if (topFragment != null) {
                     String tag = topFragment.getTag();
 
-                    PermissionManager pm = PermissionManager.getInstance(this);
+                    PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
                     if (tag != null && !pm.canAccessFragment(tag)) {
                         clearBackStack();
                         loadFragment(new MiraDashboardFragment(), "Dashboard", false);
@@ -1084,29 +1141,29 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     @Override
-    protected void onDestroy() {
-        try {
-            if (fragmentManager != null) {
-                clearBackStack();
-            }
-            stopActiveInventory();
-            mainHandler.removeCallbacksAndMessages(null);
-            if (playSoundThread != null) playSoundThread.stopPlay();
-            if (soundPool != null) soundPool.release();
-            if (mReader != null) mReader.free();
-
-            if (orgProfileManager != null && profileListener != null) {
-                orgProfileManager.removeListener(profileListener);
-            }
-            SessionMonitorManager.getInstance(this).stopMonitoring();
-        } catch (Exception e) {
-            Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
+protected void onDestroy() {
+    try {
+        if (fragmentManager != null) {
+            clearBackStack();
         }
-        MemoryManager.getInstance().unregisterActivity(this);
-        unregisterComponentCallbacks(MemoryManager.getInstance());
-        MemoryManager.getInstance().forceCleanup();
-        super.onDestroy();
+        stopActiveInventory();
+        mainHandler.removeCallbacksAndMessages(null);
+        if (playSoundThread != null) playSoundThread.stopPlay();
+        if (soundPool != null) soundPool.release();
+        if (mReader != null) mReader.free();
+
+        if (orgProfileManager != null && profileListener != null) {
+            orgProfileManager.removeListener(profileListener);
+        }
+        SessionMonitorManager.getInstance(this).stopMonitoring();
+    } catch (Exception e) {
+        Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
     }
+    MemoryManager.getInstance().unregisterActivity(this);
+    unregisterComponentCallbacks(MemoryManager.getInstance());
+    // ✅ تم حذف forceCleanup() لمنع مسح البيانات المهمة
+    super.onDestroy();
+}
 
     private void safeExecute(Runnable runnable, String errorMessage) {
         try {
