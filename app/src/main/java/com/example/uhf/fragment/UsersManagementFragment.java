@@ -354,6 +354,18 @@ public class UsersManagementFragment extends Fragment {
                 user.isOnline = u.optBoolean("is_online", false);
                 user.branchName = u.optString("branch_name", "");
                 user.branchId = u.optInt("branch_id", 0);
+                
+                user.roles = new ArrayList<>();
+user.roles.add(user.role);
+JSONArray rolesArr = u.optJSONArray("roles");
+if (rolesArr != null) {
+    for (int j = 0; j < rolesArr.length(); j++) {
+        String r = rolesArr.optString(j, "");
+        if (!r.isEmpty() && !user.roles.contains(r)) {
+            user.roles.add(r);
+        }
+    }
+}
 
                 if (!user.employeeId.isEmpty()) {
                     try {
@@ -498,6 +510,9 @@ public class UsersManagementFragment extends Fragment {
 
     // ==================== User Dialog ====================
 
+/**
+ * ✅ دالة عرض نافذة إضافة/تعديل مستخدم مع دعم تعدد الصلاحيات
+ */
 private void showUserDialog(@Nullable UserData existingUser) {
     try {
         if (!isAdded() || getContext() == null) return;
@@ -514,7 +529,7 @@ private void showUserDialog(@Nullable UserData existingUser) {
             dialog.getWindow().setBackgroundDrawableResource(android.R.color.white);
         }
 
-        // استخراج عناصر الواجهة
+        // ==================== استخراج عناصر الواجهة ====================
         TextView tvTitle = dialogView.findViewById(R.id.tvDialogTitle);
         TextView tvSubtitle = dialogView.findViewById(R.id.tvDialogSubtitle);
         EditText etDisplayName = dialogView.findViewById(R.id.etDisplayName);
@@ -533,7 +548,6 @@ private void showUserDialog(@Nullable UserData existingUser) {
         LinearLayout layoutButtons1 = dialogView.findViewById(R.id.layoutButtons1);
         LinearLayout stepsIndicator = dialogView.findViewById(R.id.stepsIndicator);
         
-        // ✅ تصحيح: استخدام MaterialButton بدلاً من ImageButton
         com.google.android.material.button.MaterialButton btnGeneratePassword = 
             dialogView.findViewById(R.id.btnGeneratePassword);
         com.google.android.material.button.MaterialButton btnCopyPassword = 
@@ -543,12 +557,18 @@ private void showUserDialog(@Nullable UserData existingUser) {
         FrameLayout loadingOverlay = dialogView.findViewById(R.id.loadingOverlay);
         TextView tvLoadingText = dialogView.findViewById(R.id.tvLoadingText);
 
-        // زر إغلاق X
+        // ==================== مجموعة الأدوار المختارة ====================
+        final Set<String> selectedRoles = new HashSet<>();
+        if (isEdit && existingUser != null && existingUser.roles != null) {
+            selectedRoles.addAll(existingUser.roles);
+        }
+
+        // ==================== زر إغلاق ====================
         if (btnCloseDialog != null) {
             btnCloseDialog.setOnClickListener(v -> dialog.dismiss());
         }
 
-        // العناوين
+        // ==================== العناوين ====================
         if (tvTitle != null) {
             tvTitle.setText(isEdit
                 ? (isArabic ? "تعديل مستخدم" : "Edit User")
@@ -560,7 +580,7 @@ private void showUserDialog(@Nullable UserData existingUser) {
                 : (isArabic ? "أدخل بيانات المستخدم الجديد" : "Enter new user data"));
         }
 
-        // إعداد قائمة الفروع
+        // ==================== إعداد قائمة الفروع ====================
         List<String> branchNames = new ArrayList<>();
         int activeBranchId = branchesManager.getActiveBranchId();
         int selectedBranchIndex = 0;
@@ -588,44 +608,43 @@ private void showUserDialog(@Nullable UserData existingUser) {
             });
         }
 
-        // إعداد قائمة الصلاحيات
-        List<String> roleNames = new ArrayList<>();
+        // ==================== إعداد اختيار الصلاحيات المتعددة ====================
         String[] allowedRoles = getAllowedRoles();
-
+        List<String> roleDisplayNames = new ArrayList<>();
         for (String roleCode : allowedRoles) {
             for (int i = 0; i < ROLES.length; i++) {
                 if (ROLES[i].equals(roleCode)) {
-                    roleNames.add(ROLE_ICONS[i] + " " + (isArabic ? ROLES_AR[i] : ROLES_EN[i]) + " (" + roleCode + ")");
+                    roleDisplayNames.add(ROLE_ICONS[i] + " " + (isArabic ? ROLES_AR[i] : ROLES_EN[i]));
                     break;
                 }
             }
         }
 
+        // ✅ عرض الأدوار المختارة
+        updateRoleDisplay(etRole, selectedRoles);
+
         if (etRole != null) {
-            if (!roleNames.isEmpty()) {
-                int defaultIndex = Math.max(0, roleNames.size() - 2);
-                etRole.setText(roleNames.get(defaultIndex));
-            }
             etRole.setFocusable(false);
             etRole.setClickable(true);
+            etRole.setHint(isArabic ? "اضغط لاختيار الصلاحيات (متعدد)" : "Tap to select permissions (Multiple)");
             etRole.setOnClickListener(v -> {
-                new AlertDialog.Builder(requireContext())
-                    .setTitle(isArabic ? "اختر الصلاحية" : "Select Role")
-                    .setItems(roleNames.toArray(new String[0]), (dialog1, which) -> {
-                        etRole.setText(roleNames.get(which));
-                    })
-                    .show();
-            });
+    showMultiRolePicker(selectedRoles, new RolePickerCallback() {
+        @Override
+        public void onRolesSelected(Set<String> roles) {
+            updateRoleDisplay(etRole, selectedRoles);
+        }
+    });
+});
         }
 
-        // رقم موظف تلقائي
+        // ==================== رقم موظف تلقائي ====================
         String branchCode = branchesManager.getActiveBranchCode();
         if (etEmployeeId != null) {
             etEmployeeId.setText(generateEmployeeId(branchCode));
             etEmployeeId.setEnabled(false);
         }
 
-        // أزرار كلمة المرور
+        // ==================== أزرار كلمة المرور ====================
         if (btnGeneratePassword != null) {
             btnGeneratePassword.setOnClickListener(v -> {
                 String pwd = generateStrongPassword(12);
@@ -656,7 +675,7 @@ private void showUserDialog(@Nullable UserData existingUser) {
             });
         }
 
-        // تعبئة بيانات التعديل
+        // ==================== تعبئة بيانات التعديل ====================
         if (isEdit && existingUser != null) {
             if (etDisplayName != null) etDisplayName.setText(existingUser.displayName);
             if (etUsername != null) {
@@ -679,14 +698,8 @@ private void showUserDialog(@Nullable UserData existingUser) {
                 }
             }
 
-            if (etRole != null) {
-                for (int i = 0; i < roleNames.size(); i++) {
-                    if (roleNames.get(i).contains(existingUser.role)) {
-                        etRole.setText(roleNames.get(i));
-                        break;
-                    }
-                }
-            }
+            // ✅ عرض الأدوار المحفوظة
+            updateRoleDisplay(etRole, selectedRoles);
 
             if (layoutStep1 != null) layoutStep1.setVisibility(View.VISIBLE);
             if (layoutStep2 != null) layoutStep2.setVisibility(View.VISIBLE);
@@ -713,7 +726,7 @@ private void showUserDialog(@Nullable UserData existingUser) {
             }
         }
 
-        // زر التالي
+        // ==================== زر التالي ====================
         if (btnNextStep != null) {
             btnNextStep.setOnClickListener(v -> {
                 String displayName = etDisplayName != null ? etDisplayName.getText().toString().trim() : "";
@@ -741,7 +754,7 @@ private void showUserDialog(@Nullable UserData existingUser) {
             });
         }
 
-        // زر الرجوع
+        // ==================== زر الرجوع ====================
         if (btnPrevStep != null) {
             btnPrevStep.setOnClickListener(v -> {
                 if (layoutStep1 != null) layoutStep1.setVisibility(View.VISIBLE);
@@ -752,14 +765,14 @@ private void showUserDialog(@Nullable UserData existingUser) {
             });
         }
 
-        // زر الإلغاء
+        // ==================== زر الإلغاء ====================
         if (btnCancel != null) {
             btnCancel.setText(isArabic ? "إلغاء" : "Cancel");
             btnCancel.setVisibility(View.VISIBLE);
             btnCancel.setOnClickListener(v -> dialog.dismiss());
         }
 
-        // زر الحفظ
+        // ==================== زر الحفظ ====================
         if (btnSaveUser != null) {
             btnSaveUser.setOnClickListener(v -> {
                 String displayName = etDisplayName != null ? etDisplayName.getText().toString().trim() : "";
@@ -767,7 +780,12 @@ private void showUserDialog(@Nullable UserData existingUser) {
                 String password = etPassword != null ? etPassword.getText().toString().trim() : "";
                 String empId = etEmployeeId != null ? etEmployeeId.getText().toString().trim() : "";
                 String branchStr = etBranch != null ? etBranch.getText().toString().trim() : "";
-                String roleStr = etRole != null ? etRole.getText().toString().trim() : "";
+
+                // ✅ التحقق من اختيار صلاحية واحدة على الأقل
+                if (selectedRoles.isEmpty()) {
+                    showToast(isArabic ? "⚠️ يجب اختيار صلاحية واحدة على الأقل" : "⚠️ At least one permission is required");
+                    return;
+                }
 
                 if (displayName.isEmpty()) {
                     showToast(isArabic ? "الاسم مطلوب" : "Name is required");
@@ -781,16 +799,16 @@ private void showUserDialog(@Nullable UserData existingUser) {
                     showToast(isArabic ? "الفرع مطلوب" : "Branch is required");
                     return;
                 }
-                if (roleStr.isEmpty()) {
-                    showToast(isArabic ? "الصلاحية مطلوبة" : "Role is required");
-                    return;
-                }
 
-                String role = extractRoleCode(roleStr);
+                // ✅ الدور الرئيسي = أول دور مختار
+                String primaryRole = selectedRoles.iterator().next();
 
-                if (!isEdit && !isRoleAllowed(role)) {
-                    showToast(isArabic ? "❌ ليس لديك صلاحية لإنشاء هذا الدور" : "❌ You don't have permission to create this role");
-                    return;
+                // ✅ التحقق من صلاحية كل دور
+                for (String role : selectedRoles) {
+                    if (!isRoleAllowed(role)) {
+                        showToast(isArabic ? "❌ ليس لديك صلاحية لإنشاء دور: " + role : "❌ You don't have permission to create role: " + role);
+                        return;
+                    }
                 }
 
                 int branchId = activeBranchId;
@@ -809,16 +827,25 @@ private void showUserDialog(@Nullable UserData existingUser) {
 
                 final int fBranchId = branchId;
                 final String fBranchName = branchName;
+                final String fPrimaryRole = primaryRole;
+                final List<String> fRolesList = new ArrayList<>(selectedRoles);
 
                 Executors.newSingleThreadExecutor().execute(() -> {
                     try {
                         JSONObject payload = new JSONObject();
                         payload.put("username", username);
                         payload.put("display_name", displayName);
-                        payload.put("role", role);
+                        payload.put("role", fPrimaryRole); // ✅ الدور الرئيسي
                         payload.put("employee_id", empId);
                         payload.put("branch_id", fBranchId);
                         payload.put("branch_name", fBranchName);
+
+                        // ✅ الأدوار المتعددة
+                        JSONArray rolesArray = new JSONArray();
+                        for (String r : fRolesList) {
+                            rolesArray.put(r);
+                        }
+                        payload.put("roles", rolesArray);
 
                         if (!password.isEmpty()) {
                             payload.put("password", password);
@@ -866,6 +893,109 @@ private void showUserDialog(@Nullable UserData existingUser) {
         showToast("Error: " + e.getMessage());
     }
 }
+
+// ==================== دوال مساعدة ====================
+
+
+/**
+ * ✅ تحديث عرض الأدوار المختارة
+ */
+private void updateRoleDisplay(EditText etRole, Set<String> selectedRoles) {
+    if (etRole == null) return;
+    
+    if (selectedRoles == null || selectedRoles.isEmpty()) {
+        etRole.setText("");
+        return;
+    }
+    
+    StringBuilder sb = new StringBuilder();
+    int count = 0;
+    for (String role : selectedRoles) {
+        if (count > 0) sb.append(" + ");
+        sb.append(getRoleDisplayName(role, isArabic));
+        count++;
+        if (count >= 2) break; // ✅ عرض أول دورين فقط لتوفير المساحة
+    }
+    
+    if (selectedRoles.size() > 2) {
+        sb.append(" +").append(selectedRoles.size() - 2).append(isArabic ? " أخرى" : " more");
+    }
+    
+    etRole.setText(sb.toString());
+}
+
+
+/**
+ * ✅ عرض نافذة اختيار صلاحيات متعددة
+ */
+private void showMultiRolePicker(Set<String> selectedRoles, RolePickerCallback callback) {
+    try {
+        String[] allowedRoles = getAllowedRoles();
+        String[] displayNames = new String[allowedRoles.length];
+        boolean[] checked = new boolean[allowedRoles.length];
+        
+        for (int i = 0; i < allowedRoles.length; i++) {
+            displayNames[i] = getRoleDisplayName(allowedRoles[i], isArabic);
+            checked[i] = selectedRoles.contains(allowedRoles[i]);
+        }
+        
+        new AlertDialog.Builder(requireContext())
+            .setTitle(isArabic ? "اختر الصلاحيات (يمكن اختيار أكثر من واحدة)" : "Select Permissions (Multiple allowed)")
+            .setMultiChoiceItems(displayNames, checked, (dialog, which, isChecked) -> {
+                if (isChecked) {
+                    selectedRoles.add(allowedRoles[which]);
+                } else {
+                    selectedRoles.remove(allowedRoles[which]);
+                }
+            })
+            .setPositiveButton(isArabic ? "تأكيد" : "OK", (dialog, which) -> {
+                if (callback != null) {
+                    callback.onRolesSelected(selectedRoles);
+                }
+            })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+            .show();
+    } catch (Exception e) {
+        android.util.Log.e("UsersManagement", "MultiRolePicker error: " + e.getMessage());
+    }
+}
+
+/**
+ * ✅ تنسيق عرض الأدوار
+ */
+private String formatRolesDisplay(Set<String> roles) {
+    if (roles == null || roles.isEmpty()) return "";
+    
+    StringBuilder sb = new StringBuilder();
+    int count = 0;
+    for (String role : roles) {
+        if (count > 0) sb.append(" + ");
+        sb.append(getRoleDisplayName(role, isArabic));
+        count++;
+    }
+    return sb.toString();
+}
+
+/**
+ * ✅ استخراج الأدوار من النص المعروض
+ */
+private List<String> extractRolesFromDisplay(String displayText) {
+    List<String> roles = new ArrayList<>();
+    for (String role : ROLES) {
+        if (displayText.contains(role)) {
+            roles.add(role);
+        }
+    }
+    return roles;
+}
+
+/**
+ * ✅ واجهة للاستدعاء
+ */
+interface RolePickerCallback {
+    void onRolesSelected(Set<String> roles);
+}
+
     // ==================== Delete User ====================
 
     private void deleteUser(int userId, String name, String role) {
@@ -908,17 +1038,18 @@ private void showUserDialog(@Nullable UserData existingUser) {
     // ==================== Data Classes ====================
 
     static class UserData {
-        int id;
-        int branchId;
-        String username;
-        String displayName;
-        String role;
-        String employeeId;
-        String status;
-        String lastLogin;
-        String branchName;
-        boolean isOnline;
-    }
+    int id;
+    int branchId;
+    String username;
+    String displayName;
+    String role;
+    List<String> roles;  // ✅ أضف هذا
+    String employeeId;
+    String status;
+    String lastLogin;
+    String branchName;
+    boolean isOnline;
+}
 
     static class BranchItem {
         int id;
