@@ -152,21 +152,51 @@ public class MiraAccountingChartsFragment extends Fragment {
                 tvChartSummary.setText(String.format(Locale.US, isArabic ? "الصافي: %.3f جرام" : "Net: %.3f g", netGold));
 
             } else {
-                boolean isRev = "revenue".equals(currentChart);
-                tvChartTitle.setText(isRev ? (isArabic ? "📊 تحليل مصادر الإيرادات" : "📊 Revenue Sources") : (isArabic ? "📊 بند المصروفات" : "📊 Expenses Breakdown"));
+    boolean isRev = "revenue".equals(currentChart);
+    tvChartTitle.setText(isRev ? (isArabic ? "📊 تحليل مصادر الإيرادات" : "📊 Revenue Sources") : (isArabic ? "📊 بند المصروفات" : "📊 Expenses Breakdown"));
+    
+    JSONArray items = isRev ? reportData.optJSONArray("revenues") : reportData.optJSONArray("expenses");
+    if (items != null) {
+        // ✅✅✅ استبعاد القيود العكسية من الإيرادات
+        JSONArray filteredItems = new JSONArray();
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject item = items.optJSONObject(i);
+            if (item != null) {
+                String name = item.optString("name", "");
+                String description = item.optString("description", "");
+                String reference = item.optString("reference", "");
                 
-                JSONArray items = isRev ? reportData.optJSONArray("revenues") : reportData.optJSONArray("expenses");
-                if (items != null) {
-                    for (int i = 0; i < items.length(); i++) {
-                        JSONObject item = items.getJSONObject(i);
-                        bars.add(new ChartBar(item.optString("name", ""), item.optDouble("amount", 0), getBarColor(i), false));
-                        maxValue = Math.max(maxValue, item.optDouble("amount", 0));
-                    }
+                // ✅ استبعاد المرتجعات من الإيرادات
+                boolean isRefund = name.contains("مرتجع") || name.contains("Refund") ||
+                                   description.contains("مرتجع") || description.contains("Refund") ||
+                                   reference.contains("REFUND") || reference.contains("refund");
+                
+                if (!isRefund) {
+                    filteredItems.put(item);
                 }
-                
-                double total = isRev ? reportData.optDouble("total_revenue", 0) : reportData.optDouble("total_expense", 0);
-                tvChartSummary.setText(String.format(Locale.US, isArabic ? "الإجمالي: %,.2f" : "Total: %,.2f", total));
             }
+        }
+        items = filteredItems;
+        
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject item = items.getJSONObject(i);
+            bars.add(new ChartBar(item.optString("name", ""), item.optDouble("amount", 0), getBarColor(i), false));
+            maxValue = Math.max(maxValue, item.optDouble("amount", 0));
+        }
+    }
+    
+    // ✅ حساب صافي الإيرادات (بعد المرتجعات)
+    double total = 0;
+    if (isRev) {
+        double grossRevenue = reportData.optDouble("total_revenue", 0);
+        double refunds = reportData.optDouble("total_refunds", 0);
+        total = grossRevenue - refunds;
+    } else {
+        total = reportData.optDouble("total_expense", 0);
+    }
+    
+    tvChartSummary.setText(String.format(Locale.US, isArabic ? "الإجمالي الصافي: %,.2f" : "Net Total: %,.2f", total));
+}
             
             for (ChartBar bar : bars) {
                 addDynamicBar(bar, maxValue);
