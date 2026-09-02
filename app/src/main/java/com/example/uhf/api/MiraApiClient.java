@@ -761,10 +761,8 @@ public ApiResponse searchPosItem(JSONObject payload) {
         return postWithAuth("/pos/search-item", payload);
     } catch (Exception e) {
         Log.e(TAG, "searchPosItem error: " + e.getMessage());
-        ApiResponse response = new ApiResponse();
-        response.isSuccess = false;
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
         response.isNetworkError = true;
-        response.error = e.getMessage();
         return response;
     }
 }
