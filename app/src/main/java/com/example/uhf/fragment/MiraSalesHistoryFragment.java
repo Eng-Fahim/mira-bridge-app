@@ -599,6 +599,12 @@ private List<MiraSaleItem> parseSalesJson(JSONArray sales) {
         item.paymentMethod = sale.optString("payment_method", sale.optString("pay_type", "CASH"));
         item.date = sale.optString("created_at", sale.optString("date", ""));
         item.branchId = sale.optInt("branch_id", 0);
+        
+        // ✅✅✅ معلومات الإرجاع
+        item.refundStatus = sale.optString("refund_status", sale.optString("status", "completed"));
+        item.refundReason = sale.optString("refund_reason", "");
+        item.refundedAt = sale.optString("refunded_at", "");
+        
         item.rawJson = sale.toString();
         items.add(item);
     }
@@ -774,26 +780,28 @@ private void saveSalesOffline(JSONArray sales, int page) {
         double amount;
         int itemCount;
         int branchId; // ✅ إضافة معرف الفرع
-
+        String refundStatus;  // ✅ أضف هذا
+        String refundReason;  // ✅ أضف هذا
+        String refundedAt;    // ✅ أضف هذا
         @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            MiraSaleItem item = (MiraSaleItem) o;
-            return Double.compare(item.amount, amount) == 0 &&
-                    itemCount == item.itemCount &&
-                    branchId == item.branchId &&
-                    Objects.equals(saleId, item.saleId) &&
-                    Objects.equals(customerName, item.customerName) &&
-                    Objects.equals(paymentMethod, item.paymentMethod) &&
-                    Objects.equals(date, item.date);
-        }
+public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    MiraSaleItem item = (MiraSaleItem) o;
+    return Double.compare(item.amount, amount) == 0 &&
+            itemCount == item.itemCount &&
+            branchId == item.branchId &&
+            Objects.equals(saleId, item.saleId) &&
+            Objects.equals(customerName, item.customerName) &&
+            Objects.equals(paymentMethod, item.paymentMethod) &&
+            Objects.equals(date, item.date) &&
+            Objects.equals(refundStatus, item.refundStatus);  // ✅ أضف هذا
+}
 
-        @Override
-        public int hashCode() {
-            return Objects.hash(saleId, customerName, paymentMethod, date, amount, itemCount, branchId);
-        }
-    }
+@Override
+public int hashCode() {
+    return Objects.hash(saleId, customerName, paymentMethod, date, amount, itemCount, branchId, refundStatus);
+}
 
     static class BranchOption {
         int id;
@@ -851,28 +859,36 @@ private void saveSalesOffline(JSONArray sales, int page) {
         }
 
         @Override
-        public void onBindViewHolder(@NonNull VH h, int pos) {
-            MiraSaleItem s = items.get(pos);
+public void onBindViewHolder(@NonNull VH h, int pos) {
+    MiraSaleItem s = items.get(pos);
 
-            if (h.tvSaleId != null) h.tvSaleId.setText("#" + (s.saleId != null ? s.saleId : "—"));
-            if (h.tvCustomer != null) h.tvCustomer.setText(s.customerName);
-            
-            if (h.tvAmount != null) h.tvAmount.setText(priceManager.formatPriceDefault(s.amount));
-            
-            if (h.tvItems != null) h.tvItems.setText(s.itemCount + " " + (isArabic ? "قطع" : "pcs"));
+    if (h.tvSaleId != null) h.tvSaleId.setText("#" + (s.saleId != null ? s.saleId : "—"));
+    if (h.tvCustomer != null) h.tvCustomer.setText(s.customerName);
+    if (h.tvAmount != null) h.tvAmount.setText(priceManager.formatPriceDefault(s.amount));
+    if (h.tvItems != null) h.tvItems.setText(s.itemCount + " " + (isArabic ? "قطع" : "pcs"));
 
-            if (h.tvPayment != null) {
-                String paymentText;
-                switch (s.paymentMethod != null ? s.paymentMethod.toUpperCase(Locale.ROOT) : "") {
-                    case "CASH": paymentText = isArabic ? "نقداً" : "Cash"; break;
-                    case "CARD": paymentText = isArabic ? "بطاقة" : "Card"; break;
-                    case "TRANSFER": paymentText = isArabic ? "تحويل" : "Transfer"; break;
-                    case "BANK_TRANSFER": paymentText = isArabic ? "تحويل بنكي" : "Bank Transfer"; break;
-                    case "CREDIT": paymentText = isArabic ? "آجل" : "Credit"; break;
-                    default: paymentText = s.paymentMethod != null ? s.paymentMethod : "—";
-                }
-                h.tvPayment.setText(paymentText);
-            }
+    // ✅✅✅ عرض حالة الإرجاع
+    if (h.tvStatus != null) {
+        String status = s.refundStatus != null ? s.refundStatus : "completed";
+        
+        switch (status) {
+            case "refunded":
+            case "fully_refunded":
+                h.tvStatus.setText(isArabic ? "🔄 مرتجع" : "🔄 Refunded");
+                h.tvStatus.setTextColor(0xFFEF4444); // أحمر
+                break;
+            case "partially_refunded":
+                h.tvStatus.setText(isArabic ? "🔄 مرتجع جزئياً" : "🔄 Partially Refunded");
+                h.tvStatus.setTextColor(0xFFF59E0B); // برتقالي
+                break;
+            case "completed":
+            default:
+                h.tvStatus.setText(isArabic ? "✅ مكتمل" : "✅ Completed");
+                h.tvStatus.setTextColor(0xFF22C55E); // أخضر
+                break;
+        }
+        h.tvStatus.setVisibility(View.VISIBLE);
+    }
 
             if (h.tvDate != null) {
                 try {
@@ -892,21 +908,22 @@ private void saveSalesOffline(JSONArray sales, int page) {
         public int getItemCount() { return items.size(); }
 
         static class VH extends RecyclerView.ViewHolder {
-            TextView tvSaleId, tvCustomer, tvAmount, tvItems, tvPayment, tvDate;
+    TextView tvSaleId, tvCustomer, tvAmount, tvItems, tvPayment, tvDate, tvStatus;  // ✅ أضف tvStatus
 
-            VH(View v) {
-                super(v);
-                tvSaleId = v.findViewById(R.id.tvMiraSaleId);
-                tvCustomer = v.findViewById(R.id.tvMiraSaleCustomer);
-                tvAmount = v.findViewById(R.id.tvMiraSaleAmount);
-                tvItems = v.findViewById(R.id.tvMiraSaleItems);
-                tvPayment = v.findViewById(R.id.tvMiraSalePayment);
-                tvDate = v.findViewById(R.id.tvMiraSaleDate);
-            }
-        }
+    VH(View v) {
+        super(v);
+        tvSaleId = v.findViewById(R.id.tvMiraSaleId);
+        tvCustomer = v.findViewById(R.id.tvMiraSaleCustomer);
+        tvAmount = v.findViewById(R.id.tvMiraSaleAmount);
+        tvItems = v.findViewById(R.id.tvMiraSaleItems);
+        tvPayment = v.findViewById(R.id.tvMiraSalePayment);
+        tvDate = v.findViewById(R.id.tvMiraSaleDate);
+        tvStatus = v.findViewById(R.id.tvMiraSaleStatus);  // ✅ أضف هذا
+    }
+}
     }
 
     private interface OnMiraSaleClickListener {
         void onClick(MiraSaleItem sale);
     }
-}
+            }
