@@ -919,10 +919,13 @@ apiClient = MiraApiClient.getInstance(getApplicationContext());
     }
     sessionManager.setBiometricLoginEnabled(biometricEnabled);
 
-    // ✅ استخدام سياق التطبيق لـ MiraBranchesManager
+        // ✅ استخدام سياق التطبيق لـ MiraBranchesManager
     MiraBranchesManager bm = MiraBranchesManager.getInstance(appContext);
     bm.setActiveBranch(branchId, branchName, branchCode, "", "");
     bm.setUserBranchLocked(true);
+
+    // ✅ إعادة تحميل MiraApiClient ليلتقط التوكن الجديد
+    MiraApiClient.reloadInstance(appContext);
 
     // ✅ الانتقال إلى النشاط الرئيسي
     navigateToMain();
