@@ -39,7 +39,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
 import com.google.android.material.button.MaterialButton;
-
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;  // ✅ أضف هذا السطر
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
@@ -82,6 +82,7 @@ public class MiraPosFragment extends MiraBaseFragment {
     private static final String PENDING_SALES_PREFS = "pos_pending_sales";
     private boolean isCheckoutDialogShowing = false; 
     private AlertDialog searchLoadingDialog;
+    private SessionManager sessionManager;  // ✅ أضف هذا السطر
     
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private MiraApiClient apiClient;
@@ -167,6 +168,7 @@ public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup c
             priceManager = MiraPriceManager.getInstance(ctx);
             permissionManager = PermissionManager.getInstance(ctx);
             isArabic = Locale.getDefault().getLanguage().equals("ar");
+            sessionManager = new SessionManager(ctx);  // ✅ أضف هذا السطر
             
             rfidManager = RFIDManager.getInstance(ctx);
             if (rfidManager != null) {
@@ -2132,4 +2134,4 @@ private void processRefund(String code, String reason) {
         }
     });
 }
-        }
+            }
