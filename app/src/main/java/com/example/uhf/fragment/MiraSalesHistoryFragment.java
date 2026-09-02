@@ -802,6 +802,7 @@ public boolean equals(Object o) {
 public int hashCode() {
     return Objects.hash(saleId, customerName, paymentMethod, date, amount, itemCount, branchId, refundStatus);
 }
+}
 
     static class BranchOption {
         int id;
