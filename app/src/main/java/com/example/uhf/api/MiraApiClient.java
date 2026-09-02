@@ -753,6 +753,22 @@ public ApiResponse getSalesHistoryPaginated(int page, int pageSize) {
     return getWithAuth(endpoint);
 }
 
+/**
+ * ✅ البحث عن قطعة في POS مع branch_id
+ */
+public ApiResponse searchPosItem(JSONObject payload) {
+    try {
+        return postWithAuth("/pos/search-item", payload);
+    } catch (Exception e) {
+        Log.e(TAG, "searchPosItem error: " + e.getMessage());
+        ApiResponse response = new ApiResponse();
+        response.isSuccess = false;
+        response.isNetworkError = true;
+        response.error = e.getMessage();
+        return response;
+    }
+}
+
 // ✅ دالة للبحث مع التحميل التدريجي
 public ApiResponse searchSalesHistory(String query, int page, int pageSize) {
     try {
