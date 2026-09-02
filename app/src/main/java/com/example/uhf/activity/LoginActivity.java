@@ -1178,3 +1178,4 @@ protected void onDestroy() {
     
     mainHandler.removeCallbacksAndMessages(null);
 }
+}
