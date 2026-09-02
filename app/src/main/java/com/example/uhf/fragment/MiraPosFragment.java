@@ -688,22 +688,35 @@ private void processRingEpc(final String code, final String source) {
         if (tvCartStatus != null) tvCartStatus.setText(isArabic ? "🔍 جاري البحث..." : "🔍 Searching...");
     });
     
-    // ✅ استخدام MiraItemSyncManager للبحث مع دعم الأوفلاين
     new Thread(() -> {
         try {
             Context context = getContext();
             if (context == null) return;
             
             MiraItemSyncManager syncManager = MiraItemSyncManager.getInstance(context);
+            final int branchId = getActiveBranchId();  // ✅ جلب الفرع الحالي
             
-            syncManager.findItem(cleanCode, new MiraItemSyncManager.ItemLookupCallback() {
+            // ✅✅✅ استخدام الدالة الجديدة مع branchId
+            syncManager.findItem(cleanCode, branchId, new MiraItemSyncManager.ItemLookupCallback() {
                 @Override
                 public void onItemFound(JSONObject item, boolean fromServer) {
                     safeRun(() -> {
                         dismissSearchLoadingDialog();
                         
+                        // ✅ تحقق إضافي من branch_id
+                        int itemBranchId = item.optInt("branch_id", -1);
+                        if (itemBranchId > 0 && itemBranchId != branchId) {
+                            showSuccessMessage(
+                                isArabic ? "❌ قطعة في فرع آخر" : "❌ Item in Another Branch",
+                                isArabic ? "هذه القطعة موجودة في فرع مختلف ولا يمكن بيعها من هنا" : 
+                                           "This item is in a different branch and cannot be sold here",
+                                false
+                            );
+                            playAlertSound(2);
+                            return;
+                        }
+                        
                         if (!fromServer) {
-                            // ✅ تم العثور عليه في الكاش المحلي
                             showToast(isArabic ? "📦 تم العثور عليه محلياً" : "📦 Found locally");
                         }
                         
