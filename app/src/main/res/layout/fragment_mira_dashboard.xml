@@ -9,14 +9,18 @@
     android:background="?android:attr/colorBackground"
     app:layoutDescription="@xml/dashboard_scene">
 
-    <!-- ==================== SHIMMER LOADING ==================== -->
-    <LinearLayout
+   <!-- ==================== SHIMMER LOADING ==================== -->
+<LinearLayout
     android:id="@+id/shimmerLayout"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_width="0dp"
+    android:layout_height="0dp"
     android:orientation="vertical"
     android:padding="16dp"
     android:visibility="gone"
+    app:layout_constraintBottom_toBottomOf="parent"
+    app:layout_constraintEnd_toEndOf="parent"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintTop_toTopOf="parent"
     tools:visibility="visible">
 
 
