@@ -76,12 +76,7 @@ private void applyTheme(View view) {
     try {
         Context context = getContext();
         if (context == null) return;
-        
-        // ✅ جذر الواجهة
-        View rootView = view.findViewById(R.id.fragmentRoot);
-        if (rootView != null) {
-            rootView.setBackgroundColor(context.getColor(R.color.report_background));
-        }
+       
         
         // ✅ SwipeRefresh
         SwipeRefreshLayout swipeRefresh = view.findViewById(R.id.swipeRefresh);
@@ -233,29 +228,6 @@ private void applyTheme(View view) {
         loadAvailableTags();
         
         Log.d(TAG, "🟢 onViewCreated completed");
-    }
-    
-    /**
-     * ✅ تطبيق الثيم على العناصر
-     */
-    private void applyTheme(View view) {
-        try {
-            Context context = getContext();
-            if (context == null) return;
-            
-            // ✅ تطبيق ألوان الثيم
-            if (tvTitle != null) {
-                tvTitle.setTextColor(context.getColor(R.color.report_text_primary));
-            }
-            if (tvCount != null) {
-                tvCount.setTextColor(context.getColor(R.color.report_text_secondary));
-            }
-            if (tvAvailableCount != null) {
-                tvAvailableCount.setTextColor(context.getColor(R.color.report_accent));
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "applyTheme error: " + e.getMessage());
-        }
     }
     
     /**
@@ -539,31 +511,38 @@ private void applyTheme(View view) {
      * ✅ تحديث حالة الشريحة
      */
     private void updateBindingStatus(int bindingId, String status) {
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                JSONObject payload = new JSONObject();
-                payload.put("binding_id", bindingId);
-                payload.put("status", status);
-                
-                MiraApiClient.ApiResponse response = apiClient.postWithAuth("/update-binding-status", payload);
-                
-                mainHandler.post(() -> {
-                    if (!isAdded() || getContext() == null) {
-                        return;
-                    }
-
-                    if (response != null && response.isSuccess) {
-                        showToast(getString(R.string.rfid_updated));
-                        loadBindings();
-                    } else {
-                        showToast(getString(R.string.rfid_load_failed));
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "updateBindingStatus error: " + e.getMessage());
-            }
-        });
+    // ✅ تحقق من الصلاحية
+    if (permissionManager == null || 
+        !(permissionManager.isManager() || permissionManager.canEdit("rfid"))) {
+        showToast(isArabic() ? "⛔ غير مصرح" : "⛔ Access Denied");
+        return;
     }
+    
+    Executors.newSingleThreadExecutor().execute(() -> {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("binding_id", bindingId);
+            payload.put("status", status);
+            
+            MiraApiClient.ApiResponse response = apiClient.postWithAuth("/update-binding-status", payload);
+            
+            mainHandler.post(() -> {
+                if (!isAdded() || getContext() == null) return;
+                
+                if (response != null && response.isSuccess) {
+                    showToast(getString(R.string.rfid_updated));
+                    loadBindings();
+                } else {
+                    String errorMsg = response != null && response.error != null ? 
+                        response.error : getString(R.string.rfid_load_failed);
+                    showToast("❌ " + errorMsg);
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "updateBindingStatus error: " + e.getMessage());
+        }
+    });
+}
     
     /**
      * ✅ تصدير CSV
