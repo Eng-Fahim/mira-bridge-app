@@ -1185,6 +1185,9 @@ private String saveSaleLocally(JSONObject payload, POSCheckoutDialog.POSCheckout
         if (ctx == null) return "";
         
         String saleId = "SALE_" + System.currentTimeMillis();
+        int branchId = getActiveBranchId();
+        int userId = sessionManager != null ? sessionManager.getUserId() : 0;
+        String username = sessionManager != null ? sessionManager.getUsername() : "";
         
         JSONObject localSale = new JSONObject();
         localSale.put("sale_id", saleId);
@@ -1196,7 +1199,31 @@ private String saveSaleLocally(JSONObject payload, POSCheckoutDialog.POSCheckout
         localSale.put("created_at", System.currentTimeMillis());
         localSale.put("status", "pending");
         
-        SharedPreferences prefs = ctx.getSharedPreferences("pos_offline_sales", Context.MODE_PRIVATE);
+        // ✅✅✅ معلومات الفرع والمستخدم
+        localSale.put("branch_id", branchId);
+        localSale.put("user_id", userId);
+        localSale.put("username", username);
+        
+        // ✅✅✅ تفاصيل القطع
+        JSONArray itemsArray = new JSONArray();
+        for (CartItem item : cartList) {
+            JSONObject itemObj = new JSONObject();
+            itemObj.put("epc", item.epc);
+            itemObj.put("title", item.name);
+            itemObj.put("price", item.price);
+            itemsArray.put(itemObj);
+        }
+        localSale.put("items", itemsArray);
+        
+        // ✅✅✅ حالة المزامنة
+        localSale.put("sync_status", "pending"); // pending, syncing, synced, failed
+        localSale.put("sync_attempts", 0);
+        localSale.put("last_sync_attempt", 0);
+        localSale.put("last_error", "");
+        
+        // ✅✅✅ حفظ في ملف منفصل لكل فرع
+        String prefsName = "pos_offline_sales_branch_" + branchId;
+        SharedPreferences prefs = ctx.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
         String existingJson = prefs.getString("pending_sales", "[]");
         JSONArray arr = new JSONArray(existingJson);
         
@@ -1211,10 +1238,8 @@ private String saveSaleLocally(JSONObject payload, POSCheckoutDialog.POSCheckout
         arr.put(localSale);
         prefs.edit().putString("pending_sales", arr.toString()).apply();
         
-        Log.d(TAG, "💾 Sale saved locally: " + saleId);
-        
-        // ✅ تحديث العداد
-        updatePendingSalesBadge(arr.length());
+        // ✅✅✅ حفظ في السجل العام أيضاً
+        saveToSyncLog(saleId, branchId, userId, username, data.finalAmount, cartList.size(), "pending", "تم الحفظ محلياً");
         
         return saleId;
     } catch (Exception e) {
@@ -1224,6 +1249,43 @@ private String saveSaleLocally(JSONObject payload, POSCheckoutDialog.POSCheckout
 }
 
 /**
+ * ✅✅✅ حفظ سجل المزامنة المفصل
+ */
+private void saveToSyncLog(String saleId, int branchId, int userId, String username, 
+                           double amount, int itemCount, String status, String message) {
+    try {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        
+        String prefsName = "pos_sync_log_branch_" + branchId;
+        SharedPreferences prefs = ctx.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
+        String existingJson = prefs.getString("sync_log", "[]");
+        JSONArray arr = new JSONArray(existingJson);
+        
+        JSONObject logEntry = new JSONObject();
+        logEntry.put("sale_id", saleId);
+        logEntry.put("branch_id", branchId);
+        logEntry.put("user_id", userId);
+        logEntry.put("username", username);
+        logEntry.put("amount", amount);
+        logEntry.put("item_count", itemCount);
+        logEntry.put("status", status); // pending, syncing, synced, failed
+        logEntry.put("message", message);
+        logEntry.put("timestamp", System.currentTimeMillis());
+        
+        arr.put(logEntry);
+        
+        // ✅ الاحتفاظ بآخر 100 سجل فقط
+        while (arr.length() > 100) {
+            arr.remove(0);
+        }
+        
+        prefs.edit().putString("sync_log", arr.toString()).apply();
+    } catch (Exception e) {
+        Log.e(TAG, "saveToSyncLog error: " + e.getMessage());
+    }
+}
+/**
  * ✅✅✅ إزالة البيع من المحلي
  */
 private void removeSaleFromLocal(String saleId) {
@@ -1231,7 +1293,10 @@ private void removeSaleFromLocal(String saleId) {
         Context ctx = getContext();
         if (ctx == null || saleId == null || saleId.isEmpty()) return;
         
-        SharedPreferences prefs = ctx.getSharedPreferences("pos_offline_sales", Context.MODE_PRIVATE);
+        // ✅ استخدم ملف الفرع الحالي
+        int currentBranchId = getActiveBranchId();
+        String prefsName = "pos_offline_sales_branch_" + currentBranchId;
+        SharedPreferences prefs = ctx.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
         String existingJson = prefs.getString("pending_sales", "[]");
         JSONArray arr = new JSONArray(existingJson);
         JSONArray newArr = new JSONArray();
@@ -1733,22 +1798,29 @@ private void showSyncPromptDialog(int pendingCount) {
 /**
  * ✅ مزامنة المبيعات المعلقة - يدوية مع تأكيد
  */
+/**
+ * ✅✅✅ مزامنة المبيعات المعلقة - الفرع الحالي فقط مع تفاصيل كاملة
+ */
 private void syncPendingSales() {
     try {
         Context ctx = getContext();
         if (ctx == null) return;
         
-        SharedPreferences prefs = ctx.getSharedPreferences("pos_offline_sales", Context.MODE_PRIVATE);
+        int currentBranchId = getActiveBranchId();
+        int currentUserId = sessionManager != null ? sessionManager.getUserId() : 0;
+        
+        // ✅✅✅ استخدام ملف الفرع الحالي فقط
+        String prefsName = "pos_offline_sales_branch_" + currentBranchId;
+        SharedPreferences prefs = ctx.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
         String existingJson = prefs.getString("pending_sales", "[]");
         JSONArray arr = new JSONArray(existingJson);
         
         if (arr.length() == 0) {
             updatePendingSalesBadge(0);
-            showToast(isArabic ? "✅ لا توجد مبيعات معلقة" : "✅ No pending sales");
+            showToast(isArabic ? "✅ لا توجد مبيعات معلقة لهذا الفرع" : "✅ No pending sales for this branch");
             return;
         }
         
-        // ✅ عرض loading
         final AlertDialog loadingDialog = showProfessionalLoadingDialog();
         
         new Thread(() -> {
@@ -1756,75 +1828,118 @@ private void syncPendingSales() {
             int failed = 0;
             JSONArray remaining = new JSONArray();
             
+            // ✅✅✅ تفاصيل المزامنة
+            StringBuilder syncDetails = new StringBuilder();
+            syncDetails.append(isArabic ? "📋 تفاصيل المزامنة:\n\n" : "📋 Sync Details:\n\n");
+            
             for (int i = 0; i < arr.length(); i++) {
                 try {
                     JSONObject sale = arr.optJSONObject(i);
                     if (sale == null) continue;
                     
+                    String saleId = sale.optString("sale_id", "Unknown");
+                    int saleBranchId = sale.optInt("branch_id", -1);
+                    int saleUserId = sale.optInt("user_id", -1);
+                    String username = sale.optString("username", "Unknown");
+                    double amount = sale.optDouble("final_amount", 0);
+                    int itemCount = sale.optInt("item_count", 0);
+                    
+                    // ✅✅✅ التحقق من أن البيع يخص الفرع الحالي
+                    if (saleBranchId != currentBranchId) {
+                        // تخطي - ليس لهذا الفرع
+                        continue;
+                    }
+                    
+                    // ✅✅✅ تحديث حالة المزامنة
+                    sale.put("sync_status", "syncing");
+                    sale.put("sync_attempts", sale.optInt("sync_attempts", 0) + 1);
+                    sale.put("last_sync_attempt", System.currentTimeMillis());
+                    
+                    saveToSyncLog(saleId, currentBranchId, saleUserId, username, amount, itemCount, 
+                                  "syncing", isArabic ? "جاري المزامنة..." : "Syncing...");
+                    
                     JSONObject payload = sale.optJSONObject("payload");
-                    if (payload == null) continue;
+                    if (payload == null) {
+                        failed++;
+                        sale.put("sync_status", "failed");
+                        sale.put("last_error", "Payload missing");
+                        remaining.put(sale);
+                        saveToSyncLog(saleId, currentBranchId, saleUserId, username, amount, itemCount, 
+                                      "failed", isArabic ? "فشل - Payload مفقود" : "Failed - Payload missing");
+                        continue;
+                    }
+                    
+                    // ✅✅✅ إضافة branch_id و user_id للـ payload
+                    payload.put("branch_id", currentBranchId);
+                    payload.put("user_id", saleUserId);
                     
                     MiraApiClient client = MiraApiClient.getInstance(ctx);
                     MiraApiClient.ApiResponse response = client.checkout(payload);
                     
                     if (response != null && response.isSuccess) {
                         synced++;
-                        Log.d(TAG, "✅ Synced sale: " + sale.optString("sale_id"));
+                        sale.put("sync_status", "synced");
+                        sale.put("last_error", "");
+                        
+                        syncDetails.append("✅ ").append(saleId)
+                            .append(" | 💰 ").append(priceManager.formatPriceDefault(amount))
+                            .append(" | 👤 ").append(username)
+                            .append("\n");
+                        
+                        saveToSyncLog(saleId, currentBranchId, saleUserId, username, amount, itemCount, 
+                                      "synced", isArabic ? "تمت المزامنة بنجاح" : "Synced successfully");
                     } else {
                         failed++;
+                        String errorMsg = response != null ? (response.error != null ? response.error : "Unknown error") : "Network error";
+                        sale.put("sync_status", "failed");
+                        sale.put("last_error", errorMsg);
                         remaining.put(sale);
-                        Log.e(TAG, "❌ Failed to sync: " + sale.optString("sale_id"));
+                        
+                        syncDetails.append("❌ ").append(saleId)
+                            .append(" | ").append(errorMsg)
+                            .append("\n");
+                        
+                        saveToSyncLog(saleId, currentBranchId, saleUserId, username, amount, itemCount, 
+                                      "failed", errorMsg);
                     }
                 } catch (Exception e) {
                     failed++;
-                    remaining.put(arr.optJSONObject(i));
-                    Log.e(TAG, "❌ Exception syncing sale: " + e.getMessage());
+                    JSONObject sale = arr.optJSONObject(i);
+                    if (sale != null) {
+                        sale.put("sync_status", "failed");
+                        sale.put("last_error", e.getMessage());
+                        remaining.put(sale);
+                        
+                        saveToSyncLog(sale.optString("sale_id", "Unknown"), currentBranchId, 
+                                      sale.optInt("user_id", -1), sale.optString("username", "Unknown"),
+                                      sale.optDouble("final_amount", 0), sale.optInt("item_count", 0),
+                                      "failed", e.getMessage());
+                    }
                 }
             }
             
-            // ✅ حفظ المتبقي
+            // ✅✅✅ حفظ المتبقي
             prefs.edit().putString("pending_sales", remaining.toString()).apply();
+            
+            // ✅✅✅ إضافة ملخص
+            syncDetails.append("\n").append(isArabic ? "📊 الملخص:\n" : "📊 Summary:\n")
+                .append(isArabic ? "✅ ناجح: " : "✅ Success: ").append(synced).append("\n")
+                .append(isArabic ? "❌ فشل: " : "❌ Failed: ").append(failed).append("\n")
+                .append(isArabic ? "📦 متبقي: " : "📦 Remaining: ").append(remaining.length()).append("\n");
             
             final int finalSynced = synced;
             final int finalFailed = failed;
             final int finalRemaining = remaining.length();
+            final String finalDetails = syncDetails.toString();
             
             safeRun(() -> {
                 if (loadingDialog != null) dismissDialog(loadingDialog);
                 updatePendingSalesBadge(finalRemaining);
                 
-                // ✅ عرض النتيجة
-                String resultMessage;
-                if (finalSynced > 0 && finalFailed == 0) {
-                    resultMessage = isArabic ? 
-                        "✅ تمت مزامنة جميع المبيعات بنجاح!\n\n" +
-                        "عدد المبيعات: " + finalSynced
-                        :
-                        "✅ All sales synced successfully!\n\n" +
-                        "Synced: " + finalSynced;
-                } else if (finalSynced > 0 && finalFailed > 0) {
-                    resultMessage = isArabic ? 
-                        "⚠️ تمت مزامنة بعض المبيعات:\n\n" +
-                        "✅ ناجح: " + finalSynced + "\n" +
-                        "❌ فشل: " + finalFailed + "\n" +
-                        "📦 متبقي: " + finalRemaining
-                        :
-                        "⚠️ Partial sync:\n\n" +
-                        "✅ Success: " + finalSynced + "\n" +
-                        "❌ Failed: " + finalFailed + "\n" +
-                        "📦 Remaining: " + finalRemaining;
-                } else {
-                    resultMessage = isArabic ? 
-                        "❌ فشلت جميع المبيعات في المزامنة\n\n" +
-                        "يرجى التحقق من الاتصال والمحاولة مرة أخرى"
-                        :
-                        "❌ All sales failed to sync\n\n" +
-                        "Please check connection and try again";
-                }
-                
+                // ✅✅✅ عرض النتيجة المفصلة
                 showSuccessMessage(
                     finalSynced > 0 ? "✅ المزامنة" : "❌ المزامنة",
-                    resultMessage,
+                    finalDetails,
                     finalSynced > 0
                 );
             });
@@ -1835,6 +1950,63 @@ private void syncPendingSales() {
     }
 }
 
+/**
+ * ✅✅✅ عرض سجل المزامنة المفصل للفرع الحالي
+ */
+private void showSyncHistoryLog() {
+    try {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        
+        int currentBranchId = getActiveBranchId();
+        String prefsName = "pos_sync_log_branch_" + currentBranchId;
+        SharedPreferences prefs = ctx.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
+        String existingJson = prefs.getString("sync_log", "[]");
+        JSONArray arr = new JSONArray(existingJson);
+        
+        if (arr.length() == 0) {
+            showToast(isArabic ? "📋 لا يوجد سجل مزامنة" : "📋 No sync history");
+            return;
+        }
+        
+        StringBuilder logText = new StringBuilder();
+        logText.append(isArabic ? "📋 سجل المزامنة - الفرع الحالي:\n\n" : "📋 Sync History - Current Branch:\n\n");
+        
+        for (int i = arr.length() - 1; i >= 0; i--) {
+            JSONObject entry = arr.optJSONObject(i);
+            if (entry == null) continue;
+            
+            String saleId = entry.optString("sale_id", "");
+            String username = entry.optString("username", "");
+            String status = entry.optString("status", "");
+            String message = entry.optString("message", "");
+            double amount = entry.optDouble("amount", 0);
+            long timestamp = entry.optLong("timestamp", 0);
+            
+            String statusEmoji = "❓";
+            switch (status) {
+                case "synced": statusEmoji = "✅"; break;
+                case "syncing": statusEmoji = "⏳"; break;
+                case "failed": statusEmoji = "❌"; break;
+                case "pending": statusEmoji = "📦"; break;
+            }
+            
+            logText.append(statusEmoji).append(" ").append(saleId)
+                .append(" | 💰 ").append(priceManager.formatPriceDefault(amount))
+                .append(" | 👤 ").append(username)
+                .append("\n  ").append(message)
+                .append("\n\n");
+        }
+        
+        new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "📋 سجل المزامنة" : "📋 Sync History")
+            .setMessage(logText.toString())
+            .setPositiveButton(isArabic ? "حسناً" : "OK", null)
+            .show();
+    } catch (Exception e) {
+        Log.e(TAG, "showSyncHistoryLog error: " + e.getMessage());
+    }
+}
 /**
  * ✅ البحث عن القطعة للتحقق من إمكانية الإرجاع
  */
