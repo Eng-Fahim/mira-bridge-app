@@ -69,7 +69,58 @@ public class MiraRfidBindingsFragment extends MiraBaseFragment {
                              @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_mira_rfid_bindings, container, false);
     }
-    
+    /**
+ * ✅ تطبيق الثيم الشامل على كل العناصر
+ */
+private void applyTheme(View view) {
+    try {
+        Context context = getContext();
+        if (context == null) return;
+        
+        // ✅ جذر الواجهة
+        View rootView = view.findViewById(R.id.fragmentRoot);
+        if (rootView != null) {
+            rootView.setBackgroundColor(context.getColor(R.color.report_background));
+        }
+        
+        // ✅ SwipeRefresh
+        SwipeRefreshLayout swipeRefresh = view.findViewById(R.id.swipeRefresh);
+        if (swipeRefresh != null) {
+            swipeRefresh.setBackgroundColor(context.getColor(R.color.report_background));
+        }
+        
+        // ✅ TabLayout
+        TabLayout tabFilter = view.findViewById(R.id.tabFilter);
+        if (tabFilter != null) {
+            tabFilter.setBackgroundColor(context.getColor(R.color.report_surface));
+            tabFilter.setTabTextColors(
+                context.getColor(R.color.report_text_secondary),
+                context.getColor(R.color.report_text_primary)
+            );
+            tabFilter.setSelectedTabIndicatorColor(context.getColor(R.color.report_accent));
+        }
+        
+        // ✅ RecyclerView
+        if (rvBindings != null) {
+            rvBindings.setBackgroundColor(context.getColor(R.color.report_background));
+        }
+        
+        // ✅ النصوص
+        if (tvTitle != null) {
+            tvTitle.setTextColor(context.getColor(R.color.report_text_primary));
+        }
+        if (tvCount != null) {
+            tvCount.setTextColor(context.getColor(R.color.report_text_secondary));
+        }
+        if (tvAvailableCount != null) {
+            tvAvailableCount.setTextColor(context.getColor(R.color.report_accent));
+        }
+        
+        Log.d(TAG, "🎨 Theme applied successfully");
+    } catch (Exception e) {
+        Log.e(TAG, "applyTheme error: " + e.getMessage());
+    }
+}
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
