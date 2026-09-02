@@ -677,6 +677,24 @@ private void refreshData() {
 private void processRingEpc(final String code, final String source) {
     if (code == null || code.trim().isEmpty() || !isAdded()) return;
     final String cleanCode = code.trim();
+     // ✅✅✅ فحص إضافي: القطعة مباعة محلياً؟
+    if (isItemSoldLocally(cleanCode)) {
+        safeRun(() -> {
+            dismissSearchLoadingDialog();
+            showSuccessMessage(
+                isArabic ? "❌ قطعة مباعة محلياً" : "❌ Item Sold Locally",
+                isArabic ? "هذه القطعة تم بيعها محلياً ولم تتم مزامنتها بعد.\nيرجى المزامنة أولاً قبل إعادة البيع." : 
+                           "This item was sold locally and hasn't been synced yet.\nPlease sync first before re-selling.",
+                false
+            );
+            playAlertSound(2);
+        });
+        synchronized (pendingEpcs) {
+            pendingEpcs.remove(cleanCode);
+        }
+        return;
+    }
+    
     
     synchronized (pendingEpcs) {
         if (pendingEpcs.contains(cleanCode)) return;
@@ -745,6 +763,61 @@ private void processRingEpc(final String code, final String source) {
             }
         }
     }).start();
+}
+
+/**
+ * ✅✅✅ عرض تفاصيل العمليات المعلقة قبل المزامنة
+ */
+private void showPendingSalesDetailsBeforeSync() {
+    try {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        
+        int currentBranchId = getActiveBranchId();
+        String prefsName = "pos_offline_sales_branch_" + currentBranchId;
+        SharedPreferences prefs = ctx.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
+        String existingJson = prefs.getString("pending_sales", "[]");
+        JSONArray arr = new JSONArray(existingJson);
+        
+        if (arr.length() == 0) {
+            showToast(isArabic ? "📋 لا توجد عمليات معلقة" : "📋 No pending sales");
+            return;
+        }
+        
+        StringBuilder details = new StringBuilder();
+        details.append(isArabic ? "📋 العمليات المعلقة:\n\n" : "📋 Pending Sales:\n\n");
+        
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject sale = arr.optJSONObject(i);
+            if (sale == null) continue;
+            
+            String saleId = sale.optString("sale_id", "");
+            String customerName = sale.optString("customer_name", "");
+            String username = sale.optString("username", "");
+            double amount = sale.optDouble("final_amount", 0);
+            int itemCount = sale.optInt("item_count", 0);
+            long createdAt = sale.optLong("created_at", 0);
+            
+            details.append(i + 1).append(". ")
+                .append(saleId).append("\n")
+                .append("   👤 العميل: ").append(customerName).append("\n")
+                .append("   🧑‍💼 البائع: ").append(username).append("\n")
+                .append("   💰 المبلغ: ").append(priceManager.formatPriceDefault(amount)).append("\n")
+                .append("   📦 القطع: ").append(itemCount).append("\n\n");
+        }
+        
+        new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(isArabic ? "📋 تفاصيل العمليات قبل المزامنة" : "📋 Pending Sales Details")
+            .setMessage(details.toString())
+            .setPositiveButton(isArabic ? "✅ مزامنة الآن" : "✅ Sync Now", (dialog, which) -> {
+                dialog.dismiss();
+                syncPendingSales();
+            })
+            .setNegativeButton(isArabic ? "⏳ لاحقاً" : "⏳ Later", null)
+            .show();
+    } catch (Exception e) {
+        Log.e(TAG, "showPendingSalesDetailsBeforeSync error: " + e.getMessage());
+    }
 }
 
 /**
@@ -1556,13 +1629,16 @@ private void showReceipt(MiraApiClient.ApiResponse response) {
     }
 }
 
-
-    private void checkPendingSales() {
-        try {
-            if (getContext() == null) return;
-            JSONArray arr = new JSONArray(getContext()
-                    .getSharedPreferences(PENDING_SALES_PREFS, Context.MODE_PRIVATE)
-                    .getString("pending", "[]"));
+private void checkPendingSales() {
+    try {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        
+        int currentBranchId = getActiveBranchId();
+        String prefsName = "pos_offline_sales_branch_" + currentBranchId;
+        JSONArray arr = new JSONArray(ctx
+                .getSharedPreferences(prefsName, Context.MODE_PRIVATE)
+                .getString("pending_sales", "[]"));
             if (arr.length() > 0) {
                 safeRun(() -> {
                     if (tvCartStatus != null) {
@@ -1751,7 +1827,9 @@ private void checkAndPromptPendingSales() {
         Context ctx = getContext();
         if (ctx == null) return;
         
-        SharedPreferences prefs = ctx.getSharedPreferences("pos_offline_sales", Context.MODE_PRIVATE);
+        int currentBranchId = getActiveBranchId();
+        String prefsName = "pos_offline_sales_branch_" + currentBranchId;
+        SharedPreferences prefs = ctx.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
         String existingJson = prefs.getString("pending_sales", "[]");
         JSONArray arr = new JSONArray(existingJson);
         
@@ -1765,38 +1843,70 @@ private void checkAndPromptPendingSales() {
 }
 
 /**
+ * ✅✅✅ التحقق من أن القطعة ليست مباعة محلياً
+ */
+private boolean isItemSoldLocally(String epc) {
+    try {
+        Context ctx = getContext();
+        if (ctx == null) return false;
+        
+        int currentBranchId = getActiveBranchId();
+        String prefsName = "pos_offline_sales_branch_" + currentBranchId;
+        SharedPreferences prefs = ctx.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
+        String existingJson = prefs.getString("pending_sales", "[]");
+        JSONArray arr = new JSONArray(existingJson);
+        
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject sale = arr.optJSONObject(i);
+            if (sale == null) continue;
+            
+            // ✅ فحص القطع في كل عملية بيع معلقة
+            JSONArray items = sale.optJSONArray("items");
+            if (items != null) {
+                for (int j = 0; j < items.length(); j++) {
+                    JSONObject item = items.optJSONObject(j);
+                    if (item != null && epc.equals(item.optString("epc", ""))) {
+                        return true; // ✅ القطعة مباعة محلياً
+                    }
+                }
+            }
+            
+            // ✅ فحص payload أيضاً
+            JSONObject payload = sale.optJSONObject("payload");
+            if (payload != null) {
+                JSONArray payloadItems = payload.optJSONArray("items");
+                if (payloadItems != null) {
+                    for (int j = 0; j < payloadItems.length(); j++) {
+                        JSONObject item = payloadItems.optJSONObject(j);
+                        if (item != null && epc.equals(item.optString("epc", ""))) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return false;
+    } catch (Exception e) {
+        Log.e(TAG, "isItemSoldLocally error: " + e.getMessage());
+        return false;
+    }
+}
+/**
  * ✅ عرض نافذة المزامنة
  */
+ 
 private void showSyncPromptDialog(int pendingCount) {
     try {
         Context ctx = getContext();
         if (ctx == null || !isAdded()) return;
         
-        String message = isArabic ? 
-            "لديك " + pendingCount + " عملية بيع معلقة لم تتم مزامنتها بعد.\n\n" +
-            "هل تريد مزامنتها الآن مع السيرفر؟"
-            :
-            "You have " + pendingCount + " pending sales that haven't been synced yet.\n\n" +
-            "Do you want to sync them now?";
-        
-        new AlertDialog.Builder(ctx)
-            .setTitle(isArabic ? "🔄 مزامنة المبيعات" : "🔄 Sync Sales")
-            .setMessage(message)
-            .setPositiveButton(isArabic ? "✅ مزامنة الآن" : "✅ Sync Now", (dialog, which) -> {
-                dialog.dismiss();
-                syncPendingSales(); // ✅ مزامنة يدوية
-            })
-            .setNegativeButton(isArabic ? "⏳ لاحقاً" : "⏳ Later", (dialog, which) -> {
-                dialog.dismiss();
-                // ✅ تبقى معلقة - سيسأل مرة أخرى لاحقاً
-            })
-            .setCancelable(false)
-            .show();
+        // ✅ بدلاً من رسالة بسيطة، اعرض التفاصيل
+        showPendingSalesDetailsBeforeSync();
     } catch (Exception e) {
         Log.e(TAG, "showSyncPromptDialog error: " + e.getMessage());
     }
 }
-
 /**
  * ✅ مزامنة المبيعات المعلقة - يدوية مع تأكيد
  */
