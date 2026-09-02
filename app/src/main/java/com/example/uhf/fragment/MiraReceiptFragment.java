@@ -338,69 +338,102 @@ public class MiraReceiptFragment extends DialogFragment {
      .append(".signature-line-box { border-top: 1px solid #333; margin-top: 30px; padding-top: 3px; }")
      .append("</style></head><body>");
 
+    // ✅ ترويسة محسّنة
     h.append("<div class='header'>")
      .append("<div class='org-name'>").append(orgName).append("</div>")
-     .append("<div class='org-meta'>").append(address).append(" | ").append(phone).append("</div>")
+     .append("<div class='org-meta'>").append(address).append("</div>")
+     .append("<div class='org-meta'>").append(phone).append("</div>")
      .append("</div>");
 
     try {
         JSONObject root = new JSONObject(receiptJsonStr);
         
-        // ✅✅✅ البحث عن transaction في أماكن متعددة
+        // ✅ البحث عن transaction في أماكن متعددة
         JSONObject t = root.optJSONObject("transaction");
         if (t == null) t = root.optJSONObject("data");
+        if (t == null) t = root.optJSONObject("receipt");
         if (t == null) t = root;
         
-        // ✅ قراءة جميع الحقول مع fallback
-        String saleNumber = t.optString("sale_number", 
-            t.optString("invoice_number", 
-            t.optString("reference", "—")));
+        // ✅✅✅ اسم البائع - البحث في جميع المفاتيح الممكنة
+        String sellerName = t.optString("seller_name", "");
+        if (sellerName.isEmpty()) sellerName = t.optString("seller", "");
+        if (sellerName.isEmpty()) sellerName = t.optString("cashier_name", "");
+        if (sellerName.isEmpty()) sellerName = t.optString("employee_name", "");
+        if (sellerName.isEmpty()) sellerName = t.optString("username", "");
+        if (sellerName.isEmpty()) sellerName = t.optString("user_name", "");
+        if (sellerName.isEmpty()) sellerName = t.optString("created_by", "");
+        if (sellerName.isEmpty()) sellerName = t.optString("user", "");
+        if (sellerName.isEmpty()) sellerName = "—";
         
-        String dateStr = t.optString("timestamp", 
-            t.optString("created_at", 
-            new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date())));
+        // ✅✅✅ الفرع - البحث في جميع المفاتيح الممكنة + fallback من Manager
+        String branchName = t.optString("branch_name", "");
+        if (branchName.isEmpty()) branchName = t.optString("branch", "");
+        if (branchName.isEmpty()) branchName = t.optString("branch_display_name", "");
+        if (branchName.isEmpty()) branchName = t.optString("location", "");
+        if (branchName.isEmpty() && getContext() != null) {
+            try {
+                MiraBranchesManager bm = MiraBranchesManager.getInstance(getContext());
+                if (bm != null && bm.hasActiveBranch()) {
+                    branchName = bm.getActiveBranchDisplayName();
+                }
+            } catch (Exception ignored) {}
+        }
+        if (branchName.isEmpty()) branchName = isArabic ? "الفرع الرئيسي" : "Main Branch";
         
-        String customer = t.optString("customer_name", 
-            t.optString("customer", 
-            isArabic ? "عميل نقدي" : "Cash Customer"));
+        // ✅ رقم الفاتورة
+        String saleNumber = t.optString("sale_number", "");
+        if (saleNumber.isEmpty()) saleNumber = t.optString("invoice_number", "");
+        if (saleNumber.isEmpty()) saleNumber = t.optString("receipt_number", "");
+        if (saleNumber.isEmpty()) saleNumber = t.optString("reference", "");
+        if (saleNumber.isEmpty()) saleNumber = t.optString("id", "—");
         
-        String customerPhone = t.optString("customer_phone", 
-            t.optString("phone", ""));
+        // ✅ التاريخ
+        String dateStr = t.optString("timestamp", "");
+        if (dateStr.isEmpty()) dateStr = t.optString("created_at", "");
+        if (dateStr.isEmpty()) dateStr = t.optString("sale_date", "");
+        if (dateStr.isEmpty()) dateStr = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date());
         
-        String paymentMethod = t.optString("payment_method", 
-            t.optString("payment", "CASH"));
+        // ✅ العميل
+        String customer = t.optString("customer_name", "");
+        if (customer.isEmpty()) customer = t.optString("customer", "");
+        if (customer.isEmpty()) customer = isArabic ? "عميل نقدي" : "Cash Customer";
         
-        String branchName = t.optString("branch_name", 
-            t.optString("branch", 
-            isArabic ? "الفرع الرئيسي" : "Main Branch"));
+        String customerPhone = t.optString("customer_phone", "");
+        if (customerPhone.isEmpty()) customerPhone = t.optString("phone", "");
         
-        String sellerName = t.optString("seller_name", 
-            t.optString("username", 
-            t.optString("user_name", "—")));
+        // ✅ طريقة الدفع
+        String paymentMethod = t.optString("payment_method", "");
+        if (paymentMethod.isEmpty()) paymentMethod = t.optString("payment", "");
+        if (paymentMethod.isEmpty()) paymentMethod = "CASH";
         
-        String currency = t.optString("currency", defaultCurrency);
+        // ✅ العملة
+        String currency = t.optString("currency", "");
+        if (currency.isEmpty()) currency = t.optString("currency_code", "");
+        if (currency.isEmpty()) currency = defaultCurrency;
+        
         double exchangeRate = t.optDouble("exchange_rate", 1.0);
-
+        
         // ✅ عنوان الفاتورة
         h.append("<div class='invoice-title'>")
          .append(isArabic ? "🧾 فاتورة بيع" : "🧾 INVOICE")
          .append("</div>");
 
-        // Info Grid
+        // ✅ Info Grid محسّن
         h.append("<table class='info-grid'>")
          .append("<tr><td class='label'>").append(isArabic ? "رقم الفاتورة:" : "Invoice #:").append("</td><td class='value'>").append(saleNumber).append("</td>")
          .append("<td class='label'>").append(isArabic ? "التاريخ:" : "Date:").append("</td><td class='value'>").append(dateStr).append("</td></tr>")
+         .append("<tr><td class='label'>").append(isArabic ? "البائع:" : "Seller:").append("</td><td class='value'><b>").append(sellerName).append("</b></td>")
+         .append("<td class='label'>").append(isArabic ? "الفرع:" : "Branch:").append("</td><td class='value'><b>").append(branchName).append("</b></td></tr>")
          .append("<tr><td class='label'>").append(isArabic ? "العميل:" : "Customer:").append("</td><td class='value'>").append(customer).append("</td>")
          .append("<td class='label'>").append(isArabic ? "الهاتف:" : "Phone:").append("</td><td class='value'>").append(customerPhone.isEmpty() ? "—" : customerPhone).append("</td></tr>")
-         .append("<tr><td class='label'>").append(isArabic ? "البائع:" : "Seller:").append("</td><td class='value'>").append(sellerName).append("</td>")
-         .append("<td class='label'>").append(isArabic ? "الفرع:" : "Branch:").append("</td><td class='value'>").append(branchName).append("</td></tr>")
          .append("<tr><td class='label'>").append(isArabic ? "طريقة الدفع:" : "Payment:").append("</td><td class='value' colspan='3'>").append(paymentMethod).append("</td></tr>")
          .append("</table>");
 
-        // ✅ Items - البحث في أماكن متعددة
+        // ✅ Items
         JSONArray items = t.optJSONArray("items");
         if (items == null) items = t.optJSONArray("sold_items");
         if (items == null) items = t.optJSONArray("products");
+        if (items == null) items = t.optJSONArray("line_items");
         
         if (items != null && items.length() > 0) {
             h.append("<table class='items'><thead><tr>")
@@ -416,25 +449,32 @@ public class MiraReceiptFragment extends DialogFragment {
                 JSONObject it = items.optJSONObject(i);
                 if (it == null) continue;
                 
-                double weight = it.optDouble("weight", 
-                    it.optDouble("gross_weight", 0.0));
+                double weight = it.optDouble("weight", 0);
+                if (weight == 0) weight = it.optDouble("gross_weight", 0);
+                if (weight == 0) weight = it.optDouble("weight_grams", 0);
                 
-                double itemPriceUSD = it.optDouble("price_usd", 
-                    it.optDouble("sale_price", 
-                    it.optDouble("price", 
-                    it.optDouble("final_price", 0))));
+                double itemPriceUSD = it.optDouble("price_usd", 0);
+                if (itemPriceUSD == 0) itemPriceUSD = it.optDouble("sale_price", 0);
+                if (itemPriceUSD == 0) itemPriceUSD = it.optDouble("price", 0);
+                if (itemPriceUSD == 0) itemPriceUSD = it.optDouble("final_price", 0);
+                if (itemPriceUSD == 0) itemPriceUSD = it.optDouble("total_price", 0);
                 
-                String serial = it.optString("serial_number", 
-                    it.optString("serial", 
-                    it.optString("epc", 
-                    it.optString("code", ""))));
-
-                String title = it.optString("title", 
-                    it.optString("name", 
-                    it.optString("item_title", "—")));
+                String serial = it.optString("serial_number", "");
+                if (serial.isEmpty()) serial = it.optString("serial", "");
+                if (serial.isEmpty()) serial = it.optString("epc", "");
+                if (serial.isEmpty()) serial = it.optString("code", "");
+                if (serial.isEmpty()) serial = it.optString("rfid_tag", "");
                 
-                String karat = it.optString("karat", 
-                    it.optString("gold_karat", "—"));
+                String title = it.optString("title", "");
+                if (title.isEmpty()) title = it.optString("name", "");
+                if (title.isEmpty()) title = it.optString("item_title", "");
+                if (title.isEmpty()) title = it.optString("description", "");
+                if (title.isEmpty()) title = "—";
+                
+                String karat = it.optString("karat", "");
+                if (karat.isEmpty()) karat = it.optString("gold_karat", "");
+                if (karat.isEmpty()) karat = it.optString("purity", "");
+                if (karat.isEmpty()) karat = "—";
 
                 h.append("<tr>")
                  .append("<td>").append(i + 1).append("</td>")
@@ -448,20 +488,24 @@ public class MiraReceiptFragment extends DialogFragment {
             h.append("</tbody></table>");
         }
 
-        // ✅ Totals - مع fallback شامل
-        double subtotalUSD = t.optDouble("subtotal_usd", 
-            t.optDouble("subtotal", 0));
+        // ✅ Totals مع fallback شامل
+        double subtotalUSD = t.optDouble("subtotal_usd", 0);
+        if (subtotalUSD == 0) subtotalUSD = t.optDouble("subtotal", 0);
         
-        double discountUSD = t.optDouble("discount_amount_usd", 
-            t.optDouble("discount_amount", 
-            t.optDouble("discount", 0)));
+        double discountUSD = t.optDouble("discount_amount_usd", 0);
+        if (discountUSD == 0) discountUSD = t.optDouble("discount_amount", 0);
+        if (discountUSD == 0) discountUSD = t.optDouble("discount", 0);
         
-        double finalUSD = t.optDouble("final_amount_usd", 
-            t.optDouble("final_amount", 
-            t.optDouble("total", subtotalUSD - discountUSD)));
+        double finalUSD = t.optDouble("final_amount_usd", 0);
+        if (finalUSD == 0) finalUSD = t.optDouble("final_amount", 0);
+        if (finalUSD == 0) finalUSD = t.optDouble("total", subtotalUSD - discountUSD);
+        if (finalUSD == 0) finalUSD = t.optDouble("grand_total", 0);
+        if (finalUSD == 0) finalUSD = subtotalUSD - discountUSD;
         
-        double finalLocal = t.optDouble("final_amount_local", 
-            t.optDouble("final_amount", finalUSD * exchangeRate));
+        double finalLocal = t.optDouble("final_amount_local", 0);
+        if (finalLocal == 0) finalLocal = t.optDouble("final_amount_local_currency", 0);
+        if (finalLocal == 0) finalLocal = t.optDouble("total_local", 0);
+        if (finalLocal == 0) finalLocal = finalUSD * exchangeRate;
 
         h.append("<table class='totals-table'>")
          .append("<tr><td class='label'>").append(isArabic ? "الإجمالي الفرعي:" : "Subtotal:").append("</td>")
@@ -484,26 +528,33 @@ public class MiraReceiptFragment extends DialogFragment {
          .append("</td></tr>")
          .append("</table>");
 
-        // ✅ المبلغ كتابةً
-        if (finalLocal > 0) {
+        // ✅✅✅ المبلغ كتابةً - بالعملة الصحيحة
+        if (finalLocal > 0 && finalLocal < 100000000) {
             try {
-                String tafweetText = ArabicNumberToWords.convert(finalLocal, 
-                    ArabicNumberToWords.getCurrencyArabicName(currency));
+                String amountInWords;
+                if ("YER".equalsIgnoreCase(currency) || "SAR".equalsIgnoreCase(currency) || "AED".equalsIgnoreCase(currency)) {
+                    // ✅ للعملات المحلية - استخدم المبلغ المحلي
+                    amountInWords = ArabicNumberToWords.convert(finalLocal, 
+                        ArabicNumberToWords.getCurrencyArabicName(currency));
+                } else {
+                    // ✅ للدولار - استخدم المبلغ بالدولار
+                    amountInWords = ArabicNumberToWords.convert(finalUSD, 
+                        ArabicNumberToWords.getCurrencyArabicName("USD"));
+                }
+                
                 h.append("<div style='font-size:10px;font-style:italic;color:#444;text-align:center;margin-top:6px;padding:6px;background:#fafafa;border-radius:4px;border:1px dashed #ccc;'>")
                  .append("<b>").append(isArabic ? "المبلغ كتابةً: " : "Amount in words: ").append("</b>")
-                 .append(tafweetText)
+                 .append(amountInWords)
                  .append("</div>");
             } catch (Exception e) {
                 Log.e(TAG, "Tafweet error: " + e.getMessage());
             }
         }
 
-        // ✅ الضمان
         h.append("<div class='warranty-box'>")
          .append(isArabic ? "🔒 ضمان لمدة سنة واحدة من تاريخ الشراء ضد عيوب التصنيع" : "🔒 1 Year Warranty against manufacturing defects")
          .append("</div>");
 
-        // ✅ QR Code
         String qrData = Uri.encode("Org:" + orgName + "|Invoice:" + saleNumber + "|Total:" + finalUSD + "|Date:" + dateStr);
         String qrApiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + qrData;
         
@@ -514,7 +565,6 @@ public class MiraReceiptFragment extends DialogFragment {
          .append("</span>")
          .append("</div>");
 
-        // ✅ التوقيعات
         h.append("<div class='signature-line'>")
          .append("<div class='signature-box'><div class='signature-line-box'>")
          .append(isArabic ? "توقيع البائع" : "Seller Signature")
@@ -526,7 +576,6 @@ public class MiraReceiptFragment extends DialogFragment {
 
     } catch (Exception e) {
         Log.e(TAG, "Error rendering receipt: " + e.getMessage(), e);
-        // ✅ عرض البيانات الخام إذا فشل التحليل
         h.append("<p style='color:red;text-align:center'>")
          .append(isArabic ? "خطأ في معالجة البيانات" : "Error processing data")
          .append("</p>")
@@ -535,7 +584,6 @@ public class MiraReceiptFragment extends DialogFragment {
          .append("</pre>");
     }
 
-    // Footer
     h.append("<div class='footer'>")
      .append(isArabic ? "شكرًا لتعاملكم معنا" : "Thank you").append("<br>")
      .append(orgName).append(" © 2026")
@@ -543,7 +591,6 @@ public class MiraReceiptFragment extends DialogFragment {
 
     webReceipt.loadDataWithBaseURL(null, h.toString(), "text/html", "UTF-8", null);
 }
-
     private void closeFragment() {
         if (!isAdded()) return;
         dismissAllowingStateLoss();
