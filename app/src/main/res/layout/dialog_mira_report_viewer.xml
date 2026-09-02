@@ -131,29 +131,43 @@
 
     </com.google.android.material.appbar.AppBarLayout>
     
-    <!-- قبل RecyclerView - صورة الرسم البياني -->
-<ScrollView
-    android:id="@+id/scrollChart"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:visibility="gone"
-    app:layout_behavior="@string/appbar_scrolling_view_behavior">
-
-    <ImageView
-        android:id="@+id/ivChart"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:adjustViewBounds="true" />
-</ScrollView>
-
-    <!-- البيانات -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvReportData"
+    <!-- ✅✅✅ NestedScrollView يحتوي على الرسم + البيانات -->
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:clipToPadding="false"
-        android:padding="8dp"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- الرسم البياني -->
+            <FrameLayout
+                android:id="@+id/scrollChart"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/ivChart"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:adjustViewBounds="true" />
+            </FrameLayout>
+
+            <!-- البيانات -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvReportData"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clipToPadding="false"
+                android:padding="8dp"
+                android:nestedScrollingEnabled="false" />
+
+        </LinearLayout>
+
+    </androidx.core.widget.NestedScrollView>
 
     <!-- التحميل -->
     <FrameLayout
