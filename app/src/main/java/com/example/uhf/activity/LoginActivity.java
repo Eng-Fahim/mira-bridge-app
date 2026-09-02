@@ -838,24 +838,49 @@ apiClient = MiraApiClient.getInstance(getApplicationContext());
                 handleLoginSuccess(finalResponse, username, password);
                 
             } else if (finalIsNetworkError || finalResponse == null) {
-                // ✅✅✅ أوفلاين - محاولة التحقق محلياً
-                if (verifyOfflineLogin(username, password)) {
-                    resetFailedAttempts();
-                    playTone(true);
-                    Toast.makeText(LoginActivity.this,
-                        isArabic ? "✅ تم الدخول (وضع الأوفلاين)" : "✅ Offline login successful",
-                        Toast.LENGTH_SHORT).show();
-                    navigateToMain();
-                } else {
-                    recordFailedAttempt();
-                    playTone(false);
-                    Toast.makeText(LoginActivity.this,
-                        isArabic ? "❌ لا يمكن التحقق من بيانات الدخول بدون اتصال" : 
-                                   "❌ Cannot verify credentials offline",
-                        Toast.LENGTH_LONG).show();
-                }
-                
-            } else {
+    // ✅✅✅ أوفلاين - محاولة التحقق محلياً
+    if (verifyOfflineLogin(username, password)) {
+        // ✅ عرض رسالة تأكيد للمستخدم
+        new androidx.appcompat.app.AlertDialog.Builder(LoginActivity.this)
+            .setTitle(isArabic ? "📡 وضع الأوفلاين" : "📡 Offline Mode")
+            .setMessage(isArabic ? 
+                "أنت غير متصل بالإنترنت.\n\n" +
+                "سيتم تسجيل الدخول باستخدام البيانات المحلية.\n" +
+                "بعض الميزات قد لا تعمل حتى يعود الاتصال.\n\n" +
+                "هل تريد المتابعة؟" :
+                "You are offline.\n\n" +
+                "Login will use local data.\n" +
+                "Some features may not work until connection returns.\n\n" +
+                "Do you want to continue?")
+            .setPositiveButton(isArabic ? "✅ متابعة" : "✅ Continue", (dialog, which) -> {
+                dialog.dismiss();
+                resetFailedAttempts();
+                playTone(true);
+                Toast.makeText(LoginActivity.this,
+                    isArabic ? "✅ تم الدخول (وضع الأوفلاين)" : "✅ Offline login successful",
+                    Toast.LENGTH_SHORT).show();
+                navigateToMain();
+            })
+            .setNegativeButton(isArabic ? "❌ إلغاء" : "❌ Cancel", (dialog, which) -> {
+                dialog.dismiss();
+                showLoading(false);
+                Toast.makeText(LoginActivity.this,
+                    isArabic ? "تم الإلغاء - تحقق من اتصالك" : "Cancelled - Check your connection",
+                    Toast.LENGTH_SHORT).show();
+            })
+            .setCancelable(false)
+            .show();
+    } else {
+        recordFailedAttempt();
+        playTone(false);
+        Toast.makeText(LoginActivity.this,
+            isArabic ? "❌ لا يمكن التحقق من بيانات الدخول بدون اتصال\n" +
+                       "يجب تسجيل الدخول مرة واحدة على الأقل مع اتصال بالإنترنت" : 
+                       "❌ Cannot verify credentials offline\n" +
+                       "You must login at least once with internet connection",
+            Toast.LENGTH_LONG).show();
+    }
+}else {
                 // ❌ خطأ من السيرفر
                 recordFailedAttempt();
                 playTone(false);
@@ -1241,4 +1266,4 @@ protected void onDestroy() {
     
     mainHandler.removeCallbacksAndMessages(null);
 }
-}
+                }
