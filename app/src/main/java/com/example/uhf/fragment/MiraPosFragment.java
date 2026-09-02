@@ -1905,19 +1905,23 @@ private void syncPendingSales() {
                                       "failed", errorMsg);
                     }
                 } catch (Exception e) {
-                    failed++;
-                    JSONObject sale = arr.optJSONObject(i);
-                    if (sale != null) {
-                        sale.put("sync_status", "failed");
-                        sale.put("last_error", e.getMessage());
-                        remaining.put(sale);
-                        
-                        saveToSyncLog(sale.optString("sale_id", "Unknown"), currentBranchId, 
-                                      sale.optInt("user_id", -1), sale.optString("username", "Unknown"),
-                                      sale.optDouble("final_amount", 0), sale.optInt("item_count", 0),
-                                      "failed", e.getMessage());
-                    }
-                }
+    failed++;
+    JSONObject sale = arr.optJSONObject(i);
+    if (sale != null) {
+        try {
+            sale.put("sync_status", "failed");
+            sale.put("last_error", e.getMessage());
+        } catch (org.json.JSONException jsonException) {
+            Log.e(TAG, "JSON error: " + jsonException.getMessage());
+        }
+        remaining.put(sale);
+        
+        saveToSyncLog(sale.optString("sale_id", "Unknown"), currentBranchId, 
+                      sale.optInt("user_id", -1), sale.optString("username", "Unknown"),
+                      sale.optDouble("final_amount", 0), sale.optInt("item_count", 0),
+                      "failed", e.getMessage());
+    }
+}
             }
             
             // ✅✅✅ حفظ المتبقي
