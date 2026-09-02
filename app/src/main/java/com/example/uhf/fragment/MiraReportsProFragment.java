@@ -84,18 +84,62 @@ public class MiraReportsProFragment extends Fragment {
     private String lastToDate = "";
     
     @Nullable
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_mira_reports_pro, container, false);
+@Override
+public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                         @Nullable Bundle savedInstanceState) {
+    View view = inflater.inflate(R.layout.fragment_mira_reports_pro, container, false);
+    
+    // ✅ تطبيق الثيم
+    applyTheme(view);
+    
+    initializeManagers();
+    initializeViews(view);
+    initializeEnhancedViews(view);
+    buildReportsList();
+    
+    return view;
+}
+
+/**
+ * ✅ تطبيق الثيم على العناصر
+ */
+private void applyTheme(View view) {
+    try {
+        Context context = getContext();
+        if (context == null) return;
         
-        initializeManagers();
-        initializeViews(view);
-        initializeEnhancedViews(view);
-        buildReportsList();
+        // ✅ الجذر
+        View rootView = view.findViewById(R.id.fragmentRoot);
+        if (rootView != null) {
+            rootView.setBackgroundColor(context.getColor(R.color.report_background));
+        }
         
-        return view;
+        // ✅ SwipeRefresh
+        SwipeRefreshLayout swipeRefresh = view.findViewById(R.id.swipeRefreshReports);
+        if (swipeRefresh != null) {
+            swipeRefresh.setBackgroundColor(context.getColor(R.color.report_background));
+            swipeRefresh.setColorSchemeResources(R.color.report_primary, R.color.report_accent);
+        }
+        
+        // ✅ TabLayout
+        TabLayout tabCategories = view.findViewById(R.id.tabReportCategories);
+        if (tabCategories != null) {
+            tabCategories.setBackgroundColor(context.getColor(R.color.report_surface));
+            tabCategories.setTabTextColors(
+                context.getColor(R.color.report_text_secondary),
+                context.getColor(R.color.report_text_primary)
+            );
+            tabCategories.setSelectedTabIndicatorColor(context.getColor(R.color.report_accent));
+        }
+        
+        // ✅ RecyclerView
+        if (rvReports != null) {
+            rvReports.setBackgroundColor(context.getColor(R.color.report_background));
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "applyTheme error: " + e.getMessage());
     }
+}
     
     @Override
     public void onResume() {
@@ -1247,8 +1291,40 @@ private void exportFormattedAdvancedReport(String type, List<ReportModels.Generi
     
         
         switch (type) {
-            case "sales":
-            return new ReportAdapters.SalesAdapter(itemsArray, isArabic, currency);
+        case "dashboard":
+    // ✅ حساب صافي الإيرادات (بعد المرتجعات)
+    JSONObject dashboardData = data;
+    double grossRevenue = dashboardData.optDouble("total_revenue_usd", 0);
+    double refunds = dashboardData.optDouble("total_refunds_usd", 0);
+    double netRevenue = grossRevenue - refunds;
+    
+    try {
+        dashboardData.put("net_revenue_usd", netRevenue);
+        dashboardData.put("total_refunds_usd", refunds);
+    } catch (Exception e) {}
+    
+    return new GenericAdapter(parseToFormattedGeneric(dashboardData));
+           case "sales":
+    // ✅ استبعاد المرتجعات من الإيرادات
+    JSONArray salesArray = extractItemsArray(data);
+    if (salesArray != null) {
+        JSONArray filteredSales = new JSONArray();
+        for (int i = 0; i < salesArray.length(); i++) {
+            JSONObject sale = salesArray.optJSONObject(i);
+            if (sale != null) {
+                String status = sale.optString("status", "completed");
+                String refundStatus = sale.optString("refund_status", "completed");
+                
+                // ✅ استبعاد المرتجعات من الإيرادات
+                if (!"refunded".equals(status) && !"fully_refunded".equals(status)
+                    && !"refunded".equals(refundStatus) && !"fully_refunded".equals(refundStatus)) {
+                    filteredSales.put(sale);
+                }
+            }
+        }
+        return new ReportAdapters.SalesAdapter(filteredSales, isArabic, currency);
+    }
+    return new ReportAdapters.SalesAdapter(salesArray, isArabic, currency);
             case "inventory":
                 return new ReportAdapters.InventoryAdapter(itemsArray, isArabic);
             case "gates":
@@ -1635,4 +1711,4 @@ private void exportFormattedAdvancedReport(String type, List<ReportModels.Generi
         super.onDestroyView();
         mainHandler.removeCallbacksAndMessages(null);
     }
-                }
+            }
