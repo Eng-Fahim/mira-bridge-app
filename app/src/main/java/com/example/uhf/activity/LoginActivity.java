@@ -124,8 +124,8 @@ public class LoginActivity extends AppCompatActivity {
         // ✅ 2. تهيئة الواجهة
         setContentView(R.layout.activity_login);
         
-        // ✅ 3. تهيئة SessionManager
-        sessionManager = new SessionManager(this);
+        // ✅ 3. تهيئة SessionManager بسياق التطبيق
+        sessionManager = new SessionManager(getApplicationContext());
 
         // ✅ 4. التحقق من تسجيل الدخول مع فحص التوكن
         if (sessionManager.isLoggedIn()) {
@@ -156,8 +156,8 @@ public class LoginActivity extends AppCompatActivity {
         // ✅ 7. تهيئة التشفير
         initializeEncryption();
         
-        // ✅ 8. باقي التهيئة
-        orgProfileManager = MiraOrgProfileManager.getInstance(this);
+        // ✅ 8. باقي التهيئة - استخدام سياق التطبيق
+        orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
         
         initViews();
         disableAutofill();
@@ -417,7 +417,7 @@ public class LoginActivity extends AppCompatActivity {
             tvAppVersion.setText("v1.0.0 Enterprise");
         }
 
-        apiClient = MiraApiClient.getInstance(this);
+        apiClient = MiraApiClient.getInstance(getApplicationContext());
 
         btnLogin.setOnClickListener(v -> attemptApiLogin());
 
@@ -432,8 +432,8 @@ public class LoginActivity extends AppCompatActivity {
                 MiraServerConfig.getInstance(this).setBaseUrl(url);
                 
                 // ✅ إعادة تهيئة API Client
-                MiraApiClient.reloadInstance(this);
-                apiClient = MiraApiClient.getInstance(this);
+                MiraApiClient.reloadInstance(getApplicationContext());
+apiClient = MiraApiClient.getInstance(getApplicationContext());
                 
                 Toast.makeText(this, isArabic ? "✓ تم حفظ رابط الخادم بنجاح" : "✓ Server URL saved", Toast.LENGTH_SHORT).show();
             } else {
@@ -531,13 +531,12 @@ public class LoginActivity extends AppCompatActivity {
         }
         applyOrgProfile();
     }
+private void applyOrgProfile() {
+    if (!isActivityAlive()) return;
 
-    private void applyOrgProfile() {
-        if (!isActivityAlive()) return;
-
-        if (orgProfileManager == null) {
-            orgProfileManager = MiraOrgProfileManager.getInstance(this);
-        }
+    if (orgProfileManager == null) {
+        orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
+    }
         
         if (tvBrandName != null) {
             if (isArabic) {
@@ -795,8 +794,8 @@ public class LoginActivity extends AppCompatActivity {
         showLoading(true);
 
         // ✅ إعادة تهيئة API Client بالرابط الجديد
-        MiraApiClient.reloadInstance(this);
-        apiClient = MiraApiClient.getInstance(this);
+        MiraApiClient.reloadInstance(getApplicationContext());
+apiClient = MiraApiClient.getInstance(getApplicationContext());
 
         // تشفير كلمة المرور قبل الإرسال
         // ✅ إرسال كلمة المرور الأصلية - HTTPS يقوم بالتشفير
@@ -866,6 +865,9 @@ public class LoginActivity extends AppCompatActivity {
    private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
     playTone(true);
 
+    // ✅ استخدام سياق التطبيق لجميع الـ Managers
+    Context appContext = getApplicationContext();
+    
     String token = response.optString("token", "");
     String roleStr = response.optString("role", "ADMIN");
     String displayName = response.optString("display_name", username);
@@ -883,24 +885,28 @@ public class LoginActivity extends AppCompatActivity {
     String apiKey = response.optString("api_key", "");
     String gateId = response.optString("gate_id", "");
     
+    // ✅ حفظ البيانات في SessionManager فقط (مصدر واحد للحقيقة)
     if (!apiKey.isEmpty()) {
         String effectiveGateId = !gateId.isEmpty() ? gateId : deviceId;
         sessionManager.saveApiKey(apiKey);
         sessionManager.saveGateId(effectiveGateId);
-        MiraServerConfig.getInstance(this).saveSession(apiKey, effectiveGateId, token);
+        // ❌ لا نستخدم MiraServerConfig.saveSession بعد الآن
+        // MiraServerConfig.getInstance(this).saveSession(apiKey, effectiveGateId, token);
     }
     
     if (!serverUrl.isEmpty()) {
-        MiraServerConfig.getInstance(this).setBaseUrl(serverUrl);
         sessionManager.setServerUrl(serverUrl);
+        // ✅ تحديث MiraServerConfig للتوافق
+        MiraServerConfig.getInstance(appContext).setBaseUrl(serverUrl);
     }
     
     String permissionsJson = response.optString("permissions", "");
     if (!permissionsJson.isEmpty()) {
-        PermissionManager pm = PermissionManager.getInstance(this);
+        PermissionManager pm = PermissionManager.getInstance(appContext);
         pm.savePermissions(permissionsJson);
     }
 
+    // ✅ حفظ بيانات الجلسة
     sessionManager.createLoginSession(username, roleStr, token, serverUrl);
     sessionManager.setDisplayName(displayName);
     sessionManager.setUserId(userId);
@@ -913,17 +919,13 @@ public class LoginActivity extends AppCompatActivity {
     }
     sessionManager.setBiometricLoginEnabled(biometricEnabled);
 
-    MiraBranchesManager bm = MiraBranchesManager.getInstance(this);
+    // ✅ استخدام سياق التطبيق لـ MiraBranchesManager
+    MiraBranchesManager bm = MiraBranchesManager.getInstance(appContext);
     bm.setActiveBranch(branchId, branchName, branchCode, "", "");
     bm.setUserBranchLocked(true);
 
-    // ✅ انتقل مباشرة مع تمرير اسم المستخدم
-    Intent intent = new Intent(this, UHFMainActivity.class);
-    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-    intent.putExtra("fresh_start", true);
-    intent.putExtra("welcome_name", displayName);
-    startActivity(intent);
-    finish();
+    // ✅ الانتقال إلى النشاط الرئيسي
+    navigateToMain();
 }
 
 /**
@@ -1041,13 +1043,13 @@ private void navigateToMainWithAnimation() {
                         sessionManager.setDisplayName(lastDisplayName);
                         sessionManager.setUserId(lastUserId);
 
-                        int savedBranchId = sessionManager.getLastBiometricBranchId();
-                        String savedBranchName = sessionManager.getLastBiometricBranchName();
-                        if (savedBranchId > 0) {
-                            MiraBranchesManager bm = MiraBranchesManager.getInstance(LoginActivity.this);
-                            bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
-                            bm.setUserBranchLocked(true);
-                        }
+                     int savedBranchId = sessionManager.getLastBiometricBranchId();
+String savedBranchName = sessionManager.getLastBiometricBranchName();
+if (savedBranchId > 0) {
+    MiraBranchesManager bm = MiraBranchesManager.getInstance(getApplicationContext());
+    bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
+    bm.setUserBranchLocked(true);
+}
                     }
                     
                     // إعادة تعيين عداد المحاولات عند نجاح البصمة
@@ -1158,18 +1160,18 @@ private void navigateToMainWithAnimation() {
     }
 
     @Override
-    protected void onDestroy() {
+protected void onDestroy() {
     // ✅ إلغاء التسجيل والتنظيف
-MemoryManager.getInstance().unregisterActivity(this);
-unregisterComponentCallbacks(MemoryManager.getInstance());
-MemoryManager.getInstance().forceCleanup();
-        super.onDestroy();
-        isDestroyed.set(true);
-        
-        if (orgProfileManager != null && profileListener != null) {
-            orgProfileManager.removeListener(profileListener);
-        }
-        
-        mainHandler.removeCallbacksAndMessages(null);
+    MemoryManager.getInstance().unregisterActivity(this);
+    unregisterComponentCallbacks(MemoryManager.getInstance());
+    // ✅ تم حذف forceCleanup() لمنع مسح البيانات المهمة
+    
+    super.onDestroy();
+    isDestroyed.set(true);
+    
+    if (orgProfileManager != null && profileListener != null) {
+        orgProfileManager.removeListener(profileListener);
     }
-                                       }
+    
+    mainHandler.removeCallbacksAndMessages(null);
+}
