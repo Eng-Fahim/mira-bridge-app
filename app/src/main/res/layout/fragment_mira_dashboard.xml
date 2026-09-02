@@ -6,7 +6,7 @@
     android:id="@+id/motionLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:attr/colorBackground"
+    android:background="?attr/colorSurface"
     app:layoutDescription="@xml/dashboard_scene">
 
    <!-- ==================== SHIMMER LOADING ==================== -->
@@ -55,7 +55,7 @@
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:gravity="center"
-        android:background="?android:attr/colorBackground"
+        android:background="?attr/colorSurface"
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true"
@@ -81,6 +81,7 @@
         android:id="@+id/swipeRefresh"
         android:layout_width="0dp"
         android:layout_height="0dp"
+        android:background="?attr/colorSurface"
         android:visibility="visible"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
