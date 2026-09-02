@@ -156,6 +156,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
 
             loadOfflineData();
             updateHeader();
+            showShimmer(false);
             loadDataIfNeeded();
 
             isViewInitialized = true;
@@ -826,46 +827,48 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     }
 
     private void refreshAllData() {
-        try {
-            showShimmer(true);
-            if (tvLiveStatus != null) {
-                tvLiveStatus.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
-                tvLiveStatus.setTextColor(0xFFF59E0B);
-            }
-
-            fetchData();
-
-            long now = System.currentTimeMillis();
-            if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
-                if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
-                    fetchLiveGoldPrices(true);
-                } else {
-                    displayGoldPricesFromCache();
-                    showShimmer(false);
-                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                    updateLiveStatusText(true);
-                }
-            } else {
-                showShimmer(false);
-                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-            }
-        } catch (Exception e) {
-            logNonFatal("refreshAllData", e);
+    try {
+        if (tvLiveStatus != null) {
+            tvLiveStatus.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
+            tvLiveStatus.setTextColor(0xFFF59E0B);
         }
+
+        fetchData();
+
+        long now = System.currentTimeMillis();
+        if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
+            if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+                fetchLiveGoldPrices(true);
+            } else {
+                displayGoldPricesFromCache();
+                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                updateLiveStatusText(true);
+            }
+        } else {
+            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+        }
+    } catch (Exception e) {
+        logNonFatal("refreshAllData", e);
     }
+}
+
 
     private void showShimmer(boolean show) {
-        try {
-            if (shimmerLayout != null) {
-                shimmerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
-            }
-            if (loadingOverlay != null) {
-                loadingOverlay.setVisibility(show ? View.VISIBLE : View.GONE);
-            }
-        } catch (Exception e) {
-            logNonFatal("showShimmer", e);
+    try {
+        if (shimmerLayout != null) {
+            shimmerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
         }
+        if (loadingOverlay != null) {
+            loadingOverlay.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+        if (swipeRefresh != null) {
+            swipeRefresh.setVisibility(show ? View.GONE : View.VISIBLE);
+        }
+    } catch (Exception e) {
+        logNonFatal("showShimmer", e);
     }
+}
+
 
     private void initBranchCache(int branchId) {
         try {
@@ -1095,4 +1098,4 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             logNonFatal("cancelFuture", e);
         }
     }
-}
+                    }
