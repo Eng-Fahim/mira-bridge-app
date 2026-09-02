@@ -630,17 +630,24 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
                         if (!isAdded()) return;
 
                         if (response != null && response.isSuccess && response.data != null) {
-                            saveOfflineData(response.data);
-                            processData(response.data);
-                            isDataLoaded = true;
-                            consecutiveFailures = 0;
-                            updateLiveStatusText(true);
-                            clearCrashlyticsCustomKeys();
-                        } else {
-                            logNonFatal("fetchData.response", new Exception("Dashboard API Failed - code=" + (response != null ? response.code : -1)));
-                            updateLiveStatusText(false);
-                            fetchInventoryDataDirectly(activeBranchId);
-                        }
+    saveOfflineData(response.data);
+    processData(response.data);
+    isDataLoaded = true;
+    consecutiveFailures = 0;
+    updateLiveStatusText(true);
+    clearCrashlyticsCustomKeys();
+    
+    // إخفاء الشيمر والإنعاش فقط عند النجاح
+    showShimmer(false);
+    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+} else {
+    logNonFatal("fetchData.response", new Exception("Dashboard API Failed - code=" + (response != null ? response.code : -1)));
+    updateLiveStatusText(false);
+    
+    // جلب البيانات احتياطياً (هي من ستتكفل بإخفاء الشيمر في نهايتها)
+    fetchInventoryDataDirectly(activeBranchId);
+}
+
                         showShimmer(false);
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                     });
