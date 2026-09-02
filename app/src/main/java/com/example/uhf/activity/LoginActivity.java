@@ -801,66 +801,73 @@ apiClient = MiraApiClient.getInstance(getApplicationContext());
         // ✅ إرسال كلمة المرور الأصلية - HTTPS يقوم بالتشفير
         final String finalPassword = password;
 
-        executeSafeBg(() -> {
-            String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-            MiraApiClient.ApiResponse response = apiClient.login(username, finalPassword, deviceId);
+       executeSafeBg(() -> {
+        String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        
+        MiraApiClient.ApiResponse response = null;
+        boolean isNetworkError = false;
+        
+        try {
+            response = apiClient.login(username, finalPassword, deviceId);
+            if (response != null) {
+                isNetworkError = response.isNetworkError;
+            }
+        } catch (Exception e) {
+            isNetworkError = true;
+        }
+        
+        final boolean finalIsNetworkError = isNetworkError;
+        final MiraApiClient.ApiResponse finalResponse = response;
+        
+        mainHandler.post(() -> {
+            if (!isActivityAlive()) return;
+            showLoading(false);
             
-            mainHandler.post(() -> {
-                if (!isActivityAlive()) return;
-                showLoading(false);
+            if (finalResponse != null && finalResponse.isSuccess) {
+                // ✅ نجاح - تسجيل دخول عبر الإنترنت
+                resetFailedAttempts();
+                sessionManager.saveLastUsername(username);
                 
-                if (response != null && response.isSuccess) {
-                    // إعادة تعيين عداد المحاولات الفاشلة عند النجاح
-                    resetFailedAttempts();
-                    
-                    // حفظ اسم المستخدم للدخول المستقبلي
-                    sessionManager.saveLastUsername(username);
-                    
-                    // التحقق من حالة المستخدم
-                    String userStatus = "active";
-                    if (response.data != null) {
-                        userStatus = response.data.optString("user_status", "active");
-                    }
-                    
-                    if ("suspended".equals(userStatus)) {
-                        playTone(false);
-                        Toast.makeText(LoginActivity.this, 
-                            isArabic ? "⛔ حسابك موقوف - تواصل مع الإدارة" : "⛔ Account suspended - Contact admin",
-                            Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                    
-                    if ("pending".equals(userStatus)) {
-                        playTone(false);
-                        Toast.makeText(LoginActivity.this, 
-                            isArabic ? "⏳ حسابك قيد المراجعة - انتظر الموافقة" : "⏳ Account pending approval",
-                            Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                    
-                    handleLoginSuccess(response, username, password);
-                } else {
-                    // تسجيل محاولة فاشلة
-                    recordFailedAttempt();
-                    
-                    playTone(false);
-                    int errorCode = response != null ? response.code : 0;
-                    String errorMsg;
-                    
-                    if (response != null && response.data != null) {
-                        String serverMessage = response.data.optString("message", null);
-                        errorMsg = getErrorMessage(errorCode, serverMessage);
-                    } else {
-                        errorMsg = getErrorMessage(errorCode, 
-                            isArabic ? "فشل الاتصال بالخادم" : "Connection failed");
-                    }
-                    
-                    Toast.makeText(LoginActivity.this, errorMsg, Toast.LENGTH_LONG).show();
-                    shakeView(loginCard);
+                // ✅ حفظ كلمة المرور المشفرة للاستخدام الأوفلاين
+                if (encryptedPrefs != null) {
+                    encryptedPrefs.edit()
+                        .putString("last_password_hash", hashPassword(password))
+                        .apply();
                 }
-            });
+                
+                handleLoginSuccess(finalResponse, username, password);
+                
+            } else if (finalIsNetworkError || finalResponse == null) {
+                // ✅✅✅ أوفلاين - محاولة التحقق محلياً
+                if (verifyOfflineLogin(username, password)) {
+                    resetFailedAttempts();
+                    playTone(true);
+                    Toast.makeText(LoginActivity.this,
+                        isArabic ? "✅ تم الدخول (وضع الأوفلاين)" : "✅ Offline login successful",
+                        Toast.LENGTH_SHORT).show();
+                    navigateToMain();
+                } else {
+                    recordFailedAttempt();
+                    playTone(false);
+                    Toast.makeText(LoginActivity.this,
+                        isArabic ? "❌ لا يمكن التحقق من بيانات الدخول بدون اتصال" : 
+                                   "❌ Cannot verify credentials offline",
+                        Toast.LENGTH_LONG).show();
+                }
+                
+            } else {
+                // ❌ خطأ من السيرفر
+                recordFailedAttempt();
+                playTone(false);
+                int errorCode = finalResponse.code;
+                String errorMsg = getErrorMessage(errorCode,
+                    isArabic ? "فشل الاتصال بالخادم" : "Connection failed");
+                Toast.makeText(LoginActivity.this, errorMsg, Toast.LENGTH_LONG).show();
+                shakeView(loginCard);
+            }
         });
-    }
+    });
+}
 
    private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
     playTone(true);
@@ -1117,6 +1124,62 @@ if (savedBranchId > 0) {
             });
         }
     }
+    
+    /**
+ * ✅✅✅ التحقق من بيانات الدخول محلياً (أوفلاين)
+ */
+private boolean verifyOfflineLogin(String username, String password) {
+    try {
+        // ✅ 1. التحقق من البصمة المحفوظة
+        String lastBiometricUser = sessionManager.getLastBiometricUser();
+        String lastBiometricRole = sessionManager.getLastBiometricRole();
+        String lastDisplayName = sessionManager.getLastBiometricDisplayName();
+        int lastUserId = sessionManager.getLastBiometricUserId();
+        String lastToken = sessionManager.getLastBiometricToken();
+        
+        if (username.equals(lastBiometricUser)) {
+            // ✅ المستخدم مطابق - إنشاء جلسة محلية
+            sessionManager.createLoginSession(username, lastBiometricRole,
+                lastToken.isEmpty() ? "OFFLINE_TOKEN" : lastToken,
+                sessionManager.getServerUrl());
+            sessionManager.setDisplayName(lastDisplayName);
+            sessionManager.setUserId(lastUserId);
+            
+            int savedBranchId = sessionManager.getLastBiometricBranchId();
+            String savedBranchName = sessionManager.getLastBiometricBranchName();
+            if (savedBranchId > 0) {
+                MiraBranchesManager bm = MiraBranchesManager.getInstance(getApplicationContext());
+                bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
+                bm.setUserBranchLocked(true);
+            }
+            
+            return true;
+        }
+        
+        // ✅ 2. التحقق من كلمة المرور المشفرة المحفوظة
+        if (encryptedPrefs != null) {
+            String savedPasswordHash = encryptedPrefs.getString("last_password_hash", "");
+            String currentHash = hashPassword(password);
+            
+            if (!savedPasswordHash.isEmpty() && savedPasswordHash.equals(currentHash)) {
+                // ✅ كلمة المرور صحيحة - إنشاء جلسة
+                sessionManager.createLoginSession(username, 
+                    sessionManager.getLastBiometricRole(),
+                    "OFFLINE_TOKEN",
+                    sessionManager.getServerUrl());
+                sessionManager.setDisplayName(sessionManager.getLastBiometricDisplayName());
+                sessionManager.setUserId(sessionManager.getLastBiometricUserId());
+                
+                return true;
+            }
+        }
+        
+        return false;
+    } catch (Exception e) {
+        Log.e(TAG, "verifyOfflineLogin error: " + e.getMessage());
+        return false;
+    }
+}
 
     /**
      * تحديث حالة زر البصمة
