@@ -855,7 +855,6 @@ private void parseItemResponse(String code, JSONObject data) {
     try {
         JSONObject item;
         
-        // ✅ إذا كان data يحتوي على "item" داخله
         if (data.has("item")) {
             item = data.optJSONObject("item");
         } else {
@@ -868,6 +867,33 @@ private void parseItemResponse(String code, JSONObject data) {
         }
         
         String vaultStatus = item.optString("status", item.optString("vault_status", "")).toLowerCase();
+        
+        // ✅✅✅ فحص: إذا كانت القطعة مباعة
+        if ("sold".equals(vaultStatus) || "exited".equals(vaultStatus)) {
+            safeRun(() -> {
+                dismissSearchLoadingDialog();
+                showSuccessMessage(
+                    isArabic ? "❌ قطعة مباعة" : "❌ Item Sold",
+                    isArabic ? "هذه القطعة تم بيعها بالفعل ولا يمكن بيعها مرة أخرى" : 
+                               "This item has already been sold",
+                    false
+                );
+                playAlertSound(2);
+            });
+            
+            // ✅ إزالة من الكاش المحلي
+            try {
+                Context ctx = getContext();
+                if (ctx != null) {
+                    MiraLocalItemCache.getInstance(ctx).removeItem(code);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Remove from cache: " + e.getMessage());
+            }
+            
+            return;
+        }
+        
         boolean isAvailable = !vaultStatus.equals("sold") && !vaultStatus.equals("reserved");
         String title = item.optString("title", item.optString("item_title", isArabic ? "قطعة" : "Item"));
         String karat = item.optString("karat", item.optString("gold_karat", "21K"));
@@ -883,8 +909,6 @@ private void parseItemResponse(String code, JSONObject data) {
         cartItem.gtin = item.optString("gtin", item.optString("gtin13", ""));
         cartItem.location = item.optString("location", item.optString("current_location", ""));
         cartItem.itemId = item.optInt("id", item.optInt("item_id", 0));
-        
-        final double finalPrice = price;
         
         safeRun(() -> {
             if (!isAvailable) {
@@ -1238,19 +1262,25 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
                     setButtonsEnabled(true);
                     
                     if (finalIsSuccess) {
-                        // ✅ نجاح - إزالة من المحلي
-                        removeSaleFromLocal(localSaleId);
-                        playAlertSound(1);
-                        clearCart();
-                        showReceipt(finalResponse);
-                        
-                    } else if (finalIsNetworkError || finalResponse == null) {
-                        // ✅✅✅ أوفلاين - البيع محفوظ محلياً - لا نعرض خطأ!
-                        playAlertSound(1);
-                        clearCart();
-                        showOfflineSaleSuccess(localSaleId, data);
-                        
-                    } else {
+    // ✅ نجاح - إزالة من المحلي
+    removeSaleFromLocal(localSaleId);
+    
+    // ✅✅✅ جديد: إزالة القطع المباعة من الكاش المحلي
+    removeSoldItemsFromCache();
+    
+    playAlertSound(1);
+    clearCart();
+    showReceipt(finalResponse);
+    
+} else if (finalIsNetworkError || finalResponse == null) {
+    // ✅✅✅ أوفلاين - البيع محفوظ محلياً
+    // ✅✅✅ مهم: إزالة القطع من الكاش المحلي أيضاً
+    removeSoldItemsFromCache();
+    
+    playAlertSound(1);
+    clearCart();
+    showOfflineSaleSuccess(localSaleId, data);
+} else {
                         // ❌ خطأ من السيرفر (ليس أوفلاين) - إعادة محاولة
                         showRetryDialog(
                             isArabic ? "❌ فشل البيع" : "❌ Sale Failed",
@@ -2349,5 +2379,27 @@ private void processRefund(String code, String reason) {
             });
         }
     });
+}
+
+/**
+ * ✅✅✅ إزالة القطع المباعة من الكاش المحلي
+ */
+private void removeSoldItemsFromCache() {
+    try {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        
+        MiraLocalItemCache localCache = MiraLocalItemCache.getInstance(ctx);
+        
+        for (CartItem item : cartList) {
+            localCache.removeItem(item.epc);
+            localCache.removeItem(item.serialNo);
+            localCache.removeItem(item.gtin);
+            
+            Log.d(TAG, "✅ Removed from cache: " + item.epc);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "removeSoldItemsFromCache: " + e.getMessage());
+    }
 }
             }
