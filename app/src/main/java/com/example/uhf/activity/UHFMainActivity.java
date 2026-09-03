@@ -245,14 +245,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             loadEssentialData();
 
-            // 7. إدارة التنقل والـ Fragments (إصلاح التحميل لتجنب الشاشة السوداء)
+            // 7. إدارة التنقل والـ Fragments
             if (savedInstanceState == null) {
                 currentFragmentTag = "Dashboard";
             } else {
                 currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
             }
-            
-            // إعادة تحميل الواجهة دائماً بشكل آمن لضمان عدم وجود View ميت
+
             loadFragmentByTag(currentFragmentTag);
 
         } catch (Exception e) {
@@ -675,7 +674,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             FragmentTransaction transaction = fragmentManager.beginTransaction();
             
-            // إلغاء أي أنيميشن لمنع تجمد الشاشة
             transaction.setCustomAnimations(0, 0, 0, 0);
             transaction.replace(R.id.fragment_container, fragment, tag);
 
@@ -1127,11 +1125,21 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private void navigateToLogin() {
         try {
+            try {
+                if (mReader != null) {
+                    mReader.free();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error resetting RFID services", e);
+            }
+
             Intent intent = new Intent(this, LoginActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);
             finish();
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            Log.e(TAG, "Navigation to login error: " + e.getMessage());
+        }
     }
 
     @Override
