@@ -4,13 +4,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/report_background">
+    android:background="?attr/colorSurface">
 
     <!-- شريط علوي -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorSurface"
+        android:background="?attr/colorPrimaryContainer"
         app:elevation="2dp">
 
         <androidx.constraintlayout.widget.ConstraintLayout
@@ -24,7 +24,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:text="نتائج التقرير المالي والجرام"
-                android:textColor="?attr/colorOnSurface"
+                android:textColor="?attr/colorOnPrimaryContainer"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 app:layout_constraintBottom_toBottomOf="parent"
@@ -38,7 +38,7 @@
                 android:layout_width="36dp"
                 android:layout_height="36dp"
                 app:icon="@android:drawable/ic_menu_close_clear_cancel"
-                app:iconTint="?attr/colorOnSurface"
+                app:iconTint="?attr/colorOnPrimaryContainer"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
 
@@ -61,6 +61,8 @@
                 android:padding="0dp"
                 android:text="من: 2026-08-01"
                 android:textSize="11sp"
+                android:textColor="?attr/colorPrimary"
+                app:strokeColor="?attr/colorPrimary"
                 app:cornerRadius="8dp" />
 
             <com.google.android.material.button.MaterialButton
@@ -73,6 +75,8 @@
                 android:padding="0dp"
                 android:text="إلى: 2026-08-30"
                 android:textSize="11sp"
+                android:textColor="?attr/colorPrimary"
+                app:strokeColor="?attr/colorPrimary"
                 app:cornerRadius="8dp" />
 
             <com.google.android.material.button.MaterialButton
@@ -103,6 +107,8 @@
                 android:layout_weight="1"
                 android:text="فلترة خيارات"
                 android:textSize="10sp"
+                android:textColor="?attr/colorOnSecondaryContainer"
+                app:backgroundTint="?attr/colorSecondaryContainer"
                 app:cornerRadius="8dp" />
 
             <com.google.android.material.button.MaterialButton
@@ -114,6 +120,8 @@
                 android:layout_weight="1"
                 android:text="تصدير Excel/PDF"
                 android:textSize="10sp"
+                android:textColor="?attr/colorOnSecondaryContainer"
+                app:backgroundTint="?attr/colorSecondaryContainer"
                 app:cornerRadius="8dp" />
 
             <com.google.android.material.button.MaterialButton
@@ -125,16 +133,19 @@
                 android:layout_weight="1"
                 android:text="طباعة"
                 android:textSize="10sp"
+                android:textColor="?attr/colorOnSecondaryContainer"
+                app:backgroundTint="?attr/colorSecondaryContainer"
                 app:cornerRadius="8dp" />
 
         </LinearLayout>
 
     </com.google.android.material.appbar.AppBarLayout>
     
-    <!-- ✅✅✅ NestedScrollView يحتوي على الرسم + البيانات -->
+    <!-- NestedScrollView يحتوي على الرسم + البيانات -->
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="?attr/colorSurface"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <LinearLayout
@@ -185,7 +196,7 @@
             android:layout_gravity="center"
             app:cardCornerRadius="16dp"
             app:cardElevation="6dp"
-            app:cardBackgroundColor="?attr/colorSurface">
+            app:cardBackgroundColor="?attr/colorSurfaceVariant">
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -220,6 +231,7 @@
         android:gravity="center"
         android:orientation="vertical"
         android:visibility="gone"
+        android:background="?attr/colorSurface"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <ImageView
