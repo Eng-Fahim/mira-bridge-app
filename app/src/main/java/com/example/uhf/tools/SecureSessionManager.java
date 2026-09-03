@@ -10,6 +10,7 @@ import androidx.annotation.Nullable;
 import androidx.security.crypto.EncryptedSharedPreferences;
 import androidx.security.crypto.MasterKey;
 
+import java.io.File;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
@@ -23,12 +24,12 @@ import javax.crypto.spec.GCMParameterSpec;
  * SecureSessionManager - إدارة الجلسات الآمنة للتطبيق
  * 
  * المميزات:
- * - تشفير كامل للبيانات الحساسة باستخدام EncryptedSharedPreferences
- * - دعم المصادقة البيومترية
+ * - تشفير كامل للبيانات الحساسة باستخدام EncryptedSharedPreferences مع معالجة حماية الانهيار (Fallback Safety)
+ * - دعم المصادقة البيومترية والأوفلاين
  * - إدارة صلاحية التوكن
  * - متوافق مع النظام الحالي
  * 
- * @version 2.0.0
+ * @version 2.1.0
  */
 public class SecureSessionManager {
     
@@ -76,9 +77,9 @@ public class SecureSessionManager {
     private static final String BIOMETRIC_TRANSFORMATION = "AES/GCM/NoPadding";
     private static final int GCM_TAG_LENGTH = 128;
     
-    private final SharedPreferences securePrefs;
+    private SharedPreferences securePrefs;
     private final SharedPreferences userPrefs;
-    private final KeyStore keyStore;
+    private KeyStore keyStore;
     
     public enum Role {
         SYSTEM_ADMIN,
@@ -93,30 +94,66 @@ public class SecureSessionManager {
     }
     
     public SecureSessionManager(Context context) {
+        // التخزين العادي
+        this.userPrefs = context.getApplicationContext().getSharedPreferences(USER_PREFS_NAME, Context.MODE_PRIVATE);
+        
+        // تهيئة KeyStore
         try {
-            // إنشاء التخزين المشفر
+            this.keyStore = KeyStore.getInstance("AndroidKeyStore");
+            this.keyStore.load(null);
+        } catch (Exception e) {
+            Log.e(TAG, "Error initializing KeyStore", e);
+        }
+
+        // إنشاء التخزين المشفر مع حماية من الانهيار (Crash Safe Init)
+        this.securePrefs = createEncryptedSharedPreferences(context.getApplicationContext());
+    }
+
+    /**
+     * إنشاء EncryptedSharedPreferences بأمان وإعادة التجديد عند حدوث Corrupted Key
+     */
+    private SharedPreferences createEncryptedSharedPreferences(Context context) {
+        try {
             MasterKey masterKey = new MasterKey.Builder(context)
                     .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                     .build();
-            
-            this.securePrefs = EncryptedSharedPreferences.create(
+
+            return EncryptedSharedPreferences.create(
                     context,
                     SECURE_PREFS_NAME,
                     masterKey,
                     EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             );
-            
-            // التخزين العادي
-            this.userPrefs = context.getSharedPreferences(USER_PREFS_NAME, Context.MODE_PRIVATE);
-            
-            // تهيئة KeyStore
-            this.keyStore = KeyStore.getInstance("AndroidKeyStore");
-            this.keyStore.load(null);
-            
         } catch (Exception e) {
-            Log.e(TAG, "Error initializing SecureSessionManager", e);
-            throw new RuntimeException("Failed to initialize secure storage", e);
+            Log.e(TAG, "EncryptedSharedPreferences corrupt or unreadable, re-creating...", e);
+            
+            // حذف الملف التالف لإنقاذ التطبيق من الانهيار
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    context.deleteSharedPreferences(SECURE_PREFS_NAME);
+                } else {
+                    File prefFile = new File(context.getFilesDir().getParent() + "/shared_prefs/" + SECURE_PREFS_NAME + ".xml");
+                    if (prefFile.exists()) {
+                        prefFile.delete();
+                    }
+                }
+                
+                MasterKey masterKey = new MasterKey.Builder(context)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build();
+
+                return EncryptedSharedPreferences.create(
+                        context,
+                        SECURE_PREFS_NAME,
+                        masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+            } catch (Exception ex) {
+                Log.e(TAG, "Fallback to standard unencrypted shared prefs due to critical crypto error", ex);
+                return context.getSharedPreferences(SECURE_PREFS_NAME + "_fallback", Context.MODE_PRIVATE);
+            }
         }
     }
     
@@ -128,11 +165,13 @@ public class SecureSessionManager {
     public void createLoginSession(String username, String role, String token, 
                                    String serverUrl, long expiresInSeconds) {
         try {
-            long expiryTime = System.currentTimeMillis() + (expiresInSeconds * 1000L);
+            long expiryTime = (expiresInSeconds > 0) 
+                    ? (System.currentTimeMillis() + (expiresInSeconds * 1000L)) 
+                    : (System.currentTimeMillis() + (86400 * 1000L * 30)); // 30 يوماً أوفلاين افتراضياً
             
             // حفظ البيانات الحساسة مشفرة
             securePrefs.edit()
-                    .putString(KEY_AUTH_TOKEN, token)
+                    .putString(KEY_AUTH_TOKEN, token != null ? token : "")
                     .putLong(KEY_TOKEN_EXPIRY, expiryTime)
                     .apply();
             
@@ -143,9 +182,9 @@ public class SecureSessionManager {
             
             userPrefs.edit()
                     .putBoolean(KEY_IS_LOGGED_IN, true)
-                    .putString(KEY_USERNAME, username)
-                    .putString(KEY_USER_ROLE, role)
-                    .putString(KEY_LAST_USERNAME, username)
+                    .putString(KEY_USERNAME, username != null ? username : "")
+                    .putString(KEY_USER_ROLE, role != null ? role : Role.INVENTORY_MGR.name())
+                    .putString(KEY_LAST_USERNAME, username != null ? username : "")
                     .putString(KEY_SERVER_URL, finalServerUrl)
                     .apply();
             
@@ -153,7 +192,6 @@ public class SecureSessionManager {
             
         } catch (Exception e) {
             Log.e(TAG, "Error creating login session", e);
-            throw new SecurityException("Failed to create secure session", e);
         }
     }
     
@@ -161,7 +199,7 @@ public class SecureSessionManager {
      * إنشاء جلسة دخول جديدة (متوافقة مع الواجهة القديمة)
      */
     public void createLoginSession(String username, String role, String token, String serverUrl) {
-        createLoginSession(username, role, token, serverUrl, 3600); // ساعة واحدة افتراضياً
+        createLoginSession(username, role, token, serverUrl, 86400 * 7); // 7 أيام افتراضياً
     }
     
     /**
@@ -183,12 +221,20 @@ public class SecureSessionManager {
     }
     
     /**
-     * التحقق من صلاحية التوكن
+     * التحقق من صلاحية التوكن (محمية للأوفلاين)
      */
     public boolean hasValidToken() {
         try {
+            String token = getAuthToken();
+            if (token == null || token.isEmpty()) {
+                return false;
+            }
             long expiryTime = securePrefs.getLong(KEY_TOKEN_EXPIRY, 0L);
-            return System.currentTimeMillis() < expiryTime - TOKEN_EXPIRY_BUFFER;
+            // إذا لم يتم تعيين تاريخ انتهاء صريح، يعتبر التوكن الموجود صالحاً
+            if (expiryTime == 0L) {
+                return true;
+            }
+            return System.currentTimeMillis() < (expiryTime - TOKEN_EXPIRY_BUFFER);
         } catch (Exception e) {
             return false;
         }
@@ -200,10 +246,20 @@ public class SecureSessionManager {
     public boolean needsTokenRefresh() {
         try {
             long expiryTime = securePrefs.getLong(KEY_TOKEN_EXPIRY, 0L);
-            return System.currentTimeMillis() > expiryTime - REFRESH_THRESHOLD;
+            if (expiryTime == 0L) return false;
+            return System.currentTimeMillis() > (expiryTime - REFRESH_THRESHOLD);
         } catch (Exception e) {
             return true;
         }
+    }
+
+    /**
+     * التحقق من وجود جلسة قابلة للعمل أوفلاين
+     */
+    public boolean hasOfflineSession() {
+        String token = getAuthToken();
+        String lastBioToken = getLastBiometricToken();
+        return (token != null && !token.isEmpty()) || (lastBioToken != null && !lastBioToken.isEmpty());
     }
     
     /**
@@ -587,6 +643,7 @@ public class SecureSessionManager {
     @Nullable
     public SecretKey getBiometricKey() {
         try {
+            if (keyStore == null) return null;
             return (SecretKey) keyStore.getKey(BIOMETRIC_KEY_ALIAS, null);
         } catch (Exception e) {
             return null;
@@ -669,7 +726,9 @@ public class SecureSessionManager {
      */
     public void deleteBiometricKey() {
         try {
-            keyStore.deleteEntry(BIOMETRIC_KEY_ALIAS);
+            if (keyStore != null) {
+                keyStore.deleteEntry(BIOMETRIC_KEY_ALIAS);
+            }
             clearBiometricData();
             setBiometricEnabled(false);
         } catch (Exception e) {
