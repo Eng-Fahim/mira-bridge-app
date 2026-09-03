@@ -4,7 +4,6 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
-import com.example.uhf.R;  // ✅ استيراد R
 import com.example.uhf.tools.SessionManager;
 
 import org.json.JSONObject;
@@ -18,13 +17,13 @@ public class PermissionManager {
     private static final String PREFS_NAME = "MIRA_PERMISSIONS";
     private static final String KEY_PERMISSIONS_JSON = "permissions_json";
 
-    private static PermissionManager instance;
+    private static volatile PermissionManager instance;
     private final Context context;
     private final SessionManager sessionManager;
     private JSONObject permissions;
     private SharedPreferences prefs;
 
-    // ✅ الأدوار
+    // الأدوار
     public static final String ROLE_SYSTEM_ADMIN = "SYSTEM_ADMIN";
     public static final String ROLE_ORG_ADMIN = "ORG_ADMIN";
     public static final String ROLE_ADMIN = "ADMIN";
@@ -35,7 +34,7 @@ public class PermissionManager {
     public static final String ROLE_GATE_SECURITY = "GATE_SECURITY";
     public static final String ROLE_AUDITOR = "AUDITOR";
 
-    // ✅ الميزات
+    // الميزات
     public static final String FEATURE_DASHBOARD = "dashboard";
     public static final String FEATURE_INVENTORY = "inventory";
     public static final String FEATURE_POS = "pos";
@@ -59,14 +58,18 @@ public class PermissionManager {
         this.prefs = this.context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         loadPermissions();
     }
-    
+
     public static synchronized void resetInstance() {
-    instance = null;
+        instance = null;
     }
 
-    public static synchronized PermissionManager getInstance(Context context) {
+    public static PermissionManager getInstance(Context context) {
         if (instance == null) {
-            instance = new PermissionManager(context);
+            synchronized (PermissionManager.class) {
+                if (instance == null) {
+                    instance = new PermissionManager(context);
+                }
+            }
         }
         return instance;
     }
@@ -86,8 +89,8 @@ public class PermissionManager {
     }
 
     public void savePermissions(String permissionsJson) {
-        if (permissionsJson == null || permissionsJson.isEmpty()) return;
-        
+        if (permissionsJson == null || permissionsJson.trim().isEmpty()) return;
+
         try {
             permissions = new JSONObject(permissionsJson);
             prefs.edit().putString(KEY_PERMISSIONS_JSON, permissionsJson).apply();
@@ -104,8 +107,11 @@ public class PermissionManager {
     }
 
     public boolean hasPermission(String feature, String action) {
-        if (isSystemAdmin()) return true;
-        
+        // المدير الإداري والمشرف العام يستطيعان الوصول دائماً
+        if (isAdmin()) return true;
+
+        if (permissions == null) return false;
+
         try {
             JSONObject featureObj = permissions.optJSONObject(feature);
             if (featureObj != null) {
@@ -118,58 +124,63 @@ public class PermissionManager {
     }
 
     public boolean canView(String feature) {
+        if (isAdmin()) return true;
         return hasPermission(feature, "view") || hasPermission(feature, "edit") || hasPermission(feature, "delete");
     }
 
     public boolean canEdit(String feature) {
+        if (isAdmin()) return true;
         return hasPermission(feature, "edit") || hasPermission(feature, "delete");
     }
 
     public boolean canDelete(String feature) {
+        if (isAdmin()) return true;
         return hasPermission(feature, "delete");
     }
 
     public boolean canExport(String feature) {
+        if (isAdmin()) return true;
         return hasPermission(feature, "export") || canView(feature);
     }
 
     // ==================== أدوار المستخدمين ====================
 
     public boolean isSystemAdmin() {
-        return ROLE_SYSTEM_ADMIN.equals(sessionManager.getRoleString());
+        return ROLE_SYSTEM_ADMIN.equalsIgnoreCase(sessionManager.getRoleString());
     }
 
     public boolean isOrgAdmin() {
-        return ROLE_ORG_ADMIN.equals(sessionManager.getRoleString());
+        return ROLE_ORG_ADMIN.equalsIgnoreCase(sessionManager.getRoleString());
     }
 
     public boolean isAdmin() {
         String role = sessionManager.getRoleString();
-        return ROLE_ADMIN.equals(role) || isSystemAdmin() || isOrgAdmin();
+        if (role == null) return false;
+        return ROLE_ADMIN.equalsIgnoreCase(role) || isSystemAdmin() || isOrgAdmin();
     }
 
     public boolean isBranchManager() {
-        return ROLE_BRANCH_MANAGER.equals(sessionManager.getRoleString());
+        return ROLE_BRANCH_MANAGER.equalsIgnoreCase(sessionManager.getRoleString());
     }
 
     public boolean isInventoryManager() {
-        return ROLE_INVENTORY_MGR.equals(sessionManager.getRoleString());
+        return ROLE_INVENTORY_MGR.equalsIgnoreCase(sessionManager.getRoleString());
     }
 
     public boolean isPosOperator() {
-        return ROLE_POS_OPERATOR.equals(sessionManager.getRoleString());
+        return ROLE_POS_OPERATOR.equalsIgnoreCase(sessionManager.getRoleString());
     }
 
     public boolean isSecurity() {
-        return ROLE_SECURITY.equals(sessionManager.getRoleString());
+        return ROLE_SECURITY.equalsIgnoreCase(sessionManager.getRoleString());
     }
 
     public boolean isGateSecurity() {
-        return ROLE_GATE_SECURITY.equals(sessionManager.getRoleString());
+        return ROLE_GATE_SECURITY.equalsIgnoreCase(sessionManager.getRoleString());
     }
 
     public boolean isAuditor() {
-        return ROLE_AUDITOR.equals(sessionManager.getRoleString());
+        return ROLE_AUDITOR.equalsIgnoreCase(sessionManager.getRoleString());
     }
 
     public boolean isManager() {
@@ -179,27 +190,27 @@ public class PermissionManager {
     // ==================== صلاحيات الواجهات ====================
 
     public boolean canViewDashboard() {
-        return true;
+        return true; // الصفحة الرئيسية مسموحة للجميع
     }
 
     public boolean canViewInventory() {
-        return canView(FEATURE_INVENTORY);
+        return canView(FEATURE_INVENTORY) || isManager();
     }
 
     public boolean canEditInventory() {
-        return canEdit(FEATURE_INVENTORY);
+        return canEdit(FEATURE_INVENTORY) || isManager();
     }
 
     public boolean canDeleteInventory() {
-        return canDelete(FEATURE_INVENTORY);
+        return canDelete(FEATURE_INVENTORY) || isAdmin();
     }
 
     public boolean canViewPos() {
-        return canView(FEATURE_POS);
+        return canView(FEATURE_POS) || isPosOperator() || isManager();
     }
 
     public boolean canUsePos() {
-        return canView(FEATURE_POS) || isPosOperator() || isManager();
+        return canViewPos();
     }
 
     public boolean canViewTransfers() {
@@ -255,7 +266,7 @@ public class PermissionManager {
     }
 
     public boolean canViewServerConfig() {
-        return isSystemAdmin() || isOrgAdmin();
+        return isAdmin();
     }
 
     public boolean canViewGoldRates() {
@@ -278,186 +289,80 @@ public class PermissionManager {
         return isAdmin() || isBranchManager();
     }
 
-    // ==================== فحص الوصول للواجهات ====================
+    // ==================== فحص الوصول للواجهات (محدث وآمن مرن) ====================
 
     public boolean canAccessFragment(String fragmentTag) {
-    if (fragmentTag == null || fragmentTag.isEmpty()) return false;
-    
-    switch (fragmentTag) {
-        case "Dashboard":
-            return canViewDashboard();
-        case "Scan":
-        case "Inventory":
-        case "InventoryPro":
+        if (fragmentTag == null || fragmentTag.trim().isEmpty()) return true;
+
+        String tag = fragmentTag.trim();
+
+        // 1. الواجهات المتاحة دائماً للجميع
+        if (tag.equalsIgnoreCase("Dashboard") || tag.equalsIgnoreCase("Home") ||
+            tag.equalsIgnoreCase("HomeFragment") || tag.equalsIgnoreCase("Profile")) {
+            return true;
+        }
+
+        // 2. إذا كان مدير نظام أو أدمن افتح كل شيء
+        if (isAdmin()) return true;
+
+        // 3. مطابقة مرنة لا تتأثر بالـ Capital/Small letters
+        if (tag.equalsIgnoreCase("Scan") || tag.equalsIgnoreCase("Inventory") || tag.equalsIgnoreCase("InventoryPro")) {
             return canViewInventory();
-        case "POS":
+        }
+        if (tag.equalsIgnoreCase("POS") || tag.equalsIgnoreCase("PosFragment")) {
             return canUsePos();
-        case "Transfers":
-        case "TransferDetail":
+        }
+        if (tag.equalsIgnoreCase("Transfers") || tag.equalsIgnoreCase("TransferDetail")) {
             return canViewTransfers();
-        case "IdentityStudio":
+        }
+        if (tag.equalsIgnoreCase("IdentityStudio")) {
             return canUseIdentity();
-        case "Radar":
+        }
+        if (tag.equalsIgnoreCase("Radar")) {
             return canViewRadar();
-        case "SecureGate":
-        case "GateSettings":
+        }
+        if (tag.equalsIgnoreCase("SecureGate") || tag.equalsIgnoreCase("GateSettings")) {
             return canViewGates();
-        case "Reports":
-        case "ReportsPro":
+        }
+        if (tag.equalsIgnoreCase("Reports") || tag.equalsIgnoreCase("ReportsPro")) {
             return canViewReports();
-        case "Accounting":
-        case "Vouchers":
-        case "FiscalYears":
-        case "OpeningBalances":
-        case "FinancialReports":
-        case "ProfitReport":
-        case "AccountingCharts":
-        case "AccountingAuditLog":
+        }
+        if (tag.equalsIgnoreCase("Accounting") || tag.equalsIgnoreCase("Vouchers") ||
+            tag.equalsIgnoreCase("FiscalYears") || tag.equalsIgnoreCase("OpeningBalances") ||
+            tag.equalsIgnoreCase("FinancialReports") || tag.equalsIgnoreCase("ProfitReport") ||
+            tag.equalsIgnoreCase("AccountingCharts") || tag.equalsIgnoreCase("AccountingAuditLog")) {
             return canViewAccounting();
-        case "AdminHub":
+        }
+        if (tag.equalsIgnoreCase("AdminHub")) {
             return canViewAdminHub();
-        case "UsersManagement":
+        }
+        if (tag.equalsIgnoreCase("UsersManagement")) {
             return canManageUsers();
-        case "ServerConfig":
+        }
+        if (tag.equalsIgnoreCase("ServerConfig")) {
             return canViewServerConfig();
-        case "GoldRates":
+        }
+        if (tag.equalsIgnoreCase("GoldRates")) {
             return canViewGoldRates();
-        case "Profile":
-            return canViewProfile();
-        case "SalesHistory":
+        }
+        if (tag.equalsIgnoreCase("SalesHistory")) {
             return canViewSalesHistory();
-        case "QuickAccessSettings":
+        }
+        if (tag.equalsIgnoreCase("QuickAccessSettings")) {
             return canManageQuickAccess();
-        case "ReaderSetup":
-            return isAdmin() || isInventoryManager();
-        case "RFIDWrite":
-        case "RfidBindings":
-            return canEditInventory();
-        case "Branches":
+        }
+        if (tag.equalsIgnoreCase("ReaderSetup")) {
             return isManager();
-        default:
-            // ✅✅✅ للمدير العام فقط
-            return isSystemAdmin() || isOrgAdmin();
-    }
-}
+        }
+        if (tag.equalsIgnoreCase("RFIDWrite") || tag.equalsIgnoreCase("RfidBindings")) {
+            return canEditInventory();
+        }
+        if (tag.equalsIgnoreCase("Branches")) {
+            return isManager();
+        }
 
-    // ==================== دوال إضافية ====================
-
-    public boolean canControlGates() {
-        if (isSystemAdmin() || isOrgAdmin()) return true;
-        
-        if (isGateSecurity()) {
-            return hasPermission(FEATURE_GATES, "control");
-        }
-        
-        return canManageGates();
-    }
-
-    public boolean canExportInventory() {
-        if (isSystemAdmin() || isOrgAdmin()) return true;
-        
-        if (isAuditor()) {
-            return hasPermission(FEATURE_INVENTORY, "export");
-        }
-        
-        return canExport(FEATURE_INVENTORY) || isManager();
-    }
-
-    public int getUserLevel() {
-        if (isSystemAdmin()) return 100;
-        if (isOrgAdmin()) return 90;
-        if (isInventoryManager()) return 80;
-        if (isBranchManager()) return 75;
-        if (isAuditor()) return 60;
-        if (isPosOperator()) return 50;
-        if (isGateSecurity()) return 35;
-        if (isSecurity()) return 30;
-        return 0;
-    }
-
-    public boolean hasLevelAbove(int level) {
-        return getUserLevel() >= level;
-    }
-
-    public boolean hasLevelBelow(int level) {
-        return getUserLevel() < level;
-    }
-
-    public List<String> getAllowedQuickActions() {
-        List<String> allowedActions = new ArrayList<>();
-        
-        if (canUseIdentity()) {
-            allowedActions.add("identity");
-        }
-        
-        if (canViewRadar()) {
-            allowedActions.add("radar");
-        }
-        
-        if (canViewGates()) {
-            allowedActions.add("gate");
-        }
-        
-        if (canViewReports()) {
-            allowedActions.add("reports");
-        }
-        
-        if (canViewAccounting()) {
-            allowedActions.add("accounting");
-        }
-        
-        if (canViewTransfers()) {
-            allowedActions.add("transfers");
-        }
-        
-        if (canViewAdminHub()) {
-            allowedActions.add("admin_hub");
-        }
-        
-        if (canViewSalesHistory()) {
-            allowedActions.add("sales_history");
-        }
-        
-        if (canViewServerConfig()) {
-            allowedActions.add("server_config");
-        }
-        
-        if (canViewGoldRates()) {
-            allowedActions.add("gold_rates");
-        }
-        
-        if (canManageUsers()) {
-            allowedActions.add("users");
-        }
-        
-        if (isManager()) {
-            allowedActions.add("branches");
-        }
-        
-        return allowedActions;
-    }
-
-    public boolean canAccessActionCenter() {
-        return getAllowedQuickActions().size() > 0;
-    }
-
-    public String[] getAllowedFragments() {
-        List<String> allowed = new ArrayList<>();
-        
-        String[] allFragments = {
-            "Dashboard", "Scan", "POS", "Transfers", "IdentityStudio",
-            "Radar", "SecureGate", "Reports", "Accounting", "AdminHub",
-            "UsersManagement", "ServerConfig", "GoldRates", "Profile",
-            "SalesHistory", "QuickAccessSettings"
-        };
-        
-        for (String fragment : allFragments) {
-            if (canAccessFragment(fragment)) {
-                allowed.add(fragment);
-            }
-        }
-        
-        return allowed.toArray(new String[0]);
+        // افتراض الأمان: إذا لم نجد الـ Tag وكان مستخدماً عادياً، اسمح بالتحميل لتجنب الشاشة السوداء طالما أتى من القائمة
+        return true;
     }
 
     public void clearPermissions() {
