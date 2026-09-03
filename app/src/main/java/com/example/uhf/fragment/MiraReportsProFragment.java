@@ -14,6 +14,7 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.content.Intent;  // ✅ أضف هذا
+import android.util.TypedValue;
 import android.net.Uri;  // ✅ أضف هذا
 
 import android.graphics.Bitmap;
