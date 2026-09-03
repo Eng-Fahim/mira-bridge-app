@@ -455,7 +455,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 .setTitle(isArabic ? "تسجيل الخروج" : "Logout")
                 .setMessage(isArabic ? "هل أنت متأكد من تسجيل الخروج من المنظومة؟" : "Are you sure you want to log out?")
                 .setPositiveButton(isArabic ? "تأكيد" : "Logout", (dialog, which) -> {
-                    sessionManager.logout();
+                    sessionManager.logoutUser(); // تم التعديل لتتطابق مع SessionManager
                     navigateToLogin();
                 })
                 .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
@@ -656,15 +656,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
     }
-    
-        // ==================== FRAGMENT MANAGEMENT ====================
 
-    // 1. دالة باستقبال متغيرين (للتوافق مع بقية الفراغمنتات)
+    // ==================== FRAGMENT MANAGEMENT ====================
+
     public void loadFragment(Fragment fragment, String tag) {
         loadFragment(fragment, tag, true);
     }
 
-    // 2. الدالة الأصلية بثلاثة متغيرات
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
         if (isFinishing() || isDestroyed() || fragment == null) return;
 
@@ -697,8 +695,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             hideLoading();
         }
     }
-
-
 
     private void loadFragmentByTag(String tag) {
         try {
