@@ -475,7 +475,6 @@ public class MiraInventoryProFragment extends KeyDwonFragment
         playScanBeep(ScanFeedbackType.ERROR);
     }
 
-    @Override
     public boolean myOnKeyDwon(int keyCode, KeyEvent event) {
         if (keyCode == KEYCODE_RFID_TRIGGER_1 || keyCode == KEYCODE_RFID_TRIGGER_2 || keyCode == KEYCODE_RFID_TRIGGER_3) {
             if (event.getRepeatCount() == 0) {
