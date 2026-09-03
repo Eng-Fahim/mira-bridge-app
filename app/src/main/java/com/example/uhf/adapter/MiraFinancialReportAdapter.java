@@ -1,5 +1,6 @@
 package com.example.uhf.adapter;
 
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -33,6 +34,10 @@ public class MiraFinancialReportAdapter extends RecyclerView.Adapter<RecyclerVie
 
     @Override
     public int getItemViewType(int position) {
+        // ✅ حماية من null أو index out of bounds
+        if (items == null || position < 0 || position >= items.size()) {
+            return MiraReportRowItem.TYPE_DATA;
+        }
         return items.get(position).getViewType();
     }
 
@@ -46,6 +51,8 @@ public class MiraFinancialReportAdapter extends RecyclerView.Adapter<RecyclerVie
 
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+        if (items == null || position >= items.size()) return;
+        
         MiraReportRowItem item = items.get(position);
         ReportViewHolder vh = (ReportViewHolder) holder;
 
@@ -60,11 +67,32 @@ public class MiraFinancialReportAdapter extends RecyclerView.Adapter<RecyclerVie
             vh.tvAccountName.setText(item.getTitle());
             vh.tvCashAmount.setText(String.format(Locale.US, "%,.2f", item.getCashAmount()));
 
-            // معالجة عرض بيانات الذهب إن وجدت
-            if (item.getGoldWeight24k() > 0 || !item.getKaratDetails().isEmpty()) {
+            // ✅✅✅ تلوين النقد
+            if (item.getCashAmount() > 0) {
+                vh.tvCashAmount.setTextColor(Color.parseColor("#27AE60"));
+            } else if (item.getCashAmount() < 0) {
+                vh.tvCashAmount.setTextColor(Color.parseColor("#E74C3C"));
+            } else {
+                vh.tvCashAmount.setTextColor(Color.parseColor("#95A5A6"));
+            }
+
+            // ✅✅✅ دعم القيم السالبة للذهب
+            if (item.getGoldWeight24k() != 0 || !item.getKaratDetails().isEmpty()) {
                 vh.layoutGoldDetails.setVisibility(View.VISIBLE);
                 
-                vh.tvGoldWeight24k.setText(String.format(Locale.US, "%.3f g (24K)", item.getGoldWeight24k()));
+                double goldWeight = item.getGoldWeight24k();
+                if (goldWeight != 0) {
+                    vh.tvGoldWeight24k.setText(String.format(Locale.US, "%+.3f g (24K)", goldWeight));
+                    
+                    if (goldWeight > 0) {
+                        vh.tvGoldWeight24k.setTextColor(Color.parseColor("#D35400"));
+                    } else {
+                        vh.tvGoldWeight24k.setTextColor(Color.parseColor("#E74C3C"));
+                    }
+                } else {
+                    vh.tvGoldWeight24k.setText("0.000 g (24K)");
+                    vh.tvGoldWeight24k.setTextColor(Color.parseColor("#95A5A6"));
+                }
                 
                 if (!item.getKaratDetails().isEmpty()) {
                     vh.tvKaratDetails.setVisibility(View.VISIBLE);
