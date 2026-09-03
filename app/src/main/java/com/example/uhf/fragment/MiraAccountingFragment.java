@@ -376,32 +376,36 @@ public class MiraAccountingFragment extends Fragment {
     }
 
     private void updateSummary() {
-        double totalDebit = 0;
-        double totalCredit = 0;
-        double totalGold = 0;
-        
-        for (AccountingEntry entry : entriesList) {
-            totalDebit += entry.debit;
-            totalCredit += entry.credit;
-            totalGold += entry.goldDebit;
-        }
-        
-        if (tvTodayRevenue != null) {
-            tvTodayRevenue.setText(String.format(Locale.US, "%,.2f", totalDebit));
-        }
-        
-        if (tvTotalGoldVolume != null) {
-            tvTotalGoldVolume.setText(String.format(Locale.US, "%.3f g", totalGold));
-        }
-        
-        if (tvBalanceStatus != null) {
-            boolean isBalanced = Math.abs(totalDebit - totalCredit) < 0.01;
-            tvBalanceStatus.setText(isBalanced ? 
-                (isArabic ? "✓ متوازن" : "✓ Balanced") : 
-                (isArabic ? "⚠️ غير متوازن" : "⚠️ Unbalanced"));
-            tvBalanceStatus.setTextColor(isBalanced ? Color.parseColor("#2ECC71") : Color.parseColor("#E74C3C"));
+    double totalDebit = 0;
+    double totalCredit = 0;
+    double totalGoldDebit = 0;
+    double totalGoldCredit = 0;
+    
+    for (AccountingEntry entry : entriesList) {
+        totalDebit += entry.debit;
+        totalCredit += entry.credit;
+        totalGoldDebit += entry.goldDebit;
+        totalGoldCredit += entry.goldCredit;
+    }
+    
+    // ✅✅✅ صافي الذهب = المدين - الدائن
+    double netGold = totalGoldDebit - totalGoldCredit;
+    
+    if (tvTodayRevenue != null) {
+        tvTodayRevenue.setText(String.format(Locale.US, "%,.2f", totalDebit));
+    }
+    
+    if (tvTotalGoldVolume != null) {
+        if (netGold != 0) {
+            tvTotalGoldVolume.setText(String.format(Locale.US, "%+.3f g", netGold));
+            tvTotalGoldVolume.setTextColor(netGold > 0 ? 
+                Color.parseColor("#2ECC71") : Color.parseColor("#E74C3C"));
+        } else {
+            tvTotalGoldVolume.setText("0.000 g");
+            tvTotalGoldVolume.setTextColor(Color.parseColor("#95A5A6"));
         }
     }
+}
 
     private void filterData(String query) {
         filteredList.clear();
@@ -638,19 +642,27 @@ public class MiraAccountingFragment extends Fragment {
         
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            AccountingEntry entry = items.get(position);
-            holder.tvCode.setText(entry.code != null ? entry.code : "—");
-            holder.tvDescription.setText(entry.description != null ? entry.description : "—");
-            
-            // ✅ عرض اسم الفرع إذا كان مختلفاً
-            if (entry.branchName != null && !entry.branchName.isEmpty()) {
-                holder.tvDescription.setText(entry.description + " (" + entry.branchName + ")");
-            }
-            
-            holder.tvGold.setText(String.format(Locale.US, "%.3f g", entry.goldDebit));
-            holder.tvDebit.setText(String.format(Locale.US, "+%,.2f", entry.debit));
-            holder.tvCredit.setText(String.format(Locale.US, "-%,.2f", entry.credit));
-        }
+    AccountingEntry entry = items.get(position);
+    holder.tvCode.setText(entry.code != null ? entry.code : "—");
+    holder.tvDescription.setText(entry.description != null ? entry.description : "—");
+    
+    // ✅✅✅ عرض صافي الذهب (مدين - دائن)
+    double netGold = entry.goldDebit - entry.goldCredit;
+    
+    if (netGold > 0) {
+        holder.tvGold.setText(String.format(Locale.US, "+%.3f g", netGold));
+        holder.tvGold.setTextColor(Color.parseColor("#2ECC71"));
+    } else if (netGold < 0) {
+        holder.tvGold.setText(String.format(Locale.US, "%.3f g", netGold));
+        holder.tvGold.setTextColor(Color.parseColor("#E74C3C"));
+    } else {
+        holder.tvGold.setText("0.000 g");
+        holder.tvGold.setTextColor(Color.parseColor("#95A5A6"));
+    }
+    
+    holder.tvDebit.setText(String.format(Locale.US, "+%,.2f", entry.debit));
+    holder.tvCredit.setText(String.format(Locale.US, "-%,.2f", entry.credit));
+}
         
         @Override
         public int getItemCount() {
@@ -670,4 +682,4 @@ public class MiraAccountingFragment extends Fragment {
             }
         }
     }
-                    }
+}
