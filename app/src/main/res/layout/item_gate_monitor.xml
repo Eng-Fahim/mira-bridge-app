@@ -5,69 +5,105 @@
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"
     app:cardBackgroundColor="?attr/colorSurface"
-    app:cardCornerRadius="8dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp"
     app:strokeColor="?attr/colorOutline"
     app:strokeWidth="1dp">
 
-    <RelativeLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="vertical"
         android:padding="12dp">
 
-        <View
-            android:id="@+id/vGateStatusDot"
-            android:layout_width="10dp"
-            android:layout_height="10dp"
-            android:layout_alignParentStart="true"
-            android:layout_centerVertical="true"
-            android:layout_marginEnd="10dp"
-            android:background="@drawable/circle_indicator_green" />
+        <!-- الصف الأول: الحالة + اسم البوابة + الحالة النصية -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
 
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
-            android:layout_toEndOf="@id/vGateStatusDot"
-            android:orientation="vertical">
+            <!-- نقطة الحالة -->
+            <View
+                android:id="@+id/vGateStatusDot"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/circle_indicator_green" />
 
+            <!-- اسم البوابة -->
             <TextView
                 android:id="@+id/tvGateName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_toEndOf="@id/vGateStatusDot"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="بوابة المدخل الرئيسي"
                 android:textColor="?attr/colorOnSurface"
                 android:textSize="14sp"
                 android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/tvGateLastEvent"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true"
-            android:gravity="end"
-            android:orientation="vertical">
-
+            <!-- حالة البوابة -->
             <TextView
                 android:id="@+id/tvGateStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp"
+                android:text="🟢 نشطة"
                 android:textColor="?attr/colorPrimary"
                 android:textSize="11sp"
                 android:textStyle="bold" />
+        </RelativeLayout>
 
+        <!-- ✅✅✅ جديد: اسم الفرع -->
+        <TextView
+            android:id="@+id/tvBranchName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="📍 الفرع الرئيسي"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+        <!-- الصف الثاني: الإحصائيات + آخر حدث -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- آخر حدث -->
+            <TextView
+                android:id="@+id/tvGateLastEvent"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="آخر حدث: لا أحداث"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp" />
+
+            <!-- الإحصائيات -->
             <TextView
                 android:id="@+id/tvGateStats"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp"
+                android:text="✅ 0 | ❌ 0"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="11sp" />
+                android:textSize="11sp"
+                android:textStyle="bold" />
         </LinearLayout>
-    </RelativeLayout>
+
+    </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
