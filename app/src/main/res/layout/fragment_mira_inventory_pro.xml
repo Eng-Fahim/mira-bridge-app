@@ -15,10 +15,10 @@
         android:layout_height="wrap_content"
         android:background="?attr/colorSurface"
         app:tabGravity="fill"
-        app:tabMode="fixed"
-        app:tabIndicatorFullWidth="false"
         app:tabIndicatorColor="?attr/colorPrimary"
+        app:tabIndicatorFullWidth="false"
         app:tabIndicatorHeight="3dp"
+        app:tabMode="fixed"
         app:tabSelectedTextColor="?attr/colorPrimary"
         app:tabTextColor="?attr/colorOnSurfaceVariant" />
 
@@ -26,7 +26,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="12dp">
+        android:padding="10dp">
 
         <!-- أزرار التحكم الرئيسية -->
         <LinearLayout
@@ -38,46 +38,58 @@
                 android:id="@+id/btnStartInventory"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
+                android:layout_marginEnd="3dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="4dp"
                 android:text="@string/start_inventory"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
                 app:cornerRadius="10dp"
-                app:iconPadding="4dp" />
+                app:icon="@android:drawable/ic_media_play"
+                app:iconGravity="textStart"
+                app:iconPadding="4dp"
+                app:iconSize="16dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnBlindInventory"
                 style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
+                android:layout_marginHorizontal="3dp"
                 android:layout_weight="1"
-                android:layout_marginHorizontal="2dp"
                 android:text="@string/blind_inventory"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
-                app:cornerRadius="10dp" />
+                app:cornerRadius="10dp"
+                app:icon="@android:drawable/ic_menu_view"
+                app:iconGravity="textStart"
+                app:iconPadding="4dp"
+                app:iconSize="16dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnStopInventory"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
+                android:layout_marginStart="3dp"
                 android:layout_weight="1"
-                android:layout_marginStart="4dp"
                 android:backgroundTint="?attr/colorError"
                 android:enabled="false"
                 android:text="@string/stop_inventory"
                 android:textColor="?attr/colorOnError"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
-                app:cornerRadius="10dp" />
+                app:cornerRadius="10dp"
+                app:icon="@android:drawable/ic_media_pause"
+                app:iconGravity="textStart"
+                app:iconPadding="4dp"
+                app:iconSize="16dp"
+                app:iconTint="?attr/colorOnError" />
         </LinearLayout>
 
         <!-- بطاقة الحالة والإشارة (RSSI) -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="6dp"
             app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
             app:cardCornerRadius="12dp"
             app:cardElevation="0dp"
@@ -88,7 +100,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="10dp">
+                android:padding="8dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -122,7 +134,7 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="4dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
@@ -160,7 +172,7 @@
                     style="?android:attr/progressBarStyleHorizontal"
                     android:layout_width="match_parent"
                     android:layout_height="6dp"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="4dp"
                     android:max="100"
                     android:progress="0"
                     android:progressTint="?attr/colorPrimary" />
@@ -170,13 +182,15 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:text="@string/last_scan_none"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="10sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- شبكة العدادات الإحصائية - استخدام LinearLayout بدلاً من GridLayout -->
+        <!-- شبكة العدادات الإحصائية -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -188,10 +202,10 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:layout_marginEnd="2dp"
+                android:layout_weight="1"
                 app:cardBackgroundColor="?attr/colorSurfaceContainer"
-                app:cardCornerRadius="10dp"
+                app:cardCornerRadius="8dp"
                 app:cardElevation="0dp">
 
                 <LinearLayout
@@ -199,7 +213,7 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="8dp">
+                    android:padding="6dp">
 
                     <TextView
                         android:id="@+id/tvExpectedCount"
@@ -207,7 +221,7 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="?attr/colorOnSurface"
-                        android:textSize="18sp"
+                        android:textSize="16sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -215,7 +229,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/expected_count"
                         android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="10sp" />
+                        android:textSize="9sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -223,10 +237,10 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:layout_marginHorizontal="2dp"
+                android:layout_weight="1"
                 app:cardBackgroundColor="?attr/colorPrimaryContainer"
-                app:cardCornerRadius="10dp"
+                app:cardCornerRadius="8dp"
                 app:cardElevation="0dp">
 
                 <LinearLayout
@@ -234,7 +248,7 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="8dp">
+                    android:padding="6dp">
 
                     <TextView
                         android:id="@+id/tvScannedCount"
@@ -242,7 +256,7 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="?attr/colorOnPrimaryContainer"
-                        android:textSize="18sp"
+                        android:textSize="16sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -250,7 +264,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/scanned_count"
                         android:textColor="?attr/colorOnPrimaryContainer"
-                        android:textSize="10sp" />
+                        android:textSize="9sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -258,10 +272,10 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:layout_marginHorizontal="2dp"
+                android:layout_weight="1"
                 app:cardBackgroundColor="?attr/colorErrorContainer"
-                app:cardCornerRadius="10dp"
+                app:cardCornerRadius="8dp"
                 app:cardElevation="0dp">
 
                 <LinearLayout
@@ -269,7 +283,7 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="8dp">
+                    android:padding="6dp">
 
                     <TextView
                         android:id="@+id/tvVariance"
@@ -277,7 +291,7 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="?attr/colorOnErrorContainer"
-                        android:textSize="18sp"
+                        android:textSize="16sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -285,7 +299,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/variance_count"
                         android:textColor="?attr/colorOnErrorContainer"
-                        android:textSize="10sp" />
+                        android:textSize="9sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -293,10 +307,10 @@
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:layout_marginStart="2dp"
+                android:layout_weight="1"
                 app:cardBackgroundColor="?attr/colorTertiaryContainer"
-                app:cardCornerRadius="10dp"
+                app:cardCornerRadius="8dp"
                 app:cardElevation="0dp">
 
                 <LinearLayout
@@ -304,7 +318,7 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="8dp">
+                    android:padding="6dp">
 
                     <TextView
                         android:id="@+id/tvAccuracy"
@@ -312,7 +326,7 @@
                         android:layout_height="wrap_content"
                         android:text="0%"
                         android:textColor="?attr/colorOnTertiaryContainer"
-                        android:textSize="18sp"
+                        android:textSize="16sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -320,7 +334,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/accuracy"
                         android:textColor="?attr/colorOnTertiaryContainer"
-                        android:textSize="10sp" />
+                        android:textSize="9sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
@@ -363,7 +377,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
                 android:enabled="false"
-                android:paddingHorizontal="12dp"
+                android:paddingHorizontal="10dp"
                 android:text="@string/commit_report"
                 android:textSize="11sp"
                 app:cornerRadius="8dp" />
@@ -375,8 +389,9 @@
                 android:layout_height="36dp"
                 android:layout_marginStart="4dp"
                 android:contentDescription="@string/archive_reports"
+                app:cornerRadius="8dp"
                 app:icon="@android:drawable/ic_menu_agenda"
-                app:cornerRadius="8dp" />
+                app:iconSize="18dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnViewSnapshots"
@@ -385,8 +400,9 @@
                 android:layout_height="36dp"
                 android:layout_marginStart="4dp"
                 android:contentDescription="@string/view_snapshots"
+                app:cornerRadius="8dp"
                 app:icon="@android:drawable/ic_menu_camera"
-                app:cornerRadius="8dp" />
+                app:iconSize="18dp" />
         </LinearLayout>
 
         <!-- بطاقة المقارنة -->
@@ -396,7 +412,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
-            app:cardCornerRadius="10dp"
+            app:cardCornerRadius="8dp"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
@@ -427,10 +443,10 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        tools:text="125"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="12sp"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        tools:text="125" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -452,10 +468,10 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        tools:text="120"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="12sp"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        tools:text="120" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -477,10 +493,10 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0"
-                        tools:text="-5"
                         android:textColor="?attr/colorPrimary"
                         android:textSize="12sp"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        tools:text="-5" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -489,8 +505,8 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
             android:layout_marginTop="6dp"
+            android:layout_weight="1"
             app:cardBackgroundColor="?attr/colorSurfaceContainerLowest"
             app:cardCornerRadius="12dp"
             app:cardElevation="0dp"
