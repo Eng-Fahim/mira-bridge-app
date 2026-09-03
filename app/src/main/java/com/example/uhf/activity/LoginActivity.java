@@ -933,10 +933,12 @@ apiClient = MiraApiClient.getInstance(getApplicationContext());
     }
     
     String permissionsJson = response.optString("permissions", "");
-    if (!permissionsJson.isEmpty()) {
-        PermissionManager pm = PermissionManager.getInstance(appContext);
-        pm.savePermissions(permissionsJson);
-    }
+if (!permissionsJson.isEmpty()) {
+    // ✅ إعادة تعيين أولاً
+    PermissionManager.resetInstance();
+    PermissionManager pm = PermissionManager.getInstance(appContext);
+    pm.savePermissions(permissionsJson);
+}
 
     // ✅ حفظ بيانات الجلسة
     sessionManager.createLoginSession(username, roleStr, token, serverUrl);
@@ -1266,4 +1268,4 @@ protected void onDestroy() {
     
     mainHandler.removeCallbacksAndMessages(null);
 }
-                }
+}
