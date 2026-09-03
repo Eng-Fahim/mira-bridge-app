@@ -310,62 +310,87 @@ public class MiraAccountingFragment extends Fragment {
     }
 
     private void parseAndDisplay(JSONObject data, String tab) {
-        try {
-            entriesList.clear();
-            JSONArray items = data.optJSONArray("data");
-            
-            if (items == null) {
-                JSONObject dataObj = data.optJSONObject("data");
-                if (dataObj != null) {
-                    items = dataObj.optJSONArray("entries");
+    try {
+        entriesList.clear();
+        JSONArray items = data.optJSONArray("data");
+        
+        if (items == null) {
+            JSONObject dataObj = data.optJSONObject("data");
+            if (dataObj != null) {
+                items = dataObj.optJSONArray("entries");
+                if (items == null) {
+                    items = dataObj.optJSONArray("accounts");
                 }
             }
-            
-            if (items != null && items.length() > 0) {
-                for (int i = 0; i < items.length(); i++) {
-                    JSONObject obj = items.getJSONObject(i);
-                    AccountingEntry entry = new AccountingEntry();
-                    entry.id = i + 1;
-                    
-                    // ✅ إضافة branch_id للقيود
-                    entry.branchId = obj.optInt("branch_id", 0);
-                    entry.branchName = obj.optString("branch_name", "");
-                    
-                    if ("journal".equals(tab)) {
-                        entry.code = obj.optString("entry_number", obj.optString("reference", "—"));
-                        entry.description = obj.optString("description", "—");
-                        entry.debit = safeDouble(obj.optString("total_debit", "0"));
-                        entry.credit = safeDouble(obj.optString("total_credit", "0"));
-                        entry.goldDebit = safeDouble(obj.optString("total_gold_debit_grams", "0"));
-                        entry.goldCredit = safeDouble(obj.optString("total_gold_credit_grams", "0"));
-                    } else if ("chart".equals(tab)) {
-                        entry.code = obj.optString("account_code", obj.optString("code", "—"));
-                        entry.description = obj.optString("account_name_ar", obj.optString("account_name", "—"));
-                        entry.debit = safeDouble(obj.optString("opening_balance", "0"));
-                        entry.credit = 0;
-                        entry.goldDebit = safeDouble(obj.optString("opening_gold_grams", "0"));
-                    } else if ("trial".equals(tab)) {
-                        entry.code = obj.optString("account_code", obj.optString("code", "—"));
-                        entry.description = obj.optString("account_name_ar", obj.optString("account_name", "—"));
-                        entry.debit = safeDouble(obj.optString("total_debit", "0"));
-                        entry.credit = safeDouble(obj.optString("total_credit", "0"));
-                        entry.goldDebit = safeDouble(obj.optString("total_gold_debit", "0"));
-                        entry.goldCredit = safeDouble(obj.optString("total_gold_credit", "0"));
-                    }
-                    
-                    entriesList.add(entry);
-                }
-            }
-            
-            filterData(etSearch != null ? etSearch.getText().toString() : "");
-            updateSummary();
-            showEmptyState(entriesList.isEmpty());
-            
-        } catch (Exception e) {
-            logNonFatal("parseAndDisplay", e);
-            showEmptyState(true);
         }
+        
+        if (items != null && items.length() > 0) {
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject obj = items.getJSONObject(i);
+                AccountingEntry entry = new AccountingEntry();
+                entry.id = i + 1;
+                entry.branchId = obj.optInt("branch_id", 0);
+                entry.branchName = obj.optString("branch_name", "");
+                
+                if ("journal".equals(tab)) {
+                    entry.code = obj.optString("entry_number", obj.optString("reference", "—"));
+                    entry.description = obj.optString("description", "—");
+                    entry.debit = safeDouble(obj.optString("total_debit", "0"));
+                    entry.credit = safeDouble(obj.optString("total_credit", "0"));
+                    entry.goldDebit = safeDouble(obj.optString("total_gold_debit_grams", "0"));
+                    entry.goldCredit = safeDouble(obj.optString("total_gold_credit_grams", "0"));
+                    
+                } else if ("chart".equals(tab)) {
+                    entry.code = obj.optString("account_code", obj.optString("code", "—"));
+                    entry.description = obj.optString("account_name_ar", obj.optString("account_name", "—"));
+                    entry.debit = safeDouble(obj.optString("opening_balance", "0"));
+                    entry.credit = 0;
+                    entry.goldDebit = safeDouble(obj.optString("opening_gold_grams", "0"));
+                    
+                } else if ("trial".equals(tab)) {
+                    entry.code = obj.optString("account_code", obj.optString("code", "—"));
+                    entry.description = obj.optString("account_name_ar", obj.optString("account_name", "—"));
+                    
+                    // ✅✅✅ دعم أسماء حقول متعددة للمبالغ
+                    entry.debit = safeDouble(
+                        obj.optString("total_debit", 
+                        obj.optString("debit_total", 
+                        obj.optString("sum_debit", "0")))
+                    );
+                    entry.credit = safeDouble(
+                        obj.optString("total_credit", 
+                        obj.optString("credit_total", 
+                        obj.optString("sum_credit", "0")))
+                    );
+                    
+                    // ✅✅✅ دعم أسماء حقول متعددة للذهب
+                    entry.goldDebit = safeDouble(
+                        obj.optString("total_gold_debit", 
+                        obj.optString("gold_debit", 
+                        obj.optString("total_gold_debit_grams", 
+                        obj.optString("sum_gold_debit", "0"))))
+                    );
+                    entry.goldCredit = safeDouble(
+                        obj.optString("total_gold_credit", 
+                        obj.optString("gold_credit", 
+                        obj.optString("total_gold_credit_grams", 
+                        obj.optString("sum_gold_credit", "0"))))
+                    );
+                }
+                
+                entriesList.add(entry);
+            }
+        }
+        
+        filterData(etSearch != null ? etSearch.getText().toString() : "");
+        updateSummary();
+        showEmptyState(entriesList.isEmpty());
+        
+    } catch (Exception e) {
+        logNonFatal("parseAndDisplay", e);
+        showEmptyState(true);
     }
+}
 
     private double safeDouble(String value) {
         try {
@@ -682,4 +707,4 @@ public class MiraAccountingFragment extends Fragment {
             }
         }
     }
-}
+    }
