@@ -659,39 +659,40 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     // ==================== FRAGMENT MANAGEMENT ====================
 
-    public void loadFragment(Fragment fragment, String tag) {
-        loadFragment(fragment, tag, true);
-    }
-
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-        if (isFinishing() || isDestroyed() || fragment == null) return;
+    if (isFinishing() || isDestroyed() || fragment == null) return;
 
-        try {
-            showLoading();
-            currentFragment = fragment;
-            currentFragmentTag = tag;
-            saveFragmentTagToPrefs(tag);
+    try {
+        showLoading();
+        currentFragment = fragment;
+        currentFragmentTag = tag;
+        saveFragmentTagToPrefs(tag);
 
-            FragmentTransaction transaction = fragmentManager.beginTransaction();
-            
-            transaction.setCustomAnimations(0, 0, 0, 0);
-            transaction.replace(R.id.fragment_container, fragment, tag);
-
-            if (addToBackStack) {
-                transaction.addToBackStack(tag);
-            }
-
-            transaction.commitAllowingStateLoss();
-            
-            updateBottomNavSelectionByTag(tag);
-
-            mainHandler.postDelayed(this::hideLoading, 150);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error switching fragment: " + e.getMessage());
-            hideLoading();
+        // إذا كان الانتقال لشاشة رئيسية من القائمة السفلى، نمسح الـ BackStack بالكامل لضمان عدم تراكم الواجهات
+        if (!addToBackStack) {
+            clearBackStack();
         }
+
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.setCustomAnimations(0, 0, 0, 0);
+        transaction.replace(R.id.fragment_container, fragment, tag);
+
+        if (addToBackStack) {
+            transaction.addToBackStack(tag);
+        }
+
+        transaction.commitAllowingStateLoss();
+        
+        updateBottomNavSelectionByTag(tag);
+
+        mainHandler.postDelayed(this::hideLoading, 150);
+
+    } catch (Exception e) {
+        Log.e(TAG, "Error switching fragment: " + e.getMessage());
+        hideLoading();
     }
+}
+
 
     private void loadFragmentByTag(String tag) {
         try {
