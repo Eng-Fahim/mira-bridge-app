@@ -34,40 +34,50 @@ public class MiraAccountingAdapter extends RecyclerView.Adapter<MiraAccountingAd
         return new AccountingViewHolder(view);
     }
 
-    @Override
-    public void onBindViewHolder(@NonNull AccountingViewHolder holder, int position) {
-        MiraAccountingItem item = itemList.get(position);
+   @Override
+public void onBindViewHolder(@NonNull AccountingViewHolder holder, int position) {
+    MiraAccountingItem item = itemList.get(position);
 
-        // 1. تعبئة النصوص الرئيسية للأعمدة
-        holder.tvCol1.setText(item.getCol1Text());
-        holder.tvCol2.setText(item.getCol2Text());
-        holder.tvCol3.setText(item.getCol3Text());
-        holder.tvCol4.setText(item.getCol4Text());
+    holder.tvCol1.setText(item.getCol1Text());
+    holder.tvCol2.setText(item.getCol2Text());
+    holder.tvCol3.setText(item.getCol3Text());
+    holder.tvCol4.setText(item.getCol4Text());
 
-        // 2. التحكم بشارة الـ RFID بشكل ديناميكي
-        String rfid = item.getRfidEpc();
-        if (rfid != null && !rfid.trim().isEmpty()) {
-            holder.tvRfidTag.setText("RFID: " + rfid);
-            holder.tvRfidTag.setVisibility(View.VISIBLE);
-        } else {
-            holder.tvRfidTag.setVisibility(View.GONE);
-        }
-
-        // 3. تنسيق ألوان الأرقام المالية (ذهب ونقد) حسب طبيعة الحركة
-        if (item.getItemType() == MiraAccountingItem.ItemType.JOURNAL_ENTRY) {
-            double netGold = item.getFineWeight24Debit() - item.getFineWeight24Credit();
-            double netCash = item.getDebitCash() - item.getCreditCash();
-
-            // لون الذهب (ذهبي للمدين / أحمر للدائن)
-            holder.tvCol3.setTextColor(netGold >= 0 ? Color.parseColor("#D35400") : Color.parseColor("#E74C3C"));
-            // لون النقدية (أخضر للمدين / أحمر للدائن)
-            holder.tvCol4.setTextColor(netCash >= 0 ? Color.parseColor("#27AE60") : Color.parseColor("#E74C3C"));
-        } else {
-            // القيم الثابتة في دليل الحسابات والميزان
-            holder.tvCol3.setTextColor(Color.parseColor("#D35400"));
-            holder.tvCol4.setTextColor(Color.parseColor("#27AE60"));
-        }
+    // ✅ شارة RFID
+    String rfid = item.getRfidEpc();
+    if (rfid != null && !rfid.trim().isEmpty()) {
+        holder.tvRfidTag.setText("RFID: " + rfid);
+        holder.tvRfidTag.setVisibility(View.VISIBLE);
+    } else {
+        holder.tvRfidTag.setVisibility(View.GONE);
     }
+
+    // ✅ تنسيق الألوان
+    if (item.getItemType() == MiraAccountingItem.ItemType.JOURNAL_ENTRY) {
+        double netGold = item.getFineWeight24Debit() - item.getFineWeight24Credit();
+        double netCash = item.getDebitCash() - item.getCreditCash();
+
+        // ✅✅✅ تحسين الألوان
+        if (netGold > 0) {
+            holder.tvCol3.setTextColor(Color.parseColor("#D35400")); // برتقالي - زيادة ذهب
+        } else if (netGold < 0) {
+            holder.tvCol3.setTextColor(Color.parseColor("#E74C3C")); // أحمر - نقص ذهب
+        } else {
+            holder.tvCol3.setTextColor(Color.parseColor("#95A5A6")); // رمادي - لا ذهب
+        }
+
+        if (netCash > 0) {
+            holder.tvCol4.setTextColor(Color.parseColor("#27AE60")); // أخضر - إيراد
+        } else if (netCash < 0) {
+            holder.tvCol4.setTextColor(Color.parseColor("#E74C3C")); // أحمر - مصروف
+        } else {
+            holder.tvCol4.setTextColor(Color.parseColor("#95A5A6")); // رمادي - لا نقد
+        }
+    } else {
+        holder.tvCol3.setTextColor(Color.parseColor("#D35400"));
+        holder.tvCol4.setTextColor(Color.parseColor("#27AE60"));
+    }
+}
 
     @Override
     public int getItemCount() {
