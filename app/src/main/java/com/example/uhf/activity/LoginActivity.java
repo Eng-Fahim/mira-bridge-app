@@ -1054,113 +1054,109 @@ private void navigateToMainWithAnimation() {
      * إعداد البصمة مع دعم PIN/Pattern/Password
      */
     private void setupBiometric() {
-        boolean biometricEnabled = sessionManager.isBiometricLoginEnabled();
-        
-        if (!biometricEnabled) {
-            if (btnBiometric != null) btnBiometric.setVisibility(View.GONE);
-            return;
-        }
-        
-        BiometricManager bm = BiometricManager.from(this);
-        int canAuthenticate = bm.canAuthenticate(
-            BiometricManager.Authenticators.BIOMETRIC_STRONG | 
-            BiometricManager.Authenticators.DEVICE_CREDENTIAL);
-            
-        if (canAuthenticate != BiometricManager.BIOMETRIC_SUCCESS) {
-            if (btnBiometric != null) btnBiometric.setVisibility(View.GONE);
-            return;
-        }
-
-        Executor executor = ContextCompat.getMainExecutor(this);
-        biometricPrompt = new BiometricPrompt(this, executor, new BiometricPrompt.AuthenticationCallback() {
-            @Override
-            public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
-                String lastUser = sessionManager.getLastBiometricUser();
-                String lastRole = sessionManager.getLastBiometricRole();
-                String lastDisplayName = sessionManager.getLastBiometricDisplayName();
-                int lastUserId = sessionManager.getLastBiometricUserId();
-                String lastToken = sessionManager.getLastBiometricToken();
-
-                if (!lastUser.isEmpty()) {
-                    if (!sessionManager.isLoggedIn()) {
-                        sessionManager.createLoginSession(lastUser, lastRole,
-                            lastToken.isEmpty() ? "BIOMETRIC_TOKEN" : lastToken,
-                            sessionManager.getServerUrl());
-                        sessionManager.setDisplayName(lastDisplayName);
-                        sessionManager.setUserId(lastUserId);
-
-                     int savedBranchId = sessionManager.getLastBiometricBranchId();
-String savedBranchName = sessionManager.getLastBiometricBranchName();
-if (savedBranchId > 0) {
-    MiraBranchesManager bm = MiraBranchesManager.getInstance(getApplicationContext());
-    bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
-    bm.setUserBranchLocked(true);
-}
-                    }
-                    
-                    // إعادة تعيين عداد المحاولات عند نجاح البصمة
-                    resetFailedAttempts();
-                    
-                    playTone(true);
-                    String nameToShow = !lastDisplayName.isEmpty() ? lastDisplayName : lastUser;
-                    Toast.makeText(LoginActivity.this,
-                        (isArabic ? "أهلاً بعودتك " : "Welcome back ") + nameToShow + " 👋",
-                        Toast.LENGTH_SHORT).show();
-                    navigateToMain();
-                } else {
-                    playTone(false);
-                    Toast.makeText(LoginActivity.this,
-                        isArabic ? "قم بتسجيل الدخول بكلمة المرور أولاً" : "Sign in with password first",
-                        Toast.LENGTH_LONG).show();
-                }
-            }
-
-            @Override
-            public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
-                if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && 
-                    errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
-                    playTone(false);
-                    Toast.makeText(LoginActivity.this, "Error: " + errString, Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onAuthenticationFailed() {
-                playTone(false);
-                Toast.makeText(LoginActivity.this,
-                    isArabic ? "لم يتم التعرف على بصمة الإصبع" : "Fingerprint not recognized",
-                    Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        promptInfo = new BiometricPrompt.PromptInfo.Builder()
-    .setTitle(isArabic ? "تسجيل الدخول الحيوي" : "Biometric Sign In")
-    .setSubtitle(isArabic ? "استخدم بصمة الإصبع" : "Use fingerprint")
-    .setNegativeButtonText(isArabic ? "استخدام كلمة المرور" : "Use password")
-    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-    .build();
-
-        if (btnBiometric != null) {
-            btnBiometric.setOnClickListener(v -> {
-                if (!sessionManager.isBiometricLoginEnabled()) {
-                    Toast.makeText(this,
-                        isArabic ? "البصمة معطلة - فعلها من الإعدادات" : "Biometric disabled",
-                        Toast.LENGTH_LONG).show();
-                    return;
-                }
-                
-                if (!sessionManager.getLastBiometricUser().isEmpty() || sessionManager.isLoggedIn()) {
-                    biometricPrompt.authenticate(promptInfo);
-                } else {
-                    playTone(false);
-                    Toast.makeText(this,
-                        isArabic ? "سجل الدخول بكلمة المرور أولاً لتفعيل البصمة" : "Sign in with password first",
-                        Toast.LENGTH_LONG).show();
-                }
-            });
-        }
+    boolean biometricEnabled = sessionManager.isBiometricLoginEnabled();
+    
+    if (!biometricEnabled) {
+        if (btnBiometric != null) btnBiometric.setVisibility(View.GONE);
+        return;
     }
     
+    BiometricManager bm = BiometricManager.from(this);
+    int canAuthenticate = bm.canAuthenticate(
+        BiometricManager.Authenticators.BIOMETRIC_STRONG);
+        
+    if (canAuthenticate != BiometricManager.BIOMETRIC_SUCCESS) {
+        if (btnBiometric != null) btnBiometric.setVisibility(View.GONE);
+        return;
+    }
+
+    Executor executor = ContextCompat.getMainExecutor(this);
+    biometricPrompt = new BiometricPrompt(this, executor, new BiometricPrompt.AuthenticationCallback() {
+        @Override
+        public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+            String lastUser = sessionManager.getLastBiometricUser();
+            String lastRole = sessionManager.getLastBiometricRole();
+            String lastDisplayName = sessionManager.getLastBiometricDisplayName();
+            int lastUserId = sessionManager.getLastBiometricUserId();
+            String lastToken = sessionManager.getLastBiometricToken();
+
+            if (!lastUser.isEmpty()) {
+                if (!sessionManager.isLoggedIn()) {
+                    sessionManager.createLoginSession(lastUser, lastRole,
+                        lastToken.isEmpty() ? "BIOMETRIC_TOKEN" : lastToken,
+                        sessionManager.getServerUrl());
+                    sessionManager.setDisplayName(lastDisplayName);
+                    sessionManager.setUserId(lastUserId);
+
+                    int savedBranchId = sessionManager.getLastBiometricBranchId();
+                    String savedBranchName = sessionManager.getLastBiometricBranchName();
+                    if (savedBranchId > 0) {
+                        MiraBranchesManager bm = MiraBranchesManager.getInstance(getApplicationContext());
+                        bm.setActiveBranch(savedBranchId, savedBranchName, "", "", "");
+                        bm.setUserBranchLocked(true);
+                    }
+                }
+                
+                resetFailedAttempts();
+                playTone(true);
+                String nameToShow = !lastDisplayName.isEmpty() ? lastDisplayName : lastUser;
+                Toast.makeText(LoginActivity.this,
+                    (isArabic ? "أهلاً بعودتك " : "Welcome back ") + nameToShow + " 👋",
+                    Toast.LENGTH_SHORT).show();
+                navigateToMain();
+            } else {
+                playTone(false);
+                Toast.makeText(LoginActivity.this,
+                    isArabic ? "قم بتسجيل الدخول بكلمة المرور أولاً" : "Sign in with password first",
+                    Toast.LENGTH_LONG).show();
+            }
+        }
+
+        @Override
+        public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+            if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && 
+                errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                playTone(false);
+                Toast.makeText(LoginActivity.this, "Error: " + errString, Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        @Override
+        public void onAuthenticationFailed() {
+            playTone(false);
+            Toast.makeText(LoginActivity.this,
+                isArabic ? "لم يتم التعرف على بصمة الإصبع" : "Fingerprint not recognized",
+                Toast.LENGTH_SHORT).show();
+        }
+    });
+
+    // ✅ الإصلاح النهائي: بدون setNegativeButtonText وبدون DEVICE_CREDENTIAL
+    promptInfo = new BiometricPrompt.PromptInfo.Builder()
+        .setTitle(isArabic ? "تسجيل الدخول الحيوي" : "Biometric Sign In")
+        .setSubtitle(isArabic ? "استخدم بصمة الإصبع" : "Use fingerprint")
+        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+        .build();
+
+    if (btnBiometric != null) {
+        btnBiometric.setOnClickListener(v -> {
+            if (!sessionManager.isBiometricLoginEnabled()) {
+                Toast.makeText(this,
+                    isArabic ? "البصمة معطلة - فعلها من الإعدادات" : "Biometric disabled",
+                    Toast.LENGTH_LONG).show();
+                return;
+            }
+            
+            if (!sessionManager.getLastBiometricUser().isEmpty() || sessionManager.isLoggedIn()) {
+                biometricPrompt.authenticate(promptInfo);
+            } else {
+                playTone(false);
+                Toast.makeText(this,
+                    isArabic ? "سجل الدخول بكلمة المرور أولاً لتفعيل البصمة" : "Sign in with password first",
+                    Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+}   
     /**
  * ✅✅✅ التحقق من بيانات الدخول محلياً (أوفلاين)
  */
