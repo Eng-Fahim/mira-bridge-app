@@ -15,7 +15,7 @@ import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraServerConfig;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SessionManager;
-import com.example.uhf.tools.FirebaseDiagnostics; // ✅ إضافة import
+import com.example.uhf.tools.FirebaseDiagnostics; // ✅ إضافة جديدة
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
