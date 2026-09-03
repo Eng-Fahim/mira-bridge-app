@@ -503,34 +503,60 @@ private void loadEssentialData() {
                 applyBottomNavPermissions(quickNav, pm);
 
                 quickNav.setOnItemSelectedListener(item -> {
-                    int id = item.getItemId();
-
-                    if (!pm.canAccessFragment(getFragmentTagForNavItem(id))) {
-                        showPermissionDenied();
-                        return false;
-                    }
-
-                    if (id == R.id.nav_home) {
-                        checkInventoryLockAndExecute(() -> {
-                            clearBackStack();
-                            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-                        });
-                        return true;
-                    } else if (id == R.id.nav_inventory) {
-                        checkInventoryLockAndExecute(() -> loadFragment(new MiraInventoryProFragment(), "Scan"));
-                        return true;
-                    } else if (id == R.id.nav_sales) {
-                        checkInventoryLockAndExecute(() -> loadFragment(new MiraPosFragment(), "POS"));
-                        return true;
-                    } else if (id == R.id.nav_transfers) {
-                        checkInventoryLockAndExecute(() -> loadFragment(new MiraTransferFragment(), "Transfers"));
-                        return true;
-                    } else if (id == R.id.nav_placeholder) {
-                        showQuickActionMenu();
-                        return false;
-                    }
-                    return false;
-                });
+    int id = item.getItemId();
+    
+    // ✅✅✅ 1. تجاهل العنصر الوهمي فوراً
+    if (id == R.id.nav_placeholder) {
+        showQuickActionMenu();
+        return false;
+    }
+    
+    // ✅✅✅ 2. الحصول على الـ tag
+    String fragmentTag = getFragmentTagForNavItem(id);
+    if (fragmentTag.isEmpty()) {
+        Toast.makeText(this, "⚠️ عنصر غير معروف", Toast.LENGTH_SHORT).show();
+        return false;
+    }
+    
+    // ✅✅✅ 3. فحص الصلاحيات مع رسالة توضيحية
+    if (!pm.canAccessFragment(fragmentTag)) {
+        Toast.makeText(this, 
+            isArabic ? "⛔ لا توجد صلاحية: " + fragmentTag : 
+                       "⛔ No permission: " + fragmentTag, 
+            Toast.LENGTH_SHORT).show();
+        showPermissionDenied();
+        return false;
+    }
+    
+    // ✅✅✅ 4. التنقل مع رسالة نجاح
+    if (id == R.id.nav_home) {
+        checkInventoryLockAndExecute(() -> {
+            clearBackStack();
+            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+            Toast.makeText(this, "✅ تم فتح الرئيسية", Toast.LENGTH_SHORT).show();
+        });
+        return true;
+    } else if (id == R.id.nav_inventory) {
+        checkInventoryLockAndExecute(() -> {
+            loadFragment(new MiraInventoryProFragment(), "Scan");
+            Toast.makeText(this, "✅ تم فتح الجرد", Toast.LENGTH_SHORT).show();
+        });
+        return true;
+    } else if (id == R.id.nav_sales) {
+        checkInventoryLockAndExecute(() -> {
+            loadFragment(new MiraPosFragment(), "POS");
+            Toast.makeText(this, "✅ تم فتح البيع", Toast.LENGTH_SHORT).show();
+        });
+        return true;
+    } else if (id == R.id.nav_transfers) {
+        checkInventoryLockAndExecute(() -> {
+            loadFragment(new MiraTransferFragment(), "Transfers");
+            Toast.makeText(this, "✅ تم فتح التحويلات", Toast.LENGTH_SHORT).show();
+        });
+        return true;
+    }
+    return false;
+});
             }
         } catch (Exception e) {
             Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
@@ -671,42 +697,41 @@ MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApp
     }
 
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-        if (isFinishing() || isDestroyed() || fragment == null) return;
+    if (isFinishing() || isDestroyed() || fragment == null) return;
 
-        try {
-            PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
+    try {
+        PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
 
-            if (!pm.canAccessFragment(tag)) {
-                showPermissionDenied();
-                return;
-            }
+        // ✅✅✅ لا تمنع إعادة التحميل - اسمح دائماً
+        // if (tag.equals(currentFragmentTag) && currentFragment != null && currentFragment.isAdded()) {
+        //     return;
+        // }
 
-            if (tag.equals(currentFragmentTag) && currentFragment != null && currentFragment.isAdded()) {
-                return;
-            }
+        showLoading();
+        currentFragment = fragment;
+        currentFragmentTag = tag;
+        saveFragmentTagToPrefs(tag);
 
-            showLoading();
-            currentFragment = fragment;
-            currentFragmentTag = tag;
-            saveFragmentTagToPrefs(tag);
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.setCustomAnimations(0, 0, 0, 0);
+        transaction.replace(R.id.fragment_container, fragment, tag);
 
-            FragmentTransaction transaction = fragmentManager.beginTransaction();
-            transaction.setCustomAnimations(0, 0, 0, 0);
-            transaction.replace(R.id.fragment_container, fragment, tag);
-
-            if (addToBackStack) {
-                transaction.addToBackStack(tag);
-            }
-
-            transaction.commitAllowingStateLoss();
-
-            mainHandler.postDelayed(this::hideLoading, 150);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error switching fragment: " + e.getMessage());
-            hideLoading();
+        if (addToBackStack) {
+            transaction.addToBackStack(tag);
         }
+
+        transaction.commitAllowingStateLoss();
+        
+        // ✅ إجبار التنفيذ الفوري
+        fragmentManager.executePendingTransactions();
+
+        mainHandler.postDelayed(this::hideLoading, 150);
+
+    } catch (Exception e) {
+        Log.e(TAG, "Error switching fragment: " + e.getMessage());
+        hideLoading();
     }
+}
 
     private void loadFragmentByTag(String tag) {
         try {
