@@ -3,7 +3,7 @@ package com.example.uhf.tools;
 import android.content.Context;
 import android.util.Log;
 
-import com.example.uhf.tools.FirebaseDiagnostics; // ✅ إضافة جديدة
+import com.example.uhf.tools.FirebaseDiagnostics;
 
 /**
  * SessionManager - كلاس التوافق الوسيط
@@ -19,7 +19,7 @@ public class SessionManager {
     private static final String TAG = "SessionManager";
     
     private final SecureSessionManager secureManager;
-    private final Context context; // ✅ إضافة جديدة
+    private final Context context;
 
     public SessionManager(Context context) {
         this.context = context.getApplicationContext();
@@ -75,17 +75,27 @@ public class SessionManager {
         return token;
     }
 
-    // ✅ إضافة فحص صلاحية التوكن
+    // ✅ فحص صلاحية التوكن مع التتبع المطور
     public boolean hasValidToken() {
         boolean valid = secureManager.hasValidToken();
         
-        // ✅ تتبع
+        // ✅ تتبع تفصيلي
         FirebaseDiagnostics.log("SESSION", "Check Valid Token", "result=" + valid);
         
         return valid;
     }
 
-    // ✅ إضافة فحص الحاجة للتجديد
+    // ✅ فحص وجود جلسة محلية قابلة للاستخدام في الأوفلاين
+    public boolean hasOfflineSession() {
+        String lastUser = getLastBiometricUser();
+        String lastToken = getLastBiometricToken();
+        boolean hasOffline = (lastUser != null && !lastUser.isEmpty()) || (lastToken != null && !lastToken.isEmpty());
+        
+        FirebaseDiagnostics.log("SESSION", "Check Offline Session", "hasOffline=" + hasOffline);
+        return hasOffline;
+    }
+
+    // ✅ فحص الحاجة للتجديد
     public boolean needsTokenRefresh() {
         return secureManager.needsTokenRefresh();
     }
@@ -365,7 +375,7 @@ public class SessionManager {
         logoutUser();
     }
 
-    // ==================== وظائف مساعدة ====================
+    // ==================== وظائف مساعدة جديدة لحماية الأوفلاين ====================
     
     public void refreshProfileData() {
         // يمكن إضافة منطق إضافي هنا إذا لزم
