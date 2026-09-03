@@ -20,6 +20,8 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import android.content.Intent;  // ✅ أضف هذا السطر
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
@@ -217,6 +219,7 @@ private void refreshData() {
         Intent refreshIntent = new Intent("com.example.uhf.REFRESH_DASHBOARD");
         refreshIntent.putExtra("source", "refund");
         refreshIntent.putExtra("branch_id", getActiveBranchId());
+        refreshIntent.putExtra("timestamp", System.currentTimeMillis());
         getActivity().sendBroadcast(refreshIntent);
         
         // ✅ الطريقة 2: استخدام LocalBroadcastManager إذا كان متاحاً
@@ -224,27 +227,17 @@ private void refreshData() {
             androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
                 .sendBroadcast(refreshIntent);
         } catch (Exception e) {
-            Log.e(TAG, "LocalBroadcast not available: " + e.getMessage());
+            Log.d(TAG, "LocalBroadcast not available: " + e.getMessage());
         }
         
-        // ✅ الطريقة 3: استخدام Interface إذا كان موجوداً
-        if (getActivity() instanceof UHFMainActivity) {
-            UHFMainActivity mainActivity = (UHFMainActivity) getActivity();
-            // ✅ استدعاء دالة التحديث إذا كانت موجودة
-            try {
-                mainActivity.refreshDashboardData();
-            } catch (Exception e) {
-                Log.e(TAG, "refreshDashboardData not available: " + e.getMessage());
-            }
-        }
-        
-        // ✅ الطريقة 4: استخدام SharedPreferences كإشارة
+        // ✅ الطريقة 3: استخدام SharedPreferences كإشارة
         Context ctx = getContext();
         if (ctx != null) {
             SharedPreferences prefs = ctx.getSharedPreferences("app_refresh_flags", Context.MODE_PRIVATE);
             prefs.edit()
-                .putLong("last_refund_timestamp", System.currentTimeMillis())
-                .putInt("last_refund_branch_id", getActiveBranchId())
+                .putLong("last_data_change", System.currentTimeMillis())
+                .putString("last_change_type", "refund")
+                .putInt("last_change_branch_id", getActiveBranchId())
                 .apply();
         }
         
