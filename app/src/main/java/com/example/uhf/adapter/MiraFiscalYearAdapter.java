@@ -8,7 +8,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-
+import android.content.res.ColorStateList;
 import com.example.uhf.R;
 import com.example.uhf.model.MiraFiscalYearItem;
 import com.google.android.material.chip.Chip;
@@ -82,14 +82,18 @@ public class MiraFiscalYearAdapter extends RecyclerView.Adapter<MiraFiscalYearAd
 
         // ✅✅✅ حالة السنة
         if (item.isClosed()) {
-            holder.chipStatus.setText(isArabic ? "🔒 مغلقة" : "🔒 Closed");
-            holder.chipStatus.setChipBackgroundColor(COLOR_NEGATIVE);
-            holder.chipStatus.setTextColor(Color.WHITE);
-        } else {
-            holder.chipStatus.setText(isArabic ? "✅ مفتوحة" : "✅ Active");
-            holder.chipStatus.setChipBackgroundColor(COLOR_POSITIVE);
-            holder.chipStatus.setTextColor(Color.WHITE);
-        }
+    holder.chipStatus.setText(isArabic ? "🔒 مغلقة" : "🔒 Closed");
+    holder.chipStatus.setChipBackgroundColor(
+        ColorStateList.valueOf(COLOR_NEGATIVE)
+    );
+    holder.chipStatus.setTextColor(Color.WHITE);
+} else {
+    holder.chipStatus.setText(isArabic ? "✅ مفتوحة" : "✅ Active");
+    holder.chipStatus.setChipBackgroundColor(
+        ColorStateList.valueOf(COLOR_POSITIVE)
+    );
+    holder.chipStatus.setTextColor(Color.WHITE);
+}
 
         holder.itemView.setOnLongClickListener(v -> {
             if (listener != null) listener.onItemLongClick(item);
