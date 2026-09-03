@@ -22,6 +22,10 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import android.content.BroadcastReceiver;
+import android.content.Intent;
+import android.content.IntentFilter;
+
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.adapter.QuickActionsAdapter;
@@ -59,7 +63,6 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private static final long PING_VALIDITY_MS = 30 * 1000;
     private static final long REFRESH_INTERVAL_MS = 5 * 60 * 1000;
     private static final int MAX_CONSECUTIVE_FAILURES = 3;
-
     // UI Elements
     private TextView tvOrgName, tvGreeting, tvDate, tvLocation, tvLiveStatus;
     private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
@@ -129,6 +132,46 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             this.source = source;
         }
     }
+    
+    // ============================================
+// ✅ داخل الكلاس MiraDashboardFragment - أضف هذا المتغير
+// ============================================
+private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (intent == null) return;
+        
+        String action = intent.getAction();
+        Log.d(TAG, "Received broadcast: " + action);
+        
+        if ("com.example.uhf.REFRESH_DASHBOARD".equals(action)) {
+            // ✅ تحديث فوري للبيانات
+            mainHandler.post(() -> {
+                if (isAdded() && isViewInitialized) {
+                    Log.d(TAG, "Refreshing dashboard from broadcast");
+                    
+                    // ✅ إعادة تعيين حالة التحميل
+                    isDataLoaded = false;
+                    lastDataFetchTime = 0;
+                    
+                    // ✅ جلب البيانات الجديدة
+                    fetchData();
+                    
+                    // ✅ تحديث أسعار الذهب إذا لزم الأمر
+                    long now = System.currentTimeMillis();
+                    if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
+                        if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+                            fetchLiveGoldPrices(false);
+                        } else {
+                            displayGoldPricesFromCache();
+                        }
+                    }
+                }
+            });
+        }
+    }
+}
+
 
     @Nullable
     @Override
@@ -820,6 +863,37 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             logNonFatal("setupListeners", e);
         }
     }
+    
+    // ============================================
+// ✅ دوال التسجيل وإلغاء التسجيل
+// ============================================
+private void registerDataRefreshReceiver() {
+    try {
+        if (getContext() == null) return;
+        
+        IntentFilter filter = new IntentFilter();
+        filter.addAction("com.example.uhf.REFRESH_DASHBOARD");
+        filter.addAction("com.example.uhf.REFRESH_INVENTORY");
+        filter.addAction("com.example.uhf.REFRESH_SALES");
+        
+        getContext().registerReceiver(dataRefreshReceiver, filter);
+        Log.d(TAG, "DataRefreshReceiver registered");
+    } catch (Exception e) {
+        Log.e(TAG, "registerDataRefreshReceiver error: " + e.getMessage());
+    }
+}
+
+private void unregisterDataRefreshReceiver() {
+    try {
+        if (getContext() != null) {
+            getContext().unregisterReceiver(dataRefreshReceiver);
+            Log.d(TAG, "DataRefreshReceiver unregistered");
+        }
+    } catch (Exception e) {
+        // Receiver may not be registered
+        Log.d(TAG, "unregisterDataRefreshReceiver: " + e.getMessage());
+    }
+}
 
     public void refreshInternalData() {
         try {
@@ -1010,48 +1084,61 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        try {
-            if (branchPrefs != null) {
-                branchPrefs.registerOnSharedPreferenceChangeListener(this);
-            }
-
-            int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-            if (latestBranchId != currentBranchId) {
-                onBranchChanged();
-            } else if (isViewInitialized) {
-                setupQuickAccessGrid();
-                updateHeader();
-                refreshInternalData();
-
-                long now = System.currentTimeMillis();
-                if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")
-                        && (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
-                    fetchLiveGoldPrices(false);
-                } else {
-                    displayGoldPricesFromCache();
-                }
-            }
-            startAutoRefresh();
-        } catch (Exception e) {
-            logNonFatal("onResume", e);
+   // ============================================
+// ✅ في onResume() - أضف تسجيل المستمع
+// ============================================
+@Override
+public void onResume() {
+    super.onResume();
+    try {
+        // ✅✅✅ تسجيل BroadcastReceiver
+        registerDataRefreshReceiver();
+        
+        if (branchPrefs != null) {
+            branchPrefs.registerOnSharedPreferenceChangeListener(this);
         }
-    }
 
-    @Override
-    public void onPause() {
-        super.onPause();
-        try {
-            stopAutoRefresh();
-            if (branchPrefs != null) {
-                branchPrefs.unregisterOnSharedPreferenceChangeListener(this);
+        int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+        if (latestBranchId != currentBranchId) {
+            onBranchChanged();
+        } else if (isViewInitialized) {
+            setupQuickAccessGrid();
+            updateHeader();
+            refreshInternalData();
+
+            long now = System.currentTimeMillis();
+            if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")
+                    && (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+                fetchLiveGoldPrices(false);
+            } else {
+                displayGoldPricesFromCache();
             }
-        } catch (Exception e) {
-            logNonFatal("onPause", e);
         }
+        startAutoRefresh();
+    } catch (Exception e) {
+        logNonFatal("onResume", e);
     }
+}
+
+    // ============================================
+// ✅ في onPause() - أضف إلغاء التسجيل
+// ============================================
+@Override
+public void onPause() {
+    super.onPause();
+    try {
+        // ✅✅✅ إلغاء تسجيل BroadcastReceiver
+        unregisterDataRefreshReceiver();
+        
+        stopAutoRefresh();
+        if (branchPrefs != null) {
+            branchPrefs.unregisterOnSharedPreferenceChangeListener(this);
+        }
+    } catch (Exception e) {
+        logNonFatal("onPause", e);
+    }
+}
+
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
@@ -1064,37 +1151,43 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
         }
     }
 
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        try {
-            stopAutoRefresh();
-            if (branchPrefs != null) {
-                branchPrefs.unregisterOnSharedPreferenceChangeListener(this);
-            }
-            if (orgProfile != null && profileListener != null) {
-                orgProfile.removeListener(profileListener);
-            }
-
-            cancelFuture(dataFuture);
-            cancelFuture(goldPriceFuture);
-            cancelFuture(pingFuture);
-
-            if (mainHandler != null) {
-                mainHandler.removeCallbacksAndMessages(null);
-            }
-
-            // Cleanup ThreadLocals to prevent memory leaks
-            dateFormatsAr.remove();
-            dateFormatsEn.remove();
-            timeFormatter.remove();
-            currencyFormatter.remove();
-
-            isViewInitialized = false;
-        } catch (Exception e) {
-            logNonFatal("onDestroyView", e);
+   // ============================================
+// ✅ في onDestroyView() - أضف إلغاء التسجيل
+// ============================================
+@Override
+public void onDestroyView() {
+    super.onDestroyView();
+    try {
+        // ✅✅✅ إلغاء تسجيل BroadcastReceiver
+        unregisterDataRefreshReceiver();
+        
+        stopAutoRefresh();
+        if (branchPrefs != null) {
+            branchPrefs.unregisterOnSharedPreferenceChangeListener(this);
         }
+        if (orgProfile != null && profileListener != null) {
+            orgProfile.removeListener(profileListener);
+        }
+
+        cancelFuture(dataFuture);
+        cancelFuture(goldPriceFuture);
+        cancelFuture(pingFuture);
+
+        if (mainHandler != null) {
+            mainHandler.removeCallbacksAndMessages(null);
+        }
+
+        // Cleanup ThreadLocals to prevent memory leaks
+        dateFormatsAr.remove();
+        dateFormatsEn.remove();
+        timeFormatter.remove();
+        currencyFormatter.remove();
+
+        isViewInitialized = false;
+    } catch (Exception e) {
+        logNonFatal("onDestroyView", e);
     }
+}
 
     private void cancelFuture(Future<?> future) {
         try {
