@@ -170,7 +170,7 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
             });
         }
     }
-}
+};
 
 
     @Nullable
