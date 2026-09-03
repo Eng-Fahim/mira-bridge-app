@@ -19,7 +19,7 @@ public class InventoryTransactionEntity {
     public int rssi;
     
     @ColumnInfo(name = "scan_timestamp")
-    public long timestamp;
+    public long scanTimestamp; // تم تعديل اسم المتغير ليطابق الاستعلام تماماً
     
     @ColumnInfo(name = "device_id")
     public String deviceId;
