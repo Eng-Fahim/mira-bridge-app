@@ -3,7 +3,6 @@ package com.example.uhf.activity;
 import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.media.AudioManager;
 import android.media.SoundPool;
@@ -65,7 +64,6 @@ import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraQuickAccessSettings;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.manager.SessionMonitorManager;
-import com.example.uhf.tools.MemoryManager;
 import com.example.uhf.tools.MiraLanguageHelper;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.ToastUtil;
@@ -232,7 +230,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
             }
 
-            // 6. الأذونات والعتاد (تأخير التهيئة لضمان اكتمال رسم الشاشة)
+            // 6. الأذونات والعتاد
             checkReadWritePermission();
             mainHandler.postDelayed(() -> {
                 if (!isFinishing() && !isDestroyed()) {
@@ -242,34 +240,26 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 }
             }, 500);
 
-            // ✅ إعادة تعيين PermissionManager لتحميل الصلاحيات الجديدة
             PermissionManager.resetInstance();
-
             setupQuickNav();
 
-            // ✅ تحميل البيانات الأساسية بعد تسجيل الدخول
             loadEssentialData();
 
-            // 7. إدارة التنقل والـ Fragments
+            // 7. إدارة التنقل والـ Fragments (إصلاح التحميل لتجنب الشاشة السوداء)
             if (savedInstanceState == null) {
                 currentFragmentTag = "Dashboard";
-                loadFragmentByTag(currentFragmentTag);
             } else {
                 currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
-                currentFragment = fragmentManager.findFragmentByTag(currentFragmentTag);
-                if (currentFragment == null) {
-                    loadFragmentByTag(currentFragmentTag);
-                }
             }
+            
+            // إعادة تحميل الواجهة دائماً بشكل آمن لضمان عدم وجود View ميت
+            loadFragmentByTag(currentFragmentTag);
 
         } catch (Exception e) {
             Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
         }
     }
 
-    /**
-     * ✅ تحميل البيانات الأساسية بعد تسجيل الدخول
-     */
     private void loadEssentialData() {
         java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
         executor.execute(() -> {
@@ -277,7 +267,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 com.example.uhf.api.MiraApiClient apiClient =
                         com.example.uhf.api.MiraApiClient.getInstance(getApplicationContext());
 
-                // 1. تحميل الملف الشخصي
                 com.example.uhf.api.MiraApiClient.ApiResponse profileResponse = apiClient.getOrgProfile();
                 if (profileResponse != null && profileResponse.isSuccess && profileResponse.data != null) {
                     org.json.JSONObject org = profileResponse.data.optJSONObject("organization");
@@ -286,13 +275,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     }
                 }
 
-                // 2. تحميل الفروع
                 com.example.uhf.api.MiraApiClient.ApiResponse branchesResponse = apiClient.getBranches();
                 if (branchesResponse != null && branchesResponse.isSuccess && branchesResponse.data != null) {
                     MiraBranchesManager.getInstance(getApplicationContext()).saveBranchesFromServer(branchesResponse.data);
                 }
 
-                // 3. تحميل أسعار الذهب والعملات
                 com.example.uhf.api.MiraApiClient.ApiResponse goldResponse = apiClient.getGoldCurrencySettings();
                 if (goldResponse != null && goldResponse.isSuccess && goldResponse.data != null) {
                     org.json.JSONObject data = goldResponse.data.optJSONObject("data");
@@ -687,6 +674,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             saveFragmentTagToPrefs(tag);
 
             FragmentTransaction transaction = fragmentManager.beginTransaction();
+            
+            // إلغاء أي أنيميشن لمنع تجمد الشاشة
             transaction.setCustomAnimations(0, 0, 0, 0);
             transaction.replace(R.id.fragment_container, fragment, tag);
 
@@ -696,11 +685,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             transaction.commitAllowingStateLoss();
             
-            // ✅1. تحديث زر الشريط السفلي ليعكس القسم الحالي
             updateBottomNavSelectionByTag(tag);
-
-            // ✅2. إجبار التنفيذ الفوري للـ Fragment Transaction
-            fragmentManager.executePendingTransactions();
 
             mainHandler.postDelayed(this::hideLoading, 150);
 
@@ -719,18 +704,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
 
             Fragment fragment = createFragmentByTag(tag);
-            currentFragment = fragment;
-            currentFragmentTag = tag;
-            saveFragmentTagToPrefs(tag);
-
-            FragmentTransaction transaction = fragmentManager.beginTransaction();
-            transaction.setCustomAnimations(0, 0, 0, 0);
-            transaction.replace(R.id.fragment_container, fragment, tag);
-            transaction.commitAllowingStateLoss();
-
-            // ✅ مزامنة زر Navigation وإجبار الرسم الفوري
-            updateBottomNavSelectionByTag(tag);
-            fragmentManager.executePendingTransactions();
+            loadFragment(fragment, tag, false);
 
         } catch (Exception e) {
             Log.e(TAG, "Load fragment by tag error: " + e.getMessage(), e);
@@ -769,7 +743,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    // ✅ دالة تحديث حالة التحديد في الشريط السفلي (في مكانها الصحيح في UHFMainActivity)
     private void updateBottomNavSelectionByTag(String tag) {
         try {
             BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
