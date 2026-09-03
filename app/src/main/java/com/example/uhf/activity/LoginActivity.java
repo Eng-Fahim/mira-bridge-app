@@ -1,5 +1,5 @@
 package com.example.uhf.activity;
-
+import com.example.uhf.tools.FirebaseDiagnostics;
 import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.content.Intent;
@@ -109,6 +109,8 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+         // ✅ تتبع
+        FirebaseDiagnostics.log("LIFECYCLE", "LoginActivity Created", "onCreate started");
         
         // ✅ 1. منع التقاط الشاشة
         getWindow().setFlags(
@@ -740,19 +742,23 @@ private void applyOrgProfile() {
     }
 
     private void attemptApiLogin() {
-        // التحقق من القفل
-        if (System.currentTimeMillis() < lockoutUntil) {
-            long remainingMinutes = (lockoutUntil - System.currentTimeMillis()) / (60 * 1000);
-            Toast.makeText(this, 
-                String.format(isArabic ? "⛔ محظور - حاول بعد %d دقيقة" : "⛔ Locked - Try in %d min", 
-                    Math.max(1, remainingMinutes)), 
-                Toast.LENGTH_LONG).show();
-            return;
-        }
+    // ✅ تتبع
+    String username = getText(etUsername);
+    FirebaseDiagnostics.log("AUTH", "Login Attempt", "username=" + username);
+    
+    // التحقق من القفل
+    if (System.currentTimeMillis() < lockoutUntil) {
+        long remainingMinutes = (lockoutUntil - System.currentTimeMillis()) / (60 * 1000);
+        Toast.makeText(this, 
+            String.format(isArabic ? "⛔ محظور - حاول بعد %d دقيقة" : "⛔ Locked - Try in %d min", 
+                Math.max(1, remainingMinutes)), 
+            Toast.LENGTH_LONG).show();
+        return;
+    }
 
-        String username = getText(etUsername);
-        String password = getText(etPassword);
-        String serverUrl = getText(etServerUrl);
+    // ✅ لا حاجة لإعادة تعريف username هنا
+    String password = getText(etPassword);
+    String serverUrl = getText(etServerUrl);
 
         // ✅ إذا كان الرابط فارغاً، استخدم الافتراضي
         if (serverUrl.isEmpty()) {
@@ -895,6 +901,9 @@ apiClient = MiraApiClient.getInstance(getApplicationContext());
 }
 
    private void handleLoginSuccess(MiraApiClient.ApiResponse response, String username, String password) {
+   // ✅ تتبع
+        FirebaseDiagnostics.log("AUTH", "Login Success", "username=" + username);
+        FirebaseDiagnostics.logSessionState("AFTER_LOGIN", username, true);
     playTone(true);
 
     // ✅ استخدام سياق التطبيق لجميع الـ Managers
@@ -1254,6 +1263,9 @@ private boolean verifyOfflineLogin(String username, String password) {
 
     @Override
 protected void onDestroy() {
+// ✅ تتبع
+        FirebaseDiagnostics.log("LIFECYCLE", "LoginActivity Destroyed", "onDestroy called");
+        
     // ✅ إلغاء التسجيل والتنظيف
     MemoryManager.getInstance().unregisterActivity(this);
     unregisterComponentCallbacks(MemoryManager.getInstance());
