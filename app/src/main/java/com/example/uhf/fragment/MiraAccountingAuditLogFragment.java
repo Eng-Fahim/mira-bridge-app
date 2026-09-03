@@ -126,12 +126,19 @@ public class MiraAccountingAuditLogFragment extends Fragment {
         tvEmptyLog.setText(message);
         rvAuditLog.setVisibility(View.GONE);
     }
+@Override
+public void onDestroyView() {
+    super.onDestroyView();
+    // ✅ لا نغلق الـ Executor هنا
+    // لأن onCreateView قد يُستدعى مرة أخرى
+}
 
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        if (executor != null && !executor.isShutdown()) {
-            executor.shutdown();
-        }
+@Override
+public void onDestroy() {
+    super.onDestroy();
+    // ✅ الإغلاق الصحيح في onDestroy
+    if (executor != null && !executor.isShutdown()) {
+        executor.shutdown();
     }
+}
 }
