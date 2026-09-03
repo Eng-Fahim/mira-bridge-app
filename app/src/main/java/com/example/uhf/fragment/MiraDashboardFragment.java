@@ -51,7 +51,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
-
+import com.example.uhf.tools.FirebaseDiagnostics;
 public class MiraDashboardFragment extends Fragment implements SharedPreferences.OnSharedPreferenceChangeListener {
 
     private static final String TAG = "MiraDashboardFragment";
@@ -210,7 +210,11 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
     }
 
     private void initializeManagers() {
+   
         try {
+         // ✅ تتبع
+            FirebaseDiagnostics.log("MANAGER", "Dashboard Initialize Managers", "Starting");
+            
             if (!isAdded()) return;
             Context context = requireContext();
             apiClient = MiraApiClient.getInstance(context);
@@ -224,10 +228,22 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
             branchPrefs = context.getSharedPreferences("mira_branches_prefs", Context.MODE_PRIVATE);
             goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE);
             lastGoldFetchTime = goldCachePrefs.getLong("last_gold_fetch_time", 0);
+        
+            // ✅ تتبع حالة الـ Managers
+            FirebaseDiagnostics.logManagerState("MiraApiClient", apiClient != null ? "NOT_NULL" : "NULL");
+            FirebaseDiagnostics.logManagerState("SessionManager", sessionManager != null ? "NOT_NULL" : "NULL");
+            FirebaseDiagnostics.logManagerState("PermissionManager", permissionManager != null ? "NOT_NULL" : "NULL");
+            
+            boolean isLoggedIn = sessionManager != null && sessionManager.isLoggedIn();
+            FirebaseDiagnostics.logSessionState("DASHBOARD_INIT", 
+                sessionManager != null ? sessionManager.getUsername() : null, 
+                isLoggedIn);
+            
         } catch (Exception e) {
-            logNonFatal("initializeManagers", e);
+            FirebaseDiagnostics.logError("MiraDashboardFragment.initializeManagers", e);
         }
     }
+    
 
     private void initViews(View v) {
         try {
@@ -648,77 +664,93 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
     }
 
     private void fetchData() {
-        try {
-            if (isLoading.get() || apiClient == null || !isAdded()) return;
+    try {
+        // ✅ تتبع
+        FirebaseDiagnostics.log("API", "Dashboard fetchData started", 
+            "branchId=" + (branchesManager != null ? branchesManager.getActiveBranchId() : -1));
+        
+        if (isLoading.get() || apiClient == null || !isAdded()) return;
 
-            long now = System.currentTimeMillis();
-            if (now - lastDataFetchTime < 2000 && isDataLoaded) return;
+        long now = System.currentTimeMillis();
+        if (now - lastDataFetchTime < 2000 && isDataLoaded) return;
 
-            isLoading.set(true);
+        isLoading.set(true);
 
-            if (tvLiveStatus != null) {
-                tvLiveStatus.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
-                tvLiveStatus.setTextColor(0xFFF59E0B);
-            }
-
-            cancelFuture(dataFuture);
-            final int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-
-            dataFuture = sharedExecutor.submit(() -> {
-                try {
-                    MiraApiClient.ApiResponse response = apiClient.getDashboardFull(activeBranchId);
-                    mainHandler.post(() -> {
-                        isLoading.set(false);
-                        lastDataFetchTime = System.currentTimeMillis();
-                        if (!isAdded()) return;
-
-                        if (response != null && response.isSuccess && response.data != null) {
-    saveOfflineData(response.data);
-    processData(response.data);
-    isDataLoaded = true;
-    consecutiveFailures = 0;
-    updateLiveStatusText(true);
-    clearCrashlyticsCustomKeys();
-    
-    // إخفاء الشيمر والإنعاش فقط عند النجاح
-    showShimmer(false);
-    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-} else {
-    logNonFatal("fetchData.response", new Exception("Dashboard API Failed - code=" + (response != null ? response.code : -1)));
-    updateLiveStatusText(false);
-    
-    // جلب البيانات احتياطياً (هي من ستتكفل بإخفاء الشيمر في نهايتها)
-    fetchInventoryDataDirectly(activeBranchId);
-}
-
-                        showShimmer(false);
-                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                    });
-                } catch (Exception e) {
-                    logNonFatal("fetchData.thread", e);
-                    mainHandler.post(() -> {
-                        isLoading.set(false);
-                        if (!isAdded()) return;
-
-                        consecutiveFailures++;
-                        updateLiveStatusText(false);
-                        loadOfflineData();
-                        showShimmer(false);
-                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-
-                        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                            Toast.makeText(getContext(), isArabic ? "تعذر تحديث البيانات من السيرفر" : "Could not update data from server", Toast.LENGTH_SHORT).show();
-                            consecutiveFailures = 0;
-                        }
-                    });
-                }
-            });
-        } catch (Exception e) {
-            logNonFatal("fetchData", e);
-            isLoading.set(false);
+        if (tvLiveStatus != null) {
+            tvLiveStatus.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
+            tvLiveStatus.setTextColor(0xFFF59E0B);
         }
-    }
 
+        cancelFuture(dataFuture);
+        final int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+
+        dataFuture = sharedExecutor.submit(() -> {
+            try {
+                MiraApiClient.ApiResponse response = apiClient.getDashboardFull(activeBranchId);
+                
+                mainHandler.post(() -> {
+                    isLoading.set(false);
+                    lastDataFetchTime = System.currentTimeMillis();
+                    if (!isAdded()) return;
+
+                    if (response != null && response.isSuccess && response.data != null) {
+                        // ✅ نجاح API
+                        FirebaseDiagnostics.logApiCall("getDashboardFull", response.code, true, "Success");
+                        
+                        saveOfflineData(response.data);
+                        processData(response.data);
+                        isDataLoaded = true;
+                        consecutiveFailures = 0;
+                        updateLiveStatusText(true);
+                        clearCrashlyticsCustomKeys();
+                        
+                        // إخفاء الشيمر والإنعاش فقط عند النجاح
+                        showShimmer(false);
+                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                    } else {
+                        // ✅ فشل API
+                        FirebaseDiagnostics.logApiCall("getDashboardFull", 
+                            response != null ? response.code : -1, 
+                            false, 
+                            "Failed");
+                        
+                        logNonFatal("fetchData.response", new Exception("Dashboard API Failed - code=" + (response != null ? response.code : -1)));
+                        updateLiveStatusText(false);
+                        
+                        // جلب البيانات احتياطياً
+                        fetchInventoryDataDirectly(activeBranchId);
+                    }
+
+                    showShimmer(false);
+                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                });
+            } catch (Exception e) {
+                FirebaseDiagnostics.logError("MiraDashboardFragment.fetchData.thread", e);
+                logNonFatal("fetchData.thread", e);
+                
+                mainHandler.post(() -> {
+                    isLoading.set(false);
+                    if (!isAdded()) return;
+
+                    consecutiveFailures++;
+                    updateLiveStatusText(false);
+                    loadOfflineData();
+                    showShimmer(false);
+                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+
+                    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                        Toast.makeText(getContext(), isArabic ? "تعذر تحديث البيانات من السيرفر" : "Could not update data from server", Toast.LENGTH_SHORT).show();
+                        consecutiveFailures = 0;
+                    }
+                });
+            }
+        });
+    } catch (Exception e) {
+        FirebaseDiagnostics.logError("MiraDashboardFragment.fetchData", e);
+        logNonFatal("fetchData", e);
+        isLoading.set(false);
+    }
+}
     private void fetchInventoryDataDirectly(int branchId) {
         try {
             if (apiClient == null || branchId <= 0) {
