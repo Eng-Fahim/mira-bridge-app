@@ -245,12 +245,24 @@ public class RFIDManager {
     /**
      * تحرير الموارد
      */
-    public void release() {
-        if (activeReader != null) {
+    /**
+ * تحرير الموارد وإعادة تصفير الـ Singleton
+ */
+public void release() {
+    if (activeReader != null) {
+        try {
+            activeReader.stopScan();
+            activeReader.disconnect();
             activeReader.release();
-            activeReader = null;
+        } catch (Exception e) {
+            Log.e(TAG, "release error: " + e.getMessage());
         }
+        activeReader = null;
     }
+    activeDevice = null;
+    instance = null; // 👈 تفريغ الـ Singleton
+}
+
     
     /**
      * اختبار الاتصال
