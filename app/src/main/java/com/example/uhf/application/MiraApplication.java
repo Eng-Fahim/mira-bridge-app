@@ -15,6 +15,7 @@ import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraServerConfig;
 import com.example.uhf.manager.PermissionManager;
 import com.example.uhf.tools.SessionManager;
+import com.example.uhf.tools.FirebaseDiagnostics; // ✅ إضافة import
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
@@ -37,13 +38,39 @@ public class MiraApplication extends AppContext {
         super.onCreate(); // ✅ هذا يستدعي initFirebase() و ToastUtil.init() من AppContext
         instance = this;
         
-        // ✅ 1. تهيئة جميع الـ Managers بسياق التطبيق أولاً
+        // ✅ 1. تهيئة FirebaseDiagnostics
+        FirebaseDiagnostics.init(this);
+        FirebaseDiagnostics.log("SYSTEM", "MiraApplication Started", "onCreate()");
+        
+        // ✅ 2. تهيئة جميع الـ Managers بسياق التطبيق أولاً
         initializeCoreServices();
         
-        // ✅ 2. تهيئة قاعدة البيانات
+        // ✅ 3. تهيئة قاعدة البيانات
         initializeDatabase();
         
+        // ✅ 4. تسجيل معلومات الجهاز
+        logDeviceInfo();
+        
         Log.d(TAG, "MiraApplication initialized successfully");
+    }
+    
+    /**
+     * ✅ تسجيل معلومات الجهاز للتشخيص
+     */
+    private void logDeviceInfo() {
+        try {
+            String deviceInfo = String.format(
+                "Device: %s %s | Android: %s | App Version: %s",
+                android.os.Build.MANUFACTURER,
+                android.os.Build.MODEL,
+                android.os.Build.VERSION.RELEASE,
+                getPackageManager().getPackageInfo(getPackageName(), 0).versionName
+            );
+            
+            FirebaseDiagnostics.log("DEVICE", "Device Info", deviceInfo);
+        } catch (Exception e) {
+            Log.e(TAG, "logDeviceInfo error: " + e.getMessage());
+        }
     }
     
     /**
@@ -53,31 +80,42 @@ public class MiraApplication extends AppContext {
         Context appContext = getApplicationContext();
         
         try {
+            FirebaseDiagnostics.log("MANAGER", "Initializing Core Services", "Starting");
+            
             // تهيئة SessionManager
             SessionManager sessionManager = new SessionManager(appContext);
+            FirebaseDiagnostics.logManagerState("SessionManager", "INITIALIZED");
             Log.d(TAG, "✅ SessionManager initialized");
             
             // تهيئة MiraServerConfig
             MiraServerConfig serverConfig = MiraServerConfig.getInstance(appContext);
+            FirebaseDiagnostics.logManagerState("MiraServerConfig", "INITIALIZED");
             Log.d(TAG, "✅ MiraServerConfig initialized");
             
             // تهيئة MiraApiClient
             MiraApiClient apiClient = MiraApiClient.getInstance(appContext);
+            FirebaseDiagnostics.logManagerState("MiraApiClient", "INITIALIZED");
             Log.d(TAG, "✅ MiraApiClient initialized");
             
             // تهيئة MiraBranchesManager
             MiraBranchesManager branchesManager = MiraBranchesManager.getInstance(appContext);
+            FirebaseDiagnostics.logManagerState("MiraBranchesManager", "INITIALIZED");
             Log.d(TAG, "✅ MiraBranchesManager initialized");
             
             // تهيئة MiraOrgProfileManager
             MiraOrgProfileManager orgProfileManager = MiraOrgProfileManager.getInstance(appContext);
+            FirebaseDiagnostics.logManagerState("MiraOrgProfileManager", "INITIALIZED");
             Log.d(TAG, "✅ MiraOrgProfileManager initialized");
             
             // تهيئة PermissionManager
             PermissionManager permissionManager = PermissionManager.getInstance(appContext);
+            FirebaseDiagnostics.logManagerState("PermissionManager", "INITIALIZED");
             Log.d(TAG, "✅ PermissionManager initialized");
             
+            FirebaseDiagnostics.log("MANAGER", "Core Services Initialized", "All managers ready");
+            
         } catch (Exception e) {
+            FirebaseDiagnostics.logError("MiraApplication.initializeCoreServices", e);
             Log.e(TAG, "❌ Error initializing core services: " + e.getMessage(), e);
         }
     }
@@ -95,8 +133,10 @@ public class MiraApplication extends AppContext {
             .fallbackToDestructiveMigration()
             .build();
             
+            FirebaseDiagnostics.log("DATABASE", "Database Initialized", "Success");
             Log.d(TAG, "Database initialized successfully");
         } catch (Exception e) {
+            FirebaseDiagnostics.logError("MiraApplication.initializeDatabase", e);
             Log.e(TAG, "Database initialization failed: " + e.getMessage());
         }
     }
@@ -123,13 +163,16 @@ public class MiraApplication extends AppContext {
      */
     @Override
     public void onTerminate() {
+        FirebaseDiagnostics.log("SYSTEM", "Application Terminating", "onTerminate()");
         super.onTerminate();
         
         if (inventoryDatabase != null) {
             try {
                 inventoryDatabase.close();
                 inventoryDatabase = null;
+                FirebaseDiagnostics.log("DATABASE", "Database Closed", "Success");
             } catch (Exception e) {
+                FirebaseDiagnostics.logError("MiraApplication.onTerminate", e);
                 Log.e(TAG, "Error closing database", e);
             }
         }
@@ -140,6 +183,7 @@ public class MiraApplication extends AppContext {
      */
     @Override
     public void onLowMemory() {
+        FirebaseDiagnostics.log("MEMORY", "Low Memory Warning", "System.gc() called");
         super.onLowMemory();
         System.gc();
     }
