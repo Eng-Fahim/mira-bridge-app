@@ -69,22 +69,36 @@ public class MiraAccountingItem {
     public String getCol1Text() { return codeOrRef != null ? codeOrRef : ""; }
     public String getCol2Text() { return nameOrDesc != null ? nameOrDesc : ""; }
     
-    public String getCol3Text() {
-        double netGold = getFineGoldBalance();
-        if (itemType == ItemType.JOURNAL_ENTRY) {
+public String getCol4Text() {
+    double netCash = getCashBalance();
+    if (itemType == ItemType.JOURNAL_ENTRY) {
+        // ✅ إظهار الصافي مع علامة
+        if (netCash > 0) {
+            return String.format(Locale.US, "+%,.2f %s", netCash, currency);
+        } else if (netCash < 0) {
+            return String.format(Locale.US, "%,.2f %s", netCash, currency);
+        } else {
+            return String.format(Locale.US, "0.00 %s", currency);
+        }
+    }
+    // ✅ دليل الحسابات وميزان المراجعة
+    return String.format(Locale.US, "%,.2f %s", debitCash, currency);
+}
+
+public String getCol3Text() {
+    double netGold = getFineGoldBalance();
+    if (itemType == ItemType.JOURNAL_ENTRY) {
+        // ✅ إظهار الصافي مع علامة
+        if (netGold > 0) {
+            return String.format(Locale.US, "+%.3f جم", netGold);
+        } else if (netGold < 0) {
             return String.format(Locale.US, "%.3f جم", netGold);
+        } else {
+            return "0.000 جم";
         }
-        return String.format(Locale.US, "%.3f جم", fineWeight24Debit);
     }
-
-    public String getCol4Text() {
-        double netCash = getCashBalance();
-        if (itemType == ItemType.JOURNAL_ENTRY) {
-            return String.format(Locale.US, "%,.0f %s", netCash, currency != null ? currency : "");
-        }
-        return String.format(Locale.US, "%,.0f %s", debitCash, currency != null ? currency : "");
-    }
-
+    return String.format(Locale.US, "%.3f جم", fineWeight24Debit);
+}
     // Getters & Setters
     public ItemType getItemType() { return itemType; }
     public void setItemType(ItemType itemType) { this.itemType = itemType; }
