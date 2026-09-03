@@ -32,15 +32,14 @@ public class MiraFinancialReportAdapter extends RecyclerView.Adapter<RecyclerVie
         notifyDataSetChanged();
     }
 
-    @Override
-    public int getItemViewType(int position) {
-        // ✅ حماية من null أو index out of bounds
-        if (items == null || position < 0 || position >= items.size()) {
-            return MiraReportRowItem.TYPE_DATA;
-        }
-        return items.get(position).getViewType();
+   @Override
+public int getItemViewType(int position) {
+    // ✅ حماية من null أو index out of bounds
+    if (items == null || position < 0 || position >= items.size()) {
+        return 0; // ✅ قيمة افتراضية آمنة
     }
-
+    return items.get(position).getViewType();
+}
     @NonNull
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
