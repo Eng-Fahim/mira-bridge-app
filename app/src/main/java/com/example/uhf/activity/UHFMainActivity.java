@@ -178,7 +178,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Toolbar Update Error: " + e.getMessage());
         }
     }
-    
+
     @Override
     protected void attachBaseContext(Context newBase) {
         String savedLang = MiraLanguageHelper.getSavedLanguage(newBase);
@@ -192,7 +192,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         try {
             // 1. التحقق من الجلسة أولاً
-            
             sessionManager = new SessionManager(getApplicationContext());
             if (!sessionManager.isLoggedIn()) {
                 navigateToLogin();
@@ -233,25 +232,27 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
             }
 
-            // 6. الأذونات والعتاد
+            // 6. الأذونات والعتاد (تأخير التهيئة لضمان اكتمال رسم الشاشة)
             checkReadWritePermission();
+            mainHandler.postDelayed(() -> {
+                if (!isFinishing() && !isDestroyed()) {
+                    safeExecute(this::initSound, "Sound Init Error");
+                    safeExecute(this::initUHF, "UHF Hardware Init Error");
+                    safeExecute(this::configureReaderForDevice, "Reader Configuration Error");
+                }
+            }, 500);
 
-            safeExecute(this::initSound, "Sound Init Error");
-            safeExecute(this::initUHF, "UHF Hardware Init Error");
-            safeExecute(this::configureReaderForDevice, "Reader Configuration Error");
             // ✅ إعادة تعيين PermissionManager لتحميل الصلاحيات الجديدة
             PermissionManager.resetInstance();
 
-
             setupQuickNav();
 
-// ✅ تحميل البيانات الأساسية بعد تسجيل الدخول
-loadEssentialData();
-
+            // ✅ تحميل البيانات الأساسية بعد تسجيل الدخول
+            loadEssentialData();
 
             // 7. إدارة التنقل والـ Fragments
             if (savedInstanceState == null) {
-                currentFragmentTag = "Dashboard"; 
+                currentFragmentTag = "Dashboard";
                 loadFragmentByTag(currentFragmentTag);
             } else {
                 currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
@@ -265,58 +266,60 @@ loadEssentialData();
             Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
         }
     }
-    
+
     /**
- * ✅ تحميل البيانات الأساسية بعد تسجيل الدخول
- * هذه الدالة تحل مشكلة "اختفاء المحتويات" و"عدم عمل التنقلات"
- */
-private void loadEssentialData() {
-    java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
-    executor.execute(() -> {
-        try {
-            com.example.uhf.api.MiraApiClient apiClient = 
-                com.example.uhf.api.MiraApiClient.getInstance(getApplicationContext());
-            
-            // ✅ 1. تحميل الملف الشخصي للمنظمة
-            com.example.uhf.api.MiraApiClient.ApiResponse profileResponse = apiClient.getOrgProfile();
-            if (profileResponse != null && profileResponse.isSuccess && profileResponse.data != null) {
-                org.json.JSONObject org = profileResponse.data.optJSONObject("organization");
-                if (org != null) {
-                    MiraOrgProfileManager.getInstance(getApplicationContext()).saveFromServer(org);
-                    runOnUiThread(this::updateToolbarTitle);
+     * ✅ تحميل البيانات الأساسية بعد تسجيل الدخول
+     */
+    private void loadEssentialData() {
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        executor.execute(() -> {
+            try {
+                com.example.uhf.api.MiraApiClient apiClient =
+                        com.example.uhf.api.MiraApiClient.getInstance(getApplicationContext());
+
+                // 1. تحميل الملف الشخصي
+                com.example.uhf.api.MiraApiClient.ApiResponse profileResponse = apiClient.getOrgProfile();
+                if (profileResponse != null && profileResponse.isSuccess && profileResponse.data != null) {
+                    org.json.JSONObject org = profileResponse.data.optJSONObject("organization");
+                    if (org != null) {
+                        MiraOrgProfileManager.getInstance(getApplicationContext()).saveFromServer(org);
+                    }
                 }
-            }
-            
-            // ✅ 2. تحميل الفروع
-            com.example.uhf.api.MiraApiClient.ApiResponse branchesResponse = apiClient.getBranches();
-            if (branchesResponse != null && branchesResponse.isSuccess && branchesResponse.data != null) {
-                MiraBranchesManager.getInstance(getApplicationContext()).saveBranchesFromServer(branchesResponse.data);
-                runOnUiThread(this::updateToolbarTitle);
-            }
-            
-            // ✅ 3. تحميل أسعار الذهب والعملات
-            com.example.uhf.api.MiraApiClient.ApiResponse goldResponse = apiClient.getGoldCurrencySettings();
-            if (goldResponse != null && goldResponse.isSuccess && goldResponse.data != null) {
-                org.json.JSONObject data = goldResponse.data.optJSONObject("data");
-                if (data == null) data = goldResponse.data;
-                org.json.JSONObject goldData = data.optJSONObject("gold");
-                org.json.JSONObject currencyData = data.optJSONObject("currency");
-                if (goldData != null) {
-                    com.example.uhf.manager.MiraPriceManager.getInstance(getApplicationContext()).saveGoldSettings(goldData);
+
+                // 2. تحميل الفروع
+                com.example.uhf.api.MiraApiClient.ApiResponse branchesResponse = apiClient.getBranches();
+                if (branchesResponse != null && branchesResponse.isSuccess && branchesResponse.data != null) {
+                    MiraBranchesManager.getInstance(getApplicationContext()).saveBranchesFromServer(branchesResponse.data);
                 }
-                if (currencyData != null) {
-                    com.example.uhf.manager.MiraPriceManager.getInstance(getApplicationContext()).saveCurrencySettings(currencyData);
+
+                // 3. تحميل أسعار الذهب والعملات
+                com.example.uhf.api.MiraApiClient.ApiResponse goldResponse = apiClient.getGoldCurrencySettings();
+                if (goldResponse != null && goldResponse.isSuccess && goldResponse.data != null) {
+                    org.json.JSONObject data = goldResponse.data.optJSONObject("data");
+                    if (data == null) data = goldResponse.data;
+                    org.json.JSONObject goldData = data.optJSONObject("gold");
+                    org.json.JSONObject currencyData = data.optJSONObject("currency");
+                    if (goldData != null) {
+                        com.example.uhf.manager.MiraPriceManager.getInstance(getApplicationContext()).saveGoldSettings(goldData);
+                    }
+                    if (currencyData != null) {
+                        com.example.uhf.manager.MiraPriceManager.getInstance(getApplicationContext()).saveCurrencySettings(currencyData);
+                    }
                 }
+
+                Log.d(TAG, "✅ Essential data loaded successfully");
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error loading essential data: " + e.getMessage());
+            } finally {
+                runOnUiThread(() -> {
+                    updateToolbarTitle();
+                    hideLoading();
+                });
             }
-            
-            Log.d(TAG, "✅ Essential data loaded successfully");
-            
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading essential data: " + e.getMessage());
-        }
-    });
-    executor.shutdown();
-}
+        });
+        executor.shutdown();
+    }
 
     @Override
     public void onResume() {
@@ -351,19 +354,6 @@ private void loadEssentialData() {
         } catch (Exception e) {
             Log.e(TAG, "Save fragment tag error: " + e.getMessage());
         }
-    }
-
-    private String getSavedFragmentTag() {
-        try {
-            SharedPreferences prefs = getSharedPreferences(PREFS_NAVIGATION, Context.MODE_PRIVATE);
-            String savedTag = prefs.getString(KEY_CURRENT_FRAGMENT, "Dashboard");
-            if (savedTag != null && !savedTag.isEmpty()) {
-                return savedTag;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Get saved fragment tag error: " + e.getMessage());
-        }
-        return "Dashboard";
     }
 
     // ==================== TOOLBAR MENU ====================
@@ -506,60 +496,48 @@ private void loadEssentialData() {
                 applyBottomNavPermissions(quickNav, pm);
 
                 quickNav.setOnItemSelectedListener(item -> {
-    int id = item.getItemId();
-    
-    // ✅✅✅ 1. تجاهل العنصر الوهمي فوراً
-    if (id == R.id.nav_placeholder) {
-        showQuickActionMenu();
-        return false;
-    }
-    
-    // ✅✅✅ 2. الحصول على الـ tag
-    String fragmentTag = getFragmentTagForNavItem(id);
-    if (fragmentTag.isEmpty()) {
-        Toast.makeText(this, "⚠️ عنصر غير معروف", Toast.LENGTH_SHORT).show();
-        return false;
-    }
-    
-    // ✅✅✅ 3. فحص الصلاحيات مع رسالة توضيحية
-    if (!pm.canAccessFragment(fragmentTag)) {
-        Toast.makeText(this, 
-            isArabic ? "⛔ لا توجد صلاحية: " + fragmentTag : 
-                       "⛔ No permission: " + fragmentTag, 
-            Toast.LENGTH_SHORT).show();
-        showPermissionDenied();
-        return false;
-    }
-    
-    // ✅✅✅ 4. التنقل مع رسالة نجاح
-    if (id == R.id.nav_home) {
-        checkInventoryLockAndExecute(() -> {
-            clearBackStack();
-            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-            Toast.makeText(this, "✅ تم فتح الرئيسية", Toast.LENGTH_SHORT).show();
-        });
-        return true;
-    } else if (id == R.id.nav_inventory) {
-        checkInventoryLockAndExecute(() -> {
-            loadFragment(new MiraInventoryProFragment(), "Scan");
-            Toast.makeText(this, "✅ تم فتح الجرد", Toast.LENGTH_SHORT).show();
-        });
-        return true;
-    } else if (id == R.id.nav_sales) {
-        checkInventoryLockAndExecute(() -> {
-            loadFragment(new MiraPosFragment(), "POS");
-            Toast.makeText(this, "✅ تم فتح البيع", Toast.LENGTH_SHORT).show();
-        });
-        return true;
-    } else if (id == R.id.nav_transfers) {
-        checkInventoryLockAndExecute(() -> {
-            loadFragment(new MiraTransferFragment(), "Transfers");
-            Toast.makeText(this, "✅ تم فتح التحويلات", Toast.LENGTH_SHORT).show();
-        });
-        return true;
-    }
-    return false;
-});
+                    int id = item.getItemId();
+
+                    if (id == R.id.nav_placeholder) {
+                        showQuickActionMenu();
+                        return false;
+                    }
+
+                    String fragmentTag = getFragmentTagForNavItem(id);
+                    if (fragmentTag.isEmpty()) {
+                        Toast.makeText(this, "⚠️ عنصر غير معروف", Toast.LENGTH_SHORT).show();
+                        return false;
+                    }
+
+                    if (!pm.canAccessFragment(fragmentTag)) {
+                        showPermissionDenied();
+                        return false;
+                    }
+
+                    if (id == R.id.nav_home) {
+                        checkInventoryLockAndExecute(() -> {
+                            clearBackStack();
+                            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
+                        });
+                        return true;
+                    } else if (id == R.id.nav_inventory) {
+                        checkInventoryLockAndExecute(() -> {
+                            loadFragment(new MiraInventoryProFragment(), "Scan");
+                        });
+                        return true;
+                    } else if (id == R.id.nav_sales) {
+                        checkInventoryLockAndExecute(() -> {
+                            loadFragment(new MiraPosFragment(), "POS");
+                        });
+                        return true;
+                    } else if (id == R.id.nav_transfers) {
+                        checkInventoryLockAndExecute(() -> {
+                            loadFragment(new MiraTransferFragment(), "Transfers");
+                        });
+                        return true;
+                    }
+                    return false;
+                });
             }
         } catch (Exception e) {
             Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
@@ -612,7 +590,7 @@ private void loadEssentialData() {
             dialog.setContentView(view);
 
             PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
-MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
+            MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApplicationContext());
 
             List<String> allowedActions = pm.getAllowedQuickActions();
 
@@ -700,41 +678,37 @@ MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApp
     }
 
     public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-    if (isFinishing() || isDestroyed() || fragment == null) return;
+        if (isFinishing() || isDestroyed() || fragment == null) return;
 
-    try {
-        PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
+        try {
+            showLoading();
+            currentFragment = fragment;
+            currentFragmentTag = tag;
+            saveFragmentTagToPrefs(tag);
 
-        // ✅✅✅ لا تمنع إعادة التحميل - اسمح دائماً
-        // if (tag.equals(currentFragmentTag) && currentFragment != null && currentFragment.isAdded()) {
-        //     return;
-        // }
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.setCustomAnimations(0, 0, 0, 0);
+            transaction.replace(R.id.fragment_container, fragment, tag);
 
-        showLoading();
-        currentFragment = fragment;
-        currentFragmentTag = tag;
-        saveFragmentTagToPrefs(tag);
+            if (addToBackStack) {
+                transaction.addToBackStack(tag);
+            }
 
-        FragmentTransaction transaction = fragmentManager.beginTransaction();
-        transaction.setCustomAnimations(0, 0, 0, 0);
-        transaction.replace(R.id.fragment_container, fragment, tag);
+            transaction.commitAllowingStateLoss();
+            
+            // ✅1. تحديث زر الشريط السفلي ليعكس القسم الحالي
+            updateBottomNavSelectionByTag(tag);
 
-        if (addToBackStack) {
-            transaction.addToBackStack(tag);
+            // ✅2. إجبار التنفيذ الفوري للـ Fragment Transaction
+            fragmentManager.executePendingTransactions();
+
+            mainHandler.postDelayed(this::hideLoading, 150);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error switching fragment: " + e.getMessage());
+            hideLoading();
         }
-
-        transaction.commitAllowingStateLoss();
-        
-        // ✅ إجبار التنفيذ الفوري
-        fragmentManager.executePendingTransactions();
-
-        mainHandler.postDelayed(this::hideLoading, 150);
-
-    } catch (Exception e) {
-        Log.e(TAG, "Error switching fragment: " + e.getMessage());
-        hideLoading();
     }
-}
 
     private void loadFragmentByTag(String tag) {
         try {
@@ -754,7 +728,8 @@ MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApp
             transaction.replace(R.id.fragment_container, fragment, tag);
             transaction.commitAllowingStateLoss();
 
-            // ⚡ إجبار النظام على رسم الواجهة فوراً
+            // ✅ مزامنة زر Navigation وإجبار الرسم الفوري
+            updateBottomNavSelectionByTag(tag);
             fragmentManager.executePendingTransactions();
 
         } catch (Exception e) {
@@ -791,6 +766,27 @@ MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApp
             case "GateSettings": return new MiraGateSettingsFragment();
             case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
             default: return new MiraDashboardFragment();
+        }
+    }
+
+    // ✅ دالة تحديث حالة التحديد في الشريط السفلي (في مكانها الصحيح في UHFMainActivity)
+    private void updateBottomNavSelectionByTag(String tag) {
+        try {
+            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+            if (quickNav == null || tag == null) return;
+
+            Menu menu = quickNav.getMenu();
+            if (tag.equals("Dashboard")) {
+                menu.findItem(R.id.nav_home).setChecked(true);
+            } else if (tag.equals("Scan")) {
+                menu.findItem(R.id.nav_inventory).setChecked(true);
+            } else if (tag.equals("POS")) {
+                menu.findItem(R.id.nav_sales).setChecked(true);
+            } else if (tag.equals("Transfers")) {
+                menu.findItem(R.id.nav_transfers).setChecked(true);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating bottom nav selection: " + e.getMessage());
         }
     }
 
@@ -1166,27 +1162,26 @@ MiraQuickAccessSettings quickAccess = MiraQuickAccessSettings.getInstance(getApp
     }
 
     @Override
-protected void onDestroy() {
-    try {
-        if (fragmentManager != null) {
-            clearBackStack();
-        }
-        stopActiveInventory();
-        mainHandler.removeCallbacksAndMessages(null);
-        if (playSoundThread != null) playSoundThread.stopPlay();
-        if (soundPool != null) soundPool.release();
-        if (mReader != null) mReader.free();
+    protected void onDestroy() {
+        try {
+            if (fragmentManager != null) {
+                clearBackStack();
+            }
+            stopActiveInventory();
+            mainHandler.removeCallbacksAndMessages(null);
+            if (playSoundThread != null) playSoundThread.stopPlay();
+            if (soundPool != null) soundPool.release();
+            if (mReader != null) mReader.free();
 
-        if (orgProfileManager != null && profileListener != null) {
-            orgProfileManager.removeListener(profileListener);
+            if (orgProfileManager != null && profileListener != null) {
+                orgProfileManager.removeListener(profileListener);
+            }
+            SessionMonitorManager.getInstance(this).stopMonitoring();
+        } catch (Exception e) {
+            Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
         }
-        SessionMonitorManager.getInstance(this).stopMonitoring();
-    } catch (Exception e) {
-        Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
+        super.onDestroy();
     }
-        // ✅ BaseTabFragmentActivity.onDestroy() سيقوم بإلغاء التسجيل
-    super.onDestroy();
-}
 
     private void safeExecute(Runnable runnable, String errorMessage) {
         try {
@@ -1224,4 +1219,4 @@ protected void onDestroy() {
             }
         }
     }
-                        }
+}
