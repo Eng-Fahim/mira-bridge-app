@@ -265,13 +265,17 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     }
 
     /**
-     * تهيئة قاعدة البيانات باستخدام Singleton Pattern
-     */
-    private void initDatabase() {
-        MiraApplication application = (MiraApplication) requireActivity().getApplication();
-        inventoryDatabase = application.getInventoryDatabase();
+ * تهيئة قاعدة البيانات بأمان باستخدام Singleton Pattern المباشر
+ */
+private void initDatabase() {
+    try {
+        inventoryDatabase = InventoryDatabase.getInstance(requireContext().getApplicationContext());
         transactionDao = inventoryDatabase.inventoryTransactionDao();
+    } catch (Exception e) {
+        Log.e(TAG, "Error initializing inventory database", e);
     }
+}
+
 
     /**
      * الحصول على معرف الجهاز بأمان
@@ -1292,70 +1296,89 @@ public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
     /**
      * تحديث الواجهة
      */
-    private void updateUI() {
-        if (!isAdded() || isFragmentDestroyed || inventoryEngine == null) return;
-        
-        int scanned = inventoryEngine.getUniqueCount();
-        int totalReads = inventoryEngine.getTotalReads();
-        int duplicates = inventoryEngine.getDuplicateCount();
+    /**
+ * تحديث الواجهة وحساب الفروقات بشكل حي
+ */
+private void updateUI() {
+    if (!isAdded() || isFragmentDestroyed || inventoryEngine == null) return;
+    
+    int scanned = inventoryEngine.getUniqueCount();
+    int totalReads = inventoryEngine.getTotalReads();
+    int duplicates = inventoryEngine.getDuplicateCount();
 
-        if (tvScannedCount != null) {
-            tvScannedCount.setText(String.valueOf(scanned));
-        }
-        
-        if (tvItemCount != null) {
-            tvItemCount.setText(String.valueOf(scanned));
-        }
+    if (tvScannedCount != null) {
+        tvScannedCount.setText(String.valueOf(scanned));
+    }
+    
+    if (tvItemCount != null) {
+        tvItemCount.setText(String.valueOf(scanned));
+    }
 
-        // ✅ تحديث عناصر المقارنة
-        if (tvCurrItems != null) {
-            tvCurrItems.setText(String.valueOf(scanned));
-        }
-
-        if (expectedCount > 0) {
-            int progress = (int) (((float) scanned / expectedCount) * 100);
-            progress = Math.min(progress, 100);
-            
-            if (progressScanned != null) {
-                progressScanned.setProgress(progress);
-            }
-            
-            if (tvProgressPercent != null) {
-                tvProgressPercent.setText(progress + "%");
-            }
-            
-            int variance = Math.max(0, expectedCount - scanned);
-            if (tvVariance != null) {
-                tvVariance.setText(String.valueOf(variance));
-            }
-            
-            int accuracy = expectedCount > 0 ? 
-                (int)(((float)scanned / expectedCount) * 100) : 0;
-            if (tvAccuracy != null) {
-                tvAccuracy.setText(accuracy + "%");
-            }
-
-            if (scanned >= expectedCount && isScanning) {
-                stopScanning();
-                playScanBeep(ScanFeedbackType.COMPLETED);
-                if (isAdded() && !isFragmentDestroyed) {
-                    Toast.makeText(requireContext(), 
-                        isArabic ? "🎉 اكتمل جرد جميع المواد المتوقعة!" : 
-                        "🎉 All expected items scanned!", 
-                        Toast.LENGTH_LONG).show();
-                }
-            }
-        }
+    // ✅ تحديث كارت المقارنة الحي (Current vs Expected/Previous)
+    if (tvCurrItems != null) {
+        tvCurrItems.setText(String.valueOf(scanned));
+    }
+    if (tvPrevItems != null) {
+        tvPrevItems.setText(String.valueOf(expectedCount));
+    }
+    if (tvDeltaItems != null) {
+        int delta = scanned - expectedCount;
+        tvDeltaItems.setText(String.format(Locale.US, "%+d", delta));
         
-        if (tvEmptyState != null) {
-            tvEmptyState.setVisibility(scanned > 0 ? View.GONE : View.VISIBLE);
-        }
-        
-        if (tvInventoryStatus != null && isScanning) {
-            tvInventoryStatus.setText((isArabic ? "📡 جاري الجرد... (الممسوح: " : 
-                "📡 Scanning... (Scanned: ") + scanned + ")");
+        // تغيير لون الفارق بناءً على النتيجة
+        if (delta == 0 && expectedCount > 0) {
+            tvDeltaItems.setTextColor(0xFF2E7D32); // أخضر (مطابق)
+        } else if (delta < 0) {
+            tvDeltaItems.setTextColor(0xFFC62828); // أحمر (عجز)
+        } else {
+            tvDeltaItems.setTextColor(0xFF1565C0); // أزرق (زيادة)
         }
     }
+
+    if (expectedCount > 0) {
+        int progress = (int) (((float) scanned / expectedCount) * 100);
+        progress = Math.min(progress, 100);
+        
+        if (progressScanned != null) {
+            progressScanned.setProgress(progress);
+        }
+        
+        if (tvProgressPercent != null) {
+            tvProgressPercent.setText(progress + "%");
+        }
+        
+        int variance = Math.max(0, expectedCount - scanned);
+        if (tvVariance != null) {
+            tvVariance.setText(String.valueOf(variance));
+        }
+        
+        int accuracy = (int) (((float) scanned / expectedCount) * 100);
+        if (tvAccuracy != null) {
+            tvAccuracy.setText(accuracy + "%");
+        }
+
+        if (scanned >= expectedCount && isScanning) {
+            stopScanning();
+            playScanBeep(ScanFeedbackType.COMPLETED);
+            if (isAdded() && !isFragmentDestroyed) {
+                Toast.makeText(requireContext(), 
+                    isArabic ? "🎉 اكتمل جرد جميع المواد المتوقعة!" : 
+                    "🎉 All expected items scanned!", 
+                    Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+    
+    if (tvEmptyState != null) {
+        tvEmptyState.setVisibility(scanned > 0 ? View.GONE : View.VISIBLE);
+    }
+    
+    if (tvInventoryStatus != null && isScanning) {
+        tvInventoryStatus.setText((isArabic ? "📡 جاري الجرد... (الممسوح: " : 
+            "📡 Scanning... (Scanned: ") + scanned + ")");
+    }
+}
+
     
     /**
      * تحديث الوقت
