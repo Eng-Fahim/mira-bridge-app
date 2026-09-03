@@ -4,9 +4,11 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * محاكي RFID للاختبار والتطوير
@@ -14,19 +16,19 @@ import java.util.Random;
  */
 public class RFIDSimulator {
     private static final String TAG = "RFIDSimulator";
-    private static RFIDSimulator instance;
+    private static volatile RFIDSimulator instance;
     
-    // تخزين الشرائح الافتراضية
-    private final Map<String, SimulatedTag> simulatedTags = new HashMap<>();
+    // استخدام ConcurrentHashMap لمنع أخطاء المزامنة أثناء التعديل والقراءة المتزامنة
+    private final Map<String, SimulatedTag> simulatedTags = new ConcurrentHashMap<>();
     private final Random random = new Random();
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private Runnable simulationRunnable;
     
     // حالة المحاكي
     private boolean isScanning = false;
     private boolean isConnected = false;
     private MiraIRFIDReader.OnTagReadListener listener;
     
-    // الشرائح الافتراضية للاختبار
     private static final String[] DEMO_EPCS = {
         "300833B2DDD9014000000001",
         "300833B2DDD9014000000002",
@@ -42,16 +44,17 @@ public class RFIDSimulator {
         initializeDemoTags();
     }
     
-    public static synchronized RFIDSimulator getInstance() {
+    public static RFIDSimulator getInstance() {
         if (instance == null) {
-            instance = new RFIDSimulator();
+            synchronized (RFIDSimulator.class) {
+                if (instance == null) {
+                    instance = new RFIDSimulator();
+                }
+            }
         }
         return instance;
     }
     
-    /**
-     * تهيئة شرائح افتراضية للاختبار
-     */
     private void initializeDemoTags() {
         for (int i = 0; i < DEMO_EPCS.length; i++) {
             SimulatedTag tag = new SimulatedTag();
@@ -62,13 +65,9 @@ public class RFIDSimulator {
             tag.isLocked = false;
             simulatedTags.put(tag.epc, tag);
         }
-        
         Log.i(TAG, "✅ تم تهيئة " + simulatedTags.size() + " شريحة افتراضية");
     }
     
-    /**
-     * الاتصال بالقارئ المحاكي
-     */
     public boolean connect() {
         isConnected = true;
         if (listener != null) {
@@ -78,9 +77,6 @@ public class RFIDSimulator {
         return true;
     }
     
-    /**
-     * قطع الاتصال
-     */
     public void disconnect() {
         isConnected = false;
         stopScan();
@@ -90,83 +86,77 @@ public class RFIDSimulator {
         Log.i(TAG, "❌ تم قطع الاتصال بالقارئ المحاكي");
     }
     
-    /**
-     * بدء المسح
-     */
     public void startScan() {
         if (!isConnected) {
             connect();
         }
+        
+        if (isScanning) return; // منع التكرار إذا كان المسح يعمل بالفعل
         
         isScanning = true;
         if (listener != null) {
             listener.onScanStarted();
         }
         
-        // محاكاة قراءة الشرائح
         startSimulationLoop();
         Log.i(TAG, "📡 بدأ المسح المحاكي");
     }
     
-    /**
-     * إيقاف المسح
-     */
     public void stopScan() {
         isScanning = false;
-        handler.removeCallbacksAndMessages(null);
+        if (simulationRunnable != null) {
+            handler.removeCallbacks(simulationRunnable);
+            simulationRunnable = null;
+        }
         if (listener != null) {
             listener.onScanStopped();
         }
         Log.i(TAG, "📡 توقف المسح المحاكي");
     }
     
-    /**
-     * حلقة المحاكاة - قراءة شرائح بشكل متتابع
-     */
     private void startSimulationLoop() {
         if (!isScanning) return;
-        
-        // قراءة شريحة عشوائية
-        readRandomTag();
-        
-        // جدولة القراءة التالية
-        handler.postDelayed(() -> {
+
+        simulationRunnable = () -> {
             if (isScanning) {
-                startSimulationLoop();
+                readRandomTag();
+                // جدولة القراءة التالية بأمان
+                if (isScanning && handler != null) {
+                    handler.postDelayed(simulationRunnable, 500 + random.nextInt(400));
+                }
             }
-        }, 800 + random.nextInt(500));
+        };
+        handler.post(simulationRunnable);
     }
     
-    /**
-     * قراءة شريحة عشوائية
-     */
     private void readRandomTag() {
         if (simulatedTags.isEmpty() || listener == null) return;
         
-        // اختيار شريحة عشوائية
-        Object[] tags = simulatedTags.values().toArray();
-        SimulatedTag tag = (SimulatedTag) tags[random.nextInt(tags.length)];
-        
-        // تحديث RSSI
-        tag.rssi = -40 - random.nextInt(20);
-        
-        // إرسال البيانات للمستمع
-        listener.onTagRead(tag.epc, tag.rssi);
+        try {
+            // أخذ نسخة آمنة من العناصر لتفادي التداخل المتزامن
+            List<SimulatedTag> tagList = new ArrayList<>(simulatedTags.values());
+            if (tagList.isEmpty()) return;
+
+            SimulatedTag tag = tagList.get(random.nextInt(tagList.size()));
+            if (tag != null) {
+                tag.rssi = -40 - random.nextInt(20);
+                listener.onTagRead(tag.epc, tag.rssi);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error during simulated tag read: " + e.getMessage());
+        }
     }
     
-    /**
-     * قراءة شريحة محددة (للفلترة)
-     */
     public String readSpecificTag(String filterData, int filterBank) {
-        if (simulatedTags.isEmpty()) return null;
+        if (simulatedTags.isEmpty() || filterData == null) return null;
         
         for (SimulatedTag tag : simulatedTags.values()) {
-            if (filterBank == 1) { // EPC Bank
-                if (tag.epc.equalsIgnoreCase(filterData) || tag.epc.contains(filterData)) {
+            if (filterBank == 1) { // EPC
+                if (tag.epc != null && (tag.epc.equalsIgnoreCase(filterData) || tag.epc.contains(filterData))) {
                     return tag.epc;
                 }
-            } else if (filterBank == 2) { // TID Bank
-                if (tag.tid.equalsIgnoreCase(filterData) || tag.tid.contains(filterData)) {
+            } else if (filterBank == 2) { // TID
+                if (tag.tid != null && (tag.tid.equalsIgnoreCase(filterData) || tag.tid.contains(filterData))) {
                     return tag.epc;
                 }
             }
@@ -174,12 +164,10 @@ public class RFIDSimulator {
         return null;
     }
     
-    /**
-     * كتابة EPC جديد
-     */
     public boolean writeEpc(String oldEpc, String newEpc, String password) {
+        if (newEpc == null || newEpc.isEmpty()) return false;
+
         if (oldEpc == null || oldEpc.isEmpty()) {
-            // كتابة شريحة جديدة
             SimulatedTag newTag = new SimulatedTag();
             newTag.epc = newEpc;
             newTag.tid = generateRandomTid();
@@ -191,7 +179,6 @@ public class RFIDSimulator {
             return true;
         }
         
-        // تحديث شريحة موجودة
         SimulatedTag tag = simulatedTags.get(oldEpc);
         if (tag != null) {
             if (tag.isLocked) {
@@ -210,10 +197,8 @@ public class RFIDSimulator {
         return false;
     }
     
-    /**
-     * كتابة User Memory
-     */
     public boolean writeUserMemory(String epc, String data, String password) {
+        if (epc == null) return false;
         SimulatedTag tag = simulatedTags.get(epc);
         if (tag != null) {
             if (tag.isLocked) {
@@ -225,37 +210,23 @@ public class RFIDSimulator {
             Log.i(TAG, "✅ تم كتابة User Memory: " + data);
             return true;
         }
-        
-        Log.e(TAG, "❌ الشريحة غير موجودة: " + epc);
         return false;
     }
     
-    /**
-     * قراءة TID
-     */
     public String readTid(String epc) {
+        if (epc == null) return null;
         SimulatedTag tag = simulatedTags.get(epc);
-        if (tag != null) {
-            return tag.tid;
-        }
-        return null;
+        return tag != null ? tag.tid : null;
     }
     
-    /**
-     * قراءة User Memory
-     */
     public String readUserMemory(String epc) {
+        if (epc == null) return null;
         SimulatedTag tag = simulatedTags.get(epc);
-        if (tag != null) {
-            return tag.userMemory;
-        }
-        return null;
+        return tag != null ? tag.userMemory : null;
     }
     
-    /**
-     * قفل الشريحة
-     */
     public boolean lockTag(String epc, String password) {
+        if (epc == null) return false;
         SimulatedTag tag = simulatedTags.get(epc);
         if (tag != null) {
             tag.isLocked = true;
@@ -265,9 +236,6 @@ public class RFIDSimulator {
         return false;
     }
     
-    /**
-     * توليد TID عشوائي
-     */
     private String generateRandomTid() {
         StringBuilder tid = new StringBuilder("E2806895");
         String hexChars = "0123456789ABCDEF";
@@ -277,50 +245,37 @@ public class RFIDSimulator {
         return tid.toString();
     }
     
-    /**
-     * إضافة شريحة افتراضية جديدة
-     */
     public void addDemoTag(String epc, String tid, String userMemory) {
+        if (epc == null) return;
         SimulatedTag tag = new SimulatedTag();
         tag.epc = epc;
-        tag.tid = tid;
+        tag.tid = tid != null ? tid : generateRandomTid();
         tag.rssi = -45;
-        tag.userMemory = userMemory;
+        tag.userMemory = userMemory != null ? userMemory : "";
         tag.isLocked = false;
         simulatedTags.put(epc, tag);
     }
     
-    /**
-     * الحصول على عدد الشرائح
-     */
     public int getTagCount() {
         return simulatedTags.size();
     }
     
-    /**
-     * تعيين المستمع
-     */
     public void setListener(MiraIRFIDReader.OnTagReadListener listener) {
         this.listener = listener;
     }
+
+    public void removeListener() {
+        this.listener = null;
+    }
     
-    /**
-     * التحقق من حالة الاتصال
-     */
     public boolean isConnected() {
         return isConnected;
     }
     
-    /**
-     * التحقق من حالة المسح
-     */
     public boolean isScanning() {
         return isScanning;
     }
     
-    /**
-     * كلاس يمثل شريحة افتراضية
-     */
     private static class SimulatedTag {
         String epc;
         String tid;
@@ -328,6 +283,4 @@ public class RFIDSimulator {
         String userMemory;
         boolean isLocked;
     }
-
-    
 }
