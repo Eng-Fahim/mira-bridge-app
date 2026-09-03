@@ -15,10 +15,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -33,6 +36,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.uhf.R;
 import com.example.uhf.activity.UHFMainActivity;
 import com.example.uhf.api.MiraApiClient;
+import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraGatesSettings;
 import com.example.uhf.manager.OfflineGateCache;
 import com.example.uhf.manager.PermissionManager;
@@ -75,11 +79,19 @@ public class MiraSecureGateFragment extends Fragment {
     private UHFMainActivity mContext;
     private MiraGatesSettings miraGatesSettings;
     private PermissionManager permissionManager;
+    private MiraBranchesManager branchesManager;
     
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private ExecutorService gateExecutor;
     private ScheduledExecutorService monitorScheduler;
     private ScheduledExecutorService pingScheduler;
+    
+    // ✅ إدارة الفروع
+    private int currentBranchId = 0;
+    private boolean isGlobalAdmin = false;
+    private Spinner spBranchSelector;
+    private TextView tvCurrentBranch;
+    private List<BranchInfo> branchesList = new ArrayList<>();
     
     private RecyclerView rvGatesMonitor;
     private GateMonitorAdapter monitorAdapter;
@@ -194,9 +206,13 @@ public class MiraSecureGateFragment extends Fragment {
         offlineCache = OfflineGateCache.getInstance(context);
         miraGatesSettings = MiraGatesSettings.getInstance(context);
         permissionManager = PermissionManager.getInstance(context);
+        branchesManager = MiraBranchesManager.getInstance(context);
         vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
         gateExecutor = Executors.newFixedThreadPool(4);
         isDestroyed = false;
+        
+        // ✅ جلب الفرع الحالي وصلاحيات المستخدم
+        loadCurrentBranchInfo();
     }
 
     private void initViews(View view) {
@@ -224,6 +240,10 @@ public class MiraSecureGateFragment extends Fragment {
         btnFilterAll = view.findViewById(R.id.btnFilterAll);
         btnFilterAlerts = view.findViewById(R.id.btnFilterAlerts);
         btnFilterPass = view.findViewById(R.id.btnFilterPass);
+        
+        // ✅ تهيئة عناصر اختيار الفرع
+        spBranchSelector = view.findViewById(R.id.spBranchSelector);
+        tvCurrentBranch = view.findViewById(R.id.tvCurrentBranch);
         
         if (rvGatesMonitor != null) {
             rvGatesMonitor.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -282,6 +302,137 @@ public class MiraSecureGateFragment extends Fragment {
     private void showToast(String message) {
         if (isAdded() && getContext() != null) {
             Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // ============================================
+    // ✅ إدارة الفروع
+    // ============================================
+    
+    private void loadCurrentBranchInfo() {
+        try {
+            Context context = getContext();
+            if (context == null) return;
+            
+            currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
+            
+            // ✅ التحقق من صلاحيات المدير العام
+            if (permissionManager != null) {
+                isGlobalAdmin = permissionManager.isGlobalAdmin();
+            }
+            
+            mainHandler.post(() -> {
+                // ✅ تحديث واجهة اختيار الفرع
+                if (isGlobalAdmin) {
+                    loadBranchesForSelector();
+                } else {
+                    // ✅ إخفاء محدد الفروع للمستخدمين العاديين
+                    if (spBranchSelector != null) {
+                        spBranchSelector.setVisibility(View.GONE);
+                    }
+                    if (tvCurrentBranch != null) {
+                        tvCurrentBranch.setText(branchesManager != null ? branchesManager.getActiveBranchName() : "");
+                        tvCurrentBranch.setVisibility(View.VISIBLE);
+                    }
+                }
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "loadCurrentBranchInfo: " + e.getMessage());
+        }
+    }
+
+    private void loadBranchesForSelector() {
+        if (gateExecutor == null || getContext() == null) return;
+        
+        gateExecutor.execute(() -> {
+            try {
+                Context context = getContext();
+                if (context == null) return;
+                
+                branchesList = branchesManager != null ? branchesManager.getAllBranches() : new ArrayList<>();
+                
+                if (branchesList != null && !branchesList.isEmpty()) {
+                    mainHandler.post(() -> {
+                        if (spBranchSelector != null && isAdded()) {
+                            List<String> branchNames = new ArrayList<>();
+                            branchNames.add(getLocalizedText("🌐 كل الفروع", "🌐 All Branches"));
+                            for (BranchInfo branch : branchesList) {
+                                branchNames.add(branch.branchName);
+                            }
+                            
+                            ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                                context,
+                                android.R.layout.simple_spinner_item,
+                                branchNames
+                            );
+                            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                            spBranchSelector.setAdapter(adapter);
+                            
+                            // ✅ تحديد الفرع الحالي
+                            if (currentBranchId > 0) {
+                                for (int i = 0; i < branchesList.size(); i++) {
+                                    if (branchesList.get(i).branchId == currentBranchId) {
+                                        spBranchSelector.setSelection(i + 1);
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            spBranchSelector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                                @Override
+                                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                                    if (position == 0) {
+                                        currentBranchId = 0;
+                                    } else if (position - 1 < branchesList.size()) {
+                                        currentBranchId = branchesList.get(position - 1).branchId;
+                                    }
+                                    
+                                    // ✅ إعادة تحميل البوابات
+                                    loadAllGatesStatus();
+                                    
+                                    String branchName = position == 0 ? 
+                                        getLocalizedText("كل الفروع", "All Branches") : 
+                                        branchesList.get(position - 1).branchName;
+                                    
+                                    logConsole(getLocalizedText("🔄 تم تغيير الفرع إلى: ", "🔄 Branch changed to: ") + branchName);
+                                }
+                                
+                                @Override
+                                public void onNothingSelected(AdapterView<?> parent) {}
+                            });
+                            
+                            spBranchSelector.setVisibility(View.VISIBLE);
+                            if (tvCurrentBranch != null) {
+                                tvCurrentBranch.setVisibility(View.GONE);
+                            }
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "loadBranchesForSelector: " + e.getMessage());
+            }
+        });
+    }
+
+    private int getCurrentBranchId() {
+        return currentBranchId;
+    }
+
+    private String getCurrentBranchName() {
+        try {
+            if (currentBranchId == 0) {
+                return getLocalizedText("كل الفروع", "All Branches");
+            }
+            
+            for (BranchInfo branch : branchesList) {
+                if (branch.branchId == currentBranchId) {
+                    return branch.branchName;
+                }
+            }
+            
+            return branchesManager != null ? branchesManager.getActiveBranchName() : String.valueOf(currentBranchId);
+        } catch (Exception e) {
+            return String.valueOf(currentBranchId);
         }
     }
 
@@ -491,6 +642,7 @@ public class MiraSecureGateFragment extends Fragment {
         updateLocalAllowedCache();
     }
 
+    // ✅ نسخة واحدة فقط من loadAllGatesStatus مع فلترة الفروع
     private void loadAllGatesStatus() {
         if (gateExecutor == null || getContext() == null) return;
         gateExecutor.execute(() -> {
@@ -498,7 +650,12 @@ public class MiraSecureGateFragment extends Fragment {
                 Context context = getContext();
                 if (context == null) return;
                 MiraApiClient client = MiraApiClient.getInstance(context);
-                MiraApiClient.ApiResponse response = client.getGatesByBranch(getCurrentBranchId());
+                
+                // ✅ تمرير branch_id في الطلب
+                MiraApiClient.ApiResponse response = client.getGatesByBranch(
+                    currentBranchId > 0 ? currentBranchId : 0
+                );
+                
                 if (response != null && response.isSuccess && response.data != null) {
                     JSONArray arr = extractGatesArray(response.data);
                     if (arr != null) {
@@ -513,6 +670,8 @@ public class MiraSecureGateFragment extends Fragment {
                             item.passCount = g.optInt("pass_count", 0);
                             item.denyCount = g.optInt("deny_count", 0);
                             item.lastEvent = g.optString("last_event", "");
+                            item.branchId = g.optInt("branch_id", 0);
+                            item.branchName = g.optString("branch_name", "");
                             items.add(item);
                         }
                         mainHandler.post(() -> updateMonitorList(items));
@@ -531,6 +690,7 @@ public class MiraSecureGateFragment extends Fragment {
         return d != null ? d.optJSONArray("gates") : null;
     }
 
+    // ✅ نسخة واحدة فقط من updateMonitorList
     private void updateMonitorList(List<GateMonitorItem> items) {
         monitorList.clear();
         monitorList.addAll(items);
@@ -546,6 +706,17 @@ public class MiraSecureGateFragment extends Fragment {
         if (tvTotalCount != null) tvTotalCount.setText(String.valueOf(items.size()));
         
         updateRiskMeter(pass, deny);
+        
+        // ✅ تحديث عنوان الفرع الحالي
+        if (tvCurrentBranch != null) {
+            String branchLabel;
+            if (currentBranchId == 0) {
+                branchLabel = getLocalizedText("🌐 كل الفروع", "🌐 All Branches");
+            } else {
+                branchLabel = getLocalizedText("📍 الفرع: ", "📍 Branch: ") + getCurrentBranchName();
+            }
+            tvCurrentBranch.setText(branchLabel);
+        }
     }
 
     private void updateRiskMeter(int pass, int deny) {
@@ -556,18 +727,6 @@ public class MiraSecureGateFragment extends Fragment {
             if (tvRiskPercentage != null) {
                 tvRiskPercentage.setText(getLocalizedText("نسبة الإنذارات: ", "Alert Rate: ") + risk + "%");
             }
-        }
-    }
-
-    private int getCurrentBranchId() {
-        try {
-            Context context = getContext();
-            if (context == null) return 0;
-            com.example.uhf.manager.MiraBranchesManager bm = 
-                com.example.uhf.manager.MiraBranchesManager.getInstance(context);
-            return bm != null ? bm.getActiveBranchId() : 0;
-        } catch (Exception e) { 
-            return 0; 
         }
     }
 
@@ -817,7 +976,15 @@ public class MiraSecureGateFragment extends Fragment {
     // ============================================
     private static class GateMonitorItem {
         String gateId, gateName, location, status, lastEvent;
+        String branchName;
         int passCount, denyCount;
+        int branchId;
+    }
+    
+    // ✅ فئة معلومات الفرع
+    private static class BranchInfo {
+        int branchId;
+        String branchName;
     }
 
     private class GateMonitorAdapter extends RecyclerView.Adapter<GateMonitorAdapter.VH> {
@@ -833,10 +1000,23 @@ public class MiraSecureGateFragment extends Fragment {
         @Override
         public void onBindViewHolder(@NonNull VH h, int position) {
             GateMonitorItem item = items.get(position);
+            
             h.tvGateName.setText(item.gateName);
             h.tvGateName.setTextColor(getTextColor());
+            
+            // ✅ اسم الفرع
+            if (h.tvBranchName != null) {
+                if (currentBranchId == 0 && !item.branchName.isEmpty()) {
+                    h.tvBranchName.setText("📍 " + item.branchName);
+                    h.tvBranchName.setVisibility(View.VISIBLE);
+                } else {
+                    h.tvBranchName.setVisibility(View.GONE);
+                }
+            }
+            
             h.tvGateStats.setText("✅ " + item.passCount + " | ❌ " + item.denyCount);
             h.tvGateStats.setTextColor(getSecondaryTextColor());
+            
             h.tvGateLastEvent.setText(item.lastEvent.isEmpty() ? getLocalizedText("لا أحداث", "No events") : item.lastEvent);
             h.tvGateLastEvent.setTextColor(getSecondaryTextColor());
             
@@ -858,7 +1038,7 @@ public class MiraSecureGateFragment extends Fragment {
         @Override public int getItemCount() { return items.size(); }
         
         class VH extends RecyclerView.ViewHolder {
-            TextView tvGateName, tvGateStatus, tvGateStats, tvGateLastEvent;
+            TextView tvGateName, tvGateStatus, tvGateStats, tvGateLastEvent, tvBranchName;
             View vStatusDot;
             VH(@NonNull View itemView) {
                 super(itemView);
@@ -866,6 +1046,7 @@ public class MiraSecureGateFragment extends Fragment {
                 tvGateStatus = itemView.findViewById(R.id.tvGateStatus);
                 tvGateStats = itemView.findViewById(R.id.tvGateStats);
                 tvGateLastEvent = itemView.findViewById(R.id.tvGateLastEvent);
+                tvBranchName = itemView.findViewById(R.id.tvBranchName);
                 vStatusDot = itemView.findViewById(R.id.vGateStatusDot);
             }
         }
@@ -897,4 +1078,4 @@ public class MiraSecureGateFragment extends Fragment {
         if (gateExecutor != null) gateExecutor.shutdownNow();
         mainHandler.removeCallbacksAndMessages(null);
     }
-                    }
+                                                               }
