@@ -881,15 +881,7 @@ private void parseItemResponse(String code, JSONObject data) {
                 playAlertSound(2);
             });
             
-            // ✅ إزالة من الكاش المحلي
-            try {
-                Context ctx = getContext();
-                if (ctx != null) {
-                    MiraLocalItemCache.getInstance(ctx).removeItem(code);
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Remove from cache: " + e.getMessage());
-            }
+           
             
             return;
         }
@@ -2389,15 +2381,12 @@ private void removeSoldItemsFromCache() {
         Context ctx = getContext();
         if (ctx == null) return;
         
-        MiraLocalItemCache localCache = MiraLocalItemCache.getInstance(ctx);
+        // ✅ نحن لا نحتاج لإزالة من الكاش هنا
+        // لأن الفحص في parseItemResponse سيمنع إعادة البيع
+        // والكاش سيتم تحديثه عند المزامنة القادمة
         
-        for (CartItem item : cartList) {
-            localCache.removeItem(item.epc);
-            localCache.removeItem(item.serialNo);
-            localCache.removeItem(item.gtin);
-            
-            Log.d(TAG, "✅ Removed from cache: " + item.epc);
-        }
+        Log.d(TAG, "✅ Sold items will be blocked by status check in parseItemResponse");
+        
     } catch (Exception e) {
         Log.e(TAG, "removeSoldItemsFromCache: " + e.getMessage());
     }
