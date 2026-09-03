@@ -59,6 +59,10 @@ public class PermissionManager {
         this.prefs = this.context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         loadPermissions();
     }
+    
+    public static synchronized void resetInstance() {
+    instance = null;
+    }
 
     public static synchronized PermissionManager getInstance(Context context) {
         if (instance == null) {
