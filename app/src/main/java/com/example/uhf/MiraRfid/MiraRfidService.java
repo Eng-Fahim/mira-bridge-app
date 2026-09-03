@@ -41,27 +41,51 @@ public class MiraRfidService {
         }
         return instance;
     }
-    
-    private void detectAndInitializeReader() {
-        try {
-            ChainwayReader chainwayReader = new ChainwayReader(context);
-            if (chainwayReader.initialize() && chainwayReader.connect()) {
-                activeReader = chainwayReader;
-                isSimulationMode = false;
-                Log.i(TAG, "✅ تم الاتصال بالقارئ الحقيقي: Chainway");
-                return;
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "فشل الاتصال بالقارئ الحقيقي: " + e.getMessage());
+private void detectAndInitializeReader() {
+    ChainwayReader chainwayReader = null;
+    try {
+        chainwayReader = new ChainwayReader(context);
+        if (chainwayReader.initialize() && chainwayReader.connect()) {
+            activeReader = chainwayReader;
+            isSimulationMode = false;
+            Log.i(TAG, "✅ تم الاتصال بالقارئ الحقيقي: Chainway");
+            return;
+        } else {
+            // ⚠️ تحرير الموارد فوراً إذا فشل الاتصال لمنع حجز المنفذ
+            chainwayReader.release();
+            chainwayReader = null;
         }
-        
-        SimulatorReader simulatorReader = new SimulatorReader(context);
-        simulatorReader.initialize();
-        simulatorReader.connect();
-        activeReader = simulatorReader;
-        isSimulationMode = true;
-        Log.i(TAG, "🔬 تم التفعيل في وضع المحاكاة");
+    } catch (Exception e) {
+        Log.w(TAG, "فشل الاتصال بالقارئ الحقيقي: " + e.getMessage());
+        if (chainwayReader != null) {
+            try { chainwayReader.release(); } catch (Exception ignored) {}
+            chainwayReader = null;
+        }
     }
+    
+    // التوجه بثبات وسلامة إلى وضع المحاكاة
+    SimulatorReader simulatorReader = new SimulatorReader(context);
+    simulatorReader.initialize();
+    simulatorReader.connect();
+    activeReader = simulatorReader;
+    isSimulationMode = true;
+    Log.i(TAG, "🔬 تم التفعيل في وضع المحاكاة");
+}
+
+public void release() {
+    if (activeReader != null) {
+        try {
+            activeReader.disconnect();
+            activeReader.release();
+        } catch (Exception e) {
+            Log.e(TAG, "Error releasing active reader: " + e.getMessage());
+        }
+        activeReader = null;
+    }
+    instance = null; // 👈 تفريغ الـ Singleton عند الخروج
+}
+
+
     
     public boolean isSimulationMode() { return isSimulationMode; }
     public MiraIRFIDReader getActiveReader() { return activeReader; }
