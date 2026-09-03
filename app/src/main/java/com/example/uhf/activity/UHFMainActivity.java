@@ -239,6 +239,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             safeExecute(this::initSound, "Sound Init Error");
             safeExecute(this::initUHF, "UHF Hardware Init Error");
             safeExecute(this::configureReaderForDevice, "Reader Configuration Error");
+            // ✅ إعادة تعيين PermissionManager لتحميل الصلاحيات الجديدة
+            PermissionManager.resetInstance();
+
 
             setupQuickNav();
 
@@ -1221,4 +1224,4 @@ protected void onDestroy() {
             }
         }
     }
-}
+                        }
