@@ -277,61 +277,65 @@ public class PermissionManager {
     // ==================== فحص الوصول للواجهات ====================
 
     public boolean canAccessFragment(String fragmentTag) {
-        if (fragmentTag == null) return false;
-        
-        switch (fragmentTag) {
-            case "Dashboard":
-                return canViewDashboard();
-            case "Scan":
-            case "Inventory":
-            case "InventoryPro":
-                return canViewInventory();
-            case "POS":
-                return canUsePos();
-            case "Transfers":
-            case "TransferDetail":
-                return canViewTransfers();
-            case "IdentityStudio":
-                return canUseIdentity();
-            case "Radar":
-                return canViewRadar();
-            case "SecureGate":
-            case "GateSettings":
-                return canViewGates();
-            case "Reports":
-            case "ReportsPro":
-                return canViewReports();
-            case "Accounting":
-            case "Vouchers":
-            case "FiscalYears":
-            case "OpeningBalances":
-            case "FinancialReports":
-            case "ProfitReport":
-            case "AccountingCharts":
-            case "AccountingAuditLog":
-                return canViewAccounting();
-            case "AdminHub":
-                return canViewAdminHub();
-            case "UsersManagement":
-                return canManageUsers();
-            case "ServerConfig":
-                return canViewServerConfig();
-            case "GoldRates":
-                return canViewGoldRates();
-            case "Profile":
-                return canViewProfile();
-            case "SalesHistory":
-                return canViewSalesHistory();
-            case "QuickAccessSettings":
-                return canManageQuickAccess();
-            case "ReaderSetup":
-                return isAdmin() || isInventoryManager();
-            case "RFIDWrite":
-                return canEditInventory();
-            default:
-                return true;
-        }
+    if (fragmentTag == null || fragmentTag.isEmpty()) return false;
+    
+    switch (fragmentTag) {
+        case "Dashboard":
+            return canViewDashboard();
+        case "Scan":
+        case "Inventory":
+        case "InventoryPro":
+            return canViewInventory();
+        case "POS":
+            return canUsePos();
+        case "Transfers":
+        case "TransferDetail":
+            return canViewTransfers();
+        case "IdentityStudio":
+            return canUseIdentity();
+        case "Radar":
+            return canViewRadar();
+        case "SecureGate":
+        case "GateSettings":
+            return canViewGates();
+        case "Reports":
+        case "ReportsPro":
+            return canViewReports();
+        case "Accounting":
+        case "Vouchers":
+        case "FiscalYears":
+        case "OpeningBalances":
+        case "FinancialReports":
+        case "ProfitReport":
+        case "AccountingCharts":
+        case "AccountingAuditLog":
+            return canViewAccounting();
+        case "AdminHub":
+            return canViewAdminHub();
+        case "UsersManagement":
+            return canManageUsers();
+        case "ServerConfig":
+            return canViewServerConfig();
+        case "GoldRates":
+            return canViewGoldRates();
+        case "Profile":
+            return canViewProfile();
+        case "SalesHistory":
+            return canViewSalesHistory();
+        case "QuickAccessSettings":
+            return canManageQuickAccess();
+        case "ReaderSetup":
+            return isAdmin() || isInventoryManager();
+        case "RFIDWrite":
+        case "RfidBindings":
+            return canEditInventory();
+        case "Branches":
+            return isManager();
+        default:
+            // ✅✅✅ للمدير العام فقط
+            return isSystemAdmin() || isOrgAdmin();
     }
+}
 
     // ==================== دوال إضافية ====================
 
