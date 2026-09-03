@@ -598,25 +598,27 @@ public class MiraInventoryProFragment extends KeyDwonFragment
                 }
                 
                 JSONArray transactionsArray = new JSONArray();
-                List<Integer> successfulIds = new ArrayList<>();
+                List<Long> successfulIds = new ArrayList<>(); // تم تغيير النوع إلى Long لتوافق الـ DAO
                 
                 for (InventoryTransactionEntity transaction : unsynced) {
                     JSONObject transactionJson = new JSONObject();
                     transactionJson.put("session_id", transaction.sessionId);
                     transactionJson.put("epc", transaction.epcCode);
                     transactionJson.put("rssi", transaction.rssi);
-                    transactionJson.put("timestamp", transaction.timestamp);
+                    transactionJson.put("timestamp", transaction.scanTimestamp); // تم التعديل إلى scanTimestamp المطابق للـ Entity
                     transactionJson.put("device_id", transaction.deviceId);
                     transactionJson.put("user_id", transaction.userId);
                     transactionJson.put("branch_id", transaction.branchId);
                     
                     transactionsArray.put(transactionJson);
-                    successfulIds.add(transaction.id);
+                    successfulIds.add((long) transaction.id); // تحويل الـ int إلى Long لتجنب خطأ توافق الأنواع
                 }
                 
                 if (transactionsArray.length() > 0) {
                     MiraApiClient.ApiResponse response = apiClient.syncOfflineTransactions(transactionsArray);
-                    if (response != null && response.isSuccess) transactionDao.markAsSynced(successfulIds);
+                    if (response != null && response.isSuccess) {
+                        transactionDao.markAsSynced(successfulIds);
+                    }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error syncing offline transactions", e);
