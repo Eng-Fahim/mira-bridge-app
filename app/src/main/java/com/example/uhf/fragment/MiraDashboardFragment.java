@@ -93,6 +93,8 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private Future<?> dataFuture, goldPriceFuture, pingFuture;
 
     private boolean isArabic;
+    private boolean isReceiverRegistered = false;
+
     private SharedPreferences offlineCache, branchPrefs, goldCachePrefs;
     private int currentBranchId = -1;
     private boolean isViewInitialized = false;
@@ -139,38 +141,25 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
 private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (intent == null) return;
+        if (intent == null || !isAdded() || !isViewInitialized) return;
         
         String action = intent.getAction();
         Log.d(TAG, "Received broadcast: " + action);
         
         if ("com.example.uhf.REFRESH_DASHBOARD".equals(action)) {
-            // ✅ تحديث فوري للبيانات
             mainHandler.post(() -> {
-                if (isAdded() && isViewInitialized) {
+                if (isAdded() && isResumed() && isViewInitialized) {
                     Log.d(TAG, "Refreshing dashboard from broadcast");
-                    
-                    // ✅ إعادة تعيين حالة التحميل
                     isDataLoaded = false;
                     lastDataFetchTime = 0;
-                    
-                    // ✅ جلب البيانات الجديدة
                     fetchData();
-                    
-                    // ✅ تحديث أسعار الذهب إذا لزم الأمر
-                    long now = System.currentTimeMillis();
-                    if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
-                        if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
-                            fetchLiveGoldPrices(false);
-                        } else {
-                            displayGoldPricesFromCache();
-                        }
-                    }
                 }
             });
         }
     }
 };
+
+
 
 
     @Nullable
@@ -901,14 +890,15 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
 // ============================================
 private void registerDataRefreshReceiver() {
     try {
-        if (getContext() == null) return;
+        if (getContext() == null || isReceiverRegistered) return;
         
         IntentFilter filter = new IntentFilter();
         filter.addAction("com.example.uhf.REFRESH_DASHBOARD");
         filter.addAction("com.example.uhf.REFRESH_INVENTORY");
         filter.addAction("com.example.uhf.REFRESH_SALES");
         
-        getContext().registerReceiver(dataRefreshReceiver, filter);
+        ContextCompat.registerReceiver(requireContext(), dataRefreshReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
+        isReceiverRegistered = true;
         Log.d(TAG, "DataRefreshReceiver registered");
     } catch (Exception e) {
         Log.e(TAG, "registerDataRefreshReceiver error: " + e.getMessage());
@@ -917,15 +907,16 @@ private void registerDataRefreshReceiver() {
 
 private void unregisterDataRefreshReceiver() {
     try {
-        if (getContext() != null) {
-            getContext().unregisterReceiver(dataRefreshReceiver);
+        if (getContext() != null && isReceiverRegistered) {
+            requireContext().unregisterReceiver(dataRefreshReceiver);
+            isReceiverRegistered = false;
             Log.d(TAG, "DataRefreshReceiver unregistered");
         }
     } catch (Exception e) {
-        // Receiver may not be registered
         Log.d(TAG, "unregisterDataRefreshReceiver: " + e.getMessage());
     }
 }
+
 
     public void refreshInternalData() {
         try {
@@ -1221,6 +1212,8 @@ public void onDestroyView() {
     }
 }
 
+    
+// ✅ بعد (صحيح):
     private void cancelFuture(Future<?> future) {
         try {
             if (future != null && !future.isDone()) {
@@ -1230,4 +1223,4 @@ public void onDestroyView() {
             logNonFatal("cancelFuture", e);
         }
     }
-                    }
+} // قوس إغلاق الكلاس MiraDashboardFragment فقط
