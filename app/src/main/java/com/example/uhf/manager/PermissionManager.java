@@ -142,6 +142,25 @@ public class PermissionManager {
         if (isAdmin()) return true;
         return hasPermission(feature, "export") || canView(feature);
     }
+    
+    public List<String> getAllowedQuickActions() {
+    List<String> allowed = new ArrayList<>();
+    // أضف المعرفات بناءً على الصلاحيات المتاحة للمستخدم الحالي
+    if (canAccessFragment("IdentityStudio")) allowed.add("identity");
+    if (canAccessFragment("Radar")) allowed.add("radar");
+    if (canAccessFragment("SecureGate")) allowed.add("gate");
+    if (canAccessFragment("Reports")) allowed.add("reports");
+    if (canAccessFragment("Accounting")) allowed.add("accounting");
+    if (canAccessFragment("Transfers")) allowed.add("transfers");
+    if (canAccessFragment("AdminHub")) allowed.add("admin_hub");
+    if (canAccessFragment("SalesHistory")) allowed.add("sales_history");
+    if (canAccessFragment("ServerConfig")) allowed.add("server_config");
+    if (canAccessFragment("GoldRates")) allowed.add("gold_rates");
+    if (canAccessFragment("UsersManagement")) allowed.add("users");
+    
+    return allowed;
+}
+
 
     // ==================== أدوار المستخدمين ====================
 
