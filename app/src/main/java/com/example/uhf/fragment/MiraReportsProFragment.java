@@ -108,33 +108,52 @@ private void applyTheme(View view) {
         Context context = getContext();
         if (context == null) return;
         
+        // ✅ استخدام ألوان الثيم الديناميكية
+        TypedValue typedValue = new TypedValue();
+        context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorPrimary, typedValue, true);
+        int primaryColor = typedValue.data;
+        
+        context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorSurface, typedValue, true);
+        int surfaceColor = typedValue.data;
+        
+        context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorPrimaryContainer, typedValue, true);
+        int primaryContainerColor = typedValue.data;
+        
         // ✅ الجذر
         View rootView = view.findViewById(R.id.fragmentRoot);
         if (rootView != null) {
-            rootView.setBackgroundColor(context.getColor(R.color.report_background));
+            rootView.setBackgroundColor(surfaceColor);
         }
         
         // ✅ SwipeRefresh
         SwipeRefreshLayout swipeRefresh = view.findViewById(R.id.swipeRefreshReports);
         if (swipeRefresh != null) {
-            swipeRefresh.setBackgroundColor(context.getColor(R.color.report_background));
-            swipeRefresh.setColorSchemeResources(R.color.report_primary, R.color.report_accent);
+            swipeRefresh.setBackgroundColor(surfaceColor);
+            swipeRefresh.setColorSchemeColors(primaryColor);
         }
         
         // ✅ TabLayout
         TabLayout tabCategories = view.findViewById(R.id.tabReportCategories);
         if (tabCategories != null) {
-            tabCategories.setBackgroundColor(context.getColor(R.color.report_surface));
+            tabCategories.setBackgroundColor(primaryContainerColor);
+            
+            // الحصول على ألوان النص المناسبة
+            context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOnPrimaryContainer, typedValue, true);
+            int onPrimaryContainerColor = typedValue.data;
+            
+            context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorPrimary, typedValue, true);
+            int accentColor = typedValue.data;
+            
             tabCategories.setTabTextColors(
-                context.getColor(R.color.report_text_secondary),
-                context.getColor(R.color.report_text_primary)
+                onPrimaryContainerColor,
+                onPrimaryContainerColor
             );
-            tabCategories.setSelectedTabIndicatorColor(context.getColor(R.color.report_accent));
+            tabCategories.setSelectedTabIndicatorColor(accentColor);
         }
         
         // ✅ RecyclerView
         if (rvReports != null) {
-            rvReports.setBackgroundColor(context.getColor(R.color.report_background));
+            rvReports.setBackgroundColor(surfaceColor);
         }
     } catch (Exception e) {
         Log.e(TAG, "applyTheme error: " + e.getMessage());
