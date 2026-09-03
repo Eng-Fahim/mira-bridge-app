@@ -8,6 +8,9 @@ import androidx.room.PrimaryKey;
 public class InventoryTransactionEntity {
     @PrimaryKey(autoGenerate = true)
     public int id;
+
+    @ColumnInfo(name = "timestamp")
+    public long timestamp;
     
     @ColumnInfo(name = "session_id")
     public String sessionId;
