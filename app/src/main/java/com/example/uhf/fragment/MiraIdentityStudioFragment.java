@@ -597,66 +597,120 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         };
     }
 
-    private Bitmap generateGS1DataMatrix(String gs1Data, int width, int height) {
-        if (gs1Data == null || gs1Data.trim().isEmpty()) {
-            return null;
-        }
-        try {
-            Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
-            hints.put(EncodeHintType.DATA_MATRIX_SHAPE, SymbolShapeHint.FORCE_SQUARE);
-            hints.put(EncodeHintType.MARGIN, 0);
-
-            BitMatrix bitMatrix = new MultiFormatWriter().encode(
-                    gs1Data, BarcodeFormat.DATA_MATRIX, width, height, hints);
-
-            int matrixWidth = bitMatrix.getWidth();
-            int matrixHeight = bitMatrix.getHeight();
-            int[] pixels = new int[matrixWidth * matrixHeight];
-
-            for (int y = 0; y < matrixHeight; y++) {
-                int offset = y * matrixWidth;
-                for (int x = 0; x < matrixWidth; x++) {
-                    pixels[offset + x] = bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE;
-                }
-            }
-
-            Bitmap bitmap = Bitmap.createBitmap(matrixWidth, matrixHeight, Bitmap.Config.ARGB_8888);
-            bitmap.setPixels(pixels, 0, matrixWidth, 0, 0, matrixWidth, matrixHeight);
-            return bitmap;
-        } catch (Exception e) {
-            Log.e(TAG, "Error generating GS1 DataMatrix: " + e.getMessage(), e);
-            return null;
-        }
+    /**
+ * توليد GS1 DataMatrix بدقة عالية للطباعة على بطاقة صغيرة
+ * الحجم: 10مم × 5مم
+ */
+private Bitmap generateGS1DataMatrix(String gs1Data, int width, int height) {
+    if (gs1Data == null || gs1Data.trim().isEmpty()) {
+        return null;
     }
+    try {
+        Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
+        hints.put(EncodeHintType.DATA_MATRIX_SHAPE, SymbolShapeHint.FORCE_RECTANGLE); // شكل مستطيل ليلائم 10×5
+        hints.put(EncodeHintType.MARGIN, 1); // هامش صغير 1 وحدة
+        hints.put(EncodeHintType.ERROR_CORRECTION, "50"); // تصحيح خطأ 50%
+        hints.put(EncodeHintType.MIN_SIZE, new com.google.zxing.Dimension(20, 10)); // الحد الأدنى للحجم
 
-    private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
-        try {
-            Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
-            hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L);
-            hints.put(EncodeHintType.MARGIN, 1);
-            hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
+        // توليد الباركود بحجم أكبر ثم تصغيره للحصول على دقة أفضل
+        int scaleFactor = 4; // تكبير 4 مرات ثم تصغير
+        BitMatrix bitMatrix = new MultiFormatWriter().encode(
+                gs1Data, 
+                BarcodeFormat.DATA_MATRIX, 
+                width * scaleFactor, 
+                height * scaleFactor, 
+                hints);
 
-            BitMatrix bitMatrix = new MultiFormatWriter().encode(
-                    qrContent, BarcodeFormat.QR_CODE, width, height, hints);
+        int matrixWidth = bitMatrix.getWidth();
+        int matrixHeight = bitMatrix.getHeight();
+        int[] pixels = new int[matrixWidth * matrixHeight];
 
-            int matrixWidth = bitMatrix.getWidth();
-            int matrixHeight = bitMatrix.getHeight();
-            int[] pixels = new int[matrixWidth * matrixHeight];
-
-            for (int y = 0; y < matrixHeight; y++) {
-                int offset = y * matrixWidth;
-                for (int x = 0; x < matrixWidth; x++) {
-                    pixels[offset + x] = bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE;
-                }
+        for (int y = 0; y < matrixHeight; y++) {
+            int offset = y * matrixWidth;
+            for (int x = 0; x < matrixWidth; x++) {
+                pixels[offset + x] = bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE;
             }
-
-            Bitmap bitmap = Bitmap.createBitmap(matrixWidth, matrixHeight, Bitmap.Config.ARGB_8888);
-            bitmap.setPixels(pixels, 0, matrixWidth, 0, 0, matrixWidth, matrixHeight);
-            return bitmap;
-        } catch (Exception e) {
-            Log.e(TAG, "Error generating Micro QR Code", e);
-            return null;
         }
+
+        Bitmap highResBitmap = Bitmap.createBitmap(matrixWidth, matrixHeight, Bitmap.Config.ARGB_8888);
+        highResBitmap.setPixels(pixels, 0, matrixWidth, 0, 0, matrixWidth, matrixHeight);
+        
+        // تصغير الصورة للحجم المطلوب مع الحفاظ على الجودة
+        Bitmap finalBitmap = Bitmap.createScaledBitmap(
+            highResBitmap, 
+            width, 
+            height, 
+            true // تصفية عالية الجودة
+        );
+        
+        // تحرير الذاكرة
+        if (highResBitmap != finalBitmap) {
+            highResBitmap.recycle();
+        }
+        
+        return finalBitmap;
+    } catch (Exception e) {
+        Log.e(TAG, "Error generating GS1 DataMatrix: " + e.getMessage(), e);
+        return null;
+    }
+}
+
+    /**
+ * توليد QR Code بدقة عالية للطباعة على بطاقة صغيرة
+ * الحجم: 10مم × 5مم
+ */
+private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
+    if (qrContent == null || qrContent.trim().isEmpty()) {
+        return null;
+    }
+    try {
+        Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
+        hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M); // تصحيح خطأ متوسط
+        hints.put(EncodeHintType.MARGIN, 1); // هامش صغير
+        hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
+
+        // توليد الباركود بحجم أكبر ثم تصغيره للحصول على دقة أفضل
+        int scaleFactor = 4; // تكبير 4 مرات ثم تصغير
+        BitMatrix bitMatrix = new MultiFormatWriter().encode(
+                qrContent, 
+                BarcodeFormat.QR_CODE, 
+                width * scaleFactor, 
+                height * scaleFactor, 
+                hints);
+
+        int matrixWidth = bitMatrix.getWidth();
+        int matrixHeight = bitMatrix.getHeight();
+        int[] pixels = new int[matrixWidth * matrixHeight];
+
+        for (int y = 0; y < matrixHeight; y++) {
+            int offset = y * matrixWidth;
+            for (int x = 0; x < matrixWidth; x++) {
+                pixels[offset + x] = bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE;
+            }
+        }
+
+        Bitmap highResBitmap = Bitmap.createBitmap(matrixWidth, matrixHeight, Bitmap.Config.ARGB_8888);
+        highResBitmap.setPixels(pixels, 0, matrixWidth, 0, 0, matrixWidth, matrixHeight);
+        
+        // تصغير الصورة للحجم المطلوب مع الحفاظ على الجودة
+        Bitmap finalBitmap = Bitmap.createScaledBitmap(
+            highResBitmap, 
+            width, 
+            height, 
+            true // تصفية عالية الجودة
+        );
+        
+        // تحرير الذاكرة
+        if (highResBitmap != finalBitmap) {
+            highResBitmap.recycle();
+        }
+        
+        return finalBitmap;
+    } catch (Exception e) {
+        Log.e(TAG, "Error generating Micro QR Code", e);
+        return null;
+    }
+}
     }
 
     private void finalizeItemIdentity() {
@@ -1513,53 +1567,156 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         successDialog.show();
     }
 
-    private Bitmap generatePhysicalTagBitmap(String epc, String gs1Data, String qrUrl) {
-        int widthPx = 708;
-        int heightPx = 354;
-
-        Bitmap tagBitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(tagBitmap);
-        canvas.drawColor(Color.WHITE);
-
-        Paint textPaint = new Paint();
-        textPaint.setColor(Color.BLACK);
-        textPaint.setTextSize(22f);
-        textPaint.setAntiAlias(true);
-        textPaint.setSubpixelText(true);
-
-        canvas.drawText("MIRA DIGITAL TAG", 30, 45, textPaint);
-        textPaint.setTextSize(18f);
-        canvas.drawText("EPC: " + (epc != null ? epc : ""), 30, 80, textPaint);
-
-        Bitmap dmBitmap = generateGS1DataMatrix(gs1Data != null ? gs1Data : epc, 180, 180);
+    /**
+ * توليد صورة البطاقة الفيزيائية بالحجم الصحيح
+ * البطاقة: 30مم × 15مم
+ * - الجزء الأيمن: GS1 DataMatrix بحجم 10مم × 5مم
+ * - الجزء الأوسط: شريحة RFID
+ * - الجزء الأيسر: QR Code بحجم 10مم × 5مم
+ * - نص منحوت: "MIRA JEWELRY RFID"
+ */
+private Bitmap generatePhysicalTagBitmap(String epc, String gs1Data, String qrUrl) {
+    // تحويل المليمترات إلى بكسل للطباعة
+    // 1مم = 8 بكسل تقريباً عند 203 DPI (دقة الطابعات الحرارية القياسية)
+    final float MM_TO_PX = 8f;
+    
+    // أبعاد البطاقة: 30مم × 15مم
+    int cardWidthPx = Math.round(30 * MM_TO_PX);   // 240 بكسل
+    int cardHeightPx = Math.round(15 * MM_TO_PX);  // 120 بكسل
+    
+    // أبعاد الباركودات: 10مم × 5مم
+    int barcodeWidthPx = Math.round(10 * MM_TO_PX);   // 80 بكسل
+    int barcodeHeightPx = Math.round(5 * MM_TO_PX);   // 40 بكسل
+    
+    // إنشاء البطاقة
+    Bitmap tagBitmap = Bitmap.createBitmap(cardWidthPx, cardHeightPx, Bitmap.Config.ARGB_8888);
+    Canvas canvas = new Canvas(tagBitmap);
+    canvas.drawColor(Color.WHITE);
+    
+    // ==================== إعدادات الرسم ====================
+    Paint textPaint = new Paint();
+    textPaint.setColor(Color.BLACK);
+    textPaint.setAntiAlias(true);
+    textPaint.setSubpixelText(true);
+    textPaint.setTypeface(android.graphics.Typeface.create("sans-serif-condensed", android.graphics.Typeface.BOLD));
+    
+    // ==================== 1. الجزء الأيمن: GS1 DataMatrix ====================
+    // المنطقة: من 0 إلى 10مم (أقصى اليمين)
+    if (gs1Data != null && !gs1Data.isEmpty()) {
+        Bitmap dmBitmap = generateGS1DataMatrix(gs1Data, barcodeWidthPx, barcodeHeightPx);
         if (dmBitmap != null) {
-            canvas.drawBitmap(dmBitmap, 40, 110, null);
-            textPaint.setTextSize(14f);
-            canvas.drawText("GS1 DATAMATRIX", 40, 315, textPaint);
+            // وضع الباركود في أقصى اليمين
+            int dmX = 0;
+            int dmY = Math.round(2 * MM_TO_PX); // هامش علوي 2مم
+            canvas.drawBitmap(dmBitmap, dmX, dmY, null);
+            
+            // نص صغير تحت الباركود
+            textPaint.setTextSize(4 * MM_TO_PX); // 4مم
+            canvas.drawText("GS1", dmX + 2, cardHeightPx - 2, textPaint);
         }
-
-        Bitmap qrBitmap = generateMicroQRCode(qrUrl != null ? qrUrl : epc, 180, 180);
+    }
+    
+    // ==================== 2. الجزء الأوسط: منطقة شريحة RFID ====================
+    // المنطقة: من 10مم إلى 20مم (الوسط)
+    int rfidCenterX = Math.round(15 * MM_TO_PX); // مركز البطاقة
+    int rfidCenterY = cardHeightPx / 2;
+    
+    // رسم إطار الشريحة (تمثيل بصري)
+    Paint rfidPaint = new Paint();
+    rfidPaint.setColor(Color.LTGRAY);
+    rfidPaint.setStyle(Paint.Style.STROKE);
+    rfidPaint.setStrokeWidth(1f);
+    
+    int rfidWidth = Math.round(8 * MM_TO_PX);   // 8مم
+    int rfidHeight = Math.round(10 * MM_TO_PX);  // 10مم
+    int rfidLeft = rfidCenterX - (rfidWidth / 2);
+    int rfidTop = rfidCenterY - (rfidHeight / 2);
+    
+    canvas.drawRect(rfidLeft, rfidTop, rfidLeft + rfidWidth, rfidTop + rfidHeight, rfidPaint);
+    
+    // رسم خطوط تمثل الهوائي الداخلي للشريحة
+    Paint antennaPaint = new Paint();
+    antennaPaint.setColor(Color.GRAY);
+    antennaPaint.setStyle(Paint.Style.STROKE);
+    antennaPaint.setStrokeWidth(0.5f);
+    
+    int coilMargin = Math.round(1 * MM_TO_PX);
+    for (int i = 0; i < 3; i++) {
+        int inset = coilMargin + (i * Math.round(0.5f * MM_TO_PX));
+        canvas.drawRect(
+            rfidLeft + inset, 
+            rfidTop + inset, 
+            rfidLeft + rfidWidth - inset, 
+            rfidTop + rfidHeight - inset, 
+            antennaPaint
+        );
+    }
+    
+    // نقطة مركز الشريحة
+    Paint chipPaint = new Paint();
+    chipPaint.setColor(Color.DKGRAY);
+    int chipSize = Math.round(2 * MM_TO_PX);
+    canvas.drawCircle(rfidCenterX, rfidCenterY, chipSize, chipPaint);
+    
+    // ==================== 3. الجزء الأيسر: QR Code ====================
+    // المنطقة: من 20مم إلى 30مم (أقصى اليسار)
+    if (qrUrl != null && !qrUrl.isEmpty()) {
+        Bitmap qrBitmap = generateMicroQRCode(qrUrl, barcodeWidthPx, barcodeHeightPx);
         if (qrBitmap != null) {
-            canvas.drawBitmap(qrBitmap, 440, 110, null);
-            textPaint.setTextSize(14f);
-            canvas.drawText("DIGITAL LINK", 460, 315, textPaint);
-        }
-
-        return tagBitmap;
-    }
-
-    private void printTagDirectly(Bitmap tagBitmap) {
-        if (getContext() == null || tagBitmap == null) return;
-        try {
-            androidx.print.PrintHelper printHelper = new androidx.print.PrintHelper(requireContext());
-            printHelper.setScaleMode(androidx.print.PrintHelper.SCALE_MODE_FIT);
-            printHelper.printBitmap("MIRA_TAG_60x30_" + System.currentTimeMillis(), tagBitmap);
-        } catch (Exception e) {
-            Log.e(TAG, "Print Error: " + e.getMessage(), e);
-            showToast(isArabic ? "❌ فشلت عملية الطباعة" : "❌ Print failed");
+            // وضع الباركود في أقصى اليسار
+            int qrX = cardWidthPx - barcodeWidthPx;
+            int qrY = Math.round(2 * MM_TO_PX); // هامش علوي 2مم
+            canvas.drawBitmap(qrBitmap, qrX, qrY, null);
+            
+            // نص صغير تحت الباركود
+            textPaint.setTextSize(4 * MM_TO_PX);
+            canvas.drawText("QR", qrX + 2, cardHeightPx - 2, textPaint);
         }
     }
+    
+    // ==================== 4. النص المنحوت: "MIRA JEWELRY RFID" ====================
+    textPaint.setTextSize(5 * MM_TO_PX); // 5مم
+    textPaint.setTextAlign(Paint.Align.CENTER);
+    textPaint.setFakeBoldText(true);
+    textPaint.setLetterSpacing(0.05f);
+    
+    // وضع النص في منتصف البطاقة (فوق منطقة RFID)
+    canvas.drawText("MIRA JEWELRY RFID", rfidCenterX, Math.round(3 * MM_TO_PX), textPaint);
+    
+    // ==================== 5. خط فاصل رفيع بين الأجزاء ====================
+    Paint dividerPaint = new Paint();
+    dividerPaint.setColor(Color.LTGRAY);
+    dividerPaint.setStrokeWidth(0.3f);
+    
+    // خط بين الجزء الأيمن والأوسط
+    int divider1X = Math.round(10 * MM_TO_PX);
+    canvas.drawLine(divider1X, 0, divider1X, cardHeightPx, dividerPaint);
+    
+    // خط بين الجزء الأوسط والأيسر
+    int divider2X = Math.round(20 * MM_TO_PX);
+    canvas.drawLine(divider2X, 0, divider2X, cardHeightPx, dividerPaint);
+    
+    return tagBitmap;
+}
 
+    /**
+ * طباعة البطاقة بالحجم الفعلي (30مم × 15مم)
+ */
+private void printTagDirectly(Bitmap tagBitmap) {
+    if (getContext() == null || tagBitmap == null) return;
+    try {
+        androidx.print.PrintHelper printHelper = new androidx.print.PrintHelper(requireContext());
+        printHelper.setScaleMode(androidx.print.PrintHelper.SCALE_MODE_FIT);
+        printHelper.setColorMode(androidx.print.PrintHelper.COLOR_MODE_MONOCHROME);
+        printHelper.setOrientation(androidx.print.PrintHelper.ORIENTATION_LANDSCAPE);
+        
+        // اسم الملف يعكس الحجم الفعلي
+        printHelper.printBitmap("MIRA_TAG_30x15mm_" + System.currentTimeMillis(), tagBitmap);
+    } catch (Exception e) {
+        Log.e(TAG, "Print Error: " + e.getMessage(), e);
+        showToast(isArabic ? "❌ فشلت عملية الطباعة" : "❌ Print failed");
+    }
+}
     private AlertDialog showProfessionalLoadingDialog(String title, String message) {
         if (getContext() == null || !isAdded()) return null;
         
