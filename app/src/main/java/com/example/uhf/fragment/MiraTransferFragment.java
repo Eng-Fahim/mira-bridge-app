@@ -757,109 +757,7 @@ public class MiraTransferFragment extends Fragment {
         } catch (Exception ignored) {}
     }
 
-    private void showNewTransferDialog() {
-        if (!isAdded() || getContext() == null) return;
-        View dv = LayoutInflater.from(getContext()).inflate(R.layout.dialog_new_transfer, null);
-        TextView tvFromBranch = dv.findViewById(R.id.tvFromBranchName);
-        Spinner spTo = dv.findViewById(R.id.spToBranch);
-        EditText etNotes = dv.findViewById(R.id.etTransferNotes);
-        Button btnCancel = dv.findViewById(R.id.btnCancelTransfer);
-        Button btnCreate = dv.findViewById(R.id.btnCreateTransfer);
-
-        tvFromBranch.setText("🏢 " + branchesManager.getActiveBranchDisplayName());
-        final int fromBranchId = branchesManager.getActiveBranchId();
-        List<String> branchNames = new ArrayList<>();
-        List<Integer> branchIds = new ArrayList<>();
-
-        executor.execute(() -> {
-            MiraApiClient.ApiResponse response = apiClient.getBranches();
-            mainHandler.post(() -> {
-                if (!isAdded() || getContext() == null) return;
-                
-                if (response != null && response.isSuccess && response.data != null) {
-                    JSONArray branches = response.data.optJSONArray("branches");
-                    if (branches != null) {
-                        for (int i = 0; i < branches.length(); i++) {
-                            JSONObject b = branches.optJSONObject(i);
-                            if (b != null && b.optInt("id") != fromBranchId) {
-                                branchNames.add(b.optString("branch_name_ar", b.optString("branch_name", "Branch")));
-                                branchIds.add(b.optInt("id"));
-                            }
-                        }
-                    }
-                }
-                if (branchNames.isEmpty()) {
-                    branchNames.add(ar("لا توجد فروع أخرى متاحة", "No other branches available"));
-                    branchIds.add(0);
-                }
-                ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, branchNames);
-                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                spTo.setAdapter(adapter);
-            });
-        });
-
-        AlertDialog dialog = new MaterialAlertDialogBuilder(requireContext()).setView(dv).create();
-        btnCancel.setOnClickListener(v -> dialog.dismiss());
-        // ✅ الكود المعدل
-btnCreate.setOnClickListener(v -> {
-    int pos = spTo.getSelectedItemPosition();
-    if (pos < 0 || pos >= branchIds.size() || branchIds.get(pos) == 0) {
-        showUserMessage(isArabic ? "⚠️ خطأ" : "⚠️ Error", isArabic ? "يرجى اختيار فرع وجهة صحيح." : "Please select a valid destination branch.");
-        return;
-    }
-    
-    int targetBranchId = branchIds.get(pos);
-    String notes = etNotes.getText().toString().trim();
-    dialog.dismiss(); // إغلاق نافذة الاختيار
-
-    showLoadingDialog(isArabic ? "جاري إنشاء مسودة التحويل..." : "Creating transfer draft...");
-    
-    executor.execute(() -> {
-        try {
-            JSONObject payload = new JSONObject();
-            payload.put("from_branch_id", fromBranchId);
-            payload.put("to_branch_id", targetBranchId);
-            payload.put("notes", notes);
-            
-            // إرسال الطلب لإنشاء التحويل
-            MiraApiClient.ApiResponse response = apiClient.createTransfer(payload);
-            
-            mainHandler.post(() -> {
-                dismissLoadingDialog();
-                if (!isAdded() || getContext() == null) return;
-                
-                if (response != null && response.isSuccess && response.data != null) {
-                    // استخراج الشحنة الجديدة التي تم إنشاؤها
-                    JSONObject transferObj = response.data.optJSONObject("transfer");
-                    TransferData newTransfer = parseTransferData(transferObj);
-                    
-                    if (newTransfer == null) {
-                        newTransfer = new TransferData();
-                        newTransfer.id = response.data.optInt("id", 0);
-                        newTransfer.fromBranchId = fromBranchId;
-                        newTransfer.toBranchId = targetBranchId;
-                    }
-
-                    Toast.makeText(getContext(), isArabic ? "✅ تم إنشاء التحويل، قم بمسح القطع الآن" : "✅ Transfer created, scan items now", Toast.LENGTH_SHORT).show();
-                    loadTransfers();
-                    
-                    // فتح حوار مسح وإضافة القطع مباشرة للشحنة الجديدة
-                    showScanItemsDialogForTransfer(newTransfer);
-                } else {
-                    showErrorMessage(isArabic ? "فشل الإنشاء" : "Create Failed", getErrorMessage(response));
-                }
-            });
-        } catch (Exception e) {
-            mainHandler.post(() -> {
-                dismissLoadingDialog();
-                showErrorMessage(isArabic ? "خطأ" : "Error", e.getMessage());
-            });
-        }
-    });
-});
-
-        dialog.show();
-    }
+    showNewTransferDialog
 
     public void onRfidTagScanned(String epc) {
         if (epc == null || epc.trim().isEmpty()) return;
@@ -950,13 +848,14 @@ btnCreate.setOnClickListener(v -> {
             if (tvScanCounter != null) tvScanCounter.setText("0");
         });
 
-        btnSave.setOnClickListener(v -> {
+                btnSave.setOnClickListener(v -> {
             if (activeScanEpcSet.isEmpty()) {
-                Toast.makeText(getContext(), isArabic ? "⚠️ لم يتم مسح أي قطع" : "⚠️ No items scanned", Toast.LENGTH_SHORT).show();
+                // هنا يتم تنبيه المستخدم محلياً فقط دون إرسال طلب فاشل للسيرفر
+                Toast.makeText(getContext(), isArabic ? "⚠️ لا توجد أي قطع صالحة أو متاحة لتحويل ضمن القائمة المحددة" : "⚠️ No valid items selected for transfer", Toast.LENGTH_SHORT).show();
                 return;
             }
             
-            showLoadingDialog(isArabic ? "جاري حفظ القطع..." : "Saving items...");
+            showLoadingDialog(isArabic ? "جاري إنشاء الشحنة وحفظ القطع..." : "Creating transfer and saving items...");
             executor.execute(() -> {
                 try {
                     JSONArray itemsArray = new JSONArray();
@@ -964,20 +863,54 @@ btnCreate.setOnClickListener(v -> {
                         itemsArray.put(epc);
                     }
                     
-                    MiraApiClient.ApiResponse response = apiClient.addItemsToTransfer(t.id, itemsArray);
+                    int targetTransferId = t.id;
+                    
+                    // إذا كان التحويل جديد ولم يتم إنشاؤه بعد في السيرفر، نقوم بإنشائه الآن مع القطع دفعة واحدة
+                    if (targetTransferId == 0) {
+                        JSONObject createPayload = new JSONObject();
+                        createPayload.put("from_branch_id", t.fromBranchId);
+                        createPayload.put("to_branch_id", t.toBranchId);
+                        createPayload.put("notes", t.notes != null ? t.notes : "");
+                        createPayload.put("items", itemsArray); // إرسال القطع مع الإنشاء مباشرة
+
+                        MiraApiClient.ApiResponse createResponse = apiClient.createTransfer(createPayload);
+                        if (createResponse != null && createResponse.isSuccess && createResponse.data != null) {
+                            JSONObject transferObj = createResponse.data.optJSONObject("transfer");
+                            if (transferObj != null) {
+                                targetTransferId = transferObj.optInt("id", 0);
+                            } else {
+                                targetTransferId = createResponse.data.optInt("id", 0);
+                            }
+                        } else {
+                            mainHandler.post(() -> {
+                                dismissLoadingDialog();
+                                showErrorMessage(isArabic ? "فشل الإنشاء" : "Create Failed", getErrorMessage(createResponse));
+                            });
+                            return;
+                        }
+                    } else {
+                        // إذا كان التحويل موجود مسبقاً، نقوم فقط بإضافة القطع إليه
+                        MiraApiClient.ApiResponse addResponse = apiClient.addItemsToTransfer(targetTransferId, itemsArray);
+                        if (addResponse == null || !addResponse.isSuccess) {
+                            mainHandler.post(() -> {
+                                dismissLoadingDialog();
+                                showErrorMessage(isArabic ? "فشل الحفظ" : "Save Failed", getErrorMessage(addResponse));
+                            });
+                            return;
+                        }
+                    }
+
+                    final int finalId = targetTransferId;
                     mainHandler.post(() -> {
                         dismissLoadingDialog();
                         if (!isAdded() || getContext() == null) return;
                         
-                        if (response != null && response.isSuccess) {
-                            showSuccessMessage(isArabic ? "تمت الإضافة" : "Items Added", isArabic ? "تم حفظ القطع الممسوحة بنجاح للتحويل." : "Items saved successfully.");
-                            loadTransfers();
-                            notifyDashboardUpdate();
-                            dialog.dismiss();
-                        } else {
-                            showErrorMessage(isArabic ? "فشل الحفظ" : "Save Failed", getErrorMessage(response));
-                        }
+                        showSuccessMessage(isArabic ? "تمت العملية بنجاح" : "Success", isArabic ? "تم إنشاء التحويل وحفظ القطع بنجاح." : "Transfer created and items saved successfully.");
+                        loadTransfers();
+                        notifyDashboardUpdate();
+                        dialog.dismiss();
                     });
+
                 } catch (Exception e) {
                     mainHandler.post(() -> {
                         dismissLoadingDialog();
@@ -986,6 +919,7 @@ btnCreate.setOnClickListener(v -> {
                 }
             });
         });
+
 
         dialog.show();
     }
