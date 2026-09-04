@@ -1,10 +1,6 @@
-// MiraDialogHelper.java
 package com.example.uhf.utils;
 
 import android.content.Context;
-import android.graphics.drawable.Drawable;
-import androidx.annotation.DrawableRes;
-import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.example.uhf.R;
@@ -20,7 +16,7 @@ public class MiraDialogHelper {
     }
     
     // ✅ نافذة تأكيد موحدة
-    public AlertDialog showConfirmationDialog(
+    public AlertDialog showConfirmation(
             String title, 
             String message, 
             String positiveText, 
@@ -38,7 +34,7 @@ public class MiraDialogHelper {
     }
     
     // ✅ نافذة معلومات موحدة
-    public AlertDialog showInfoDialog(String title, String message) {
+    public AlertDialog showInfo(String title, String message) {
         return new MaterialAlertDialogBuilder(context)
                 .setTitle(title)
                 .setMessage(message)
@@ -47,7 +43,7 @@ public class MiraDialogHelper {
     }
     
     // ✅ نافذة خطأ موحدة
-    public AlertDialog showErrorDialog(String title, String message) {
+    public AlertDialog showError(String title, String message) {
         return new MaterialAlertDialogBuilder(context)
                 .setTitle(title)
                 .setMessage(message)
@@ -57,7 +53,7 @@ public class MiraDialogHelper {
     }
     
     // ✅ نافذة تحذير موحدة
-    public AlertDialog showWarningDialog(String title, String message) {
+    public AlertDialog showWarning(String title, String message) {
         return new MaterialAlertDialogBuilder(context)
                 .setTitle(title)
                 .setMessage(message)
@@ -67,7 +63,7 @@ public class MiraDialogHelper {
     }
     
     // ✅ نافذة اختيار موحدة
-    public AlertDialog showOptionsDialog(
+    public AlertDialog showOptions(
             String title, 
             String[] options,
             android.content.DialogInterface.OnClickListener listener) {
@@ -79,11 +75,47 @@ public class MiraDialogHelper {
     }
     
     // ✅ نافذة تحميل موحدة
-    public AlertDialog showLoadingDialog(String title, String message) {
+    public AlertDialog showLoading(String title, String message) {
         return new MaterialAlertDialogBuilder(context)
                 .setTitle(title)
                 .setMessage(message)
                 .setCancelable(false)
                 .show();
+    }
+    
+    // ✅ نافذة مخصصة كاملة
+    public AlertDialog showCustom(
+            String title,
+            String message,
+            String positiveText,
+            String negativeText,
+            String neutralText,
+            Runnable onPositive,
+            Runnable onNegative,
+            Runnable onNeutral) {
+        
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context)
+                .setTitle(title)
+                .setMessage(message);
+        
+        if (positiveText != null) {
+            builder.setPositiveButton(positiveText, (d, w) -> {
+                if (onPositive != null) onPositive.run();
+            });
+        }
+        
+        if (negativeText != null) {
+            builder.setNegativeButton(negativeText, (d, w) -> {
+                if (onNegative != null) onNegative.run();
+            });
+        }
+        
+        if (neutralText != null) {
+            builder.setNeutralButton(neutralText, (d, w) -> {
+                if (onNeutral != null) onNeutral.run();
+            });
+        }
+        
+        return builder.show();
     }
 }
