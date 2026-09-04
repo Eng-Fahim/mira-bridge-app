@@ -801,7 +801,7 @@ public class MiraTransferFragment extends Fragment {
         AlertDialog dialog = new MaterialAlertDialogBuilder(requireContext()).setView(dv).create();
         btnCancel.setOnClickListener(v -> dialog.dismiss());
         
-        btnCreate.setOnClickListener(v -> {
+                btnCreate.setOnClickListener(v -> {
             int pos = spTo.getSelectedItemPosition();
             if (pos < 0 || pos >= branchIds.size() || branchIds.get(pos) == 0) {
                 showUserMessage(isArabic ? "⚠️ خطأ" : "⚠️ Error", isArabic ? "يرجى اختيار فرع وجهة صحيح." : "Please select a valid destination branch.");
@@ -809,6 +809,7 @@ public class MiraTransferFragment extends Fragment {
             }
             
             int targetBranchId = branchIds.get(pos);
+            String targetBranchName = branchNames.get(pos); // اسم الفرع الوجهة للعرض
             String notes = etNotes.getText().toString().trim();
             dialog.dismiss();
 
@@ -817,11 +818,13 @@ public class MiraTransferFragment extends Fragment {
             pendingTransfer.fromBranchId = fromBranchId;
             pendingTransfer.toBranchId = targetBranchId;
             pendingTransfer.fromBranch = branchesManager.getActiveBranchDisplayName();
+            pendingTransfer.toBranch = targetBranchName; // تعيين اسم الفرع الوجهة بوضوح
             pendingTransfer.notes = notes;
             pendingTransfer.status = "draft";
             pendingTransfer.transferNumber = "TR-NEW";
 
             showScanItemsDialogForTransfer(pendingTransfer);
+
         });
 
         dialog.show();
