@@ -28,7 +28,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
@@ -72,6 +71,7 @@ import com.example.uhf.tools.ToastUtil;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.rscja.deviceapi.entity.UHFTAGInfo;
 
@@ -464,11 +464,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void confirmLogout() {
-        new AlertDialog.Builder(this)
+        new MaterialAlertDialogBuilder(this)
                 .setTitle(isArabic ? "تسجيل الخروج" : "Logout")
                 .setMessage(isArabic ? "هل أنت متأكد من تسجيل الخروج من المنظومة؟" : "Are you sure you want to log out?")
                 .setPositiveButton(isArabic ? "تأكيد" : "Logout", (dialog, which) -> {
-                    sessionManager.logoutUser(); // تم التعديل لتتطابق مع SessionManager
+                    sessionManager.logoutUser();
                     navigateToLogin();
                 })
                 .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
@@ -756,14 +756,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             default: return new MiraDashboardFragment();
         }
     }
-        private void showUHFVersionDialog() {
-        // 1. تحديد تعريف إصدار منظومة MIRA ID™ بدلاً من السوفتوير الخاص بالجهاز
+
+    private void showUHFVersionDialog() {
         String miraSystemVersion = "MIRA ID™ v1.0.0 (Enterprise)";
         String swVer = miraSystemVersion;
         String hwVer = null;
         String modelName = Build.MODEL;
 
-        // 2. محاولة جلب إصدار العتاد (Hardware) فقط من الـ Reader
         try {
             if (mReader != null) {
                 hwVer = mReader.getHardwareVersion();
@@ -772,7 +771,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Error fetching RFID reader info: " + e.getMessage());
         }
 
-        // 3. بناء نص الرسالة بأسلوب منظم يبرز هُوية المنظومة
         StringBuilder message = new StringBuilder();
         message.append("MIRA Trust Architecture™\n");
         message.append(isArabic ? "نظام المصادقة والتتبع المعتمد للمجوهرات\n\n" : "Jewelry Tracking & Authentication System\n\n");
@@ -787,14 +785,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             message.append(isArabic ? "🟢 الحالة: وحدة UHF نشطة ومتصلة" : "🟢 Status: Active & Connected");
         }
 
-        // 4. عرض الديالوج بشكل متناسق ومستقر
-        new AlertDialog.Builder(this)
+        new MaterialAlertDialogBuilder(this)
                 .setTitle(isArabic ? "عن المنظومة | MIRA ID™" : "About System | MIRA ID™")
                 .setMessage(message.toString())
                 .setPositiveButton(isArabic ? "موافق" : "OK", (dialog, which) -> dialog.dismiss())
                 .show();
     }
-
 
     private void updateBottomNavSelectionByTag(String tag) {
         try {
@@ -854,7 +850,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         String[] options = optionsList.toArray(new String[0]);
 
-        new AlertDialog.Builder(this)
+        new MaterialAlertDialogBuilder(this)
                 .setTitle(isArabic ? "📡 أجهزة ومستشعرات المنظومة" : "📡 Hardware & Sensors")
                 .setItems(options, (dialog, which) -> {
                     String selected = options[which];
@@ -929,23 +925,20 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ==================== INVENTORY LOCK PROTECTION ====================
 
     public boolean isInventoryActive() {
-    // ✅ فقط إذا كانت واجهة الجرد هي الظاهرة حالياً
-    if (currentFragment instanceof MiraInventoryProFragment && currentFragment.isVisible()) {
-        return ((MiraInventoryProFragment) currentFragment).isScanning();
+        if (currentFragment instanceof MiraInventoryProFragment && currentFragment.isVisible()) {
+            return ((MiraInventoryProFragment) currentFragment).isScanning();
+        }
+        
+        if (currentFragment instanceof MiraUHFReadTagFragment && currentFragment.isVisible()) {
+            return ((MiraUHFReadTagFragment) currentFragment).isScanning();
+        }
+        
+        return false;
     }
-    
-    // ✅ فقط إذا كانت واجهة UHF Read Tag هي الظاهرة
-    if (currentFragment instanceof MiraUHFReadTagFragment && currentFragment.isVisible()) {
-        return ((MiraUHFReadTagFragment) currentFragment).isScanning();
-    }
-    
-    // ❌ لا تعتبر واجهات أخرى كجرد نشط
-    return false;
-}
 
     private void checkInventoryLockAndExecute(Runnable onConfirmed) {
         if (isInventoryActive()) {
-            new AlertDialog.Builder(this)
+            new MaterialAlertDialogBuilder(this)
                     .setTitle(isArabic ? "⚠️ الجرد قيد التشغيل" : "⚠️ Inventory In Progress")
                     .setMessage(isArabic ? "عملية الجرد تعمل حالياً. هل تريد إيقاف الجرد والانتقال؟"
                             : "Active scanning in progress. Stop and proceed?")
@@ -961,22 +954,20 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void stopActiveInventory() {
-    try {
-        // ✅ إيقاف فقط إذا كانت الواجهة الحالية هي الجرد
-        if (currentFragment instanceof MiraInventoryProFragment && currentFragment.isVisible()) {
-            ((MiraInventoryProFragment) currentFragment).stopScanning();
+        try {
+            if (currentFragment instanceof MiraInventoryProFragment && currentFragment.isVisible()) {
+                ((MiraInventoryProFragment) currentFragment).stopScanning();
+            }
+            
+            if (currentFragment instanceof MiraUHFReadTagFragment && currentFragment.isVisible()) {
+                ((MiraUHFReadTagFragment) currentFragment).stopScanning();
+            }
+            
+            stopUHFScan();
+        } catch (Exception e) {
+            Log.e(TAG, "Error stopping inventory: " + e.getMessage());
         }
-        
-        // ✅ إيقاف فقط إذا كانت واجهة UHF Read Tag
-        if (currentFragment instanceof MiraUHFReadTagFragment && currentFragment.isVisible()) {
-            ((MiraUHFReadTagFragment) currentFragment).stopScanning();
-        }
-        
-        stopUHFScan();  // إيقاف أي مسح UHF عام
-    } catch (Exception e) {
-        Log.e(TAG, "Error stopping inventory: " + e.getMessage());
     }
-}
 
     // ==================== BACK BUTTON HANDLING ====================
 
@@ -1269,4 +1260,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
     }
-        }
+}
