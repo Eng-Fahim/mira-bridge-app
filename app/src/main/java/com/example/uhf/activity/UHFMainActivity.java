@@ -1,7 +1,6 @@
 package com.example.uhf.activity;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -35,6 +34,8 @@ import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
+import androidx.appcompat.view.menu.MenuBuilder;
+import android.annotation.SuppressLint;
 
 import com.example.uhf.R;
 import com.example.uhf.fragment.MiraAccountingFragment;
@@ -95,8 +96,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private FragmentManager fragmentManager;
 
     private MiraPosFragment activePOSFragment = null;
-    private MiraIdentityStudioFragment activeEncodingFragment = null;
-    private OnRfidScannedListener activeRfidListener = null;
+    private MiraIdentityStudioFragment activeEncodingFragment;
+    private OnRfidScannedListener activeRfidListener;
 
     private SessionManager sessionManager;
     private MiraBranchesManager branchesManager;
@@ -114,7 +115,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     private static final long DOUBLE_BACK_TIMEOUT = 2000;
 
     private PlaySoundThread playSoundThread = null;
-    private GetUHFInfoThread getUHFInfoThread = null;
     private SoundPool soundPool;
     private AudioManager audioManager;
     private final HashMap<Integer, Integer> soundMap = new HashMap<>();
@@ -129,10 +129,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     public void setActiveRfidListener(OnRfidScannedListener listener) {
         this.activeRfidListener = listener;
-    }
-
-    public void setActivePOSFragment(MiraPosFragment fragment) {
-        this.activePOSFragment = fragment;
     }
 
     private void setupOrgProfileListener() {
@@ -317,15 +313,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public void onResume() {
         super.onResume();
         updateToolbarTitle();
-
-        // التحقق من تغير الفرع النشط عند العودة للشاشة وإعادة تحميل البيانات
-        if (branchesManager != null) {
-            int currentBranchId = branchesManager.getActiveBranchId();
-            if (lastActiveBranchId != currentBranchId) {
-                lastActiveBranchId = currentBranchId;
-                loadFragmentByTag(currentFragmentTag);
-            }
-        }
     }
 
     private void initializeLanguageState() {
@@ -359,11 +346,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     // ==================== TOOLBAR MENU ====================
 
-    @SuppressLint("RestrictedApi")
-    @Override
+       @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.main_menu, menu);
 
+        // إجبار النظام على إظهار الأيقونات داخل القائمة المنسدلة (Overflow Menu)
         if (menu instanceof androidx.appcompat.view.menu.MenuBuilder) {
             ((androidx.appcompat.view.menu.MenuBuilder) menu).setOptionalIconsVisible(true);
         }
@@ -372,6 +359,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         applyToolbarMenuPermissions(menu, pm);
         return true;
     }
+
 
     private void applyToolbarMenuPermissions(Menu menu, PermissionManager pm) {
         if (pm == null) return;
@@ -458,6 +446,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         return super.onOptionsItemSelected(item);
     }
 
+
     private void toggleLanguage() {
         try {
             String newLang = isArabic ? "en" : "ar";
@@ -479,7 +468,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 .setTitle(isArabic ? "تسجيل الخروج" : "Logout")
                 .setMessage(isArabic ? "هل أنت متأكد من تسجيل الخروج من المنظومة؟" : "Are you sure you want to log out?")
                 .setPositiveButton(isArabic ? "تأكيد" : "Logout", (dialog, which) -> {
-                    sessionManager.logoutUser();
+                    sessionManager.logoutUser(); // تم التعديل لتتطابق مع SessionManager
                     navigateToLogin();
                 })
                 .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
@@ -692,12 +681,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         try {
             showLoading();
-            
-            // تنظيف المراجع لتفادي تسريب الذاكرة عند استبدال الواجهة
-            setActivePOSFragment(null);
-            setActiveEncodingFragment(null);
-            setActiveRfidListener(null);
-
             currentFragment = fragment;
             currentFragmentTag = tag;
             saveFragmentTagToPrefs(tag);
@@ -715,7 +698,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
 
             transaction.commitAllowingStateLoss();
-
+            
             updateBottomNavSelectionByTag(tag);
 
             mainHandler.postDelayed(this::hideLoading, 150);
@@ -773,7 +756,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             default: return new MiraDashboardFragment();
         }
     }
-
     private void showUHFVersionDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(new androidx.appcompat.view.ContextThemeWrapper(this, R.style.MiraCustomDialogTheme));
         View view = getLayoutInflater().inflate(R.layout.dialog_device_info, null);
@@ -787,13 +769,14 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         TextView tvHardware = view.findViewById(R.id.tv_uhf_hardware);
         View btnClose = view.findViewById(R.id.btn_close_dialog);
 
+        // جلب اسم الموديل واستخدام Chainway Hardware / RFID SDK
         String modelName = Build.MODEL;
         String swVer = null;
         String hwVer = null;
 
         try {
             if (mReader != null) {
-                swVer = mReader.getSoftwareVersion();
+                swVer = mReader.getVersion();
                 hwVer = mReader.getHardwareVersion();
             }
         } catch (Exception e) {
@@ -905,18 +888,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 .show();
     }
 
-    // ==================== UHF SCANNING & HARDWARE THREADS ====================
+    // ==================== LEGACY COMPATIBILITY METHODS ====================
 
     public void startUHFScan() {
         try {
-            if (mReader != null && !loopFlag) {
-                if (mReader.startInventoryTag()) {
-                    loopFlag = true;
-                    getUHFInfoThread = new GetUHFInfoThread();
-                    getUHFInfoThread.start();
-                } else {
-                    showToast(isArabic ? "فشل تشغيل القارئ" : "Failed to start RFID reader");
-                }
+            loopFlag = true;
+            if (mReader != null) {
+                mReader.startInventoryTag();
             }
         } catch (Exception e) {
             Log.e(TAG, "startUHFScan Error: " + e.getMessage());
@@ -929,36 +907,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             if (mReader != null) {
                 mReader.stopInventory();
             }
-            if (getUHFInfoThread != null) {
-                getUHFInfoThread.interrupt();
-                getUHFInfoThread = null;
-            }
         } catch (Exception e) {
             Log.e(TAG, "stopUHFScan Error: " + e.getMessage());
-        }
-    }
-
-    // خيط العمل المستقل للتحقق القادمة من البوفر الخاص بالـ Chainway SDK
-    private class GetUHFInfoThread extends Thread {
-        @Override
-        public void run() {
-            UHFTAGInfo uhfTagInfo;
-            while (loopFlag) {
-                if (mReader != null) {
-                    uhfTagInfo = mReader.readTagFromBuffer();
-                    if (uhfTagInfo != null) {
-                        String epc = uhfTagInfo.getEPC();
-                        if (epc != null && !epc.isEmpty()) {
-                            mainHandler.post(() -> onTagRead(epc));
-                        }
-                    }
-                }
-                try {
-                    Thread.sleep(10);
-                } catch (InterruptedException e) {
-                    break;
-                }
-            }
         }
     }
 
@@ -1028,7 +978,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    // ==================== BACK BUTTON & HARDWARE KEY HANDLING ====================
+    // ==================== BACK BUTTON HANDLING ====================
 
     @Override
     public void onBackPressed() {
@@ -1098,18 +1048,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        // معالجة الضغط على أزرار المسح الجانبية للجهاز (Trigger Key)
-        if (keyCode == 139 || keyCode == 280 || keyCode == KeyEvent.KEYCODE_F4) {
-            if (event.getRepeatCount() == 0) {
-                if (!loopFlag) {
-                    startUHFScan();
-                } else {
-                    stopUHFScan();
-                }
-                return true;
-            }
-        }
-
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             onBackPressed();
             return true;
@@ -1117,12 +1055,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         return super.onKeyDown(keyCode, event);
     }
 
-    // ==================== RFID LISTENERS ====================
+    // ==================== RFID & HARDWARE LISTENERS ====================
 
     public void onTagRead(String epc) {
         try {
-            playSound(1); // إطلاق نغمة قراءة الباركد/RFID
-
             if (activeEncodingFragment != null && activeEncodingFragment.isAdded()) {
                 activeEncodingFragment.onRfidScanned(epc);
                 return;
@@ -1180,6 +1116,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         if (loadingOverlay != null && !isFinishing() && !isDestroyed()) {
             loadingOverlay.setVisibility(View.GONE);
         }
+    }
+
+    public void setActivePOSFragment(MiraPosFragment fragment) {
+        this.activePOSFragment = fragment;
     }
 
     @Override
