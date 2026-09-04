@@ -757,7 +757,75 @@ public class MiraTransferFragment extends Fragment {
         } catch (Exception ignored) {}
     }
 
-    showNewTransferDialog
+    private void showNewTransferDialog() {
+        if (!isAdded() || getContext() == null) return;
+        View dv = LayoutInflater.from(getContext()).inflate(R.layout.dialog_new_transfer, null);
+        TextView tvFromBranch = dv.findViewById(R.id.tvFromBranchName);
+        Spinner spTo = dv.findViewById(R.id.spToBranch);
+        EditText etNotes = dv.findViewById(R.id.etTransferNotes);
+        Button btnCancel = dv.findViewById(R.id.btnCancelTransfer);
+        Button btnCreate = dv.findViewById(R.id.btnCreateTransfer);
+
+        tvFromBranch.setText("🏢 " + branchesManager.getActiveBranchDisplayName());
+        final int fromBranchId = branchesManager.getActiveBranchId();
+        List<String> branchNames = new ArrayList<>();
+        List<Integer> branchIds = new ArrayList<>();
+
+        executor.execute(() -> {
+            MiraApiClient.ApiResponse response = apiClient.getBranches();
+            mainHandler.post(() -> {
+                if (!isAdded() || getContext() == null) return;
+                
+                if (response != null && response.isSuccess && response.data != null) {
+                    JSONArray branches = response.data.optJSONArray("branches");
+                    if (branches != null) {
+                        for (int i = 0; i < branches.length(); i++) {
+                            JSONObject b = branches.optJSONObject(i);
+                            if (b != null && b.optInt("id") != fromBranchId) {
+                                branchNames.add(b.optString("branch_name_ar", b.optString("branch_name", "Branch")));
+                                branchIds.add(b.optInt("id"));
+                            }
+                        }
+                    }
+                }
+                if (branchNames.isEmpty()) {
+                    branchNames.add(ar("لا توجد فروع أخرى متاحة", "No other branches available"));
+                    branchIds.add(0);
+                }
+                ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, branchNames);
+                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                spTo.setAdapter(adapter);
+            });
+        });
+
+        AlertDialog dialog = new MaterialAlertDialogBuilder(requireContext()).setView(dv).create();
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+        
+        btnCreate.setOnClickListener(v -> {
+            int pos = spTo.getSelectedItemPosition();
+            if (pos < 0 || pos >= branchIds.size() || branchIds.get(pos) == 0) {
+                showUserMessage(isArabic ? "⚠️ خطأ" : "⚠️ Error", isArabic ? "يرجى اختيار فرع وجهة صحيح." : "Please select a valid destination branch.");
+                return;
+            }
+            
+            int targetBranchId = branchIds.get(pos);
+            String notes = etNotes.getText().toString().trim();
+            dialog.dismiss();
+
+            TransferData pendingTransfer = new TransferData();
+            pendingTransfer.id = 0;
+            pendingTransfer.fromBranchId = fromBranchId;
+            pendingTransfer.toBranchId = targetBranchId;
+            pendingTransfer.fromBranch = branchesManager.getActiveBranchDisplayName();
+            pendingTransfer.notes = notes;
+            pendingTransfer.status = "draft";
+            pendingTransfer.transferNumber = "TR-NEW";
+
+            showScanItemsDialogForTransfer(pendingTransfer);
+        });
+
+        dialog.show();
+    }
 
     public void onRfidTagScanned(String epc) {
         if (epc == null || epc.trim().isEmpty()) return;
@@ -848,9 +916,8 @@ public class MiraTransferFragment extends Fragment {
             if (tvScanCounter != null) tvScanCounter.setText("0");
         });
 
-                btnSave.setOnClickListener(v -> {
+        btnSave.setOnClickListener(v -> {
             if (activeScanEpcSet.isEmpty()) {
-                // هنا يتم تنبيه المستخدم محلياً فقط دون إرسال طلب فاشل للسيرفر
                 Toast.makeText(getContext(), isArabic ? "⚠️ لا توجد أي قطع صالحة أو متاحة لتحويل ضمن القائمة المحددة" : "⚠️ No valid items selected for transfer", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -865,13 +932,12 @@ public class MiraTransferFragment extends Fragment {
                     
                     int targetTransferId = t.id;
                     
-                    // إذا كان التحويل جديد ولم يتم إنشاؤه بعد في السيرفر، نقوم بإنشائه الآن مع القطع دفعة واحدة
                     if (targetTransferId == 0) {
                         JSONObject createPayload = new JSONObject();
                         createPayload.put("from_branch_id", t.fromBranchId);
                         createPayload.put("to_branch_id", t.toBranchId);
                         createPayload.put("notes", t.notes != null ? t.notes : "");
-                        createPayload.put("items", itemsArray); // إرسال القطع مع الإنشاء مباشرة
+                        createPayload.put("items", itemsArray);
 
                         MiraApiClient.ApiResponse createResponse = apiClient.createTransfer(createPayload);
                         if (createResponse != null && createResponse.isSuccess && createResponse.data != null) {
@@ -889,7 +955,6 @@ public class MiraTransferFragment extends Fragment {
                             return;
                         }
                     } else {
-                        // إذا كان التحويل موجود مسبقاً، نقوم فقط بإضافة القطع إليه
                         MiraApiClient.ApiResponse addResponse = apiClient.addItemsToTransfer(targetTransferId, itemsArray);
                         if (addResponse == null || !addResponse.isSuccess) {
                             mainHandler.post(() -> {
@@ -900,7 +965,6 @@ public class MiraTransferFragment extends Fragment {
                         }
                     }
 
-                    final int finalId = targetTransferId;
                     mainHandler.post(() -> {
                         dismissLoadingDialog();
                         if (!isAdded() || getContext() == null) return;
@@ -919,7 +983,6 @@ public class MiraTransferFragment extends Fragment {
                 }
             });
         });
-
 
         dialog.show();
     }
@@ -1054,4 +1117,4 @@ public class MiraTransferFragment extends Fragment {
             }
         }
     }
-                }
+}
