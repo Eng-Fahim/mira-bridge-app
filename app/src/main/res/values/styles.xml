@@ -23,6 +23,7 @@
         <item name="overlapAnchor">false</item>
         <item name="android:dropDownVerticalOffset">8dp</item>
         <item name="android:popupBackground">@drawable/bg_custom_popup_menu</item>
+        <item name="android:itemIconDisabledAlpha">0.5</item>
     </style>
 
     <style name="TransparentBottomSheetDialog" parent="Theme.Design.Light.BottomSheetDialog">
@@ -33,10 +34,11 @@
     <!-- توحيد الثيمات لضمان عمل كافة النشاطات بالهوية الجديدة -->
     <style name="AppBaseTheme" parent="Theme.Uhfuartdemo" />
         
-    <!-- الثيم الرئيسي للتطبيق موصول بالديالوج المخصص -->
+    <!-- الثيم الرئيسي للتطبيق شامل الربط مع تصميم الديالوج والقائمة المنسدلة -->
     <style name="AppTheme" parent="Theme.Uhfuartdemo">
         <item name="android:alertDialogTheme">@style/MiraCustomDialogTheme</item>
         <item name="alertDialogTheme">@style/MiraCustomDialogTheme</item>
+        <item name="actionOverflowMenuStyle">@style/CustomOverflowMenu</item>
     </style>
 
     <style name="CustomTheme" parent="Theme.Uhfuartdemo" />
