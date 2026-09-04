@@ -6,7 +6,7 @@ import android.util.Log;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraServerConfig;
 import com.example.uhf.model.ApiProvider;
-import com.example.uhf.tools.CertificatePinningManager;  // ✅ أضف هذا
+import com.example.uhf.tools.CertificatePinningManager;  
 import com.example.uhf.tools.SessionManager;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -26,14 +26,13 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-import javax.net.ssl.HttpsURLConnection;  // ✅ أضف هذا
+import javax.net.ssl.HttpsURLConnection;  
 
 public class MiraApiClient {
 
     private static final String TAG = "MiraApiClient";
     private static final String SESSION_PREFS = "MiraEnterpriseSession";
     
-    // ✅ إضافة عنوان الخادم الافتراضي
     private static final String API_PREFIX = "mira-gate/v1";
     private static final String DEFAULT_BASE_URL = "https://sa.mirabarcode.com/wp-json";
 
@@ -41,7 +40,6 @@ public class MiraApiClient {
     private final MiraServerConfig serverConfig;
     private final SessionManager sessionManager;
 
-    // ✅ قيم ديناميكية تتحدث بعد تسجيل الدخول
     private String baseUrl;
     private String apiUrl;
     private String apiKey;
@@ -57,89 +55,69 @@ public class MiraApiClient {
     }
 
     private MiraApiClient(Context context) {
-    this.context = context;
-    this.serverConfig = MiraServerConfig.getInstance(context);
-    this.sessionManager = new SessionManager(context);
-    
-    // ✅ قراءة baseUrl من SessionManager أولاً
-    String savedBaseUrl = sessionManager.getServerUrl();
-    if (savedBaseUrl == null || savedBaseUrl.isEmpty()) {
-        // ✅ Fallback إلى serverConfig إذا لم يوجد في SessionManager
-        savedBaseUrl = serverConfig.getBaseUrl();
+        this.context = context;
+        this.serverConfig = MiraServerConfig.getInstance(context);
+        this.sessionManager = new SessionManager(context);
+        
+        String savedBaseUrl = sessionManager.getServerUrl();
         if (savedBaseUrl == null || savedBaseUrl.isEmpty()) {
-            savedBaseUrl = DEFAULT_BASE_URL;
+            savedBaseUrl = serverConfig.getBaseUrl();
+            if (savedBaseUrl == null || savedBaseUrl.isEmpty()) {
+                savedBaseUrl = DEFAULT_BASE_URL;
+            }
+            sessionManager.setServerUrl(savedBaseUrl);
+            serverConfig.setBaseUrl(savedBaseUrl);
         }
-        // حفظ في كلا المكانين
-        sessionManager.setServerUrl(savedBaseUrl);
-        serverConfig.setBaseUrl(savedBaseUrl);
+        baseUrl = savedBaseUrl;
+        
+        refreshCredentials();
     }
-    baseUrl = savedBaseUrl;
-    
-    refreshCredentials();
-}
 
-    /**
-     * ✅ تحديث القيم من MiraServerConfig
-     */
-        private void refreshCredentials() {
-    // تنظيف الـ baseUrl
-    String cleanBaseUrl = baseUrl;
-    if (!cleanBaseUrl.endsWith("/")) {
-        cleanBaseUrl += "/";
+    private void refreshCredentials() {
+        String cleanBaseUrl = baseUrl;
+        if (!cleanBaseUrl.endsWith("/")) {
+            cleanBaseUrl += "/";
+        }
+        
+        this.apiUrl = cleanBaseUrl + API_PREFIX + "/";
+        
+        this.apiKey = sessionManager.getApiKey();
+        this.gateId = sessionManager.getGateId();
+        
+        if (this.apiKey.isEmpty()) {
+            this.apiKey = serverConfig.getApiKey();
+        }
+        if (this.gateId.isEmpty()) {
+            this.gateId = serverConfig.getGateId();
+        }
+        
+        Log.d(TAG, "Credentials: URL=" + apiUrl + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "SET") + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId));
     }
-    
-    // بناء الرابط الصحيح
-    this.apiUrl = cleanBaseUrl + API_PREFIX + "/";
-    
-    // ✅ قراءة من SessionManager كمصدر رئيسي
-    this.apiKey = sessionManager.getApiKey();
-    this.gateId = sessionManager.getGateId();
-    
-    // ✅ Fallback إلى serverConfig إذا كانت SessionManager فارغة
-    if (this.apiKey.isEmpty()) {
-        this.apiKey = serverConfig.getApiKey();
-    }
-    if (this.gateId.isEmpty()) {
-        this.gateId = serverConfig.getGateId();
-    }
-    
-    Log.d(TAG, "Credentials: URL=" + apiUrl + ", Key=" + (apiKey.isEmpty() ? "EMPTY" : "SET") + ", Gate=" + (gateId.isEmpty() ? "EMPTY" : gateId));
-}
 
-    /**
-     * إعادة تحميل الإعدادات بعد تغيير الدومين
-     */
     public static synchronized void reloadInstance(Context context) {
         instance = new MiraApiClient(context.getApplicationContext());
     }
 
-    /**
-     * ✅ دالة لإعادة تهيئة عنوان الخادم
-     */
     public boolean reinitializeWithServer(String newServerUrl) {
-    try {
-        // تنظيف الرابط
-        String cleanUrl = newServerUrl.trim();
-        if (!cleanUrl.endsWith("/")) {
-            cleanUrl += "/";
+        try {
+            String cleanUrl = newServerUrl.trim();
+            if (!cleanUrl.endsWith("/")) {
+                cleanUrl += "/";
+            }
+            
+            sessionManager.setServerUrl(cleanUrl);
+            serverConfig.setBaseUrl(cleanUrl);
+            
+            baseUrl = cleanUrl;
+            refreshCredentials();
+            
+            return pingApi();
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Reinitialize error: " + e.getMessage());
+            return false;
         }
-        
-        // ✅ حفظ الرابط في كلا المكانين
-        sessionManager.setServerUrl(cleanUrl);
-        serverConfig.setBaseUrl(cleanUrl);
-        
-        // إعادة تهيئة الإعدادات
-        baseUrl = cleanUrl;
-        refreshCredentials();
-        
-        // اختبار الاتصال
-        return pingApi();
-        
-    } catch (Exception e) {
-        Log.e(TAG, "Reinitialize error: " + e.getMessage());
-        return false;
     }
-}
 
     private String getEffectiveApiKey() {
         if (apiKey == null || apiKey.isEmpty()) {
@@ -156,17 +134,15 @@ public class MiraApiClient {
         }
         return gateId;
     }
-private String getAuthToken() {
-    // ✅ قراءة من SessionManager أولاً
-    String token = sessionManager.getAuthToken();
-    if (token == null || token.isEmpty()) {
-        // ✅ Fallback إلى serverConfig
-        token = serverConfig.getAuthToken();
-    }
-    return token;
-}
-    
 
+    private String getAuthToken() {
+        String token = sessionManager.getAuthToken();
+        if (token == null || token.isEmpty()) {
+            token = serverConfig.getAuthToken();
+        }
+        return token;
+    }
+    
     public boolean hasValidCredentials() {
         return !getEffectiveApiKey().isEmpty() && !getEffectiveGateId().isEmpty();
     }
@@ -174,9 +150,6 @@ private String getAuthToken() {
     public String getGateId() { return getEffectiveGateId(); }
     public String getApiUrl() { return apiUrl; }
 
-    /**
-     * ✅ توحيد إضافة Headers للطلبات لتجنب التكرار والخطأ
-     */
     private void applyStandardHeaders(HttpURLConnection conn, boolean requiresAuth) {
         conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
 
@@ -194,145 +167,120 @@ private String getAuthToken() {
         }
     }
 
-    // ===================== CORE HTTP METHODS =====================
-
     public ApiResponse getWithAuth(String endpoint) {
-    HttpURLConnection conn = null;
-    try {
-        String cleanEndpoint = endpoint;
-        if (cleanEndpoint.startsWith("/")) {
-            cleanEndpoint = cleanEndpoint.substring(1);
+        HttpURLConnection conn = null;
+        try {
+            String cleanEndpoint = endpoint;
+            if (cleanEndpoint.startsWith("/")) {
+                cleanEndpoint = cleanEndpoint.substring(1);
+            }
+            
+            String fullUrl = apiUrl + cleanEndpoint;
+            URL url = new URL(fullUrl);
+            
+            if (url.getProtocol().equals("https")) {
+                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+                CertificatePinningManager.applyPinning(httpsConn);
+                conn = httpsConn;
+            } else {
+                conn = (HttpURLConnection) url.openConnection();
+            }
+            conn.setRequestMethod("GET");
+            applyStandardHeaders(conn, true);
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            return buildResponse(conn);
+            
+        } catch (java.net.UnknownHostException e) {
+            ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
+            response.isNetworkError = true;
+            return response;
+        } catch (java.net.ConnectException e) {
+            ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
+            response.isNetworkError = true;
+            return response;
+        } catch (java.net.SocketTimeoutException e) {
+            ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
+            response.isNetworkError = true;
+            return response;
+        } catch (Exception e) {
+            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+            response.isNetworkError = true;
+            return response;
+        } finally {
+            if (conn != null) conn.disconnect();
         }
-        
-        String fullUrl = apiUrl + cleanEndpoint;
-        Log.d(TAG, "GET Auth Request: " + fullUrl);
-        
-        URL url = new URL(fullUrl);
-        
-        if (url.getProtocol().equals("https")) {
-    HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-    CertificatePinningManager.applyPinning(httpsConn);
-    conn = httpsConn;
-} else {
-    conn = (HttpURLConnection) url.openConnection();
-}
-        conn.setRequestMethod("GET");
-        applyStandardHeaders(conn, true);
-        conn.setConnectTimeout(15000);
-        conn.setReadTimeout(15000);
-        return buildResponse(conn);
-        
-    } catch (java.net.UnknownHostException e) {
-        Log.e(TAG, "❌ Host not found: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
-        response.isNetworkError = true; // ✅✅✅
-        return response;
-        
-    } catch (java.net.ConnectException e) {
-        Log.e(TAG, "❌ Connection failed: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
-        response.isNetworkError = true; // ✅✅✅
-        return response;
-        
-    } catch (java.net.SocketTimeoutException e) {
-        Log.e(TAG, "❌ Timeout: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
-        response.isNetworkError = true; // ✅✅✅
-        return response;
-        
-    } catch (Exception e) {
-        Log.e(TAG, "GET Auth Error [" + endpoint + "]: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
-        response.isNetworkError = true; // ✅✅✅
-        return response;
-        
-    } finally {
-        if (conn != null) conn.disconnect();
     }
-}
 
     public ApiResponse postWithAuth(String endpoint, JSONObject payload) {
-    HttpURLConnection conn = null;
-    try {
-        String cleanEndpoint = endpoint;
-        if (cleanEndpoint.startsWith("/")) {
-            cleanEndpoint = cleanEndpoint.substring(1);
-        }
-        
-        String fullUrl = apiUrl + cleanEndpoint;
-        Log.d(TAG, "POST Auth Request: " + fullUrl);
-        
-        URL url = new URL(fullUrl);
-        if (url.getProtocol().equals("https")) {
-    HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-    CertificatePinningManager.applyPinning(httpsConn);
-    conn = httpsConn;
-} else {
-    conn = (HttpURLConnection) url.openConnection();
-}
-        conn.setRequestMethod("POST");
-        applyStandardHeaders(conn, true);
-        conn.setConnectTimeout(15000);
-        conn.setReadTimeout(15000);
-        conn.setDoOutput(true);
-
-        if (payload != null) {
-            byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(input, 0, input.length);
+        HttpURLConnection conn = null;
+        try {
+            String cleanEndpoint = endpoint;
+            if (cleanEndpoint.startsWith("/")) {
+                cleanEndpoint = cleanEndpoint.substring(1);
             }
+            
+            String fullUrl = apiUrl + cleanEndpoint;
+            URL url = new URL(fullUrl);
+            if (url.getProtocol().equals("https")) {
+                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+                CertificatePinningManager.applyPinning(httpsConn);
+                conn = httpsConn;
+            } else {
+                conn = (HttpURLConnection) url.openConnection();
+            }
+            conn.setRequestMethod("POST");
+            applyStandardHeaders(conn, true);
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            conn.setDoOutput(true);
+
+            if (payload != null) {
+                byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
+                try (OutputStream os = conn.getOutputStream()) {
+                    os.write(input, 0, input.length);
+                }
+            }
+            return buildResponse(conn);
+            
+        } catch (java.net.UnknownHostException e) {
+            ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
+            response.isNetworkError = true;
+            return response;
+        } catch (java.net.ConnectException e) {
+            ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
+            response.isNetworkError = true;
+            return response;
+        } catch (java.net.SocketTimeoutException e) {
+            ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
+            response.isNetworkError = true;
+            return response;
+        } catch (Exception e) {
+            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+            response.isNetworkError = true;
+            return response;
+        } finally {
+            if (conn != null) conn.disconnect();
         }
-        return buildResponse(conn);
-        
-    } catch (java.net.UnknownHostException e) {
-        Log.e(TAG, "❌ Host not found: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
-        response.isNetworkError = true; // ✅✅✅
-        return response;
-        
-    } catch (java.net.ConnectException e) {
-        Log.e(TAG, "❌ Connection failed: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
-        response.isNetworkError = true; // ✅✅✅
-        return response;
-        
-    } catch (java.net.SocketTimeoutException e) {
-        Log.e(TAG, "❌ Timeout: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
-        response.isNetworkError = true; // ✅✅✅
-        return response;
-        
-    } catch (Exception e) {
-        Log.e(TAG, "POST Auth Error [" + endpoint + "]: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
-        response.isNetworkError = true; // ✅✅✅
-        return response;
-        
-    } finally {
-        if (conn != null) conn.disconnect();
     }
-}
 
     private ApiResponse post(String endpoint, JSONObject payload) {
-    HttpURLConnection conn = null;
-    try {
-        // ✅ إزالة الـ / من بداية الـ endpoint
-        String cleanEndpoint = endpoint;
-        if (cleanEndpoint.startsWith("/")) {
-            cleanEndpoint = cleanEndpoint.substring(1);
-        }
-        
-        String fullUrl = apiUrl + cleanEndpoint;
-        Log.d(TAG, "POST Request: " + fullUrl);
-        
-        URL url = new URL(fullUrl);
+        HttpURLConnection conn = null;
+        try {
+            String cleanEndpoint = endpoint;
+            if (cleanEndpoint.startsWith("/")) {
+                cleanEndpoint = cleanEndpoint.substring(1);
+            }
+            
+            String fullUrl = apiUrl + cleanEndpoint;
+            URL url = new URL(fullUrl);
             if (url.getProtocol().equals("https")) {
-    HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-    CertificatePinningManager.applyPinning(httpsConn);
-    conn = httpsConn;
-} else {
-    conn = (HttpURLConnection) url.openConnection();
-}
+                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+                CertificatePinningManager.applyPinning(httpsConn);
+                conn = httpsConn;
+            } else {
+                conn = (HttpURLConnection) url.openConnection();
+            }
             conn.setRequestMethod("POST");
             applyStandardHeaders(conn, false);
 
@@ -347,114 +295,96 @@ private String getAuthToken() {
                 }
             }
             return buildResponse(conn);
-         } catch (java.net.UnknownHostException e) {
-        Log.e(TAG, "❌ Host not found: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
-        response.isNetworkError = true; // ✅✅✅ مهم!
-        return response;
-        
-    } catch (java.net.ConnectException e) {
-        Log.e(TAG, "❌ Connection failed: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
-        response.isNetworkError = true; // ✅✅✅ مهم!
-        return response;
-        
-    } catch (java.net.SocketTimeoutException e) {
-        Log.e(TAG, "❌ Timeout: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
-        response.isNetworkError = true; // ✅✅✅ مهم!
-        return response;
-        
-    } catch (Exception e) {
-        Log.e(TAG, "POST Auth Error: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
-        response.isNetworkError = true; // ✅✅✅ مهم!
-        return response;
-    } finally {
-        if (conn != null) conn.disconnect();
+        } catch (java.net.UnknownHostException e) {
+            ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
+            response.isNetworkError = true;
+            return response;
+        } catch (java.net.ConnectException e) {
+            ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
+            response.isNetworkError = true;
+            return response;
+        } catch (java.net.SocketTimeoutException e) {
+            ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
+            response.isNetworkError = true;
+            return response;
+        } catch (Exception e) {
+            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+            response.isNetworkError = true;
+            return response;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
     }
-}
 
     private ApiResponse get(String endpoint) {
-    HttpURLConnection conn = null;
-    try {
-        String cleanEndpoint = endpoint;
-        if (cleanEndpoint.startsWith("/")) {
-            cleanEndpoint = cleanEndpoint.substring(1);
+        HttpURLConnection conn = null;
+        try {
+            String cleanEndpoint = endpoint;
+            if (cleanEndpoint.startsWith("/")) {
+                cleanEndpoint = cleanEndpoint.substring(1);
+            }
+            
+            String fullUrl = apiUrl + cleanEndpoint;
+            URL url = new URL(fullUrl);
+            if (url.getProtocol().equals("https")) {
+                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+                CertificatePinningManager.applyPinning(httpsConn);
+                conn = httpsConn;
+            } else {
+                conn = (HttpURLConnection) url.openConnection();
+            }
+            conn.setRequestMethod("GET");
+            applyStandardHeaders(conn, false);
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            return buildResponse(conn);
+            
+        } catch (java.net.UnknownHostException e) {
+            ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
+            response.isNetworkError = true;
+            return response;
+        } catch (java.net.ConnectException e) {
+            ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
+            response.isNetworkError = true;
+            return response;
+        } catch (Exception e) {
+            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+            response.isNetworkError = true;
+            return response;
+        } finally {
+            if (conn != null) conn.disconnect();
         }
-        
-        String fullUrl = apiUrl + cleanEndpoint;
-        Log.d(TAG, "GET Request: " + fullUrl);
-        
-        URL url = new URL(fullUrl);
-        if (url.getProtocol().equals("https")) {
-    HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-    CertificatePinningManager.applyPinning(httpsConn);
-    conn = httpsConn;
-} else {
-    conn = (HttpURLConnection) url.openConnection();
-}
-        conn.setRequestMethod("GET");
-        applyStandardHeaders(conn, false);
-        conn.setConnectTimeout(15000);
-        conn.setReadTimeout(15000);
-        return buildResponse(conn);
-        
-    } catch (java.net.UnknownHostException e) {
-        Log.e(TAG, "❌ Host not found: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
-        response.isNetworkError = true; // ✅✅✅
-        return response;
-        
-    } catch (java.net.ConnectException e) {
-        Log.e(TAG, "❌ Connection failed: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
-        response.isNetworkError = true; // ✅✅✅
-        return response;
-        
-    } catch (Exception e) {
-        Log.e(TAG, "GET Error [" + endpoint + "]: " + e.getMessage());
-        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
-        response.isNetworkError = true; // ✅✅✅
-        return response;
-        
-    } finally {
-        if (conn != null) conn.disconnect();
     }
-}
 
     private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
-    int responseCode = conn.getResponseCode();
-    InputStream is = (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream();
+        int responseCode = conn.getResponseCode();
+        InputStream is = (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream();
 
-    if (is == null) {
-        return new ApiResponse(responseCode, null, "Empty response");
-    }
-
-    StringBuilder response = new StringBuilder();
-    try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-        String line;
-        while ((line = reader.readLine()) != null) {
-            response.append(line.trim());
+        if (is == null) {
+            return new ApiResponse(responseCode, null, "Empty response");
         }
-    }
 
-    String responseBody = response.toString();
-    JSONObject json = null;
-    try {
-        if (!responseBody.isEmpty()) {
-            json = new JSONObject(responseBody);
+        StringBuilder response = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                response.append(line.trim());
+            }
         }
-    } catch (Exception ignored) {}
 
-    // ✅ إنشاء ApiResponse مع تخزين النص الخام
-    ApiResponse apiResponse = new ApiResponse(responseCode, json, responseCode >= 400 ? responseBody : null);
-    apiResponse.setBody(responseBody); // ✅ حفظ النص الخام
-    
-    return apiResponse;
-}
+        String responseBody = response.toString();
+        JSONObject json = null;
+        try {
+            if (!responseBody.isEmpty()) {
+                json = new JSONObject(responseBody);
+            }
+        } catch (Exception ignored) {}
 
-    // ===================== 🔑 AUTHENTICATION =====================
+        ApiResponse apiResponse = new ApiResponse(responseCode, json, responseCode >= 400 ? responseBody : null);
+        apiResponse.setBody(responseBody);
+        
+        return apiResponse;
+    }
 
     public ApiResponse login(String username, String password, String deviceId) {
         JSONObject payload = new JSONObject();
@@ -463,7 +393,6 @@ private String getAuthToken() {
             payload.put("password", password);
             payload.put("device_id", deviceId != null ? deviceId : "");
             
-            // ✅ استخدام gate_id من الإعدادات أو deviceId
             String effectiveGateId = getEffectiveGateId();
             if (effectiveGateId.isEmpty()) {
                 effectiveGateId = deviceId != null ? deviceId : "default-gate";
@@ -472,52 +401,38 @@ private String getAuthToken() {
             
             payload.put("gate_id", effectiveGateId);
             payload.put("app_version", "MIRA-ANDROID-v3.0");
-            
-            Log.d(TAG, "Login attempt: URL=" + apiUrl + "/auth/login");
-            Log.d(TAG, "Login payload: " + payload.toString());
-        } catch (Exception e) {
-            Log.e(TAG, "Error building login payload: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
 
-            ApiResponse response = post("/auth/login", payload);
+        ApiResponse response = post("/auth/login", payload);
 
-    if (response.isSuccess && response.data != null) {
-        String newApiKey = response.data.optString("api_key", "");
-        String newGateId = response.data.optString("gate_id", "");
-        String authToken = response.data.optString("token", "");
+        if (response.isSuccess && response.data != null) {
+            String newApiKey = response.data.optString("api_key", "");
+            String newGateId = response.data.optString("gate_id", "");
+            String authToken = response.data.optString("token", "");
 
-        if (!newApiKey.isEmpty()) {
-            String effectiveGateId = !newGateId.isEmpty() ? newGateId :
-                    (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
+            if (!newApiKey.isEmpty()) {
+                String effectiveGateId = !newGateId.isEmpty() ? newGateId :
+                        (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
 
-            // ✅ حفظ في SessionManager فقط (مصدر واحد)
-            sessionManager.saveApiKey(newApiKey);
-            sessionManager.saveGateId(effectiveGateId);
+                sessionManager.saveApiKey(newApiKey);
+                sessionManager.saveGateId(effectiveGateId);
+                refreshCredentials();
+            } else if (!authToken.isEmpty()) {
+                String currentApiKey = getEffectiveApiKey();
+                String currentGateId = getEffectiveGateId();
 
-            refreshCredentials();
-            Log.d(TAG, "✅ API Key saved to SessionManager");
-        } else if (!authToken.isEmpty()) {
-            String currentApiKey = getEffectiveApiKey();
-            String currentGateId = getEffectiveGateId();
+                String effectiveGateId = !currentGateId.isEmpty() ? currentGateId :
+                        (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
 
-            String effectiveGateId = !currentGateId.isEmpty() ? currentGateId :
-                    (deviceId != null && !deviceId.isEmpty() ? deviceId : "");
-
-            // ✅ حفظ في SessionManager فقط
-            if (!currentApiKey.isEmpty()) {
-                sessionManager.saveApiKey(currentApiKey);
+                if (!currentApiKey.isEmpty()) {
+                    sessionManager.saveApiKey(currentApiKey);
+                }
+                sessionManager.saveGateId(effectiveGateId);
+                refreshCredentials();
             }
-            sessionManager.saveGateId(effectiveGateId);
-
-            refreshCredentials();
-            Log.d(TAG, "✅ Using existing API Key with gate_id: " + effectiveGateId);
         }
-    } else {
-        Log.e(TAG, "❌ Login failed: " + (response.error != null ? response.error : "Unknown error"));
+        return response;
     }
-
-    return response;
-}
 
     public ApiResponse reconnectDevice(String username, String password, String gateId) {
         try {
@@ -533,19 +448,17 @@ private String getAuthToken() {
                 String authToken = response.data.optString("token", "");
 
                 if (!newApiKey.isEmpty() || !authToken.isEmpty()) {
-    // ✅ حفظ في SessionManager
-    if (!newApiKey.isEmpty()) {
-        sessionManager.saveApiKey(newApiKey);
-    }
-    if (newGateId != null && !newGateId.isEmpty()) {
-        sessionManager.saveGateId(newGateId);
-    }
-    refreshCredentials();
-}
+                    if (!newApiKey.isEmpty()) {
+                        sessionManager.saveApiKey(newApiKey);
+                    }
+                    if (newGateId != null && !newGateId.isEmpty()) {
+                        sessionManager.saveGateId(newGateId);
+                    }
+                    refreshCredentials();
+                }
             }
             return response;
         } catch (Exception e) {
-            Log.e(TAG, "Reconnect error: " + e.getMessage());
             return new ApiResponse(-1, null, e.getMessage());
         }
     }
@@ -555,9 +468,7 @@ private String getAuthToken() {
         try {
             payload.put("token", token);
             payload.put("gate_id", getEffectiveGateId());
-        } catch (Exception e) {
-            Log.e(TAG, "Error building validate payload: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
         return post("/auth/validate-token", payload);
     }
 
@@ -566,9 +477,7 @@ private String getAuthToken() {
         try {
             payload.put("token", token);
             payload.put("gate_id", getEffectiveGateId());
-        } catch (Exception e) {
-            Log.e(TAG, "Error building logout payload: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
         return post("/auth/logout", payload);
     }
 
@@ -581,9 +490,7 @@ private String getAuthToken() {
         try {
             payload.put("token", oldToken);
             payload.put("gate_id", getEffectiveGateId());
-        } catch (Exception e) {
-            Log.e(TAG, "Error building refresh payload: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
         return postWithAuth("/auth/refresh-token", payload);
     }
 
@@ -608,8 +515,6 @@ private String getAuthToken() {
         return post("/auth/verify-biometric", payload);
     }
 
-    // ===================== 🏢 PROFILE & ORG =====================
-
     public ApiResponse getOrgProfile() {
         return getWithAuth("/profile/get");
     }
@@ -621,21 +526,19 @@ private String getAuthToken() {
     public ApiResponse updateUserProfile(JSONObject payload) {
         return postWithAuth("/profile/update-user", payload);
     }
+
     public ApiResponse uploadUserAvatar(JSONObject payload) {
-    return postWithAuth("/profile/upload-avatar", payload);
-}
+        return postWithAuth("/profile/upload-avatar", payload);
+    }
 
-// ✅✅✅ أضف هذه الدالة لتغيير كلمة المرور
-public ApiResponse changePassword(String currentPassword, String newPassword) {
-    JSONObject payload = new JSONObject();
-    try {
-        payload.put("current_password", currentPassword);
-        payload.put("new_password", newPassword);
-    } catch (Exception ignored) {}
-    return postWithAuth("/auth/change-password", payload);
-}
-
-    // ===================== 👥 USERS =====================
+    public ApiResponse changePassword(String currentPassword, String newPassword) {
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("current_password", currentPassword);
+            payload.put("new_password", newPassword);
+        } catch (Exception ignored) {}
+        return postWithAuth("/auth/change-password", payload);
+    }
 
     public ApiResponse getUsers() {
         return getWithAuth("/auth/users");
@@ -655,8 +558,6 @@ public ApiResponse changePassword(String currentPassword, String newPassword) {
         return postWithAuth("/auth/users/delete", p);
     }
 
-    // ===================== 🔑 AUTHORIZE =====================
-
     public ApiResponse authorize(String epc, String contextType, JSONObject extraParams) {
         JSONObject payload = new JSONObject();
         try {
@@ -674,41 +575,35 @@ public ApiResponse changePassword(String currentPassword, String newPassword) {
         return post("/authorize", payload);
     }
 
-    // ===================== 📡 PING =====================
-
     public boolean pingApi() {
-    HttpURLConnection conn = null;
-    try {
-        String cleanUrl = this.apiUrl;
-        if (cleanUrl.endsWith("/")) {
-            cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
+        HttpURLConnection conn = null;
+        try {
+            String cleanUrl = this.apiUrl;
+            if (cleanUrl.endsWith("/")) {
+                cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
+            }
+
+            URL url = new URL(cleanUrl + "/ping");
+            if (url.getProtocol().equals("https")) {
+                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+                CertificatePinningManager.applyPinning(httpsConn);
+                conn = httpsConn;
+            } else {
+                conn = (HttpURLConnection) url.openConnection();
+            }
+            conn.setRequestMethod("GET");
+            applyStandardHeaders(conn, true);
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(8000);
+
+            int responseCode = conn.getResponseCode();
+            return (responseCode >= 200 && responseCode < 400);
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (conn != null) conn.disconnect();
         }
-
-        URL url = new URL(cleanUrl + "/ping");
-        if (url.getProtocol().equals("https")) {
-    HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-    CertificatePinningManager.applyPinning(httpsConn);
-    conn = httpsConn;
-} else {
-    conn = (HttpURLConnection) url.openConnection();
-}
-        conn.setRequestMethod("GET");
-        applyStandardHeaders(conn, true);
-
-        conn.setConnectTimeout(8000);
-        conn.setReadTimeout(8000);
-
-        int responseCode = conn.getResponseCode();
-        return (responseCode >= 200 && responseCode < 400);
-    } catch (Exception e) {
-        Log.e(TAG, "Ping error: " + e.getMessage());
-        return false;
-    } finally {
-        if (conn != null) conn.disconnect();
     }
-}
-
-    // ===================== 📊 DASHBOARD =====================
 
     public ApiResponse getDashboardSummary() {
         return getWithAuth("/dashboard/summary");
@@ -726,8 +621,6 @@ public ApiResponse changePassword(String currentPassword, String newPassword) {
         return getDashboardFull(0);
     }
 
-    // ===================== 🛒 POS =====================
-
     public ApiResponse checkout(JSONObject payload) {
         return postWithAuth("/pos/checkout", payload);
     }
@@ -744,102 +637,75 @@ public ApiResponse changePassword(String currentPassword, String newPassword) {
     }
 
     public ApiResponse getSalesHistory() {
-    return getWithAuth("/pos/sales");
-}
+        return getWithAuth("/pos/sales");
+    }
 
-// ✅ دالة جديدة للتحميل التدريجي (Pagination)
-public ApiResponse getSalesHistoryPaginated(int page, int pageSize) {
-    String endpoint = "/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize;
-    return getWithAuth(endpoint);
-}
+    public ApiResponse getSalesHistoryPaginated(int page, int pageSize) {
+        String endpoint = "/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize;
+        return getWithAuth(endpoint);
+    }
 
-/**
- * ✅ البحث عن قطعة في POS مع branch_id
- */
-public ApiResponse searchPosItem(JSONObject payload) {
+    public ApiResponse searchPosItem(JSONObject payload) {
+        try {
+            return postWithAuth("/pos/search-item", payload);
+        } catch (Exception e) {
+            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+            response.isNetworkError = true;
+            return response;
+        }
+    }
+
+    public ApiResponse searchSalesHistory(String query, int page, int pageSize) {
+        try {
+            String encodedQuery = URLEncoder.encode(query, "UTF-8");
+            String endpoint = "/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize + "&search=" + encodedQuery;
+            return getWithAuth(endpoint);
+        } catch (Exception e) {
+            String endpoint = "/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize + "&search=" + query;
+            return getWithAuth(endpoint);
+        }
+    }
+
+    public ApiResponse getSalesHistoryByPaymentMethod(String paymentMethod, int page, int pageSize) {
+        String endpoint = "/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize + "&payment_method=" + paymentMethod;
+        return getWithAuth(endpoint);
+    }
+
+    public ApiResponse getSalesStats() {
+        return getWithAuth("/pos/sales/stats");
+    }
+
+    public ApiResponse getSalesHistoryByDateRange(String fromDate, String toDate, int page, int pageSize) {
+        String endpoint = "/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize;
+        if (fromDate != null && !fromDate.isEmpty()) endpoint += "&from=" + fromDate;
+        if (toDate != null && !toDate.isEmpty()) endpoint += "&to=" + toDate;
+        return getWithAuth(endpoint);
+    }
+
+    public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod, String fromDate, String toDate, int page, int pageSize, int branchId) {
     try {
-        return postWithAuth("/pos/search-item", payload);
+        StringBuilder endpoint = new StringBuilder("/pos/sales?");
+        endpoint.append("page=").append(page);
+        endpoint.append("&limit=").append(pageSize);
+        
+        if (search != null && !search.trim().isEmpty()) {
+            endpoint.append("&search=").append(URLEncoder.encode(search, "UTF-8"));
+        }
+        if (paymentMethod != null && !paymentMethod.equalsIgnoreCase("ALL")) {
+            endpoint.append("&payment_method=").append(paymentMethod.toLowerCase());
+        }
+        if (fromDate != null && !fromDate.isEmpty()) endpoint.append("&from=").append(fromDate);
+        if (toDate != null && !toDate.isEmpty()) endpoint.append("&to=").append(toDate);
+        if (branchId > 0) endpoint.append("&branch_id=").append(branchId);
+        
+        return getWithAuth(endpoint.toString());
     } catch (Exception e) {
-        Log.e(TAG, "searchPosItem error: " + e.getMessage());
         ApiResponse response = new ApiResponse(-1, null, e.getMessage());
         response.isNetworkError = true;
         return response;
     }
 }
 
-// ✅ دالة للبحث مع التحميل التدريجي
-public ApiResponse searchSalesHistory(String query, int page, int pageSize) {
-    try {
-        String encodedQuery = URLEncoder.encode(query, "UTF-8");
-        String endpoint = "/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize + "&search=" + encodedQuery;
-        return getWithAuth(endpoint);
-    } catch (Exception e) {
-        // في حالة فشل الترميز، نستخدم بدون ترميز
-        String endpoint = "/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize + "&search=" + query;
-        return getWithAuth(endpoint);
-    }
-}
-
-// ✅ دالة للفلترة حسب نوع الدفع مع التحميل التدريجي
-public ApiResponse getSalesHistoryByPaymentMethod(String paymentMethod, int page, int pageSize) {
-    String endpoint = "/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize + "&payment_method=" + paymentMethod;
-    return getWithAuth(endpoint);
-}
-
-// ✅ دالة لجلب إحصائيات المبيعات (الإجمالي والعدد)
-public ApiResponse getSalesStats() {
-    return getWithAuth("/pos/sales/stats");
-}
-
-// ✅ دالة لجلب المبيعات حسب نطاق تاريخ
-public ApiResponse getSalesHistoryByDateRange(String fromDate, String toDate, int page, int pageSize) {
-    String endpoint = "/pos/sales?page=" + page + "&limit=" + pageSize + "&per_page=" + pageSize;
-    
-    if (fromDate != null && !fromDate.isEmpty()) {
-        endpoint += "&from=" + fromDate;
-    }
-    
-    if (toDate != null && !toDate.isEmpty()) {
-        endpoint += "&to=" + toDate;
-    }
-    
-    return getWithAuth(endpoint);
-}
-
-// ✅ دالة شاملة للفلترة المتقدمة
-// ✅ بديل بدون Uri
-public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod, 
-                                            String fromDate, String toDate, 
-                                            int page, int pageSize, int branchId) {
-    try {
-        StringBuilder endpoint = new StringBuilder("/pos/sales?");
-        endpoint.append("page=").append(page);
-        endpoint.append("&limit=").append(pageSize);
-        
-        if (!search.isEmpty()) {
-            endpoint.append("&search=").append(URLEncoder.encode(search, "UTF-8"));
-        }
-        if (!paymentMethod.equals("ALL")) {
-            endpoint.append("&payment_method=").append(paymentMethod.toLowerCase());
-        }
-        if (fromDate != null && !fromDate.isEmpty()) {
-            endpoint.append("&from=").append(fromDate);
-        }
-        if (toDate != null && !toDate.isEmpty()) {
-            endpoint.append("&to=").append(toDate);
-        }
-        if (branchId > 0) {
-            endpoint.append("&branch_id=").append(branchId);
-        }
-        
-        return getWithAuth(endpoint.toString());
-    } catch (Exception e) {
-        Log.e(TAG, "getSalesHistoryAdvanced error: " + e.getMessage());
-        return null;
-    }
-}
-
-    // ===================== 🏷️ ITEM =====================
 
     public ApiResponse getItemDetail(String code) {
         return getWithAuth("/item/" + code); 
@@ -851,15 +717,14 @@ public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod,
             String fullUrl = apiUrl + "/items/" + itemId + "/images";
             URL url = new URL(fullUrl);
             if (url.getProtocol().equals("https")) {
-    HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-    CertificatePinningManager.applyPinning(httpsConn);
-    conn = httpsConn;
-} else {
-    conn = (HttpURLConnection) url.openConnection();
-}
+                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+                CertificatePinningManager.applyPinning(httpsConn);
+                conn = httpsConn;
+            } else {
+                conn = (HttpURLConnection) url.openConnection();
+            }
             conn.setRequestMethod("POST");
             applyStandardHeaders(conn, true);
-
             conn.setConnectTimeout(30000);
             conn.setReadTimeout(30000);
             conn.setDoOutput(true);
@@ -901,14 +766,11 @@ public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod,
 
             return buildResponse(conn);
         } catch (Exception e) {
-            Log.e(TAG, "uploadItemImage error: " + e.getMessage());
             return new ApiResponse(-1, null, e.getMessage());
         } finally {
             if (conn != null) conn.disconnect();
         }
     }
-
-    // ===================== 📸 SNAPSHOTS & INVENTORY REPORTS =====================
 
     public ApiResponse getLastSnapshot(String location) {
         return get("/inventory/last-snapshot?location=" + (location != null ? location : "Main Showroom"));
@@ -926,8 +788,6 @@ public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod,
     public ApiResponse getHighValueItems(String location, double threshold) {
         return get("/inventory/high-value?location=" + (location != null ? location : "Main Showroom") + "&threshold=" + threshold);
     }
-
-    // ===================== 📊 INVENTORY =====================
 
     public ApiResponse getInventorySessionsList() {
         return getWithAuth("/inventory/sessions");
@@ -985,12 +845,9 @@ public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod,
     public ApiResponse getInventorySettings(String location) {
         return get("/inventory/settings/" + (location != null ? location : "default"));
     }
-
-    public void submitInventoryAuditReport(JSONObject payload) {
-        postWithAuth("/inventory/submit-audit", payload);
-    }
-
-    // ===================== 🏷️ ENCODE =====================
+    public ApiResponse submitInventoryAuditReport(JSONObject payload) {
+    return postWithAuth("/inventory/submit-audit", payload);
+}
 
     public ApiResponse encodeItem(JSONObject itemPayload) {
         return postWithAuth("/encode-item", itemPayload);
@@ -1016,33 +873,25 @@ public ApiResponse getSalesHistoryAdvanced(String search, String paymentMethod,
         return encodeItem(payload);
     }
 
-    // ===================== 🚪 GATES =====================
-
     public ApiResponse createGate(JSONObject gateData) {
-    return postWithAuth("/gates", gateData);
-}
+        return postWithAuth("/gates", gateData);
+    }
 
-public ApiResponse getGates() {
-    return getWithAuth("/gates");
-}
+    public ApiResponse getGates() {
+        return getWithAuth("/gates");
+    }
 
-/**
- * ✅✅✅ جلب بوابات فرع محدد - دالة جديدة
- */
-public ApiResponse getGatesByBranch(int branchId) {
-    return getWithAuth("/gates?branch_id=" + branchId);
-}
+    public ApiResponse getGatesByBranch(int branchId) {
+        return getWithAuth("/gates?branch_id=" + branchId);
+    }
 
-public ApiResponse getGatesStats() {
-    return getWithAuth("/gates/stats");
-}
+    public ApiResponse getGatesStats() {
+        return getWithAuth("/gates/stats");
+    }
 
-// ✅ أضف بعد getGatesStats()
-public ApiResponse getTestEpcs() {
-    return getWithAuth("/test-epcs");
-}
-
-    // ===================== 💓 HEARTBEAT & SETTINGS =====================
+    public ApiResponse getTestEpcs() {
+        return getWithAuth("/test-epcs");
+    }
 
     public ApiResponse heartbeat(String status, int battery) {
         JSONObject payload = new JSONObject();
@@ -1066,8 +915,6 @@ public ApiResponse getTestEpcs() {
         } catch (Exception ignored) {}
         return post("/settings", payload);
     }
-
-    // ===================== 🔧 TAG OPERATIONS =====================
 
     public ApiResponse spotlightTags(String[] tags) {
         JSONObject payload = new JSONObject();
@@ -1105,8 +952,6 @@ public ApiResponse getTestEpcs() {
         } catch (Exception ignored) {}
         return post("/deactivate", payload);
     }
-
-    // ===================== 🏢 BRANCHES =====================
 
     public ApiResponse getBranches() {
         return getWithAuth("/branches");
@@ -1155,8 +1000,36 @@ public ApiResponse getTestEpcs() {
     public ApiResponse getBranchItemsList(int branchId) {
         return getWithAuth("/branches/" + branchId + "/inventory/items");
     }
+    
+    // ==========================================
+// MIRA TRANSFER EXTENSIONS (إضافات التحويلات)
+// ==========================================
 
-    // ===================== 📦 TRANSFERS =====================
+/**
+ * جلب قائمة القطع (EPCs) المرتبطة بتحويل معين
+ */
+public ApiResponse getTransferItems(int transferId) {
+    return getWithAuth("/transfers/" + transferId + "/items");
+}
+
+/**
+ * حذف قطعة معينة (EPC) من مسودة التحويل قبل اعتماده
+ */
+public ApiResponse deleteTransferItem(int transferId, String epc) {
+    JSONObject payload = new JSONObject();
+    try {
+        payload.put("epc", epc);
+    } catch (Exception ignored) {}
+    return postWithAuth("/transfers/" + transferId + "/items/delete", payload);
+}
+
+/**
+ * إلغاء طلب التحويل بالكامل (في حال كان في حالة Draft أو Pending)
+ */
+public ApiResponse cancelTransfer(int transferId) {
+    return postWithAuth("/transfers/" + transferId + "/cancel", new JSONObject());
+}
+
 
     public ApiResponse getTransfers(int branchId, String status) {
         String url = "/transfers?branch_id=" + branchId;
@@ -1209,8 +1082,6 @@ public ApiResponse getTestEpcs() {
         } catch (Exception ignored) {}
         return postWithAuth("/transfers/" + transferId + "/items", payload);
     }
-
-    // ===================== 💰 ACCOUNTING =====================
 
     public ApiResponse getJournalEntries(String branchId) {
         String url = "/accounting/journal-entries";
@@ -1301,8 +1172,6 @@ public ApiResponse getTestEpcs() {
         return getWithAuth("/accounting/audit-log?limit=50");
     }
 
-    // ===================== 📈 ACCOUNTING REPORTS & GENERAL REPORTS =====================
-
     public ApiResponse getBalanceSheet(String branchId, String asOfDate) {
         String url = "/accounting/balance-sheet";
         boolean hasParam = false;
@@ -1341,14 +1210,11 @@ public ApiResponse getTestEpcs() {
             if (toDate != null && !toDate.isEmpty()) endpoint.append("&to=").append(URLEncoder.encode(toDate, "UTF-8"));
             if (branchId > 0) endpoint.append("&branch_id=").append(branchId);
 
-            Log.d(TAG, "📊 Reports URL: " + endpoint.toString());
             return getWithAuth(endpoint.toString());
         } catch (Exception e) {
             return new ApiResponse(-1, null, e.getMessage());
         }
     }
-
-    // ===================== 📈 GOLD & CURRENCY =====================
 
     public List<ApiProvider> getActiveProviders() {
         List<ApiProvider> providers = new ArrayList<>();
@@ -1408,7 +1274,6 @@ public ApiResponse getTestEpcs() {
             }
             return new ApiResponse(-1, null, "Provider not found");
         } catch (Exception e) {
-            Log.e(TAG, "Error fetching price with provider: " + e.getMessage());
             return new ApiResponse(-1, null, e.getMessage());
         }
     }
@@ -1485,56 +1350,39 @@ public ApiResponse getTestEpcs() {
         return getWithAuth("/gold-currency/live-prices");
     }
     
-    //المزامنة للجرد
-    // ✅ الكود الصحيح
-public ApiResponse syncOfflineTransactions(JSONArray transactionsArray) {
-    try {
-        // إنشاء payload
-        JSONObject payload = new JSONObject();
-        payload.put("transactions", transactionsArray);
-        payload.put("gate_id", getEffectiveGateId());
-        
-        // استخدام الدوال الموجودة في الكلاس
-        return postWithAuth("/inventory/sync-offline", payload);
-        
-    } catch (Exception e) {
-        Log.e(TAG, "Error syncing offline transactions", e);
-        return new ApiResponse(-1, null, e.getMessage());
-    }
-}
-    // ===================== 📦 MY BRANCH INVENTORY =====================
-
-/**
- * ✅ جلب قطع فرع المستخدم الحالي المتاحة للتحويل
- */
-public ApiResponse getMyBranchInventoryItems(String category) {
-    String endpoint = "/my-branch/inventory/items";
-    if (category != null && !category.isEmpty()) {
+    public ApiResponse syncOfflineTransactions(JSONArray transactionsArray) {
         try {
-            endpoint += "?category=" + URLEncoder.encode(category, "UTF-8");
+            JSONObject payload = new JSONObject();
+            payload.put("transactions", transactionsArray);
+            payload.put("gate_id", getEffectiveGateId());
+            
+            return postWithAuth("/inventory/sync-offline", payload);
         } catch (Exception e) {
-            endpoint += "?category=" + category;
+            return new ApiResponse(-1, null, e.getMessage());
         }
     }
-    return getWithAuth(endpoint);
-}
 
-/**
- * ✅ جلب إحصائيات مخزون الفرع
- */
-public ApiResponse getBranchInventoryStats(int branchId) {
-    return getWithAuth("/branches/" + branchId + "/inventory/stats");
-}
+    public ApiResponse getMyBranchInventoryItems(String category) {
+        String endpoint = "/my-branch/inventory/items";
+        if (category != null && !category.isEmpty()) {
+            try {
+                endpoint += "?category=" + URLEncoder.encode(category, "UTF-8");
+            } catch (Exception e) {
+                endpoint += "?category=" + category;
+            }
+        }
+        return getWithAuth(endpoint);
+    }
 
-    // ===================== 👥 USER PERMISSIONS & LOGS =====================
+    public ApiResponse getBranchInventoryStats(int branchId) {
+        return getWithAuth("/branches/" + branchId + "/inventory/stats");
+    }
 
     public ApiResponse checkUsername(String username) {
         JSONObject payload = new JSONObject();
         try {
             payload.put("username", username);
-        } catch (Exception e) {
-            Log.e(TAG, "Error building checkUsername payload: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
         return postWithAuth("/auth/users/check-username", payload);
     }
 
@@ -1560,17 +1408,13 @@ public ApiResponse getBranchInventoryStats(int branchId) {
         try {
             payload.put("user_id", userId);
             payload.put("status", status);
-        } catch (Exception e) {
-            Log.e(TAG, "Error building updateUserStatus payload: " + e.getMessage());
-        }
+        } catch (Exception ignored) {}
         return postWithAuth("/auth/users/update-status", payload);
     }
 
     public ApiResponse getPermissionTemplates() {
         return getWithAuth("/auth/permissions/templates");
     }
-
-    // ===================== ASYNC CALLBACK EXECUTION =====================
 
     public interface ApiCallback {
         void onSuccess(ApiResponse response);
@@ -1593,63 +1437,60 @@ public ApiResponse getBranchInventoryStats(int branchId) {
         }).start();
     }
 
-    // ===================== ApiResponse =====================
-
     public static class ApiResponse {
-    public final int code;
-    public final JSONObject data;
-    public final String error;
-    public String message; 
-    public int statusCode;
-    public boolean isNetworkError;
-    public String errorCode;
-    public final boolean isSuccess;
-    private String rawBody;
+        public final int code;
+        public final JSONObject data;
+        public final String error;
+        public String message; 
+        public int statusCode;
+        public boolean isNetworkError;
+        public String errorCode;
+        public final boolean isSuccess;
+        private String rawBody;
 
-    public ApiResponse(int code, JSONObject data, String error) {
-        this.code = code;
-        this.data = data;
-        this.error = error;
-        this.isSuccess = code >= 200 && code < 300;
-        this.rawBody = data != null ? data.toString() : "";
-        
-        // ✅ استخراج message من data إذا كانت موجودة
-        if (data != null) {
-            this.message = data.optString("message", "");
-        } else {
-            this.message = "";
+        public ApiResponse(int code, JSONObject data, String error) {
+            this.code = code;
+            this.data = data;
+            this.error = error;
+            this.isSuccess = code >= 200 && code < 300;
+            this.rawBody = data != null ? data.toString() : "";
+            
+            if (data != null) {
+                this.message = data.optString("message", "");
+            } else {
+                this.message = "";
+            }
         }
-    }
 
-    public String getBody() {
-        if (rawBody != null && !rawBody.isEmpty()) {
-            return rawBody;
+        public String getBody() {
+            if (rawBody != null && !rawBody.isEmpty()) {
+                return rawBody;
+            }
+            return data != null ? data.toString() : "";
         }
-        return data != null ? data.toString() : "";
-    }
 
-    public void setBody(String body) {
-        this.rawBody = body;
-    }
+        public void setBody(String body) {
+            this.rawBody = body;
+        }
 
-    public String optString(String key, String defaultValue) {
-        if (data != null) return data.optString(key, defaultValue);
-        return defaultValue;
-    }
+        public String optString(String key, String defaultValue) {
+            if (data != null) return data.optString(key, defaultValue);
+            return defaultValue;
+        }
 
-    public int optInt(String key, int defaultValue) {
-        if (data != null) return data.optInt(key, defaultValue);
-        return defaultValue;
-    }
+        public int optInt(String key, int defaultValue) {
+            if (data != null) return data.optInt(key, defaultValue);
+            return defaultValue;
+        }
 
-    public JSONObject optJSONObject(String key) {
-        if (data != null) return data.optJSONObject(key);
-        return null;
-    }
+        public JSONObject optJSONObject(String key) {
+            if (data != null) return data.optJSONObject(key);
+            return null;
+        }
 
-    public JSONArray optJSONArray(String key) {
-        if (data != null) return data.optJSONArray(key);
-        return null;
+        public JSONArray optJSONArray(String key) {
+            if (data != null) return data.optJSONArray(key);
+            return null;
+        }
     }
 }
-            }
