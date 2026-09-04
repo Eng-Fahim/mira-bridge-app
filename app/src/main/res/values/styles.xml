@@ -95,7 +95,7 @@
         <item name="android:titleTextColor">#D4AF37</item>
         <item name="android:fontFamily">@font/cairo</item>
         <item name="colorAccent">#D4AF37</item>
-        <item name="buttonBarPositiveButtonStyle">@style/MiraDialogButton.Positive</item>
+        
         <item name="buttonBarNegativeButtonStyle">@style/MiraDialogButton.Negative</item>
     </style>
 
@@ -104,20 +104,7 @@
         <item name="cornerSize">24dp</item>
     </style>
 
-    <!-- 2. تنسيق الأزرار داخل النوافذ -->
-    <style name="MiraDialogButton.Positive" parent="Widget.MaterialComponents.Button.TextButton">
-        <item name="android:textColor">#D4AF37</item>
-        <item name="android:fontFamily">@font/cairo</item>
-        <item name="android:textSize">15sp</item>
-        <item name="android:textStyle">bold</item>
-    </style>
-
-    <style name="MiraDialogButton.Negative" parent="Widget.MaterialComponents.Button.TextButton">
-        <item name="android:textColor">#8E8E93</item>
-        <item name="android:fontFamily">@font/cairo</item>
-        <item name="android:textSize">15sp</item>
-    </style>
-
+    <!-- Circle Image Style -->
     <style name="CircleImageStyle">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">50%</item>
