@@ -800,33 +800,64 @@ public class MiraTransferFragment extends Fragment {
 
         AlertDialog dialog = new MaterialAlertDialogBuilder(requireContext()).setView(dv).create();
         btnCancel.setOnClickListener(v -> dialog.dismiss());
-        btnCreate.setOnClickListener(v -> {
-            int pos = spTo.getSelectedItemPosition();
-            if (pos < 0 || pos >= branchIds.size() || branchIds.get(pos) == 0) {
-                showUserMessage(isArabic ? "⚠️ خطأ" : "⚠️ Error", isArabic ? "يرجى اختيار فرع وجهة صحيح." : "Please select a valid destination branch.");
-                return;
-            }
-            executor.execute(() -> {
-                try {
-                    JSONObject payload = new JSONObject();
-                    payload.put("from_branch_id", fromBranchId);
-                    payload.put("to_branch_id", branchIds.get(pos));
-                    payload.put("notes", etNotes.getText().toString().trim());
-                    payload.put("items", new JSONArray());
-                    MiraApiClient.ApiResponse response = apiClient.createTransfer(payload);
-                    mainHandler.post(() -> {
-                        if (!isAdded() || getContext() == null) return;
-                        if (response != null && response.isSuccess) {
-                            Toast.makeText(getContext(), isArabic ? "✅ تم إنشاء التحويل بنجاح" : "✅ Transfer created successfully", Toast.LENGTH_SHORT).show();
-                            loadTransfers();
-                        } else {
-                            showErrorMessage(isArabic ? "فشل الإنشاء" : "Create Failed", getErrorMessage(response));
-                        }
-                    });
-                } catch (Exception ignored) {}
+        // ✅ الكود المعدل
+btnCreate.setOnClickListener(v -> {
+    int pos = spTo.getSelectedItemPosition();
+    if (pos < 0 || pos >= branchIds.size() || branchIds.get(pos) == 0) {
+        showUserMessage(isArabic ? "⚠️ خطأ" : "⚠️ Error", isArabic ? "يرجى اختيار فرع وجهة صحيح." : "Please select a valid destination branch.");
+        return;
+    }
+    
+    int targetBranchId = branchIds.get(pos);
+    String notes = etNotes.getText().toString().trim();
+    dialog.dismiss(); // إغلاق نافذة الاختيار
+
+    showLoadingDialog(isArabic ? "جاري إنشاء مسودة التحويل..." : "Creating transfer draft...");
+    
+    executor.execute(() -> {
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("from_branch_id", fromBranchId);
+            payload.put("to_branch_id", targetBranchId);
+            payload.put("notes", notes);
+            
+            // إرسال الطلب لإنشاء التحويل
+            MiraApiClient.ApiResponse response = apiClient.createTransfer(payload);
+            
+            mainHandler.post(() -> {
+                dismissLoadingDialog();
+                if (!isAdded() || getContext() == null) return;
+                
+                if (response != null && response.isSuccess && response.data != null) {
+                    // استخراج الشحنة الجديدة التي تم إنشاؤها
+                    JSONObject transferObj = response.data.optJSONObject("transfer");
+                    TransferData newTransfer = parseTransferData(transferObj);
+                    
+                    if (newTransfer == null) {
+                        newTransfer = new TransferData();
+                        newTransfer.id = response.data.optInt("id", 0);
+                        newTransfer.fromBranchId = fromBranchId;
+                        newTransfer.toBranchId = targetBranchId;
+                    }
+
+                    Toast.makeText(getContext(), isArabic ? "✅ تم إنشاء التحويل، قم بمسح القطع الآن" : "✅ Transfer created, scan items now", Toast.LENGTH_SHORT).show();
+                    loadTransfers();
+                    
+                    // فتح حوار مسح وإضافة القطع مباشرة للشحنة الجديدة
+                    showScanItemsDialogForTransfer(newTransfer);
+                } else {
+                    showErrorMessage(isArabic ? "فشل الإنشاء" : "Create Failed", getErrorMessage(response));
+                }
             });
-            dialog.dismiss();
-        });
+        } catch (Exception e) {
+            mainHandler.post(() -> {
+                dismissLoadingDialog();
+                showErrorMessage(isArabic ? "خطأ" : "Error", e.getMessage());
+            });
+        }
+    });
+});
+
         dialog.show();
     }
 
@@ -1089,4 +1120,4 @@ public class MiraTransferFragment extends Fragment {
             }
         }
     }
-}
+                }
