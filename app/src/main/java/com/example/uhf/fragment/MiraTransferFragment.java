@@ -54,7 +54,6 @@ import java.util.concurrent.Executors;
 public class MiraTransferFragment extends Fragment {
 
     private SessionManager sessionManager;
-
     private static final String TAG = "MiraTransfer";
     private static final String OFFLINE_PREFS = "transfers_cache";
 
@@ -71,7 +70,7 @@ public class MiraTransferFragment extends Fragment {
     private TransferAdapter adapter;
     private String currentFilter = "";
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private ExecutorService executor;
     private boolean isArabic;
     private SharedPreferences offlineCache;
     private TransferData selectedTransfer = null;
@@ -80,6 +79,7 @@ public class MiraTransferFragment extends Fragment {
     private TextView activeDialogScannedTv;
     private TextView tvScanCounter;
     private AlertDialog loadingDialog;
+    private ToneGenerator toneGenerator;
 
     @Nullable
     @Override
@@ -92,6 +92,7 @@ public class MiraTransferFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        executor = Executors.newSingleThreadExecutor();
         isArabic = Locale.getDefault().getLanguage().equals("ar");
         view.setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
         
@@ -101,6 +102,10 @@ public class MiraTransferFragment extends Fragment {
         permissionManager = PermissionManager.getInstance(context);
         offlineCache = context.getSharedPreferences(OFFLINE_PREFS, Context.MODE_PRIVATE);
         sessionManager = new SessionManager(context);
+        
+        try {
+            toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
+        } catch (Exception ignored) {}
 
         initViews(view);
         setupListeners();
@@ -121,7 +126,9 @@ public class MiraTransferFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         dismissLoadingDialog();
-        mainHandler.removeCallbacksAndMessages(null);
+        if (mainHandler != null) {
+            mainHandler.removeCallbacksAndMessages(null);
+        }
     }
 
     @Override
@@ -129,6 +136,10 @@ public class MiraTransferFragment extends Fragment {
         super.onDestroy();
         if (executor != null && !executor.isShutdown()) {
             executor.shutdownNow();
+        }
+        if (toneGenerator != null) {
+            toneGenerator.release();
+            toneGenerator = null;
         }
     }
 
@@ -177,9 +188,17 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private boolean canReceiveTransfer(TransferData t) {
+        if (t == null) return false;
         int userBranchId = branchesManager.getActiveBranchId();
+        
+        if (t.fromBranchId == userBranchId) {
+            return false;
+        }
+        
         SecureSessionManager.Role userRole = sessionManager != null ? sessionManager.getUserRole() : SecureSessionManager.Role.BRANCH_MANAGER;
-        return (userRole == SecureSessionManager.Role.SYSTEM_ADMIN || userRole == SecureSessionManager.Role.ORG_ADMIN) || (t.toBranchId == userBranchId);
+        
+        return (userRole == SecureSessionManager.Role.SYSTEM_ADMIN || userRole == SecureSessionManager.Role.ORG_ADMIN) 
+                || (t.toBranchId == userBranchId);
     }
 
     private boolean canDeleteTransfer() {
@@ -202,12 +221,10 @@ public class MiraTransferFragment extends Fragment {
 
     private void setupFilterChips() {
         if (chipGroupFilters == null) return;
-        
         Context context = getContext();
         if (context == null || !isAdded()) return;
         
         chipGroupFilters.removeAllViews();
-        
         Map<String, Integer> counts = getStatusCounts();
         
         FilterItem[] filters = new FilterItem[]{
@@ -220,7 +237,6 @@ public class MiraTransferFragment extends Fragment {
 
         for (FilterItem item : filters) {
             Chip chip = new Chip(context); 
-            
             chip.setText(String.format(Locale.getDefault(), "%s (%d)", item.label, item.count));
             chip.setCheckable(true);
             chip.setClickable(true);
@@ -327,6 +343,8 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void loadTransfers() {
+        if (executor == null || executor.isShutdown()) return;
+        
         executor.execute(() -> {
             int branchId = branchesManager.getActiveBranchId();
             SecureSessionManager.Role userRole = sessionManager != null ? sessionManager.getUserRole() : SecureSessionManager.Role.BRANCH_MANAGER;
@@ -444,22 +462,20 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void showTransferActions(TransferData t) {
-        if (!isAdded() || getContext() == null) return;
+        if (!isAdded() || getContext() == null || t == null) return;
         selectedTransfer = t;
         List<String> options = new ArrayList<>();
         
-        options.add(ar("📦 عرض القطع (" + t.itemCount + ")", "📦 View Items (" + t.itemCount + ")"));
+        options.add(ar("📦 عرض وإدارة القطع (" + t.itemCount + ")", "📦 View & Manage Items (" + t.itemCount + ")"));
         
-        if ("draft".equals(t.status)) {
+        if ("draft".equals(t.status) || "pending".equals(t.status)) {
             if (canCreateTransfer()) {
-                options.add(ar("📷 إضافة/مسح قطع", "📷 Scan & Add Items"));
-                options.add(ar("🗑️ حذف المسودة", "🗑️ Delete Draft"));
+                options.add(ar("➕ إضافة قطعة للشحنة", "➕ Add Item to Transfer"));
             }
-        } else if ("pending".equals(t.status)) {
             if (canApproveTransfer()) {
-                options.add(ar("✅ اعتماد وتجهيز", "✅ Approve & Dispatch"));
+                options.add(ar("✅ اعتماد وتجهيز الشحنة", "✅ Approve & Dispatch"));
             }
-            options.add(ar("🔍 تدقيق القائمة", "🔍 Scan Verification"));
+            options.add(ar("🚫 إلغاء الشحنة بالكامل", "🚫 Cancel Entire Transfer"));
         } else if ("approved".equals(t.status) || "in_transit".equals(t.status)) {
             if (canReceiveTransfer(t)) {
                 options.add(ar("📥 استلام الشحنة", "📥 Receive Shipment"));
@@ -474,29 +490,73 @@ public class MiraTransferFragment extends Fragment {
             .setTitle((t.transferNumber != null ? t.transferNumber : "TR-" + t.id) + " (" + t.fromBranch + " ➔ " + t.toBranch + ")")
             .setItems(items, (dialog, which) -> {
                 String sel = items[which];
-                if (sel.contains("عرض القطع") || sel.contains("View Items")) {
+                if (sel.contains("عرض وإدارة") || sel.contains("View & Manage")) {
                     showTransferItems(t);
-                } else if (sel.contains("إضافة") || sel.contains("Scan & Add")) {
+                } else if (sel.contains("إضافة قطعة") || sel.contains("Add Item")) {
                     showScanItemsDialogForTransfer(t);
                 } else if (sel.contains("اعتماد") || sel.contains("Approve")) {
                     if (canApproveTransfer()) approveTransfer(t);
                     else showAccessDenied();
                 } else if (sel.contains("استلام") || sel.contains("Receive")) {
                     if (canReceiveTransfer(t)) receiveTransfer(t);
-                    else showAccessDenied();
-                } else if (sel.contains("تدقيق") || sel.contains("Verification") || sel.contains("Audit")) {
-                    showScanItemsDialogForTransfer(t);
-                } else if (sel.contains("حذف") || sel.contains("Delete")) {
-                    if (canDeleteTransfer()) deleteTransfer(t);
-                    else showAccessDenied();
-                } else if (sel.contains("تفاصيل") || sel.contains("Manifest") || sel.contains("Details")) {
+                    else showUserMessage(isArabic ? "⛔ غير مصرح" : "⛔ Not Allowed", isArabic ? "لا يجوز للفرع المرسل استلام الشحنة!" : "Sending branch cannot receive shipment!");
+                } else if (sel.contains("إلغاء الشحنة") || sel.contains("Cancel Entire")) {
+                    cancelTransfer(t);
+                } else if (sel.contains("تفاصيل") || sel.contains("Details")) {
                     showTransferDetails(t);
                 }
             })
             .setNegativeButton(ar("إغلاق", "Close"), null).show();
     }
 
+    private void cancelTransfer(TransferData t) {
+        if (!canCreateTransfer() && !permissionManager.isManager()) {
+            showAccessDenied();
+            return;
+        }
+        
+        new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(ar("🚫 إلغاء الشحنة", "🚫 Cancel Transfer"))
+            .setMessage(isArabic ? 
+                "هل أنت متأكد من إلغاء الشحنة " + t.transferNumber + " بالكامل؟" : 
+                "Are you sure you want to cancel transfer " + t.transferNumber + "?")
+            .setPositiveButton(ar("🚫 تأكيد الإلغاء", "🚫 Confirm Cancel"), (d, w) -> {
+                showLoadingDialog(isArabic ? "جاري إلغاء الشحنة..." : "Cancelling transfer...");
+                executor.execute(() -> {
+                    try {
+                        JSONObject payload = new JSONObject();
+                        payload.put("status", "cancelled");
+                        
+                        MiraApiClient.ApiResponse response = apiClient.updateTransfer(t.id, payload);
+                        mainHandler.post(() -> {
+                            dismissLoadingDialog();
+                            if (!isAdded() || getContext() == null) return;
+                            
+                            if (response != null && response.isSuccess) {
+                                showSuccessMessage(
+                                    isArabic ? "تم الإلغاء" : "Transfer Cancelled", 
+                                    isArabic ? "تم إلغاء الشحنة بنجاح." : "The transfer has been successfully cancelled."
+                                );
+                                loadTransfers();
+                                notifyDashboardUpdate();
+                            } else {
+                                showErrorMessage(isArabic ? "فشل الإلغاء" : "Cancel Failed", getErrorMessage(response));
+                            }
+                        });
+                    } catch (Exception e) {
+                        mainHandler.post(() -> {
+                            dismissLoadingDialog();
+                            showErrorMessage(isArabic ? "خطأ" : "Error", e.getMessage());
+                        });
+                    }
+                });
+            })
+            .setNegativeButton(ar("تراجع", "Cancel"), null)
+            .show();
+    }
+
     private void showTransferItems(TransferData t) {
+        if (t == null) return;
         showLoadingDialog(isArabic ? "جاري تحميل القطع..." : "Loading items...");
         
         executor.execute(() -> {
@@ -561,7 +621,7 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void showTransferDetails(TransferData t) {
-        if (!isAdded() || getContext() == null) return;
+        if (!isAdded() || getContext() == null || t == null) return;
         String statusText = getStatusText(t.status);
         String details = isArabic ?
             "📋 رقم التحويل: " + t.transferNumber + "\n" +
@@ -611,7 +671,7 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void approveTransfer(TransferData t) {
-        if (!canApproveTransfer() || !isAdded() || getContext() == null) {
+        if (!canApproveTransfer() || !isAdded() || getContext() == null || t == null) {
             showAccessDenied();
             return;
         }
@@ -638,7 +698,7 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void receiveTransfer(TransferData t) {
-        if (!canReceiveTransfer(t) || !isAdded() || getContext() == null) {
+        if (!canReceiveTransfer(t) || !isAdded() || getContext() == null || t == null) {
             showAccessDenied();
             return;
         }
@@ -695,34 +755,6 @@ public class MiraTransferFragment extends Fragment {
                 }
             }
         } catch (Exception ignored) {}
-    }
-
-    private void deleteTransfer(TransferData t) {
-        if (!canDeleteTransfer() || !isAdded() || getContext() == null) {
-            showAccessDenied();
-            return;
-        }
-        new MaterialAlertDialogBuilder(requireContext())
-            .setTitle(ar("🗑️ حذف المسودة", "🗑️ Delete Draft"))
-            .setMessage(isArabic ? "هل أنت متأكد من حذف المسودة " + t.transferNumber + "؟" : "Are you sure you want to delete draft " + t.transferNumber + "?")
-            .setPositiveButton(ar("🗑️ حذف", "🗑️ Delete"), (d, w) -> {
-                executor.execute(() -> {
-                    JSONObject payload = new JSONObject();
-                    try { payload.put("status", "cancelled"); } catch (Exception ignored) {}
-                    MiraApiClient.ApiResponse response = apiClient.updateTransfer(t.id, payload);
-                    mainHandler.post(() -> {
-                        if (!isAdded() || getContext() == null) return;
-                        if (response != null && response.isSuccess) {
-                            Toast.makeText(getContext(), isArabic ? "✅ تم حذف المسودة" : "✅ Draft deleted", Toast.LENGTH_SHORT).show();
-                            loadTransfers();
-                        } else {
-                            showErrorMessage(isArabic ? "فشل الحذف" : "Delete Failed", getErrorMessage(response));
-                        }
-                    });
-                });
-            })
-            .setNegativeButton(ar("إلغاء", "Cancel"), null)
-            .show();
     }
 
     private void showNewTransferDialog() {
@@ -812,10 +844,11 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private void playScanBeepSound() {
-        try {
-            ToneGenerator toneGen = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
-            toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 120);
-        } catch (Exception ignored) {}
+        if (toneGenerator != null) {
+            try {
+                toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, 100);
+            } catch (Exception ignored) {}
+        }
     }
 
     private void showScanItemsDialogForTransfer(TransferData t) {
@@ -863,6 +896,7 @@ public class MiraTransferFragment extends Fragment {
                             if (allowed || (itemObj != null)) {
                                 String title = itemObj != null ? itemObj.optString("title", epc) : epc;
                                 activeScanEpcSet.add(epc);
+                                playScanBeepSound();
                                 if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n✅ " + title);
                                 if (tvScanCounter != null) tvScanCounter.setText(String.valueOf(activeScanEpcSet.size()));
                             } else {
@@ -926,13 +960,15 @@ public class MiraTransferFragment extends Fragment {
     }
 
     private String getStatusText(String status) {
+        if (status == null) return "";
         switch (status) {
             case "draft": return ar("📝 مسودة", "📝 Draft");
             case "pending": return ar("⏳ معلق للتأكيد", "⏳ Pending");
             case "approved": return ar("✅ معتمد ومجهز", "✅ Approved");
             case "in_transit": return ar("🚚 قيد النقل", "🚚 In Transit");
             case "received": return ar("📥 مستلم", "📥 Received");
-            case "rejected": return ar("❌ ملغى", "❌ Cancelled");
+            case "rejected": 
+            case "cancelled": return ar("❌ ملغى", "❌ Cancelled");
             default: return status;
         }
     }
