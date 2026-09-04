@@ -48,6 +48,7 @@ import com.example.uhf.manager.PermissionManager;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
@@ -864,7 +865,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                             String errorMsg = finalErrorMessage != null ? finalErrorMessage : 
                                 (isArabic ? "❌ فشل التكويد" : "❌ Encoding failed");
                             
-                            showErrorDialog(errorMsg);
+                            showErrorDialog(isArabic ? "خطأ في التكويد" : "Encoding Error", errorMsg);
                             unlockFormFast();
                             setFormEnabled(true);
                         }
@@ -875,7 +876,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                         dismissDialog(loadingDialog);
                         unlockFormFast();
                         setFormEnabled(true);
-                        showErrorDialog(e.getMessage());
+                        showErrorDialog(isArabic ? "خطأ للنظام" : "System Error", e.getMessage());
                     });
                 }
             });
@@ -939,17 +940,40 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         return isArabic ? "❌ فشل العملية" : "❌ Operation failed";
     }
 
-    private void showErrorDialog(String message) {
-        try {
-            new AlertDialog.Builder(requireContext())
-                .setTitle(isArabic ? "❌ خطأ" : "❌ Error")
-                .setMessage(message)
-                .setPositiveButton(isArabic ? "حسناً" : "OK", null)
-                .setIcon(android.R.drawable.ic_dialog_alert)
-                .setCancelable(false)
-                .show();
-        } catch (Exception e) {
-            showToast(message);
+    private void showErrorDialog(String title, String message) {
+        if (getContext() == null || !isAdded()) return;
+        new MaterialAlertDialogBuilder(requireContext())
+            .setTitle(title)
+            .setMessage(message)
+            .setIcon(R.drawable.ic_error_outline)
+            .setPositiveButton(isArabic ? "موافق" : "OK", (dialog, which) -> dialog.dismiss())
+            .setCancelable(false)
+            .show();
+    }
+
+    public void validateAndProcessEpc(String scannedEpc) {
+        if (scannedEpc == null || scannedEpc.trim().isEmpty()) {
+            showErrorDialog(isArabic ? "خطأ" : "Error", isArabic ? "لم يتم قراءة رمز الشريحة بشكل صحيح." : "Invalid EPC tag.");
+            return;
+        }
+
+        // الاستعلام الأوفلاين عبر الكاش للتحقق الفوري من التضارب
+        if (offlineCache != null) {
+            String pendingJson = offlineCache.getString("pending_encodes", "[]");
+            if (pendingJson.contains(scannedEpc)) {
+                showErrorDialog(
+                    isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
+                    isArabic ? "هذه الشريحة مسجلة بالفعل في قائمة الانتظار للرفع." : "This tag is already queued in offline pending items."
+                );
+                playErrorSound();
+                return;
+            }
+        }
+
+        if (binding != null && binding.etEpc != null) {
+            binding.etEpc.setText(scannedEpc);
+            binding.tvStatusBadge.setText("BOUND");
+            playSuccessSound();
         }
     }
 
@@ -1404,7 +1428,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
         MaterialButton btnClose = view.findViewById(R.id.btnCloseIdentity);
         
-        // التحقق الآمن لمنع NullPointerException إذا لم يتوفر ID الزر في ملف XML
         View printView = view.findViewById(R.id.btnPrintTag);
         if (printView instanceof MaterialButton) {
             MaterialButton btnPrintTag = (MaterialButton) printView;
@@ -1721,6 +1744,16 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             }
         } catch (Exception e) {
             Log.e(TAG, "playSuccessSound error: " + e.getMessage());
+        }
+    }
+
+    private void playErrorSound() {
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                ((UHFMainActivity) getActivity()).playSound(2);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "playErrorSound error: " + e.getMessage());
         }
     }
 
