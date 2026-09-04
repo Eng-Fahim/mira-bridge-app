@@ -756,59 +756,45 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             default: return new MiraDashboardFragment();
         }
     }
-    private void showUHFVersionDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(new androidx.appcompat.view.ContextThemeWrapper(this, R.style.MiraCustomDialogTheme));
-        View view = getLayoutInflater().inflate(R.layout.dialog_device_info, null);
-        builder.setView(view);
-
-        AlertDialog dialog = builder.create();
-
-        TextView tvModel = view.findViewById(R.id.tv_device_model);
-        TextView tvStatus = view.findViewById(R.id.tv_device_status);
-        TextView tvSoftware = view.findViewById(R.id.tv_uhf_software);
-        TextView tvHardware = view.findViewById(R.id.tv_uhf_hardware);
-        View btnClose = view.findViewById(R.id.btn_close_dialog);
-
-        // جلب اسم الموديل واستخدام Chainway Hardware / RFID SDK
-        String modelName = Build.MODEL;
-        String swVer = null;
+        private void showUHFVersionDialog() {
+        // 1. تحديد تعريف إصدار منظومة MIRA ID™ بدلاً من السوفتوير الخاص بالجهاز
+        String miraSystemVersion = "MIRA ID™ v1.0.0 (Enterprise)";
+        String swVer = miraSystemVersion;
         String hwVer = null;
+        String modelName = Build.MODEL;
 
+        // 2. محاولة جلب إصدار العتاد (Hardware) فقط من الـ Reader
         try {
             if (mReader != null) {
-                swVer = mReader.getVersion();
                 hwVer = mReader.getHardwareVersion();
             }
         } catch (Exception e) {
             Log.e(TAG, "Error fetching RFID reader info: " + e.getMessage());
         }
 
-        tvModel.setText(isArabic ? "الموديل: " + modelName : "Model: " + modelName);
-
-        if (swVer == null || swVer.equalsIgnoreCase("null") || swVer.trim().isEmpty()) {
-            tvSoftware.setText(isArabic ? "البرمجيات: غير متوفر / لم يتم الاتصال" : "Software: Not Available");
-            tvSoftware.setTextColor(android.graphics.Color.parseColor("#FF453A"));
-        } else {
-            tvSoftware.setText((isArabic ? "البرمجيات: " : "Software: ") + swVer);
-        }
+        // 3. بناء نص الرسالة بأسلوب منظم يبرز هُوية المنظومة
+        StringBuilder message = new StringBuilder();
+        message.append("MIRA Trust Architecture™\n");
+        message.append(isArabic ? "نظام المصادقة والتتبع المعتمد للمجوهرات\n\n" : "Jewelry Tracking & Authentication System\n\n");
+        message.append(isArabic ? "📱 الموديل: " : "📱 Model: ").append(modelName).append("\n");
+        message.append(isArabic ? "📦 المنظومة: " : "📦 System: ").append(swVer).append("\n");
 
         if (hwVer == null || hwVer.equalsIgnoreCase("null") || hwVer.trim().isEmpty()) {
-            tvHardware.setText(isArabic ? "العتاد: غير متهيئ (Chainway C72 SDK)" : "Hardware: Not Configured");
-            tvHardware.setTextColor(android.graphics.Color.parseColor("#FF453A"));
-            tvStatus.setText(isArabic ? "الحالة: غير متصل بقارئ RFID" : "Status: Disconnected");
-            tvStatus.setTextColor(android.graphics.Color.parseColor("#FF9500"));
+            message.append(isArabic ? "📡 العتاد: غير متهيئ (Chainway C72 SDK)" : "📡 Hardware: Not Configured").append("\n");
+            message.append(isArabic ? "🔴 الحالة: غير متصل بقارئ RFID" : "🔴 Status: Disconnected");
         } else {
-            tvHardware.setText((isArabic ? "العتاد: " : "Hardware: ") + hwVer);
-            tvStatus.setText(isArabic ? "الحالة: وحدة UHF نشطة ومتصلة" : "Status: Active & Connected");
-            tvStatus.setTextColor(android.graphics.Color.parseColor("#34C759"));
+            message.append(isArabic ? "📡 العتاد: " : "📡 Hardware: ").append(hwVer).append("\n");
+            message.append(isArabic ? "🟢 الحالة: وحدة UHF نشطة ومتصلة" : "🟢 Status: Active & Connected");
         }
 
-        if (btnClose != null) {
-            btnClose.setOnClickListener(v -> dialog.dismiss());
-        }
-
-        dialog.show();
+        // 4. عرض الديالوج بشكل متناسق ومستقر
+        new AlertDialog.Builder(this)
+                .setTitle(isArabic ? "عن المنظومة | MIRA ID™" : "About System | MIRA ID™")
+                .setMessage(message.toString())
+                .setPositiveButton(isArabic ? "موافق" : "OK", (dialog, which) -> dialog.dismiss())
+                .show();
     }
+
 
     private void updateBottomNavSelectionByTag(String tag) {
         try {
@@ -1269,4 +1255,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
     }
-}
+        }
