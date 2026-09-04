@@ -2,7 +2,7 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- 📌 1. الإجراءات السريعة (تظهر مباشرة على شريط العنوان) -->
+    <!-- 📌 1. الإجراءات السريعة (شريط العنوان العلوي) -->
     <item
         android:id="@+id/action_dashboard"
         android:icon="@drawable/ic_dashboard"
@@ -21,9 +21,9 @@
         android:title="@string/menu_quick_access"
         app:showAsAction="ifRoom" />
 
-    <!-- 📌 2. قائمة الخيارات المنسدلة (Overflow Menu) -->
+    <!-- 📌 2. العناصر داخل القائمة المنسدلة المتقدمة -->
 
-    <!-- مجموعة الإدارة والفروع -->
+    <!-- مجموعة إدارة الفروع -->
     <group android:id="@+id/group_management">
         <item
             android:id="@+id/action_branches"
