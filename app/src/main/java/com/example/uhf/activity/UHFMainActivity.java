@@ -34,6 +34,8 @@ import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
+import androidx.appcompat.view.menu.MenuBuilder;
+import android.annotation.SuppressLint;
 
 import com.example.uhf.R;
 import com.example.uhf.fragment.MiraAccountingFragment;
@@ -344,13 +346,20 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     // ==================== TOOLBAR MENU ====================
 
-    @Override
+       @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.main_menu, menu);
+
+        // إجبار النظام على إظهار الأيقونات داخل القائمة المنسدلة (Overflow Menu)
+        if (menu instanceof androidx.appcompat.view.menu.MenuBuilder) {
+            ((androidx.appcompat.view.menu.MenuBuilder) menu).setOptionalIconsVisible(true);
+        }
+
         PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
         applyToolbarMenuPermissions(menu, pm);
         return true;
     }
+
 
     private void applyToolbarMenuPermissions(Menu menu, PermissionManager pm) {
         if (pm == null) return;
@@ -1203,4 +1212,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
     }
-}
+                    }
