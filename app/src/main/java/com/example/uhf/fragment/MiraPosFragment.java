@@ -927,67 +927,68 @@ private void parseItemResponse(String code, JSONObject data) {
 }
 
     private void showSearchLoadingDialog(String code) {
-        try {
-            Context ctx = getContext();
-            if (ctx == null || !isAdded()) return;
-            
-            dismissSearchLoadingDialog();
-            
-            MaterialCardView cardView = new MaterialCardView(ctx);
-            cardView.setRadius(24);
-            cardView.setCardElevation(10);
-            
-            LinearLayout layout = new LinearLayout(ctx);
-            layout.setOrientation(LinearLayout.VERTICAL);
-            layout.setPadding(50, 40, 50, 40);
-            layout.setGravity(android.view.Gravity.CENTER);
-            
-            TextView tvIcon = new TextView(ctx);
-            tvIcon.setText("🔍");
-            tvIcon.setTextSize(36);
-            tvIcon.setGravity(android.view.Gravity.CENTER);
-            layout.addView(tvIcon);
-            
-            ProgressBar progressBar = new ProgressBar(ctx);
-            progressBar.setIndeterminate(true);
-            LinearLayout.LayoutParams pbParams = new LinearLayout.LayoutParams(100, 100);
-            pbParams.gravity = android.view.Gravity.CENTER_HORIZONTAL;
-            pbParams.topMargin = 16;
-            progressBar.setLayoutParams(pbParams);
-            layout.addView(progressBar);
-            
-            TextView tvLoading = new TextView(ctx);
-            tvLoading.setText(isArabic ? "جاري البحث عن القطعة..." : "Searching for item...");
-            tvLoading.setTextSize(16);
-            tvLoading.setTypeface(null, android.graphics.Typeface.BOLD);
-            tvLoading.setGravity(android.view.Gravity.CENTER);
-            tvLoading.setPadding(0, 16, 0, 8);
-            tvLoading.setTextColor(0xFF1A1A2E);
-            layout.addView(tvLoading);
-            
-            TextView tvCode = new TextView(ctx);
-            tvCode.setText(code);
-            tvCode.setTextSize(13);
-            tvCode.setGravity(android.view.Gravity.CENTER);
-            tvCode.setAlpha(0.7f);
-            tvCode.setTextColor(0xFF555555);
-            layout.addView(tvCode);
-            
-            cardView.addView(layout);
-            
-            AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
-            builder.setView(cardView);
-            builder.setCancelable(false);
-            
-            searchLoadingDialog = builder.create();
-            if (searchLoadingDialog.getWindow() != null) {
-                searchLoadingDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            }
-            searchLoadingDialog.show();
-        } catch (Exception e) {
-            Log.e(TAG, "showSearchLoadingDialog error: " + e.getMessage());
+    try {
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return;
+        
+        dismissSearchLoadingDialog();
+        
+        MaterialCardView cardView = new MaterialCardView(ctx);
+        cardView.setRadius(24);
+        cardView.setCardElevation(10);
+        
+        LinearLayout layout = new LinearLayout(ctx);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 40);
+        layout.setGravity(android.view.Gravity.CENTER);
+        
+        TextView tvIcon = new TextView(ctx);
+        tvIcon.setText("🔍");
+        tvIcon.setTextSize(36);
+        tvIcon.setGravity(android.view.Gravity.CENTER);
+        layout.addView(tvIcon);
+        
+        ProgressBar progressBar = new ProgressBar(ctx);
+        progressBar.setIndeterminate(true);
+        LinearLayout.LayoutParams pbParams = new LinearLayout.LayoutParams(100, 100);
+        pbParams.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+        pbParams.topMargin = 16;
+        progressBar.setLayoutParams(pbParams);
+        layout.addView(progressBar);
+        
+        TextView tvLoading = new TextView(ctx);
+        tvLoading.setText(isArabic ? "جاري البحث عن القطعة..." : "Searching for item...");
+        tvLoading.setTextSize(16);
+        tvLoading.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvLoading.setGravity(android.view.Gravity.CENTER);
+        tvLoading.setPadding(0, 16, 0, 8);
+        tvLoading.setTextColor(0xFF1A1A2E);
+        layout.addView(tvLoading);
+        
+        TextView tvCode = new TextView(ctx);
+        tvCode.setText(code);
+        tvCode.setTextSize(13);
+        tvCode.setGravity(android.view.Gravity.CENTER);
+        tvCode.setAlpha(0.7f);
+        tvCode.setTextColor(0xFF555555);
+        layout.addView(tvCode);
+        
+        cardView.addView(layout);
+        
+        // ✅ استبدال بـ MaterialAlertDialogBuilder
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(ctx);
+        builder.setView(cardView);
+        builder.setCancelable(false);
+        
+        searchLoadingDialog = builder.create();
+        if (searchLoadingDialog.getWindow() != null) {
+            searchLoadingDialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         }
+        searchLoadingDialog.show();
+    } catch (Exception e) {
+        Log.e(TAG, "showSearchLoadingDialog error: " + e.getMessage());
     }
+}
 
     private void dismissSearchLoadingDialog() {
         try {
@@ -1002,53 +1003,54 @@ private void parseItemResponse(String code, JSONObject data) {
     }
 
     private void showSuccessMessage(String title, String message, boolean isSuccess) {
-        try {
-            Context ctx = getContext();
-            if (ctx == null || !isAdded()) return;
-            
-            MaterialCardView cardView = new MaterialCardView(ctx);
-            cardView.setRadius(24);
-            cardView.setCardElevation(10);
-            
-            LinearLayout layout = new LinearLayout(ctx);
-            layout.setOrientation(LinearLayout.VERTICAL);
-            layout.setPadding(40, 30, 40, 30);
-            layout.setGravity(android.view.Gravity.CENTER);
-            
-            TextView tvIcon = new TextView(ctx);
-            tvIcon.setText(isSuccess ? "✅" : "❌");
-            tvIcon.setTextSize(48);
-            tvIcon.setGravity(android.view.Gravity.CENTER);
-            layout.addView(tvIcon);
-            
-            TextView tvTitle = new TextView(ctx);
-            tvTitle.setText(title);
-            tvTitle.setTextSize(18);
-            tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-            tvTitle.setGravity(android.view.Gravity.CENTER);
-            tvTitle.setPadding(0, 12, 0, 8);
-            tvTitle.setTextColor(isSuccess ? 0xFF22C55E : 0xFFEF4444);
-            layout.addView(tvTitle);
-            
-            TextView tvMessage = new TextView(ctx);
-            tvMessage.setText(message);
-            tvMessage.setTextSize(14);
-            tvMessage.setGravity(android.view.Gravity.CENTER);
-            tvMessage.setPadding(0, 4, 0, 16);
-            tvMessage.setTextColor(0xFF555555);
-            layout.addView(tvMessage);
-            
-            cardView.addView(layout);
-            
-            AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
-            builder.setView(cardView);
-            builder.setPositiveButton(isArabic ? "حسناً" : "OK", (d, w) -> d.dismiss());
-            builder.setCancelable(false);
-            builder.show();
-        } catch (Exception e) {
-            Log.e(TAG, "showSuccessMessage error: " + e.getMessage());
-        }
+    try {
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return;
+        
+        MaterialCardView cardView = new MaterialCardView(ctx);
+        cardView.setRadius(24);
+        cardView.setCardElevation(10);
+        
+        LinearLayout layout = new LinearLayout(ctx);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(40, 30, 40, 30);
+        layout.setGravity(android.view.Gravity.CENTER);
+        
+        TextView tvIcon = new TextView(ctx);
+        tvIcon.setText(isSuccess ? "✅" : "❌");
+        tvIcon.setTextSize(48);
+        tvIcon.setGravity(android.view.Gravity.CENTER);
+        layout.addView(tvIcon);
+        
+        TextView tvTitle = new TextView(ctx);
+        tvTitle.setText(title);
+        tvTitle.setTextSize(18);
+        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvTitle.setGravity(android.view.Gravity.CENTER);
+        tvTitle.setPadding(0, 12, 0, 8);
+        tvTitle.setTextColor(isSuccess ? 0xFF22C55E : 0xFFEF4444);
+        layout.addView(tvTitle);
+        
+        TextView tvMessage = new TextView(ctx);
+        tvMessage.setText(message);
+        tvMessage.setTextSize(14);
+        tvMessage.setGravity(android.view.Gravity.CENTER);
+        tvMessage.setPadding(0, 4, 0, 16);
+        tvMessage.setTextColor(0xFF555555);
+        layout.addView(tvMessage);
+        
+        cardView.addView(layout);
+        
+        // ✅ استبدال بـ MaterialAlertDialogBuilder
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(ctx);
+        builder.setView(cardView);
+        builder.setPositiveButton(isArabic ? "حسناً" : "OK", (d, w) -> d.dismiss());
+        builder.setCancelable(false);
+        builder.show();
+    } catch (Exception e) {
+        Log.e(TAG, "showSuccessMessage error: " + e.getMessage());
     }
+}
 
     
 
@@ -1551,48 +1553,48 @@ private void updatePendingSalesBadge(int count) {
     }
 }
     private AlertDialog showProfessionalLoadingDialog() {
-        try {
-            Context ctx = getContext();
-            if (ctx == null || !isAdded()) return null;
-            
-            MaterialCardView cardView = new MaterialCardView(ctx);
-            cardView.setRadius(20);
-            cardView.setCardElevation(8);
-            
-            LinearLayout layout = new LinearLayout(ctx);
-            layout.setOrientation(LinearLayout.VERTICAL);
-            layout.setPadding(40, 36, 40, 36);
-            layout.setGravity(android.view.Gravity.CENTER);
-            
-            ProgressBar progressBar = new ProgressBar(ctx);
-            progressBar.setIndeterminate(true);
-            layout.addView(progressBar);
-            
-            TextView tvLoading = new TextView(ctx);
-            tvLoading.setText(isArabic ? "جاري إتمام البيع..." : "Processing sale...");
-            tvLoading.setTextSize(17);
-            tvLoading.setTypeface(null, android.graphics.Typeface.BOLD);
-            tvLoading.setGravity(android.view.Gravity.CENTER);
-            tvLoading.setPadding(0, 20, 0, 6);
-            layout.addView(tvLoading);
-            
-            cardView.addView(layout);
-            
-            AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
-            builder.setView(cardView);
-            builder.setCancelable(false);
-            
-            AlertDialog dialog = builder.create();
-            if (dialog.getWindow() != null) {
-                dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            }
-            dialog.show();
-            return dialog;
-        } catch (Exception e) {
-            return null;
+    try {
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return null;
+        
+        MaterialCardView cardView = new MaterialCardView(ctx);
+        cardView.setRadius(20);
+        cardView.setCardElevation(8);
+        
+        LinearLayout layout = new LinearLayout(ctx);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(40, 36, 40, 36);
+        layout.setGravity(android.view.Gravity.CENTER);
+        
+        ProgressBar progressBar = new ProgressBar(ctx);
+        progressBar.setIndeterminate(true);
+        layout.addView(progressBar);
+        
+        TextView tvLoading = new TextView(ctx);
+        tvLoading.setText(isArabic ? "جاري إتمام البيع..." : "Processing sale...");
+        tvLoading.setTextSize(17);
+        tvLoading.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvLoading.setGravity(android.view.Gravity.CENTER);
+        tvLoading.setPadding(0, 20, 0, 6);
+        layout.addView(tvLoading);
+        
+        cardView.addView(layout);
+        
+        // ✅ استبدال بـ MaterialAlertDialogBuilder
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(ctx);
+        builder.setView(cardView);
+        builder.setCancelable(false);
+        
+        AlertDialog dialog = builder.create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         }
+        dialog.show();
+        return dialog;
+    } catch (Exception e) {
+        return null;
     }
-
+}
     private void setButtonsEnabled(boolean enabled) {
         safeRun(() -> {
             try {
@@ -1608,22 +1610,23 @@ private void updatePendingSalesBadge(int count) {
     }
 
     private void showRetryDialog(String title, String message, Runnable retryAction) {
-        try {
-            Context ctx = getContext();
-            if (ctx == null || !isAdded()) return;
-            
-            AlertDialog.Builder builder = new AlertDialog.Builder(ctx);
-            builder.setTitle(title).setMessage(message).setCancelable(false);
-            if (retryAction != null) {
-                builder.setPositiveButton(isArabic ? "🔄 إعادة المحاولة" : "🔄 Retry", (dialog, which) -> {
-                    dialog.dismiss();
-                    retryAction.run();
-                });
-            }
-            builder.setNegativeButton(isArabic ? "إغلاق" : "Close", (dialog, which) -> dialog.dismiss());
-            builder.show();
-        } catch (Exception e) {}
-    }
+    try {
+        Context ctx = getContext();
+        if (ctx == null || !isAdded()) return;
+        
+        // ✅ استبدال بـ MaterialAlertDialogBuilder
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(ctx);
+        builder.setTitle(title).setMessage(message).setCancelable(false);
+        if (retryAction != null) {
+            builder.setPositiveButton(isArabic ? "🔄 إعادة المحاولة" : "🔄 Retry", (dialog, which) -> {
+                dialog.dismiss();
+                retryAction.run();
+            });
+        }
+        builder.setNegativeButton(isArabic ? "إغلاق" : "Close", (dialog, which) -> dialog.dismiss());
+        builder.show();
+    } catch (Exception e) {}
+}
 
     protected void dismissDialog(AlertDialog dialog) {
         try {
