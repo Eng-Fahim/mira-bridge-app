@@ -357,34 +357,46 @@ public class MiraApiClient {
     }
 
     private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
-        int responseCode = conn.getResponseCode();
-        InputStream is = (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream();
+    int responseCode = conn.getResponseCode();
+    InputStream is = (responseCode >= 200 && responseCode < 300) ? conn.getInputStream() : conn.getErrorStream();
 
-        if (is == null) {
-            return new ApiResponse(responseCode, null, "Empty response");
-        }
-
-        StringBuilder response = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                response.append(line.trim());
-            }
-        }
-
-        String responseBody = response.toString();
-        JSONObject json = null;
-        try {
-            if (!responseBody.isEmpty()) {
-                json = new JSONObject(responseBody);
-            }
-        } catch (Exception ignored) {}
-
-        ApiResponse apiResponse = new ApiResponse(responseCode, json, responseCode >= 400 ? responseBody : null);
-        apiResponse.setBody(responseBody);
-        
-        return apiResponse;
+    if (is == null) {
+        return new ApiResponse(responseCode, null, "Empty response");
     }
+
+    StringBuilder response = new StringBuilder();
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+        String line;
+        while ((line = reader.readLine()) != null) {
+            response.append(line.trim());
+        }
+    }
+
+    String responseBody = response.toString();
+    JSONObject json = null;
+    String errorMessage = null;
+
+    try {
+        if (!responseBody.isEmpty()) {
+            json = new JSONObject(responseBody);
+            // استخراج الرسالة المترجمة من الـ JSON إن وجدت
+            if (json.has("message")) {
+                errorMessage = json.optString("message", null);
+            }
+        }
+    } catch (Exception ignored) {}
+
+    // إذا لم تكن هناك رسالة داخل JSON يظهر النص الخام
+    if (errorMessage == null && responseCode >= 400) {
+        errorMessage = responseBody;
+    }
+
+    ApiResponse apiResponse = new ApiResponse(responseCode, json, errorMessage);
+    apiResponse.setBody(responseBody);
+    
+    return apiResponse;
+}
+
 
     public ApiResponse login(String username, String password, String deviceId) {
         JSONObject payload = new JSONObject();
