@@ -419,20 +419,26 @@ public class MiraBarcodeScannerFragment extends Fragment {
     // ==================== Animation ====================
 
     private void startScanAnimation() {
-        if (scanLine == null || scannerOverlay == null) return;
-        try {
-            scanLine.post(() -> {
-                scanLine.animate().translationY(scannerOverlay.getHeight())
-                    .setDuration(2000)
-                    .withEndAction(() -> {
-                        scanLine.setTranslationY(0);
-                        if (isScanning) startScanAnimation();
-                    }).start();
-            });
-        } catch (Exception e) {
-            Log.e(TAG, "Error starting animation: " + e.getMessage());
-        }
+    if (scanLine == null || scannerOverlay == null) return;
+    try {
+        // ✅ إعادة تعيين الموضع الأولي
+        scanLine.setTranslationY(0);
+        
+        // ✅ تحريك الخط من الأعلى إلى الأسفل داخل الإطار
+        scanLine.post(() -> {
+            scanLine.animate()
+                .translationY(scannerOverlay.getHeight() - 2)
+                .setDuration(2000)
+                .withEndAction(() -> {
+                    scanLine.setTranslationY(0);
+                    if (isScanning) startScanAnimation();
+                })
+                .start();
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "Error starting animation: " + e.getMessage());
     }
+}
 
     // ==================== Flash ====================
 
