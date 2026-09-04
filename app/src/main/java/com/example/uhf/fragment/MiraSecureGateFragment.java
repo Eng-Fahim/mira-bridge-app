@@ -72,7 +72,8 @@ public class MiraSecureGateFragment extends Fragment {
     private static final int API_TIMEOUT_SECONDS = 5;
     private static final int MONITOR_INTERVAL_SECONDS = 5;
     private static final int PING_INTERVAL_SECONDS = 10;
-    
+    private volatile boolean isCameraOpen = false;
+
     private OfflineGateCache offlineCache;
     private volatile boolean isOnline = true;
 
@@ -123,13 +124,21 @@ public class MiraSecureGateFragment extends Fragment {
     private boolean isArabic = true;
 
     private final ActivityResultLauncher<ScanOptions> barcodeLauncher = registerForActivityResult(
-        new ScanContract(),
-        result -> {
-            if (result.getContents() != null && !isDestroyed) {
-                processInputEpc(result.getContents().trim(), "CAMERA");
-            }
+    new ScanContract(),
+    result -> {
+        isCameraOpen = false; // إعادة الضبط عند العودة من الكاميرا
+        
+        if (result.getContents() != null && !isDestroyed) {
+            processInputEpc(result.getContents().trim(), "CAMERA");
         }
-    );
+        
+        // إعادة تشغيل مسح الـ RFID بعد العودة من الكاميرا إذا لم تكن البوابة في حالة الإغلاق الطارئ
+        if (!isLockdown && !isDestroyed) {
+            autoStartScanning();
+        }
+    }
+);
+
 
     // ==================== Helper Methods ====================
     
@@ -269,14 +278,24 @@ public class MiraSecureGateFragment extends Fragment {
             });
         }
         if (btnScanBarcode != null) {
-            btnScanBarcode.setOnClickListener(v -> {
-                ScanOptions options = new ScanOptions();
-                options.setPrompt(getLocalizedText("📷 وجه الكاميرا نحو باركود القطعة", "📷 Aim camera at item barcode"));
-                options.setBeepEnabled(false);
-                options.setOrientationLocked(true);
-                barcodeLauncher.launch(options);
-            });
+    btnScanBarcode.setOnClickListener(v -> {
+        // 1. إيقاف مسح الـ RFID فوراً لتفريغ الموارد ومنع التجمّد
+        stopScanning();
+        isCameraOpen = true;
+
+        ScanOptions options = new ScanOptions();
+        options.setPrompt(getLocalizedText("📷 وجه الكاميرا نحو باركود القطعة", "📷 Aim camera at item barcode"));
+        options.setBeepEnabled(false);
+        options.setOrientationLocked(true);
+        
+        try {
+            barcodeLauncher.launch(options);
+        } catch (Exception e) {
+            isCameraOpen = false;
+            logConsole(getLocalizedText("⚠️ تعذر فتح الكاميرا: ", "⚠️ Camera error: ") + e.getMessage());
         }
+    });
+}
         if (btnEmergencyLockdown != null) btnEmergencyLockdown.setOnClickListener(v -> toggleLockdown());
         
         if (btnClearConsole != null) {
@@ -428,68 +447,66 @@ private void loadBranchesForSelector() {
 }
 
 // ✅ دالة تحويل الكائن إلى BranchInfo
+// ✅ دالة تحويل الكائن إلى BranchInfo بشكل آمن 100% بدون إمكانية حدوث Crash
 private BranchInfo convertToBranchInfo(Object obj) {
     if (obj == null) return null;
     
-    try {
-        BranchInfo info = new BranchInfo();
-        
-        // ✅ محاولة استخدام reflection للحصول على الحقول
-        Class<?> clazz = obj.getClass();
-        
-        // جرب getId() أو getBranchId()
-        try {
-            java.lang.reflect.Method getId = clazz.getMethod("getId");
-            info.branchId = ((Number) getId.invoke(obj)).intValue();
-        } catch (Exception e1) {
-            try {
-                java.lang.reflect.Method getBranchId = clazz.getMethod("getBranchId");
-                info.branchId = ((Number) getBranchId.invoke(obj)).intValue();
-            } catch (Exception e2) {
-                try {
-                    java.lang.reflect.Field idField = clazz.getField("id");
-                    info.branchId = ((Number) idField.get(obj)).intValue();
-                } catch (Exception e3) {
-                    try {
-                        java.lang.reflect.Field branchIdField = clazz.getField("branchId");
-                        info.branchId = ((Number) branchIdField.get(obj)).intValue();
-                    } catch (Exception e4) {
-                        info.branchId = 0;
-                    }
-                }
-            }
-        }
-        
-        // جرب getName() أو getBranchName()
-        try {
-            java.lang.reflect.Method getName = clazz.getMethod("getName");
-            info.branchName = (String) getName.invoke(obj);
-        } catch (Exception e1) {
-            try {
-                java.lang.reflect.Method getBranchName = clazz.getMethod("getBranchName");
-                info.branchName = (String) getBranchName.invoke(obj);
-            } catch (Exception e2) {
-                try {
-                    java.lang.reflect.Field nameField = clazz.getField("name");
-                    info.branchName = (String) nameField.get(obj);
-                } catch (Exception e3) {
-                    try {
-                        java.lang.reflect.Field branchNameField = clazz.getField("branchName");
-                        info.branchName = (String) branchNameField.get(obj);
-                    } catch (Exception e4) {
-                        info.branchName = "فرع " + info.branchId;
-                    }
-                }
-            }
-        }
-        
-        return info;
-        
-    } catch (Exception e) {
-        Log.e(TAG, "convertToBranchInfo: " + e.getMessage());
-        return null;
+    BranchInfo info = new BranchInfo();
+    Class<?> clazz = obj.getClass();
+
+    // 1️⃣ البحث عن معرف الفرع (Branch ID)
+    info.branchId = extractIntProperty(clazz, obj, new String[]{"getId", "getBranchId", "id", "branchId"});
+
+    // 2️⃣ البحث عن اسم الفرع (Branch Name)
+    info.branchName = extractStringProperty(clazz, obj, new String[]{"getName", "getBranchName", "name", "branchName"});
+    
+    if (info.branchName == null || info.branchName.isEmpty()) {
+        info.branchName = (isArabic ? "فرع " : "Branch ") + info.branchId;
     }
+
+    return info;
 }
+
+private int extractIntProperty(Class<?> clazz, Object obj, String[] names) {
+    for (String name : names) {
+        // تجربة Getters
+        try {
+            java.lang.reflect.Method method = clazz.getMethod(name);
+            Object result = method.invoke(obj);
+            if (result instanceof Number) return ((Number) result).intValue();
+        } catch (Throwable ignored) {}
+
+        // تجربة Fields
+        try {
+            java.lang.reflect.Field field = clazz.getDeclaredField(name);
+            field.setAccessible(true);
+            Object result = field.get(obj);
+            if (result instanceof Number) return ((Number) result).intValue();
+        } catch (Throwable ignored) {}
+    }
+    return 0;
+}
+
+private String extractStringProperty(Class<?> clazz, Object obj, String[] names) {
+    for (String name : names) {
+        // تجربة Getters
+        try {
+            java.lang.reflect.Method method = clazz.getMethod(name);
+            Object result = method.invoke(obj);
+            if (result != null) return result.toString();
+        } catch (Throwable ignored) {}
+
+        // تجربة Fields
+        try {
+            java.lang.reflect.Field field = clazz.getDeclaredField(name);
+            field.setAccessible(true);
+            Object result = field.get(obj);
+            if (result != null) return result.toString();
+        } catch (Throwable ignored) {}
+    }
+    return null;
+}
+
 
     private int getCurrentBranchId() {
         return currentBranchId;
@@ -1139,10 +1156,14 @@ private BranchInfo convertToBranchInfo(Object obj) {
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        if (!isScanning && isAdded() && !isLockdown) autoStartScanning();
+public void onResume() {
+    super.onResume();
+    // عدم البدء التلقائي إذا كانت واجهة الكاميرا مفتوحة حالياً
+    if (!isScanning && isAdded() && !isLockdown && !isCameraOpen) {
+        autoStartScanning();
     }
+}
+
 
     @Override
     public void onDestroyView() {
