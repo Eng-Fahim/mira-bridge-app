@@ -1128,40 +1128,40 @@ private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
     }
 
     private void showPendingItemsDialog() {
-        if (offlineCache == null || !isAdded() || getContext() == null) return;
+    if (offlineCache == null || !isAdded() || getContext() == null) return;
 
-        try {
-            String json = offlineCache.getString("pending_encodes", "[]");
-            JSONArray arr = new JSONArray(json);
+    try {
+        String json = offlineCache.getString("pending_encodes", "[]");
+        JSONArray arr = new JSONArray(json);
 
-            if (arr.length() == 0) {
-                showToast(isArabic ? "لا توجد عناصر معلقة" : "No pending items");
-                return;
-            }
-
-            StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject item = arr.getJSONObject(i);
-                builder.append("• ")
-                        .append(item.optString("title"))
-                        .append(" | ")
-                        .append(item.optString("epc"))
-                        .append(" (")
-                        .append(item.optDouble("gross_weight"))
-                        .append("g)\n");
-            }
-
-            new AlertDialog.Builder(requireContext())
-                    .setTitle(isArabic ? "العناصر المخزنة محلياً" : "Offline Stored Items")
-                    .setMessage(builder.toString())
-                    .setPositiveButton(isArabic ? "مزامنة الآن" : "Sync Now", (d, w) -> syncPendingEncodes())
-                    .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                    .show();
-
-        } catch (Exception e) {
-            Log.e(TAG, "showPendingItemsDialog error: " + e.getMessage(), e);
+        if (arr.length() == 0) {
+            showToast(isArabic ? "لا توجد عناصر معلقة" : "No pending items");
+            return;
         }
+
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject item = arr.getJSONObject(i);
+            builder.append("• ")
+                    .append(item.optString("title"))
+                    .append(" | ")
+                    .append(item.optString("epc"))
+                    .append(" (")
+                    .append(item.optDouble("gross_weight"))
+                    .append("g)\n");
+        }
+
+        new MaterialAlertDialogBuilder(requireContext()) // ✅
+                .setTitle(isArabic ? "العناصر المخزنة محلياً" : "Offline Stored Items")
+                .setMessage(builder.toString())
+                .setPositiveButton(isArabic ? "مزامنة الآن" : "Sync Now", (d, w) -> syncPendingEncodes())
+                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+                .show();
+
+    } catch (Exception e) {
+        Log.e(TAG, "showPendingItemsDialog error: " + e.getMessage(), e);
     }
+}
 
     private void setupPhotoLaunchers() {
         requestPermissionLauncher = registerForActivityResult(
@@ -1245,24 +1245,25 @@ private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
     }
 
     private void showImageSourceDialog() {
-        if (getContext() == null || !isAdded()) return;
-        if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
-            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-            return;
-        }
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle(isArabic ? "إضافة صورة" : "Add Photo");
-        String[] options = {
-                isArabic ? "📷 التقاط صورة" : "📷 Take Photo",
-                isArabic ? "🖼️ اختيار من الاستوديو" : "🖼️ Choose from Gallery"
-        };
-        builder.setItems(options, (dialog, which) -> {
-            if (which == 0) checkCameraPermissionAndTakePhoto();
-            else openGallery();
-        });
-        builder.show();
+    if (getContext() == null || !isAdded()) return;
+    if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
+        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+        return;
     }
+
+    MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext()); // ✅
+    builder.setTitle(isArabic ? "إضافة صورة" : "Add Photo");
+    String[] options = {
+            isArabic ? "📷 التقاط صورة" : "📷 Take Photo",
+            isArabic ? "🖼️ اختيار من الاستوديو" : "🖼️ Choose from Gallery"
+    };
+    builder.setItems(options, (dialog, which) -> {
+        if (which == 0) checkCameraPermissionAndTakePhoto();
+        else openGallery();
+    });
+    builder.show();
+}
+
 
     private void checkCameraPermissionAndTakePhoto() {
         if (getContext() == null) return;
@@ -1717,24 +1718,24 @@ private void printTagDirectly(Bitmap tagBitmap) {
     }
 }
     private AlertDialog showProfessionalLoadingDialog(String title, String message) {
-        if (getContext() == null || !isAdded()) return null;
-        
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle(title);
-        builder.setMessage(message);
-        builder.setCancelable(false);
+    if (getContext() == null || !isAdded()) return null;
+    
+    MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext()); // ✅
+    builder.setTitle(title);
+    builder.setMessage(message);
+    builder.setCancelable(false);
 
-        ProgressBar progressBar = new ProgressBar(requireContext());
-        progressBar.setIndeterminate(true);
-        progressBar.setPadding(40, 20, 40, 20);
-        builder.setView(progressBar);
+    ProgressBar progressBar = new ProgressBar(requireContext());
+    progressBar.setIndeterminate(true);
+    progressBar.setPadding(40, 20, 40, 20);
+    builder.setView(progressBar);
 
-        AlertDialog dialog = builder.create();
-        dialog.setCanceledOnTouchOutside(false);
-        dialog.setCancelable(false);
-        dialog.show();
-        return dialog;
-    }
+    AlertDialog dialog = builder.create();
+    dialog.setCanceledOnTouchOutside(false);
+    dialog.setCancelable(false);
+    dialog.show();
+    return dialog;
+}
 
     private void setFormEnabled(boolean enabled) {
         try {
@@ -1780,19 +1781,19 @@ private void printTagDirectly(Bitmap tagBitmap) {
     }
 
     private void showValidationError(String message) {
-        try {
-            if (getContext() == null || !isAdded()) return;
+    try {
+        if (getContext() == null || !isAdded()) return;
 
-            new AlertDialog.Builder(requireContext())
-                    .setTitle(isArabic ? "⚠️ تنبيه الحماية" : "⚠️ Validation Alert")
-                    .setMessage(message)
-                    .setPositiveButton(isArabic ? "حسناً" : "OK", null)
-                    .setCancelable(false)
-                    .show();
-        } catch (Exception e) {
-            showToast(message);
-        }
+        new MaterialAlertDialogBuilder(requireContext()) // ✅
+                .setTitle(isArabic ? "⚠️ تنبيه الحماية" : "⚠️ Validation Alert")
+                .setMessage(message)
+                .setPositiveButton(isArabic ? "حسناً" : "OK", null)
+                .setCancelable(false)
+                .show();
+    } catch (Exception e) {
+        showToast(message);
     }
+}
 
     private void uploadItemImages(int itemId, List<String> imagePaths) {
         if (imagePaths == null || imagePaths.isEmpty() || itemId <= 0 || apiClient == null) return;
@@ -2141,4 +2142,4 @@ private boolean isEpcDuplicateLocally(String epc) {
             }
         }
     }
-}
+                    }
