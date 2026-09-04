@@ -710,7 +710,6 @@ private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
         Log.e(TAG, "Error generating Micro QR Code", e);
         return null;
     }
-}
     }
 
     private void finalizeItemIdentity() {
