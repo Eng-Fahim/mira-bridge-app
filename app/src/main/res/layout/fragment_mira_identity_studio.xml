@@ -61,12 +61,12 @@
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
                     android:layout_marginTop="8dp"
-                    android:text="📦 عرض الطلبات المحفوظة محلياً"
-                    android:textColor="#D97706"
-                    app:strokeColor="#D97706"
+                    android:text="@string/btn_view_pending"
+                    android:textColor="?attr/colorPrimary"
+                    app:strokeColor="?attr/colorPrimary"
                     app:cornerRadius="8dp"
                     app:icon="@android:drawable/ic_menu_upload"
-                    app:iconTint="#D97706" />
+                    app:iconTint="?attr/colorPrimary" />
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/tilEpc"
@@ -163,6 +163,7 @@
                 android:maxLines="2" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- حاوية الاقتراحات الأفقية -->
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -208,7 +209,7 @@
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="24K" />
+                android:text="@string/karat_24" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chip21K"
@@ -216,21 +217,21 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
-                android:text="21K" />
+                android:text="@string/karat_21" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chip18K"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="18K" />
+                android:text="@string/karat_18" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chip14K"
                 style="@style/Widget.MaterialComponents.Chip.Choice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="14K" />
+                android:text="@string/karat_14" />
         </com.google.android.material.chip.ChipGroup>
 
         <com.google.android.material.card.MaterialCardView
@@ -304,7 +305,7 @@
             android:layout_marginTop="20dp"
             android:layout_marginBottom="8dp"/>
 
-        <!-- ✅ حاوية الأحجار - قابلة للنقر بالكامل -->
+        <!-- حاوية الأحجار -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/layoutStonesContainer"
             android:layout_width="match_parent"
@@ -340,7 +341,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="اضغط للتفعيل أو الإلغاء"
+                        android:text="@string/toggle_stones_hint"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="9sp"
                         android:layout_marginTop="2dp" />
@@ -395,7 +396,7 @@
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="4dp"
-                    android:hint="وزن الأحجار (قيراط / ct)">
+                    android:hint="@string/stone_weight_hint">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etStoneWeight"
@@ -496,10 +497,47 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:textColor="#D97706"
+            android:textColor="?attr/colorPrimary"
             android:textSize="12sp"
             android:textStyle="bold"
             android:visibility="gone" />
+
+        <!-- ✅ المعرفات المطلوبة لفك التعارض وإنهاء خطأ البناء في Codemagic -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/imgGs1DataMatrix"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+            <ImageView
+                android:id="@+id/imgMicroQr"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+            <TextView
+                android:id="@+id/tvTidCode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+            <TextView
+                android:id="@+id/tvGs1CodeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+            <ImageView
+                android:id="@+id/imgFullGs1Matrix"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+            <ImageView
+                android:id="@+id/imgFullQrCode"
+                android:layout_width="wrap_content"android:layout_height="wrap_content" />
+        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>
