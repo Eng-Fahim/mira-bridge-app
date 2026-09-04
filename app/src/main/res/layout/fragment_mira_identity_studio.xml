@@ -88,6 +88,19 @@
                         android:maxLines="1" />
                 </com.google.android.material.textfield.TextInputLayout>
 
+                <!-- معرفات TID و GS1 النصية البرمجية -->
+                <TextView
+                    android:id="@+id/tvTidCode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tvGs1CodeText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone" />
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnScanRfid"
                     android:layout_width="match_parent"
@@ -469,12 +482,39 @@
             android:layout_gravity="center"
             android:layout_marginTop="4dp" />
 
+        <!-- الـ RecyclerView المعالجة للتحكم بالتمرير وارتفاع محدد -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvPhotosPreview"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="100dp"
             android:layout_marginTop="8dp"
             android:orientation="horizontal"
+            android:nestedScrollingEnabled="false"
+            android:visibility="gone" />
+
+        <!-- الصور المقترنة البرمجية المدمجة بدون حاوية وهمية -->
+        <ImageView
+            android:id="@+id/imgGs1DataMatrix"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/imgMicroQr"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/imgFullGs1Matrix"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/imgFullQrCode"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
             android:visibility="gone" />
 
         <com.google.android.material.button.MaterialButton
@@ -501,44 +541,6 @@
             android:textSize="12sp"
             android:textStyle="bold"
             android:visibility="gone" />
-
-                <!-- ✅ المعرفات المطلوبة لفك التعارض وإنهاء خطأ البناء في Codemagic -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <ImageView
-                android:id="@+id/imgGs1DataMatrix"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-
-            <ImageView
-                android:id="@+id/imgMicroQr"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-
-            <TextView
-                android:id="@+id/tvTidCode"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-
-            <TextView
-                android:id="@+id/tvGs1CodeText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-
-            <ImageView
-                android:id="@+id/imgFullGs1Matrix"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-
-            <ImageView
-                android:id="@+id/imgFullQrCode"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>
