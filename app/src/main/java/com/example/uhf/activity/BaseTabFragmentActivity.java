@@ -28,6 +28,7 @@ import com.example.uhf.tools.DeviceDetector;
 import com.example.uhf.tools.UIHelper;
 
 import com.example.uhf.tools.MemoryManager;
+import com.example.uhf.utils.MiraDialogHelper;
 import com.rscja.deviceapi.RFIDWithUHFUART;
 import com.rscja.utility.StringUtility;
 
