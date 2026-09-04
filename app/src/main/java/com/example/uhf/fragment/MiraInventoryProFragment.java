@@ -181,6 +181,7 @@ public class MiraInventoryProFragment extends KeyDwonFragment
     private ExecutorService backgroundExecutor;
     private final Handler mainThreadHandler = new Handler(Looper.getMainLooper());
     private volatile boolean isScanning = false;
+    
     private volatile boolean isFragmentDestroyed = false;
     private volatile boolean isArabic = true;
     private long scanStartTime = 0;
@@ -231,7 +232,12 @@ public class MiraInventoryProFragment extends KeyDwonFragment
             }
         }
     };
-    
+    /**
+ * التحقق من حالة الجرد
+ */
+public boolean isScanning() {
+    return isScanning;
+}
     // ==================== مكونات الأعمال ====================
     private MiraInventoryEngine inventoryEngine;
     private MiraApiClient apiClient;
