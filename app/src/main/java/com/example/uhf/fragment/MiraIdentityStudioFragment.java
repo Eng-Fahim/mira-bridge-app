@@ -47,7 +47,6 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 
-// ZXing Imports لتوليد GS1 DataMatrix و QR Code بدقة عالية
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
 import com.google.zxing.MultiFormatWriter;
@@ -599,18 +598,13 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     // 🌟 3. توليد الأكواد المجهرية المقاس الصغير جداً (6x6 mm Optimized Bitmaps)
     // =========================================================================
 
-    /**
-     * توليد رمز GS1 DataMatrix بدقة فائقة مخصصة للطباعة الصغيرة (6x6 mm)
-     */
     private Bitmap generateGS1DataMatrix(String gs1Data, int width, int height) {
         try {
             Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
             hints.put(EncodeHintType.DATA_MATRIX_SHAPE, SymbolShapeHint.FORCE_SQUARE);
-            hints.put(EncodeHintType.MARGIN, 0); // إزالة الهوامش الزائدة للطباعة المجهرية
+            hints.put(EncodeHintType.MARGIN, 0);
 
-            // تفعيل نمط GS1 إذا بدأ التنسيق بالمعرف المعتمد
             if (!gs1Data.startsWith("]d2")) {
-                // FNC1 character for GS1 DataMatrix standard formatting
                 gs1Data = "\u00f1" + gs1Data;
             }
 
@@ -637,14 +631,11 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         }
     }
 
-    /**
-     * توليد رمز QR Code عالي الدقة ومحسّن الحجم للطباعة المجهرية
-     */
     private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
         try {
             Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
-            hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L); // تقليل التصحيح لتقليل التعقيد
-            hints.put(EncodeHintType.MARGIN, 1); // هامش مجهري
+            hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L);
+            hints.put(EncodeHintType.MARGIN, 1);
             hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
 
             BitMatrix bitMatrix = new MultiFormatWriter().encode(
@@ -819,22 +810,26 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                                 uploadItemImages(finalServerItemId, finalPhotoPaths);
                             }
                             
-                            // استخراج بيانات التكويد والـ GS1 المسندة للقطعة
                             String activeEpc = finalEpc;
                             String gs1Code = "010729000000" + (finalServerItemId > 0 ? finalServerItemId : System.currentTimeMillis() % 100000) + "21" + activeEpc;
                             String qrUrl = "https://ibreg.org/id/" + (finalServerItemId > 0 ? finalServerItemId : activeEpc);
 
                             if (finalResponseData != null) {
                                 activeEpc = finalResponseData.optString("epc", activeEpc);
-                                if (finalResponseData.has("gs1_datamatrix")) {
-                                    gs1Code = finalResponseData.optString("gs1_datamatrix");
-                                }
-                                if (finalResponseData.has("qr_url")) {
-                                    qrUrl = finalResponseData.optString("qr_url");
+                                JSONObject gs1Obj = finalResponseData.optJSONObject("gs1");
+                                if (gs1Obj != null) {
+                                    gs1Code = gs1Obj.optString("raw_fnc1", gs1Code);
+                                    qrUrl = gs1Obj.optString("digital_link", qrUrl);
+                                } else {
+                                    if (finalResponseData.has("gs1_datamatrix")) {
+                                        gs1Code = finalResponseData.optString("gs1_datamatrix");
+                                    }
+                                    if (finalResponseData.has("qr_url")) {
+                                        qrUrl = finalResponseData.optString("qr_url");
+                                    }
                                 }
                             }
 
-                            // عرض دياليوج النجاح والأكواد المجهرية المتطورة
                             showEncodingSuccessDialogEnhanced(
                                     finalTitle,
                                     activeEpc,
@@ -1381,7 +1376,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         TextView tvPrice = view.findViewById(R.id.tvSummaryPrice);
         ImageView imgItemPhoto = view.findViewById(R.id.imgSummaryPhoto);
 
-        // عناصر استعراض الأكواد المجهرية (Micro Codes Preview)
         ImageView imgGs1DataMatrix = view.findViewById(R.id.imgGs1DataMatrix);
         ImageView imgMicroQr = view.findViewById(R.id.imgMicroQr);
 
@@ -1397,7 +1391,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             tvPrice.setText(priceManager.formatPriceDefault(finalPrice));
         }
 
-        // توليد عالي الدقة للطباعة الصغرى (6x6 mm = 200x200 Pixels Display)
         if (imgGs1DataMatrix != null) {
             Bitmap dmBitmap = generateGS1DataMatrix(gs1DataMatrix, 200, 200);
             if (dmBitmap != null) {
@@ -1445,9 +1438,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         bottomSheetDialog.show();
     }
 
-    /**
-     * واجهة جواز السفر الرقمي المكتمل للقطعة الثمينة (MIRA ID Complete Digital Passport)
-     */
     private void showDigitalIdentityDialogComplete(
             String title, String epc, String tid, String gs1DataMatrix, String qrUrl,
             String weight, String karat, double finalPrice, List<String> photos) {
@@ -1491,7 +1481,6 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             }
         }
 
-        // إخراج الأكواد بالـ Bitmap الدقيق جداً
         if (imgFullGs1Matrix != null) {
             Bitmap dm = generateGS1DataMatrix(gs1DataMatrix, 300, 300);
             if (dm != null) imgFullGs1Matrix.setImageBitmap(dm);
