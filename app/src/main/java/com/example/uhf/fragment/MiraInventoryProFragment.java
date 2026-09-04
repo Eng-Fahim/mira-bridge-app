@@ -1612,7 +1612,7 @@ public boolean isScanning() {
     /**
      * إيقاف المسح
      */
-    private void stopScanning() {
+    public void stopScanning() {
         if (!isScanning || isFragmentDestroyed) return;
         
         isScanning = false;
@@ -2825,4 +2825,4 @@ public boolean isScanning() {
             this.status = status;
         }
     }
-                                           }
+                }
