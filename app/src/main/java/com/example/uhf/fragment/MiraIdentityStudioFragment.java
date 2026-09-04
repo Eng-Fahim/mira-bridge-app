@@ -953,29 +953,35 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     public void validateAndProcessEpc(String scannedEpc) {
-        if (scannedEpc == null || scannedEpc.trim().isEmpty()) {
-            showErrorDialog(isArabic ? "خطأ" : "Error", isArabic ? "لم يتم قراءة رمز الشريحة بشكل صحيح." : "Invalid EPC tag.");
-            return;
-        }
-
-        if (offlineCache != null) {
-            String pendingJson = offlineCache.getString("pending_encodes", "[]");
-            if (pendingJson.contains(scannedEpc)) {
-                showErrorDialog(
-                    isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
-                    isArabic ? "هذه الشريحة مسجلة بالفعل في قائمة الانتظار للرفع." : "This tag is already queued in offline pending items."
-                );
-                playErrorSound();
-                return;
-            }
-        }
-
-        if (binding != null && binding.etEpc != null) {
-            binding.etEpc.setText(scannedEpc);
-            binding.tvStatusBadge.setText("BOUND");
-            playSuccessSound();
-        }
+    if (scannedEpc == null || scannedEpc.trim().isEmpty()) {
+        showErrorDialog(
+            isArabic ? "خطأ" : "Error", 
+            isArabic ? "لم يتم قراءة رمز الشريحة بشكل صحيح." : "Invalid EPC tag."
+        );
+        return;
     }
+
+    // توحيد صيغة الأحرف الكبيرة
+    String normalizedEpc = scannedEpc.trim().toUpperCase(Locale.US);
+
+    // 🛑 فحص التكرار المحلي فوراً
+    if (isEpcDuplicateLocally(normalizedEpc)) {
+        playErrorSound();
+        showErrorDialog(
+            isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
+            isArabic ? "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل في قائمة الانتظار أو الكاش المحلي." 
+                     : "This tag (" + normalizedEpc + ") is already stored in local pending items or cache."
+        );
+        return;
+    }
+
+    // إذا كان الرمز سليماً وغير مكرر
+    if (binding != null && binding.etEpc != null) {
+        binding.etEpc.setText(normalizedEpc);
+        binding.tvStatusBadge.setText("BOUND");
+        playSuccessSound();
+    }
+}
 
     private boolean validateInputData(String epc, String title, String weightStr) {
         if (title.isEmpty()) {
@@ -1318,39 +1324,58 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     private void activateRFIDModeForEncoding() {
-        if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
-            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-            return;
-        }
-        
-        try {
-            if (getActivity() instanceof UHFMainActivity) {
-                UHFMainActivity activity = (UHFMainActivity) getActivity();
-                isRfidScanning = true;
-                binding.btnScanRfid.setText(isArabic ? "إيقاف المسح..." : "Stop Scan...");
-                binding.tvStatusBadge.setText("SCANNING...");
-
-                activity.setActiveRfidListener(epc -> {
-                    if (binding != null && binding.etEpc != null) {
-                        binding.etEpc.setText(epc);
-                        binding.tvStatusBadge.setText("BOUND");
-                    }
-                    activity.playSound(1);
-                    stopRfidScanningMode();
-                });
-
-                activity.startUHFScan();
-                showToast(isArabic ? "📡 جاري البحث عن شريحة RFID..." : "📡 Searching for RFID tag...");
-
-                if (rfidTimeoutRunnable != null) handler.removeCallbacks(rfidTimeoutRunnable);
-                rfidTimeoutRunnable = this::stopRfidScanningMode;
-                handler.postDelayed(rfidTimeoutRunnable, RFID_TIMEOUT_MS);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "activateRFIDMode error: " + e.getMessage(), e);
-        }
+    if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
+        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+        return;
     }
+    
+    try {
+        if (getActivity() instanceof UHFMainActivity) {
+            UHFMainActivity activity = (UHFMainActivity) getActivity();
+            isRfidScanning = true;
+            binding.btnScanRfid.setText(isArabic ? "إيقاف المسح..." : "Stop Scan...");
+            binding.tvStatusBadge.setText("SCANNING...");
 
+            activity.setActiveRfidListener(epc -> {
+                // توحيد صيغة الأحرف الكبيرة
+                String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
+                
+                // فحص التكرار المحلي
+                if (isEpcDuplicateLocally(normalizedEpc)) {
+                    getActivity().runOnUiThread(() -> {
+                        playErrorSound();
+                        showErrorDialog(
+                            isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
+                            isArabic ? "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل. يرجى استخدام شريحة جديدة." 
+                                     : "This tag (" + normalizedEpc + ") is already registered. Please use a new tag."
+                        );
+                        binding.tvStatusBadge.setText("DUPLICATE");
+                        stopRfidScanningMode();
+                    });
+                    return;
+                }
+                
+                if (binding != null && binding.etEpc != null) {
+                    getActivity().runOnUiThread(() -> {
+                        binding.etEpc.setText(normalizedEpc);
+                        binding.tvStatusBadge.setText("BOUND");
+                        playSuccessSound();
+                        stopRfidScanningMode();
+                    });
+                }
+            });
+
+            activity.startUHFScan();
+            showToast(isArabic ? "📡 جاري البحث عن شريحة RFID..." : "📡 Searching for RFID tag...");
+
+            if (rfidTimeoutRunnable != null) handler.removeCallbacks(rfidTimeoutRunnable);
+            rfidTimeoutRunnable = this::stopRfidScanningMode;
+            handler.postDelayed(rfidTimeoutRunnable, RFID_TIMEOUT_MS);
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "activateRFIDMode error: " + e.getMessage(), e);
+    }
+}
     private void stopRfidScanningMode() {
         try {
             isRfidScanning = false;
@@ -1375,16 +1400,32 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     public void onRfidScanned(String epc) {
-        if (getActivity() == null || binding == null) return;
-        getActivity().runOnUiThread(() -> {
-            binding.etEpc.setText(epc);
-            binding.tvStatusBadge.setText("BOUND");
-            if (getActivity() instanceof UHFMainActivity) {
-                ((UHFMainActivity) getActivity()).playSound(1);
-            }
+    if (getActivity() == null || binding == null) return;
+    
+    // توحيد صيغة الأحرف الكبيرة
+    String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
+    
+    getActivity().runOnUiThread(() -> {
+        // فحص التكرار قبل العرض
+        if (isEpcDuplicateLocally(normalizedEpc)) {
+            playErrorSound();
+            showErrorDialog(
+                isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
+                isArabic ? "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل." 
+                         : "This tag (" + normalizedEpc + ") is already registered."
+            );
             stopRfidScanningMode();
-        });
-    }
+            return;
+        }
+        
+        binding.etEpc.setText(normalizedEpc);
+        binding.tvStatusBadge.setText("BOUND");
+        if (getActivity() instanceof UHFMainActivity) {
+            ((UHFMainActivity) getActivity()).playSound(1);
+        }
+        stopRfidScanningMode();
+    });
+}
 
     private void populateSuggestions(String typeKey) {
         try {
@@ -1622,6 +1663,69 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             });
         });
     }
+/**
+ * دالة للتحقق الشامل من تكرار رمز EPC محلياً
+ * مع توحيد صيغة الأحرف الكبيرة لمنع تجاوز الفحص
+ * @param epc الرمز المراد التحقق منه
+ * @return true إذا كان الرمز مكرراً محلياً، false إذا كان سليماً
+ */
+private boolean isEpcDuplicateLocally(String epc) {
+    if (epc == null || epc.trim().isEmpty() || offlineCache == null) {
+        return false;
+    }
+
+    // توحيد صيغة الأحرف الكبيرة
+    String cleanEpc = epc.trim().toUpperCase(Locale.US);
+
+    try {
+        // 1️⃣ الفحص في قائمة العناصر المنتظرة للمزامنة (Pending Sync Queue)
+        String pendingJson = offlineCache.getString("pending_encodes", "[]");
+        JSONArray pendingArray = new JSONArray(pendingJson);
+
+        for (int i = 0; i < pendingArray.length(); i++) {
+            JSONObject item = pendingArray.optJSONObject(i);
+            if (item != null) {
+                String storedEpc = item.optString("epc", "").trim().toUpperCase(Locale.US);
+                if (cleanEpc.equals(storedEpc)) {
+                    Log.w(TAG, "Duplicate found in Offline Pending Sync List: " + cleanEpc);
+                    return true;
+                }
+            }
+        }
+
+        // 2️⃣ الفحص في المسودة الحالية المفتوحة (Current Draft)
+        String draftJson = offlineCache.getString("current_draft", null);
+        if (draftJson != null) {
+            JSONObject draft = new JSONObject(draftJson);
+            String draftEpc = draft.optString("epc", "").trim().toUpperCase(Locale.US);
+            if (cleanEpc.equals(draftEpc)) {
+                Log.w(TAG, "EPC matches current unsaved draft: " + cleanEpc);
+                return true;
+            }
+        }
+
+        // 3️⃣ الفحص في الكاش المحلي للمنتجات المخزنة مسبقاً (Local Master DB / Cache)
+        String localItemsJson = offlineCache.getString("cached_master_items", "[]");
+        JSONArray localItemsArray = new JSONArray(localItemsJson);
+
+        for (int i = 0; i < localItemsArray.length(); i++) {
+            JSONObject item = localItemsArray.optJSONObject(i);
+            if (item != null) {
+                String storedEpc = item.optString("epc", "").trim().toUpperCase(Locale.US);
+                if (cleanEpc.equals(storedEpc)) {
+                    Log.w(TAG, "Duplicate found in Local Master Cache: " + cleanEpc);
+                    return true;
+                }
+            }
+        }
+
+    } catch (Exception e) {
+        Log.e(TAG, "Error checking duplicate EPC: " + e.getMessage(), e);
+    }
+
+    return false; // الرمز غير مكرر محلياً
+}
+    
 
     private void saveEncodeOffline(JSONObject payload) {
         try {
