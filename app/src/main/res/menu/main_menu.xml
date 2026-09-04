@@ -2,56 +2,69 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <!-- 📌 1. الإجراءات السريعة (تظهر مباشرة على شريط العنوان) -->
     <item
         android:id="@+id/action_dashboard"
-        android:icon="@android:drawable/ic_menu_today"
+        android:icon="@drawable/ic_dashboard"
         android:title="@string/menu_dashboard"
         app:showAsAction="always" />
 
     <item
-        android:id="@+id/action_quick_access_settings"
-        android:icon="@android:drawable/ic_menu_preferences"
-        android:title="@string/menu_quick_access"
-        app:showAsAction="always" />
-
-    <item
         android:id="@+id/action_gold_rates"
-        android:icon="@android:drawable/ic_menu_compass"
+        android:icon="@drawable/ic_gold_rate"
         android:title="@string/menu_gold_rates"
         app:showAsAction="ifRoom" />
 
-    <!-- ✅ الفروع -->
     <item
-        android:id="@+id/action_branches"
-        android:icon="@android:drawable/ic_menu_compass"
-        android:title="@string/menu_branches"
+        android:id="@+id/action_quick_access_settings"
+        android:icon="@drawable/ic_settings"
+        android:title="@string/menu_quick_access"
         app:showAsAction="ifRoom" />
 
-    <item
-        android:id="@+id/action_toggle_language"
-        android:title="@string/menu_toggle_language"
-        app:showAsAction="never" />
+    <!-- 📌 2. قائمة الخيارات المنسدلة (Overflow Menu) -->
 
-    <item
-        android:id="@+id/action_profile"
-        android:title="@string/menu_profile"
-        app:showAsAction="never" />
+    <!-- مجموعة الإدارة والفروع -->
+    <group android:id="@+id/group_management">
+        <item
+            android:id="@+id/action_branches"
+            android:icon="@drawable/ic_branch"
+            android:title="@string/menu_branches"
+            app:showAsAction="never" />
+    </group>
 
-    <item
-        android:id="@+id/action_logout"
-        android:title="@string/menu_logout"
-        app:showAsAction="never" />
-
-    <!-- ✅ مجموعة متقدمة -->
+    <!-- مجموعة أدوات البيانات والنظام -->
     <group android:id="@+id/group_advanced">
         <item
             android:id="@+id/export"
+            android:icon="@drawable/ic_export"
             android:title="@string/menu_export_data"
             app:showAsAction="never" />
 
         <item
             android:id="@+id/UHF_ver"
+            android:icon="@drawable/ic_info"
             android:title="@string/menu_device_version"
+            app:showAsAction="never" />
+    </group>
+
+    <!-- مجموعة الحساب والتفضيلات -->
+    <group android:id="@+id/group_user_account">
+        <item
+            android:id="@+id/action_profile"
+            android:icon="@drawable/ic_profile"
+            android:title="@string/menu_profile"
+            app:showAsAction="never" />
+
+        <item
+            android:id="@+id/action_toggle_language"
+            android:icon="@drawable/ic_language"
+            android:title="@string/menu_toggle_language"
+            app:showAsAction="never" />
+
+        <item
+            android:id="@+id/action_logout"
+            android:icon="@drawable/ic_logout"
+            android:title="@string/menu_logout"
             app:showAsAction="never" />
     </group>
 
