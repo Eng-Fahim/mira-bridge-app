@@ -4,7 +4,7 @@ import androidx.room.Entity;
 import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
-import java.util.Locale;  // ← Add this import
+import java.util.Locale;
 
 /**
  * كيان Room Database لتخزين العناصر المشفرة
@@ -15,7 +15,7 @@ import java.util.Locale;  // ← Add this import
     indices = {
         @Index(value = "epc", unique = true),  // فهرس فريد لمنع التكرار
         @Index(value = "title"),               // فهرس للبحث بالعنوان
-        @Index(value = "created_at")           // فهرس للترتيب الزمني
+        @Index(value = "createdAt")            // ✅ تم التصحيح: استخدام camelCase وليس snake_case
     }
 )
 public class EncodedItemEntity {
@@ -39,7 +39,7 @@ public class EncodedItemEntity {
     private String rfidTid;
     private double retailPrice;
     private String currency;
-    private long createdAt;
+    private long createdAt;       // ✅ هذا هو اسم الحقل الفعلي
     private boolean isSynced;
     
     // Constructors
@@ -57,8 +57,6 @@ public class EncodedItemEntity {
         // توحيد الأحرف الكبيرة عند التخزين
         this.epc = epc != null ? epc.trim().toUpperCase(Locale.US) : null; 
     }
-    
-    
     
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
