@@ -940,7 +940,8 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         return isArabic ? "❌ فشل العملية" : "❌ Operation failed";
     }
 
-    private void showErrorDialog(String title, String message) {
+    @Override
+protected void showErrorDialog(String title, String message) {
         if (getContext() == null || !isAdded()) return;
         new MaterialAlertDialogBuilder(requireContext())
             .setTitle(title)
