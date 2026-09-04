@@ -929,12 +929,19 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     // ==================== INVENTORY LOCK PROTECTION ====================
 
     public boolean isInventoryActive() {
-        if (loopFlag) return true;
-        if (currentFragment instanceof MiraUHFReadTagFragment && currentFragment.isVisible()) {
-            return ((MiraUHFReadTagFragment) currentFragment).isScanning();
-        }
-        return false;
+    // ✅ فقط إذا كانت واجهة الجرد هي الظاهرة حالياً
+    if (currentFragment instanceof MiraInventoryProFragment && currentFragment.isVisible()) {
+        return ((MiraInventoryProFragment) currentFragment).isScanning();
     }
+    
+    // ✅ فقط إذا كانت واجهة UHF Read Tag هي الظاهرة
+    if (currentFragment instanceof MiraUHFReadTagFragment && currentFragment.isVisible()) {
+        return ((MiraUHFReadTagFragment) currentFragment).isScanning();
+    }
+    
+    // ❌ لا تعتبر واجهات أخرى كجرد نشط
+    return false;
+}
 
     private void checkInventoryLockAndExecute(Runnable onConfirmed) {
         if (isInventoryActive()) {
@@ -954,15 +961,22 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     private void stopActiveInventory() {
-        try {
-            stopUHFScan();
-            if (currentFragment instanceof MiraUHFReadTagFragment) {
-                ((MiraUHFReadTagFragment) currentFragment).stopScanning();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error stopping inventory: " + e.getMessage());
+    try {
+        // ✅ إيقاف فقط إذا كانت الواجهة الحالية هي الجرد
+        if (currentFragment instanceof MiraInventoryProFragment && currentFragment.isVisible()) {
+            ((MiraInventoryProFragment) currentFragment).stopScanning();
         }
+        
+        // ✅ إيقاف فقط إذا كانت واجهة UHF Read Tag
+        if (currentFragment instanceof MiraUHFReadTagFragment && currentFragment.isVisible()) {
+            ((MiraUHFReadTagFragment) currentFragment).stopScanning();
+        }
+        
+        stopUHFScan();  // إيقاف أي مسح UHF عام
+    } catch (Exception e) {
+        Log.e(TAG, "Error stopping inventory: " + e.getMessage());
     }
+}
 
     // ==================== BACK BUTTON HANDLING ====================
 
