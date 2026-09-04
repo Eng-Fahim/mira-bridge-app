@@ -33,8 +33,8 @@
         <item name="tabStyle">@style/AppTabStyle</item>
 
         <!-- 🎨 لوحة الألوان الفاخرة للوضع الداكن (Dark Luxury Theme) -->
-        <item name="colorPrimary">#D4AF37</item> <!-- الذهبي الفاخر -->
-        <item name="colorOnPrimary">#111827</item> <!-- نص داكن فوق الزر الذهبي للتباين الداكن -->
+        <item name="colorPrimary">#D4AF37</item>
+        <item name="colorOnPrimary">#111827</item>
         <item name="colorPrimaryContainer">#2A2413</item>
         <item name="colorOnPrimaryContainer">#FDF8E7</item>
         
@@ -44,18 +44,25 @@
         <item name="colorOnSecondaryContainer">#F9F4E9</item>
 
         <!-- 🖼️ خلفية كربونية داكنة للوضع الداكن -->
-        <item name="android:colorBackground">#0B0B0C</item> <!-- أسود كربوني فخم -->
-        <item name="colorOnBackground">#F3F4F6</item> <!-- نصوص فاتحة مريحة -->
+        <item name="android:colorBackground">#0B0B0C</item>
+        <item name="colorOnBackground">#F3F4F6</item>
         
         <!-- 🗂️ الأسطح والبطاقات الداكنة -->
-        <item name="colorSurface">#161618</item> <!-- بطاقات رمادية داكنة تطفو فوق الخلفية الكربونية -->
-        <item name="colorOnSurface">#F9FAFB</item> <!-- نصوص رئيسية بيضاء -->
-        <item name="colorSurfaceVariant">#1E1E22</item> <!-- أسطح فرعية أو حقول إدخال داكنة -->
-        <item name="colorOnSurfaceVariant">#9CA3AF</item> <!-- نصوص ثانوية رمادية فاتحة -->
+        <item name="colorSurface">#161618</item>
+        <item name="colorOnSurface">#F9FAFB</item>
+        <item name="colorSurfaceVariant">#1E1E22</item>
+        <item name="colorOnSurfaceVariant">#9CA3AF</item>
         
         <!-- 🔲 الحدود والإطارات الداكنة -->
         <item name="colorOutline">#2D2D32</item>
         <item name="colorOutlineVariant">#3F3F46</item>
+
+        <!-- ✅ توحيد النوافذ الحوارية -->
+        <item name="android:alertDialogTheme">@style/MiraDialogTheme</item>
+        <item name="alertDialogTheme">@style/MiraDialogTheme</item>
+        
+        <!-- ✅ توحيد الـ BottomSheet -->
+        <item name="bottomSheetDialogTheme">@style/MiraBottomSheetDialogTheme</item>
     </style>
 
     <!-- ============================================ -->
@@ -105,6 +112,70 @@
     <style name="AppTabStyle" parent="Widget.Material3.TabLayout">
         <item name="fontFamily">@font/cairo</item>
         <item name="android:fontFamily">@font/cairo</item>
+    </style>
+
+    <!-- ============================================ -->
+    <!-- ✅ أنماط النوافذ الحوارية الموحدة للوضع الداكن -->
+    <!-- ============================================ -->
+
+    <style name="MiraDialogTheme" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="android:windowBackground">@drawable/bg_mira_dialog_dark</item>
+        <item name="android:backgroundDimAmount">0.7</item>
+        <item name="android:textColorPrimary">#F9FAFB</item>
+        <item name="android:textColorSecondary">#9CA3AF</item>
+        <item name="android:titleTextColor">#D4AF37</item>
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="fontFamily">@font/cairo</item>
+        <item name="colorAccent">#D4AF37</item>
+        <item name="colorPrimary">#D4AF37</item>
+        <item name="colorOnPrimary">#111827</item>
+        <item name="shapeAppearanceOverlay">@style/MiraDialogShape</item>
+        
+        <item name="buttonBarPositiveButtonStyle">@style/MiraDialogButton.Positive</item>
+        <item name="buttonBarNegativeButtonStyle">@style/MiraDialogButton.Negative</item>
+        <item name="buttonBarNeutralButtonStyle">@style/MiraDialogButton.Neutral</item>
+    </style>
+
+    <style name="MiraDialogShape" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">20dp</item>
+    </style>
+
+    <style name="MiraDialogButton.Positive" parent="Widget.Material3.Button.TextButton">
+        <item name="android:textColor">#D4AF37</item>
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="MiraDialogButton.Negative" parent="Widget.Material3.Button.TextButton">
+        <item name="android:textColor">#9CA3AF</item>
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="MiraDialogButton.Neutral" parent="Widget.Material3.Button.TextButton">
+        <item name="android:textColor">#C5A059</item>
+        <item name="android:fontFamily">@font/cairo</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="MiraBottomSheetDialogTheme" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/MiraBottomSheetStyle</item>
+        <item name="android:fontFamily">@font/cairo</item>
+    </style>
+
+    <style name="MiraBottomSheetStyle" parent="Widget.Material3.BottomSheet.Modal">
+        <item name="android:background">@drawable/bg_bottom_sheet_dark</item>
+        <item name="shapeAppearanceOverlay">@style/MiraBottomSheetShape</item>
+    </style>
+
+    <style name="MiraBottomSheetShape" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">24dp</item>
+        <item name="cornerSizeTopRight">24dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
     </style>
 
     <style name="Theme.Uhfuartdemo" parent="Base.Theme.Uhfuartdemo" />
