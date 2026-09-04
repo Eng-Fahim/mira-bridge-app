@@ -941,9 +941,9 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     @Override
-protected void showErrorDialog(String title, String message) {
-        if (getContext() == null || !isAdded()) return;
-        new MaterialAlertDialogBuilder(requireContext())
+    protected AlertDialog showErrorDialog(String title, String message) {
+        if (getContext() == null || !isAdded()) return null;
+        return new MaterialAlertDialogBuilder(requireContext())
             .setTitle(title)
             .setMessage(message)
             .setIcon(R.drawable.ic_error_outline)
@@ -958,7 +958,6 @@ protected void showErrorDialog(String title, String message) {
             return;
         }
 
-        // الاستعلام الأوفلاين عبر الكاش للتحقق الفوري من التضارب
         if (offlineCache != null) {
             String pendingJson = offlineCache.getString("pending_encodes", "[]");
             if (pendingJson.contains(scannedEpc)) {
@@ -1070,7 +1069,7 @@ protected void showErrorDialog(String title, String message) {
     }
 
     private void showPendingItemsDialog() {
-        if (offlineCache == null || !isAdded()) return;
+        if (offlineCache == null || !isAdded() || getContext() == null) return;
 
         try {
             String json = offlineCache.getString("pending_encodes", "[]");
@@ -1187,7 +1186,7 @@ protected void showErrorDialog(String title, String message) {
     }
 
     private void showImageSourceDialog() {
-        if (getContext() == null) return;
+        if (getContext() == null || !isAdded()) return;
         if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
             showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
             return;
@@ -1274,7 +1273,7 @@ protected void showErrorDialog(String title, String message) {
     private void onPhotosUpdated() {
         if (photosAdapter != null) photosAdapter.notifyDataSetChanged();
         updatePhotosCountText();
-        if (binding.rvPhotosPreview != null) {
+        if (binding != null && binding.rvPhotosPreview != null) {
             binding.rvPhotosPreview.setVisibility(photoPaths.isEmpty() ? View.GONE : View.VISIBLE);
         }
     }
@@ -1521,6 +1520,8 @@ protected void showErrorDialog(String title, String message) {
     }
 
     private AlertDialog showProfessionalLoadingDialog(String title, String message) {
+        if (getContext() == null || !isAdded()) return null;
+        
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setTitle(title);
         builder.setMessage(message);
@@ -1803,12 +1804,7 @@ protected void showErrorDialog(String title, String message) {
             binding.chip21K.setChecked(true);
             binding.etEpc.requestFocus();
             
-            for (String path : photoPaths) {
-                File photoFile = new File(path);
-                if (photoFile.exists()) {
-                    photoFile.delete();
-                }
-            }
+            // حماية الصور الأوفلاين: تنظيف قائمة المراجع دون حذف الصور الفيزيائية
             photoPaths.clear();
             onPhotosUpdated();
             
@@ -1828,7 +1824,7 @@ protected void showErrorDialog(String title, String message) {
         stopRfidScanningMode();
         
         if (executorService != null && !executorService.isShutdown()) {
-            executorService.shutdown();
+            executorService.shutdownNow();
         }
         
         handler.removeCallbacksAndMessages(null);
