@@ -857,19 +857,25 @@ public class MiraTransferFragment extends Fragment {
                     mainHandler.post(() -> {
                         if (!isAdded() || getContext() == null) return;
                         if (response != null && response.isSuccess && response.data != null) {
-                            JSONObject item = response.data.optJSONObject("item");
-                            JSONObject decision = response.data.optJSONObject("decision");
-                            if (item != null && decision != null && decision.optBoolean("allowed", false)) {
+                            boolean allowed = response.data.optBoolean("allowed", false);
+                            JSONObject itemObj = response.data.optJSONObject("item");
+                            
+                            if (allowed || (itemObj != null)) {
+                                String title = itemObj != null ? itemObj.optString("title", epc) : epc;
                                 activeScanEpcSet.add(epc);
-                                if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n✅ " + item.optString("title", epc));
+                                if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n✅ " + title);
                                 if (tvScanCounter != null) tvScanCounter.setText(String.valueOf(activeScanEpcSet.size()));
                             } else {
-                                if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n❌ " + epc);
+                                if (activeDialogScannedTv != null) activeDialogScannedTv.append("\n❌ " + epc + " (غير مسموح)");
                             }
+                        } else {
+                            Toast.makeText(getContext(), isArabic ? "القطعة غير مسجلة" : "Item not found", Toast.LENGTH_SHORT).show();
                         }
                         etEpc.setText("");
                     });
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    mainHandler.post(() -> Toast.makeText(getContext(), e.getMessage(), Toast.LENGTH_SHORT).show());
+                }
             });
         });
 
@@ -880,16 +886,26 @@ public class MiraTransferFragment extends Fragment {
         });
 
         btnSave.setOnClickListener(v -> {
-            if (activeScanEpcSet.isEmpty()) return;
+            if (activeScanEpcSet.isEmpty()) {
+                Toast.makeText(getContext(), isArabic ? "⚠️ لم يتم مسح أي قطع" : "⚠️ No items scanned", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
+            showLoadingDialog(isArabic ? "جاري حفظ القطع..." : "Saving items...");
             executor.execute(() -> {
                 try {
-                    JSONArray items = new JSONArray();
-                    for (String epc : activeScanEpcSet) items.put(epc);
-                    MiraApiClient.ApiResponse response = apiClient.addItemsToTransfer(t.id, items);
+                    JSONArray itemsArray = new JSONArray();
+                    for (String epc : activeScanEpcSet) {
+                        itemsArray.put(epc);
+                    }
+                    
+                    MiraApiClient.ApiResponse response = apiClient.addItemsToTransfer(t.id, itemsArray);
                     mainHandler.post(() -> {
+                        dismissLoadingDialog();
                         if (!isAdded() || getContext() == null) return;
+                        
                         if (response != null && response.isSuccess) {
-                            showSuccessMessage(isArabic ? "تمت الإضافة" : "Items Added", isArabic ? "تم حفظ القطع الممسوحة بنجاح." : "Items saved successfully.");
+                            showSuccessMessage(isArabic ? "تمت الإضافة" : "Items Added", isArabic ? "تم حفظ القطع الممسوحة بنجاح للتحويل." : "Items saved successfully.");
                             loadTransfers();
                             notifyDashboardUpdate();
                             dialog.dismiss();
@@ -897,7 +913,12 @@ public class MiraTransferFragment extends Fragment {
                             showErrorMessage(isArabic ? "فشل الحفظ" : "Save Failed", getErrorMessage(response));
                         }
                     });
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    mainHandler.post(() -> {
+                        dismissLoadingDialog();
+                        showErrorMessage(isArabic ? "خطأ" : "Error", e.getMessage());
+                    });
+                }
             });
         });
 
