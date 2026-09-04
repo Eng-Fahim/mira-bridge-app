@@ -255,6 +255,16 @@
                     android:textColor="?attr/colorOnSurface"/>
             </LinearLayout>
         </LinearLayout>
+<!-- زر الطباعة المباشرة -->
+<com.google.android.material.button.MaterialButton
+    android:id="@+id/btnPrintTag"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:layout_marginTop="12dp"
+    android:text="طباعة كارت الشريحة"
+    app:icon="@android:drawable/ic_menu_print"
+    app:cornerRadius="10dp"
+    app:backgroundTint="?attr/colorSecondary"/>
 
         <!-- زر الإغلاق -->
         <com.google.android.material.button.MaterialButton
