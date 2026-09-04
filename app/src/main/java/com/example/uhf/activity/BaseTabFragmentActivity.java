@@ -43,7 +43,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     public Fragment currentFragment = null;  // ✅ تغير من KeyDwonFragment إلى Fragment
     public int TidLen = 6;
 
-    
+    protected MiraDialogHelper dialogHelper;
     private static final int MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE = 1;
     private static final int RFID_INIT_TIMEOUT_MS = 10000; // 10 ثواني
     private int initRetryCount = 0;
@@ -67,6 +67,9 @@ protected void onCreate(Bundle savedInstanceState) {
     
     // ✅ تسجيل النشاط في MemoryManager
     MemoryManager.getInstance().registerActivity(this);
+    
+    // ✅ تهيئة MiraDialogHelper
+    dialogHelper = new MiraDialogHelper(this);
     
     // ✅ تسجيل لاستقبال إشعارات الذاكرة
     registerComponentCallbacks(MemoryManager.getInstance());
