@@ -85,7 +85,7 @@ import java.util.List;
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
 private static final boolean ENABLE_DASHBOARD = true;      // ✅ مفعل
-private static final boolean ENABLE_INVENTORY = false;      // ✅ مفعل
+private static final boolean ENABLE_INVENTORY = true;      // ✅ مفعل
 private static final boolean ENABLE_POS = true;           // ❌ معطل مؤقتاً
 private static final boolean ENABLE_TRANSFERS = true;     // ❌ معطل مؤقتاً
 private static final boolean ENABLE_OTHER = true;         // ❌ معطل مؤقتاً
@@ -507,43 +507,17 @@ protected void onCreate(Bundle savedInstanceState) {
                 applyBottomNavPermissions(quickNav, pm);
 
                 quickNav.setOnItemSelectedListener(item -> {
-                    int id = item.getItemId();
-
-                    String fragmentTag = getFragmentTagForNavItem(id);
-                    if (fragmentTag.isEmpty()) {
-                        Toast.makeText(this, "⚠️ عنصر غير معروف", Toast.LENGTH_SHORT).show();
-                        return false;
-                    }
-
-                    if (!pm.canAccessFragment(fragmentTag)) {
-                        showPermissionDenied();
-                        return false;
-                    }
-
-                    if (id == R.id.nav_home) {
-                        checkInventoryLockAndExecute(() -> {
-                            clearBackStack();
-                            loadFragment(new MiraDashboardFragment(), "Dashboard", false);
-                        });
-                        return true;
-                    } else if (id == R.id.nav_inventory) {
-                        checkInventoryLockAndExecute(() -> {
-                            loadFragment(new MiraInventoryProFragment(), "Scan");
-                        });
-                        return true;
-                    } else if (id == R.id.nav_sales) {
-                        checkInventoryLockAndExecute(() -> {
-                            loadFragment(new MiraPosFragment(), "POS");
-                        });
-                        return true;
-                    } else if (id == R.id.nav_transfers) {
-                        checkInventoryLockAndExecute(() -> {
-                            loadFragment(new MiraTransferFragment(), "Transfers");
-                        });
-                        return true;
-                    }
-                    return false;
-                });
+    int id = item.getItemId();
+    
+    String tag = getFragmentTagForNavItem(id);
+    Fragment fragment = createFragmentByTag(tag);
+    
+    if (fragment != null) {
+        loadFragment(fragment, tag, false);
+        return true;
+    }
+    return false;
+});
             }
         } catch (Exception e) {
             Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
@@ -604,18 +578,17 @@ protected void onCreate(Bundle savedInstanceState) {
     Menu menu = quickNav.getMenu();
 
     MenuItem navHome = menu.findItem(R.id.nav_home);
-    if (navHome != null) navHome.setVisible(true); // ✅ دائماً ظاهر
+    if (navHome != null) navHome.setVisible(true);
 
     MenuItem navInventory = menu.findItem(R.id.nav_inventory);
-    if (navInventory != null) navInventory.setVisible(ENABLE_INVENTORY); // ✅ حسب التحكم
+    if (navInventory != null) navInventory.setVisible(true);
 
     MenuItem navSales = menu.findItem(R.id.nav_sales);
-    if (navSales != null) navSales.setVisible(ENABLE_POS); // ✅ حسب التحكم
+    if (navSales != null) navSales.setVisible(true);
 
     MenuItem navTransfers = menu.findItem(R.id.nav_transfers);
-    if (navTransfers != null) navTransfers.setVisible(ENABLE_TRANSFERS); // ✅ حسب التحكم
+    if (navTransfers != null) navTransfers.setVisible(true);
 }
-
     private String getFragmentTagForNavItem(int itemId) {
         if (itemId == R.id.nav_home) return "Dashboard";
         if (itemId == R.id.nav_inventory) return "Scan";
