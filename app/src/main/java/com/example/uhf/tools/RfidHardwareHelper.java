@@ -78,6 +78,15 @@ public class RfidHardwareHelper {
         });
     }
 
+    public void shutdown() {
+    try {
+        executor.shutdown();
+        instance = null;
+    } catch (Exception e) {
+        Log.e(TAG, "Shutdown error: " + e.getMessage());
+    }
+    }
+
     /**
      * التمهيد الآمن لفتح الكاميرا (إيقاف + انتظر مهلة الـ UART Port ثم فتح الكاميرا)
      */
