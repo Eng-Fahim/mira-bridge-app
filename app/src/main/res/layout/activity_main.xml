@@ -11,7 +11,7 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- الشريط العلوي -->
+        <!-- الشريط العلوي - واحد فقط -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
@@ -23,30 +23,66 @@
             app:popupTheme="@style/CustomOverflowMenu">
 
             <LinearLayout
-                android:id="@+id/btnHardwareStatus"
                 android:layout_width="wrap_content"
-                android:layout_height="32dp"
+                android:layout_height="match_parent"
                 android:layout_gravity="end"
-                android:layout_marginEnd="12dp"
-                android:background="@drawable/bg_hardware_badge"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:paddingHorizontal="10dp">
+                android:orientation="horizontal"
+                android:gravity="center">
 
-                <View
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
-                    android:background="@drawable/bg_status_dot_green" />
-
-                <TextView
+                <!-- زر إعادة التشغيل -->
+                <LinearLayout
+                    android:id="@+id/btnRestartApp"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:text="@string/hardware_connected"
-                    android:textColor="?attr/colorOnPrimary"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/bg_restart_badge"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="10dp">
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_restart"
+                        android:tint="?attr/colorOnPrimary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:text="إعادة تشغيل"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- زر حالة العتاد -->
+                <LinearLayout
+                    android:id="@+id/btnHardwareStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="12dp"
+                    android:background="@drawable/bg_hardware_badge"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="10dp">
+
+                    <View
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:background="@drawable/bg_status_dot_green" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="@string/hardware_connected"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.appbar.MaterialToolbar>
 
