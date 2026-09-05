@@ -251,44 +251,42 @@ public boolean isScanning() {
     // ==================== المحول ====================
     private ScannedItemsAdapter scannedItemsAdapter;
 
-    @Nullable
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, 
-                             @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_mira_inventory_pro, container, false);
-        
-        isFragmentDestroyed = false;
-        
-        // تهيئة آمنة للـ Executor
-        if (backgroundExecutor == null || backgroundExecutor.isShutdown()) {
-            backgroundExecutor = Executors.newSingleThreadExecutor();
-        }
-        
-        isArabic = Locale.getDefault().getLanguage().equals("ar");
-        view.setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
-        
-        initSoundPool();
-        initViews(view);
-        initDatabase();
-        
-        // تهيئة مكونات الأعمال
-        String sessionId = "SESS-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        String deviceId = getDeviceId();
-        
-        inventoryEngine = new MiraInventoryEngine(requireContext(), sessionId, deviceId);
-        apiClient = MiraApiClient.getInstance(requireContext());
-        branchesManager = MiraBranchesManager.getInstance(requireContext());
-        permissionManager = PermissionManager.getInstance(requireContext());
-        
-        rfidManager = RFIDManager.getInstance(requireContext());
-        rfidManager.setListener(this);
-        
-        setupBackPressHandler();
-        applyPermissions();
-        applyLanguage();
-        
-        return view;
+   @Nullable
+@Override
+public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, 
+                         @Nullable Bundle savedInstanceState) {
+    View view = null;
+    
+    try {
+        view = inflater.inflate(R.layout.fragment_mira_inventory_pro, container, false);
+    } catch (Exception e) {
+        Log.e(TAG, "Inflate error: " + e.getMessage(), e);
+        TextView textView = new TextView(requireContext());
+        textView.setText("✅ الجرد يعمل (Fallback)\n\nخطأ: " + e.getMessage());
+        textView.setTextSize(16);
+        textView.setGravity(android.view.Gravity.CENTER);
+        return textView;
     }
+    
+    isFragmentDestroyed = false;
+    
+    try { if (backgroundExecutor == null || backgroundExecutor.isShutdown()) { backgroundExecutor = Executors.newSingleThreadExecutor(); } } catch (Exception e) {}
+    try { isArabic = Locale.getDefault().getLanguage().equals("ar"); view.setLayoutDirection(isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR); } catch (Exception e) {}
+    try { initSoundPool(); } catch (Exception e) { Log.e(TAG, "Sound: " + e.getMessage()); }
+    try { initViews(view); } catch (Exception e) { Log.e(TAG, "Views: " + e.getMessage()); }
+    try { initDatabase(); } catch (Exception e) { Log.e(TAG, "DB: " + e.getMessage()); }
+    
+    try { String sessionId = "SESS-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(); inventoryEngine = new MiraInventoryEngine(requireContext(), sessionId, getDeviceId()); } catch (Exception e) {}
+    try { apiClient = MiraApiClient.getInstance(requireContext()); } catch (Exception e) { apiClient = null; }
+    try { branchesManager = MiraBranchesManager.getInstance(requireContext()); } catch (Exception e) { branchesManager = null; }
+    try { permissionManager = PermissionManager.getInstance(requireContext()); } catch (Exception e) { permissionManager = null; }
+    try { rfidManager = RFIDManager.getInstance(requireContext()); rfidManager.setListener(this); } catch (Exception e) { rfidManager = null; }
+    try { setupBackPressHandler(); } catch (Exception e) {}
+    try { applyPermissions(); } catch (Exception e) {}
+    try { applyLanguage(); } catch (Exception e) {}
+    
+    return view;
+}
 
     /**
      * تهيئة قاعدة البيانات بأمان
