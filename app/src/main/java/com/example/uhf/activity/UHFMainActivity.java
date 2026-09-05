@@ -1,5 +1,7 @@
 package com.example.uhf.activity;
 
+// أضف هذا import في أعلى الملف
+import com.example.uhf.application.MiraApplication;
 import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
@@ -234,6 +236,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             PermissionManager.resetInstance();
             setupQuickNav();
+            setupRestartButton();
 
             loadEssentialData();
 
@@ -542,6 +545,58 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "QuickNav Setup Error: " + e.getMessage());
         }
     }
+
+private void setupRestartButton() {
+    try {
+        View btnRestartApp = findViewById(R.id.btnRestartApp);
+        if (btnRestartApp != null) {
+            btnRestartApp.setOnClickListener(v -> showRestartConfirmationDialog());
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "Restart button setup error: " + e.getMessage());
+    }
+}
+
+private void showRestartConfirmationDialog() {
+    new MaterialAlertDialogBuilder(this)
+            .setTitle(isArabic ? "إعادة تشغيل التطبيق" : "Restart Application")
+            .setMessage(isArabic ? 
+                "هل تريد إعادة تشغيل التطبيق؟\nسيتم إغلاق جميع العمليات وإعادة التشغيل." : 
+                "Do you want to restart the application?\nAll processes will be closed and restarted.")
+            .setPositiveButton(isArabic ? "إعادة التشغيل" : "Restart", (dialog, which) -> {
+                performAppRestart();
+            })
+            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+            .show();
+}
+
+private void performAppRestart() {
+    try {
+        Toast.makeText(this, 
+            isArabic ? "جاري إعادة التشغيل..." : "Restarting...", 
+            Toast.LENGTH_SHORT).show();
+        
+        // إيقاف جميع العمليات
+        stopActiveInventory();
+        stopUHFScan();
+        
+        // تنظيف الموارد
+        if (soundPool != null) {
+            soundPool.release();
+            soundPool = null;
+        }
+        
+        // إعادة التشغيل
+        mainHandler.postDelayed(() -> {
+            MiraApplication.getInstance().restartApp();
+        }, 500);
+        
+    } catch (Exception e) {
+        Log.e(TAG, "Restart error: " + e.getMessage());
+        MiraApplication.getInstance().restartApp();
+    }
+}
+
 
     private void applyBottomNavPermissions(BottomNavigationView quickNav, PermissionManager pm) {
         Menu menu = quickNav.getMenu();
