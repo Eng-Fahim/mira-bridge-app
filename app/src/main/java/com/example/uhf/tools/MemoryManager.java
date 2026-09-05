@@ -93,20 +93,17 @@ public class MemoryManager implements ComponentCallbacks2 {
      * تنظيف شامل للذاكرة
      */
     public void forceCleanup() {
-        Log.d(TAG, "Forcing memory cleanup");
-        
-        // تنظيف المراجع الميتة
-        cleanupDeadReferences();
-        
-        // طلب جمع القمامة
+    Log.d(TAG, "Forcing memory cleanup");
+    
+    cleanupDeadReferences();
+    
+    // ✅ تشغيل GC في خيط منفصل
+    new Thread(() -> {
         Runtime.getRuntime().gc();
-        
-        // طلب جمع نهائي
         Runtime.getRuntime().runFinalization();
-        
-        // طلب جمع مرة أخرى
         Runtime.getRuntime().gc();
-    }
+    }, "MemoryCleanup").start();
+}
 
     /**
      * الحصول على معلومات الذاكرة
