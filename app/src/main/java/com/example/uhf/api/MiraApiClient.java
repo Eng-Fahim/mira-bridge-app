@@ -168,193 +168,211 @@ public class MiraApiClient {
     }
 
     public ApiResponse getWithAuth(String endpoint) {
-        HttpURLConnection conn = null;
-        try {
-            String cleanEndpoint = endpoint;
-            if (cleanEndpoint.startsWith("/")) {
-                cleanEndpoint = cleanEndpoint.substring(1);
-            }
-            
-            String fullUrl = apiUrl + cleanEndpoint;
-            URL url = new URL(fullUrl);
-            
-            if (url.getProtocol().equals("https")) {
-                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-                CertificatePinningManager.applyPinning(httpsConn);
-                conn = httpsConn;
-            } else {
-                conn = (HttpURLConnection) url.openConnection();
-            }
-            conn.setRequestMethod("GET");
-            applyStandardHeaders(conn, true);
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
-            return buildResponse(conn);
-            
-        } catch (java.net.UnknownHostException e) {
-            ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
-            response.isNetworkError = true;
+    HttpURLConnection conn = null;
+    try {
+        // ✅ فحص التوكن قبل الطلب
+        String token = getAuthToken();
+        if (token == null || token.isEmpty()) {
+            Log.w(TAG, "No auth token for endpoint: " + endpoint);
+            ApiResponse response = new ApiResponse(401, null, "No auth token");
+            response.isNetworkError = false;
             return response;
-        } catch (java.net.ConnectException e) {
-            ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
-            response.isNetworkError = true;
-            return response;
-        } catch (java.net.SocketTimeoutException e) {
-            ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
-            response.isNetworkError = true;
-            return response;
-        } catch (Exception e) {
-            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
-            response.isNetworkError = true;
-            return response;
-        } finally {
-            if (conn != null) conn.disconnect();
         }
+        
+        String cleanEndpoint = endpoint;
+        if (cleanEndpoint.startsWith("/")) {
+            cleanEndpoint = cleanEndpoint.substring(1);
+        }
+        
+        String fullUrl = apiUrl + cleanEndpoint;
+        URL url = new URL(fullUrl);
+        
+        if (url.getProtocol().equals("https")) {
+            HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+            CertificatePinningManager.applyPinning(httpsConn);
+            conn = httpsConn;
+        } else {
+            conn = (HttpURLConnection) url.openConnection();
+        }
+        conn.setRequestMethod("GET");
+        applyStandardHeaders(conn, true);
+        conn.setConnectTimeout(10000);  // ✅ 10 ثواني
+        conn.setReadTimeout(10000);     // ✅ 10 ثواني
+        return buildResponse(conn);
+        
+    } catch (java.net.UnknownHostException e) {
+        ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
+        response.isNetworkError = true;
+        return response;
+    } catch (java.net.ConnectException e) {
+        ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
+        response.isNetworkError = true;
+        return response;
+    } catch (java.net.SocketTimeoutException e) {
+        ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
+        response.isNetworkError = true;
+        return response;
+    } catch (Exception e) {
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true;
+        return response;
+    } finally {
+        if (conn != null) conn.disconnect();
     }
+}
 
     public ApiResponse postWithAuth(String endpoint, JSONObject payload) {
-        HttpURLConnection conn = null;
-        try {
-            String cleanEndpoint = endpoint;
-            if (cleanEndpoint.startsWith("/")) {
-                cleanEndpoint = cleanEndpoint.substring(1);
-            }
-            
-            String fullUrl = apiUrl + cleanEndpoint;
-            URL url = new URL(fullUrl);
-            if (url.getProtocol().equals("https")) {
-                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-                CertificatePinningManager.applyPinning(httpsConn);
-                conn = httpsConn;
-            } else {
-                conn = (HttpURLConnection) url.openConnection();
-            }
-            conn.setRequestMethod("POST");
-            applyStandardHeaders(conn, true);
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
-            conn.setDoOutput(true);
-
-            if (payload != null) {
-                byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(input, 0, input.length);
-                }
-            }
-            return buildResponse(conn);
-            
-        } catch (java.net.UnknownHostException e) {
-            ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
-            response.isNetworkError = true;
+    HttpURLConnection conn = null;
+    try {
+        // ✅ فحص التوكن قبل الطلب
+        String token = getAuthToken();
+        if (token == null || token.isEmpty()) {
+            Log.w(TAG, "No auth token for endpoint: " + endpoint);
+            ApiResponse response = new ApiResponse(401, null, "No auth token");
+            response.isNetworkError = false;
             return response;
-        } catch (java.net.ConnectException e) {
-            ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
-            response.isNetworkError = true;
-            return response;
-        } catch (java.net.SocketTimeoutException e) {
-            ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
-            response.isNetworkError = true;
-            return response;
-        } catch (Exception e) {
-            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
-            response.isNetworkError = true;
-            return response;
-        } finally {
-            if (conn != null) conn.disconnect();
         }
+        
+        String cleanEndpoint = endpoint;
+        if (cleanEndpoint.startsWith("/")) {
+            cleanEndpoint = cleanEndpoint.substring(1);
+        }
+        
+        String fullUrl = apiUrl + cleanEndpoint;
+        URL url = new URL(fullUrl);
+        if (url.getProtocol().equals("https")) {
+            HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+            CertificatePinningManager.applyPinning(httpsConn);
+            conn = httpsConn;
+        } else {
+            conn = (HttpURLConnection) url.openConnection();
+        }
+        conn.setRequestMethod("POST");
+        applyStandardHeaders(conn, true);
+        conn.setConnectTimeout(10000);  // ✅ 10 ثواني
+        conn.setReadTimeout(10000);     // ✅ 10 ثواني
+        conn.setDoOutput(true);
+
+        if (payload != null) {
+            byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(input, 0, input.length);
+            }
+        }
+        return buildResponse(conn);
+        
+    } catch (java.net.UnknownHostException e) {
+        ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
+        response.isNetworkError = true;
+        return response;
+    } catch (java.net.ConnectException e) {
+        ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
+        response.isNetworkError = true;
+        return response;
+    } catch (java.net.SocketTimeoutException e) {
+        ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
+        response.isNetworkError = true;
+        return response;
+    } catch (Exception e) {
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true;
+        return response;
+    } finally {
+        if (conn != null) conn.disconnect();
     }
+}
 
     private ApiResponse post(String endpoint, JSONObject payload) {
-        HttpURLConnection conn = null;
-        try {
-            String cleanEndpoint = endpoint;
-            if (cleanEndpoint.startsWith("/")) {
-                cleanEndpoint = cleanEndpoint.substring(1);
-            }
-            
-            String fullUrl = apiUrl + cleanEndpoint;
-            URL url = new URL(fullUrl);
-            if (url.getProtocol().equals("https")) {
-                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-                CertificatePinningManager.applyPinning(httpsConn);
-                conn = httpsConn;
-            } else {
-                conn = (HttpURLConnection) url.openConnection();
-            }
-            conn.setRequestMethod("POST");
-            applyStandardHeaders(conn, false);
-
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
-            conn.setDoOutput(true);
-
-            if (payload != null) {
-                byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(input, 0, input.length);
-                }
-            }
-            return buildResponse(conn);
-        } catch (java.net.UnknownHostException e) {
-            ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
-            response.isNetworkError = true;
-            return response;
-        } catch (java.net.ConnectException e) {
-            ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
-            response.isNetworkError = true;
-            return response;
-        } catch (java.net.SocketTimeoutException e) {
-            ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
-            response.isNetworkError = true;
-            return response;
-        } catch (Exception e) {
-            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
-            response.isNetworkError = true;
-            return response;
-        } finally {
-            if (conn != null) conn.disconnect();
+    HttpURLConnection conn = null;
+    try {
+        String cleanEndpoint = endpoint;
+        if (cleanEndpoint.startsWith("/")) {
+            cleanEndpoint = cleanEndpoint.substring(1);
         }
+        
+        String fullUrl = apiUrl + cleanEndpoint;
+        URL url = new URL(fullUrl);
+        if (url.getProtocol().equals("https")) {
+            HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+            CertificatePinningManager.applyPinning(httpsConn);
+            conn = httpsConn;
+        } else {
+            conn = (HttpURLConnection) url.openConnection();
+        }
+        conn.setRequestMethod("POST");
+        applyStandardHeaders(conn, false);
+
+        conn.setConnectTimeout(10000);  // ✅ 10 ثواني
+        conn.setReadTimeout(10000);     // ✅ 10 ثواني
+        conn.setDoOutput(true);
+
+        if (payload != null) {
+            byte[] input = payload.toString().getBytes(StandardCharsets.UTF_8);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(input, 0, input.length);
+            }
+        }
+        return buildResponse(conn);
+    } catch (java.net.UnknownHostException e) {
+        ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
+        response.isNetworkError = true;
+        return response;
+    } catch (java.net.ConnectException e) {
+        ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
+        response.isNetworkError = true;
+        return response;
+    } catch (java.net.SocketTimeoutException e) {
+        ApiResponse response = new ApiResponse(-1, null, "انتهت المهلة");
+        response.isNetworkError = true;
+        return response;
+    } catch (Exception e) {
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true;
+        return response;
+    } finally {
+        if (conn != null) conn.disconnect();
     }
+}
 
     private ApiResponse get(String endpoint) {
-        HttpURLConnection conn = null;
-        try {
-            String cleanEndpoint = endpoint;
-            if (cleanEndpoint.startsWith("/")) {
-                cleanEndpoint = cleanEndpoint.substring(1);
-            }
-            
-            String fullUrl = apiUrl + cleanEndpoint;
-            URL url = new URL(fullUrl);
-            if (url.getProtocol().equals("https")) {
-                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-                CertificatePinningManager.applyPinning(httpsConn);
-                conn = httpsConn;
-            } else {
-                conn = (HttpURLConnection) url.openConnection();
-            }
-            conn.setRequestMethod("GET");
-            applyStandardHeaders(conn, false);
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
-            return buildResponse(conn);
-            
-        } catch (java.net.UnknownHostException e) {
-            ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
-            response.isNetworkError = true;
-            return response;
-        } catch (java.net.ConnectException e) {
-            ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
-            response.isNetworkError = true;
-            return response;
-        } catch (Exception e) {
-            ApiResponse response = new ApiResponse(-1, null, e.getMessage());
-            response.isNetworkError = true;
-            return response;
-        } finally {
-            if (conn != null) conn.disconnect();
+    HttpURLConnection conn = null;
+    try {
+        String cleanEndpoint = endpoint;
+        if (cleanEndpoint.startsWith("/")) {
+            cleanEndpoint = cleanEndpoint.substring(1);
         }
+        
+        String fullUrl = apiUrl + cleanEndpoint;
+        URL url = new URL(fullUrl);
+        if (url.getProtocol().equals("https")) {
+            HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+            CertificatePinningManager.applyPinning(httpsConn);
+            conn = httpsConn;
+        } else {
+            conn = (HttpURLConnection) url.openConnection();
+        }
+        conn.setRequestMethod("GET");
+        applyStandardHeaders(conn, false);
+        conn.setConnectTimeout(10000);  // ✅ 10 ثواني
+        conn.setReadTimeout(10000);     // ✅ 10 ثواني
+        return buildResponse(conn);
+        
+    } catch (java.net.UnknownHostException e) {
+        ApiResponse response = new ApiResponse(-1, null, "الخادم غير موجود");
+        response.isNetworkError = true;
+        return response;
+    } catch (java.net.ConnectException e) {
+        ApiResponse response = new ApiResponse(-1, null, "لا يمكن الاتصال بالخادم");
+        response.isNetworkError = true;
+        return response;
+    } catch (Exception e) {
+        ApiResponse response = new ApiResponse(-1, null, e.getMessage());
+        response.isNetworkError = true;
+        return response;
+    } finally {
+        if (conn != null) conn.disconnect();
     }
+}
 
     private ApiResponse buildResponse(HttpURLConnection conn) throws Exception {
     int responseCode = conn.getResponseCode();
@@ -588,35 +606,34 @@ public class MiraApiClient {
     }
 
     public boolean pingApi() {
-        HttpURLConnection conn = null;
-        try {
-            String cleanUrl = this.apiUrl;
-            if (cleanUrl.endsWith("/")) {
-                cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
-            }
-
-            URL url = new URL(cleanUrl + "/ping");
-            if (url.getProtocol().equals("https")) {
-                HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
-                CertificatePinningManager.applyPinning(httpsConn);
-                conn = httpsConn;
-            } else {
-                conn = (HttpURLConnection) url.openConnection();
-            }
-            conn.setRequestMethod("GET");
-            applyStandardHeaders(conn, true);
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(8000);
-
-            int responseCode = conn.getResponseCode();
-            return (responseCode >= 200 && responseCode < 400);
-        } catch (Exception e) {
-            return false;
-        } finally {
-            if (conn != null) conn.disconnect();
+    HttpURLConnection conn = null;
+    try {
+        String cleanUrl = this.apiUrl;
+        if (cleanUrl.endsWith("/")) {
+            cleanUrl = cleanUrl.substring(0, cleanUrl.length() - 1);
         }
-    }
 
+        URL url = new URL(cleanUrl + "/ping");
+        if (url.getProtocol().equals("https")) {
+            HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
+            CertificatePinningManager.applyPinning(httpsConn);
+            conn = httpsConn;
+        } else {
+            conn = (HttpURLConnection) url.openConnection();
+        }
+        conn.setRequestMethod("GET");
+        applyStandardHeaders(conn, true);
+        conn.setConnectTimeout(5000);   // ✅ 5 ثواني
+        conn.setReadTimeout(5000);      // ✅ 5 ثواني
+
+        int responseCode = conn.getResponseCode();
+        return (responseCode >= 200 && responseCode < 400);
+    } catch (Exception e) {
+        return false;
+    } finally {
+        if (conn != null) conn.disconnect();
+    }
+}
     public ApiResponse getDashboardSummary() {
         return getWithAuth("/dashboard/summary");
     }
@@ -1255,35 +1272,41 @@ public ApiResponse cancelTransfer(int transferId) {
     }
 
     public List<ApiProvider> getActiveProviders() {
-        List<ApiProvider> providers = new ArrayList<>();
-        try {
-            ApiResponse response = getWithAuth("/gold/providers/active");
-            if (response.isSuccess && response.data != null) {
-                JSONArray providersArray = response.data.optJSONArray("providers");
-                if (providersArray == null) {
-                    providersArray = response.data.optJSONArray("data");
-                }
+    List<ApiProvider> providers = new ArrayList<>();
+    try {
+        // ✅ فحص سريع للتوكن
+        if (getAuthToken().isEmpty()) {
+            Log.w(TAG, "No auth token - returning empty providers list");
+            return providers;
+        }
+        
+        ApiResponse response = getWithAuth("/gold/providers/active");
+        if (response.isSuccess && response.data != null) {
+            JSONArray providersArray = response.data.optJSONArray("providers");
+            if (providersArray == null) {
+                providersArray = response.data.optJSONArray("data");
+            }
 
-                if (providersArray != null) {
-                    for (int i = 0; i < providersArray.length(); i++) {
-                        JSONObject providerJson = providersArray.getJSONObject(i);
-                        ApiProvider provider = new ApiProvider();
-                        provider.setId(providerJson.optInt("id", 0));
-                        provider.setProviderName(providerJson.optString("name", ""));
-                        provider.setProviderType(providerJson.optString("type", ""));
-                        provider.setApiKey(providerJson.optString("api_key", ""));
-                        provider.setBaseUrl(providerJson.optString("base_url", ""));
-                        provider.setActive(providerJson.optBoolean("is_active", true));
+            if (providersArray != null) {
+                for (int i = 0; i < providersArray.length(); i++) {
+                    JSONObject providerJson = providersArray.getJSONObject(i);
+                    ApiProvider provider = new ApiProvider();
+                    provider.setId(providerJson.optInt("id", 0));
+                    provider.setProviderName(providerJson.optString("name", ""));
+                    provider.setProviderType(providerJson.optString("type", ""));
+                    provider.setApiKey(providerJson.optString("api_key", ""));
+                    provider.setBaseUrl(providerJson.optString("base_url", ""));
+                    provider.setActive(providerJson.optBoolean("is_active", true));
 
-                        providers.add(provider);
-                    }
+                    providers.add(provider);
                 }
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error fetching providers: " + e.getMessage());
         }
-        return providers;
+    } catch (Exception e) {
+        Log.e(TAG, "Error fetching providers: " + e.getMessage());
     }
+    return providers;
+}
 
     public ApiResponse activateProvider(int providerId) {
         JSONObject payload = new JSONObject();
