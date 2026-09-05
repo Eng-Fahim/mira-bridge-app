@@ -2026,7 +2026,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         void onDelete(int position);
     }
 
-    private static class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewHolder> {
+        private static class PhotosAdapter extends RecyclerView.Adapter<PhotosAdapter.PhotoViewHolder> {
         private final List<String> paths;
         private final OnPhotoDeleteListener deleteListener;
 
@@ -2050,12 +2050,14 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             if (thumbnail != null) {
                 holder.imgThumbnail.setImageBitmap(thumbnail);
             } else {
-                holder.imgThumbnail.setImageResource(R.drawable.ic_placeholder);
+                // تم تعديل المورد لتفادي خطأ ic_placeholder المفقود
+                holder.imgThumbnail.setImageResource(R.drawable.ic_photo);
             }
 
             holder.btnDelete.setOnClickListener(v -> {
                 if (deleteListener != null) {
-                    int adapterPosition = holder.getBindingAdapterPosition();
+                    // تم تعديل الدالة إلى getAdapterPosition() لتتوافق مع الإصدار الحالي
+                    int adapterPosition = holder.getAdapterPosition();
                     if (adapterPosition != RecyclerView.NO_POSITION) {
                         deleteListener.onDelete(adapterPosition);
                     }
