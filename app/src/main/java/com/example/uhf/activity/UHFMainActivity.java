@@ -200,7 +200,7 @@ protected void onCreate(Bundle savedInstanceState) {
         setContentView(R.layout.activity_main);
 
         // ✅ إخفاء loading_overlay فوراً بعد setContentView
-        loadingOverlay = findViewById(R.id.loading_overlay);
+        //loadingOverlay = findViewById(R.id.loading_overlay);
         if (loadingOverlay != null) {
             loadingOverlay.setVisibility(View.GONE);
             loadingOverlay.setAlpha(0.0f);
