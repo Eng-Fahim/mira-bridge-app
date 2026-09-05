@@ -103,8 +103,8 @@ public class LoginActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        FirebaseDiagnostics.log("LIFECYCLE", "LoginActivity Created", "onCreate started");
+    super.onCreate(savedInstanceState);
+    FirebaseDiagnostics.log("LIFECYCLE", "LoginActivity Created", "onCreate started");
 
         // 1. منع التقاط الشاشة لأغراض الأمان
         getWindow().setFlags(
@@ -119,6 +119,11 @@ public class LoginActivity extends AppCompatActivity {
         registerComponentCallbacks(MemoryManager.getInstance());
 
         setContentView(R.layout.activity_login);
+        if (getIntent() != null && getIntent().getBooleanExtra("session_expired", false)) {
+        Toast.makeText(this, 
+            isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : "Session expired - Please sign in again", 
+            Toast.LENGTH_LONG).show();
+    }
 
         sessionManager = new SessionManager(getApplicationContext());
 
