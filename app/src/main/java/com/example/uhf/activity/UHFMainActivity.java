@@ -84,6 +84,12 @@ import java.util.List;
 
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
+private static final boolean ENABLE_DASHBOARD = true;      // ✅ مفعل
+private static final boolean ENABLE_INVENTORY = true;      // ✅ مفعل
+private static final boolean ENABLE_POS = false;           // ❌ معطل مؤقتاً
+private static final boolean ENABLE_TRANSFERS = false;     // ❌ معطل مؤقتاً
+private static final boolean ENABLE_OTHER = false;         // ❌ معطل مؤقتاً
+
     private static final String TAG = "UHFMainActivity";
     private static final int PERMISSION_REQUEST_CODE = 1001;
     private static final String PREFS_NAVIGATION = "app_navigation";
@@ -206,15 +212,8 @@ protected void onCreate(Bundle savedInstanceState) {
         ToastUtil.init(getApplicationContext());
         initializeLanguageState();
 
-        // ✅ لا حاجة لـ SessionMonitorManager للاختبار
-        // SessionMonitorManager.getInstance(this).startMonitoring(this);
-        
         branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
         fragmentManager = getSupportFragmentManager();
-
-        // ✅ لا حاجة لـ setupOrgProfileListener للاختبار
-        // setupOrgProfileListener();
-        // updateBottomNavLanguage();
 
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
@@ -222,27 +221,22 @@ protected void onCreate(Bundle savedInstanceState) {
             updateToolbarTitle();
         }
 
-        // ✅ لا حاجة لـ setupQuickNav للاختبار
-        // setupQuickNav();
-        // setupRestartButton();
+        setupQuickNav();
 
-        // ✅ اختبار بدون Fragment نهائياً
-        FrameLayout container = findViewById(R.id.fragment_container);
-        if (container != null) {
-            TextView testView = new TextView(this);
-            testView.setText("✅ MainActivity يعمل!\n\nلا يوجد Fragment هنا.\nالواجهة تعمل بشكل طبيعي.\n\nإذا رأيت هذا النص الأخضر،\nفالمشكلة كانت في Fragment.");
-            testView.setTextSize(22);
-            testView.setTextColor(0xFF16A34A);
-            testView.setGravity(android.view.Gravity.CENTER);
-            testView.setPadding(32, 32, 32, 32);
-            testView.setBackgroundColor(0xFFFFFFFF);
-            container.addView(testView);
-            
-            Log.d(TAG, "✅ Test view added directly without Fragment");
+        if (savedInstanceState == null) {
+            currentFragmentTag = "Dashboard";
+        } else {
+            currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
         }
+
+        // ✅ تحميل الـ Fragment الحقيقي
+        loadFragmentDirectly(createFragmentByTag(currentFragmentTag), currentFragmentTag);
 
     } catch (Exception e) {
         Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
+        try {
+            loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+        } catch (Exception ignored) {}
     }
 }
 
@@ -607,20 +601,20 @@ protected void onCreate(Bundle savedInstanceState) {
     }
 
     private void applyBottomNavPermissions(BottomNavigationView quickNav, PermissionManager pm) {
-        Menu menu = quickNav.getMenu();
+    Menu menu = quickNav.getMenu();
 
-        MenuItem navHome = menu.findItem(R.id.nav_home);
-        if (navHome != null) navHome.setVisible(pm.canViewDashboard());
+    MenuItem navHome = menu.findItem(R.id.nav_home);
+    if (navHome != null) navHome.setVisible(true); // ✅ دائماً ظاهر
 
-        MenuItem navInventory = menu.findItem(R.id.nav_inventory);
-        if (navInventory != null) navInventory.setVisible(pm.canViewInventory());
+    MenuItem navInventory = menu.findItem(R.id.nav_inventory);
+    if (navInventory != null) navInventory.setVisible(ENABLE_INVENTORY); // ✅ حسب التحكم
 
-        MenuItem navSales = menu.findItem(R.id.nav_sales);
-        if (navSales != null) navSales.setVisible(pm.canUsePos() || pm.canViewSalesHistory());
+    MenuItem navSales = menu.findItem(R.id.nav_sales);
+    if (navSales != null) navSales.setVisible(ENABLE_POS); // ✅ حسب التحكم
 
-        MenuItem navTransfers = menu.findItem(R.id.nav_transfers);
-        if (navTransfers != null) navTransfers.setVisible(pm.canViewTransfers());
-    }
+    MenuItem navTransfers = menu.findItem(R.id.nav_transfers);
+    if (navTransfers != null) navTransfers.setVisible(ENABLE_TRANSFERS); // ✅ حسب التحكم
+}
 
     private String getFragmentTagForNavItem(int itemId) {
         if (itemId == R.id.nav_home) return "Dashboard";
@@ -798,33 +792,51 @@ private void loadFragmentDirectly(Fragment fragment, String tag) {
     }
 
     private Fragment createFragmentByTag(String tag) {
-        if (tag == null) return new MiraDashboardFragment();
+    if (tag == null) return new MiraDashboardFragment();
 
-        switch (tag) {
-            case "Dashboard": return new MiraDashboardFragment();
-            case "Branches": return new MiraBranchesManagementFragment();
-            case "RfidBindings": return new MiraRfidBindingsFragment();
-            case "Scan": return new MiraInventoryProFragment();
-            case "POS": return new MiraPosFragment();
-            case "Transfers": return new MiraTransferFragment();
-            case "IdentityStudio": return new MiraIdentityStudioFragment();
-            case "Radar": return new MiraUHFRadarLocationFragment();
-            case "SecureGate": return new MiraSecureGateFragment();
-            case "Reports": return new MiraReportsProFragment();
-            case "Accounting": return new MiraAccountingFragment();
-            case "AdminHub": return new MiraAdminHubFragment();
-            case "SalesHistory": return new MiraSalesHistoryFragment();
-            case "ServerConfig": return new MiraServerConfigFragment();
-            case "GoldRates": return new MiraGoldCurrencyFragment();
-            case "Profile": return new MiraProfileFragment();
-            case "UsersManagement": return new UsersManagementFragment();
-            case "RFIDWrite": return new MiraUHFReadWriteFragment();
-            case "ReaderSetup": return new MiraReaderSetupFragment();
-            case "GateSettings": return new MiraGateSettingsFragment();
-            case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
-            default: return new MiraDashboardFragment();
-        }
+    switch (tag) {
+        case "Dashboard":
+            if (ENABLE_DASHBOARD) return new MiraDashboardFragment();
+            return new MiraDashboardFragment(); // ✅ دائماً يعمل
+
+        case "Scan":
+            if (ENABLE_INVENTORY) return new MiraInventoryProFragment();
+            return new MiraDashboardFragment(); // ✅ بديل مؤقت
+
+        case "POS":
+            if (ENABLE_POS) return new MiraPosFragment();
+            return new MiraDashboardFragment();
+
+        case "Transfers":
+            if (ENABLE_TRANSFERS) return new MiraTransferFragment();
+            return new MiraDashboardFragment();
+
+        default:
+            if (ENABLE_OTHER) {
+                // ✅ تفعيل الكل
+                switch (tag) {
+                    case "IdentityStudio": return new MiraIdentityStudioFragment();
+                    case "Radar": return new MiraUHFRadarLocationFragment();
+                    case "SecureGate": return new MiraSecureGateFragment();
+                    case "Reports": return new MiraReportsProFragment();
+                    case "Accounting": return new MiraAccountingFragment();
+                    case "AdminHub": return new MiraAdminHubFragment();
+                    case "SalesHistory": return new MiraSalesHistoryFragment();
+                    case "ServerConfig": return new MiraServerConfigFragment();
+                    case "GoldRates": return new MiraGoldCurrencyFragment();
+                    case "Profile": return new MiraProfileFragment();
+                    case "UsersManagement": return new UsersManagementFragment();
+                    case "RFIDWrite": return new MiraUHFReadWriteFragment();
+                    case "ReaderSetup": return new MiraReaderSetupFragment();
+                    case "GateSettings": return new MiraGateSettingsFragment();
+                    case "QuickAccessSettings": return new MiraQuickAccessSettingsFragment();
+                    case "Branches": return new MiraBranchesManagementFragment();
+                    case "RfidBindings": return new MiraRfidBindingsFragment();
+                }
+            }
+            return new MiraDashboardFragment();
     }
+}
 
     private void showUHFVersionDialog() {
         String miraSystemVersion = "MIRA ID™ v1.0.0 (Enterprise)";
