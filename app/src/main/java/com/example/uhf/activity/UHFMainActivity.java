@@ -85,10 +85,10 @@ import java.util.List;
 public class UHFMainActivity extends BaseTabFragmentActivity {
 
 private static final boolean ENABLE_DASHBOARD = true;      // ✅ مفعل
-private static final boolean ENABLE_INVENTORY = true;      // ✅ مفعل
-private static final boolean ENABLE_POS = false;           // ❌ معطل مؤقتاً
-private static final boolean ENABLE_TRANSFERS = false;     // ❌ معطل مؤقتاً
-private static final boolean ENABLE_OTHER = false;         // ❌ معطل مؤقتاً
+private static final boolean ENABLE_INVENTORY = false;      // ✅ مفعل
+private static final boolean ENABLE_POS = true;           // ❌ معطل مؤقتاً
+private static final boolean ENABLE_TRANSFERS = true;     // ❌ معطل مؤقتاً
+private static final boolean ENABLE_OTHER = true;         // ❌ معطل مؤقتاً
 
     private static final String TAG = "UHFMainActivity";
     private static final int PERMISSION_REQUEST_CODE = 1001;
