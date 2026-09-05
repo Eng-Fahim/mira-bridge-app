@@ -1,30 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
         android:id="@+id/nav_home"
         android:icon="@drawable/ic_home"
-        android:title="@string/nav_home" />
+        android:title="@string/nav_home"
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/nav_inventory"
         android:icon="@drawable/ic_inventory"
-        android:title="@string/nav_inventory" />
-
-    <!-- عنصر وهمي فارغ لحجز المساحة أسفل زر الإجراءات العائم -->
-    <item
-        android:id="@+id/nav_placeholder"
-        android:enabled="false"
-        android:title="" />
+        android:title="@string/nav_inventory"
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/nav_sales"
         android:icon="@drawable/ic_sales"
-        android:title="@string/nav_sales" />
+        android:title="@string/nav_sales"
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/nav_transfers"
         android:icon="@drawable/ic_transfer"
-        android:title="@string/nav_transfers" />
+        android:title="@string/nav_transfers"
+        app:showAsAction="always" />
 
 </menu>
