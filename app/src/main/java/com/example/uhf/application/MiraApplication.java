@@ -85,24 +85,24 @@ public class MiraApplication extends AppContext {
     }
     
     private synchronized void initializeDatabase() {
-        if (inventoryDatabase == null) {
-            try {
-                inventoryDatabase = Room.databaseBuilder(
-                    getApplicationContext(),
-                    InventoryDatabase.class,
-                    DATABASE_NAME
-                )
-                .fallbackToDestructiveMigration()
-                .allowMainThreadQueries() // يمنع التعطيل في العمليات الاستعلامية السريعة
-                .build();
-                
-                FirebaseDiagnostics.log("DATABASE", "Database Initialized", "Success");
-            } catch (Exception e) {
-                FirebaseDiagnostics.logError("MiraApplication.initializeDatabase", e);
-                Log.e(TAG, "Database initialization failed: " + e.getMessage());
-            }
+    if (inventoryDatabase == null) {
+        try {
+            inventoryDatabase = Room.databaseBuilder(
+                getApplicationContext(),
+                InventoryDatabase.class,
+                DATABASE_NAME
+            )
+            .fallbackToDestructiveMigration()
+            // ❌ تم حذف allowMainThreadQueries
+            .build();
+            
+            FirebaseDiagnostics.log("DATABASE", "Database Initialized", "Success");
+        } catch (Exception e) {
+            FirebaseDiagnostics.logError("MiraApplication.initializeDatabase", e);
+            Log.e(TAG, "Database initialization failed: " + e.getMessage());
         }
     }
+}
     
     public static MiraApplication getInstance() {
         if (instance == null) {
