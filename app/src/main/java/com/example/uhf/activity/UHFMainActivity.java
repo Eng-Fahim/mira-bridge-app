@@ -185,82 +185,94 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
 
-        try {
-            sessionManager = new SessionManager(getApplicationContext());
-            if (!sessionManager.isLoggedIn()) {
-                navigateToLogin();
-                return;
-            }
-
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-
-            setContentView(R.layout.activity_main);
-
-            // بدء مراقبة التجمد
-            AppWatchdog.getInstance().startMonitoring(() -> {
-                Log.e(TAG, "🚨 UI Thread FROZEN! Restarting app...");
-                MiraApplication.getInstance().restartApp();
-            });
-
-            ToastUtil.init(getApplicationContext());
-            initializeLanguageState();
-
-            SessionMonitorManager.getInstance(this).startMonitoring(this);
-            branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
-            if (branchesManager != null) {
-                lastActiveBranchId = branchesManager.getActiveBranchId();
-            }
-
-            loadingOverlay = findViewById(R.id.loading_overlay);
-            fragmentManager = getSupportFragmentManager();
-
-            setupOrgProfileListener();
-            updateBottomNavLanguage();
-
-            MaterialToolbar toolbar = findViewById(R.id.toolbar);
-            if (toolbar != null) {
-                setSupportActionBar(toolbar);
-                updateToolbarTitle();
-            }
-
-            View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
-            if (btnHardwareStatus != null) {
-                btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
-            }
-
-            checkReadWritePermission();
-            mainHandler.postDelayed(() -> {
-                if (!isFinishing() && !isDestroyed()) {
-                    safeExecute(this::initSound, "Sound Init Error");
-                    // ✅ تم التعديل هنا: منع محاولة الإتصال بالعتاد نهائياً في حال عدم توفره لتجنب حظر الواجهة
-                    if (BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
-                        safeExecute(this::initUHF, "UHF Hardware Init Error");
-                        safeExecute(this::configureReaderForDevice, "Reader Configuration Error");
-                    }
-                }
-            }, 500);
-
-            PermissionManager.resetInstance();
-            setupQuickNav();
-            setupRestartButton();
-
-            loadEssentialData();
-
-            if (savedInstanceState == null) {
-                currentFragmentTag = "Dashboard";
-            } else {
-                currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
-            }
-
-            loadFragmentByTag(currentFragmentTag);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
+    try {
+        sessionManager = new SessionManager(getApplicationContext());
+        if (!sessionManager.isLoggedIn()) {
+            navigateToLogin();
+            return;
         }
+
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+
+        setContentView(R.layout.activity_main);
+
+        // ✅ إخفاء loading_overlay فوراً بعد setContentView
+        loadingOverlay = findViewById(R.id.loading_overlay);
+        if (loadingOverlay != null) {
+            loadingOverlay.setVisibility(View.GONE);
+            loadingOverlay.setAlpha(0.0f);
+            loadingOverlay.setClickable(false);
+            loadingOverlay.setFocusable(false);
+        }
+
+        // بدء مراقبة التجمد
+        AppWatchdog.getInstance().startMonitoring(() -> {
+            Log.e(TAG, "🚨 UI Thread FROZEN! Restarting app...");
+            MiraApplication.getInstance().restartApp();
+        });
+
+        ToastUtil.init(getApplicationContext());
+        initializeLanguageState();
+
+        SessionMonitorManager.getInstance(this).startMonitoring(this);
+        branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
+        if (branchesManager != null) {
+            lastActiveBranchId = branchesManager.getActiveBranchId();
+        }
+
+        fragmentManager = getSupportFragmentManager();
+
+        setupOrgProfileListener();
+        updateBottomNavLanguage();
+
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            setSupportActionBar(toolbar);
+            updateToolbarTitle();
+        }
+
+        View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
+        if (btnHardwareStatus != null) {
+            btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
+        }
+
+        checkReadWritePermission();
+        mainHandler.postDelayed(() -> {
+            if (!isFinishing() && !isDestroyed()) {
+                safeExecute(this::initSound, "Sound Init Error");
+                if (BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
+                    safeExecute(this::initUHF, "UHF Hardware Init Error");
+                    safeExecute(this::configureReaderForDevice, "Reader Configuration Error");
+                }
+            }
+        }, 500);
+
+        PermissionManager.resetInstance();
+        setupQuickNav();
+        setupRestartButton();
+
+        loadEssentialData();
+
+        if (savedInstanceState == null) {
+            currentFragmentTag = "Dashboard";
+        } else {
+            currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
+        }
+
+        // ✅ تحميل الـ Fragment مباشرة
+        loadFragmentDirectly(createFragmentByTag(currentFragmentTag), currentFragmentTag);
+
+    } catch (Exception e) {
+        Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
+        // ✅ محاولة أخيرة
+        try {
+            loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
+        } catch (Exception ignored) {}
     }
+}
 
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
@@ -280,15 +292,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Configuration change error: " + e.getMessage());
         }
     }
-
+    
     private void loadEssentialData() {
-        // ✅ تم التعديل هنا: إظهار التحميل عبر الـ Main Thread بشكل آمن قبل تشغيل الـ Thread
-        mainHandler.post(this::showLoading);
-        
-        Thread dataThread = new Thread(() -> {
-            try {
-                com.example.uhf.api.MiraApiClient apiClient =
-                        com.example.uhf.api.MiraApiClient.getInstance(getApplicationContext());
+    Thread dataThread = new Thread(() -> {
+        try {
+            com.example.uhf.api.MiraApiClient apiClient =
+                    com.example.uhf.api.MiraApiClient.getInstance(getApplicationContext());
 
                 com.example.uhf.api.MiraApiClient.ApiResponse profileResponse = apiClient.getOrgProfile();
                 if (profileResponse != null && profileResponse.isSuccess && profileResponse.data != null) {
@@ -317,25 +326,25 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                     }
                 }
 
-                Log.d(TAG, "✅ Essential data loaded successfully");
+                            
+            Log.d(TAG, "✅ Essential data loaded successfully");
 
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading essential data: " + e.getMessage());
-            } finally {
-                // ✅ تم التعديل هنا: إخفاء التحميل بشكل آمن ومضمون
-                mainHandler.post(() -> {
-                    if (!isFinishing() && !isDestroyed()) {
-                        updateToolbarTitle();
-                        hideLoading();
-                    }
-                });
-            }
-        });
-        
-        dataThread.setName("EssentialDataLoader");
-        dataThread.setDaemon(true);
-        dataThread.start();
-    }
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading essential data: " + e.getMessage());
+        } finally {
+            mainHandler.post(() -> {
+                if (!isFinishing() && !isDestroyed()) {
+                    updateToolbarTitle();
+                    hideLoading();
+                }
+            });
+        }
+    });
+    
+    dataThread.setName("EssentialDataLoader");
+    dataThread.setDaemon(true);
+    dataThread.start();
+}
 
     @Override
     public void onResume() {
@@ -744,50 +753,59 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     public void loadFragment(Fragment fragment, String tag) {
-        loadFragment(fragment, tag, true);
-    }
+    loadFragment(fragment, tag, true);
+}
 
-    public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-        if (isFinishing() || isDestroyed() || fragment == null) return;
+public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
+    if (isFinishing() || isDestroyed() || fragment == null) return;
 
-        try {
-           // showLoading();
-            currentFragment = fragment;
-            currentFragmentTag = tag;
+    try {
+        // ❌ لا showLoading إطلاقاً
+        currentFragment = fragment;
+        currentFragmentTag = tag;
 
-            if (!addToBackStack) {
-                clearBackStack();
-            }
-
-            FragmentTransaction transaction = fragmentManager.beginTransaction();
-            transaction.setCustomAnimations(0, 0, 0, 0);
-            transaction.replace(R.id.fragment_container, fragment, tag);
-
-            if (addToBackStack) {
-                transaction.addToBackStack(tag);
-            }
-
-            transaction.commitAllowingStateLoss();
-            
-            updateBottomNavSelectionByTag(tag);
-
-            mainHandler.postDelayed(this::hideLoading, 100);
-            
-            // ✅ ضمان إضافي لفك التجميد عن الواجهة
-            mainHandler.postDelayed(() -> {
-                if (!isFinishing() && !isDestroyed() && loadingOverlay != null 
-                    && loadingOverlay.getVisibility() == View.VISIBLE) {
-                    Log.w(TAG, "Force hiding loading overlay - timeout");
-                    hideLoading();
-                }
-            }, 2000);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error switching fragment: " + e.getMessage());
-            hideLoading();
+        if (!addToBackStack) {
+            clearBackStack();
         }
-    }
 
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.setCustomAnimations(0, 0, 0, 0);
+        transaction.replace(R.id.fragment_container, fragment, tag);
+
+        if (addToBackStack) {
+            transaction.addToBackStack(tag);
+        }
+
+        transaction.commitNowAllowingStateLoss();
+        
+        updateBottomNavSelectionByTag(tag);
+        
+        // ✅ إخفاء loading فوراً
+        hideLoading();
+
+    } catch (Exception e) {
+        Log.e(TAG, "Error switching fragment: " + e.getMessage(), e);
+        hideLoading();
+    }
+}
+private void loadFragmentDirectly(Fragment fragment, String tag) {
+    try {
+        currentFragment = fragment;
+        currentFragmentTag = tag;
+        
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.fragment_container, fragment, tag);
+        transaction.commitNow();
+        
+        updateBottomNavSelectionByTag(tag);
+        hideLoading();
+        
+        Log.d(TAG, "Fragment loaded directly: " + tag);
+    } catch (Exception e) {
+        Log.e(TAG, "Direct load error: " + e.getMessage(), e);
+        hideLoading();
+    }
+}
     private void loadFragmentByTag(String tag) {
         try {
             PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
@@ -1186,26 +1204,31 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     }
 
     public void showLoading() {
-        // ✅ تم التعديل هنا: التحديث عبر Handler لتجنب مشاكل الواجهة
-        mainHandler.post(() -> {
-            if (loadingOverlay != null && !isFinishing() && !isDestroyed()) {
-                TextView tvTitle = loadingOverlay.findViewById(R.id.tvLoadingTitle);
-                if (tvTitle != null) tvTitle.setText(isArabic ? "جاري التحميل..." : "Loading...");
-                loadingOverlay.setVisibility(View.VISIBLE);
-                loadingOverlay.setAlpha(1.0f);
-            }
-        });
-    }
+    mainHandler.post(() -> {
+        if (loadingOverlay != null && !isFinishing() && !isDestroyed()) {
+            TextView tvTitle = loadingOverlay.findViewById(R.id.tvLoadingTitle);
+            if (tvTitle != null) tvTitle.setText(isArabic ? "جاري التحميل..." : "Loading...");
+            loadingOverlay.setVisibility(View.VISIBLE);
+            loadingOverlay.setAlpha(1.0f);
+            loadingOverlay.setClickable(true);
+            loadingOverlay.setFocusable(true);
+            
+            // ✅ إخفاء تلقائي بعد 3 ثواني كحد أقصى
+            mainHandler.postDelayed(this::hideLoading, 3000);
+        }
+    });
+}
 
-    public void hideLoading() {
-        // ✅ تم التعديل هنا: استخدام Handler للتأكد التام من الإخفاء
-        mainHandler.post(() -> {
-            if (loadingOverlay != null) {
-                loadingOverlay.setVisibility(View.GONE);
-                loadingOverlay.setAlpha(0.0f);
-            }
-        });
-    }
+public void hideLoading() {
+    mainHandler.post(() -> {
+        if (loadingOverlay != null) {
+            loadingOverlay.setVisibility(View.GONE);
+            loadingOverlay.setAlpha(0.0f);
+            loadingOverlay.setClickable(false);
+            loadingOverlay.setFocusable(false);
+        }
+    });
+}
 
     public void setActivePOSFragment(MiraPosFragment fragment) {
         this.activePOSFragment = fragment;
