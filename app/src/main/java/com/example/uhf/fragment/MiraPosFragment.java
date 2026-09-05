@@ -2403,4 +2403,4 @@ private void removeSoldItemsFromCache() {
     }
 }
 
-} // 👈 إغلاق كلاس MiraPosFragment
+} 
