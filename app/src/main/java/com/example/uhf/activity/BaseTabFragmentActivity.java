@@ -79,23 +79,24 @@ protected void onCreate(Bundle savedInstanceState) {
         // ✅ طلب إذن القراءة من التخزين الخارجي
         checkStoragePermission();
     }
+    // ==================== LIFECYCLE ====================
 
     @Override
-protected void onDestroy() {
-    isDestroyed.set(true);
-    
-    dismissInitDialogSafely();
-    shutdownExecutorSafely();
-    freeReaderSafely();
-    
-    // ❌ احذف هذا السطر
-    // mainHandler.removeCallbacksAndMessages(null);
-    
-    MemoryManager.getInstance().unregisterActivity(this);
-    unregisterComponentCallbacks(MemoryManager.getInstance());
-    MemoryManager.getInstance().forceCleanup();
-    super.onDestroy();
-}
+    protected void onDestroy() {
+        isDestroyed.set(true);
+        
+        // ✅ إزالة أي رسائل أو مهام مؤجلة لمنع الـ Memory Leaks
+        mainHandler.removeCallbacksAndMessages(null);
+        
+        dismissInitDialogSafely();
+        shutdownExecutorSafely();
+        freeReaderSafely();
+        
+        MemoryManager.getInstance().unregisterActivity(this);
+        unregisterComponentCallbacks(MemoryManager.getInstance());
+        MemoryManager.getInstance().forceCleanup();
+        super.onDestroy();
+    }
 
     // ==================== PERMISSIONS ====================
 
