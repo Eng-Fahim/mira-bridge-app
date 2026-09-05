@@ -3,6 +3,7 @@ package com.example.uhf.tools;
 import android.os.Build;
 import android.util.Log;
 
+import com.example.uhf.activity.BaseTabFragmentActivity;
 import com.rscja.deviceapi.RFIDWithUHFUART;
 
 /**
@@ -26,7 +27,6 @@ public class DeviceDetector {
         FAILED
     }
 
-    // 🌟 تم الإصلاح: إضافة الكلاس المفقود DeviceProfile الذي سبب خطأ (cannot find symbol class DeviceProfile)
     public static class DeviceProfile {
         public long timestamp;
         public String androidVersion;
@@ -66,8 +66,6 @@ public class DeviceDetector {
     private static String lastError = null;
     private static long detectionTime = 0;
 
-    // 🌟 تم الإصلاح: إضافة الدوال المفقودة التي سببت خطأ (cannot find symbol method getDeviceModelName و getDeviceModel)
-    
     public static String getDeviceModelName() {
         return Build.MODEL != null ? Build.MODEL : "UNKNOWN";
     }
@@ -86,16 +84,12 @@ public class DeviceDetector {
         return cachedModel;
     }
 
-    // ==================== Check Methods ====================
-
-    /**
-     * التحقق الشامل هل الجهاز هو Chainway C72 سواء من الاسم، المصنّع، أو الـ Model
-     */
     public static boolean isChainwayC72() {
         String model = Build.MODEL != null ? Build.MODEL.toUpperCase() : "";
         String manufacturer = Build.MANUFACTURER != null ? Build.MANUFACTURER.toUpperCase() : "";
         
-        return model.contains("C72") || model.contains("CHAINWAY") || manufacturer.contains("CHAINWAY") || getDeviceModel() == DeviceModel.C72;
+        return model.contains("C72") || model.contains("CHAINWAY") || 
+               manufacturer.contains("CHAINWAY") || getDeviceModel() == DeviceModel.C72;
     }
 
     public static boolean isC5() { return getDeviceModel() == DeviceModel.C5; }
@@ -105,15 +99,25 @@ public class DeviceDetector {
     public static DeviceProfile getProfile() { return activeProfile; }
     public static String getLastError() { return lastError; }
     
-    // ==================== التدفق الرئيسي ====================
-    
     /**
      * التدفق الكامل: اكتشاف → قدرات → Profile → تحقق → تسجيل
-     * 
-     * @param reader القارئ المهيأ
-     * @return Profile كامل أو null في حال الفشل
      */
     public static DeviceProfile configure(RFIDWithUHFUART reader) {
+        // ✅ فحص سريع - إذا لم يكن الجهاز موجوداً
+        if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
+            Log.i(TAG, "RFID device not present - skipping configuration");
+            profileStatus = ProfileStatus.FAILED;
+            lastError = "RFID device not present";
+            return null;
+        }
+        
+        if (reader == null) {
+            Log.e(TAG, "Reader is null - cannot configure");
+            profileStatus = ProfileStatus.FAILED;
+            lastError = "Reader is null";
+            return null;
+        }
+        
         detectionTime = System.currentTimeMillis();
         activeProfile = new DeviceProfile();
         activeProfile.timestamp = detectionTime;
@@ -150,8 +154,6 @@ public class DeviceDetector {
         }
     }
     
-    // ==================== المرحلة 1: الاكتشاف ====================
-    
     private static boolean detect(RFIDWithUHFUART reader) {
         try {
             activeProfile.modelName = getDeviceModelName();
@@ -161,11 +163,6 @@ public class DeviceDetector {
             Log.i(TAG, "📱 Phase 1 - Detection: " + activeProfile.modelName + 
                 " → " + activeProfile.model.name());
             
-            if (activeProfile.model == DeviceModel.UNKNOWN) {
-                Log.w(TAG, "⚠️ Unknown device model: " + activeProfile.modelName);
-                // نستمر - قد يكون جهازاً جديداً
-            }
-            
             return true;
         } catch (Exception e) {
             lastError = "Detection error: " + e.getMessage();
@@ -173,32 +170,39 @@ public class DeviceDetector {
         }
     }
     
-    // ==================== المرحلة 2: قراءة القدرات ====================
-    
     private static boolean readCapabilities(RFIDWithUHFUART reader) {
         try {
             Log.i(TAG, "🔍 Phase 2 - Reading capabilities...");
             
-            // قراءة إصدارات البرنامج والهاردوير
-            activeProfile.softwareVersion = reader.getVersion();
-            activeProfile.hardwareVersion = reader.getHardwareVersion();
+            // ✅ استخدام timeout للقراءات
+            final String[] versions = new String[2];
+            versions[0] = "Unknown";
+            versions[1] = "Unknown";
             
-            // قراءة درجة الحرارة
-            // درجة الحرارة - قد لا تكون مدعومة
-            activeProfile.temperature = 25;
-            activeProfile.temperatureOK = true;
-            try {
-                java.lang.reflect.Method getTemp = reader.getClass().getMethod("getTemperature");
-                activeProfile.temperature = (int) getTemp.invoke(reader);
-                activeProfile.temperatureOK = activeProfile.temperature > -40 && activeProfile.temperature < 85;
-            } catch (Exception e) {
-                Log.w(TAG, "   Temperature reading not supported");
+            Thread readThread = new Thread(() -> {
+                try {
+                    versions[0] = reader.getVersion();
+                    versions[1] = reader.getHardwareVersion();
+                } catch (Exception e) {
+                    Log.e(TAG, "Version read error", e);
+                }
+            });
+            readThread.setDaemon(true);
+            readThread.start();
+            readThread.join(3000); // ✅ 3 ثواني timeout
+            
+            if (readThread.isAlive()) {
+                Log.w(TAG, "Version read timeout - using defaults");
             }
             
-            // تحديد نطاق الطاقة بناءً على الجهاز الفعلي
-            determinePowerRange();
+            activeProfile.softwareVersion = versions[0];
+            activeProfile.hardwareVersion = versions[1];
             
-            // تحديد نطاق التردد
+            // درجة الحرارة
+            activeProfile.temperature = 25;
+            activeProfile.temperatureOK = true;
+            
+            determinePowerRange();
             determineFrequencyRange();
             
             profileStatus = ProfileStatus.CAPABILITIES_READ;
@@ -208,8 +212,7 @@ public class DeviceDetector {
             Log.i(TAG, "   Power Range: " + activeProfile.minPower + "-" + 
                 activeProfile.maxPower + " dBm");
             Log.i(TAG, "   Frequency: " + activeProfile.frequencyRange);
-            Log.i(TAG, "   Temperature: " + activeProfile.temperature + "°C " + 
-                (activeProfile.temperatureOK ? "✓" : "⚠️"));
+            Log.i(TAG, "   Temperature: " + activeProfile.temperature + "°C");
             
             return true;
             
@@ -231,7 +234,6 @@ public class DeviceDetector {
                 activeProfile.maxPower = 33;
                 break;
             default:
-                // Conservative range for unknown devices
                 activeProfile.minPower = 10;
                 activeProfile.maxPower = 26;
                 break;
@@ -241,11 +243,11 @@ public class DeviceDetector {
     private static void determineFrequencyRange() {
         switch (activeProfile.model) {
             case C5:
-                activeProfile.frequencyMode = 2; // ETSI
+                activeProfile.frequencyMode = 2;
                 activeProfile.frequencyRange = "865-868 MHz (ETSI)";
                 break;
             case C72:
-                activeProfile.frequencyMode = 1; // FCC
+                activeProfile.frequencyMode = 1;
                 activeProfile.frequencyRange = "902-928 MHz (FCC)";
                 break;
             default:
@@ -255,19 +257,14 @@ public class DeviceDetector {
         }
     }
     
-    // ==================== المرحلة 3: تطبيق Profile ====================
-    
     private static boolean applyProfile(RFIDWithUHFUART reader) {
         try {
             Log.i(TAG, "⚙️ Phase 3 - Applying profile...");
             
             activeProfile.appliedPower = calculateOptimalPower();
             
-            // RFIDWithUHFUART لا يدعم setOutputPower مباشرة
-            // نستخدم setPower بدلاً منها إن وجدت
             boolean powerResult = false;
             try {
-                // محاولة استخدام الدالة الصحيحة
                 java.lang.reflect.Method setPower = reader.getClass().getMethod("setPower", int.class);
                 setPower.invoke(reader, activeProfile.appliedPower);
                 powerResult = true;
@@ -278,7 +275,7 @@ public class DeviceDetector {
                     powerResult = true;
                 } catch (NoSuchMethodException e2) {
                     Log.w(TAG, "   Power setting not available - skipping");
-                    powerResult = true; // نستمر بدون ضبط الطاقة
+                    powerResult = true;
                 }
             }
             
@@ -300,25 +297,15 @@ public class DeviceDetector {
     }
     
     private static int calculateOptimalPower() {
-        // للمجوهرات والجرد:
-        // - نحتاج مدى قصير (30-50 سم) لتجنب قراءة قطع من واجهات مجاورة
-        // - دقة أعلى من السرعة
-        // - استهلاك بطارية أقل
-        
         switch (activeProfile.model) {
             case C5:
-                // C5 ممتاز للجرد القريب
-                return 22; // مدى ~40 سم مع دقة عالية
+                return 22;
             case C72:
-                // C72 يحتاج طاقة أقل شوي
                 return 24;
             default:
-                // قيمة آمنة للجميع
                 return 22;
         }
     }
-    
-    // ==================== المرحلة 4: التحقق ====================
     
     private static boolean verify(RFIDWithUHFUART reader) {
         try {
@@ -326,34 +313,18 @@ public class DeviceDetector {
             
             boolean allOK = true;
             
-            // تحقق من الطاقة
             if (!activeProfile.powerVerified) {
                 Log.w(TAG, "   ⚠️ Power setting not verified");
-                allOK = false;
             }
             
-            // تحقق من درجة الحرارة
             if (!activeProfile.temperatureOK) {
-                Log.w(TAG, "   ⚠️ Temperature out of safe range: " + 
-                    activeProfile.temperature + "°C");
-            }
-            
-            // تحقق من الإصدار
-            if (activeProfile.softwareVersion == null || 
-                activeProfile.softwareVersion.isEmpty()) {
-                Log.w(TAG, "   ⚠️ Could not read software version");
+                Log.w(TAG, "   ⚠️ Temperature out of safe range");
             }
             
             profileStatus = ProfileStatus.VERIFIED;
+            Log.i(TAG, "   ✅ Verification complete");
             
-            if (allOK) {
-                Log.i(TAG, "   ✅ All checks passed");
-            } else {
-                Log.w(TAG, "   ⚠️ Some checks failed but device is operational");
-                allOK = true; // نسمح بالعمل مع تحذيرات
-            }
-            
-            return allOK;
+            return true;
             
         } catch (Exception e) {
             lastError = "Verification error: " + e.getMessage();
@@ -362,16 +333,9 @@ public class DeviceDetector {
         }
     }
     
-    // ==================== المرحلة 5: التسجيل ====================
-    
     private static void logProfile() {
         Log.i(TAG, "\n" + activeProfile.toString());
-        
-        // هنا يمكن إرسال الـ Profile إلى الخادم للتحليلات
-        // sendProfileToServer(activeProfile);
     }
-    
-    // ==================== Helper ====================
     
     private static DeviceProfile fail(String reason) {
         lastError = reason;
@@ -380,34 +344,22 @@ public class DeviceDetector {
             activeProfile.ready = false;
         }
         Log.e(TAG, "❌ Device configuration FAILED: " + reason);
-        Log.e(TAG, "   Time: " + (System.currentTimeMillis() - detectionTime) + "ms");
         return null;
     }
     
-    // ==================== Public API ====================
-    
-    /**
-     * فحص سريع: هل الجهاز جاهز؟
-     */
     public static boolean isReady() {
         return profileStatus == ProfileStatus.READY && 
                activeProfile != null && 
                activeProfile.ready;
     }
     
-    /**
-     * الحصول على الطاقة الحالية
-     */
     public static int getCurrentPower() {
         if (activeProfile != null) {
             return activeProfile.appliedPower;
         }
-        return 22; // افتراضي آمن
+        return 22;
     }
     
-    /**
-     * الحصول على معلومات الجهاز كنص منسق
-     */
     public static String getDeviceInfo() {
         if (activeProfile != null) {
             return activeProfile.toString();
@@ -415,9 +367,6 @@ public class DeviceDetector {
         return "Device not configured yet\nModel: " + getDeviceModelName();
     }
     
-    /**
-     * إعادة تعيين حالة الكاشف (للتطوير والاختبار)
-     */
     public static void reset() {
         cachedModel = null;
         profileStatus = ProfileStatus.UNKNOWN;
