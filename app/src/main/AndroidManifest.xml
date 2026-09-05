@@ -40,7 +40,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" /> <!-- ✅ تم إضافة إذن الإقلاع -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- ==================== ميزات العتاد ==================== -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
@@ -72,7 +72,7 @@
             android:theme="@style/SplashTheme"
             android:exported="true"
             android:screenOrientation="portrait"
-            android:configChanges="orientation|screenSize|keyboardHidden">
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode|screenLayout|smallestScreenSize|density">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -84,14 +84,14 @@
             android:name=".ReportsActivity"
             android:exported="false"
             android:screenOrientation="portrait"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode|screenLayout|smallestScreenSize|density" />
 
         <!-- ==================== MainActivity ==================== -->
         <activity
             android:name="com.example.uhf.MainActivity"
             android:exported="false"
             android:screenOrientation="portrait"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode|screenLayout|smallestScreenSize|density"
             android:windowSoftInputMode="adjustResize" />
 
         <!-- ==================== LoginActivity ==================== -->
@@ -102,7 +102,7 @@
             android:label="@string/app_name"
             android:theme="@style/Theme.Uhfuartdemo"
             android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode|screenLayout|smallestScreenSize|density" />
 
         <!-- ==================== UHFMainActivity ==================== -->
         <activity
@@ -111,7 +111,7 @@
             android:exported="false"
             android:label="@string/app_name"
             android:theme="@style/Theme.Uhfuartdemo"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode|screenLayout|smallestScreenSize|density"
             android:windowSoftInputMode="adjustResize" />
 
         <!-- ==================== المستقبلات ==================== -->
@@ -133,14 +133,14 @@
             android:name="com.example.uhf.filebrowser.FileManagerActivity"
             android:screenOrientation="portrait"
             android:exported="false"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode|screenLayout|smallestScreenSize|density" />
 
         <!-- ==================== TestActivity ==================== -->
         <activity
             android:name="com.example.uhf.activity.TestActivity"
             android:screenOrientation="portrait"
             android:exported="false"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode|screenLayout|smallestScreenSize|density" />
 
         <!-- ==================== ItemStudioActivity ==================== -->
         <activity
@@ -149,7 +149,7 @@
             android:exported="false"
             android:label="MIRA Identity Studio"
             android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode|screenLayout|smallestScreenSize|density" />
 
         <!-- ==================== FileProvider ==================== -->
         <provider
