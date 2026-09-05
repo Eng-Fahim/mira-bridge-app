@@ -199,11 +199,11 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             setContentView(R.layout.activity_main);
 
-// ✅ بدء مراقبة التجمد
-AppWatchdog.getInstance().startMonitoring(() -> {
-    Log.e(TAG, "🚨 UI Thread FROZEN! Restarting app...");
-    MiraApplication.getInstance().restartApp();
-});
+            // بدء مراقبة التجمد
+            AppWatchdog.getInstance().startMonitoring(() -> {
+                Log.e(TAG, "🚨 UI Thread FROZEN! Restarting app...");
+                MiraApplication.getInstance().restartApp();
+            });
 
             ToastUtil.init(getApplicationContext());
             initializeLanguageState();
@@ -235,8 +235,11 @@ AppWatchdog.getInstance().startMonitoring(() -> {
             mainHandler.postDelayed(() -> {
                 if (!isFinishing() && !isDestroyed()) {
                     safeExecute(this::initSound, "Sound Init Error");
-                    safeExecute(this::initUHF, "UHF Hardware Init Error");
-                    safeExecute(this::configureReaderForDevice, "Reader Configuration Error");
+                    // ✅ تم التعديل هنا: منع محاولة الإتصال بالعتاد نهائياً في حال عدم توفره لتجنب حظر الواجهة
+                    if (BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
+                        safeExecute(this::initUHF, "UHF Hardware Init Error");
+                        safeExecute(this::configureReaderForDevice, "Reader Configuration Error");
+                    }
                 }
             }, 500);
 
@@ -279,6 +282,9 @@ AppWatchdog.getInstance().startMonitoring(() -> {
     }
 
     private void loadEssentialData() {
+        // ✅ تم التعديل هنا: إظهار التحميل عبر الـ Main Thread بشكل آمن قبل تشغيل الـ Thread
+        mainHandler.post(this::showLoading);
+        
         Thread dataThread = new Thread(() -> {
             try {
                 com.example.uhf.api.MiraApiClient apiClient =
@@ -316,7 +322,8 @@ AppWatchdog.getInstance().startMonitoring(() -> {
             } catch (Exception e) {
                 Log.e(TAG, "Error loading essential data: " + e.getMessage());
             } finally {
-                runOnUiThread(() -> {
+                // ✅ تم التعديل هنا: إخفاء التحميل بشكل آمن ومضمون
+                mainHandler.post(() -> {
                     if (!isFinishing() && !isDestroyed()) {
                         updateToolbarTitle();
                         hideLoading();
@@ -334,17 +341,23 @@ AppWatchdog.getInstance().startMonitoring(() -> {
     public void onResume() {
         super.onResume();
         updateToolbarTitle();
-        // ✅ إخفاء أي loading overlay متبقي
-        hideLoading();
+        // ✅ تم التعديل هنا: استخدام postDelayed لضمان تنظيف الشاشة من أي حالة تجمد سابقة
+        mainHandler.postDelayed(this::hideLoading, 100);
     }
     
     @Override
-public void onPause() {
-    super.onPause();
-    hideLoading();
-    // ✅ إيقاف المراقبة
-    AppWatchdog.getInstance().stopMonitoring();
-}
+    public void onPause() {
+        super.onPause();
+        hideLoading();
+        AppWatchdog.getInstance().stopMonitoring();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // ✅ تم التعديل هنا: ضمان إخفاء نافذة التحميل تماماً عند وضع التطبيق في الخلفية
+        hideLoading();
+    }
 
     private void initializeLanguageState() {
         try {
@@ -733,19 +746,14 @@ public void onPause() {
     public void loadFragment(Fragment fragment, String tag) {
         loadFragment(fragment, tag, true);
     }
-public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-    if (isFinishing() || isDestroyed() || fragment == null) return;
 
-    try {
-        // ❌ لا تستدعي saveFragmentTagToPrefs في كل مرة
-        // saveFragmentTagToPrefs(tag);
-        
-        showLoading();
-        currentFragment = fragment;
-        currentFragmentTag = tag;
-        // ✅ احفظ فقط في onPause أو onDestroy
-        // saveFragmentTagToPrefs(tag);
-        
+    public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
+        if (isFinishing() || isDestroyed() || fragment == null) return;
+
+        try {
+            showLoading();
+            currentFragment = fragment;
+            currentFragmentTag = tag;
 
             if (!addToBackStack) {
                 clearBackStack();
@@ -765,7 +773,7 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
 
             mainHandler.postDelayed(this::hideLoading, 100);
             
-            // ✅ ضمان إضافي
+            // ✅ ضمان إضافي لفك التجميد عن الواجهة
             mainHandler.postDelayed(() -> {
                 if (!isFinishing() && !isDestroyed() && loadingOverlay != null 
                     && loadingOverlay.getVisibility() == View.VISIBLE) {
@@ -1178,19 +1186,25 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
     }
 
     public void showLoading() {
-        if (loadingOverlay != null && !isFinishing() && !isDestroyed()) {
-            TextView tvTitle = loadingOverlay.findViewById(R.id.tvLoadingTitle);
-            if (tvTitle != null) tvTitle.setText(isArabic ? "جاري التحميل..." : "Loading...");
-            loadingOverlay.setVisibility(View.VISIBLE);
-            loadingOverlay.setAlpha(1.0f);
-        }
+        // ✅ تم التعديل هنا: التحديث عبر Handler لتجنب مشاكل الواجهة
+        mainHandler.post(() -> {
+            if (loadingOverlay != null && !isFinishing() && !isDestroyed()) {
+                TextView tvTitle = loadingOverlay.findViewById(R.id.tvLoadingTitle);
+                if (tvTitle != null) tvTitle.setText(isArabic ? "جاري التحميل..." : "Loading...");
+                loadingOverlay.setVisibility(View.VISIBLE);
+                loadingOverlay.setAlpha(1.0f);
+            }
+        });
     }
 
     public void hideLoading() {
-        if (loadingOverlay != null && !isFinishing() && !isDestroyed()) {
-            loadingOverlay.setVisibility(View.GONE);
-            loadingOverlay.setAlpha(0.0f);
-        }
+        // ✅ تم التعديل هنا: استخدام Handler للتأكد التام من الإخفاء
+        mainHandler.post(() -> {
+            if (loadingOverlay != null) {
+                loadingOverlay.setVisibility(View.GONE);
+                loadingOverlay.setAlpha(0.0f);
+            }
+        });
     }
 
     public void setActivePOSFragment(MiraPosFragment fragment) {
@@ -1294,7 +1308,6 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
 
     private void navigateToLogin() {
         try {
-            // ✅ إخفاء loading قبل الانتقال
             hideLoading();
             
             try {
@@ -1316,13 +1329,10 @@ public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) 
     }
     
     @Override
-protected void onDestroy() {
-    try {
-        // ✅ إيقاف المراقبة أولاً
-        AppWatchdog.getInstance().stopMonitoring();
-        
-        hideLoading();
-            
+    protected void onDestroy() {
+        try {
+            AppWatchdog.getInstance().stopMonitoring();
+            hideLoading();
             stopActiveInventory();
 
             if (soundPool != null) {
@@ -1380,4 +1390,4 @@ protected void onDestroy() {
             Log.e(TAG, errorMessage + ": " + e.getMessage());
         }
     }
-        }
+}
