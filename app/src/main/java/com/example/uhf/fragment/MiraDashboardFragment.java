@@ -52,6 +52,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import com.example.uhf.tools.FirebaseDiagnostics;
+
 public class MiraDashboardFragment extends Fragment implements SharedPreferences.OnSharedPreferenceChangeListener {
 
     private static final String TAG = "MiraDashboardFragment";
@@ -63,6 +64,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private static final long PING_VALIDITY_MS = 30 * 1000;
     private static final long REFRESH_INTERVAL_MS = 5 * 60 * 1000;
     private static final int MAX_CONSECUTIVE_FAILURES = 3;
+
     // UI Elements
     private TextView tvOrgName, tvGreeting, tvDate, tvLocation, tvLiveStatus;
     private TextView tvTotalItems, tvTotalWeight, tvSoldToday;
@@ -88,7 +90,7 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private MiraQuickAccessSettings quickAccessSettings;
     private PermissionManager permissionManager;
 
-    private static final ExecutorService sharedExecutor = Executors.newFixedThreadPool(3);
+    private static final ExecutorService sharedExecutor = Executors.newFixedThreadPool(2);
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Future<?> dataFuture, goldPriceFuture, pingFuture;
 
@@ -104,11 +106,18 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
     private long lastDataFetchTime = 0, lastGoldFetchTime = 0, lastPingTime = 0;
     private int consecutiveFailures = 0;
 
-    // ThreadLocal Formatters Safely Managed
-    private static final ThreadLocal<SimpleDateFormat> dateFormatsAr = ThreadLocal.withInitial(() -> new SimpleDateFormat("EEEE، d MMMM yyyy", new Locale("ar")));
-    private static final ThreadLocal<SimpleDateFormat> dateFormatsEn = ThreadLocal.withInitial(() -> new SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.US));
-    private static final ThreadLocal<SimpleDateFormat> timeFormatter = ThreadLocal.withInitial(() -> new SimpleDateFormat("HH:mm:ss", Locale.US));
-    private static final ThreadLocal<NumberFormat> currencyFormatter = ThreadLocal.withInitial(() -> NumberFormat.getCurrencyInstance(Locale.US));
+    // Safe Non-Leaking Formatters (Instantiated per call or safely cached locally without ThreadLocal static leaks)
+    private SimpleDateFormat getDateFormatter() {
+        return isArabic ? new SimpleDateFormat("EEEE، d MMMM yyyy", new Locale("ar")) : new SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.US);
+    }
+
+    private SimpleDateFormat getTimeFormatter() {
+        return new SimpleDateFormat("HH:mm:ss", Locale.US);
+    }
+
+    private NumberFormat getCurrencyFormatter() {
+        return NumberFormat.getCurrencyInstance(Locale.US);
+    }
 
     private final Runnable autoRefreshRunnable = new Runnable() {
         @Override
@@ -134,33 +143,29 @@ public class MiraDashboardFragment extends Fragment implements SharedPreferences
             this.source = source;
         }
     }
-    
-    // ============================================
-// ✅ داخل الكلاس MiraDashboardFragment - أضف هذا المتغير
-// ============================================
-private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
-    @Override
-    public void onReceive(Context context, Intent intent) {
-        if (intent == null || !isAdded() || !isViewInitialized) return;
-        
-        String action = intent.getAction();
-        Log.d(TAG, "Received broadcast: " + action);
-        
-        if ("com.example.uhf.REFRESH_DASHBOARD".equals(action)) {
-            mainHandler.post(() -> {
-                if (isAdded() && isResumed() && isViewInitialized) {
-                    Log.d(TAG, "Refreshing dashboard from broadcast");
-                    isDataLoaded = false;
-                    lastDataFetchTime = 0;
-                    fetchData();
-                }
-            });
+
+    private final BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent == null || !isAdded() || !isViewInitialized) return;
+            
+            String action = intent.getAction();
+            Log.d(TAG, "Received broadcast: " + action);
+            
+            if ("com.example.uhf.REFRESH_DASHBOARD".equals(action) || 
+                "com.example.uhf.REFRESH_INVENTORY".equals(action) || 
+                "com.example.uhf.REFRESH_SALES".equals(action)) {
+                mainHandler.post(() -> {
+                    if (isAdded() && isResumed() && isViewInitialized) {
+                        Log.d(TAG, "Refreshing dashboard from broadcast");
+                        isDataLoaded = false;
+                        lastDataFetchTime = 0;
+                        fetchData();
+                    }
+                });
+            }
         }
-    }
-};
-
-
-
+    };
 
     @Nullable
     @Override
@@ -189,9 +194,9 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
             loadOfflineData();
             updateHeader();
             showShimmer(false);
-            loadDataIfNeeded();
-
+            
             isViewInitialized = true;
+            loadDataIfNeeded();
             startAutoRefresh();
         } catch (Throwable e) {
             logNonFatal("onViewCreated", e);
@@ -199,9 +204,7 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
     }
 
     private void initializeManagers() {
-   
         try {
-         // ✅ تتبع
             FirebaseDiagnostics.log("MANAGER", "Dashboard Initialize Managers", "Starting");
             
             if (!isAdded()) return;
@@ -218,7 +221,6 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
             goldCachePrefs = context.getSharedPreferences("gold_cache_prefs", Context.MODE_PRIVATE);
             lastGoldFetchTime = goldCachePrefs.getLong("last_gold_fetch_time", 0);
         
-            // ✅ تتبع حالة الـ Managers
             FirebaseDiagnostics.logManagerState("MiraApiClient", apiClient != null ? "NOT_NULL" : "NULL");
             FirebaseDiagnostics.logManagerState("SessionManager", sessionManager != null ? "NOT_NULL" : "NULL");
             FirebaseDiagnostics.logManagerState("PermissionManager", permissionManager != null ? "NOT_NULL" : "NULL");
@@ -232,7 +234,6 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
             FirebaseDiagnostics.logError("MiraDashboardFragment.initializeManagers", e);
         }
     }
-    
 
     private void initViews(View v) {
         try {
@@ -295,10 +296,8 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
     private void updateHeader() {
         try {
             if (tvDate != null) {
-                SimpleDateFormat formatter = isArabic ? dateFormatsAr.get() : dateFormatsEn.get();
-                if (formatter != null) {
-                    tvDate.setText(formatter.format(new Date()));
-                }
+                SimpleDateFormat formatter = getDateFormatter();
+                tvDate.setText(formatter.format(new Date()));
             }
             if (tvOrgName != null && orgProfile != null) {
                 String orgName = orgProfile.getDisplayName();
@@ -522,8 +521,8 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
                 tvPriceSource.setText("📡 " + getSourceDisplayName(data.source));
             }
             if (tvLastUpdate != null) {
-                SimpleDateFormat timeFmt = timeFormatter.get();
-                String time = timeFmt != null ? timeFmt.format(new Date()) : "";
+                SimpleDateFormat timeFmt = getTimeFormatter();
+                String time = timeFmt.format(new Date());
                 tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
             }
 
@@ -567,8 +566,8 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
             if (tvLastUpdate != null && offlineCache != null) {
                 long lastUpdate = offlineCache.getLong("last_update", 0);
                 if (lastUpdate > 0) {
-                    SimpleDateFormat timeFmt = timeFormatter.get();
-                    String time = timeFmt != null ? timeFmt.format(new Date(lastUpdate)) : "";
+                    SimpleDateFormat timeFmt = getTimeFormatter();
+                    String time = timeFmt.format(new Date(lastUpdate));
                     tvLastUpdate.setText(isArabic ? "⏰ آخر تحديث: " + time : "⏰ Last update: " + time);
                 }
             }
@@ -577,78 +576,74 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
         }
     }
 
-    
-
     private void loadOfflineData() {
-    if (offlineCache == null) return;
-    
-    // ✅ قراءة في خيط منفصل
-    sharedExecutor.execute(() -> {
-        try {
-            final int totalItems = offlineCache.getInt("total_items", 0);
-            final float totalWeight = offlineCache.getFloat("total_weight", 0.0f);
-            final int soldToday = offlineCache.getInt("sold_today", 0);
-            final float salesToday = offlineCache.getFloat("sales_today", 0.0f);
-            final float salesMonth = offlineCache.getFloat("sales_month", 0.0f);
-            final float salesYear = offlineCache.getFloat("sales_year", 0.0f);
-            
-            // ✅ تحديث UI على Main Thread
-            mainHandler.post(() -> {
-                setText(tvTotalItems, String.valueOf(totalItems));
-                setText(tvTotalWeight, formatWeight(totalWeight));
-                setText(tvSoldToday, String.valueOf(soldToday));
-                setText(tvSalesToday, formatCurrency(salesToday));
-                setText(tvSalesMonth, formatCurrency(salesMonth));
-                setText(tvSalesYear, formatCurrency(salesYear));
+        if (offlineCache == null) return;
+        
+        sharedExecutor.execute(() -> {
+            try {
+                final int totalItems = offlineCache.getInt("total_items", 0);
+                final float totalWeight = offlineCache.getFloat("total_weight", 0.0f);
+                final int soldToday = offlineCache.getInt("sold_today", 0);
+                final float salesToday = offlineCache.getFloat("sales_today", 0.0f);
+                final float salesMonth = offlineCache.getFloat("sales_month", 0.0f);
+                final float salesYear = offlineCache.getFloat("sales_year", 0.0f);
                 
-                if (priceManager != null) {
-                    displayGoldPricesFromCache();
-                }
-            });
-        } catch (Exception e) {
-            logNonFatal("loadOfflineData", e);
-        }
-    });
-}
-
-private void calculateTrend(double currentPrice) {
-    if (tvGoldTrend == null || tvGoldChange == null || offlineCache == null) return;
-    
-    // ✅ قراءة وكتابة في خيط منفصل
-    sharedExecutor.execute(() -> {
-        try {
-            double previousPrice = offlineCache.getFloat("gold_price_24k_prev", 0);
-            
-            if (previousPrice > 0 && currentPrice > 0) {
-                double change = currentPrice - previousPrice;
-                double changePercent = (change / previousPrice) * 100;
-                
-                // ✅ تحديث UI على Main Thread
                 mainHandler.post(() -> {
-                    if (change > 0) {
-                        tvGoldTrend.setText("📈");
-                        tvGoldChange.setText(String.format(Locale.US, "+%.2f%%", changePercent));
-                        tvGoldChange.setTextColor(0xFF16A34A);
-                    } else if (change < 0) {
-                        tvGoldTrend.setText("📉");
-                        tvGoldChange.setText(String.format(Locale.US, "%.2f%%", changePercent));
-                        tvGoldChange.setTextColor(0xFFDC2626);
-                    } else {
-                        tvGoldTrend.setText("➡️");
-                        tvGoldChange.setText("0.00%");
-                        tvGoldChange.setTextColor(0xFF6B7280);
+                    if (!isAdded()) return;
+                    setText(tvTotalItems, String.valueOf(totalItems));
+                    setText(tvTotalWeight, formatWeight(totalWeight));
+                    setText(tvSoldToday, String.valueOf(soldToday));
+                    setText(tvSalesToday, formatCurrency(salesToday));
+                    setText(tvSalesMonth, formatCurrency(salesMonth));
+                    setText(tvSalesYear, formatCurrency(salesYear));
+                    
+                    if (priceManager != null) {
+                        displayGoldPricesFromCache();
                     }
                 });
+            } catch (Exception e) {
+                logNonFatal("loadOfflineData", e);
             }
-            
-            if (currentPrice > 0) {
-                offlineCache.edit().putFloat("gold_price_24k_prev", (float) currentPrice).apply();
+        });
+    }
+
+    private void calculateTrend(double currentPrice) {
+        if (tvGoldTrend == null || tvGoldChange == null || offlineCache == null) return;
+        
+        sharedExecutor.execute(() -> {
+            try {
+                double previousPrice = offlineCache.getFloat("gold_price_24k_prev", 0);
+                
+                if (previousPrice > 0 && currentPrice > 0) {
+                    double change = currentPrice - previousPrice;
+                    double changePercent = (change / previousPrice) * 100;
+                    
+                    mainHandler.post(() -> {
+                        if (!isAdded()) return;
+                        if (change > 0) {
+                            tvGoldTrend.setText("📈");
+                            tvGoldChange.setText(String.format(Locale.US, "+%.2f%%", changePercent));
+                            tvGoldChange.setTextColor(0xFF16A34A);
+                        } else if (change < 0) {
+                            tvGoldTrend.setText("📉");
+                            tvGoldChange.setText(String.format(Locale.US, "%.2f%%", changePercent));
+                            tvGoldChange.setTextColor(0xFFDC2626);
+                        } else {
+                            tvGoldTrend.setText("➡️");
+                            tvGoldChange.setText("0.00%");
+                            tvGoldChange.setTextColor(0xFF6B7280);
+                        }
+                    });
+                }
+                
+                if (currentPrice > 0) {
+                    offlineCache.edit().putFloat("gold_price_24k_prev", (float) currentPrice).apply();
+                }
+            } catch (Exception e) {
+                logNonFatal("calculateTrend", e);
             }
-        } catch (Exception e) {
-            logNonFatal("calculateTrend", e);
-        }
-    });
-}
+        });
+    }
 
     private void saveOfflineData(JSONObject data) {
         try {
@@ -677,160 +672,141 @@ private void calculateTrend(double currentPrice) {
     }
 
     private void fetchData() {
-    try {
-        FirebaseDiagnostics.log("API", "Dashboard fetchData started", 
-            "branchId=" + (branchesManager != null ? branchesManager.getActiveBranchId() : -1));
-        
-        if (isLoading.get() || apiClient == null || !isAdded()) return;
+        try {
+            FirebaseDiagnostics.log("API", "Dashboard fetchData started", 
+                "branchId=" + (branchesManager != null ? branchesManager.getActiveBranchId() : -1));
+            
+            if (isLoading.get() || apiClient == null || !isAdded()) return;
 
-        // ✅ فحص التوكن قبل الطلب
-        if (sessionManager == null || !sessionManager.isLoggedIn() || !sessionManager.hasValidToken()) {
-            Log.w(TAG, "Token invalid, redirecting to login");
-            redirectToLogin();
-            return;
-        }
+            if (sessionManager == null || !sessionManager.isLoggedIn() || !sessionManager.hasValidToken()) {
+                Log.w(TAG, "Token invalid, redirecting to login");
+                redirectToLogin();
+                return;
+            }
 
-        long now = System.currentTimeMillis();
-        if (now - lastDataFetchTime < 2000 && isDataLoaded) return;
+            long now = System.currentTimeMillis();
+            if (now - lastDataFetchTime < 2000 && isDataLoaded) return;
 
-        isLoading.set(true);
+            isLoading.set(true);
 
-        if (tvLiveStatus != null) {
-            tvLiveStatus.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
-            tvLiveStatus.setTextColor(0xFFF59E0B);
-        }
+            if (tvLiveStatus != null) {
+                tvLiveStatus.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
+                tvLiveStatus.setTextColor(0xFFF59E0B);
+            }
 
-        cancelFuture(dataFuture);
-        final int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+            cancelFuture(dataFuture);
+            final int activeBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
 
-        dataFuture = sharedExecutor.submit(() -> {
-            try {
-                MiraApiClient.ApiResponse response = apiClient.getDashboardFull(activeBranchId);
-                
-                mainHandler.post(() -> {
-                    isLoading.set(false);
-                    lastDataFetchTime = System.currentTimeMillis();
-                    if (!isAdded()) return;
+            dataFuture = sharedExecutor.submit(() -> {
+                try {
+                    MiraApiClient.ApiResponse response = apiClient.getDashboardFull(activeBranchId);
+                    
+                    mainHandler.post(() -> {
+                        isLoading.set(false);
+                        lastDataFetchTime = System.currentTimeMillis();
+                        if (!isAdded()) return;
 
-                    // ✅ معالجة خاصة للـ 401
-                    if (response != null && response.code == 401) {
-                        FirebaseDiagnostics.logApiCall("getDashboardFull", 401, false, "Token expired");
-                        handleTokenExpired();
-                        return;
-                    }
+                        if (response != null && response.code == 401) {
+                            FirebaseDiagnostics.logApiCall("getDashboardFull", 401, false, "Token expired");
+                            handleTokenExpired();
+                            return;
+                        }
 
-                    if (response != null && response.isSuccess && response.data != null) {
-                        FirebaseDiagnostics.logApiCall("getDashboardFull", response.code, true, "Success");
-                        
-                        saveOfflineData(response.data);
-                        processData(response.data);
-                        isDataLoaded = true;
-                        consecutiveFailures = 0;
-                        updateLiveStatusText(true);
-                        clearCrashlyticsCustomKeys();
-                        
+                        if (response != null && response.isSuccess && response.data != null) {
+                            FirebaseDiagnostics.logApiCall("getDashboardFull", response.code, true, "Success");
+                            
+                            saveOfflineData(response.data);
+                            processData(response.data);
+                            isDataLoaded = true;
+                            consecutiveFailures = 0;
+                            updateLiveStatusText(true);
+                            clearCrashlyticsCustomKeys();
+                            
+                            showShimmer(false);
+                            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                        } else {
+                            FirebaseDiagnostics.logApiCall("getDashboardFull", 
+                                response != null ? response.code : -1, 
+                                false, 
+                                "Failed");
+                            
+                            if (response == null || response.code != 401) {
+                                logNonFatal("fetchData.response", new Exception("Dashboard API Failed - code=" + (response != null ? response.code : -1)));
+                            }
+                            
+                            updateLiveStatusText(false);
+                            fetchInventoryDataDirectly(activeBranchId);
+                        }
+
                         showShimmer(false);
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                    } else {
-                        FirebaseDiagnostics.logApiCall("getDashboardFull", 
-                            response != null ? response.code : -1, 
-                            false, 
-                            "Failed");
-                        
-                        // ✅ لا تسجل الـ 401 كخطأ fatal
-                        if (response == null || response.code != 401) {
-                            logNonFatal("fetchData.response", new Exception("Dashboard API Failed - code=" + (response != null ? response.code : -1)));
-                        }
-                        
+                    });
+                } catch (Exception e) {
+                    FirebaseDiagnostics.logError("MiraDashboardFragment.fetchData.thread", e);
+                    logNonFatal("fetchData.thread", e);
+                    
+                    mainHandler.post(() -> {
+                        isLoading.set(false);
+                        if (!isAdded()) return;
+
+                        consecutiveFailures++;
                         updateLiveStatusText(false);
-                        
-                        // جلب البيانات احتياطياً
-                        fetchInventoryDataDirectly(activeBranchId);
-                    }
+                        loadOfflineData();
+                        showShimmer(false);
+                        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
 
-                    showShimmer(false);
-                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                });
-            } catch (Exception e) {
-                FirebaseDiagnostics.logError("MiraDashboardFragment.fetchData.thread", e);
-                logNonFatal("fetchData.thread", e);
-                
-                mainHandler.post(() -> {
-                    isLoading.set(false);
-                    if (!isAdded()) return;
+                        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                            Toast.makeText(getContext(), isArabic ? "تعذر تحديث البيانات من السيرفر" : "Could not update data from server", Toast.LENGTH_SHORT).show();
+                            consecutiveFailures = 0;
+                        }
+                    });
+                }
+            });
+        } catch (Exception e) {
+            FirebaseDiagnostics.logError("MiraDashboardFragment.fetchData", e);
+            logNonFatal("fetchData", e);
+            isLoading.set(false);
+        }
+    }
 
-                    consecutiveFailures++;
-                    updateLiveStatusText(false);
-                    loadOfflineData();
-                    showShimmer(false);
-                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-
-                    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                        Toast.makeText(getContext(), isArabic ? "تعذر تحديث البيانات من السيرفر" : "Could not update data from server", Toast.LENGTH_SHORT).show();
-                        consecutiveFailures = 0;
-                    }
-                });
+    private void handleTokenExpired() {
+        try {
+            Log.w(TAG, "401 received - clearing session and redirecting to login");
+            
+            if (sessionManager != null) {
+                sessionManager.clearAuthToken();
+                sessionManager.logoutUser();
             }
-        });
-    } catch (Exception e) {
-        FirebaseDiagnostics.logError("MiraDashboardFragment.fetchData", e);
-        logNonFatal("fetchData", e);
-        isLoading.set(false);
+            
+            isLoading.set(false);
+            showShimmer(false);
+            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+            
+            if (isAdded() && getContext() != null) {
+                Toast.makeText(getContext(), 
+                    isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : "Session expired - Please sign in again", 
+                    Toast.LENGTH_LONG).show();
+            }
+            
+            redirectToLogin();
+        } catch (Exception e) {
+            Log.e(TAG, "handleTokenExpired error: " + e.getMessage());
+        }
     }
-}
 
-// ✅ دالة جديدة لمعالجة انتهاء التوكن
-private void handleTokenExpired() {
-    try {
-        Log.w(TAG, "401 received - clearing session and redirecting to login");
-        
-        // ✅ مسح التوكن نهائياً أولاً
-        if (sessionManager != null) {
-            sessionManager.clearAuthToken();  // ✅ الآن هذه الدالة موجودة
-            sessionManager.logoutUser();
+    private void redirectToLogin() {
+        try {
+            if (isAdded() && getActivity() != null) {
+                Intent intent = new Intent(getActivity(), com.example.uhf.activity.LoginActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                intent.putExtra("session_expired", true);
+                startActivity(intent);
+                getActivity().finish();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "redirectToLogin error: " + e.getMessage());
         }
-        
-        // إيقاف التحميل
-        isLoading.set(false);
-        showShimmer(false);
-        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-        
-        // عرض رسالة
-        if (isAdded() && getContext() != null) {
-            Toast.makeText(getContext(), 
-                isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : "Session expired - Please sign in again", 
-                Toast.LENGTH_LONG).show();
-        }
-        
-        // التوجيه لشاشة تسجيل الدخول
-        if (isAdded() && getActivity() != null) {
-            Intent intent = new Intent(getActivity(), com.example.uhf.activity.LoginActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            intent.putExtra("session_expired", true);
-            startActivity(intent);
-            getActivity().finish();
-        }
-        
-    } catch (Exception e) {
-        Log.e(TAG, "handleTokenExpired error: " + e.getMessage());
     }
-}
-
-// ✅ دالة مساعدة للتوجيه لتسجيل الدخول
-private void redirectToLogin() {
-    try {
-        if (isAdded() && getActivity() != null) {
-            Intent intent = new Intent(getActivity(), com.example.uhf.activity.LoginActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            intent.putExtra("session_expired", true);
-            startActivity(intent);
-            getActivity().finish();
-        }
-    } catch (Exception e) {
-        Log.e(TAG, "redirectToLogin error: " + e.getMessage());
-    }
-}
-
 
     private void fetchInventoryDataDirectly(int branchId) {
         try {
@@ -976,39 +952,35 @@ private void redirectToLogin() {
             logNonFatal("setupListeners", e);
         }
     }
-    
-    // ============================================
-// ✅ دوال التسجيل وإلغاء التسجيل
-// ============================================
-private void registerDataRefreshReceiver() {
-    try {
-        if (getContext() == null || isReceiverRegistered) return;
-        
-        IntentFilter filter = new IntentFilter();
-        filter.addAction("com.example.uhf.REFRESH_DASHBOARD");
-        filter.addAction("com.example.uhf.REFRESH_INVENTORY");
-        filter.addAction("com.example.uhf.REFRESH_SALES");
-        
-        ContextCompat.registerReceiver(requireContext(), dataRefreshReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
-        isReceiverRegistered = true;
-        Log.d(TAG, "DataRefreshReceiver registered");
-    } catch (Exception e) {
-        Log.e(TAG, "registerDataRefreshReceiver error: " + e.getMessage());
-    }
-}
 
-private void unregisterDataRefreshReceiver() {
-    try {
-        if (getContext() != null && isReceiverRegistered) {
-            requireContext().unregisterReceiver(dataRefreshReceiver);
-            isReceiverRegistered = false;
-            Log.d(TAG, "DataRefreshReceiver unregistered");
+    private void registerDataRefreshReceiver() {
+        try {
+            if (getContext() == null || isReceiverRegistered) return;
+            
+            IntentFilter filter = new IntentFilter();
+            filter.addAction("com.example.uhf.REFRESH_DASHBOARD");
+            filter.addAction("com.example.uhf.REFRESH_INVENTORY");
+            filter.addAction("com.example.uhf.REFRESH_SALES");
+            
+            ContextCompat.registerReceiver(requireContext(), dataRefreshReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
+            isReceiverRegistered = true;
+            Log.d(TAG, "DataRefreshReceiver registered");
+        } catch (Exception e) {
+            Log.e(TAG, "registerDataRefreshReceiver error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.d(TAG, "unregisterDataRefreshReceiver: " + e.getMessage());
     }
-}
 
+    private void unregisterDataRefreshReceiver() {
+        try {
+            if (getContext() != null && isReceiverRegistered) {
+                requireContext().unregisterReceiver(dataRefreshReceiver);
+                isReceiverRegistered = false;
+                Log.d(TAG, "DataRefreshReceiver unregistered");
+            }
+        } catch (Exception e) {
+            Log.d(TAG, "unregisterDataRefreshReceiver: " + e.getMessage());
+        }
+    }
 
     public void refreshInternalData() {
         try {
@@ -1023,48 +995,46 @@ private void unregisterDataRefreshReceiver() {
     }
 
     private void refreshAllData() {
-    try {
-        if (tvLiveStatus != null) {
-            tvLiveStatus.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
-            tvLiveStatus.setTextColor(0xFFF59E0B);
-        }
-
-        fetchData();
-
-        long now = System.currentTimeMillis();
-        if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
-            if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
-                fetchLiveGoldPrices(true);
-            } else {
-                displayGoldPricesFromCache();
-                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-                updateLiveStatusText(true);
+        try {
+            if (tvLiveStatus != null) {
+                tvLiveStatus.setText(isArabic ? "⏳ جاري التحديث..." : "⏳ Updating...");
+                tvLiveStatus.setTextColor(0xFFF59E0B);
             }
-        } else {
-            if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
-        }
-    } catch (Exception e) {
-        logNonFatal("refreshAllData", e);
-    }
-}
 
+            fetchData();
+
+            long now = System.currentTimeMillis();
+            if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")) {
+                if ((now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+                    fetchLiveGoldPrices(true);
+                } else {
+                    displayGoldPricesFromCache();
+                    if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+                    updateLiveStatusText(true);
+                }
+            } else {
+                if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+            }
+        } catch (Exception e) {
+            logNonFatal("refreshAllData", e);
+        }
+    }
 
     private void showShimmer(boolean show) {
-    try {
-        if (shimmerLayout != null) {
-            shimmerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
+        try {
+            if (shimmerLayout != null) {
+                shimmerLayout.setVisibility(show ? View.VISIBLE : View.GONE);
+            }
+            if (loadingOverlay != null) {
+                loadingOverlay.setVisibility(show ? View.VISIBLE : View.GONE);
+            }
+            if (swipeRefresh != null) {
+                swipeRefresh.setVisibility(show ? View.GONE : View.VISIBLE);
+            }
+        } catch (Exception e) {
+            logNonFatal("showShimmer", e);
         }
-        if (loadingOverlay != null) {
-            loadingOverlay.setVisibility(show ? View.VISIBLE : View.GONE);
-        }
-        if (swipeRefresh != null) {
-            swipeRefresh.setVisibility(show ? View.GONE : View.VISIBLE);
-        }
-    } catch (Exception e) {
-        logNonFatal("showShimmer", e);
     }
-}
-
 
     private void initBranchCache(int branchId) {
         try {
@@ -1159,8 +1129,8 @@ private void unregisterDataRefreshReceiver() {
         try {
             if (amount <= 0) return "—";
             if (priceManager != null) return priceManager.formatPriceDefault(amount);
-            NumberFormat fmt = currencyFormatter.get();
-            return fmt != null ? fmt.format(amount) : String.valueOf(amount);
+            NumberFormat fmt = getCurrencyFormatter();
+            return fmt.format(amount);
         } catch (Exception e) {
             return "—";
         }
@@ -1199,61 +1169,51 @@ private void unregisterDataRefreshReceiver() {
         }
     }
 
-   // ============================================
-// ✅ في onResume() - أضف تسجيل المستمع
-// ============================================
-@Override
-public void onResume() {
-    super.onResume();
-    try {
-        // ✅✅✅ تسجيل BroadcastReceiver
-        registerDataRefreshReceiver();
-        
-        if (branchPrefs != null) {
-            branchPrefs.registerOnSharedPreferenceChangeListener(this);
-        }
-
-        int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
-        if (latestBranchId != currentBranchId) {
-            onBranchChanged();
-        } else if (isViewInitialized) {
-            setupQuickAccessGrid();
-            updateHeader();
-            refreshInternalData();
-
-            long now = System.currentTimeMillis();
-            if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")
-                    && (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
-                fetchLiveGoldPrices(false);
-            } else {
-                displayGoldPricesFromCache();
+    @Override
+    public void onResume() {
+        super.onResume();
+        try {
+            registerDataRefreshReceiver();
+            
+            if (branchPrefs != null) {
+                branchPrefs.registerOnSharedPreferenceChangeListener(this);
             }
-        }
-        startAutoRefresh();
-    } catch (Exception e) {
-        logNonFatal("onResume", e);
-    }
-}
 
-    // ============================================
-// ✅ في onPause() - أضف إلغاء التسجيل
-// ============================================
-@Override
-public void onPause() {
-    super.onPause();
-    try {
-        // ✅✅✅ إلغاء تسجيل BroadcastReceiver
-        unregisterDataRefreshReceiver();
-        
-        stopAutoRefresh();
-        if (branchPrefs != null) {
-            branchPrefs.unregisterOnSharedPreferenceChangeListener(this);
-        }
-    } catch (Exception e) {
-        logNonFatal("onPause", e);
-    }
-}
+            int latestBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : -1;
+            if (latestBranchId != currentBranchId) {
+                onBranchChanged();
+            } else if (isViewInitialized) {
+                setupQuickAccessGrid();
+                updateHeader();
+                refreshInternalData();
 
+                long now = System.currentTimeMillis();
+                if (permissionManager != null && permissionManager.canAccessFragment("GoldRates")
+                        && (now - lastGoldFetchTime) > GOLD_CACHE_VALIDITY_MS) {
+                    fetchLiveGoldPrices(false);
+                } else {
+                    displayGoldPricesFromCache();
+                }
+            }
+            startAutoRefresh();
+        } catch (Exception e) {
+            logNonFatal("onResume", e);
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        try {
+            unregisterDataRefreshReceiver();
+            stopAutoRefresh();
+            if (branchPrefs != null) {
+                branchPrefs.unregisterOnSharedPreferenceChangeListener(this);
+            }
+        } catch (Exception e) {
+            logNonFatal("onPause", e);
+        }
+    }
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
@@ -1266,46 +1226,33 @@ public void onPause() {
         }
     }
 
-   // ============================================
-// ✅ في onDestroyView() - أضف إلغاء التسجيل
-// ============================================
-@Override
-public void onDestroyView() {
-    super.onDestroyView();
-    try {
-        // ✅✅✅ إلغاء تسجيل BroadcastReceiver
-        unregisterDataRefreshReceiver();
-        
-        stopAutoRefresh();
-        if (branchPrefs != null) {
-            branchPrefs.unregisterOnSharedPreferenceChangeListener(this);
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        try {
+            unregisterDataRefreshReceiver();
+            stopAutoRefresh();
+            if (branchPrefs != null) {
+                branchPrefs.unregisterOnSharedPreferenceChangeListener(this);
+            }
+            if (orgProfile != null && profileListener != null) {
+                orgProfile.removeListener(profileListener);
+            }
+
+            cancelFuture(dataFuture);
+            cancelFuture(goldPriceFuture);
+            cancelFuture(pingFuture);
+
+            if (mainHandler != null) {
+                mainHandler.removeCallbacksAndMessages(null);
+            }
+
+            isViewInitialized = false;
+        } catch (Exception e) {
+            logNonFatal("onDestroyView", e);
         }
-        if (orgProfile != null && profileListener != null) {
-            orgProfile.removeListener(profileListener);
-        }
-
-        cancelFuture(dataFuture);
-        cancelFuture(goldPriceFuture);
-        cancelFuture(pingFuture);
-
-        if (mainHandler != null) {
-            mainHandler.removeCallbacksAndMessages(null);
-        }
-
-        // Cleanup ThreadLocals to prevent memory leaks
-        dateFormatsAr.remove();
-        dateFormatsEn.remove();
-        timeFormatter.remove();
-        currencyFormatter.remove();
-
-        isViewInitialized = false;
-    } catch (Exception e) {
-        logNonFatal("onDestroyView", e);
     }
-}
 
-    
-// ✅ بعد (صحيح):
     private void cancelFuture(Future<?> future) {
         try {
             if (future != null && !future.isDone()) {
@@ -1315,4 +1262,4 @@ public void onDestroyView() {
             logNonFatal("cancelFuture", e);
         }
     }
-} // قوس إغلاق الكلاس MiraDashboardFragment فقط
+}
