@@ -758,10 +758,11 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
 // ✅ دالة جديدة لمعالجة انتهاء التوكن
 private void handleTokenExpired() {
     try {
-        Log.w(TAG, "Token expired, redirecting to login");
+        Log.w(TAG, "401 received - clearing session and redirecting to login");
         
-        // تسجيل الخروج
+        // ✅ مسح التوكن نهائياً أولاً
         if (sessionManager != null) {
+            sessionManager.clearAuthToken();  // ✅ الآن هذه الدالة موجودة
             sessionManager.logoutUser();
         }
         
@@ -781,6 +782,7 @@ private void handleTokenExpired() {
         if (isAdded() && getActivity() != null) {
             Intent intent = new Intent(getActivity(), com.example.uhf.activity.LoginActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            intent.putExtra("session_expired", true);
             startActivity(intent);
             getActivity().finish();
         }
@@ -796,6 +798,7 @@ private void redirectToLogin() {
         if (isAdded() && getActivity() != null) {
             Intent intent = new Intent(getActivity(), com.example.uhf.activity.LoginActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            intent.putExtra("session_expired", true);
             startActivity(intent);
             getActivity().finish();
         }
@@ -803,6 +806,8 @@ private void redirectToLogin() {
         Log.e(TAG, "redirectToLogin error: " + e.getMessage());
     }
 }
+
+
     private void fetchInventoryDataDirectly(int branchId) {
         try {
             if (apiClient == null || branchId <= 0) {
