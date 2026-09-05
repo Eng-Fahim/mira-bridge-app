@@ -10,6 +10,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -22,6 +23,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -34,6 +36,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
+import androidx.print.PrintHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -74,6 +77,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import com.example.uhf.MiraRfid.MiraRfidService;
 
@@ -132,7 +136,9 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
             populateSuggestions("rings");
             updatePendingSyncBadge();
             restoreDraftIfExists();
-
+            if (savedInstanceState != null) {
+                currentPhotoPath = savedInstanceState.getString("camera_photo_path");
+            }
             if (getActivity() instanceof UHFMainActivity) {
                 ((UHFMainActivity) getActivity()).setActiveEncodingFragment(this);
             }
@@ -156,7 +162,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     private void restoreDraftIfExists() {
         try {
-            if (offlineCache == null) return;
+            if (offlineCache == null || binding == null) return;
             String draftJson = offlineCache.getString("current_draft", null);
             if (draftJson == null) return;
 
@@ -255,6 +261,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
     }
 
     private void applyPermissions() {
+        if (binding == null) return;
         boolean canEdit = permissionManager.canEdit("identity") || permissionManager.isManager();
         
         if (binding.btnSaveIdentity != null) {
@@ -311,6 +318,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     private void setArabicTexts() {
         try {
+            if (binding == null) return;
             binding.tvStepTitle.setText("الخطوة 1 من 4: الربط والتصنيف وتوليد الاكواد المجهرية");
             binding.tilEpc.setHint("رمز الشريحة (EPC / GTIN)...");
             binding.btnScanRfid.setText(isRfidScanning ? "إيقاف المسح..." : "مسح رمز RFID");
@@ -327,6 +335,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     private void setEnglishTexts() {
         try {
+            if (binding == null) return;
             binding.tvStepTitle.setText("Step 1 of 4: Bind, Classify & Generate Codes");
             binding.tilEpc.setHint("EPC / GTIN Code...");
             binding.btnScanRfid.setText(isRfidScanning ? "Stop Scan..." : "Scan RFID Tag");
@@ -376,10 +385,14 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     private void setupListeners() {
         try {
+            if (binding == null) return;
+
             binding.etEpc.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
                 @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    binding.tvStatusBadge.setText(s.length() > 0 ? "BOUND" : "WAITING");
+                    if (binding != null) {
+                        binding.tvStatusBadge.setText(s.length() > 0 ? "BOUND" : "WAITING");
+                    }
                 }
                 @Override public void afterTextChanged(Editable s) {}
             });
@@ -489,21 +502,26 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
                 .alpha(1f)
                 .translationY(0f)
                 .setDuration(250)
-                .setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator())
+                .setInterpolator(new AccelerateDecelerateInterpolator())
                 .start();
         } else {
             binding.layoutStonesDetails.animate()
                 .alpha(0f)
                 .translationY(-10f)
                 .setDuration(200)
-                .setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator())
-                .withEndAction(() -> binding.layoutStonesDetails.setVisibility(View.GONE))
+                .setInterpolator(new AccelerateDecelerateInterpolator())
+                .withEndAction(() -> {
+                    if (binding != null && binding.layoutStonesDetails != null) {
+                        binding.layoutStonesDetails.setVisibility(View.GONE);
+                    }
+                })
                 .start();
         }
     }
 
     private int getSelectedKaratNumber() {
         try {
+            if (binding == null) return 21;
             int checkedId = binding.chipGroupKarat.getCheckedChipId();
             if (checkedId == binding.chip24K.getId()) return 24;
             if (checkedId == binding.chip21K.getId()) return 21;
@@ -570,6 +588,7 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
 
     private void resetCalculatedDisplay() {
         try {
+            if (binding == null) return;
             String zeroText = "0.00 " + priceManager.getCurrencySymbol(priceManager.getDefaultCurrency());
             binding.tvEstimatedGoldValue.setText(zeroText);
             binding.tvSummaryPrice.setText(zeroText);
@@ -597,119 +616,90 @@ public class MiraIdentityStudioFragment extends MiraBaseFragment {
         };
     }
 
-    /**
- * توليد GS1 DataMatrix بدقة عالية للطباعة على بطاقة صغيرة
- * الحجم: 10مم × 5مم
- */
-private Bitmap generateGS1DataMatrix(String gs1Data, int width, int height) {
-    if (gs1Data == null || gs1Data.trim().isEmpty()) {
-        return null;
+    @Override
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (currentPhotoPath != null) {
+            outState.putString("camera_photo_path", currentPhotoPath);
+        }
     }
-    try {
-        Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
-        hints.put(EncodeHintType.DATA_MATRIX_SHAPE, SymbolShapeHint.FORCE_RECTANGLE); // شكل مستطيل ليلائم 10×5
-        hints.put(EncodeHintType.MARGIN, 1); // هامش صغير 1 وحدة
-        hints.put(EncodeHintType.ERROR_CORRECTION, "50"); // تصحيح خطأ 50%
-        hints.put(EncodeHintType.MIN_SIZE, new com.google.zxing.Dimension(20, 10)); // الحد الأدنى للحجم
 
-        // توليد الباركود بحجم أكبر ثم تصغيره للحصول على دقة أفضل
-        int scaleFactor = 4; // تكبير 4 مرات ثم تصغير
-        BitMatrix bitMatrix = new MultiFormatWriter().encode(
-                gs1Data, 
-                BarcodeFormat.DATA_MATRIX, 
-                width * scaleFactor, 
-                height * scaleFactor, 
-                hints);
+    private Bitmap generateGS1DataMatrix(String gs1Data, int width, int height) {
+        if (gs1Data == null || gs1Data.trim().isEmpty()) return null;
+        try {
+            Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
+            hints.put(EncodeHintType.DATA_MATRIX_SHAPE, SymbolShapeHint.FORCE_SQUARE);
+            hints.put(EncodeHintType.MARGIN, 0);
 
-        int matrixWidth = bitMatrix.getWidth();
-        int matrixHeight = bitMatrix.getHeight();
-        int[] pixels = new int[matrixWidth * matrixHeight];
+            BitMatrix bitMatrix = new MultiFormatWriter().encode(
+                    gs1Data, BarcodeFormat.DATA_MATRIX, width, height, hints);
 
-        for (int y = 0; y < matrixHeight; y++) {
-            int offset = y * matrixWidth;
-            for (int x = 0; x < matrixWidth; x++) {
-                pixels[offset + x] = bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE;
+            int w = bitMatrix.getWidth();
+            int h = bitMatrix.getHeight();
+            int[] pixels = new int[w * h];
+            for (int y = 0; y < h; y++) {
+                int offset = y * w;
+                for (int x = 0; x < w; x++) {
+                    pixels[offset + x] = bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE;
+                }
             }
+            Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            bitmap.setPixels(pixels, 0, w, 0, 0, w, h);
+            return bitmap;
+        } catch (Exception e) {
+            Log.e(TAG, "Error generating GS1 DataMatrix: " + e.getMessage());
+            return null;
         }
+    }
 
-        Bitmap highResBitmap = Bitmap.createBitmap(matrixWidth, matrixHeight, Bitmap.Config.ARGB_8888);
-        highResBitmap.setPixels(pixels, 0, matrixWidth, 0, 0, matrixWidth, matrixHeight);
-        
-        // تصغير الصورة للحجم المطلوب مع الحفاظ على الجودة
-        Bitmap finalBitmap = Bitmap.createScaledBitmap(
-            highResBitmap, 
-            width, 
-            height, 
-            true // تصفية عالية الجودة
-        );
-        
-        // تحرير الذاكرة
-        if (highResBitmap != finalBitmap) {
-            highResBitmap.recycle();
+    private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
+        if (qrContent == null || qrContent.trim().isEmpty()) {
+            return null;
         }
-        
-        return finalBitmap;
-    } catch (Exception e) {
-        Log.e(TAG, "Error generating GS1 DataMatrix: " + e.getMessage(), e);
-        return null;
-    }
-}
+        try {
+            Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
+            hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
+            hints.put(EncodeHintType.MARGIN, 1);
+            hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
 
-    /**
- * توليد QR Code بدقة عالية للطباعة على بطاقة صغيرة
- * الحجم: 10مم × 5مم
- */
-private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
-    if (qrContent == null || qrContent.trim().isEmpty()) {
-        return null;
-    }
-    try {
-        Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
-        hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M); // تصحيح خطأ متوسط
-        hints.put(EncodeHintType.MARGIN, 1); // هامش صغير
-        hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
+            int scaleFactor = 4;
+            BitMatrix bitMatrix = new MultiFormatWriter().encode(
+                    qrContent, 
+                    BarcodeFormat.QR_CODE, 
+                    width * scaleFactor, 
+                    height * scaleFactor, 
+                    hints);
 
-        // توليد الباركود بحجم أكبر ثم تصغيره للحصول على دقة أفضل
-        int scaleFactor = 4; // تكبير 4 مرات ثم تصغير
-        BitMatrix bitMatrix = new MultiFormatWriter().encode(
-                qrContent, 
-                BarcodeFormat.QR_CODE, 
-                width * scaleFactor, 
-                height * scaleFactor, 
-                hints);
+            int matrixWidth = bitMatrix.getWidth();
+            int matrixHeight = bitMatrix.getHeight();
+            int[] pixels = new int[matrixWidth * matrixHeight];
 
-        int matrixWidth = bitMatrix.getWidth();
-        int matrixHeight = bitMatrix.getHeight();
-        int[] pixels = new int[matrixWidth * matrixHeight];
-
-        for (int y = 0; y < matrixHeight; y++) {
-            int offset = y * matrixWidth;
-            for (int x = 0; x < matrixWidth; x++) {
-                pixels[offset + x] = bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE;
+            for (int y = 0; y < matrixHeight; y++) {
+                int offset = y * matrixWidth;
+                for (int x = 0; x < matrixWidth; x++) {
+                    pixels[offset + x] = bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE;
+                }
             }
-        }
 
-        Bitmap highResBitmap = Bitmap.createBitmap(matrixWidth, matrixHeight, Bitmap.Config.ARGB_8888);
-        highResBitmap.setPixels(pixels, 0, matrixWidth, 0, 0, matrixWidth, matrixHeight);
-        
-        // تصغير الصورة للحجم المطلوب مع الحفاظ على الجودة
-        Bitmap finalBitmap = Bitmap.createScaledBitmap(
-            highResBitmap, 
-            width, 
-            height, 
-            true // تصفية عالية الجودة
-        );
-        
-        // تحرير الذاكرة
-        if (highResBitmap != finalBitmap) {
-            highResBitmap.recycle();
+            Bitmap highResBitmap = Bitmap.createBitmap(matrixWidth, matrixHeight, Bitmap.Config.ARGB_8888);
+            highResBitmap.setPixels(pixels, 0, matrixWidth, 0, 0, matrixWidth, matrixHeight);
+            
+            Bitmap finalBitmap = Bitmap.createScaledBitmap(
+                highResBitmap, 
+                width, 
+                height, 
+                true
+            );
+            
+            if (highResBitmap != finalBitmap) {
+                highResBitmap.recycle();
+            }
+            
+            return finalBitmap;
+        } catch (Exception e) {
+            Log.e(TAG, "Error generating Micro QR Code", e);
+            return null;
         }
-        
-        return finalBitmap;
-    } catch (Exception e) {
-        Log.e(TAG, "Error generating Micro QR Code", e);
-        return null;
-    }
     }
 
     private void finalizeItemIdentity() {
@@ -1006,35 +996,32 @@ private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
     }
 
     public void validateAndProcessEpc(String scannedEpc) {
-    if (scannedEpc == null || scannedEpc.trim().isEmpty()) {
-        showErrorDialog(
-            isArabic ? "خطأ" : "Error", 
-            isArabic ? "لم يتم قراءة رمز الشريحة بشكل صحيح." : "Invalid EPC tag."
-        );
-        return;
-    }
+        if (scannedEpc == null || scannedEpc.trim().isEmpty()) {
+            showErrorDialog(
+                isArabic ? "خطأ" : "Error", 
+                isArabic ? "لم يتم قراءة رمز الشريحة بشكل صحيح." : "Invalid EPC tag."
+            );
+            return;
+        }
 
-    // توحيد صيغة الأحرف الكبيرة
-    String normalizedEpc = scannedEpc.trim().toUpperCase(Locale.US);
+        String normalizedEpc = scannedEpc.trim().toUpperCase(Locale.US);
 
-    // 🛑 فحص التكرار المحلي فوراً
-    if (isEpcDuplicateLocally(normalizedEpc)) {
-        playErrorSound();
-        showErrorDialog(
-            isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
-            isArabic ? "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل في قائمة الانتظار أو الكاش المحلي." 
-                     : "This tag (" + normalizedEpc + ") is already stored in local pending items or cache."
-        );
-        return;
-    }
+        if (isEpcDuplicateLocally(normalizedEpc)) {
+            playErrorSound();
+            showErrorDialog(
+                isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
+                isArabic ? "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل في قائمة الانتظار أو الكاش المحلي." 
+                         : "This tag (" + normalizedEpc + ") is already stored in local pending items or cache."
+            );
+            return;
+        }
 
-    // إذا كان الرمز سليماً وغير مكرر
-    if (binding != null && binding.etEpc != null) {
-        binding.etEpc.setText(normalizedEpc);
-        binding.tvStatusBadge.setText("BOUND");
-        playSuccessSound();
+        if (binding != null && binding.etEpc != null) {
+            binding.etEpc.setText(normalizedEpc);
+            binding.tvStatusBadge.setText("BOUND");
+            playSuccessSound();
+        }
     }
-}
 
     private boolean validateInputData(String epc, String title, String weightStr) {
         if (title.isEmpty()) {
@@ -1128,40 +1115,40 @@ private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
     }
 
     private void showPendingItemsDialog() {
-    if (offlineCache == null || !isAdded() || getContext() == null) return;
+        if (offlineCache == null || !isAdded() || getContext() == null) return;
 
-    try {
-        String json = offlineCache.getString("pending_encodes", "[]");
-        JSONArray arr = new JSONArray(json);
+        try {
+            String json = offlineCache.getString("pending_encodes", "[]");
+            JSONArray arr = new JSONArray(json);
 
-        if (arr.length() == 0) {
-            showToast(isArabic ? "لا توجد عناصر معلقة" : "No pending items");
-            return;
+            if (arr.length() == 0) {
+                showToast(isArabic ? "لا توجد عناصر معلقة" : "No pending items");
+                return;
+            }
+
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject item = arr.getJSONObject(i);
+                builder.append("• ")
+                        .append(item.optString("title"))
+                        .append(" | ")
+                        .append(item.optString("epc"))
+                        .append(" (")
+                        .append(item.optDouble("gross_weight"))
+                        .append("g)\n");
+            }
+
+            new MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(isArabic ? "العناصر المخزنة محلياً" : "Offline Stored Items")
+                    .setMessage(builder.toString())
+                    .setPositiveButton(isArabic ? "مزامنة الآن" : "Sync Now", (d, w) -> syncPendingEncodes())
+                    .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
+                    .show();
+
+        } catch (Exception e) {
+            Log.e(TAG, "showPendingItemsDialog error: " + e.getMessage(), e);
         }
-
-        StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < arr.length(); i++) {
-            JSONObject item = arr.getJSONObject(i);
-            builder.append("• ")
-                    .append(item.optString("title"))
-                    .append(" | ")
-                    .append(item.optString("epc"))
-                    .append(" (")
-                    .append(item.optDouble("gross_weight"))
-                    .append("g)\n");
-        }
-
-        new MaterialAlertDialogBuilder(requireContext()) // ✅
-                .setTitle(isArabic ? "العناصر المخزنة محلياً" : "Offline Stored Items")
-                .setMessage(builder.toString())
-                .setPositiveButton(isArabic ? "مزامنة الآن" : "Sync Now", (d, w) -> syncPendingEncodes())
-                .setNegativeButton(isArabic ? "إغلاق" : "Close", null)
-                .show();
-
-    } catch (Exception e) {
-        Log.e(TAG, "showPendingItemsDialog error: " + e.getMessage(), e);
     }
-}
 
     private void setupPhotoLaunchers() {
         requestPermissionLauncher = registerForActivityResult(
@@ -1245,25 +1232,24 @@ private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
     }
 
     private void showImageSourceDialog() {
-    if (getContext() == null || !isAdded()) return;
-    if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
-        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-        return;
+        if (getContext() == null || !isAdded()) return;
+        if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
+            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            return;
+        }
+
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
+        builder.setTitle(isArabic ? "إضافة صورة" : "Add Photo");
+        String[] options = {
+                isArabic ? "📷 التقاط صورة" : "📷 Take Photo",
+                isArabic ? "🖼️ اختيار من الاستوديو" : "🖼️ Choose from Gallery"
+        };
+        builder.setItems(options, (dialog, which) -> {
+            if (which == 0) checkCameraPermissionAndTakePhoto();
+            else openGallery();
+        });
+        builder.show();
     }
-
-    MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext()); // ✅
-    builder.setTitle(isArabic ? "إضافة صورة" : "Add Photo");
-    String[] options = {
-            isArabic ? "📷 التقاط صورة" : "📷 Take Photo",
-            isArabic ? "🖼️ اختيار من الاستوديو" : "🖼️ Choose from Gallery"
-    };
-    builder.setItems(options, (dialog, which) -> {
-        if (which == 0) checkCameraPermissionAndTakePhoto();
-        else openGallery();
-    });
-    builder.show();
-}
-
 
     private void checkCameraPermissionAndTakePhoto() {
         if (getContext() == null) return;
@@ -1299,6 +1285,7 @@ private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
     }
 
     private File createImageFile() throws IOException {
+        if (getContext() == null) return null;
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
         File storageDir = getContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         File image = File.createTempFile("MIRA_" + timeStamp + "_", ".jpg", storageDir);
@@ -1378,58 +1365,63 @@ private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
     }
 
     private void activateRFIDModeForEncoding() {
-    if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
-        showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
-        return;
-    }
-    
-    try {
-        if (getActivity() instanceof UHFMainActivity) {
-            UHFMainActivity activity = (UHFMainActivity) getActivity();
-            isRfidScanning = true;
-            binding.btnScanRfid.setText(isArabic ? "إيقاف المسح..." : "Stop Scan...");
-            binding.tvStatusBadge.setText("SCANNING...");
-
-            activity.setActiveRfidListener(epc -> {
-                // توحيد صيغة الأحرف الكبيرة
-                String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
-                
-                // فحص التكرار المحلي
-                if (isEpcDuplicateLocally(normalizedEpc)) {
-                    getActivity().runOnUiThread(() -> {
-                        playErrorSound();
-                        showErrorDialog(
-                            isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
-                            isArabic ? "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل. يرجى استخدام شريحة جديدة." 
-                                     : "This tag (" + normalizedEpc + ") is already registered. Please use a new tag."
-                        );
-                        binding.tvStatusBadge.setText("DUPLICATE");
-                        stopRfidScanningMode();
-                    });
-                    return;
-                }
-                
-                if (binding != null && binding.etEpc != null) {
-                    getActivity().runOnUiThread(() -> {
-                        binding.etEpc.setText(normalizedEpc);
-                        binding.tvStatusBadge.setText("BOUND");
-                        playSuccessSound();
-                        stopRfidScanningMode();
-                    });
-                }
-            });
-
-            activity.startUHFScan();
-            showToast(isArabic ? "📡 جاري البحث عن شريحة RFID..." : "📡 Searching for RFID tag...");
-
-            if (rfidTimeoutRunnable != null) handler.removeCallbacks(rfidTimeoutRunnable);
-            rfidTimeoutRunnable = this::stopRfidScanningMode;
-            handler.postDelayed(rfidTimeoutRunnable, RFID_TIMEOUT_MS);
+        if (!(permissionManager.canEdit("identity") || permissionManager.isManager())) {
+            showToast(isArabic ? "⛔ غير مصرح" : "⛔ Access Denied");
+            return;
         }
-    } catch (Exception e) {
-        Log.e(TAG, "activateRFIDMode error: " + e.getMessage(), e);
+        
+        try {
+            if (getActivity() instanceof UHFMainActivity) {
+                UHFMainActivity activity = (UHFMainActivity) getActivity();
+                isRfidScanning = true;
+                if (binding != null) {
+                    binding.btnScanRfid.setText(isArabic ? "إيقاف المسح..." : "Stop Scan...");
+                    binding.tvStatusBadge.setText("SCANNING...");
+                }
+
+                activity.setActiveRfidListener(epc -> {
+                    String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
+                    
+                    if (isEpcDuplicateLocally(normalizedEpc)) {
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                playErrorSound();
+                                showErrorDialog(
+                                    isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
+                                    isArabic ? "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل. يرجى استخدام شريحة جديدة." 
+                                             : "This tag (" + normalizedEpc + ") is already registered. Please use a new tag."
+                                );
+                                if (binding != null) binding.tvStatusBadge.setText("DUPLICATE");
+                                stopRfidScanningMode();
+                            });
+                        }
+                        return;
+                    }
+                    
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            if (binding != null && binding.etEpc != null) {
+                                binding.etEpc.setText(normalizedEpc);
+                                binding.tvStatusBadge.setText("BOUND");
+                            }
+                            playSuccessSound();
+                            stopRfidScanningMode();
+                        });
+                    }
+                });
+
+                activity.startUHFScan();
+                showToast(isArabic ? "📡 جاري البحث عن شريحة RFID..." : "📡 Searching for RFID tag...");
+
+                if (rfidTimeoutRunnable != null) handler.removeCallbacks(rfidTimeoutRunnable);
+                rfidTimeoutRunnable = this::stopRfidScanningMode;
+                handler.postDelayed(rfidTimeoutRunnable, RFID_TIMEOUT_MS);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "activateRFIDMode error: " + e.getMessage(), e);
+        }
     }
-}
+
     private void stopRfidScanningMode() {
         try {
             isRfidScanning = false;
@@ -1454,35 +1446,32 @@ private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
     }
 
     public void onRfidScanned(String epc) {
-    if (getActivity() == null || binding == null) return;
-    
-    // توحيد صيغة الأحرف الكبيرة
-    String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
-    
-    getActivity().runOnUiThread(() -> {
-        // فحص التكرار قبل العرض
-        if (isEpcDuplicateLocally(normalizedEpc)) {
-            playErrorSound();
-            showErrorDialog(
-                isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
-                isArabic ? "هذه الشريحة (" + normalizedEpc + ") مسجلة بالفعل." 
-                         : "This tag (" + normalizedEpc + ") is already registered."
-            );
-            stopRfidScanningMode();
-            return;
-        }
+        if (!isAdded() || getActivity() == null) return;
+        String normalizedEpc = epc != null ? epc.trim().toUpperCase(Locale.US) : "";
         
-        binding.etEpc.setText(normalizedEpc);
-        binding.tvStatusBadge.setText("BOUND");
-        if (getActivity() instanceof UHFMainActivity) {
-            ((UHFMainActivity) getActivity()).playSound(1);
-        }
-        stopRfidScanningMode();
-    });
-}
+        getActivity().runOnUiThread(() -> {
+            if (!isAdded() || binding == null) return;
+            
+            if (isEpcDuplicateLocally(normalizedEpc)) {
+                playErrorSound();
+                showErrorDialog(
+                    isArabic ? "شريحة مكررة محلياً" : "Duplicate Local Tag", 
+                    isArabic ? "هذه الشريحة مسجلة بالفعل." : "This tag is already registered."
+                );
+                stopRfidScanningMode();
+                return;
+            }
+            
+            binding.etEpc.setText(normalizedEpc);
+            binding.tvStatusBadge.setText("BOUND");
+            playSuccessSound();
+            stopRfidScanningMode();
+        });
+    }
 
     private void populateSuggestions(String typeKey) {
         try {
+            if (binding == null) return;
             binding.chipGroupSuggestions.removeAllViews();
             String[] suggestions = typeSuggestions.get(typeKey);
             if (suggestions == null || getContext() == null) return;
@@ -1491,7 +1480,9 @@ private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
                 chip.setText(suggestion);
                 chip.setClickable(true);
                 chip.setCheckable(false);
-                chip.setOnClickListener(v -> binding.etTitle.setText(suggestion));
+                chip.setOnClickListener(v -> {
+                    if (binding != null) binding.etTitle.setText(suggestion);
+                });
                 binding.chipGroupSuggestions.addView(chip);
             }
         } catch (Exception e) {
@@ -1567,178 +1558,119 @@ private Bitmap generateMicroQRCode(String qrContent, int width, int height) {
         successDialog.show();
     }
 
-    /**
- * توليد صورة البطاقة الفيزيائية بالحجم الصحيح
- * البطاقة: 30مم × 15مم
- * - الجزء الأيمن: GS1 DataMatrix بحجم 10مم × 5مم
- * - الجزء الأوسط: شريحة RFID
- * - الجزء الأيسر: QR Code بحجم 10مم × 5مم
- * - نص منحوت: "MIRA JEWELRY RFID"
- */
-private Bitmap generatePhysicalTagBitmap(String epc, String gs1Data, String qrUrl) {
-    // تحويل المليمترات إلى بكسل للطباعة
-    // 1مم = 8 بكسل تقريباً عند 203 DPI (دقة الطابعات الحرارية القياسية)
-    final float MM_TO_PX = 8f;
-    
-    // أبعاد البطاقة: 30مم × 15مم
-    int cardWidthPx = Math.round(30 * MM_TO_PX);   // 240 بكسل
-    int cardHeightPx = Math.round(15 * MM_TO_PX);  // 120 بكسل
-    
-    // أبعاد الباركودات: 10مم × 5مم
-    int barcodeWidthPx = Math.round(10 * MM_TO_PX);   // 80 بكسل
-    int barcodeHeightPx = Math.round(5 * MM_TO_PX);   // 40 بكسل
-    
-    // إنشاء البطاقة
-    Bitmap tagBitmap = Bitmap.createBitmap(cardWidthPx, cardHeightPx, Bitmap.Config.ARGB_8888);
-    Canvas canvas = new Canvas(tagBitmap);
-    canvas.drawColor(Color.WHITE);
-    
-    // ==================== إعدادات الرسم ====================
-    Paint textPaint = new Paint();
-    textPaint.setColor(Color.BLACK);
-    textPaint.setAntiAlias(true);
-    textPaint.setSubpixelText(true);
-    textPaint.setTypeface(android.graphics.Typeface.create("sans-serif-condensed", android.graphics.Typeface.BOLD));
-    
-    // ==================== 1. الجزء الأيمن: GS1 DataMatrix ====================
-    // المنطقة: من 0 إلى 10مم (أقصى اليمين)
-    if (gs1Data != null && !gs1Data.isEmpty()) {
-        Bitmap dmBitmap = generateGS1DataMatrix(gs1Data, barcodeWidthPx, barcodeHeightPx);
-        if (dmBitmap != null) {
-            // وضع الباركود في أقصى اليمين
-            int dmX = 0;
-            int dmY = Math.round(2 * MM_TO_PX); // هامش علوي 2مم
-            canvas.drawBitmap(dmBitmap, dmX, dmY, null);
-            
-            // نص صغير تحت الباركود
-            textPaint.setTextSize(4 * MM_TO_PX); // 4مم
-            canvas.drawText("GS1", dmX + 2, cardHeightPx - 2, textPaint);
-        }
-    }
-    
-    // ==================== 2. الجزء الأوسط: منطقة شريحة RFID ====================
-    // المنطقة: من 10مم إلى 20مم (الوسط)
-    int rfidCenterX = Math.round(15 * MM_TO_PX); // مركز البطاقة
-    int rfidCenterY = cardHeightPx / 2;
-    
-    // رسم إطار الشريحة (تمثيل بصري)
-    Paint rfidPaint = new Paint();
-    rfidPaint.setColor(Color.LTGRAY);
-    rfidPaint.setStyle(Paint.Style.STROKE);
-    rfidPaint.setStrokeWidth(1f);
-    
-    int rfidWidth = Math.round(8 * MM_TO_PX);   // 8مم
-    int rfidHeight = Math.round(10 * MM_TO_PX);  // 10مم
-    int rfidLeft = rfidCenterX - (rfidWidth / 2);
-    int rfidTop = rfidCenterY - (rfidHeight / 2);
-    
-    canvas.drawRect(rfidLeft, rfidTop, rfidLeft + rfidWidth, rfidTop + rfidHeight, rfidPaint);
-    
-    // رسم خطوط تمثل الهوائي الداخلي للشريحة
-    Paint antennaPaint = new Paint();
-    antennaPaint.setColor(Color.GRAY);
-    antennaPaint.setStyle(Paint.Style.STROKE);
-    antennaPaint.setStrokeWidth(0.5f);
-    
-    int coilMargin = Math.round(1 * MM_TO_PX);
-    for (int i = 0; i < 3; i++) {
-        int inset = coilMargin + (i * Math.round(0.5f * MM_TO_PX));
-        canvas.drawRect(
-            rfidLeft + inset, 
-            rfidTop + inset, 
-            rfidLeft + rfidWidth - inset, 
-            rfidTop + rfidHeight - inset, 
-            antennaPaint
-        );
-    }
-    
-    // نقطة مركز الشريحة
-    Paint chipPaint = new Paint();
-    chipPaint.setColor(Color.DKGRAY);
-    int chipSize = Math.round(2 * MM_TO_PX);
-    canvas.drawCircle(rfidCenterX, rfidCenterY, chipSize, chipPaint);
-    
-    // ==================== 3. الجزء الأيسر: QR Code ====================
-    // المنطقة: من 20مم إلى 30مم (أقصى اليسار)
-    if (qrUrl != null && !qrUrl.isEmpty()) {
-        Bitmap qrBitmap = generateMicroQRCode(qrUrl, barcodeWidthPx, barcodeHeightPx);
-        if (qrBitmap != null) {
-            // وضع الباركود في أقصى اليسار
-            int qrX = cardWidthPx - barcodeWidthPx;
-            int qrY = Math.round(2 * MM_TO_PX); // هامش علوي 2مم
-            canvas.drawBitmap(qrBitmap, qrX, qrY, null);
-            
-            // نص صغير تحت الباركود
-            textPaint.setTextSize(4 * MM_TO_PX);
-            canvas.drawText("QR", qrX + 2, cardHeightPx - 2, textPaint);
-        }
-    }
-    
-    // ==================== 4. النص المنحوت: "MIRA JEWELRY RFID" ====================
-    textPaint.setTextSize(5 * MM_TO_PX); // 5مم
-    textPaint.setTextAlign(Paint.Align.CENTER);
-    textPaint.setFakeBoldText(true);
-    textPaint.setLetterSpacing(0.05f);
-    
-    // وضع النص في منتصف البطاقة (فوق منطقة RFID)
-    canvas.drawText("MIRA JEWELRY RFID", rfidCenterX, Math.round(3 * MM_TO_PX), textPaint);
-    
-    // ==================== 5. خط فاصل رفيع بين الأجزاء ====================
-    Paint dividerPaint = new Paint();
-    dividerPaint.setColor(Color.LTGRAY);
-    dividerPaint.setStrokeWidth(0.3f);
-    
-    // خط بين الجزء الأيمن والأوسط
-    int divider1X = Math.round(10 * MM_TO_PX);
-    canvas.drawLine(divider1X, 0, divider1X, cardHeightPx, dividerPaint);
-    
-    // خط بين الجزء الأوسط والأيسر
-    int divider2X = Math.round(20 * MM_TO_PX);
-    canvas.drawLine(divider2X, 0, divider2X, cardHeightPx, dividerPaint);
-    
-    return tagBitmap;
-}
-
-    /**
- * طباعة البطاقة بالحجم الفعلي (30مم × 15مم)
- */
-private void printTagDirectly(Bitmap tagBitmap) {
-    if (getContext() == null || tagBitmap == null) return;
-    try {
-        androidx.print.PrintHelper printHelper = new androidx.print.PrintHelper(requireContext());
-        printHelper.setScaleMode(androidx.print.PrintHelper.SCALE_MODE_FIT);
-        printHelper.setColorMode(androidx.print.PrintHelper.COLOR_MODE_MONOCHROME);
-        printHelper.setOrientation(androidx.print.PrintHelper.ORIENTATION_LANDSCAPE);
+    private Bitmap generatePhysicalTagBitmap(String epc, String gs1Data, String qrUrl) {
+        final float MM_TO_PX = 8.0f; // 203 DPI (8 dots per mm)
         
-        // اسم الملف يعكس الحجم الفعلي
-        printHelper.printBitmap("MIRA_TAG_30x15mm_" + System.currentTimeMillis(), tagBitmap);
-    } catch (Exception e) {
-        Log.e(TAG, "Print Error: " + e.getMessage(), e);
-        showToast(isArabic ? "❌ فشلت عملية الطباعة" : "❌ Print failed");
+        int cardWidthPx = Math.round(30 * MM_TO_PX);   // 240 px
+        int cardHeightPx = Math.round(15 * MM_TO_PX);  // 120 px
+        
+        int barcodeSizePx = Math.round(8 * MM_TO_PX);  // 64 px
+        
+        Bitmap tagBitmap = Bitmap.createBitmap(cardWidthPx, cardHeightPx, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(tagBitmap);
+        canvas.drawColor(Color.WHITE);
+
+        Paint titlePaint = new Paint();
+        titlePaint.setColor(Color.BLACK);
+        titlePaint.setAntiAlias(true);
+        titlePaint.setTextSize(2.2f * MM_TO_PX);
+        titlePaint.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
+        titlePaint.setTextAlign(Paint.Align.CENTER);
+
+        canvas.drawText("MIRA JEWELRY RFID", cardWidthPx / 2f, 3 * MM_TO_PX, titlePaint);
+
+        if (gs1Data != null && !gs1Data.isEmpty()) {
+            Bitmap dmBitmap = generateGS1DataMatrix(gs1Data, barcodeSizePx, barcodeSizePx);
+            if (dmBitmap != null) {
+                int dmX = Math.round(1 * MM_TO_PX);
+                int dmY = Math.round(4.5f * MM_TO_PX);
+                canvas.drawBitmap(dmBitmap, dmX, dmY, null);
+                dmBitmap.recycle();
+            }
+        }
+
+        int rfidCenterX = Math.round(15 * MM_TO_PX);
+        int rfidCenterY = Math.round(8.5f * MM_TO_PX);
+
+        Paint rfidPaint = new Paint();
+        rfidPaint.setColor(Color.LTGRAY);
+        rfidPaint.setStyle(Paint.Style.STROKE);
+        rfidPaint.setStrokeWidth(1f);
+
+        int rfidWidth = Math.round(7 * MM_TO_PX);
+        int rfidHeight = Math.round(7 * MM_TO_PX);
+        canvas.drawRect(rfidCenterX - rfidWidth/2f, rfidCenterY - rfidHeight/2f, 
+                        rfidCenterX + rfidWidth/2f, rfidCenterY + rfidHeight/2f, rfidPaint);
+
+        Paint chipPaint = new Paint();
+        chipPaint.setColor(Color.BLACK);
+        canvas.drawCircle(rfidCenterX, rfidCenterY, 1.5f * MM_TO_PX, chipPaint);
+
+        if (qrUrl != null && !qrUrl.isEmpty()) {
+            Bitmap qrBitmap = generateMicroQRCode(qrUrl, barcodeSizePx, barcodeSizePx);
+            if (qrBitmap != null) {
+                int qrX = cardWidthPx - barcodeSizePx - Math.round(1 * MM_TO_PX);
+                int qrY = Math.round(4.5f * MM_TO_PX);
+                canvas.drawBitmap(qrBitmap, qrX, qrY, null);
+                qrBitmap.recycle();
+            }
+        }
+
+        Paint labelPaint = new Paint();
+        labelPaint.setColor(Color.BLACK);
+        labelPaint.setAntiAlias(true);
+        labelPaint.setTextSize(1.8f * MM_TO_PX);
+        labelPaint.setTextAlign(Paint.Align.CENTER);
+
+        canvas.drawText("GS1", 5 * MM_TO_PX, 14 * MM_TO_PX, labelPaint);
+        canvas.drawText("QR", cardWidthPx - (5 * MM_TO_PX), 14 * MM_TO_PX, labelPaint);
+
+        return tagBitmap;
     }
-}
+
+    private void printTagDirectly(Bitmap tagBitmap) {
+        if (getContext() == null || tagBitmap == null) return;
+        try {
+            if (!PrintHelper.systemSupportsPrint()) {
+                showToast(isArabic ? "⚠️ ميزة الطباعة غير مدعومة على هذا الجهاز" : "⚠️ Printing is not supported on this device");
+                return;
+            }
+
+            PrintHelper printHelper = new PrintHelper(requireContext());
+            printHelper.setScaleMode(PrintHelper.SCALE_MODE_FILL);
+            printHelper.setColorMode(PrintHelper.COLOR_MODE_MONOCHROME);
+            printHelper.setOrientation(PrintHelper.ORIENTATION_LANDSCAPE);
+            
+            printHelper.printBitmap("MIRA_TAG_30x15mm", tagBitmap);
+        } catch (Exception e) {
+            Log.e(TAG, "Print Error: " + e.getMessage(), e);
+            showToast(isArabic ? "❌ تعذر إرسال أمر الطباعة" : "❌ Print request failed");
+        }
+    }
+
     private AlertDialog showProfessionalLoadingDialog(String title, String message) {
-    if (getContext() == null || !isAdded()) return null;
-    
-    MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext()); // ✅
-    builder.setTitle(title);
-    builder.setMessage(message);
-    builder.setCancelable(false);
+        if (getContext() == null || !isAdded()) return null;
+        
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext());
+        builder.setTitle(title);
+        builder.setMessage(message);
+        builder.setCancelable(false);
 
-    ProgressBar progressBar = new ProgressBar(requireContext());
-    progressBar.setIndeterminate(true);
-    progressBar.setPadding(40, 20, 40, 20);
-    builder.setView(progressBar);
+        ProgressBar progressBar = new ProgressBar(requireContext());
+        progressBar.setIndeterminate(true);
+        progressBar.setPadding(40, 20, 40, 20);
+        builder.setView(progressBar);
 
-    AlertDialog dialog = builder.create();
-    dialog.setCanceledOnTouchOutside(false);
-    dialog.setCancelable(false);
-    dialog.show();
-    return dialog;
-}
+        AlertDialog dialog = builder.create();
+        dialog.setCanceledOnTouchOutside(false);
+        dialog.setCancelable(false);
+        dialog.show();
+        return dialog;
+    }
 
     private void setFormEnabled(boolean enabled) {
         try {
+            if (binding == null) return;
             boolean canEdit = permissionManager.canEdit("identity") || permissionManager.isManager();
             boolean finalEnabled = enabled && canEdit && !isFormLocked;
             
@@ -1781,19 +1713,19 @@ private void printTagDirectly(Bitmap tagBitmap) {
     }
 
     private void showValidationError(String message) {
-    try {
-        if (getContext() == null || !isAdded()) return;
+        try {
+            if (getContext() == null || !isAdded()) return;
 
-        new MaterialAlertDialogBuilder(requireContext()) // ✅
-                .setTitle(isArabic ? "⚠️ تنبيه الحماية" : "⚠️ Validation Alert")
-                .setMessage(message)
-                .setPositiveButton(isArabic ? "حسناً" : "OK", null)
-                .setCancelable(false)
-                .show();
-    } catch (Exception e) {
-        showToast(message);
+            new MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(isArabic ? "⚠️ تنبيه الحماية" : "⚠️ Validation Alert")
+                    .setMessage(message)
+                    .setPositiveButton(isArabic ? "حسناً" : "OK", null)
+                    .setCancelable(false)
+                    .show();
+        } catch (Exception e) {
+            showToast(message);
+        }
     }
-}
 
     private void uploadItemImages(int itemId, List<String> imagePaths) {
         if (imagePaths == null || imagePaths.isEmpty() || itemId <= 0 || apiClient == null) return;
@@ -1820,69 +1752,59 @@ private void printTagDirectly(Bitmap tagBitmap) {
             });
         });
     }
-/**
- * دالة للتحقق الشامل من تكرار رمز EPC محلياً
- * مع توحيد صيغة الأحرف الكبيرة لمنع تجاوز الفحص
- * @param epc الرمز المراد التحقق منه
- * @return true إذا كان الرمز مكرراً محلياً، false إذا كان سليماً
- */
-private boolean isEpcDuplicateLocally(String epc) {
-    if (epc == null || epc.trim().isEmpty() || offlineCache == null) {
+
+    private boolean isEpcDuplicateLocally(String epc) {
+        if (epc == null || epc.trim().isEmpty() || offlineCache == null) {
+            return false;
+        }
+
+        String cleanEpc = epc.trim().toUpperCase(Locale.US);
+
+        try {
+            String pendingJson = offlineCache.getString("pending_encodes", "[]");
+            JSONArray pendingArray = new JSONArray(pendingJson);
+
+            for (int i = 0; i < pendingArray.length(); i++) {
+                JSONObject item = pendingArray.optJSONObject(i);
+                if (item != null) {
+                    String storedEpc = item.optString("epc", "").trim().toUpperCase(Locale.US);
+                    if (cleanEpc.equals(storedEpc)) {
+                        Log.w(TAG, "Duplicate found in Offline Pending Sync List: " + cleanEpc);
+                        return true;
+                    }
+                }
+            }
+
+            String draftJson = offlineCache.getString("current_draft", null);
+            if (draftJson != null) {
+                JSONObject draft = new JSONObject(draftJson);
+                String draftEpc = draft.optString("epc", "").trim().toUpperCase(Locale.US);
+                if (cleanEpc.equals(draftEpc)) {
+                    Log.w(TAG, "EPC matches current unsaved draft: " + cleanEpc);
+                    return true;
+                }
+            }
+
+            String localItemsJson = offlineCache.getString("cached_master_items", "[]");
+            JSONArray localItemsArray = new JSONArray(localItemsJson);
+
+            for (int i = 0; i < localItemsArray.length(); i++) {
+                JSONObject item = localItemsArray.optJSONObject(i);
+                if (item != null) {
+                    String storedEpc = item.optString("epc", "").trim().toUpperCase(Locale.US);
+                    if (cleanEpc.equals(storedEpc)) {
+                        Log.w(TAG, "Duplicate found in Local Master Cache: " + cleanEpc);
+                        return true;
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking duplicate EPC: " + e.getMessage(), e);
+        }
+
         return false;
     }
-
-    // توحيد صيغة الأحرف الكبيرة
-    String cleanEpc = epc.trim().toUpperCase(Locale.US);
-
-    try {
-        // 1️⃣ الفحص في قائمة العناصر المنتظرة للمزامنة (Pending Sync Queue)
-        String pendingJson = offlineCache.getString("pending_encodes", "[]");
-        JSONArray pendingArray = new JSONArray(pendingJson);
-
-        for (int i = 0; i < pendingArray.length(); i++) {
-            JSONObject item = pendingArray.optJSONObject(i);
-            if (item != null) {
-                String storedEpc = item.optString("epc", "").trim().toUpperCase(Locale.US);
-                if (cleanEpc.equals(storedEpc)) {
-                    Log.w(TAG, "Duplicate found in Offline Pending Sync List: " + cleanEpc);
-                    return true;
-                }
-            }
-        }
-
-        // 2️⃣ الفحص في المسودة الحالية المفتوحة (Current Draft)
-        String draftJson = offlineCache.getString("current_draft", null);
-        if (draftJson != null) {
-            JSONObject draft = new JSONObject(draftJson);
-            String draftEpc = draft.optString("epc", "").trim().toUpperCase(Locale.US);
-            if (cleanEpc.equals(draftEpc)) {
-                Log.w(TAG, "EPC matches current unsaved draft: " + cleanEpc);
-                return true;
-            }
-        }
-
-        // 3️⃣ الفحص في الكاش المحلي للمنتجات المخزنة مسبقاً (Local Master DB / Cache)
-        String localItemsJson = offlineCache.getString("cached_master_items", "[]");
-        JSONArray localItemsArray = new JSONArray(localItemsJson);
-
-        for (int i = 0; i < localItemsArray.length(); i++) {
-            JSONObject item = localItemsArray.optJSONObject(i);
-            if (item != null) {
-                String storedEpc = item.optString("epc", "").trim().toUpperCase(Locale.US);
-                if (cleanEpc.equals(storedEpc)) {
-                    Log.w(TAG, "Duplicate found in Local Master Cache: " + cleanEpc);
-                    return true;
-                }
-            }
-        }
-
-    } catch (Exception e) {
-        Log.e(TAG, "Error checking duplicate EPC: " + e.getMessage(), e);
-    }
-
-    return false; // الرمز غير مكرر محلياً
-}
-    
 
     private void saveEncodeOffline(JSONObject payload) {
         try {
@@ -2032,6 +1954,7 @@ private boolean isEpcDuplicateLocally(String epc) {
 
     private String getSelectedCategory() {
         try {
+            if (binding == null) return isArabic ? "مجوهرات" : "Jewelry";
             int checkedId = binding.chipGroupTypes.getCheckedChipId();
             if (checkedId == binding.chipRing.getId()) return isArabic ? "خواتم" : "Rings";
             if (checkedId == binding.chipSet.getId()) return isArabic ? "أطقم" : "Sets";
@@ -2065,7 +1988,6 @@ private boolean isEpcDuplicateLocally(String epc) {
             binding.chip21K.setChecked(true);
             binding.etEpc.requestFocus();
             
-            // حماية الصور الأوفلاين: تنظيف قائمة المراجع دون حذف الصور الفيزيائية
             photoPaths.clear();
             onPhotosUpdated();
             
@@ -2085,7 +2007,15 @@ private boolean isEpcDuplicateLocally(String epc) {
         stopRfidScanningMode();
         
         if (executorService != null && !executorService.isShutdown()) {
-            executorService.shutdownNow();
+            try {
+                executorService.shutdown();
+                if (!executorService.awaitTermination(800, TimeUnit.MILLISECONDS)) {
+                    executorService.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executorService.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
         }
         
         handler.removeCallbacksAndMessages(null);
@@ -2115,10 +2045,17 @@ private boolean isEpcDuplicateLocally(String epc) {
         @Override
         public void onBindViewHolder(@NonNull PhotoViewHolder holder, int position) {
             String path = paths.get(position);
-            holder.imgThumbnail.setImageURI(Uri.fromFile(new File(path)));
+            
+            Bitmap thumbnail = decodeSampledBitmapFromFile(path, 100, 100);
+            if (thumbnail != null) {
+                holder.imgThumbnail.setImageBitmap(thumbnail);
+            } else {
+                holder.imgThumbnail.setImageResource(R.drawable.ic_placeholder);
+            }
+
             holder.btnDelete.setOnClickListener(v -> {
                 if (deleteListener != null) {
-                    int adapterPosition = holder.getAdapterPosition();
+                    int adapterPosition = holder.getBindingAdapterPosition();
                     if (adapterPosition != RecyclerView.NO_POSITION) {
                         deleteListener.onDelete(adapterPosition);
                     }
@@ -2129,6 +2066,36 @@ private boolean isEpcDuplicateLocally(String epc) {
         @Override
         public int getItemCount() {
             return paths.size();
+        }
+
+        private Bitmap decodeSampledBitmapFromFile(String path, int reqWidth, int reqHeight) {
+            try {
+                final BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(path, options);
+
+                options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
+                options.inJustDecodeBounds = false;
+                return BitmapFactory.decodeFile(path, options);
+            } catch (Exception e) {
+                return null;
+            }
+        }
+
+        private int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
+            final int height = options.outHeight;
+            final int width = options.outWidth;
+            int inSampleSize = 1;
+
+            if (height > reqHeight || width > reqWidth) {
+                final int halfHeight = height / 2;
+                final int halfWidth = width / 2;
+
+                while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                    inSampleSize *= 2;
+                }
+            }
+            return inSampleSize;
         }
 
         static class PhotoViewHolder extends RecyclerView.ViewHolder {
@@ -2142,4 +2109,4 @@ private boolean isEpcDuplicateLocally(String epc) {
             }
         }
     }
-                    }
+}
