@@ -124,21 +124,20 @@ public class MiraSecureGateFragment extends Fragment {
     private boolean isArabic = true;
 
     private final ActivityResultLauncher<ScanOptions> barcodeLauncher = registerForActivityResult(
-    new ScanContract(),
-    result -> {
-        isCameraOpen = false; // إعادة الضبط عند العودة من الكاميرا
-        
-        if (result.getContents() != null && !isDestroyed) {
-            processInputEpc(result.getContents().trim(), "CAMERA");
+        new ScanContract(),
+        result -> {
+            isCameraOpen = false; // إعادة الضبط عند العودة من الكاميرا
+            
+            if (result.getContents() != null && !isDestroyed) {
+                processInputEpc(result.getContents().trim(), "CAMERA");
+            }
+            
+            // إعادة تشغيل مسح الـ RFID بعد العودة من الكاميرا إذا لم تكن البوابة في حالة الإغلاق الطارئ
+            if (!isLockdown && !isDestroyed) {
+                autoStartScanning();
+            }
         }
-        
-        // إعادة تشغيل مسح الـ RFID بعد العودة من الكاميرا إذا لم تكن البوابة في حالة الإغلاق الطارئ
-        if (!isLockdown && !isDestroyed) {
-            autoStartScanning();
-        }
-    }
-);
-
+    );
 
     // ==================== Helper Methods ====================
     
@@ -278,24 +277,24 @@ public class MiraSecureGateFragment extends Fragment {
             });
         }
         if (btnScanBarcode != null) {
-    btnScanBarcode.setOnClickListener(v -> {
-        // 1. إيقاف مسح الـ RFID فوراً لتفريغ الموارد ومنع التجمّد
-        stopScanning();
-        isCameraOpen = true;
+            btnScanBarcode.setOnClickListener(v -> {
+                // 1. إيقاف مسح الـ RFID فوراً لتفريغ الموارد ومنع التجمّد
+                stopScanning();
+                isCameraOpen = true;
 
-        ScanOptions options = new ScanOptions();
-        options.setPrompt(getLocalizedText("📷 وجه الكاميرا نحو باركود القطعة", "📷 Aim camera at item barcode"));
-        options.setBeepEnabled(false);
-        options.setOrientationLocked(true);
-        
-        try {
-            barcodeLauncher.launch(options);
-        } catch (Exception e) {
-            isCameraOpen = false;
-            logConsole(getLocalizedText("⚠️ تعذر فتح الكاميرا: ", "⚠️ Camera error: ") + e.getMessage());
+                ScanOptions options = new ScanOptions();
+                options.setPrompt(getLocalizedText("📷 وجه الكاميرا نحو باركود القطعة", "📷 Aim camera at item barcode"));
+                options.setBeepEnabled(false);
+                options.setOrientationLocked(true);
+                
+                try {
+                    barcodeLauncher.launch(options);
+                } catch (Exception e) {
+                    isCameraOpen = false;
+                    logConsole(getLocalizedText("⚠️ تعذر فتح الكاميرا: ", "⚠️ Camera error: ") + e.getMessage());
+                }
+            });
         }
-    });
-}
         if (btnEmergencyLockdown != null) btnEmergencyLockdown.setOnClickListener(v -> toggleLockdown());
         
         if (btnClearConsole != null) {
@@ -328,185 +327,169 @@ public class MiraSecureGateFragment extends Fragment {
     // ✅ إدارة الفروع
     // ============================================
     
-    // ✅ تعديل loadCurrentBranchInfo() - استخدام الطرق الصحيحة
-private void loadCurrentBranchInfo() {
-    try {
-        Context context = getContext();
-        if (context == null) return;
-        
-        currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-        
-        // ✅ التحقق من صلاحيات المدير العام بالطرق الصحيحة
-        isGlobalAdmin = permissionManager != null && 
-            (permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin());
-        
-        mainHandler.post(() -> {
-            // ✅ تحديث واجهة اختيار الفرع
-            if (isGlobalAdmin) {
-                loadBranchesForSelector();
-            } else {
-                // ✅ إخفاء محدد الفروع للمستخدمين العاديين
-                if (spBranchSelector != null) {
-                    spBranchSelector.setVisibility(View.GONE);
-                }
-                if (tvCurrentBranch != null) {
-                    tvCurrentBranch.setText(branchesManager != null ? branchesManager.getActiveBranchName() : "");
-                    tvCurrentBranch.setVisibility(View.VISIBLE);
-                }
-            }
-        });
-    } catch (Exception e) {
-        Log.e(TAG, "loadCurrentBranchInfo: " + e.getMessage());
-    }
-}
-
-    // ✅ تعديل loadBranchesForSelector() - معالجة النوع بشكل آمن
-private void loadBranchesForSelector() {
-    if (gateExecutor == null || getContext() == null) return;
-    
-    gateExecutor.execute(() -> {
+    private void loadCurrentBranchInfo() {
         try {
             Context context = getContext();
             if (context == null) return;
             
-            // ✅ استخدام List<Object> للتعامل مع أي نوع
-            List<?> allBranches = branchesManager != null ? branchesManager.getAllBranches() : new ArrayList<>();
+            currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
             
-            // ✅ تحويل النتائج إلى BranchInfo
-            branchesList.clear();
-            if (allBranches != null) {
-                for (Object branchObj : allBranches) {
-                    BranchInfo info = convertToBranchInfo(branchObj);
-                    if (info != null) {
-                        branchesList.add(info);
+            // ✅ التحقق من صلاحيات المدير العام بالطرق الصحيحة
+            isGlobalAdmin = permissionManager != null && 
+                (permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin());
+            
+            mainHandler.post(() -> {
+                // ✅ تحديث واجهة اختيار الفرع
+                if (isGlobalAdmin) {
+                    loadBranchesForSelector();
+                } else {
+                    // ✅ إخفاء محدد الفروع للمستخدمين العاديين
+                    if (spBranchSelector != null) {
+                        spBranchSelector.setVisibility(View.GONE);
+                    }
+                    if (tvCurrentBranch != null) {
+                        tvCurrentBranch.setText(branchesManager != null ? branchesManager.getActiveBranchName() : "");
+                        tvCurrentBranch.setVisibility(View.VISIBLE);
                     }
                 }
-            }
-            
-            if (!branchesList.isEmpty()) {
-                mainHandler.post(() -> {
-                    if (spBranchSelector != null && isAdded()) {
-                        List<String> branchNames = new ArrayList<>();
-                        branchNames.add(getLocalizedText("🌐 كل الفروع", "🌐 All Branches"));
-                        for (BranchInfo branch : branchesList) {
-                            branchNames.add(branch.branchName);
-                        }
-                        
-                        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                            context,
-                            android.R.layout.simple_spinner_item,
-                            branchNames
-                        );
-                        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                        spBranchSelector.setAdapter(adapter);
-                        
-                        // ✅ تحديد الفرع الحالي
-                        if (currentBranchId > 0) {
-                            for (int i = 0; i < branchesList.size(); i++) {
-                                if (branchesList.get(i).branchId == currentBranchId) {
-                                    spBranchSelector.setSelection(i + 1);
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        spBranchSelector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                            @Override
-                            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                                if (position == 0) {
-                                    currentBranchId = 0;
-                                } else if (position - 1 < branchesList.size()) {
-                                    currentBranchId = branchesList.get(position - 1).branchId;
-                                }
-                                
-                                // ✅ إعادة تحميل البوابات
-                                loadAllGatesStatus();
-                                
-                                String branchName = position == 0 ? 
-                                    getLocalizedText("كل الفروع", "All Branches") : 
-                                    branchesList.get(position - 1).branchName;
-                                
-                                logConsole(getLocalizedText("🔄 تم تغيير الفرع إلى: ", "🔄 Branch changed to: ") + branchName);
-                            }
-                            
-                            @Override
-                            public void onNothingSelected(AdapterView<?> parent) {}
-                        });
-                        
-                        spBranchSelector.setVisibility(View.VISIBLE);
-                        if (tvCurrentBranch != null) {
-                            tvCurrentBranch.setVisibility(View.GONE);
+            });
+        } catch (Exception e) {
+            Log.e(TAG, "loadCurrentBranchInfo: " + e.getMessage());
+        }
+    }
+
+    private void loadBranchesForSelector() {
+        if (gateExecutor == null || getContext() == null) return;
+        
+        gateExecutor.execute(() -> {
+            try {
+                Context context = getContext();
+                if (context == null) return;
+                
+                List<?> allBranches = branchesManager != null ? branchesManager.getAllBranches() : new ArrayList<>();
+                
+                branchesList.clear();
+                if (allBranches != null) {
+                    for (Object branchObj : allBranches) {
+                        BranchInfo info = convertToBranchInfo(branchObj);
+                        if (info != null) {
+                            branchesList.add(info);
                         }
                     }
-                });
+                }
+                
+                if (!branchesList.isEmpty()) {
+                    mainHandler.post(() -> {
+                        if (spBranchSelector != null && isAdded()) {
+                            List<String> branchNames = new ArrayList<>();
+                            branchNames.add(getLocalizedText("🌐 كل الفروع", "🌐 All Branches"));
+                            for (BranchInfo branch : branchesList) {
+                                branchNames.add(branch.branchName);
+                            }
+                            
+                            ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                                context,
+                                android.R.layout.simple_spinner_item,
+                                branchNames
+                            );
+                            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                            spBranchSelector.setAdapter(adapter);
+                            
+                            if (currentBranchId > 0) {
+                                for (int i = 0; i < branchesList.size(); i++) {
+                                    if (branchesList.get(i).branchId == currentBranchId) {
+                                        spBranchSelector.setSelection(i + 1);
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            spBranchSelector.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                                @Override
+                                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                                    if (position == 0) {
+                                        currentBranchId = 0;
+                                    } else if (position - 1 < branchesList.size()) {
+                                        currentBranchId = branchesList.get(position - 1).branchId;
+                                    }
+                                    
+                                    loadAllGatesStatus();
+                                    
+                                    String branchName = position == 0 ? 
+                                        getLocalizedText("كل الفروع", "All Branches") : 
+                                        branchesList.get(position - 1).branchName;
+                                    
+                                    logConsole(getLocalizedText("🔄 تم تغيير الفرع إلى: ", "🔄 Branch changed to: ") + branchName);
+                                }
+                                
+                                @Override
+                                public void onNothingSelected(AdapterView<?> parent) {}
+                            });
+                            
+                            spBranchSelector.setVisibility(View.VISIBLE);
+                            if (tvCurrentBranch != null) {
+                                tvCurrentBranch.setVisibility(View.GONE);
+                            }
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "loadBranchesForSelector: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "loadBranchesForSelector: " + e.getMessage());
+        });
+    }
+
+    private BranchInfo convertToBranchInfo(Object obj) {
+        if (obj == null) return null;
+        
+        BranchInfo info = new BranchInfo();
+        Class<?> clazz = obj.getClass();
+
+        info.branchId = extractIntProperty(clazz, obj, new String[]{"getId", "getBranchId", "id", "branchId"});
+        info.branchName = extractStringProperty(clazz, obj, new String[]{"getName", "getBranchName", "name", "branchName"});
+        
+        if (info.branchName == null || info.branchName.isEmpty()) {
+            info.branchName = (isArabic ? "فرع " : "Branch ") + info.branchId;
         }
-    });
-}
 
-// ✅ دالة تحويل الكائن إلى BranchInfo
-// ✅ دالة تحويل الكائن إلى BranchInfo بشكل آمن 100% بدون إمكانية حدوث Crash
-private BranchInfo convertToBranchInfo(Object obj) {
-    if (obj == null) return null;
-    
-    BranchInfo info = new BranchInfo();
-    Class<?> clazz = obj.getClass();
-
-    // 1️⃣ البحث عن معرف الفرع (Branch ID)
-    info.branchId = extractIntProperty(clazz, obj, new String[]{"getId", "getBranchId", "id", "branchId"});
-
-    // 2️⃣ البحث عن اسم الفرع (Branch Name)
-    info.branchName = extractStringProperty(clazz, obj, new String[]{"getName", "getBranchName", "name", "branchName"});
-    
-    if (info.branchName == null || info.branchName.isEmpty()) {
-        info.branchName = (isArabic ? "فرع " : "Branch ") + info.branchId;
+        return info;
     }
 
-    return info;
-}
+    private int extractIntProperty(Class<?> clazz, Object obj, String[] names) {
+        for (String name : names) {
+            try {
+                java.lang.reflect.Method method = clazz.getMethod(name);
+                Object result = method.invoke(obj);
+                if (result instanceof Number) return ((Number) result).intValue();
+            } catch (Throwable ignored) {}
 
-private int extractIntProperty(Class<?> clazz, Object obj, String[] names) {
-    for (String name : names) {
-        // تجربة Getters
-        try {
-            java.lang.reflect.Method method = clazz.getMethod(name);
-            Object result = method.invoke(obj);
-            if (result instanceof Number) return ((Number) result).intValue();
-        } catch (Throwable ignored) {}
-
-        // تجربة Fields
-        try {
-            java.lang.reflect.Field field = clazz.getDeclaredField(name);
-            field.setAccessible(true);
-            Object result = field.get(obj);
-            if (result instanceof Number) return ((Number) result).intValue();
-        } catch (Throwable ignored) {}
+            try {
+                java.lang.reflect.Field field = clazz.getDeclaredField(name);
+                field.setAccessible(true);
+                Object result = field.get(obj);
+                if (result instanceof Number) return ((Number) result).intValue();
+            } catch (Throwable ignored) {}
+        }
+        return 0;
     }
-    return 0;
-}
 
-private String extractStringProperty(Class<?> clazz, Object obj, String[] names) {
-    for (String name : names) {
-        // تجربة Getters
-        try {
-            java.lang.reflect.Method method = clazz.getMethod(name);
-            Object result = method.invoke(obj);
-            if (result != null) return result.toString();
-        } catch (Throwable ignored) {}
+    private String extractStringProperty(Class<?> clazz, Object obj, String[] names) {
+        for (String name : names) {
+            try {
+                java.lang.reflect.Method method = clazz.getMethod(name);
+                Object result = method.invoke(obj);
+                if (result != null) return result.toString();
+            } catch (Throwable ignored) {}
 
-        // تجربة Fields
-        try {
-            java.lang.reflect.Field field = clazz.getDeclaredField(name);
-            field.setAccessible(true);
-            Object result = field.get(obj);
-            if (result != null) return result.toString();
-        } catch (Throwable ignored) {}
+            try {
+                java.lang.reflect.Field field = clazz.getDeclaredField(name);
+                field.setAccessible(true);
+                Object result = field.get(obj);
+                if (result != null) return result.toString();
+            } catch (Throwable ignored) {}
+        }
+        return null;
     }
-    return null;
-}
-
 
     private int getCurrentBranchId() {
         return currentBranchId;
@@ -736,7 +719,6 @@ private String extractStringProperty(Class<?> clazz, Object obj, String[] names)
         updateLocalAllowedCache();
     }
 
-    // ✅ نسخة واحدة فقط من loadAllGatesStatus مع فلترة الفروع
     private void loadAllGatesStatus() {
         if (gateExecutor == null || getContext() == null) return;
         gateExecutor.execute(() -> {
@@ -745,7 +727,6 @@ private String extractStringProperty(Class<?> clazz, Object obj, String[] names)
                 if (context == null) return;
                 MiraApiClient client = MiraApiClient.getInstance(context);
                 
-                // ✅ تمرير branch_id في الطلب
                 MiraApiClient.ApiResponse response = client.getGatesByBranch(
                     currentBranchId > 0 ? currentBranchId : 0
                 );
@@ -784,7 +765,6 @@ private String extractStringProperty(Class<?> clazz, Object obj, String[] names)
         return d != null ? d.optJSONArray("gates") : null;
     }
 
-    // ✅ نسخة واحدة فقط من updateMonitorList
     private void updateMonitorList(List<GateMonitorItem> items) {
         monitorList.clear();
         monitorList.addAll(items);
@@ -801,7 +781,6 @@ private String extractStringProperty(Class<?> clazz, Object obj, String[] names)
         
         updateRiskMeter(pass, deny);
         
-        // ✅ تحديث عنوان الفرع الحالي
         if (tvCurrentBranch != null) {
             String branchLabel;
             if (currentBranchId == 0) {
@@ -1075,7 +1054,6 @@ private String extractStringProperty(Class<?> clazz, Object obj, String[] names)
         int branchId;
     }
     
-    // ✅ فئة معلومات الفرع
     private static class BranchInfo {
         int branchId;
         String branchName;
@@ -1098,7 +1076,6 @@ private String extractStringProperty(Class<?> clazz, Object obj, String[] names)
             h.tvGateName.setText(item.gateName);
             h.tvGateName.setTextColor(getTextColor());
             
-            // ✅ اسم الفرع
             if (h.tvBranchName != null) {
                 if (currentBranchId == 0 && !item.branchName.isEmpty()) {
                     h.tvBranchName.setText("📍 " + item.branchName);
@@ -1156,14 +1133,12 @@ private String extractStringProperty(Class<?> clazz, Object obj, String[] names)
     }
 
     @Override
-public void onResume() {
-    super.onResume();
-    // عدم البدء التلقائي إذا كانت واجهة الكاميرا مفتوحة حالياً
-    if (!isScanning && isAdded() && !isLockdown && !isCameraOpen) {
-        autoStartScanning();
+    public void onResume() {
+        super.onResume();
+        if (!isScanning && isAdded() && !isLockdown && !isCameraOpen) {
+            autoStartScanning();
+        }
     }
-}
-
 
     @Override
     public void onDestroyView() {
