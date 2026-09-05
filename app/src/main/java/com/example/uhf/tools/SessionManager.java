@@ -401,7 +401,17 @@ public class SessionManager {
         secureManager.clearSessionCompletely();
         FirebaseDiagnostics.log("SESSION", "Session Cleared", "Done");
     }
+// ==================== إنشاء جلسة دخول ====================
 
+public void createLoginSession(String username, String role, String token, String serverUrl) {
+    FirebaseDiagnostics.log("SESSION", "Creating Login Session", 
+        "user=" + username + ", role=" + role + ", token=" + (token != null && !token.isEmpty() ? "PRESENT" : "EMPTY"));
+    
+    secureManager.createLoginSession(username, role, token, serverUrl);
+    
+    FirebaseDiagnostics.logSessionState("AFTER_CREATE", username, true);
+    Log.d(TAG, "Login session created for user: " + username);
+}
     
 
 }  // ✅ قوس واحد فقط
