@@ -1256,25 +1256,23 @@ private void executeCheckout(POSCheckoutDialog.POSCheckoutData data) {
                     setButtonsEnabled(true);
                     
                     if (finalIsSuccess) {
-    // ✅ نجاح - إزالة من المحلي
+    // ✅ نجاح البيع أونلاين
     removeSaleFromLocal(localSaleId);
-    
-    // ✅✅✅ جديد: إزالة القطع المباعة من الكاش المحلي
-    removeSoldItemsFromCache();
+    removeSoldItemsFromCache(); // 👈 أضف هذا السطر هنا لتحديث الكاش محلياً
     
     playAlertSound(1);
     clearCart();
     showReceipt(finalResponse);
     
 } else if (finalIsNetworkError || finalResponse == null) {
-    // ✅✅✅ أوفلاين - البيع محفوظ محلياً
-    // ✅✅✅ مهم: إزالة القطع من الكاش المحلي أيضاً
-    removeSoldItemsFromCache();
+    // ✅ حفظ البيع أوفلاين
+    removeSoldItemsFromCache(); // 👈 وأضف هذا السطر هنا أيضاً
     
     playAlertSound(1);
     clearCart();
     showOfflineSaleSuccess(localSaleId, data);
-} else {
+}
+ else {
                         // ❌ خطأ من السيرفر (ليس أوفلاين) - إعادة محاولة
                         showRetryDialog(
                             isArabic ? "❌ فشل البيع" : "❌ Sale Failed",
@@ -2221,177 +2219,133 @@ private void showSyncHistoryLog() {
  * ✅ البحث عن القطعة للتحقق من إمكانية الإرجاع
  */
 private void searchItemForRefund(String code) {
+    if (code == null || code.trim().isEmpty()) return;
+    
     executor.execute(() -> {
         try {
             JSONObject payload = new JSONObject();
             payload.put("epc", code);
             payload.put("serial_no", code);
+            payload.put("branch_id", getActiveBranchId());
             payload.put("context", "refund_check");
-            payload.put("branch_id", getActiveBranchId()); // ✅ أضف الفرع
-            
-            MiraApiClient.ApiResponse response = apiClient.postWithAuth("/pos/search-item", payload);
-            
-            mainHandler.post(() -> {
-                if (!isAdded() || refundDialog == null || !refundDialog.isShowing()) return;
-                
+
+            // الاستعلام من API أو الكاش المحلي
+            MiraApiClient client = MiraApiClient.getInstance(requireContext());
+            MiraApiClient.ApiResponse response = client.checkRefundEligibility(payload);
+
+            safeRun(() -> {
                 if (response != null && response.isSuccess && response.data != null) {
-                    JSONObject item = response.data.optJSONObject("item");
-                    if (item != null) {
-                        String title = item.optString("title", "");
-                        String status = item.optString("status", "");
-                        
-                        // ✅ استخدام is_refundable من السيرفر
-                        isRefundable = item.optBoolean("is_refundable", 
-                            "sold".equals(status) || "exited".equals(status));
-                        
-                        showRefundItemInfo(title, status, isRefundable);
-                    }
+                    showRefundItemInfo(response.data);
                 } else {
-                    hideRefundItemInfo();
-                    // ✅ عرض رسالة الخطأ
-                    String msg = response != null ? response.message : "Unknown error";
-                    Toast.makeText(getContext(), msg, Toast.LENGTH_SHORT).show();
+                    showRefundItemError(isArabic ? "⚠️ القطعة غير صالحة للإرجاع أو غير مباعة" : "⚠️ Item not eligible for refund");
                 }
             });
         } catch (Exception e) {
             Log.e(TAG, "searchItemForRefund error: " + e.getMessage());
-            mainHandler.post(this::hideRefundItemInfo);
+            safeRun(() -> showRefundItemError(isArabic ? "⚠️ خطأ في البحث عن القطعة" : "⚠️ Error searching item"));
         }
     });
 }
 
-/**
- * ✅ عرض معلومات القطعة
- */
-private void showRefundItemInfo(String title, String status, boolean refundable) {
-    if (cardRefundItemInfo != null) {
-        cardRefundItemInfo.setVisibility(View.VISIBLE);
-        cardRefundItemInfo.setAlpha(0f);
-        cardRefundItemInfo.animate().alpha(1f).setDuration(300).start();
-    }
-    
-    if (tvRefundItemTitle != null) {
-        tvRefundItemTitle.setText(title);
-    }
-    
-    if (tvRefundItemStatus != null) {
-        String statusText;
-        int color;
+private void showRefundItemInfo(JSONObject itemData) {
+    try {
+        if (cardRefundItemInfo != null) cardRefundItemInfo.setVisibility(View.VISIBLE);
         
-        if (refundable) {
-            statusText = isArabic ? "✅ قابل للإرجاع" : "✅ Refundable";
-            color = Color.parseColor("#2ECC71");
-        } else {
-            statusText = isArabic ? "❌ غير قابل للإرجاع" : "❌ Not refundable";
-            color = Color.parseColor("#E74C3C");
+        String title = itemData.optString("title", isArabic ? "قطعة ذهبية" : "Gold Item");
+        String status = itemData.optString("status", "SOLD");
+        double price = itemData.optDouble("sold_price", itemData.optDouble("price", 0.0));
+
+        if (tvRefundItemTitle != null) {
+            tvRefundItemTitle.setText(title + " (" + priceManager.formatPriceDefault(price) + ")");
         }
         
-        tvRefundItemStatus.setText(statusText + " (" + status + ")");
-        tvRefundItemStatus.setTextColor(color);
+        if (tvRefundItemStatus != null) {
+            tvRefundItemStatus.setText(isArabic ? "حالة القطعة: مباعة ✅" : "Status: SOLD ✅");
+            tvRefundItemStatus.setTextColor(Color.parseColor("#2ECC71"));
+        }
+        
+        isRefundable = true;
+    } catch (Exception e) {
+        Log.e(TAG, "showRefundItemInfo error: " + e.getMessage());
     }
 }
 
-/**
- * ✅ إخفاء معلومات القطعة
- */
 private void hideRefundItemInfo() {
-    isRefundable = false;
-    if (cardRefundItemInfo != null) {
-        cardRefundItemInfo.setVisibility(View.GONE);
-    }
+    safeRun(() -> {
+        if (cardRefundItemInfo != null) cardRefundItemInfo.setVisibility(View.GONE);
+        isRefundable = false;
+    });
 }
 
+private void showRefundItemError(String message) {
+    if (cardRefundItemInfo != null) cardRefundItemInfo.setVisibility(View.VISIBLE);
+    if (tvRefundItemTitle != null) tvRefundItemTitle.setText(message);
+    if (tvRefundItemStatus != null) {
+        tvRefundItemStatus.setText(isArabic ? "غير قابلة للإرجاع ❌" : "Not Refundable ❌");
+        tvRefundItemStatus.setTextColor(Color.parseColor("#E74C3C"));
+    }
+    isRefundable = false;
+}
 
-// ============================================
-// ✅ تحسين processRefund مع تحديث فعلي
-// ============================================
 private void processRefund(String code, String reason) {
-    // ✅ عرض مؤشر تحميل
     final AlertDialog loadingDialog = showProfessionalLoadingDialog();
     
     executor.execute(() -> {
         try {
             JSONObject payload = new JSONObject();
+            payload.put("action", "PROCESS_REFUND");
             payload.put("epc", code);
-            payload.put("serial_no", code);
             payload.put("reason", reason);
-            payload.put("branch_id", getActiveBranchId()); // ✅ إضافة الفرع
+            payload.put("branch_id", getActiveBranchId());
             payload.put("user_id", sessionManager != null ? sessionManager.getUserId() : 0);
-            
-            MiraApiClient.ApiResponse response = apiClient.postWithAuth("/pos/refund", payload);
-            
-            mainHandler.post(() -> {
-                if (loadingDialog != null) dismissDialog(loadingDialog);
-                
-                if (!isAdded()) return;
+
+            MiraApiClient client = MiraApiClient.getInstance(requireContext());
+            MiraApiClient.ApiResponse response = client.processRefund(payload);
+
+            safeRun(() -> {
+                dismissDialog(loadingDialog);
+                if (refundDialog != null && refundDialog.isShowing()) {
+                    refundDialog.dismiss();
+                }
                 
                 if (response != null && response.isSuccess) {
-                    Toast.makeText(getContext(), 
-                        isArabic ? "✅ تم الإرجاع بنجاح" : "✅ Refund successful", 
-                        Toast.LENGTH_SHORT).show();
-                    
-                    if (refundDialog != null && refundDialog.isShowing()) {
-                        refundDialog.dismiss();
-                    }
-                    
-                    // ✅✅✅ تحديث الداشبورد مباشرة
-                    refreshData();
-                    
-                    // ✅ عرض رسالة نجاح
                     showSuccessMessage(
-                        isArabic ? "✅ تم الإرجاع" : "✅ Refund Completed",
-                        isArabic ? "تمت عملية الإرجاع بنجاح\n\n" + 
-                                   "🔑 الرمز: " + code + "\n" +
-                                   "📝 السبب: " + reason : 
-                                   "Refund completed successfully\n\n" + 
-                                   "🔑 Code: " + code + "\n" +
-                                   "📝 Reason: " + reason,
+                        isArabic ? "✅ تم الإرجاع" : "✅ Refund Successful",
+                        isArabic ? "تم إرجاع القطعة بنجاح إلى المخزون" : "Item successfully returned to inventory",
                         true
                     );
+                    refreshData(); // تحديث الواجهات والداشبورد
                 } else {
-                    String errorMsg = response != null ? response.message : "Unknown error";
-                    Toast.makeText(getContext(), 
-                        isArabic ? "❌ فشل الإرجاع: " + errorMsg : "❌ Refund failed: " + errorMsg, 
-                        Toast.LENGTH_LONG).show();
-                    
+                    String err = response != null && response.error != null ? response.error : "Unknown error";
                     showSuccessMessage(
                         isArabic ? "❌ فشل الإرجاع" : "❌ Refund Failed",
-                        errorMsg,
+                        err,
                         false
                     );
                 }
             });
         } catch (Exception e) {
             Log.e(TAG, "processRefund error: " + e.getMessage());
-            mainHandler.post(() -> {
-                if (loadingDialog != null) dismissDialog(loadingDialog);
-                
-                if (isAdded()) {
-                    Toast.makeText(getContext(), 
-                        isArabic ? "❌ خطأ في الإرجاع: " + e.getMessage() : "❌ Refund error: " + e.getMessage(), 
-                        Toast.LENGTH_LONG).show();
-                }
+            safeRun(() -> {
+                dismissDialog(loadingDialog);
+                showSuccessMessage(isArabic ? "❌ خطأ" : "❌ Error", e.getMessage(), false);
             });
         }
     });
 }
 
-/**
- * ✅✅✅ إزالة القطع المباعة من الكاش المحلي
- */
+// ✅ دالة تحديث كاش القطع المباعة محلياً
 private void removeSoldItemsFromCache() {
     try {
         Context ctx = getContext();
         if (ctx == null) return;
-        
-        // ✅ نحن لا نحتاج لإزالة من الكاش هنا
-        // لأن الفحص في parseItemResponse سيمنع إعادة البيع
-        // والكاش سيتم تحديثه عند المزامنة القادمة
-        
-        Log.d(TAG, "✅ Sold items will be blocked by status check in parseItemResponse");
-        
+        MiraLocalItemCache cache = MiraLocalItemCache.getInstance(ctx);
+        for (CartItem item : cartList) {
+            cache.markItemAsSold(item.epc);
+        }
     } catch (Exception e) {
-        Log.e(TAG, "removeSoldItemsFromCache: " + e.getMessage());
+        Log.e(TAG, "removeSoldItemsFromCache error: " + e.getMessage());
     }
 }
-            }
+
+} // 👈 إغلاق كلاس MiraPosFragment
