@@ -389,4 +389,22 @@ public class SessionManager {
         
         FirebaseDiagnostics.log("SESSION", "Clear All Completed", "Done");
     }
-}
+    
+    /**
+     * مسح التوكن نهائياً
+     */
+    public void clearAuthToken() {
+        FirebaseDiagnostics.log("SESSION", "Clear Auth Token", "Clearing permanently...");
+        secureManager.clearAuthToken();
+        FirebaseDiagnostics.log("SESSION", "Auth Token Cleared", "Done");
+    }
+    
+    /**
+     * مسح الجلسة بالكامل
+     */
+    public void clearSessionCompletely() {
+        FirebaseDiagnostics.log("SESSION", "Clear Session", "Clearing completely...");
+        secureManager.clearSessionCompletely();
+        FirebaseDiagnostics.log("SESSION", "Session Cleared", "Done");
+    }
+}  // ✅ قوس واحد فقط
