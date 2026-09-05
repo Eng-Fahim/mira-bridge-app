@@ -33,6 +33,7 @@ import com.rscja.utility.StringUtility;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class BaseTabFragmentActivity extends AppCompatActivity {
@@ -50,8 +51,8 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     private final AtomicBoolean isDestroyed = new AtomicBoolean(false);
     protected final Handler mainHandler = new Handler(Looper.getMainLooper());
     
-    // ✅ مسار واحد مخصص لجميع عمليات الهاردوير لمنع التداخل والتعليق
-    protected final ExecutorService rfidExecutor = Executors.newSingleThreadExecutor();
+    // ✅ مسار واحد مخصص لجميع عمليات الهاردوير
+    private volatile ExecutorService rfidExecutor;
     
     private boolean isInitialized = false;
     private ProgressDialog initDialog;
@@ -68,7 +69,18 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
         dialogHelper = new MiraDialogHelper(this);
         registerComponentCallbacks(MemoryManager.getInstance());
         isDestroyed.set(false);
+        
+        // ✅ إنشاء executor جديد
+        createExecutorIfNeeded();
+        
         checkStoragePermission();
+    }
+
+    // ✅ دالة لإنشاء executor جديد
+    private void createExecutorIfNeeded() {
+        if (rfidExecutor == null || rfidExecutor.isShutdown() || rfidExecutor.isTerminated()) {
+            rfidExecutor = Executors.newSingleThreadExecutor();
+        }
     }
 
     @Override
@@ -77,13 +89,31 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
         mainHandler.removeCallbacksAndMessages(null);
         dismissInitDialogSafely();
         
-        freeReaderSafely(); // ✅ التنظيف يعمل في الخلفية
-        rfidExecutor.shutdown(); // إغلاق المسار بعد إكمال المهام المتبقية
+        // ✅ تحرير القارئ بشكل آمن
+        freeReaderSafely();
+        
+        // ✅ إغلاق executor بشكل آمن
+        shutdownExecutorSafely();
         
         MemoryManager.getInstance().unregisterActivity(this);
         unregisterComponentCallbacks(MemoryManager.getInstance());
         MemoryManager.getInstance().forceCleanup();
         super.onDestroy();
+    }
+
+    // ✅ إغلاق آمن للـ executor
+    private void shutdownExecutorSafely() {
+        if (rfidExecutor != null && !rfidExecutor.isShutdown()) {
+            try {
+                rfidExecutor.shutdown();
+                if (!rfidExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
+                    rfidExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                rfidExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     private void checkStoragePermission() {
@@ -106,17 +136,39 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
 
     public void initUHF() {
         if (isDestroyed.get()) return;
+        
+        // ✅ التأكد من أن executor جاهز
+        createExecutorIfNeeded();
+        
         showInitDialog();
         initStartTime = System.currentTimeMillis();
         
-        // ✅ نقل getInstance و init معاً إلى المسار الخلفي
         rfidExecutor.execute(() -> {
             try {
                 if (mReader == null) {
                     mReader = RFIDWithUHFUART.getInstance();
                 }
                 if (mReader != null) {
-                    boolean result = mReader.init(BaseTabFragmentActivity.this);
+                    // ✅ إضافة timeout للـ init
+                    final boolean[] initResult = new boolean[1];
+                    Thread initThread = new Thread(() -> {
+                        try {
+                            initResult[0] = mReader.init(BaseTabFragmentActivity.this);
+                        } catch (Exception e) {
+                            Log.e(TAG, "UHF init thread error", e);
+                            initResult[0] = false;
+                        }
+                    });
+                    initThread.start();
+                    initThread.join(RFID_INIT_TIMEOUT_MS);
+                    
+                    if (initThread.isAlive()) {
+                        Log.e(TAG, "UHF init timeout!");
+                        mainHandler.post(() -> handleInitResult(false));
+                        return;
+                    }
+                    
+                    boolean result = initResult[0];
                     long elapsed = System.currentTimeMillis() - initStartTime;
                     if (elapsed > RFID_INIT_TIMEOUT_MS) {
                         Log.w(TAG, "UHF init took too long: " + elapsed + "ms");
@@ -161,6 +213,8 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
         if (isDestroyed.get() || isFinishing()) return;
         mainHandler.post(() -> {
             try {
+                if (isDestroyed.get() || isFinishing()) return;
+                
                 dismissInitDialogSafely();
                 initDialog = new ProgressDialog(BaseTabFragmentActivity.this);
                 initDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
@@ -189,23 +243,35 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     }
 
     private void freeReaderSafely() {
-        // ✅ التحرير يتم عبر rfidExecutor لمنع تعليق الشاشة عند إغلاق التطبيق
-        rfidExecutor.execute(() -> {
-            try {
-                if (mReader != null) {
-                    mReader.free();
-                    mReader = null;
+        if (mReader == null) return;
+        
+        final RFIDWithUHFUART readerToFree = mReader;
+        mReader = null;
+        
+        try {
+            Thread freeThread = new Thread(() -> {
+                try {
+                    readerToFree.free();
+                } catch (Exception e) {
+                    Log.e(TAG, "Free reader error", e);
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "Free reader error: " + e.getMessage());
+            });
+            freeThread.start();
+            freeThread.join(2000); // ✅ انتظار 2 ثانية كحد أقصى
+            
+            if (freeThread.isAlive()) {
+                Log.w(TAG, "Free reader timeout");
             }
-        });
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     public void configureReaderForDevice() {
         if (!isInitialized) return;
         
-        // ✅ إعداد الهاردوير يحتاج أن يكون في الخلفية لتفادي أي ثواني تجميد
+        createExecutorIfNeeded();
+        
         rfidExecutor.execute(() -> {
             try {
                 DeviceDetector.DeviceProfile profile = DeviceDetector.configure(mReader);
@@ -289,6 +355,9 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
             toastMessageSafe("Reader not available");
             return;
         }
+        
+        createExecutorIfNeeded();
+        
         rfidExecutor.execute(() -> {
             try {
                 String rfidVer = mReader.getVersion();
