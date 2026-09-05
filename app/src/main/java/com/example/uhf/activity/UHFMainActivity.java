@@ -1,6 +1,7 @@
 package com.example.uhf.activity;
 
 import com.example.uhf.application.MiraApplication;
+import com.example.uhf.manager.AppWatchdog;
 import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
@@ -198,6 +199,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             setContentView(R.layout.activity_main);
 
+// ✅ بدء مراقبة التجمد
+AppWatchdog.getInstance().startMonitoring(() -> {
+    Log.e(TAG, "🚨 UI Thread FROZEN! Restarting app...");
+    MiraApplication.getInstance().restartApp();
+});
+
             ToastUtil.init(getApplicationContext());
             initializeLanguageState();
 
@@ -330,13 +337,14 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         // ✅ إخفاء أي loading overlay متبقي
         hideLoading();
     }
-
+    
     @Override
-    public void onPause() {
-        super.onPause();
-        // ✅ إخفاء loading عند الخروج
-        hideLoading();
-    }
+public void onPause() {
+    super.onPause();
+    hideLoading();
+    // ✅ إيقاف المراقبة
+    AppWatchdog.getInstance().stopMonitoring();
+}
 
     private void initializeLanguageState() {
         try {
@@ -1302,12 +1310,14 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Navigation to login error: " + e.getMessage());
         }
     }
-
+    
     @Override
-    protected void onDestroy() {
-        try {
-            // ✅ إخفاء loading أولاً
-            hideLoading();
+protected void onDestroy() {
+    try {
+        // ✅ إيقاف المراقبة أولاً
+        AppWatchdog.getInstance().stopMonitoring();
+        
+        hideLoading();
             
             stopActiveInventory();
 
