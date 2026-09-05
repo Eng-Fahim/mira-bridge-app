@@ -40,7 +40,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
 
     private static final String TAG = "BaseTabFragmentActivity";
     
-    // ✅ إضافة وضع التطوير - اجعلها false عند وصول الجهاز
+    // ✅ وضع التطوير - اجعلها true فقط عند وصول الجهاز لبرمجة الشرائح فعلياً
     public static final boolean RFID_DEVICE_PRESENT = false;
     private static final boolean SKIP_RFID_INIT_IF_ABSENT = true;
     
@@ -50,7 +50,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
 
     protected MiraDialogHelper dialogHelper;
     private static final int MY_PERMISSIONS_REQUEST_READ_EXTERNAL_STORAGE = 1;
-    private static final int RFID_INIT_TIMEOUT_MS = 5000; // ✅ تقليل timeout إلى 5 ثواني
+    private static final int RFID_INIT_TIMEOUT_MS = 5000;
     private int initRetryCount = 0;
     private final AtomicBoolean isDestroyed = new AtomicBoolean(false);
     protected final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -73,7 +73,9 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
         registerComponentCallbacks(MemoryManager.getInstance());
         isDestroyed.set(false);
         
-        createExecutorIfNeeded();
+        if (RFID_DEVICE_PRESENT) {
+            createExecutorIfNeeded();
+        }
         
         checkStoragePermission();
     }
@@ -90,9 +92,10 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
         mainHandler.removeCallbacksAndMessages(null);
         dismissInitDialogSafely();
         
-        freeReaderSafely();
-        
-        shutdownExecutorSafely();
+        if (RFID_DEVICE_PRESENT) {
+            freeReaderSafely();
+            shutdownExecutorSafely();
+        }
         
         MemoryManager.getInstance().unregisterActivity(this);
         unregisterComponentCallbacks(MemoryManager.getInstance());
@@ -135,14 +138,11 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     public void initUHF() {
         if (isDestroyed.get()) return;
         
-        // ✅ إذا كان الجهاز غير موجود، تخطى التهيئة تماماً
-        if (!RFID_DEVICE_PRESENT && SKIP_RFID_INIT_IF_ABSENT) {
-            Log.i(TAG, "RFID device not present - skipping initialization");
+        // ✅ تم التعديل هنا: تجاوز تهيئة العتاد بالكامل إن لم يكن موجوداً لتجنب حظر الواجهة تماماً
+        if (!RFID_DEVICE_PRESENT) {
+            Log.i(TAG, "RFID device present flag is FALSE - Bypassing UHF Init completely");
             isInitialized = false;
-            mainHandler.post(() -> {
-                dismissInitDialogSafely();
-                // لا تظهر رسالة خطأ - فقط تجاهل
-            });
+            dismissInitDialogSafely();
             return;
         }
         
@@ -199,20 +199,17 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
             isInitialized = false;
             DeviceDetector.reset();
             
-            // ✅ لا تظهر رسالة خطأ مزعجة إذا كان الجهاز غير موجود
             if (RFID_DEVICE_PRESENT) {
                 String errorMsg = "UHF Init Failed\nDevice: " + Build.MODEL;
                 toastMessageSafe(errorMsg);
             }
             
-            // ✅ تقليل عدد المحاولات وزيادة المدة بينها
             if (initRetryCount < 1 && RFID_DEVICE_PRESENT) {
                 initRetryCount++;
                 mainHandler.postDelayed(() -> {
                     if (!isDestroyed.get() && !isInitialized) initUHF();
-                }, 10000); // 10 ثواني بدلاً من 3
+                }, 10000); 
             }
-            // ✅ إذا لم يكن الجهاز موجوداً، لا تحاول مرة أخرى
         } else {
             isInitialized = true;
             initRetryCount = 0;
@@ -221,8 +218,7 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     }
 
     private void showInitDialog() {
-        // ✅ لا تعرض dialog إذا كان الجهاز غير موجود
-        if (!RFID_DEVICE_PRESENT && SKIP_RFID_INIT_IF_ABSENT) {
+        if (!RFID_DEVICE_PRESENT) {
             return;
         }
         
@@ -284,7 +280,6 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     }
 
     public void configureReaderForDevice() {
-        // ✅ إذا لم يكن الجهاز موجوداً، تخطى
         if (!RFID_DEVICE_PRESENT || !isInitialized) return;
         
         createExecutorIfNeeded();
@@ -302,7 +297,6 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     }
 
     public boolean isReaderReady() {
-        // ✅ دائماً false إذا لم يكن الجهاز موجوداً
         return RFID_DEVICE_PRESENT && mReader != null && isInitialized && !isDestroyed.get();
     }
 
@@ -369,7 +363,6 @@ public class BaseTabFragmentActivity extends AppCompatActivity {
     }
 
     public void getUHFVersion() {
-        // ✅ إذا لم يكن الجهاز موجوداً، عرض رسالة
         if (!RFID_DEVICE_PRESENT) {
             toastMessageSafe("RFID device not connected");
             return;
