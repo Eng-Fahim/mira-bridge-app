@@ -106,72 +106,77 @@ public class LoginActivity extends AppCompatActivity {
     super.onCreate(savedInstanceState);
     FirebaseDiagnostics.log("LIFECYCLE", "LoginActivity Created", "onCreate started");
 
-        // 1. منع التقاط الشاشة لأغراض الأمان
-        getWindow().setFlags(
-                WindowManager.LayoutParams.FLAG_SECURE,
-                WindowManager.LayoutParams.FLAG_SECURE
-        );
+    // 1. منع التقاط الشاشة
+    getWindow().setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE
+    );
 
-        isDestroyed.set(false);
-        initExecutor();
+    isDestroyed.set(false);
+    initExecutor();
 
-        MemoryManager.getInstance().registerActivity(this);
-        registerComponentCallbacks(MemoryManager.getInstance());
+    MemoryManager.getInstance().registerActivity(this);
+    registerComponentCallbacks(MemoryManager.getInstance());
 
-        setContentView(R.layout.activity_login);
-        if (getIntent() != null && getIntent().getBooleanExtra("session_expired", false)) {
+    setContentView(R.layout.activity_login);
+    
+    // ✅ فحص session_expired
+    if (getIntent() != null && getIntent().getBooleanExtra("session_expired", false)) {
         Toast.makeText(this, 
             isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : "Session expired - Please sign in again", 
             Toast.LENGTH_LONG).show();
     }
 
-        sessionManager = new SessionManager(getApplicationContext());
+    sessionManager = new SessionManager(getApplicationContext());
 
-        // التحقق من الجلسة والتأكد من التوكن
-        if (sessionManager.isLoggedIn()) {
-            if (sessionManager.hasValidToken()) {
-                navigateToMain();
-                return;
-            } else {
-                sessionManager.logoutUser();
-                Toast.makeText(this,
-                        isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" :
-                                "Session expired - Please sign in again",
-                        Toast.LENGTH_SHORT).show();
-            }
+    // ✅ التحقق من الجلسة - بدون انتظار
+    if (sessionManager.isLoggedIn()) {
+        if (sessionManager.hasValidToken()) {
+            navigateToMain();
+            return;
+        } else {
+            sessionManager.logoutUser();
         }
-
-        // فحص الـ Root
-        if (isDeviceRooted()) {
-            Toast.makeText(this,
-                    isArabic ? "⚠️ تحذير: تم اكتشاف صلاحيات Root على الجهاز" :
-                            "⚠️ Warning: Root access detected on this device",
-                    Toast.LENGTH_LONG).show();
-        }
-
-        // ضبط اللغة
-        String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
-        isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
-
-        // تهيئة التشفير الآمن
-        initializeEncryption();
-
-        orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
-
-        initViews();
-        disableAutofill();
-        setupBiometric();
-        setupServerConfigToggle();
-        animateEntrance();
-        setupTextWatchers();
-        updateUiLanguage(isArabic);
-        setupProfileListener();
-        updateBiometricButtonState();
-        restoreLastUsername();
-        checkLockoutStatus();
-
-        loadOrgProfileFromCloud();
     }
+
+    // ✅ ضبط اللغة - قبل أي شيء آخر
+    String currentLang = AppCompatDelegate.getApplicationLocales().toLanguageTags();
+    isArabic = currentLang.isEmpty() || currentLang.startsWith("ar");
+
+    // ✅ تهيئة التشفير في الخلفية - لا تنتظر
+    mainHandler.postDelayed(this::initializeEncryption, 100);
+
+    orgProfileManager = MiraOrgProfileManager.getInstance(getApplicationContext());
+
+    // ✅ تهيئة الواجهة أولاً - لا تنتظر التشفير
+    initViews();
+    disableAutofill();
+    
+    // ✅ تأجيل العمليات الثقيلة
+    mainHandler.postDelayed(() -> {
+        if (!isDestroyed.get()) {
+            setupBiometric();
+            animateEntrance();
+            setupTextWatchers();
+            updateUiLanguage(isArabic);
+            setupProfileListener();
+            updateBiometricButtonState();
+            restoreLastUsername();
+            checkLockoutStatus();
+        }
+    }, 200);
+
+    // ✅ تحميل ملف المنظمة في الخلفية
+    mainHandler.postDelayed(() -> {
+        if (!isDestroyed.get()) {
+            loadOrgProfileFromCloud();
+        }
+    }, 500);
+
+    setupServerConfigToggle();
+    
+    FirebaseDiagnostics.log("LIFECYCLE", "LoginActivity Created", "onCreate completed");
+}
 
     private synchronized static void initExecutor() {
         if (bgExecutor == null || bgExecutor.isShutdown() || bgExecutor.isTerminated()) {
@@ -195,23 +200,34 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void initializeEncryption() {
-        try {
-            MasterKey masterKey = new MasterKey.Builder(this)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build();
+    try {
+        // ✅ استخدام Executor للتشفير في الخلفية
+        executeSafeBg(() -> {
+            try {
+                MasterKey masterKey = new MasterKey.Builder(this)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build();
 
-            encryptedPrefs = EncryptedSharedPreferences.create(
-                    this,
-                    "secure_login_prefs_v2",
-                    masterKey,
-                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            );
-        } catch (GeneralSecurityException | IOException e) {
-            Log.e(TAG, "EncryptedSharedPreferences initialization failed", e);
-            encryptedPrefs = getSharedPreferences("fallback_login_prefs_v2", MODE_PRIVATE);
-        }
+                encryptedPrefs = EncryptedSharedPreferences.create(
+                        this,
+                        "secure_login_prefs_v2",
+                        masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                );
+                
+                Log.d(TAG, "Encryption initialized successfully");
+                
+            } catch (GeneralSecurityException | IOException e) {
+                Log.e(TAG, "EncryptedSharedPreferences initialization failed", e);
+                encryptedPrefs = getSharedPreferences("fallback_login_prefs_v2", MODE_PRIVATE);
+            }
+        });
+    } catch (Exception e) {
+        Log.e(TAG, "initializeEncryption error: " + e.getMessage());
+        encryptedPrefs = getSharedPreferences("fallback_login_prefs_v2", MODE_PRIVATE);
     }
+}
 
     /**
      * تشفير كلمة المرور محلياً باستخدام PBKDF2 و Salt عشوائي للحماية الأوفلاين
@@ -398,10 +414,13 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void loadOrgProfileFromCloud() {
-        if (apiClient == null) return;
+    if (apiClient == null) return;
 
-        executeSafeBg(() -> {
+    executeSafeBg(() -> {
+        try {
+            // ✅ إضافة timeout
             MiraApiClient.ApiResponse response = apiClient.getOrgProfile();
+            
             if (response != null && response.isSuccess && response.data != null) {
                 JSONObject org = response.data.optJSONObject("organization");
                 if (org != null && orgProfileManager != null) {
@@ -411,9 +430,11 @@ public class LoginActivity extends AppCompatActivity {
                     mainHandler.post(this::applyOrgProfile);
                 }
             }
-        });
-    }
-
+        } catch (Exception e) {
+            Log.e(TAG, "loadOrgProfileFromCloud error: " + e.getMessage());
+        }
+    });
+}
     private void updateUiLanguage(boolean arabic) {
         getWindow().getDecorView().setLayoutDirection(arabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
         if (arabic) {
