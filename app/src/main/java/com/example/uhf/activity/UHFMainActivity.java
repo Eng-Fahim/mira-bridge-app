@@ -1202,27 +1202,41 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    @Override
+        @Override
     protected void onDestroy() {
         try {
+            // 1. إيقاف المسح الفعال فوراً
+            stopActiveInventory();
+
+            // 2. إغلاق مسارات الصوت الخاصة بـ UHFMainActivity
+            if (playSoundThread != null) {
+                playSoundThread.stopPlay();
+                playSoundThread = null;
+            }
+            if (soundPool != null) {
+                soundPool.release();
+                soundPool = null;
+            }
+
+            // 3. تنظيف إدارة الجلسات والمستمعين
             if (fragmentManager != null) {
                 clearBackStack();
             }
-            stopActiveInventory();
-            mainHandler.removeCallbacksAndMessages(null);
-            if (playSoundThread != null) playSoundThread.stopPlay();
-            if (soundPool != null) soundPool.release();
-            if (mReader != null) mReader.free();
-
             if (orgProfileManager != null && profileListener != null) {
                 orgProfileManager.removeListener(profileListener);
             }
             SessionMonitorManager.getInstance(this).stopMonitoring();
+
+            // ⚠️ ملاحظة: لا تستدعِ mReader.free() أو mainHandler هنا نهائياً
+            // لأن super.onDestroy() ستدعو BaseTabFragmentActivity.onDestroy()
+            // والتي تقوم بتحرير العتاد والـ Handlers بأمان وبدون تكرار.
+
         } catch (Exception e) {
             Log.e(TAG, "onDestroy cleanup error: " + e.getMessage());
         }
-        super.onDestroy();
+        super.onDestroy(); // ✅ سيتكفل بالعتاد والـ MemoryManager
     }
+
 
     private void safeExecute(Runnable runnable, String errorMessage) {
         try {
