@@ -8,6 +8,8 @@ import androidx.room.Room;
 import com.example.uhf.AppContext;
 import com.example.uhf.api.MiraApiClient;
 import com.example.uhf.database.InventoryDatabase;
+import com.example.uhf.manager.AppCrashHandler;
+import com.example.uhf.manager.AppRestartManager;
 import com.example.uhf.manager.MiraBranchesManager;
 import com.example.uhf.manager.MiraOrgProfileManager;
 import com.example.uhf.manager.MiraServerConfig;
@@ -22,11 +24,15 @@ public class MiraApplication extends AppContext {
     
     private static volatile MiraApplication instance;
     private volatile InventoryDatabase inventoryDatabase;
+    private volatile boolean isRestarting = false;
     
     @Override
     public void onCreate() {
         super.onCreate(); // يقوم بتأكيد mApp وإعداد AppContext
         instance = this;
+        
+        // ✅ تثبيت معالج الأخطاء غير المتوقعة
+        Thread.setDefaultUncaughtExceptionHandler(new AppCrashHandler(this));
         
         FirebaseDiagnostics.init(this);
         FirebaseDiagnostics.log("SYSTEM", "MiraApplication Started", "onCreate()");
@@ -116,6 +122,76 @@ public class MiraApplication extends AppContext {
         return inventoryDatabase;
     }
     
+    /**
+     * ✅ تنظيف الموارد عند إعادة التشغيل
+     */
+    public void cleanupOnRestart() {
+        if (isRestarting) return;
+        isRestarting = true;
+        
+        try {
+            FirebaseDiagnostics.log("SYSTEM", "Cleanup On Restart", "Starting");
+            Log.i(TAG, "Cleaning up application resources...");
+            
+            // إغلاق قاعدة البيانات
+            if (inventoryDatabase != null) {
+                try {
+                    inventoryDatabase.close();
+                    inventoryDatabase = null;
+                    Log.d(TAG, "Database closed successfully");
+                } catch (Exception e) {
+                    Log.e(TAG, "Error closing database: " + e.getMessage());
+                }
+            }
+            
+            // تنظيف الذاكرة
+            System.gc();
+            
+            FirebaseDiagnostics.log("SYSTEM", "Cleanup On Restart", "Completed");
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Cleanup error: " + e.getMessage());
+            FirebaseDiagnostics.logError("MiraApplication.cleanupOnRestart", e);
+        }
+    }
+    
+    /**
+     * ✅ إعادة تشغيل التطبيق
+     */
+    public void restartApp() {
+        try {
+            FirebaseDiagnostics.log("SYSTEM", "Restart App", "Manual restart requested");
+            Log.i(TAG, "Manual restart requested");
+            
+            // تنظيف الموارد
+            cleanupOnRestart();
+            
+            // إعادة التشغيل
+            AppRestartManager.restartApp(this);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Restart app error: " + e.getMessage());
+            FirebaseDiagnostics.logError("MiraApplication.restartApp", e);
+        }
+    }
+    
+    /**
+     * ✅ إعادة تهيئة قاعدة البيانات (عند الحاجة)
+     */
+    public synchronized void reinitializeDatabase() {
+        try {
+            if (inventoryDatabase != null) {
+                inventoryDatabase.close();
+                inventoryDatabase = null;
+            }
+            initializeDatabase();
+            FirebaseDiagnostics.log("DATABASE", "Database Reinitialized", "Success");
+        } catch (Exception e) {
+            Log.e(TAG, "Database reinitialization failed: " + e.getMessage());
+            FirebaseDiagnostics.logError("MiraApplication.reinitializeDatabase", e);
+        }
+    }
+    
     @Override
     public void onTerminate() {
         FirebaseDiagnostics.log("SYSTEM", "Application Terminating", "onTerminate()");
@@ -135,6 +211,41 @@ public class MiraApplication extends AppContext {
     public void onLowMemory() {
         super.onLowMemory();
         FirebaseDiagnostics.log("MEMORY", "Low Memory Warning", "System.gc() called");
-        System.gc();
+        
+        // ✅ تنظيف إضافي عند انخفاض الذاكرة
+        try {
+            System.gc();
+            if (inventoryDatabase != null && !inventoryDatabase.isOpen()) {
+                inventoryDatabase = null;
+                initializeDatabase();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Low memory cleanup error: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * ✅ التحقق من حالة التطبيق
+     */
+    public boolean isAppHealthy() {
+        try {
+            // فحص قاعدة البيانات
+            if (inventoryDatabase != null && !inventoryDatabase.isOpen()) {
+                Log.w(TAG, "Database is not open");
+                return false;
+            }
+            
+            // فحص الخدمات الأساسية
+            if (MiraApiClient.getInstance(getApplicationContext()) == null) {
+                Log.w(TAG, "API Client is null");
+                return false;
+            }
+            
+            return true;
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Health check error: " + e.getMessage());
+            return false;
+        }
     }
 }
