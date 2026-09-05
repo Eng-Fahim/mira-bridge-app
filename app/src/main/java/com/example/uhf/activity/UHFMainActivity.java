@@ -1,6 +1,5 @@
 package com.example.uhf.activity;
 
-// أضف هذا import في أعلى الملف
 import com.example.uhf.application.MiraApplication;
 import android.Manifest;
 import android.content.Context;
@@ -328,6 +327,15 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     public void onResume() {
         super.onResume();
         updateToolbarTitle();
+        // ✅ إخفاء أي loading overlay متبقي
+        hideLoading();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        // ✅ إخفاء loading عند الخروج
+        hideLoading();
     }
 
     private void initializeLanguageState() {
@@ -546,57 +554,55 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-private void setupRestartButton() {
-    try {
-        View btnRestartApp = findViewById(R.id.btnRestartApp);
-        if (btnRestartApp != null) {
-            btnRestartApp.setOnClickListener(v -> showRestartConfirmationDialog());
+    private void setupRestartButton() {
+        try {
+            View btnRestartApp = findViewById(R.id.btnRestartApp);
+            if (btnRestartApp != null) {
+                btnRestartApp.setOnClickListener(v -> showRestartConfirmationDialog());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Restart button setup error: " + e.getMessage());
         }
-    } catch (Exception e) {
-        Log.e(TAG, "Restart button setup error: " + e.getMessage());
     }
-}
 
-private void showRestartConfirmationDialog() {
-    new MaterialAlertDialogBuilder(this)
-            .setTitle(isArabic ? "إعادة تشغيل التطبيق" : "Restart Application")
-            .setMessage(isArabic ? 
-                "هل تريد إعادة تشغيل التطبيق؟\nسيتم إغلاق جميع العمليات وإعادة التشغيل." : 
-                "Do you want to restart the application?\nAll processes will be closed and restarted.")
-            .setPositiveButton(isArabic ? "إعادة التشغيل" : "Restart", (dialog, which) -> {
-                performAppRestart();
-            })
-            .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
-            .show();
-}
+    private void showRestartConfirmationDialog() {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(isArabic ? "إعادة تشغيل التطبيق" : "Restart Application")
+                .setMessage(isArabic ? 
+                    "هل تريد إعادة تشغيل التطبيق؟\nسيتم إغلاق جميع العمليات وإعادة التشغيل." : 
+                    "Do you want to restart the application?\nAll processes will be closed and restarted.")
+                .setPositiveButton(isArabic ? "إعادة التشغيل" : "Restart", (dialog, which) -> {
+                    performAppRestart();
+                })
+                .setNegativeButton(isArabic ? "إلغاء" : "Cancel", null)
+                .show();
+    }
 
-private void performAppRestart() {
-    try {
-        Toast.makeText(this, 
-            isArabic ? "جاري إعادة التشغيل..." : "Restarting...", 
-            Toast.LENGTH_SHORT).show();
-        
-        // إيقاف جميع العمليات
-        stopActiveInventory();
-        stopUHFScan();
-        
-        // تنظيف الموارد
-        if (soundPool != null) {
-            soundPool.release();
-            soundPool = null;
-        }
-        
-        // إعادة التشغيل
-        mainHandler.postDelayed(() -> {
+    private void performAppRestart() {
+        try {
+            Toast.makeText(this, 
+                isArabic ? "جاري إعادة التشغيل..." : "Restarting...", 
+                Toast.LENGTH_SHORT).show();
+            
+            stopActiveInventory();
+            stopUHFScan();
+            
+            if (soundPool != null) {
+                soundPool.release();
+                soundPool = null;
+            }
+            
+            hideLoading();
+            
+            mainHandler.postDelayed(() -> {
+                MiraApplication.getInstance().restartApp();
+            }, 500);
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Restart error: " + e.getMessage());
             MiraApplication.getInstance().restartApp();
-        }, 500);
-        
-    } catch (Exception e) {
-        Log.e(TAG, "Restart error: " + e.getMessage());
-        MiraApplication.getInstance().restartApp();
+        }
     }
-}
-
 
     private void applyBottomNavPermissions(BottomNavigationView quickNav, PermissionManager pm) {
         Menu menu = quickNav.getMenu();
@@ -745,7 +751,16 @@ private void performAppRestart() {
             
             updateBottomNavSelectionByTag(tag);
 
-            mainHandler.postDelayed(this::hideLoading, 150);
+            mainHandler.postDelayed(this::hideLoading, 100);
+            
+            // ✅ ضمان إضافي
+            mainHandler.postDelayed(() -> {
+                if (!isFinishing() && !isDestroyed() && loadingOverlay != null 
+                    && loadingOverlay.getVisibility() == View.VISIBLE) {
+                    Log.w(TAG, "Force hiding loading overlay - timeout");
+                    hideLoading();
+                }
+            }, 2000);
 
         } catch (Exception e) {
             Log.e(TAG, "Error switching fragment: " + e.getMessage());
@@ -802,47 +817,46 @@ private void performAppRestart() {
     }
 
     private void showUHFVersionDialog() {
-    String miraSystemVersion = "MIRA ID™ v1.0.0 (Enterprise)";
-    String swVer = miraSystemVersion;
-    String hwVer = null;
-    String modelName = Build.MODEL;
+        String miraSystemVersion = "MIRA ID™ v1.0.0 (Enterprise)";
+        String swVer = miraSystemVersion;
+        String hwVer = null;
+        String modelName = Build.MODEL;
 
-    // ✅ إذا لم يكن الجهاز موجوداً
-    if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
-        hwVer = null;
-    } else {
-        try {
-            if (mReader != null) {
-                hwVer = mReader.getHardwareVersion();
+        if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
+            hwVer = null;
+        } else {
+            try {
+                if (mReader != null) {
+                    hwVer = mReader.getHardwareVersion();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error fetching RFID reader info: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error fetching RFID reader info: " + e.getMessage());
         }
+
+        StringBuilder message = new StringBuilder();
+        message.append("MIRA Trust Architecture™\n");
+        message.append(isArabic ? "نظام المصادقة والتتبع المعتمد للمجوهرات\n\n" : "Jewelry Tracking & Authentication System\n\n");
+        message.append(isArabic ? "📱 الموديل: " : "📱 Model: ").append(modelName).append("\n");
+        message.append(isArabic ? "📦 المنظومة: " : "📦 System: ").append(swVer).append("\n");
+
+        if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
+            message.append(isArabic ? "📡 العتاد: غير متصل" : "📡 Hardware: Not Connected").append("\n");
+            message.append(isArabic ? "⏳ الحالة: بانتظار وصول الجهاز" : "⏳ Status: Waiting for device");
+        } else if (hwVer == null || hwVer.equalsIgnoreCase("null") || hwVer.trim().isEmpty()) {
+            message.append(isArabic ? "📡 العتاد: غير متهيئ" : "📡 Hardware: Not Configured").append("\n");
+            message.append(isArabic ? "🔴 الحالة: غير متصل بقارئ RFID" : "🔴 Status: Disconnected");
+        } else {
+            message.append(isArabic ? "📡 العتاد: " : "📡 Hardware: ").append(hwVer).append("\n");
+            message.append(isArabic ? "🟢 الحالة: وحدة UHF نشطة ومتصلة" : "🟢 Status: Active & Connected");
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(isArabic ? "عن المنظومة | MIRA ID™" : "About System | MIRA ID™")
+                .setMessage(message.toString())
+                .setPositiveButton(isArabic ? "موافق" : "OK", (dialog, which) -> dialog.dismiss())
+                .show();
     }
-
-    StringBuilder message = new StringBuilder();
-    message.append("MIRA Trust Architecture™\n");
-    message.append(isArabic ? "نظام المصادقة والتتبع المعتمد للمجوهرات\n\n" : "Jewelry Tracking & Authentication System\n\n");
-    message.append(isArabic ? "📱 الموديل: " : "📱 Model: ").append(modelName).append("\n");
-    message.append(isArabic ? "📦 المنظومة: " : "📦 System: ").append(swVer).append("\n");
-
-    if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
-        message.append(isArabic ? "📡 العتاد: غير متصل" : "📡 Hardware: Not Connected").append("\n");
-        message.append(isArabic ? "⏳ الحالة: بانتظار وصول الجهاز" : "⏳ Status: Waiting for device");
-    } else if (hwVer == null || hwVer.equalsIgnoreCase("null") || hwVer.trim().isEmpty()) {
-        message.append(isArabic ? "📡 العتاد: غير متهيئ" : "📡 Hardware: Not Configured").append("\n");
-        message.append(isArabic ? "🔴 الحالة: غير متصل بقارئ RFID" : "🔴 Status: Disconnected");
-    } else {
-        message.append(isArabic ? "📡 العتاد: " : "📡 Hardware: ").append(hwVer).append("\n");
-        message.append(isArabic ? "🟢 الحالة: وحدة UHF نشطة ومتصلة" : "🟢 Status: Active & Connected");
-    }
-
-    new MaterialAlertDialogBuilder(this)
-            .setTitle(isArabic ? "عن المنظومة | MIRA ID™" : "About System | MIRA ID™")
-            .setMessage(message.toString())
-            .setPositiveButton(isArabic ? "موافق" : "OK", (dialog, which) -> dialog.dismiss())
-            .show();
-}
 
     private void updateBottomNavSelectionByTag(String tag) {
         try {
@@ -922,46 +936,41 @@ private void performAppRestart() {
                 .show();
     }
 
-    // في UHFMainActivity.java، عدل هذه الدوال:
-
-public void startUHFScan() {
-    // ✅ فحص سريع - إذا لم يكن الجهاز موجوداً، لا تفعل شيئاً
-    if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
-        Log.d(TAG, "RFID device not present - skipping scan");
-        return;
-    }
-    
-    if (!isReaderReady()) {
-        Log.d(TAG, "RFID reader not ready - skipping scan");
-        return;
-    }
-    
-    try {
-        loopFlag = true;
-        if (mReader != null) {
-            mReader.startInventoryTag();
+    public void startUHFScan() {
+        if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
+            Log.d(TAG, "RFID device not present - skipping scan");
+            return;
         }
-    } catch (Exception e) {
-        Log.e(TAG, "startUHFScan Error: " + e.getMessage());
-    }
-}
-
-public void stopUHFScan() {
-    // ✅ نفس الفحص
-    if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
-        return;
-    }
-    
-    try {
-        loopFlag = false;
-        if (mReader != null) {
-            mReader.stopInventory();
+        
+        if (!isReaderReady()) {
+            Log.d(TAG, "RFID reader not ready - skipping scan");
+            return;
         }
-    } catch (Exception e) {
-        Log.e(TAG, "stopUHFScan Error: " + e.getMessage());
+        
+        try {
+            loopFlag = true;
+            if (mReader != null) {
+                mReader.startInventoryTag();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "startUHFScan Error: " + e.getMessage());
+        }
     }
-}
 
+    public void stopUHFScan() {
+        if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
+            return;
+        }
+        
+        try {
+            loopFlag = false;
+            if (mReader != null) {
+                mReader.stopInventory();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "stopUHFScan Error: " + e.getMessage());
+        }
+    }
 
     public void openReceiptFragment(String rawJson) {
         try {
@@ -1161,12 +1170,14 @@ public void stopUHFScan() {
             TextView tvTitle = loadingOverlay.findViewById(R.id.tvLoadingTitle);
             if (tvTitle != null) tvTitle.setText(isArabic ? "جاري التحميل..." : "Loading...");
             loadingOverlay.setVisibility(View.VISIBLE);
+            loadingOverlay.setAlpha(1.0f);
         }
     }
 
     public void hideLoading() {
         if (loadingOverlay != null && !isFinishing() && !isDestroyed()) {
             loadingOverlay.setVisibility(View.GONE);
+            loadingOverlay.setAlpha(0.0f);
         }
     }
 
@@ -1271,6 +1282,9 @@ public void stopUHFScan() {
 
     private void navigateToLogin() {
         try {
+            // ✅ إخفاء loading قبل الانتقال
+            hideLoading();
+            
             try {
                 if (mReader != null) {
                     mReader.free();
@@ -1292,6 +1306,9 @@ public void stopUHFScan() {
     @Override
     protected void onDestroy() {
         try {
+            // ✅ إخفاء loading أولاً
+            hideLoading();
+            
             stopActiveInventory();
 
             if (soundPool != null) {
