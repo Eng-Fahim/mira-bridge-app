@@ -22,14 +22,7 @@ import javax.crypto.spec.GCMParameterSpec;
 
 /**
  * SecureSessionManager - إدارة الجلسات الآمنة للتطبيق
- * 
- * المميزات:
- * - تشفير كامل للبيانات الحساسة باستخدام EncryptedSharedPreferences مع معالجة حماية الانهيار (Fallback Safety)
- * - دعم المصادقة البيومترية والأوفلاين
- * - إدارة صلاحية التوكن
- * - متوافق مع النظام الحالي
- * 
- * @version 2.1.0
+ * مع تخزين مؤقت لمنع I/O المتكرر على الـ Main Thread
  */
 public class SecureSessionManager {
     
@@ -69,8 +62,9 @@ public class SecureSessionManager {
     
     // القيم الافتراضية
     private static final String DEFAULT_SERVER_URL = "https://sa.mirabarcode.com/wp-json";
-    private static final long TOKEN_EXPIRY_BUFFER = 60000L; // دقيقة واحدة
-    private static final long REFRESH_THRESHOLD = 300000L; // 5 دقائق
+    private static final long TOKEN_EXPIRY_BUFFER = 60000L;
+    private static final long REFRESH_THRESHOLD = 300000L;
+    private static final long CACHE_VALIDITY_MS = 5000; // ✅ 5 ثواني تخزين مؤقت
     
     // التشفير البيومتري
     private static final String BIOMETRIC_KEY_ALIAS = "mira_biometric_key";
@@ -80,6 +74,22 @@ public class SecureSessionManager {
     private SharedPreferences securePrefs;
     private final SharedPreferences userPrefs;
     private KeyStore keyStore;
+    
+    // ✅ تخزين مؤقت للقيم المستخدمة كثيراً
+    private String cachedAuthToken = null;
+    private long tokenCacheTime = 0;
+    
+    private String cachedApiKey = null;
+    private long apiKeyCacheTime = 0;
+    
+    private Boolean cachedLoggedIn = null;
+    private long loggedInCacheTime = 0;
+    
+    private String cachedUsername = null;
+    private long usernameCacheTime = 0;
+    
+    private String cachedServerUrl = null;
+    private long serverUrlCacheTime = 0;
     
     public enum Role {
         SYSTEM_ADMIN,
@@ -94,10 +104,8 @@ public class SecureSessionManager {
     }
     
     public SecureSessionManager(Context context) {
-        // التخزين العادي
         this.userPrefs = context.getApplicationContext().getSharedPreferences(USER_PREFS_NAME, Context.MODE_PRIVATE);
         
-        // تهيئة KeyStore
         try {
             this.keyStore = KeyStore.getInstance("AndroidKeyStore");
             this.keyStore.load(null);
@@ -105,13 +113,9 @@ public class SecureSessionManager {
             Log.e(TAG, "Error initializing KeyStore", e);
         }
 
-        // إنشاء التخزين المشفر مع حماية من الانهيار (Crash Safe Init)
         this.securePrefs = createEncryptedSharedPreferences(context.getApplicationContext());
     }
 
-    /**
-     * إنشاء EncryptedSharedPreferences بأمان وإعادة التجديد عند حدوث Corrupted Key
-     */
     private SharedPreferences createEncryptedSharedPreferences(Context context) {
         try {
             MasterKey masterKey = new MasterKey.Builder(context)
@@ -126,32 +130,20 @@ public class SecureSessionManager {
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             );
         } catch (Exception e) {
-            Log.e(TAG, "EncryptedSharedPreferences corrupt or unreadable, re-creating...", e);
-            
-            // حذف الملف التالف لإنقاذ التطبيق من الانهيار
+            Log.e(TAG, "EncryptedSharedPreferences corrupt, re-creating...", e);
             try {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
                     context.deleteSharedPreferences(SECURE_PREFS_NAME);
-                } else {
-                    File prefFile = new File(context.getFilesDir().getParent() + "/shared_prefs/" + SECURE_PREFS_NAME + ".xml");
-                    if (prefFile.exists()) {
-                        prefFile.delete();
-                    }
                 }
-                
                 MasterKey masterKey = new MasterKey.Builder(context)
                         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                         .build();
-
                 return EncryptedSharedPreferences.create(
-                        context,
-                        SECURE_PREFS_NAME,
-                        masterKey,
+                        context, SECURE_PREFS_NAME, masterKey,
                         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 );
             } catch (Exception ex) {
-                Log.e(TAG, "Fallback to standard unencrypted shared prefs due to critical crypto error", ex);
                 return context.getSharedPreferences(SECURE_PREFS_NAME + "_fallback", Context.MODE_PRIVATE);
             }
         }
@@ -159,26 +151,24 @@ public class SecureSessionManager {
     
     // ==================== إدارة الجلسة ====================
     
-    /**
-     * إنشاء جلسة دخول جديدة (بالوقت المحدد)
-     */
     public void createLoginSession(String username, String role, String token, 
                                    String serverUrl, long expiresInSeconds) {
         try {
             long expiryTime = (expiresInSeconds > 0) 
                     ? (System.currentTimeMillis() + (expiresInSeconds * 1000L)) 
-                    : (System.currentTimeMillis() + (86400 * 1000L * 30)); // 30 يوماً أوفلاين افتراضياً
+                    : (System.currentTimeMillis() + (86400 * 1000L * 30));
             
-            // حفظ البيانات الحساسة مشفرة
             securePrefs.edit()
                     .putString(KEY_AUTH_TOKEN, token != null ? token : "")
                     .putLong(KEY_TOKEN_EXPIRY, expiryTime)
                     .apply();
             
-            // حفظ البيانات غير الحساسة
+            // ✅ تحديث التخزين المؤقت
+            cachedAuthToken = token;
+            tokenCacheTime = System.currentTimeMillis();
+            
             String finalServerUrl = (serverUrl != null && !serverUrl.isEmpty()) 
-                    ? normalizeServerUrl(serverUrl) 
-                    : DEFAULT_SERVER_URL;
+                    ? normalizeServerUrl(serverUrl) : DEFAULT_SERVER_URL;
             
             userPrefs.edit()
                     .putBoolean(KEY_IS_LOGGED_IN, true)
@@ -188,6 +178,14 @@ public class SecureSessionManager {
                     .putString(KEY_SERVER_URL, finalServerUrl)
                     .apply();
             
+            // ✅ تحديث التخزين المؤقت
+            cachedLoggedIn = true;
+            cachedUsername = username;
+            cachedServerUrl = finalServerUrl;
+            loggedInCacheTime = System.currentTimeMillis();
+            usernameCacheTime = System.currentTimeMillis();
+            serverUrlCacheTime = System.currentTimeMillis();
+            
             Log.d(TAG, "Login session created for user: " + username);
             
         } catch (Exception e) {
@@ -195,54 +193,44 @@ public class SecureSessionManager {
         }
     }
     
-    /**
-     * إنشاء جلسة دخول جديدة (متوافقة مع الواجهة القديمة)
-     */
     public void createLoginSession(String username, String role, String token, String serverUrl) {
-        createLoginSession(username, role, token, serverUrl, 86400 * 7); // 7 أيام افتراضياً
+        createLoginSession(username, role, token, serverUrl, 86400 * 7);
     }
     
-    /**
-     * تحديث التوكن
-     */
     public void updateToken(String newToken, long expiresInSeconds) {
         long expiryTime = System.currentTimeMillis() + (expiresInSeconds * 1000L);
         securePrefs.edit()
                 .putString(KEY_AUTH_TOKEN, newToken)
                 .putLong(KEY_TOKEN_EXPIRY, expiryTime)
                 .apply();
+        // ✅ تحديث التخزين المؤقت
+        cachedAuthToken = newToken;
+        tokenCacheTime = System.currentTimeMillis();
     }
     
-    /**
-     * الحصول على التوكن
-     */
     public String getAuthToken() {
-        return securePrefs.getString(KEY_AUTH_TOKEN, "");
+        // ✅ استخدام التخزين المؤقت
+        long now = System.currentTimeMillis();
+        if (cachedAuthToken != null && (now - tokenCacheTime) < CACHE_VALIDITY_MS) {
+            return cachedAuthToken;
+        }
+        cachedAuthToken = securePrefs.getString(KEY_AUTH_TOKEN, "");
+        tokenCacheTime = now;
+        return cachedAuthToken;
     }
     
-    /**
-     * التحقق من صلاحية التوكن (محمية للأوفلاين)
-     */
     public boolean hasValidToken() {
         try {
             String token = getAuthToken();
-            if (token == null || token.isEmpty()) {
-                return false;
-            }
+            if (token == null || token.isEmpty()) return false;
             long expiryTime = securePrefs.getLong(KEY_TOKEN_EXPIRY, 0L);
-            // إذا لم يتم تعيين تاريخ انتهاء صريح، يعتبر التوكن الموجود صالحاً
-            if (expiryTime == 0L) {
-                return true;
-            }
+            if (expiryTime == 0L) return true;
             return System.currentTimeMillis() < (expiryTime - TOKEN_EXPIRY_BUFFER);
         } catch (Exception e) {
             return false;
         }
     }
     
-    /**
-     * التحقق من الحاجة لتجديد التوكن
-     */
     public boolean needsTokenRefresh() {
         try {
             long expiryTime = securePrefs.getLong(KEY_TOKEN_EXPIRY, 0L);
@@ -253,27 +241,19 @@ public class SecureSessionManager {
         }
     }
 
-    /**
-     * التحقق من وجود جلسة قابلة للعمل أوفلاين
-     */
     public boolean hasOfflineSession() {
         String token = getAuthToken();
         String lastBioToken = getLastBiometricToken();
         return (token != null && !token.isEmpty()) || (lastBioToken != null && !lastBioToken.isEmpty());
     }
     
-    /**
-     * تسجيل الخروج الآمن
-     */
     public void logoutUser() {
-        // حفظ البيانات التي يجب أن تبقى
         boolean keepBiometric = isBiometricEnabled();
         String apiKey = getApiKey();
         String serverUrl = getServerUrl();
         String lastUsername = getLastUsername();
         String gateId = getGateId();
         
-        // حفظ البيانات البيومترية إذا كانت مفعلة
         String biometricUser = getLastBiometricUser();
         String biometricRole = getLastBiometricRole();
         String biometricDisplayName = getLastBiometricDisplayName();
@@ -282,11 +262,21 @@ public class SecureSessionManager {
         int biometricBranchId = getLastBiometricBranchId();
         String biometricBranchName = getLastBiometricBranchName();
         
-        // مسح جميع البيانات
         securePrefs.edit().clear().apply();
         userPrefs.edit().clear().apply();
         
-        // استعادة البيانات الضرورية
+        // ✅ مسح التخزين المؤقت
+        cachedAuthToken = null;
+        cachedApiKey = null;
+        cachedLoggedIn = false;
+        cachedUsername = null;
+        cachedServerUrl = null;
+        tokenCacheTime = 0;
+        apiKeyCacheTime = 0;
+        loggedInCacheTime = System.currentTimeMillis();
+        usernameCacheTime = 0;
+        serverUrlCacheTime = 0;
+        
         SharedPreferences.Editor userEditor = userPrefs.edit();
         SharedPreferences.Editor secureEditor = securePrefs.edit();
         
@@ -301,21 +291,10 @@ public class SecureSessionManager {
             secureEditor.putString(KEY_LAST_BIOMETRIC_TOKEN, biometricToken);
         }
         
-        if (apiKey != null && !apiKey.isEmpty()) {
-            secureEditor.putString(KEY_API_KEY, apiKey);
-        }
-        
-        if (serverUrl != null && !serverUrl.isEmpty()) {
-            userEditor.putString(KEY_SERVER_URL, serverUrl);
-        }
-        
-        if (lastUsername != null && !lastUsername.isEmpty()) {
-            userEditor.putString(KEY_LAST_USERNAME, lastUsername);
-        }
-        
-        if (gateId != null && !gateId.isEmpty()) {
-            userEditor.putString(KEY_GATE_ID, gateId);
-        }
+        if (apiKey != null && !apiKey.isEmpty()) secureEditor.putString(KEY_API_KEY, apiKey);
+        if (serverUrl != null && !serverUrl.isEmpty()) userEditor.putString(KEY_SERVER_URL, serverUrl);
+        if (lastUsername != null && !lastUsername.isEmpty()) userEditor.putString(KEY_LAST_USERNAME, lastUsername);
+        if (gateId != null && !gateId.isEmpty()) userEditor.putString(KEY_GATE_ID, gateId);
         
         userEditor.apply();
         secureEditor.apply();
@@ -323,9 +302,6 @@ public class SecureSessionManager {
         Log.d(TAG, "User logged out securely");
     }
     
-    /**
-     * تسجيل الخروج (متوافقة مع الواجهة القديمة)
-     */
     public void logout() {
         logoutUser();
     }
@@ -333,11 +309,25 @@ public class SecureSessionManager {
     // ==================== إدارة المستخدم ====================
     
     public boolean isLoggedIn() {
-        return userPrefs.getBoolean(KEY_IS_LOGGED_IN, false);
+        // ✅ استخدام التخزين المؤقت
+        long now = System.currentTimeMillis();
+        if (cachedLoggedIn != null && (now - loggedInCacheTime) < CACHE_VALIDITY_MS) {
+            return cachedLoggedIn;
+        }
+        cachedLoggedIn = userPrefs.getBoolean(KEY_IS_LOGGED_IN, false);
+        loggedInCacheTime = now;
+        return cachedLoggedIn;
     }
     
     public String getUsername() {
-        return userPrefs.getString(KEY_USERNAME, "");
+        // ✅ استخدام التخزين المؤقت
+        long now = System.currentTimeMillis();
+        if (cachedUsername != null && (now - usernameCacheTime) < CACHE_VALIDITY_MS) {
+            return cachedUsername;
+        }
+        cachedUsername = userPrefs.getString(KEY_USERNAME, "");
+        usernameCacheTime = now;
+        return cachedUsername;
     }
     
     public String getUserName() {
@@ -413,27 +403,32 @@ public class SecureSessionManager {
     // ==================== إدارة عنوان الخادم ====================
     
     public String getServerUrl() {
+        // ✅ استخدام التخزين المؤقت
+        long now = System.currentTimeMillis();
+        if (cachedServerUrl != null && (now - serverUrlCacheTime) < CACHE_VALIDITY_MS) {
+            return cachedServerUrl;
+        }
         String url = userPrefs.getString(KEY_SERVER_URL, "");
         if (url == null || url.isEmpty()) {
             url = DEFAULT_SERVER_URL;
             setServerUrl(url);
         }
+        cachedServerUrl = url;
+        serverUrlCacheTime = now;
         return url;
     }
     
     public void setServerUrl(String url) {
-        if (url == null || url.isEmpty()) {
-            Log.e(TAG, "Cannot save empty server URL!");
-            return;
-        }
-        
+        if (url == null || url.isEmpty()) return;
         String normalizedUrl = normalizeServerUrl(url);
         userPrefs.edit().putString(KEY_SERVER_URL, normalizedUrl).apply();
-        Log.d(TAG, "Server URL saved: " + normalizedUrl);
+        // ✅ تحديث التخزين المؤقت
+        cachedServerUrl = normalizedUrl;
+        serverUrlCacheTime = System.currentTimeMillis();
     }
     
     public boolean hasServerUrl() {
-        String url = userPrefs.getString(KEY_SERVER_URL, "");
+        String url = getServerUrl();
         return url != null && !url.isEmpty();
     }
     
@@ -444,9 +439,7 @@ public class SecureSessionManager {
     
     private String normalizeServerUrl(String url) {
         String normalized = url.trim();
-        if (!normalized.endsWith("/")) {
-            normalized += "/";
-        }
+        if (!normalized.endsWith("/")) normalized += "/";
         return normalized;
     }
     
@@ -455,29 +448,21 @@ public class SecureSessionManager {
     public void saveApiKey(String apiKey) {
         if (apiKey != null && !apiKey.isEmpty()) {
             securePrefs.edit().putString(KEY_API_KEY, apiKey).apply();
-            Log.d(TAG, "API Key saved");
+            // ✅ تحديث التخزين المؤقت
+            cachedApiKey = apiKey;
+            apiKeyCacheTime = System.currentTimeMillis();
         }
     }
     
-    public void saveApiKeyInfo(String apiKey, String keyId, String keyPrefix, String createdAt) {
-        securePrefs.edit()
-                .putString(KEY_API_KEY, apiKey)
-                .putString(KEY_API_KEY_ID, keyId)
-                .putString(KEY_API_KEY_PREFIX, keyPrefix)
-                .putString(KEY_API_KEY_CREATED_AT, createdAt)
-                .apply();
-    }
-    
     public String getApiKey() {
-        return securePrefs.getString(KEY_API_KEY, "");
-    }
-    
-    public String getApiKeyId() {
-        return securePrefs.getString(KEY_API_KEY_ID, "");
-    }
-    
-    public String getApiKeyPrefix() {
-        return securePrefs.getString(KEY_API_KEY_PREFIX, "");
+        // ✅ استخدام التخزين المؤقت
+        long now = System.currentTimeMillis();
+        if (cachedApiKey != null && (now - apiKeyCacheTime) < CACHE_VALIDITY_MS) {
+            return cachedApiKey;
+        }
+        cachedApiKey = securePrefs.getString(KEY_API_KEY, "");
+        apiKeyCacheTime = now;
+        return cachedApiKey;
     }
     
     public boolean hasApiKey() {
@@ -491,15 +476,16 @@ public class SecureSessionManager {
                 .remove(KEY_API_KEY_PREFIX)
                 .remove(KEY_API_KEY_CREATED_AT)
                 .apply();
-        Log.d(TAG, "API Key cleared");
+        // ✅ مسح التخزين المؤقت
+        cachedApiKey = null;
+        apiKeyCacheTime = 0;
     }
     
-    // ==================== إدارة Gate ID ====================
+    // ==================== Gate ID ====================
     
     public void saveGateId(String gateId) {
         if (gateId != null && !gateId.isEmpty()) {
             userPrefs.edit().putString(KEY_GATE_ID, gateId).apply();
-            Log.d(TAG, "Gate ID saved");
         }
     }
     
@@ -545,14 +531,6 @@ public class SecureSessionManager {
         return isBiometricEnabled();
     }
     
-    public void setBiometricConfirmEnabled(boolean enabled) {
-        userPrefs.edit().putBoolean(KEY_BIOMETRIC_CONFIRM_ENABLED, enabled).apply();
-    }
-    
-    public boolean isBiometricConfirmEnabled() {
-        return userPrefs.getBoolean(KEY_BIOMETRIC_CONFIRM_ENABLED, false);
-    }
-    
     public void saveBiometricUser(String username, String role, String displayName, int userId, String token) {
         userPrefs.edit()
                 .putString(KEY_LAST_BIOMETRIC_USER, username)
@@ -560,7 +538,6 @@ public class SecureSessionManager {
                 .putString(KEY_LAST_BIOMETRIC_DISPLAY_NAME, displayName)
                 .putInt(KEY_LAST_BIOMETRIC_USER_ID, userId)
                 .apply();
-        
         securePrefs.edit()
                 .putString(KEY_LAST_BIOMETRIC_TOKEN, token)
                 .apply();
@@ -615,13 +592,8 @@ public class SecureSessionManager {
     
     // ==================== التشفير البيومتري ====================
     
-    /**
-     * إنشاء مفتاح بيومتري في KeyStore
-     */
     public SecretKey createBiometricKey() throws GeneralSecurityException {
-        KeyGenerator keyGenerator = KeyGenerator.getInstance(
-                "AES", "AndroidKeyStore");
-        
+        KeyGenerator keyGenerator = KeyGenerator.getInstance("AES", "AndroidKeyStore");
         android.security.keystore.KeyGenParameterSpec keyGenParameterSpec = 
                 new android.security.keystore.KeyGenParameterSpec.Builder(
                         BIOMETRIC_KEY_ALIAS,
@@ -632,14 +604,10 @@ public class SecureSessionManager {
                 .setUserAuthenticationRequired(true)
                 .setInvalidatedByBiometricEnrollment(true)
                 .build();
-        
         keyGenerator.init(keyGenParameterSpec);
         return keyGenerator.generateKey();
     }
     
-    /**
-     * الحصول على المفتاح البيومتري
-     */
     @Nullable
     public SecretKey getBiometricKey() {
         try {
@@ -650,85 +618,53 @@ public class SecureSessionManager {
         }
     }
     
-    /**
-     * التحقق من توفر المفتاح البيومتري
-     */
     public boolean isBiometricKeyAvailable() {
         return getBiometricKey() != null;
     }
     
-    /**
-     * تشفير البيانات باستخدام المفتاح البيومتري
-     */
     @Nullable
     public String encryptWithBiometricKey(String data) {
         try {
             SecretKey key = getBiometricKey();
-            if (key == null) {
-                key = createBiometricKey();
-            }
-            
+            if (key == null) key = createBiometricKey();
             Cipher cipher = Cipher.getInstance(BIOMETRIC_TRANSFORMATION);
             cipher.init(Cipher.ENCRYPT_MODE, key);
-            
             byte[] encryptedData = cipher.doFinal(data.getBytes());
             byte[] iv = cipher.getIV();
-            
-            // حفظ IV + البيانات المشفرة معاً
             byte[] combined = new byte[iv.length + encryptedData.length];
             System.arraycopy(iv, 0, combined, 0, iv.length);
             System.arraycopy(encryptedData, 0, combined, iv.length, encryptedData.length);
-            
             return Base64.encodeToString(combined, Base64.NO_WRAP);
-            
         } catch (Exception e) {
             Log.e(TAG, "Error encrypting with biometric key", e);
             return null;
         }
     }
     
-    /**
-     * فك تشفير البيانات باستخدام المفتاح البيومتري
-     */
     @Nullable
     public String decryptWithBiometricKey(String encryptedBase64) {
         try {
             SecretKey key = getBiometricKey();
-            if (key == null) {
-                return null;
-            }
-            
+            if (key == null) return null;
             byte[] combined = Base64.decode(encryptedBase64, Base64.NO_WRAP);
-            
-            // استخراج IV والبيانات المشفرة
             Cipher cipher = Cipher.getInstance(BIOMETRIC_TRANSFORMATION);
             int ivLength = cipher.getBlockSize();
-            
             byte[] iv = new byte[ivLength];
             byte[] encryptedData = new byte[combined.length - ivLength];
-            
             System.arraycopy(combined, 0, iv, 0, ivLength);
             System.arraycopy(combined, ivLength, encryptedData, 0, encryptedData.length);
-            
             cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
-            
             byte[] decryptedData = cipher.doFinal(encryptedData);
             return new String(decryptedData);
-            
         } catch (Exception e) {
             Log.e(TAG, "Error decrypting with biometric key", e);
             return null;
         }
     }
     
-    /**
-     * حذف المفتاح البيومتري
-     */
     public void deleteBiometricKey() {
         try {
-            if (keyStore != null) {
-                keyStore.deleteEntry(BIOMETRIC_KEY_ALIAS);
-            }
+            if (keyStore != null) keyStore.deleteEntry(BIOMETRIC_KEY_ALIAS);
             clearBiometricData();
             setBiometricEnabled(false);
         } catch (Exception e) {
@@ -738,19 +674,18 @@ public class SecureSessionManager {
     
     // ==================== وظائف مساعدة ====================
     
-    /**
-     * مسح جميع البيانات
-     */
     public void clearAll() {
         securePrefs.edit().clear().apply();
         userPrefs.edit().clear().apply();
+        // ✅ مسح التخزين المؤقت
+        cachedAuthToken = null;
+        cachedApiKey = null;
+        cachedLoggedIn = false;
+        cachedUsername = null;
+        cachedServerUrl = null;
         deleteBiometricKey();
-        Log.d(TAG, "All session data cleared");
     }
     
-    /**
-     * الحصول على ملخص حالة الجلسة
-     */
     public String getSessionSummary() {
         return "isLoggedIn=" + isLoggedIn() +
                 ", username=" + getUsername() +
@@ -761,24 +696,20 @@ public class SecureSessionManager {
                 ", serverUrl=" + getServerUrl();
     }
     
-        /**
-     * مسح التوكن نهائياً (للاستخدام عند 401)
-     */
     public void clearAuthToken() {
         try {
             securePrefs.edit()
                     .remove(KEY_AUTH_TOKEN)
                     .remove(KEY_TOKEN_EXPIRY)
                     .apply();
-            Log.d(TAG, "Auth token cleared permanently");
+            // ✅ مسح التخزين المؤقت
+            cachedAuthToken = null;
+            tokenCacheTime = 0;
         } catch (Exception e) {
             Log.e(TAG, "clearAuthToken error: " + e.getMessage());
         }
     }
     
-    /**
-     * مسح جميع بيانات الجلسة بما فيها التوكن
-     */
     public void clearSessionCompletely() {
         try {
             securePrefs.edit()
@@ -786,14 +717,18 @@ public class SecureSessionManager {
                     .remove(KEY_TOKEN_EXPIRY)
                     .remove(KEY_REFRESH_TOKEN)
                     .apply();
-            
             userPrefs.edit()
                     .remove(KEY_IS_LOGGED_IN)
                     .remove(KEY_USERNAME)
                     .remove(KEY_USER_ROLE)
                     .apply();
-            
-            Log.d(TAG, "Session cleared completely");
+            // ✅ مسح التخزين المؤقت
+            cachedAuthToken = null;
+            cachedLoggedIn = false;
+            cachedUsername = null;
+            tokenCacheTime = 0;
+            loggedInCacheTime = 0;
+            usernameCacheTime = 0;
         } catch (Exception e) {
             Log.e(TAG, "clearSessionCompletely error: " + e.getMessage());
         }
