@@ -733,4 +733,36 @@ public class SecureSessionManager {
             Log.e(TAG, "clearSessionCompletely error: " + e.getMessage());
         }
     }
+
+    public void saveApiKeyInfo(String apiKey, String keyId, String keyPrefix, String createdAt) {
+    securePrefs.edit()
+            .putString(KEY_API_KEY, apiKey)
+            .putString(KEY_API_KEY_ID, keyId)
+            .putString(KEY_API_KEY_PREFIX, keyPrefix)
+            .putString(KEY_API_KEY_CREATED_AT, createdAt)
+            .apply();
+    // ✅ تحديث التخزين المؤقت
+    cachedApiKey = apiKey;
+    apiKeyCacheTime = System.currentTimeMillis();
+}
+
+public String getApiKeyId() {
+    return securePrefs.getString(KEY_API_KEY_ID, "");
+}
+
+public String getApiKeyPrefix() {
+    return securePrefs.getString(KEY_API_KEY_PREFIX, "");
+}
+
+public void setBiometricConfirmEnabled(boolean enabled) {
+    userPrefs.edit().putBoolean(KEY_BIOMETRIC_CONFIRM_ENABLED, enabled).apply();
+}
+
+public boolean isBiometricConfirmEnabled() {
+    return userPrefs.getBoolean(KEY_BIOMETRIC_CONFIRM_ENABLED, false);
+}
+
+public void createLoginSession(String username, String role, String token, String serverUrl) {
+    createLoginSession(username, role, token, serverUrl, 86400 * 7);
+}
 }
