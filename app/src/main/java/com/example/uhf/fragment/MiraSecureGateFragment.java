@@ -126,16 +126,25 @@ public class MiraSecureGateFragment extends Fragment {
     private final ActivityResultLauncher<ScanOptions> barcodeLauncher = registerForActivityResult(
         new ScanContract(),
         result -> {
-            isCameraOpen = false; // إعادة الضبط عند العودة من الكاميرا
-            
-            if (result.getContents() != null && !isDestroyed) {
-                processInputEpc(result.getContents().trim(), "CAMERA");
-            }
-            
-            // إعادة تشغيل مسح الـ RFID بعد العودة من الكاميرا إذا لم تكن البوابة في حالة الإغلاق الطارئ
-            if (!isLockdown && !isDestroyed) {
-                autoStartScanning();
-            }
+            // معالجة نتيجة الكاميرا في خلفية آمنة لمنع تعليق الواجهة
+            gateExecutor.execute(() -> {
+                try {
+                    Thread.sleep(300); // إعطاء مجال لنظام الكاميرا لإغلاق الـ Activity بالكامل
+                } catch (InterruptedException ignored) {}
+
+                mainHandler.post(() -> {
+                    isCameraOpen = false;
+                    
+                    if (result.getContents() != null && !isDestroyed) {
+                        processInputEpc(result.getContents().trim(), "CAMERA");
+                    }
+                    
+                    // إعادة تشغيل الـ RFID بعد التأكد من تحرير الموارد
+                    if (!isLockdown && !isDestroyed) {
+                        autoStartScanning();
+                    }
+                });
+            });
         }
     );
 
@@ -219,7 +228,6 @@ public class MiraSecureGateFragment extends Fragment {
         gateExecutor = Executors.newFixedThreadPool(4);
         isDestroyed = false;
         
-        // ✅ جلب الفرع الحالي وصلاحيات المستخدم
         loadCurrentBranchInfo();
     }
 
@@ -249,7 +257,6 @@ public class MiraSecureGateFragment extends Fragment {
         btnFilterAlerts = view.findViewById(R.id.btnFilterAlerts);
         btnFilterPass = view.findViewById(R.id.btnFilterPass);
         
-        // ✅ تهيئة عناصر اختيار الفرع
         spBranchSelector = view.findViewById(R.id.spBranchSelector);
         tvCurrentBranch = view.findViewById(R.id.tvCurrentBranch);
         
@@ -278,20 +285,29 @@ public class MiraSecureGateFragment extends Fragment {
         }
         if (btnScanBarcode != null) {
             btnScanBarcode.setOnClickListener(v -> {
-                // 1. إيقاف مسح الـ RFID فوراً لتفريغ الموارد ومنع التجمّد
-                stopScanning();
                 isCameraOpen = true;
-
-                ScanOptions options = new ScanOptions();
-                options.setPrompt(getLocalizedText("📷 وجه الكاميرا نحو باركود القطعة", "📷 Aim camera at item barcode"));
-                options.setBeepEnabled(false);
-                options.setOrientationLocked(true);
                 
-                try {
-                    barcodeLauncher.launch(options);
-                } catch (Exception e) {
-                    isCameraOpen = false;
-                    logConsole(getLocalizedText("⚠️ تعذر فتح الكاميرا: ", "⚠️ Camera error: ") + e.getMessage());
+                // 1. إيقاف المسح في الخيط الخلفي لضمان عدم تجميد الـ UI
+                if (gateExecutor != null && !gateExecutor.isShutdown()) {
+                    gateExecutor.execute(() -> {
+                        stopScanningSync(); // إيقاف متزامن في الخلفية
+                        
+                        // 2. فتح الكاميرا من الـ MainThread بعد الاطمئنان لتحرير الموارد
+                        mainHandler.post(() -> {
+                            ScanOptions options = new ScanOptions();
+                            options.setPrompt(getLocalizedText("📷 وجه الكاميرا نحو باركود القطعة", "📷 Aim camera at item barcode"));
+                            options.setBeepEnabled(false);
+                            options.setOrientationLocked(true);
+                            
+                            try {
+                                barcodeLauncher.launch(options);
+                            } catch (Exception e) {
+                                isCameraOpen = false;
+                                logConsole(getLocalizedText("⚠️ تعذر فتح الكاميرا: ", "⚠️ Camera error: ") + e.getMessage());
+                                autoStartScanning();
+                            }
+                        });
+                    });
                 }
             });
         }
@@ -333,17 +349,13 @@ public class MiraSecureGateFragment extends Fragment {
             if (context == null) return;
             
             currentBranchId = branchesManager != null ? branchesManager.getActiveBranchId() : 0;
-            
-            // ✅ التحقق من صلاحيات المدير العام بالطرق الصحيحة
             isGlobalAdmin = permissionManager != null && 
                 (permissionManager.isSystemAdmin() || permissionManager.isOrgAdmin());
             
             mainHandler.post(() -> {
-                // ✅ تحديث واجهة اختيار الفرع
                 if (isGlobalAdmin) {
                     loadBranchesForSelector();
                 } else {
-                    // ✅ إخفاء محدد الفروع للمستخدمين العاديين
                     if (spBranchSelector != null) {
                         spBranchSelector.setVisibility(View.GONE);
                     }
@@ -654,12 +666,14 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     // ============================================
-    // ✅ المسح
+    // ✅ المسح المعدل (حل مشكلة التجميد النهائي)
     // ============================================
     private void autoStartScanning() {
         mainHandler.postDelayed(() -> {
-            if (!isDestroyed && isAdded() && !isLockdown) startScanning();
-        }, 1000);
+            if (!isDestroyed && isAdded() && !isLockdown && !isCameraOpen) {
+                startScanning();
+            }
+        }, 1200); // زيادة أمان المهلة الزمنية لضمان إغلاق الكاميرا بالكامل
     }
 
     private void toggleScanning() {
@@ -667,40 +681,62 @@ public class MiraSecureGateFragment extends Fragment {
     }
 
     private void startScanning() {
-        if (isDestroyed || mContext == null || mContext.mReader == null) {
-            logConsole(getLocalizedText("⚠️ قارئ RFID غير متوفر - استخدم الكاميرا", "⚠️ RFID reader unavailable - use camera"));
+        if (isDestroyed || mContext == null || mContext.mReader == null || isCameraOpen) {
+            logConsole(getLocalizedText("⚠️ قارئ RFID غير متوفر أو الكاميرا قيد التشغيل", "⚠️ RFID reader unavailable or camera active"));
             return;
         }
-        try {
-            mContext.mReader.setPower(miraGatesSettings.getRfidPower());
-            mContext.mReader.setInventoryCallback(new IUHFInventoryCallback() {
-                @Override
-                public void callback(UHFTAGInfo info) {
-                    if (!isDestroyed && info != null && info.getEPC() != null) {
-                        processInputEpc(info.getEPC(), "RFID");
+
+        if (gateExecutor == null || gateExecutor.isShutdown()) return;
+
+        // تشغيل حجز القارئ في الخيط الخلفي لعدم تعليق الـ Main UI
+        gateExecutor.execute(() -> {
+            try {
+                if (mContext != null && mContext.mReader != null) {
+                    mContext.mReader.setPower(miraGatesSettings.getRfidPower());
+                    mContext.mReader.setInventoryCallback(new IUHFInventoryCallback() {
+                        @Override
+                        public void callback(UHFTAGInfo info) {
+                            if (!isDestroyed && info != null && info.getEPC() != null) {
+                                processInputEpc(info.getEPC(), "RFID");
+                            }
+                        }
+                    });
+                    
+                    boolean success = mContext.mReader.startInventoryTag();
+                    if (success) {
+                        isScanning = true;
+                        mainHandler.post(() -> {
+                            if (btnToggleScan != null) btnToggleScan.setText(getLocalizedText("🔴 إيقاف المسح", "🔴 Stop Scan"));
+                            logConsole(getLocalizedText("🛡️ قارئ RFID يعمل", "🛡️ RFID reader active"));
+                        });
                     }
                 }
-            });
-            mContext.mReader.startInventoryTag();
-            isScanning = true;
-            if (btnToggleScan != null) btnToggleScan.setText(getLocalizedText("🔴 إيقاف المسح", "🔴 Stop Scan"));
-            logConsole(getLocalizedText("🛡️ قارئ RFID يعمل", "🛡️ RFID reader active"));
-        } catch (Exception e) {
-            logConsole(getLocalizedText("⚠️ خطأ: ", "⚠️ Error: ") + e.getMessage());
-        }
+            } catch (Exception e) {
+                mainHandler.post(() -> logConsole(getLocalizedText("⚠️ خطأ في تشغيل القارئ: ", "⚠️ Reader error: ") + e.getMessage()));
+            }
+        });
     }
 
     private void stopScanning() {
+        if (gateExecutor != null && !gateExecutor.isShutdown()) {
+            gateExecutor.execute(this::stopScanningSync);
+        }
+    }
+
+    // دالة إيقاف متزامنة وتعمل بأمان داخل الخيط الخلفي
+    private void stopScanningSync() {
         if (mContext != null && mContext.mReader != null) {
             try { 
                 mContext.mReader.stopInventory(); 
                 mContext.mReader.setInventoryCallback(null); 
             } catch (Exception e) {
-                Log.e(TAG, "stopScanning: " + e.getMessage());
+                Log.e(TAG, "stopScanningSync: " + e.getMessage());
             }
         }
         isScanning = false;
-        if (btnToggleScan != null) btnToggleScan.setText(getLocalizedText("🛡️ تفعيل المسح", "🛡️ Start Scan"));
+        mainHandler.post(() -> {
+            if (btnToggleScan != null) btnToggleScan.setText(getLocalizedText("🛡️ تفعيل المسح", "🛡️ Start Scan"));
+        });
     }
 
     // ============================================
@@ -1144,7 +1180,7 @@ public class MiraSecureGateFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         isDestroyed = true;
-        stopScanning();
+        stopScanningSync();
         stopAlarm();
         if (monitorScheduler != null) monitorScheduler.shutdownNow();
         if (pingScheduler != null) pingScheduler.shutdownNow();
