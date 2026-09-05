@@ -577,54 +577,78 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
         }
     }
 
-    private void calculateTrend(double currentPrice) {
-        try {
-            if (tvGoldTrend == null || tvGoldChange == null || offlineCache == null) return;
-            double previousPrice = offlineCache.getFloat("gold_price_24k_prev", 0);
+    
 
+    private void loadOfflineData() {
+    if (offlineCache == null) return;
+    
+    // ✅ قراءة في خيط منفصل
+    sharedExecutor.execute(() -> {
+        try {
+            final int totalItems = offlineCache.getInt("total_items", 0);
+            final float totalWeight = offlineCache.getFloat("total_weight", 0.0f);
+            final int soldToday = offlineCache.getInt("sold_today", 0);
+            final float salesToday = offlineCache.getFloat("sales_today", 0.0f);
+            final float salesMonth = offlineCache.getFloat("sales_month", 0.0f);
+            final float salesYear = offlineCache.getFloat("sales_year", 0.0f);
+            
+            // ✅ تحديث UI على Main Thread
+            mainHandler.post(() -> {
+                setText(tvTotalItems, String.valueOf(totalItems));
+                setText(tvTotalWeight, formatWeight(totalWeight));
+                setText(tvSoldToday, String.valueOf(soldToday));
+                setText(tvSalesToday, formatCurrency(salesToday));
+                setText(tvSalesMonth, formatCurrency(salesMonth));
+                setText(tvSalesYear, formatCurrency(salesYear));
+                
+                if (priceManager != null) {
+                    displayGoldPricesFromCache();
+                }
+            });
+        } catch (Exception e) {
+            logNonFatal("loadOfflineData", e);
+        }
+    });
+}
+
+private void calculateTrend(double currentPrice) {
+    if (tvGoldTrend == null || tvGoldChange == null || offlineCache == null) return;
+    
+    // ✅ قراءة وكتابة في خيط منفصل
+    sharedExecutor.execute(() -> {
+        try {
+            double previousPrice = offlineCache.getFloat("gold_price_24k_prev", 0);
+            
             if (previousPrice > 0 && currentPrice > 0) {
                 double change = currentPrice - previousPrice;
                 double changePercent = (change / previousPrice) * 100;
-
-                if (change > 0) {
-                    tvGoldTrend.setText("📈");
-                    tvGoldChange.setText(String.format(Locale.US, "+%.2f%%", changePercent));
-                    tvGoldChange.setTextColor(0xFF16A34A);
-                } else if (change < 0) {
-                    tvGoldTrend.setText("📉");
-                    tvGoldChange.setText(String.format(Locale.US, "%.2f%%", changePercent));
-                    tvGoldChange.setTextColor(0xFFDC2626);
-                } else {
-                    tvGoldTrend.setText("➡️");
-                    tvGoldChange.setText("0.00%");
-                    tvGoldChange.setTextColor(0xFF6B7280);
-                }
+                
+                // ✅ تحديث UI على Main Thread
+                mainHandler.post(() -> {
+                    if (change > 0) {
+                        tvGoldTrend.setText("📈");
+                        tvGoldChange.setText(String.format(Locale.US, "+%.2f%%", changePercent));
+                        tvGoldChange.setTextColor(0xFF16A34A);
+                    } else if (change < 0) {
+                        tvGoldTrend.setText("📉");
+                        tvGoldChange.setText(String.format(Locale.US, "%.2f%%", changePercent));
+                        tvGoldChange.setTextColor(0xFFDC2626);
+                    } else {
+                        tvGoldTrend.setText("➡️");
+                        tvGoldChange.setText("0.00%");
+                        tvGoldChange.setTextColor(0xFF6B7280);
+                    }
+                });
             }
+            
             if (currentPrice > 0) {
                 offlineCache.edit().putFloat("gold_price_24k_prev", (float) currentPrice).apply();
             }
         } catch (Exception e) {
             logNonFatal("calculateTrend", e);
         }
-    }
-
-    private void loadOfflineData() {
-        try {
-            if (offlineCache == null) return;
-            setText(tvTotalItems, String.valueOf(offlineCache.getInt("total_items", 0)));
-            setText(tvTotalWeight, formatWeight(offlineCache.getFloat("total_weight", 0.0f)));
-            setText(tvSoldToday, String.valueOf(offlineCache.getInt("sold_today", 0)));
-            setText(tvSalesToday, formatCurrency(offlineCache.getFloat("sales_today", 0.0f)));
-            setText(tvSalesMonth, formatCurrency(offlineCache.getFloat("sales_month", 0.0f)));
-            setText(tvSalesYear, formatCurrency(offlineCache.getFloat("sales_year", 0.0f)));
-
-            if (priceManager != null) {
-                displayGoldPricesFromCache();
-            }
-        } catch (Exception e) {
-            logNonFatal("loadOfflineData", e);
-        }
-    }
+    });
+}
 
     private void saveOfflineData(JSONObject data) {
         try {
