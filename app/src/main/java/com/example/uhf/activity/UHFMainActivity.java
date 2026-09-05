@@ -751,7 +751,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         if (isFinishing() || isDestroyed() || fragment == null) return;
 
         try {
-            showLoading();
+           // showLoading();
             currentFragment = fragment;
             currentFragmentTag = tag;
 
