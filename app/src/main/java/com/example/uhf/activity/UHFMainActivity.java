@@ -1204,7 +1204,7 @@ private void loadFragmentDirectly(Fragment fragment, String tag) {
     }
 
     public void showLoading() {
-    mainHandler.post(() -> {
+   /* mainHandler.post(() -> {
         if (loadingOverlay != null && !isFinishing() && !isDestroyed()) {
             TextView tvTitle = loadingOverlay.findViewById(R.id.tvLoadingTitle);
             if (tvTitle != null) tvTitle.setText(isArabic ? "جاري التحميل..." : "Loading...");
@@ -1216,18 +1216,19 @@ private void loadFragmentDirectly(Fragment fragment, String tag) {
             // ✅ إخفاء تلقائي بعد 3 ثواني كحد أقصى
             mainHandler.postDelayed(this::hideLoading, 3000);
         }
-    });
+    });*/
+    
 }
 
 public void hideLoading() {
-    mainHandler.post(() -> {
+    /*mainHandler.post(() -> {
         if (loadingOverlay != null) {
             loadingOverlay.setVisibility(View.GONE);
             loadingOverlay.setAlpha(0.0f);
             loadingOverlay.setClickable(false);
             loadingOverlay.setFocusable(false);
         }
-    });
+    });*/
 }
 
     public void setActivePOSFragment(MiraPosFragment fragment) {
