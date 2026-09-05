@@ -17,7 +17,7 @@ import com.example.uhf.tools.ToastUtil;
 /**
  * Global Application base class for managing application configuration
  */
-public class AppContext extends Application implements Thread.UncaughtExceptionHandler {
+public class AppContext extends Application {
     private static final String TAG = "AppContext";
 
     public static final String DEFAULT_PATH = "/sdcard/uhf/";
@@ -40,7 +40,8 @@ public class AppContext extends Application implements Thread.UncaughtExceptionH
         mApp = this;
         
         initFirebase();
-        Thread.setDefaultUncaughtExceptionHandler(this);
+        // ❌ تم حذف Thread.setDefaultUncaughtExceptionHandler(this);
+        // ✅ سيتم تثبيت AppCrashHandler في MiraApplication
         ToastUtil.init(mApp);
         
         Log.d(TAG, "AppContext initialized successfully");
@@ -56,23 +57,6 @@ public class AppContext extends Application implements Thread.UncaughtExceptionH
             }
         } catch (Exception e) {
             Log.e(TAG, "Firebase initialization failed: " + e.getMessage());
-        }
-    }
-
-    @Override
-    public void uncaughtException(Thread thread, Throwable throwable) {
-        Log.e(TAG, "Uncaught Exception in thread " + thread.getName(), throwable);
-        
-        try {
-            FirebaseCrashlytics.getInstance().recordException(throwable);
-            FileUtils.saveCrashFile(throwable);
-            SystemClock.sleep(300);
-        } catch (Exception e) {
-            Log.e(TAG, "Error handling uncaught exception: " + e.getMessage());
-        } finally {
-            // إنهاء آمن وموثوق لعملية أندرويد بدون ترك أجزاء معلقة
-            Process.killProcess(Process.myPid());
-            System.exit(1);
         }
     }
 
