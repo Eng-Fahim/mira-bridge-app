@@ -762,7 +762,5 @@ public boolean isBiometricConfirmEnabled() {
     return userPrefs.getBoolean(KEY_BIOMETRIC_CONFIRM_ENABLED, false);
 }
 
-public void createLoginSession(String username, String role, String token, String serverUrl) {
-    createLoginSession(username, role, token, serverUrl, 86400 * 7);
-}
+
 }
