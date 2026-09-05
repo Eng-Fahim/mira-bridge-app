@@ -42,34 +42,41 @@ public class MiraRfidService {
         return instance;
     }
 private void detectAndInitializeReader() {
-    ChainwayReader chainwayReader = null;
-    try {
-        chainwayReader = new ChainwayReader(context);
-        if (chainwayReader.initialize() && chainwayReader.connect()) {
-            activeReader = chainwayReader;
-            isSimulationMode = false;
-            Log.i(TAG, "✅ تم الاتصال بالقارئ الحقيقي: Chainway");
-            return;
-        } else {
-            // ⚠️ تحرير الموارد فوراً إذا فشل الاتصال لمنع حجز المنفذ
-            chainwayReader.release();
-            chainwayReader = null;
+    // ✅ استخدام خيط منفصل للاتصال
+    Thread detectThread = new Thread(() -> {
+        ChainwayReader chainwayReader = null;
+        try {
+            chainwayReader = new ChainwayReader(context);
+            if (chainwayReader.initialize() && chainwayReader.connect()) {
+                activeReader = chainwayReader;
+                isSimulationMode = false;
+                Log.i(TAG, "✅ تم الاتصال بالقارئ الحقيقي: Chainway");
+                return;
+            } else {
+                if (chainwayReader != null) {
+                    chainwayReader.release();
+                    chainwayReader = null;
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "فشل الاتصال بالقارئ الحقيقي: " + e.getMessage());
+            if (chainwayReader != null) {
+                try { chainwayReader.release(); } catch (Exception ignored) {}
+            }
         }
-    } catch (Exception e) {
-        Log.w(TAG, "فشل الاتصال بالقارئ الحقيقي: " + e.getMessage());
-        if (chainwayReader != null) {
-            try { chainwayReader.release(); } catch (Exception ignored) {}
-            chainwayReader = null;
-        }
-    }
+        
+        // ✅ التوجه للمحاكاة
+        SimulatorReader simulatorReader = new SimulatorReader(context);
+        simulatorReader.initialize();
+        simulatorReader.connect();
+        activeReader = simulatorReader;
+        isSimulationMode = true;
+        Log.i(TAG, "🔬 تم التفعيل في وضع المحاكاة");
+    });
     
-    // التوجه بثبات وسلامة إلى وضع المحاكاة
-    SimulatorReader simulatorReader = new SimulatorReader(context);
-    simulatorReader.initialize();
-    simulatorReader.connect();
-    activeReader = simulatorReader;
-    isSimulationMode = true;
-    Log.i(TAG, "🔬 تم التفعيل في وضع المحاكاة");
+    detectThread.setName("RFID-Detector");
+    detectThread.setDaemon(true);
+    detectThread.start();
 }
 
 public void release() {
