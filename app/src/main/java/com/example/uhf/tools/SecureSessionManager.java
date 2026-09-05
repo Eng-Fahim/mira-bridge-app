@@ -760,4 +760,42 @@ public class SecureSessionManager {
                 ", hasApiKey=" + hasApiKey() +
                 ", serverUrl=" + getServerUrl();
     }
+    
+        /**
+     * مسح التوكن نهائياً (للاستخدام عند 401)
+     */
+    public void clearAuthToken() {
+        try {
+            securePrefs.edit()
+                    .remove(KEY_AUTH_TOKEN)
+                    .remove(KEY_TOKEN_EXPIRY)
+                    .apply();
+            Log.d(TAG, "Auth token cleared permanently");
+        } catch (Exception e) {
+            Log.e(TAG, "clearAuthToken error: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * مسح جميع بيانات الجلسة بما فيها التوكن
+     */
+    public void clearSessionCompletely() {
+        try {
+            securePrefs.edit()
+                    .remove(KEY_AUTH_TOKEN)
+                    .remove(KEY_TOKEN_EXPIRY)
+                    .remove(KEY_REFRESH_TOKEN)
+                    .apply();
+            
+            userPrefs.edit()
+                    .remove(KEY_IS_LOGGED_IN)
+                    .remove(KEY_USERNAME)
+                    .remove(KEY_USER_ROLE)
+                    .apply();
+            
+            Log.d(TAG, "Session cleared completely");
+        } catch (Exception e) {
+            Log.e(TAG, "clearSessionCompletely error: " + e.getMessage());
+        }
+    }
 }
