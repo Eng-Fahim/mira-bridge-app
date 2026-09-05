@@ -187,20 +187,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         super.onCreate(savedInstanceState);
 
         try {
-            // 1. التحقق من الجلسة أولاً
             sessionManager = new SessionManager(getApplicationContext());
             if (!sessionManager.isLoggedIn()) {
                 navigateToLogin();
                 return;
             }
 
-            // 2. ضبط الوضع الليلي
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
 
-            // 3. ربط التخطيط
             setContentView(R.layout.activity_main);
 
-            // 4. تهيئة الخدمات والمدراء
             ToastUtil.init(getApplicationContext());
             initializeLanguageState();
 
@@ -210,7 +206,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 lastActiveBranchId = branchesManager.getActiveBranchId();
             }
 
-            // 5. تهيئة عناصر UI
             loadingOverlay = findViewById(R.id.loading_overlay);
             fragmentManager = getSupportFragmentManager();
 
@@ -228,7 +223,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
             }
 
-            // 6. الأذونات والعتاد
             checkReadWritePermission();
             mainHandler.postDelayed(() -> {
                 if (!isFinishing() && !isDestroyed()) {
@@ -243,7 +237,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
             loadEssentialData();
 
-            // 7. إدارة التنقل والـ Fragments
             if (savedInstanceState == null) {
                 currentFragmentTag = "Dashboard";
             } else {
@@ -262,15 +255,12 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         super.onConfigurationChanged(newConfig);
         
         try {
-            // تحديث حالة اللغة
             isArabic = newConfig.locale.getLanguage().equals("ar");
             
-            // تحديث اتجاه التخطيط
             getWindow().getDecorView().setLayoutDirection(
                     isArabic ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR
             );
             
-            // تحديث عناصر الواجهة
             updateBottomNavLanguage();
             updateToolbarTitle();
             
@@ -365,8 +355,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Save fragment tag error: " + e.getMessage());
         }
     }
-
-    // ==================== TOOLBAR MENU ====================
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -494,8 +482,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 .show();
     }
 
-    // ==================== NAV SYSTEM & FRAGMENT MANAGEMENT ====================
-
     private void setupQuickNav() {
         try {
             BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
@@ -515,11 +501,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
                 quickNav.setOnItemSelectedListener(item -> {
                     int id = item.getItemId();
-
-                    if (id == R.id.nav_placeholder) {
-                        showQuickActionMenu();
-                        return false;
-                    }
 
                     String fragmentTag = getFragmentTagForNavItem(id);
                     if (fragmentTag.isEmpty()) {
@@ -576,15 +557,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         MenuItem navTransfers = menu.findItem(R.id.nav_transfers);
         if (navTransfers != null) navTransfers.setVisible(pm.canViewTransfers());
-
-        MenuItem navPlaceholder = menu.findItem(R.id.nav_placeholder);
-        if (navPlaceholder != null) {
-            int visibleCount = 0;
-            for (int i = 0; i < menu.size(); i++) {
-                if (menu.getItem(i).isVisible()) visibleCount++;
-            }
-            navPlaceholder.setVisible(visibleCount >= 3);
-        }
     }
 
     private String getFragmentTagForNavItem(int itemId) {
@@ -688,8 +660,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
         }
     }
-
-    // ==================== FRAGMENT MANAGEMENT ====================
 
     public void loadFragment(Fragment fragment, String tag) {
         loadFragment(fragment, tag, true);
@@ -889,8 +859,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 .show();
     }
 
-    // ==================== LEGACY COMPATIBILITY METHODS ====================
-
     public void startUHFScan() {
         try {
             loopFlag = true;
@@ -941,8 +909,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }, 10);
     }
 
-    // ==================== INVENTORY LOCK PROTECTION ====================
-
     public boolean isInventoryActive() {
         if (currentFragment instanceof MiraInventoryProFragment && currentFragment.isVisible()) {
             return ((MiraInventoryProFragment) currentFragment).isScanning();
@@ -987,8 +953,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Error stopping inventory: " + e.getMessage());
         }
     }
-
-    // ==================== BACK BUTTON HANDLING ====================
 
     @Override
     public void onBackPressed() {
@@ -1065,8 +1029,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         return super.onKeyDown(keyCode, event);
     }
 
-    // ==================== RFID & HARDWARE LISTENERS ====================
-
     public void onTagRead(String epc) {
         try {
             if (activeEncodingFragment != null && activeEncodingFragment.isAdded()) {
@@ -1088,8 +1050,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, "Tag Read Processing Error: " + e.getMessage());
         }
     }
-
-    // ==================== SYSTEM & TOOLBAR HELPERS ====================
 
     private void updateBottomNavLanguage() {
         try {
@@ -1250,10 +1210,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
     @Override
     protected void onDestroy() {
         try {
-            // 1. إيقاف المسح الفعال فوراً
             stopActiveInventory();
 
-            // 2. إغلاق موارد الصوت
             if (soundPool != null) {
                 try {
                     soundPool.release();
@@ -1264,7 +1222,6 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             }
             audioManager = null;
             
-            // 3. تنظيف إدارة الجلسات والمستمعين
             if (fragmentManager != null) {
                 try {
                     clearBackStack();
@@ -1287,12 +1244,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 Log.e(TAG, "Session monitor stop error: " + e.getMessage());
             }
 
-            // 4. تنظيف المراجع
             activePOSFragment = null;
             activeEncodingFragment = null;
             activeRfidListener = null;
             
-            // 5. مسح data structures
             if (tagList != null) {
                 tagList.clear();
                 tagList = null;
@@ -1312,4 +1267,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, errorMessage + ": " + e.getMessage());
         }
     }
-                }
+}
