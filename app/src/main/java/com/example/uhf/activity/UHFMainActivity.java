@@ -70,7 +70,7 @@ import com.example.uhf.tools.MiraLanguageHelper;
 import com.example.uhf.tools.SessionManager;
 import com.example.uhf.tools.ToastUtil;
 import com.google.android.material.appbar.MaterialToolbar;
-import com.google.android.material.bottomappbar.BottomAppBar;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -498,7 +498,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private void setupQuickNav() {
         try {
-            BottomAppBar bottomAppBar = findViewById(R.id.bottomAppBar);
+            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
             FloatingActionButton fabActionCenter = findViewById(R.id.fabActionCenter);
 
             PermissionManager pm = PermissionManager.getInstance(getApplicationContext());
@@ -510,11 +510,16 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
                 fabActionCenter.setOnClickListener(v -> showQuickActionMenu());
             }
 
-            if (bottomAppBar != null) {
-                applyBottomNavPermissions(bottomAppBar, pm);
+            if (quickNav != null) {
+                applyBottomNavPermissions(quickNav, pm);
 
-                bottomAppBar.setOnItemSelectedListener(item -> {
+                quickNav.setOnItemSelectedListener(item -> {
                     int id = item.getItemId();
+
+                    if (id == R.id.nav_placeholder) {
+                        showQuickActionMenu();
+                        return false;
+                    }
 
                     String fragmentTag = getFragmentTagForNavItem(id);
                     if (fragmentTag.isEmpty()) {
@@ -557,8 +562,8 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         }
     }
 
-    private void applyBottomNavPermissions(BottomAppBar bottomAppBar, PermissionManager pm) {
-        Menu menu = bottomAppBar.getMenu();
+    private void applyBottomNavPermissions(BottomNavigationView quickNav, PermissionManager pm) {
+        Menu menu = quickNav.getMenu();
 
         MenuItem navHome = menu.findItem(R.id.nav_home);
         if (navHome != null) navHome.setVisible(pm.canViewDashboard());
@@ -571,6 +576,15 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
         MenuItem navTransfers = menu.findItem(R.id.nav_transfers);
         if (navTransfers != null) navTransfers.setVisible(pm.canViewTransfers());
+
+        MenuItem navPlaceholder = menu.findItem(R.id.nav_placeholder);
+        if (navPlaceholder != null) {
+            int visibleCount = 0;
+            for (int i = 0; i < menu.size(); i++) {
+                if (menu.getItem(i).isVisible()) visibleCount++;
+            }
+            navPlaceholder.setVisible(visibleCount >= 3);
+        }
     }
 
     private String getFragmentTagForNavItem(int itemId) {
@@ -799,10 +813,10 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private void updateBottomNavSelectionByTag(String tag) {
         try {
-            BottomAppBar bottomAppBar = findViewById(R.id.bottomAppBar);
-            if (bottomAppBar == null || tag == null) return;
+            BottomNavigationView quickNav = findViewById(R.id.bottomNavigationView);
+            if (quickNav == null || tag == null) return;
 
-            Menu menu = bottomAppBar.getMenu();
+            Menu menu = quickNav.getMenu();
             if (tag.equals("Dashboard")) {
                 menu.findItem(R.id.nav_home).setChecked(true);
             } else if (tag.equals("Scan")) {
@@ -1079,9 +1093,9 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
 
     private void updateBottomNavLanguage() {
         try {
-            BottomAppBar bottomAppBar = findViewById(R.id.bottomAppBar);
-            if (bottomAppBar != null && bottomAppBar.getMenu() != null) {
-                Menu menu = bottomAppBar.getMenu();
+            BottomNavigationView nav = findViewById(R.id.bottomNavigationView);
+            if (nav != null && nav.getMenu() != null) {
+                Menu menu = nav.getMenu();
 
                 MenuItem home = menu.findItem(R.id.nav_home);
                 if (home != null) home.setTitle(isArabic ? "الرئيسية" : "Home");
@@ -1104,26 +1118,13 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         if (loadingOverlay != null && !isFinishing() && !isDestroyed()) {
             TextView tvTitle = loadingOverlay.findViewById(R.id.tvLoadingTitle);
             if (tvTitle != null) tvTitle.setText(isArabic ? "جاري التحميل..." : "Loading...");
-            
             loadingOverlay.setVisibility(View.VISIBLE);
-            loadingOverlay.animate()
-                    .alpha(1.0f)
-                    .setDuration(200)
-                    .start();
         }
     }
 
     public void hideLoading() {
         if (loadingOverlay != null && !isFinishing() && !isDestroyed()) {
-            loadingOverlay.animate()
-                    .alpha(0.0f)
-                    .setDuration(200)
-                    .withEndAction(() -> {
-                        if (!isFinishing() && !isDestroyed()) {
-                            loadingOverlay.setVisibility(View.GONE);
-                        }
-                    })
-                    .start();
+            loadingOverlay.setVisibility(View.GONE);
         }
     }
 
@@ -1311,4 +1312,4 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
             Log.e(TAG, errorMessage + ": " + e.getMessage());
         }
     }
-}
+                }
