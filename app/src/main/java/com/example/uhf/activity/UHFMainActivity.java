@@ -184,7 +184,7 @@ public class UHFMainActivity extends BaseTabFragmentActivity {
         super.attachBaseContext(newBase);
     }
 
-    @Override
+   @Override
 protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
 
@@ -196,19 +196,8 @@ protected void onCreate(Bundle savedInstanceState) {
         }
 
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
-
         setContentView(R.layout.activity_main);
 
-        // ✅ إخفاء loading_overlay فوراً بعد setContentView
-        //loadingOverlay = findViewById(R.id.loading_overlay);
-        if (loadingOverlay != null) {
-            loadingOverlay.setVisibility(View.GONE);
-            loadingOverlay.setAlpha(0.0f);
-            loadingOverlay.setClickable(false);
-            loadingOverlay.setFocusable(false);
-        }
-
-        // بدء مراقبة التجمد
         AppWatchdog.getInstance().startMonitoring(() -> {
             Log.e(TAG, "🚨 UI Thread FROZEN! Restarting app...");
             MiraApplication.getInstance().restartApp();
@@ -217,16 +206,15 @@ protected void onCreate(Bundle savedInstanceState) {
         ToastUtil.init(getApplicationContext());
         initializeLanguageState();
 
-        SessionMonitorManager.getInstance(this).startMonitoring(this);
+        // ✅ لا حاجة لـ SessionMonitorManager للاختبار
+        // SessionMonitorManager.getInstance(this).startMonitoring(this);
+        
         branchesManager = MiraBranchesManager.getInstance(getApplicationContext());
-        if (branchesManager != null) {
-            lastActiveBranchId = branchesManager.getActiveBranchId();
-        }
-
         fragmentManager = getSupportFragmentManager();
 
-        setupOrgProfileListener();
-        updateBottomNavLanguage();
+        // ✅ لا حاجة لـ setupOrgProfileListener للاختبار
+        // setupOrgProfileListener();
+        // updateBottomNavLanguage();
 
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
@@ -234,43 +222,27 @@ protected void onCreate(Bundle savedInstanceState) {
             updateToolbarTitle();
         }
 
-        View btnHardwareStatus = findViewById(R.id.btnHardwareStatus);
-        if (btnHardwareStatus != null) {
-            btnHardwareStatus.setOnClickListener(v -> showHardwareOptionsDialog());
+        // ✅ لا حاجة لـ setupQuickNav للاختبار
+        // setupQuickNav();
+        // setupRestartButton();
+
+        // ✅ اختبار بدون Fragment نهائياً
+        FrameLayout container = findViewById(R.id.fragment_container);
+        if (container != null) {
+            TextView testView = new TextView(this);
+            testView.setText("✅ MainActivity يعمل!\n\nلا يوجد Fragment هنا.\nالواجهة تعمل بشكل طبيعي.\n\nإذا رأيت هذا النص الأخضر،\nفالمشكلة كانت في Fragment.");
+            testView.setTextSize(22);
+            testView.setTextColor(0xFF16A34A);
+            testView.setGravity(android.view.Gravity.CENTER);
+            testView.setPadding(32, 32, 32, 32);
+            testView.setBackgroundColor(0xFFFFFFFF);
+            container.addView(testView);
+            
+            Log.d(TAG, "✅ Test view added directly without Fragment");
         }
-
-        checkReadWritePermission();
-        mainHandler.postDelayed(() -> {
-            if (!isFinishing() && !isDestroyed()) {
-                safeExecute(this::initSound, "Sound Init Error");
-                if (BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
-                    safeExecute(this::initUHF, "UHF Hardware Init Error");
-                    safeExecute(this::configureReaderForDevice, "Reader Configuration Error");
-                }
-            }
-        }, 500);
-
-        PermissionManager.resetInstance();
-        setupQuickNav();
-        setupRestartButton();
-
-        loadEssentialData();
-
-        if (savedInstanceState == null) {
-            currentFragmentTag = "Dashboard";
-        } else {
-            currentFragmentTag = savedInstanceState.getString("current_fragment", "Dashboard");
-        }
-
-        // ✅ تحميل الـ Fragment مباشرة
-        loadFragmentDirectly(createFragmentByTag(currentFragmentTag), currentFragmentTag);
 
     } catch (Exception e) {
         Log.e(TAG, "Fatal error in onCreate: " + e.getMessage(), e);
-        // ✅ محاولة أخيرة
-        try {
-            loadFragmentDirectly(new MiraDashboardFragment(), "Dashboard");
-        } catch (Exception ignored) {}
     }
 }
 
