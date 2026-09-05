@@ -654,11 +654,17 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
 
     private void fetchData() {
     try {
-        // ✅ تتبع
         FirebaseDiagnostics.log("API", "Dashboard fetchData started", 
             "branchId=" + (branchesManager != null ? branchesManager.getActiveBranchId() : -1));
         
         if (isLoading.get() || apiClient == null || !isAdded()) return;
+
+        // ✅ فحص التوكن قبل الطلب
+        if (sessionManager == null || !sessionManager.isLoggedIn() || !sessionManager.hasValidToken()) {
+            Log.w(TAG, "Token invalid, redirecting to login");
+            redirectToLogin();
+            return;
+        }
 
         long now = System.currentTimeMillis();
         if (now - lastDataFetchTime < 2000 && isDataLoaded) return;
@@ -682,8 +688,14 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
                     lastDataFetchTime = System.currentTimeMillis();
                     if (!isAdded()) return;
 
+                    // ✅ معالجة خاصة للـ 401
+                    if (response != null && response.code == 401) {
+                        FirebaseDiagnostics.logApiCall("getDashboardFull", 401, false, "Token expired");
+                        handleTokenExpired();
+                        return;
+                    }
+
                     if (response != null && response.isSuccess && response.data != null) {
-                        // ✅ نجاح API
                         FirebaseDiagnostics.logApiCall("getDashboardFull", response.code, true, "Success");
                         
                         saveOfflineData(response.data);
@@ -693,17 +705,19 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
                         updateLiveStatusText(true);
                         clearCrashlyticsCustomKeys();
                         
-                        // إخفاء الشيمر والإنعاش فقط عند النجاح
                         showShimmer(false);
                         if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
                     } else {
-                        // ✅ فشل API
                         FirebaseDiagnostics.logApiCall("getDashboardFull", 
                             response != null ? response.code : -1, 
                             false, 
                             "Failed");
                         
-                        logNonFatal("fetchData.response", new Exception("Dashboard API Failed - code=" + (response != null ? response.code : -1)));
+                        // ✅ لا تسجل الـ 401 كخطأ fatal
+                        if (response == null || response.code != 401) {
+                            logNonFatal("fetchData.response", new Exception("Dashboard API Failed - code=" + (response != null ? response.code : -1)));
+                        }
+                        
                         updateLiveStatusText(false);
                         
                         // جلب البيانات احتياطياً
@@ -738,6 +752,55 @@ private BroadcastReceiver dataRefreshReceiver = new BroadcastReceiver() {
         FirebaseDiagnostics.logError("MiraDashboardFragment.fetchData", e);
         logNonFatal("fetchData", e);
         isLoading.set(false);
+    }
+}
+
+// ✅ دالة جديدة لمعالجة انتهاء التوكن
+private void handleTokenExpired() {
+    try {
+        Log.w(TAG, "Token expired, redirecting to login");
+        
+        // تسجيل الخروج
+        if (sessionManager != null) {
+            sessionManager.logoutUser();
+        }
+        
+        // إيقاف التحميل
+        isLoading.set(false);
+        showShimmer(false);
+        if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
+        
+        // عرض رسالة
+        if (isAdded() && getContext() != null) {
+            Toast.makeText(getContext(), 
+                isArabic ? "انتهت صلاحية الجلسة - سجل الدخول مجدداً" : "Session expired - Please sign in again", 
+                Toast.LENGTH_LONG).show();
+        }
+        
+        // التوجيه لشاشة تسجيل الدخول
+        if (isAdded() && getActivity() != null) {
+            Intent intent = new Intent(getActivity(), com.example.uhf.activity.LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            getActivity().finish();
+        }
+        
+    } catch (Exception e) {
+        Log.e(TAG, "handleTokenExpired error: " + e.getMessage());
+    }
+}
+
+// ✅ دالة مساعدة للتوجيه لتسجيل الدخول
+private void redirectToLogin() {
+    try {
+        if (isAdded() && getActivity() != null) {
+            Intent intent = new Intent(getActivity(), com.example.uhf.activity.LoginActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            getActivity().finish();
+        }
+    } catch (Exception e) {
+        Log.e(TAG, "redirectToLogin error: " + e.getMessage());
     }
 }
     private void fetchInventoryDataDirectly(int branchId) {
