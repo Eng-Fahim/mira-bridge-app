@@ -849,12 +849,45 @@ private void showPendingSalesDetailsBeforeSync() {
 }
 
 /**
+ * ✅ التحقق الشامل من تكرار القطعة في السلة
+ * يفحص EPC و Serial و GTIN معاً
+ */
+private boolean isItemAlreadyInCart(String epc, String serialNo, String gtin) {
+    synchronized (cartList) {
+        for (CartItem item : cartList) {
+            // ✅ فحص EPC
+            if (item.epc != null && epc != null && item.epc.equalsIgnoreCase(epc)) {
+                return true;
+            }
+            
+            // ✅ فحص Serial Number
+            if (item.serialNo != null && serialNo != null && !serialNo.isEmpty() 
+                && item.serialNo.equalsIgnoreCase(serialNo)) {
+                return true;
+            }
+            
+            // ✅ فحص GTIN
+            if (item.gtin != null && gtin != null && !gtin.isEmpty() 
+                && item.gtin.equalsIgnoreCase(gtin)) {
+                return true;
+            }
+            
+            // ✅ فحص إضافي: أي تطابق جزئي
+            if (item.epc != null && epc != null 
+                && (item.epc.contains(epc) || epc.contains(item.epc))) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
  * ✅ تحليل استجابة القطعة - معدلة للعمل مع JSONObject مباشرة
  */
 private void parseItemResponse(String code, JSONObject data) {
     try {
         JSONObject item;
-        
         if (data.has("item")) {
             item = data.optJSONObject("item");
         } else {
@@ -868,7 +901,6 @@ private void parseItemResponse(String code, JSONObject data) {
         
         String vaultStatus = item.optString("status", item.optString("vault_status", "")).toLowerCase();
         
-        // ✅✅✅ فحص: إذا كانت القطعة مباعة
         if ("sold".equals(vaultStatus) || "exited".equals(vaultStatus)) {
             safeRun(() -> {
                 dismissSearchLoadingDialog();
@@ -880,9 +912,6 @@ private void parseItemResponse(String code, JSONObject data) {
                 );
                 playAlertSound(2);
             });
-            
-           
-            
             return;
         }
         
@@ -897,12 +926,21 @@ private void parseItemResponse(String code, JSONObject data) {
         }
         
         CartItem cartItem = new CartItem(code, title, karat, weight, liveScaleWeight, price, isAvailable, vaultStatus.toUpperCase());
-        cartItem.serialNo = item.optString("serial", item.optString("serial_number", code));
+        cartItem.serialNo = item.optString("serial", item.optString("serial_number", ""));
         cartItem.gtin = item.optString("gtin", item.optString("gtin13", ""));
         cartItem.location = item.optString("location", item.optString("current_location", ""));
         cartItem.itemId = item.optInt("id", item.optInt("item_id", 0));
         
+        // ✅✅✅ **الفحص الشامل الجديد**
+        boolean alreadyInCart = isItemAlreadyInCart(cartItem.epc, cartItem.serialNo, cartItem.gtin);
+        
         safeRun(() -> {
+            if (alreadyInCart) {
+                showToast(isArabic ? "⚠️ هذه القطعة مضافة مسبقاً!" : "⚠️ Item already in cart!");
+                playAlertSound(2);
+                return;
+            }
+            
             if (!isAvailable) {
                 showSuccessMessage(
                     isArabic ? "❌ قطعة غير متاحة" : "❌ Item Unavailable",
@@ -913,7 +951,15 @@ private void parseItemResponse(String code, JSONObject data) {
                 return;
             }
             
+            // ✅✅✅ إضافة جميع المعرفات إلى scannedEpcs
             scannedEpcs.add(code);
+            if (cartItem.serialNo != null && !cartItem.serialNo.isEmpty()) {
+                scannedEpcs.add(cartItem.serialNo);
+            }
+            if (cartItem.gtin != null && !cartItem.gtin.isEmpty()) {
+                scannedEpcs.add(cartItem.gtin);
+            }
+            
             cartList.add(0, cartItem);
             if (cartAdapter != null) cartAdapter.notifyItemInserted(0);
             if (rvCartItems != null) rvCartItems.scrollToPosition(0);
@@ -925,7 +971,6 @@ private void parseItemResponse(String code, JSONObject data) {
         handleItemNotFound(code);
     }
 }
-
     private void showSearchLoadingDialog(String code) {
     try {
         Context ctx = getContext();
@@ -1100,31 +1145,41 @@ private void parseItemResponse(String code, JSONObject data) {
     }
 
     private void removeItemFromCart(int pos) {
-        try {
-            if (pos >= 0 && pos < cartList.size()) {
-                scannedEpcs.remove(cartList.get(pos).epc);
-                cartList.remove(pos);
-                if (cartAdapter != null) cartAdapter.notifyItemRemoved(pos);
-                updateCartSummary();
+    try {
+        if (pos >= 0 && pos < cartList.size()) {
+            CartItem item = cartList.get(pos);
+            
+            // ✅✅✅ إزالة جميع المعرفات
+            scannedEpcs.remove(item.epc);
+            if (item.serialNo != null && !item.serialNo.isEmpty()) {
+                scannedEpcs.remove(item.serialNo);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "removeItemFromCart error: " + e.getMessage());
+            if (item.gtin != null && !item.gtin.isEmpty()) {
+                scannedEpcs.remove(item.gtin);
+            }
+            
+            cartList.remove(pos);
+            if (cartAdapter != null) cartAdapter.notifyItemRemoved(pos);
+            updateCartSummary();
         }
+    } catch (Exception e) {
+        Log.e(TAG, "removeItemFromCart error: " + e.getMessage());
     }
+}
 
     private void clearCart() {
-        try {
-            int size = cartList.size();
-            if (size > 0) {
-                cartList.clear();
-                scannedEpcs.clear();
-                if (cartAdapter != null) cartAdapter.notifyItemRangeRemoved(0, size);
-                updateCartSummary();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "clearCart error: " + e.getMessage());
+    try {
+        int size = cartList.size();
+        if (size > 0) {
+            cartList.clear();
+            scannedEpcs.clear();
+            if (cartAdapter != null) cartAdapter.notifyItemRangeRemoved(0, size);
+            updateCartSummary();
         }
+    } catch (Exception e) {
+        Log.e(TAG, "clearCart error: " + e.getMessage());
     }
+}
 
     private double getCartTotal() {
         double t = 0;
