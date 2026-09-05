@@ -28,10 +28,11 @@ public class MiraApplication extends AppContext {
     
     @Override
     public void onCreate() {
-        super.onCreate(); // يقوم بتأكيد mApp وإعداد AppContext
+        super.onCreate(); // ✅ يستدعي AppContext.onCreate() بدون معالج
+        
         instance = this;
         
-        // ✅ تثبيت معالج الأخطاء غير المتوقعة
+        // ✅ تثبيت معالج الأخطاء هنا - مرة واحدة فقط
         Thread.setDefaultUncaughtExceptionHandler(new AppCrashHandler(this));
         
         FirebaseDiagnostics.init(this);
@@ -43,6 +44,7 @@ public class MiraApplication extends AppContext {
         
         Log.d(TAG, "MiraApplication initialized successfully");
     }
+
     
     private void logDeviceInfo() {
         try {
