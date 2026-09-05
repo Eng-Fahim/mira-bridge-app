@@ -59,31 +59,30 @@
 
     </LinearLayout>
 
-    <!-- الشريط السفلي مع FAB مدمج -->
-    <com.google.android.material.bottomappbar.BottomAppBar
-        android:id="@+id/bottomAppBar"
+    <!-- الشريط السفلي -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNavigationView"
         android:layout_width="match_parent"
         android:layout_height="68dp"
         android:layout_gravity="bottom"
         android:background="?attr/colorSurface"
-        app:fabAlignmentMode="center"
-        app:fabCradleMargin="10dp"
-        app:fabCradleRoundedCornerRadius="20dp"
-        app:fabCradleVerticalOffset="10dp"
-        app:menu="@menu/bottom_nav_menu"
+        android:elevation="12dp"
+        app:elevation="12dp"
         app:itemActiveIndicatorStyle="@style/CustomActiveIndicator"
         app:itemIconSize="22dp"
         app:itemIconTint="@color/nav_item_color_selector"
         app:itemRippleColor="?attr/colorPrimary"
         app:itemTextColor="@color/nav_item_color_selector"
-        app:labelVisibilityMode="labeled" />
+        app:labelVisibilityMode="labeled"
+        app:menu="@menu/bottom_nav_menu" />
 
-    <!-- الزر العائم المدمج مع BottomAppBar -->
+    <!-- الزر العائم -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabActionCenter"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="44dp"
         android:contentDescription="@string/nav_actions"
         app:backgroundTint="?attr/colorPrimary"
         app:strokeColor="?attr/colorSurface"
