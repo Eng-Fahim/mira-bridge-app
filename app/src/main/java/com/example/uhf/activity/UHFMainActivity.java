@@ -733,15 +733,19 @@ public void onPause() {
     public void loadFragment(Fragment fragment, String tag) {
         loadFragment(fragment, tag, true);
     }
+public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
+    if (isFinishing() || isDestroyed() || fragment == null) return;
 
-    public void loadFragment(Fragment fragment, String tag, boolean addToBackStack) {
-        if (isFinishing() || isDestroyed() || fragment == null) return;
-
-        try {
-            showLoading();
-            currentFragment = fragment;
-            currentFragmentTag = tag;
-            saveFragmentTagToPrefs(tag);
+    try {
+        // ❌ لا تستدعي saveFragmentTagToPrefs في كل مرة
+        // saveFragmentTagToPrefs(tag);
+        
+        showLoading();
+        currentFragment = fragment;
+        currentFragmentTag = tag;
+        // ✅ احفظ فقط في onPause أو onDestroy
+        // saveFragmentTagToPrefs(tag);
+        
 
             if (!addToBackStack) {
                 clearBackStack();
@@ -1376,4 +1380,4 @@ protected void onDestroy() {
             Log.e(TAG, errorMessage + ": " + e.getMessage());
         }
     }
-}
+        }
