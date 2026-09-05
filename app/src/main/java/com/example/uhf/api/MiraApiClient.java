@@ -647,6 +647,32 @@ public class MiraApiClient {
         } catch (Exception ignored) {}
         return postWithAuth("/pos/refund", payload);
     }
+    
+    
+
+// ==========================================
+// ✅ REFUND EXTENSIONS (إضافات المرتجعات)
+// ==========================================
+
+public ApiResponse checkRefundEligibility(JSONObject payload) {
+    try {
+        return postWithAuth("/pos/check-refund", payload);
+    } catch (Exception e) {
+        Log.e(TAG, "checkRefundEligibility error: " + e.getMessage());
+        return new ApiResponse(-1, null, e.getMessage());
+    }
+}
+
+public ApiResponse processRefund(JSONObject payload) {
+    try {
+        return postWithAuth("/pos/refund", payload);
+    } catch (Exception e) {
+        Log.e(TAG, "processRefund error: " + e.getMessage());
+        return new ApiResponse(-1, null, e.getMessage());
+    }
+}
+
+
 
     public ApiResponse getSalesHistory() {
         return getWithAuth("/pos/sales");
