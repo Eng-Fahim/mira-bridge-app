@@ -29,8 +29,7 @@ public abstract class MiraDatabase extends RoomDatabase {
                         MiraDatabase.class,
                         "mira_database.db"
                     )
-                    .fallbackToDestructiveMigration() // للتطوير فقط - يجب تغييره للإنتاج
-                    .build();
+                    .build();  // ✅ بدون fallbackToDestructiveMigration
                 }
             }
         }
