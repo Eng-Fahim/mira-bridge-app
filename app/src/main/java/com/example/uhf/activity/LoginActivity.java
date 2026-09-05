@@ -791,6 +791,7 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void setupBiometric() {
+    try {
         boolean biometricEnabled = sessionManager.isBiometricLoginEnabled();
         if (!biometricEnabled) {
             if (btnBiometric != null) btnBiometric.setVisibility(View.GONE);
@@ -864,31 +865,86 @@ public class LoginActivity extends AppCompatActivity {
             }
         });
 
-        promptInfo = new BiometricPrompt.PromptInfo.Builder()
-                .setTitle(isArabic ? "تسجيل الدخول الحيوي" : "Biometric Sign In")
-                .setSubtitle(isArabic ? "استخدم بصمة الإصبع" : "Use fingerprint")
-                .setNegativeButtonText(isArabic ? "إلغاء" : "Cancel")
-                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-                .build();
+        // ✅ الإصلاح الأساسي: استخدام نصوص ثابتة ومضمونة
+        String biometricTitle;
+        String biometricSubtitle;
+        String negativeButtonText;
+        
+        if (isArabic) {
+            biometricTitle = "تسجيل الدخول الحيوي";
+            biometricSubtitle = "استخدم بصمة الإصبع";
+            negativeButtonText = "إلغاء";
+        } else {
+            biometricTitle = "Biometric Sign In";
+            biometricSubtitle = "Use fingerprint";
+            negativeButtonText = "Cancel";
+        }
+        
+        // ✅ فحص إضافي للتأكد من عدم وجود نصوص فارغة أو null
+        if (biometricTitle == null || biometricTitle.trim().isEmpty()) {
+            biometricTitle = "Biometric Sign In";
+        }
+        if (biometricSubtitle == null || biometricSubtitle.trim().isEmpty()) {
+            biometricSubtitle = "Use fingerprint";
+        }
+        if (negativeButtonText == null || negativeButtonText.trim().isEmpty()) {
+            negativeButtonText = "Cancel";
+        }
+
+        // ✅ بناء PromptInfo مع النصوص الصحيحة
+        BiometricPrompt.PromptInfo.Builder promptBuilder = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle(biometricTitle)
+                .setSubtitle(biometricSubtitle)
+                .setNegativeButtonText(negativeButtonText);
+
+        // ✅ إضافة allowedAuthenticators فقط إذا كان مدعوماً (Android 11+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            promptBuilder.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG);
+        }
+
+        promptInfo = promptBuilder.build();
 
         if (btnBiometric != null) {
+            btnBiometric.setVisibility(View.VISIBLE);
             btnBiometric.setOnClickListener(v -> {
-                if (!sessionManager.isBiometricLoginEnabled()) {
-                    Toast.makeText(this, isArabic ? "البصمة معطلة" : "Biometric disabled", Toast.LENGTH_LONG).show();
-                    return;
-                }
+                try {
+                    if (!sessionManager.isBiometricLoginEnabled()) {
+                        Toast.makeText(this, isArabic ? "البصمة معطلة" : "Biometric disabled", Toast.LENGTH_LONG).show();
+                        return;
+                    }
 
-                if (!sessionManager.getLastBiometricUser().isEmpty() || sessionManager.isLoggedIn()) {
-                    biometricPrompt.authenticate(promptInfo);
-                } else {
-                    playTone(false);
-                    Toast.makeText(this,
-                            isArabic ? "سجل الدخول بكلمة المرور أولاً لتفعيل البصمة" : "Sign in with password first",
-                            Toast.LENGTH_LONG).show();
+                    if (!sessionManager.getLastBiometricUser().isEmpty() || sessionManager.isLoggedIn()) {
+                        if (biometricPrompt != null && promptInfo != null) {
+                            biometricPrompt.authenticate(promptInfo);
+                        } else {
+                            Toast.makeText(this, 
+                                isArabic ? "البصمة غير متاحة حالياً" : "Biometric not available", 
+                                Toast.LENGTH_SHORT).show();
+                        }
+                    } else {
+                        playTone(false);
+                        Toast.makeText(this,
+                                isArabic ? "سجل الدخول بكلمة المرور أولاً لتفعيل البصمة" : "Sign in with password first",
+                                Toast.LENGTH_LONG).show();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Biometric authenticate error: " + e.getMessage(), e);
+                    Toast.makeText(this, 
+                        isArabic ? "خطأ في المصادقة البيومترية" : "Biometric authentication error", 
+                        Toast.LENGTH_SHORT).show();
                 }
             });
         }
+
+    } catch (Exception e) {
+        Log.e(TAG, "Biometric setup error: " + e.getMessage(), e);
+        // ✅ تعطيل البصمة إذا فشلت التهيئة
+        if (btnBiometric != null) {
+            btnBiometric.setVisibility(View.GONE);
+        }
     }
+}
+
 
     private boolean verifyOfflineLogin(String username, String password) {
         try {
