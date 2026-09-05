@@ -20,45 +20,39 @@ public class SessionManager {
     
     private final SecureSessionManager secureManager;
     private final Context context;
+    
+    // ✅ تخزين مؤقت للقيم المستخدمة كثيراً
+    private String cachedUsername = null;
+    private Boolean cachedLoggedIn = null;
+    private long lastCheckTime = 0;
+    private static final long CACHE_VALIDITY = 3000; // 3 ثواني
 
     public SessionManager(Context context) {
         this.context = context.getApplicationContext();
         this.secureManager = new SecureSessionManager(context);
-        
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "SessionManager Created", "New instance");
-    }
-
-    // ==================== إدارة الجلسة ====================
-    
-    public void createLoginSession(String username, String role, String token, String serverUrl) {
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Creating Login Session", 
-            "user=" + username + ", role=" + role + ", token=" + (token != null && !token.isEmpty() ? "PRESENT" : "EMPTY"));
-        
-        secureManager.createLoginSession(username, role, token, serverUrl);
-        
-        // ✅ تتبع
-        FirebaseDiagnostics.logSessionState("AFTER_CREATE", username, true);
-        Log.d(TAG, "Login session created for user: " + username);
     }
 
     public boolean isLoggedIn() {
-        boolean loggedIn = secureManager.isLoggedIn();
+        // ✅ تخزين مؤقت
+        long now = System.currentTimeMillis();
+        if (cachedLoggedIn != null && (now - lastCheckTime) < CACHE_VALIDITY) {
+            return cachedLoggedIn;
+        }
         
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Check isLoggedIn", "result=" + loggedIn);
-        
-        return loggedIn;
+        cachedLoggedIn = secureManager.isLoggedIn();
+        lastCheckTime = now;
+        return cachedLoggedIn;
     }
 
     public String getUsername() {
-        String username = secureManager.getUsername();
+        // ✅ تخزين مؤقت
+        long now = System.currentTimeMillis();
+        if (cachedUsername != null && (now - lastCheckTime) < CACHE_VALIDITY) {
+            return cachedUsername;
+        }
         
-        // ✅ تتبع
-        FirebaseDiagnostics.log("SESSION", "Get Username", "result=" + (username != null ? username : "null"));
-        
-        return username;
+        cachedUsername = secureManager.getUsername();
+        return cachedUsername;
     }
 
     public String getUserName() {
