@@ -166,26 +166,50 @@ public class ChainwayReader implements MiraIRFIDReader {
     }
     
     @Override
-    public boolean startScan() {
-        if (reader == null && !connect()) return false;
-        if (isScanning) return true;
+public boolean startScan() {
+    // ✅ فحص سريع - إذا لم يكن الجهاز موجوداً
+    if (!com.example.uhf.activity.BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
+        Log.d(TAG, "RFID device not present - cannot start real scan");
+        return false;
+    }
+    
+    if (reader == null && !connect()) return false;
+    if (isScanning) return true;
+    
+    try {
+        applySupportedSettings();
         
-        try {
-            applySupportedSettings();
-            boolean success = reader.startInventoryTag();
-            
-            if (success) {
-                isScanning = true;
-                if (listener != null) listener.onScanStarted();
-                ensureExecutor();
-                scanExecutor.execute(this::scanLoop);
+        // ✅ استخدام timeout للبدء
+        final boolean[] result = new boolean[1];
+        Thread scanThread = new Thread(() -> {
+            try {
+                result[0] = reader.startInventoryTag();
+            } catch (Exception e) {
+                result[0] = false;
             }
-            return success;
-        } catch (Exception e) {
-            Log.e(TAG, "startScan error", e);
+        });
+        scanThread.start();
+        scanThread.join(3000); // ✅ 3 ثواني timeout
+        
+        if (scanThread.isAlive()) {
+            Log.e(TAG, "startInventoryTag timeout - device not responding");
             return false;
         }
+        
+        boolean success = result[0];
+        
+        if (success) {
+            isScanning = true;
+            if (listener != null) listener.onScanStarted();
+            ensureExecutor();
+            scanExecutor.execute(this::scanLoop);
+        }
+        return success;
+    } catch (Exception e) {
+        Log.e(TAG, "startScan error", e);
+        return false;
     }
+}
     
     private void scanLoop() {
         while (isScanning && !Thread.currentThread().isInterrupted()) {
