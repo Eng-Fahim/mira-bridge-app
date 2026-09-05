@@ -205,11 +205,28 @@ public class RFIDManager {
      * الحصول على القارئ النشط
      */
     public MiraIRFIDReader getActiveReader() {
-        if (activeReader == null) {
-            setActiveDevice(getActiveDevice());
+    if (activeReader == null) {
+        RFIDDevice device = getActiveDevice();
+        if (device.getType() == MiraIRFIDReader.ReaderType.SIMULATOR) {
+            // ✅ للمحاكاة - لا حاجة لانتظار
+            setActiveDevice(device);
+        } else {
+            // ✅ للأجهزة الحقيقية - استخدم خيط منفصل
+            Thread initThread = new Thread(() -> {
+                setActiveDevice(device);
+            });
+            initThread.setDaemon(true);
+            initThread.start();
+            
+            // ✅ في هذه الأثناء، استخدم المحاكي
+            SimulatorReader simulatorReader = new SimulatorReader(context);
+            simulatorReader.initialize();
+            simulatorReader.connect();
+            return simulatorReader;
         }
-        return activeReader;
     }
+    return activeReader;
+}
     
     /**
      * تعيين المستمع
@@ -225,13 +242,26 @@ public class RFIDManager {
      * بدء المسح
      */
     public boolean startScan() {
-        MiraIRFIDReader reader = getActiveReader();
-        if (reader == null) return false;
-        if (!reader.isConnected()) {
-            reader.connect();
+    // ✅ فحص سريع - إذا لم يكن الجهاز موجوداً
+    if (!BaseTabFragmentActivity.RFID_DEVICE_PRESENT) {
+        Log.d(TAG, "RFID device not present - using simulator");
+        // استخدم المحاكي مباشرة
+        if (activeReader == null || activeReader instanceof SimulatorReader) {
+            SimulatorReader simulator = new SimulatorReader(context);
+            simulator.initialize();
+            simulator.connect();
+            activeReader = simulator;
         }
-        return reader.startScan();
+        return activeReader != null && activeReader.startScan();
     }
+    
+    MiraIRFIDReader reader = getActiveReader();
+    if (reader == null) return false;
+    if (!reader.isConnected()) {
+        reader.connect();
+    }
+    return reader.startScan();
+}
     
     /**
      * إيقاف المسح
