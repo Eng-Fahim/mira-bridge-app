@@ -1,9 +1,8 @@
-# ==================== إعدادات التعديل والضغط ====================
+# ==================== إعدادات التعديل والضغط العامة ====================
 -keepattributes *Annotation*,Signature,Exception
 -dontwarn **
 
 # ==================== مكتبات الجهاز RFID/UHF ====================
-# تم العودة لإبقاء الكلاسات المستدعاة فعلياً فقط بدلاً من { *; } الشاملة
 -keep class com.hsm.** { *; }
 -keep class com.rscja.deviceapi.** { *; }
 -keep class com.imagealgorithmlab.** { *; }
@@ -36,7 +35,16 @@
 -keep public class * implements com.bumptech.glide.module.GlideModule
 -keep class * extends com.bumptech.glide.module.AppGlideModule
 
-# ==================== حذف سجلات Log نهائياً لتخفيض الحجم ====================
+# ==================== نماذج البيانات الخاصة بالتطبيق ====================
+# تم تخصيص الإبقاء للحقول والمتغيرات فقط بدلاً من الكلاس بأكمله لتسهيل الضغط
+-keepclassmembers class com.mira.jewelry.enterprise.models.** {
+    <fields>;
+}
+-keepclassmembers class com.mira.jewelry.enterprise.data.** {
+    <fields>;
+}
+
+# ==================== حذف سجلات Log والتتبع نهائياً للتثبيط والحجم ====================
 -assumenosideeffects class android.util.Log {
     public static boolean isLoggable(java.lang.String, int);
     public static int v(...);
@@ -46,6 +54,6 @@
     public static int e(...);
 }
 
-# ==================== نماذج البيانات الخاصة بالتطبيق (مهم للـ SerializedName) ====================
--keep class com.mira.jewelry.enterprise.models.** { *; }
--keep class com.mira.jewelry.enterprise.data.** { *; }
+-assumenosideeffects class okhttp3.internal.concurrent.TaskRunner {
+    public static void logger(...);
+}
