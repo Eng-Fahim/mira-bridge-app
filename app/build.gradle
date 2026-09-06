@@ -13,7 +13,8 @@ android {
         versionCode 4
         versionName "1.4.8"
         
-        // ⚡ تم حذف multiDexEnabled لأن minSdk 26 يدعمه تلقائياً وبأداء أعلى
+        // MultiDex غير مطلوب لأن minSdk 26 يدعمه افتراضياً بالنظام
+        // multiDexEnabled false
         
         buildConfigField "boolean", "Test", "false"
         buildConfigField "boolean", "ENABLE_LOGGING", "false"
@@ -25,9 +26,10 @@ android {
             useSupportLibrary true
         }
         
-        // ⚡ تحديد اللغات المستهدفة فقط لحذف باقي ترجمات المكتبات الخارجية
+        // الاحتفاظ باللغات المستخدمة فقط لإزالة باقي ملفات الترجمة الزائدة
         resConfigs "en", "ar"
         
+        // حصري لمعمارية المعالجات الحديثة 64-bit لتقليل حجم المكتبات الأصلية (.so)
         ndk {
             abiFilters "arm64-v8a"
         }
@@ -52,10 +54,11 @@ android {
         release {
             signingConfig signingConfigs.release
             
-            // ✅ تفعيل الضغط وحذف الأكواد والموارد الزائدة لتصغير حجم التطبيق
+            // تفعيل الضغط واستئصال الموارد والأكواد غير المستخدمة
             minifyEnabled true
             shrinkResources true
             
+            // استخدام قواعد الضغط المحسّنة (Optimize)
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             
             buildConfigField "boolean", "ENABLE_LOGGING", "false"
@@ -94,7 +97,6 @@ android {
     
     packagingOptions {
         resources {
-            // ⚡ استبعاد الملفات والموارد الناتجة عن المكتبات الثقيلة (Apache POI وغيرها)
             excludes += [
                 '/META-INF/{AL2.0,LGPL2.1}',
                 '/META-INF/DEPENDENCIES',
@@ -102,9 +104,11 @@ android {
                 '/META-INF/NOTICE*',
                 '/META-INF/INDEX.LIST',
                 '/META-INF/versions/**',
+                'META-INF/*.version',
                 'META-INF/proguard/*',
-                'META-INF/services/javax.annotation.processing.Processor',
-                '**/*.proto'
+                '/*.properties',
+                'fabric/*',
+                'com/google/thirdparty/publicsuffix/*'
             ]
         }
     }
@@ -120,28 +124,22 @@ dependencies {
     implementation 'androidx.gridlayout:gridlayout:1.0.0'
     implementation 'androidx.preference:preference:1.2.1'
     
-    // ⚡ تم حذف مكتبة multidex الخارجية لأنها غير مخصصة لـ minSdk 26
-    
     implementation 'androidx.biometric:biometric:1.1.0'
     
     // Local Libraries
     implementation fileTree(dir: 'libs', include: ['*.aar'])
     
-    // Apache POI (مخصصة ومقللة المكونات)
-    implementation ('org.apache.poi:poi:5.2.5') {
-        exclude group: 'org.apache.commons', module: 'commons-math3'
-    }
-    implementation ('org.apache.poi:poi-ooxml:5.2.5') {
-        exclude group: 'org.apache.xmlbeans', module: 'xmlbeans'
-        exclude group: 'com.github.virtuald', module: 'curvesapi'
-    }
+    // Apache POI
+    implementation 'org.apache.poi:poi:5.2.5'
+    implementation 'org.apache.poi:poi-ooxml:5.2.5'
     
     // Networking
     implementation 'com.squareup.retrofit2:retrofit:2.11.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.11.0'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
     implementation 'com.google.code.gson:gson:2.11.0'
+    // تم استبعاد logging-interceptor من التضمين في الـ Release لتخفيف الحجم
+    debugImplementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
     
     // CameraX
     def camerax_version = "1.3.4"
@@ -150,8 +148,7 @@ dependencies {
     implementation "androidx.camera:camera-lifecycle:${camerax_version}"
     implementation "androidx.camera:camera-view:${camerax_version}"
     
-    // Barcode Scanning
-    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+    // Barcode Scanning (تمت إزالة zxing لتجنب التكرار والاعتماد على MLKit الخفيف)
     implementation 'com.google.mlkit:barcode-scanning:17.3.0'
     
     // Charts
@@ -188,7 +185,6 @@ android.applicationVariants.all { variant ->
         def versionName = variant.versionName
         def buildType = variant.buildType.name
         
-        // ✅ اسم مخصص للملف
         def apkName = "MIRA_ID_Smart_Jewelry_Tag_v${versionName}_${buildType}.apk"
         
         output.outputFileName = apkName
