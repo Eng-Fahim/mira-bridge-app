@@ -2259,15 +2259,29 @@ private void searchItemForRefund(String code) {
             payload.put("branch_id", getActiveBranchId());
             payload.put("context", "refund_check");
 
-            // الاستعلام من API أو الكاش المحلي
+            // ✅ استخدم searchItem بدلاً من checkRefundEligibility
             MiraApiClient client = MiraApiClient.getInstance(requireContext());
-            MiraApiClient.ApiResponse response = client.checkRefundEligibility(payload);
+            MiraApiClient.ApiResponse response = client.searchItem(payload);
 
             safeRun(() -> {
                 if (response != null && response.isSuccess && response.data != null) {
-                    showRefundItemInfo(response.data);
+                    // ✅ استخراج بيانات القطعة
+                    JSONObject itemData = response.data.optJSONObject("item");
+                    if (itemData == null) {
+                        itemData = response.data;
+                    }
+                    
+                    // ✅ فحص إذا كانت القطعة قابلة للإرجاع
+                    boolean isRefundable = itemData.optBoolean("is_refundable", false);
+                    
+                    if (isRefundable) {
+                        showRefundItemInfo(itemData);
+                    } else {
+                        showRefundItemError(isArabic ? "⚠️ القطعة غير صالحة للإرجاع" : "⚠️ Item not eligible for refund");
+                    }
                 } else {
-                    showRefundItemError(isArabic ? "⚠️ القطعة غير صالحة للإرجاع أو غير مباعة" : "⚠️ Item not eligible for refund");
+                    String errorMsg = response != null ? response.error : "Unknown error";
+                    showRefundItemError(errorMsg);
                 }
             });
         } catch (Exception e) {
@@ -2276,21 +2290,19 @@ private void searchItemForRefund(String code) {
         }
     });
 }
-
 private void showRefundItemInfo(JSONObject itemData) {
     try {
         if (cardRefundItemInfo != null) cardRefundItemInfo.setVisibility(View.VISIBLE);
         
-        String title = itemData.optString("title", isArabic ? "قطعة ذهبية" : "Gold Item");
-        String status = itemData.optString("status", "SOLD");
-        double price = itemData.optDouble("sold_price", itemData.optDouble("price", 0.0));
+        String title = itemData.optString("title", itemData.optString("item_title", isArabic ? "قطعة ذهبية" : "Gold Item"));
+        double price = itemData.optDouble("retail_price_usd", itemData.optDouble("retail_price", 0.0));
 
         if (tvRefundItemTitle != null) {
             tvRefundItemTitle.setText(title + " (" + priceManager.formatPriceDefault(price) + ")");
         }
         
         if (tvRefundItemStatus != null) {
-            tvRefundItemStatus.setText(isArabic ? "حالة القطعة: مباعة ✅" : "Status: SOLD ✅");
+            tvRefundItemStatus.setText(isArabic ? "✅ القطعة مباعة وقابلة للإرجاع" : "✅ Item sold and refundable");
             tvRefundItemStatus.setTextColor(Color.parseColor("#2ECC71"));
         }
         
@@ -2326,8 +2338,11 @@ private void processRefund(String code, String reason) {
     executor.execute(() -> {
         try {
             JSONObject payload = new JSONObject();
-            payload.put("action", "PROCESS_REFUND");
+            // ❌ احذف هذا السطر
+            // payload.put("action", "PROCESS_REFUND");
+            
             payload.put("epc", code);
+            payload.put("serial_no", code); // ✅ أضف هذا
             payload.put("reason", reason);
             payload.put("branch_id", getActiveBranchId());
             payload.put("user_id", sessionManager != null ? sessionManager.getUserId() : 0);
@@ -2348,7 +2363,6 @@ private void processRefund(String code, String reason) {
                         true
                     );
                     
-                    // ✅✅✅ تحديث الداشبورد والمخزون بعد الإرجاع
                     notifyDashboardAndInventoryUpdate("refund");
                     
                 } else {
